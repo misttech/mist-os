@@ -64,7 +64,7 @@ class Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TEST> {
   size_t data_size_;
 
   // For serving the runtime service.
-  std::optional<driver::OutgoingDirectory> outgoing_;
+  std::optional<fdf::OutgoingDirectory> outgoing_;
 };
 
 zx_status_t Device::OnRuntimeConnect(fdf::Channel channel) {
@@ -168,7 +168,7 @@ zx_status_t Device::Bind(void* ctx, zx_device_t* device) {
   }
 
   auto dispatcher = fdf::Dispatcher::GetCurrent()->get();
-  dev->outgoing_ = driver::OutgoingDirectory::Create(dispatcher);
+  dev->outgoing_ = fdf::OutgoingDirectory::Create(dispatcher);
 
   auto protocol =
       [dev = dev.get()](

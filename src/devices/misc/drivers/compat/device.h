@@ -44,7 +44,7 @@ class Device : public std::enable_shared_from_this<Device>,
                public fidl::WireServer<fuchsia_driver_framework::RuntimeConnector> {
  public:
   Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
-         std::optional<Device*> parent, driver::Logger* logger, async_dispatcher_t* dispatcher);
+         std::optional<Device*> parent, fdf::Logger* logger, async_dispatcher_t* dispatcher);
 
   ~Device();
 
@@ -126,12 +126,12 @@ class Device : public std::enable_shared_from_this<Device>,
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   fpromise::scope& scope() { return scope_; }
-  driver::Logger& logger() { return *logger_; }
+  fdf::Logger& logger() { return *logger_; }
   async::Executor& executor() { return executor_; }
   DeviceServer& device_server() { return device_server_; }
   devfs_fidl::DeviceServer& devfs_server() { return devfs_server_; }
 
-  void set_logger(driver::Logger* logger) { logger_ = logger; }
+  void set_logger(fdf::Logger* logger) { logger_ = logger; }
 
   const std::vector<std::string>& fragments() { return fragments_; }
 
@@ -183,7 +183,7 @@ class Device : public std::enable_shared_from_this<Device>,
   // A unique id for the device.
   uint32_t device_id_ = 0;
 
-  driver::Logger* logger_;
+  fdf::Logger* logger_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::RuntimeConnector> bindings_;
   async_dispatcher_t* const dispatcher_;
   uint32_t device_flags_ = 0;
@@ -243,7 +243,7 @@ class Device : public std::enable_shared_from_this<Device>,
 };
 
 std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
-    fidl::AnyArena& arena, driver::Logger& logger, device_add_args_t* zx_args);
+    fidl::AnyArena& arena, fdf::Logger& logger, device_add_args_t* zx_args);
 
 }  // namespace compat
 

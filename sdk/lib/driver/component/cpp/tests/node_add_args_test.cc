@@ -33,13 +33,13 @@ void CheckOffer(fcd::Offer offer) {
 }
 
 TEST(NodeAddArgsTest, MakeOfferNatural) {
-  auto offer = driver::MakeOffer(kServiceName, kInstanceName);
+  auto offer = fdf::MakeOffer(kServiceName, kInstanceName);
   CheckOffer(offer);
 }
 
 TEST(NodeAddArgsTest, MakeOfferWire) {
   fidl::Arena arena;
-  auto offer = fidl::ToNatural(driver::MakeOffer(arena, kServiceName, kInstanceName));
+  auto offer = fidl::ToNatural(fdf::MakeOffer(arena, kServiceName, kInstanceName));
   CheckOffer(offer);
 }
 

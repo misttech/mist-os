@@ -24,10 +24,10 @@
 namespace compat {
 
 // Driver is the compatibility driver that loads DFv1 drivers.
-class Driver : public driver::DriverBase {
+class Driver : public fdf::DriverBase {
  public:
-  Driver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher,
-         device_t device, const zx_protocol_device_t* ops, std::string_view driver_path);
+  Driver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher, device_t device,
+         const zx_protocol_device_t* ops, std::string_view driver_path);
   ~Driver() override;
 
   zx::result<> Start() override;
@@ -63,14 +63,14 @@ class Driver : public driver::DriverBase {
       std::string name, std::string_view topological_path, uint32_t proto_id);
 
   Device& GetDevice() { return device_; }
-  const driver::DevfsExporter& devfs_exporter() const { return devfs_exporter_; }
+  const fdf::DevfsExporter& devfs_exporter() const { return devfs_exporter_; }
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
-  async_dispatcher_t* dispatcher() { return driver::DriverBase::dispatcher(); }
-  const async_dispatcher_t* dispatcher() const { return driver::DriverBase::dispatcher(); }
-  const driver::Namespace& driver_namespace() { return *context().incoming(); }
-  driver::OutgoingDirectory& outgoing() { return *context().outgoing(); }
+  async_dispatcher_t* dispatcher() { return fdf::DriverBase::dispatcher(); }
+  const async_dispatcher_t* dispatcher() const { return fdf::DriverBase::dispatcher(); }
+  const fdf::Namespace& driver_namespace() { return *context().incoming(); }
+  fdf::OutgoingDirectory& outgoing() { return *context().outgoing(); }
 
   uint32_t GetNextDeviceId() { return next_device_id_++; }
 
@@ -123,10 +123,10 @@ class Driver : public driver::DriverBase {
   std::unique_ptr<fs::SynchronousVfs> devfs_vfs_;
   // The directory to store nodes that we are putting into devfs.
   fbl::RefPtr<fs::PseudoDir> devfs_dir_;
-  driver::DevfsExporter devfs_exporter_;
+  fdf::DevfsExporter devfs_exporter_;
   std::string node_name_;
 
-  std::unique_ptr<driver::Logger> inner_logger_;
+  std::unique_ptr<fdf::Logger> inner_logger_;
   Device device_;
 
   std::unique_ptr<fs::SynchronousVfs> diagnostics_vfs_;
@@ -151,8 +151,8 @@ class Driver : public driver::DriverBase {
 
 class DriverFactory {
  public:
-  static zx::result<std::unique_ptr<driver::DriverBase>> CreateDriver(
-      driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher);
+  static zx::result<std::unique_ptr<fdf::DriverBase>> CreateDriver(
+      fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher);
 };
 
 class DriverList {

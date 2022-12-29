@@ -38,10 +38,10 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
   // Serve this interface in an outgoing directory.
   zx_status_t Serve(async_dispatcher_t* dispatcher, component::OutgoingDirectory* outgoing);
-  zx_status_t Serve(async_dispatcher_t* dispatcher, driver::OutgoingDirectory* outgoing);
+  zx_status_t Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing);
 
   // Export a service path to devfs with this device's properties.
-  void ExportToDevfs(const driver::DevfsExporter& exporter, std::string_view service_path,
+  void ExportToDevfs(const fdf::DevfsExporter& exporter, std::string_view service_path,
                      fit::callback<void(zx_status_t)> callback) const;
 
   // Create offers to offer this interface to another component.

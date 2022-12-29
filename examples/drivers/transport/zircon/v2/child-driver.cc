@@ -17,9 +17,9 @@ class TestProtocolServer : public fidl::WireServer<fuchsia_gizmo_protocol::Testi
   void GetValue(GetValueCompleter::Sync& completer) { completer.Reply(0x1234); }
 };
 
-class ChildZirconTransportDriver : public driver::DriverBase {
+class ChildZirconTransportDriver : public fdf::DriverBase {
  public:
-  ChildZirconTransportDriver(driver::DriverStartArgs start_args,
+  ChildZirconTransportDriver(fdf::DriverStartArgs start_args,
                              fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("transport-child", std::move(start_args), std::move(driver_dispatcher)) {}
 
@@ -143,4 +143,4 @@ class ChildZirconTransportDriver : public driver::DriverBase {
 
 }  // namespace zircon_transport
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<zircon_transport::ChildZirconTransportDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<zircon_transport::ChildZirconTransportDriver>);

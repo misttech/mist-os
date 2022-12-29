@@ -14,12 +14,12 @@ namespace ft = fuchsia_devfs_test;
 
 namespace {
 
-class RootDriver : public driver::DriverBase, public fidl::WireServer<ft::Device> {
+class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
   static constexpr std::string_view name = "root";
 
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase(name, std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase(name, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     // Setup the outgoing directory.
@@ -38,7 +38,7 @@ class RootDriver : public driver::DriverBase, public fidl::WireServer<ft::Device
     if (status.is_error()) {
       return status.take_error();
     }
-    auto exporter = driver::DevfsExporter::Create(
+    auto exporter = fdf::DevfsExporter::Create(
         *context().incoming(), dispatcher(),
         fidl::WireSharedClient(std::move(endpoints->client), dispatcher()));
     if (exporter.is_error()) {
@@ -66,9 +66,9 @@ class RootDriver : public driver::DriverBase, public fidl::WireServer<ft::Device
   void Ping(PingCompleter::Sync& completer) override { completer.Reply(); }
 
   fidl::ServerBindingGroup<ft::Device> bindings_;
-  driver::DevfsExporter exporter_;
+  fdf::DevfsExporter exporter_;
 };
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

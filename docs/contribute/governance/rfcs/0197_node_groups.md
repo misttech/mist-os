@@ -368,59 +368,59 @@ With a `driver2` library (DDK for DFv1), the driver code can then add the node
 group:
 
 ```
-const driver::BindRule i2c_bind_rules[] = {
-  driver::BindRule::Accept(
+const fdf::BindRule i2c_bind_rules[] = {
+  fdf::BindRule::Accept(
       BIND_FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-  driver::BindRule::Accept(
+  fdf::BindRule::Accept(
       BIND_I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_ASTRO_2),
-  driver::BindRule::Accept(
+  fdf::BindRule::Accept(
       BIND_I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
 
 const fdf::NodeProperty i2c_bind_properties[] = {
-  driver::MakeProperty(BIND_FIDL_PROTOCOL,
+  fdf::MakeProperty(BIND_FIDL_PROTOCOL,
      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-  driver::MakeProperty(BIND_PLATFORM_DEV_DID,
+  fdf::MakeProperty(BIND_PLATFORM_DEV_DID,
      bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_FOCALTOUCH),
 
 };
 
-const driver::BindRule gpio_interrupt_bind_rules[] = {
-  driver::BindRule::Accept(
+const fdf::BindRule gpio_interrupt_bind_rules[] = {
+  fdf::BindRule::Accept(
       BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-  driver::BindRule::Accept(
+  fdf::BindRule::Accept(
       BIND_GPIO_PIN, bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
 }
 
 const fdf::NodeProperty gpio_interrupt_bind_properties[] = {
-  driver::MakeProperty(BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-  driver::MakeProperty(bind_fuchsia_gpio::FUNCTION,
+  fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+  fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
      bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT),
-  driver::MakeProperty(BIND_PLATFORM_DEV_DID,
+  fdf::MakeProperty(BIND_PLATFORM_DEV_DID,
      bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_FOCALTOUCH),
 };
 
-const driver::BindRule gpio_reset_bind_rules[] = {
-  driver::BindRule::Accept(
+const fdf::BindRule gpio_reset_bind_rules[] = {
+  fdf::BindRule::Accept(
       BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-  driver::BindRule::Accept(
+  fdf::BindRule::Accept(
       BIND_GPIO_PIN, bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
 };
 
 const fdf::NodeProperty gpio_reset_bind_properties[] = {
-  driver::MakeProperty(BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-  driver::MakeProperty(bind_fuchsia_gpio::FUNCTION,
+  fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+  fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
        bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
-  driver::MakeProperty(BIND_PLATFORM_DEV_DID,
+  fdf::MakeProperty(BIND_PLATFORM_DEV_DID,
      bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_FOCALTOUCH),
 };
 
 auto focaltech_touch_device =
-  driver::NodeGroup(i2c_bind_rules, i2c_bind_properties)
+  fdf::NodeGroup(i2c_bind_rules, i2c_bind_properties)
       .AddNodeRepresentation(gpio_interrupt_bind_rules,
           gpio_interrupt_bind_properties)
       .AddNodeRepresentation(gpio_reset_bind_rules, gpio_reset_bind_properties);
-driver::AddNodeGroup(node, focaltech_touch_device);
+fdf::AddNodeGroup(node, focaltech_touch_device);
 ```
 
 The Focaltech driver composite bind rules will then need to be updated:

@@ -144,13 +144,13 @@ class DeviceTest : public gtest::TestLoopFixture {
     auto ns = CreateNamespace(std::move(svc->client));
     ASSERT_EQ(ZX_OK, ns.status_value());
 
-    auto logger = driver::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
+    auto logger = fdf::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
     ASSERT_EQ(ZX_OK, logger.status_value());
     logger_ = std::move(*logger);
   }
 
  protected:
-  driver::Logger* logger() { return logger_.get(); }
+  fdf::Logger* logger() { return logger_.get(); }
 
   std::pair<std::unique_ptr<TestNode>, fidl::ClientEnd<fdf::Node>> CreateTestNode() {
     auto endpoints = fidl::CreateEndpoints<fdf::Node>();
@@ -161,17 +161,17 @@ class DeviceTest : public gtest::TestLoopFixture {
   }
 
  private:
-  zx::result<driver::Namespace> CreateNamespace(fidl::ClientEnd<fio::Directory> client_end) {
+  zx::result<fdf::Namespace> CreateNamespace(fidl::ClientEnd<fio::Directory> client_end) {
     fidl::Arena arena;
     fidl::VectorView<frunner::wire::ComponentNamespaceEntry> entries(arena, 1);
     entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
                      .path("/svc")
                      .directory(std::move(client_end))
                      .Build();
-    return driver::Namespace::Create(entries);
+    return fdf::Namespace::Create(entries);
   }
 
-  std::unique_ptr<driver::Logger> logger_;
+  std::unique_ptr<fdf::Logger> logger_;
 };
 
 TEST_F(DeviceTest, ConstructDevice) {
@@ -914,8 +914,8 @@ TEST_F(DeviceTest, DeviceRebind) {
 
 TEST_F(DeviceTest, CreateNodeProperties) {
   fidl::Arena<512> arena;
-  auto logger = std::make_unique<driver::Logger>("", 0, zx::socket(),
-                                                 fidl::WireClient<fuchsia_logger::LogSink>());
+  auto logger = std::make_unique<fdf::Logger>("", 0, zx::socket(),
+                                              fidl::WireClient<fuchsia_logger::LogSink>());
   device_add_args_t args = {};
 
   zx_device_prop_t prop;

@@ -24,13 +24,13 @@ namespace {
 
 const std::string kDeviceName = "InputReport";
 
-class InputReportDriver : public driver::DriverBase {
+class InputReportDriver : public fdf::DriverBase {
  public:
-  InputReportDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher dispatcher)
+  InputReportDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher dispatcher)
       : DriverBase(kDeviceName, std::move(start_args), std::move(dispatcher)) {}
 
   zx::result<> Start() override {
-    auto parent_symbol = driver::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
+    auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
 
     hid_device_protocol_t proto = {};
     if (parent_symbol->proto_ops.id != ZX_PROTOCOL_HID_DEVICE) {
@@ -114,4 +114,4 @@ bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severit
   return true;
 }
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<InputReportDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<InputReportDriver>);

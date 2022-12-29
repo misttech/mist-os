@@ -13,7 +13,7 @@ namespace fcd = fuchsia_component_decl;
 std::vector<fcd::wire::Offer> ServiceOffersV1::CreateOffers(fidl::ArenaBase& arena) {
   std::vector<fcd::wire::Offer> offers;
   for (const auto& service_name : offers_) {
-    offers.push_back(driver::MakeOffer(arena, service_name, name_));
+    offers.push_back(fdf::MakeOffer(arena, service_name, name_));
   }
   return offers;
 }
@@ -21,7 +21,7 @@ std::vector<fcd::wire::Offer> ServiceOffersV1::CreateOffers(fidl::ArenaBase& are
 std::vector<fcd::Offer> ServiceOffersV1::CreateOffers() {
   std::vector<fcd::Offer> offers;
   for (const auto& service_name : offers_) {
-    offers.push_back(driver::MakeOffer(service_name, name_));
+    offers.push_back(fdf::MakeOffer(service_name, name_));
   }
   return offers;
 }
@@ -49,7 +49,7 @@ zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
 }
 
 zx_status_t ServiceOffersV1::Serve(async_dispatcher_t* dispatcher,
-                                   driver::OutgoingDirectory* outgoing) {
+                                   fdf::OutgoingDirectory* outgoing) {
   // Add each service in the device as an service in our outgoing directory.
   // We rename each instance from "default" into the child name, and then rename it back to default
   // via the offer.

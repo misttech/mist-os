@@ -28,11 +28,11 @@ namespace {
 
 const std::string_view kChildName = "leaf";
 
-class RootDriver : public driver::DriverBase,
+class RootDriver : public fdf::DriverBase,
                    public fdf::Server<ft::Setter>,
                    public fdf::Server<ft::Getter> {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("root", std::move(start_args), std::move(driver_dispatcher)),
         node_(fidl::WireClient(std::move(node()), dispatcher())) {}
 
@@ -75,7 +75,7 @@ class RootDriver : public driver::DriverBase,
   fit::result<fdf::wire::NodeError> AddChild() {
     fidl::Arena arena;
 
-    auto offer = driver::MakeOffer<ft::Service>(kChildName);
+    auto offer = fdf::MakeOffer<ft::Service>(kChildName);
 
     // Set the properties of the node that a driver will bind to.
     auto property = fdf::NodeProperty{
@@ -115,4 +115,4 @@ class RootDriver : public driver::DriverBase,
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

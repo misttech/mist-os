@@ -160,4 +160,4 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
 
 }  // namespace audio::da7219
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<audio::da7219::Driver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<audio::da7219::Driver>);

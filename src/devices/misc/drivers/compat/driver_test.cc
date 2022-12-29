@@ -456,7 +456,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     program_vec.push_back(std::move(program_entry));
     fdata::Dictionary program({.entries = std::move(program_vec)});
 
-    driver::DriverStartArgs start_args(
+    fdf::DriverStartArgs start_args(
         {.node = std::move(node_endpoints->client),
          .symbols = std::move(symbols),
          .url = std::string("fuchsia-pkg://fuchsia.com/driver#meta/driver.cm"),

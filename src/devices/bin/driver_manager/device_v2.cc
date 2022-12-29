@@ -23,7 +23,7 @@ zx::result<std::unique_ptr<Device>> Device::CreateAndServe(
 
   // Manually make the offer for the compat service, because we need to set the
   // source to "driver_manager".
-  auto offer = driver::MakeOffer<fuchsia_driver_compat::Service>(name);
+  auto offer = fdf::MakeOffer<fuchsia_driver_compat::Service>(name);
   auto child = fuchsia_component_decl::ChildRef();
   child.name() = "driver_manager";
   offer.service()->source() = fuchsia_component_decl::Ref::WithChild(std::move(child));

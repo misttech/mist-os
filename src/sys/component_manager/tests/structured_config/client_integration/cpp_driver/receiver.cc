@@ -13,11 +13,10 @@ namespace scrs = test_structuredconfig_receiver_shim;
 
 namespace {
 
-class ReceiverDriver : public driver::DriverBase,
-                       public fidl::WireServer<scr::ConfigReceiverPuppet> {
+class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::ConfigReceiverPuppet> {
  public:
-  ReceiverDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("receiver", std::move(start_args), std::move(driver_dispatcher)),
+  ReceiverDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("receiver", std::move(start_args), std::move(driver_dispatcher)),
         config_(take_config<receiver_config::Config>()) {}
 
   zx::result<> Start() override {
@@ -94,4 +93,4 @@ class ReceiverDriver : public driver::DriverBase,
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<ReceiverDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<ReceiverDriver>);

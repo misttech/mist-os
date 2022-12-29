@@ -52,7 +52,7 @@ void FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
       });
 }
 
-void ConnectToParentDevices(async_dispatcher_t* dispatcher, const driver::Namespace* ns,
+void ConnectToParentDevices(async_dispatcher_t* dispatcher, const fdf::Namespace* ns,
                             ConnectCallback cb) {
   std::vector<ParentDevice> devices;
 

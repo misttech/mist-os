@@ -15,10 +15,10 @@ using namespace fuchsia_driver_framework;
 
 namespace {
 
-class RootDriver : public driver::DriverBase {
+class RootDriver : public fdf::DriverBase {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     node_.Bind(std::move(node()), dispatcher());
@@ -39,7 +39,7 @@ class RootDriver : public driver::DriverBase {
 
     // Set the properties of the node that a driver will bind to.
     fdf::NodeProperty property =
-        driver::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
+        fdf::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
     auto offers = child_->CreateOffers();
 
@@ -81,4 +81,4 @@ class RootDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

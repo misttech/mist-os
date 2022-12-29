@@ -151,7 +151,7 @@ zx::result<fidl::ClientEnd<fdh::Driver>> DriverHost::Start(
     return endpoints.take_error();
   }
 
-  auto binary = driver::ProgramValue(start_info.program(), "binary").value_or("");
+  auto binary = fdf::ProgramValue(start_info.program(), "binary").value_or("");
   fidl::Arena arena;
   auto args = fdf::wire::DriverStartArgs::Builder(arena);
   args.node(std::move(client_end))

@@ -9,7 +9,7 @@ namespace fdf {
 
 namespace internal {
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
-    const driver::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
+    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::wire::OpenFlags flags) {
   auto file = ns.Open<fuchsia_io::File>(path, flags);
   if (file.is_error()) {

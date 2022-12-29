@@ -6,8 +6,7 @@
 
 namespace compat {
 
-void Context::ConnectAndCreate(driver::DriverContext* driver_context,
-                               async_dispatcher_t* dispatcher,
+void Context::ConnectAndCreate(fdf::DriverContext* driver_context, async_dispatcher_t* dispatcher,
                                fit::callback<void(zx::result<std::unique_ptr<Context>>)> callback) {
   auto context = std::make_unique<Context>();
 
@@ -41,7 +40,7 @@ void Context::ConnectAndCreate(driver::DriverContext* driver_context,
     return callback(zx::error(response.status()));
   }
 
-  auto exporter = driver::DevfsExporter::Create(
+  auto exporter = fdf::DevfsExporter::Create(
       *driver_context->incoming(), dispatcher,
       fidl::WireSharedClient(std::move(svc_endpoints->client), dispatcher));
   if (exporter.is_error()) {

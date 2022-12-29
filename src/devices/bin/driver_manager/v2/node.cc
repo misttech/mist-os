@@ -651,7 +651,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
 
   // We set a property for DFv2 devices.
   child->properties_.emplace_back(
-      driver::MakeProperty(child->arena_, "fuchsia.driver.framework.dfv2", true));
+      fdf::MakeProperty(child->arena_, "fuchsia.driver.framework.dfv2", true));
 
   if (args.has_symbols()) {
     auto is_valid = ValidateSymbols(args.symbols());
@@ -707,7 +707,7 @@ zx::result<> Node::StartDriver(
     fuchsia_component_runner::wire::ComponentStartInfo start_info,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller) {
   auto url = start_info.resolved_url().get();
-  bool colocate = driver::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
+  bool colocate = fdf::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
 
   if (colocate && !driver_host_) {
     LOGF(ERROR,

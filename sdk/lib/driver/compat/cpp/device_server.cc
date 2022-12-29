@@ -69,8 +69,7 @@ zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher,
   return ZX_OK;
 }
 
-zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher,
-                                driver::OutgoingDirectory* outgoing) {
+zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing) {
   auto device = [this, dispatcher](
                     fidl::ServerEnd<fuchsia_driver_compat::Device> server_end) mutable -> void {
     fidl::BindServer(dispatcher, std::move(server_end), this);
@@ -91,8 +90,7 @@ zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher,
   return ZX_OK;
 }
 
-void DeviceServer::ExportToDevfs(const driver::DevfsExporter& exporter,
-                                 std::string_view service_path,
+void DeviceServer::ExportToDevfs(const fdf::DevfsExporter& exporter, std::string_view service_path,
                                  fit::callback<void(zx_status_t)> callback) const {
   exporter.Export(service_path, topological_path_, fuchsia_device_fs::ExportOptions(), proto_id_,
                   std::move(callback));
@@ -101,7 +99,7 @@ void DeviceServer::ExportToDevfs(const driver::DevfsExporter& exporter,
 std::vector<fcd::wire::Offer> DeviceServer::CreateOffers(fidl::ArenaBase& arena) {
   std::vector<fcd::wire::Offer> offers;
   // Create the main fuchsia.driver.compat.Service offer.
-  offers.push_back(driver::MakeOffer<fuchsia_driver_compat::Service>(arena, name()));
+  offers.push_back(fdf::MakeOffer<fuchsia_driver_compat::Service>(arena, name()));
 
   if (service_offers_) {
     auto service_offers = service_offers_->CreateOffers(arena);
@@ -114,7 +112,7 @@ std::vector<fcd::wire::Offer> DeviceServer::CreateOffers(fidl::ArenaBase& arena)
 std::vector<fcd::Offer> DeviceServer::CreateOffers() {
   std::vector<fcd::Offer> offers;
   // Create the main fuchsia.driver.compat.Service offer.
-  offers.push_back(driver::MakeOffer<fuchsia_driver_compat::Service>(name()));
+  offers.push_back(fdf::MakeOffer<fuchsia_driver_compat::Service>(name()));
 
   if (service_offers_) {
     auto service_offers = service_offers_->CreateOffers();

@@ -9,12 +9,12 @@ namespace ft = fuchsia_services_test;
 
 namespace {
 
-class RootDriver : public driver::DriverBase,
+class RootDriver : public fdf::DriverBase,
                    public fidl::WireServer<ft::ControlPlane>,
                    public fidl::WireServer<ft::DataPlane> {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     auto control = [this](fidl::ServerEnd<ft::ControlPlane> server_end) -> void {
@@ -43,4 +43,4 @@ class RootDriver : public driver::DriverBase,
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

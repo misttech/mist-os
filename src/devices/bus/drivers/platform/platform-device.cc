@@ -100,7 +100,7 @@ PlatformDevice::PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
       did_(node.did().value_or(0)),
       instance_id_(node.instance_id().value_or(0)),
       node_(std::move(node)),
-      outgoing_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
+      outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
   strlcpy(name_, node_.name().value_or("no name?").data(), sizeof(name_));
 }
 

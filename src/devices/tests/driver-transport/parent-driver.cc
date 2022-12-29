@@ -37,7 +37,7 @@ class Device : public DeviceType,
   Device(zx_device_t* parent, fdf::UnownedDispatcher dispatcher)
       : DeviceType(parent),
         dispatcher_(std::move(dispatcher)),
-        outgoing_(driver::OutgoingDirectory::Create(dispatcher_->get())) {}
+        outgoing_(fdf::OutgoingDirectory::Create(dispatcher_->get())) {}
 
   // TestDevice protocol implementation.
   void SetTestData(SetTestDataRequestView request, SetTestDataCompleter::Sync& completer) override;
@@ -52,7 +52,7 @@ class Device : public DeviceType,
  private:
   fdf::UnownedDispatcher dispatcher_;
 
-  driver::OutgoingDirectory outgoing_;
+  fdf::OutgoingDirectory outgoing_;
 
   // Data set by the test using |SetTestData|.
   uint8_t data_[fdtt::wire::kMaxTransferSize];

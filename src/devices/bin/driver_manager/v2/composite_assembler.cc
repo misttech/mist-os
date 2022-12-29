@@ -9,11 +9,11 @@
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 
-namespace dfv2 {
-
 namespace fdf {
 using namespace fuchsia_driver_framework;
-}
+}  //  namespace fdf
+
+namespace dfv2 {
 
 fbl::Array<const zx_device_prop_t> NodeToProps(Node* node) {
   std::vector<zx_device_prop_t> props;
@@ -106,7 +106,7 @@ zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::
   // Create the properties.
   for (auto& prop : descriptor.props()) {
     assembler->properties_.emplace_back(
-        driver::MakeProperty(assembler->arena_, prop.id(), prop.value()));
+        fdf::MakeProperty(assembler->arena_, prop.id(), prop.value()));
   }
 
   // Create the string properties.
@@ -114,28 +114,28 @@ zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::
     switch (prop.value().Which()) {
       case fuchsia_device_manager::PropertyValue::Tag::kBoolValue:
         assembler->properties_.emplace_back(
-            driver::MakeProperty(assembler->arena_, prop.key(), prop.value().bool_value().value()));
+            fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().bool_value().value()));
         break;
 
       case fuchsia_device_manager::PropertyValue::Tag::kIntValue:
         assembler->properties_.emplace_back(
-            driver::MakeProperty(assembler->arena_, prop.key(), prop.value().int_value().value()));
+            fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().int_value().value()));
         break;
 
       case fuchsia_device_manager::PropertyValue::Tag::kStrValue:
         assembler->properties_.emplace_back(
-            driver::MakeProperty(assembler->arena_, prop.key(), prop.value().str_value().value()));
+            fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().str_value().value()));
         break;
 
       case fuchsia_device_manager::PropertyValue::Tag::kEnumValue:
         assembler->properties_.emplace_back(
-            driver::MakeProperty(assembler->arena_, prop.key(), prop.value().enum_value().value()));
+            fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().enum_value().value()));
         break;
     }
   }
 
   // Add the composite value.
-  assembler->properties_.emplace_back(driver::MakeProperty(assembler->arena_, BIND_COMPOSITE, 1));
+  assembler->properties_.emplace_back(fdf::MakeProperty(assembler->arena_, BIND_COMPOSITE, 1));
 
   // Make the primary fragment first.
   auto fragment =

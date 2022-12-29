@@ -159,7 +159,7 @@ class PlatformDevice : public PlatformDeviceType,
 
   fuchsia_hardware_platform_bus::Node node_;
   std::unique_ptr<RestrictPlatformBus> restricted_;
-  driver::OutgoingDirectory outgoing_;
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace platform_bus

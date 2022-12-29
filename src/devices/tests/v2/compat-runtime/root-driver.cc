@@ -20,9 +20,9 @@ namespace ft = fuchsia_compat_runtime_test;
 
 namespace {
 
-class RootDriver : public driver::DriverBase, public fdf::Server<ft::Root> {
+class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("root", std::move(start_args), std::move(driver_dispatcher)),
         node_(fidl::WireClient(std::move(node()), dispatcher())) {}
 
@@ -97,7 +97,7 @@ class RootDriver : public driver::DriverBase, public fdf::Server<ft::Root> {
 
     // Set the properties of the node that a driver will bind to.
     auto property =
-        driver::MakeProperty(1 /*BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
+        fdf::MakeProperty(1 /*BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
     auto offers = child_->CreateOffers(arena);
     std::vector<fuchsia_component_decl::Offer> natural_offers;
@@ -139,4 +139,4 @@ class RootDriver : public driver::DriverBase, public fdf::Server<ft::Root> {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

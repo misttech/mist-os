@@ -19,19 +19,18 @@ class Context {
   // outlive this class.
   // This function attempts to connect to `/svc/fuchsia.driver.compat.Service/default/device` as
   // well as `/svc/fuchsia.device.fs.Exporter`.
-  static void ConnectAndCreate(driver::DriverContext* driver_context,
-                               async_dispatcher_t* dispatcher,
+  static void ConnectAndCreate(fdf::DriverContext* driver_context, async_dispatcher_t* dispatcher,
                                fit::callback<void(zx::result<std::unique_ptr<Context>>)> callback);
 
   // Given a |relative_child_path| return that child's full topological path.
   std::string TopologicalPath(std::string_view relative_child_path) const;
 
-  const driver::DevfsExporter& devfs_exporter() const { return devfs_exporter_; }
+  const fdf::DevfsExporter& devfs_exporter() const { return devfs_exporter_; }
 
  private:
   std::string parent_topological_path_;
   fidl::SharedClient<fuchsia_driver_compat::Device> parent_device_;
-  driver::DevfsExporter devfs_exporter_;
+  fdf::DevfsExporter devfs_exporter_;
 };
 
 }  // namespace compat

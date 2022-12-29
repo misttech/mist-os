@@ -123,9 +123,9 @@ void DriverList::Log(FuchsiaLogSeverity severity, const char* tag, const char* f
   (*drivers_.begin())->Log(severity, tag, file, line, msg, args);
 }
 
-Driver::Driver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher,
+Driver::Driver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher,
                device_t device, const zx_protocol_device_t* ops, std::string_view driver_path)
-    : driver::DriverBase("compat", std::move(start_args), std::move(driver_dispatcher)),
+    : fdf::DriverBase("compat", std::move(start_args), std::move(driver_dispatcher)),
       executor_(dispatcher()),
       driver_path_(driver_path),
       device_(device, ops, this, std::nullopt, nullptr, dispatcher()) {
@@ -161,7 +161,7 @@ zx::result<> Driver::Start() {
     return zx::error(serve_status);
   }
 
-  auto exporter = driver::DevfsExporter::Create(
+  auto exporter = fdf::DevfsExporter::Create(
       *context().incoming(), dispatcher(),
       fidl::WireSharedClient(std::move(endpoints->client), dispatcher()));
   if (exporter.is_error()) {
@@ -194,7 +194,7 @@ zx::result<> Driver::Start() {
       // If the root resource is invalid, try fetching it. Once we've fetched it we might find that
       // we lost the race with another process -- we'll handle that later.
       auto connect_promise =
-          driver::Connect<fboot::RootResource>(*context().incoming(), dispatcher())
+          fdf::Connect<fboot::RootResource>(*context().incoming(), dispatcher())
               .and_then(fit::bind_member<&Driver::GetRootResource>(this))
               .or_else([this](zx_status_t& status) {
                 FDF_LOG(WARNING, "Failed to get root resource: %s", zx_status_get_string(status));
@@ -206,11 +206,10 @@ zx::result<> Driver::Start() {
     }
   }
 
-  auto loader_vmo = driver::Open(*context().incoming(), dispatcher(), kLibDriverPath, kOpenFlags)
+  auto loader_vmo = fdf::Open(*context().incoming(), dispatcher(), kLibDriverPath, kOpenFlags)
                         .and_then(fit::bind_member<&Driver::GetBuffer>(this));
-  auto driver_vmo =
-      driver::Open(*context().incoming(), dispatcher(), driver_path_.c_str(), kOpenFlags)
-          .and_then(fit::bind_member<&Driver::GetBuffer>(this));
+  auto driver_vmo = fdf::Open(*context().incoming(), dispatcher(), driver_path_.c_str(), kOpenFlags)
+                        .and_then(fit::bind_member<&Driver::GetBuffer>(this));
   auto start_driver =
       join_promises(std::move(root_resource), std::move(loader_vmo), std::move(driver_vmo))
           .then(fit::bind_member<&Driver::Join>(this))
@@ -428,8 +427,7 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
   record_->driver = global_driver_list.ZxDriver();
 
   // Create logger.
-  auto inner_logger =
-      driver::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
+  auto inner_logger = fdf::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
   if (inner_logger.is_error()) {
     return error(inner_logger.status_value());
   }
@@ -590,7 +588,7 @@ zx::result<zx::vmo> Driver::LoadFirmware(Device* device, const char* filename, s
   std::string full_filename = "/pkg/lib/firmware/";
   full_filename.append(filename);
   fpromise::result connect_result = fpromise::run_single_threaded(
-      driver::Open(*context().incoming(), dispatcher(), full_filename.c_str(), kOpenFlags));
+      fdf::Open(*context().incoming(), dispatcher(), full_filename.c_str(), kOpenFlags));
   if (connect_result.is_error()) {
     return zx::error(connect_result.take_error());
   }
@@ -619,7 +617,7 @@ void Driver::LoadFirmwareAsync(Device* device, const char* filename,
   std::string firmware_path = "/pkg/lib/firmware/";
   firmware_path.append(filename);
   executor_.schedule_task(
-      driver::Open(*context().incoming(), dispatcher(), firmware_path.c_str(), kOpenFlags)
+      fdf::Open(*context().incoming(), dispatcher(), firmware_path.c_str(), kOpenFlags)
           .and_then(fit::bind_member<&Driver::GetBuffer>(this))
           .and_then([callback, ctx](FileVmo& result) {
             callback(ctx, ZX_OK, result.vmo.release(), result.size);
@@ -750,15 +748,15 @@ zx::result<fit::deferred_callback> Driver::ExportToDevfsSync(
   return zx::ok(fit::deferred_callback(callback));
 }
 
-zx::result<std::unique_ptr<driver::DriverBase>> DriverFactory::CreateDriver(
-    driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher) {
+zx::result<std::unique_ptr<fdf::DriverBase>> DriverFactory::CreateDriver(
+    fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher) {
   auto compat_device =
-      driver::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol, &kDefaultDevice);
+      fdf::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol, &kDefaultDevice);
   const zx_protocol_device_t* ops =
-      driver::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), kOps);
+      fdf::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), kOps);
 
   // Open the compat driver's binary within the package.
-  auto compat = driver::ProgramValue(start_args.program(), "compat");
+  auto compat = fdf::ProgramValue(start_args.program(), "compat");
   if (compat.is_error()) {
     return compat.take_error();
   }
@@ -796,5 +794,5 @@ zx_status_t Driver::ServeDiagnosticsDir() {
 
 }  // namespace compat
 
-using record = driver::Record<compat::Driver, compat::DriverFactory>;
+using record = fdf::Record<compat::Driver, compat::DriverFactory>;
 FUCHSIA_DRIVER_RECORD_CPP_V3(record);

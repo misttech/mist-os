@@ -25,7 +25,7 @@ struct ParentDevice {
 
 using ConnectCallback = fit::callback<void(zx::result<std::vector<ParentDevice>>)>;
 // Asynchronously connect to each of the parent devices.
-void ConnectToParentDevices(async_dispatcher_t* dispatcher, const driver::Namespace* ns,
+void ConnectToParentDevices(async_dispatcher_t* dispatcher, const fdf::Namespace* ns,
                             ConnectCallback cb);
 
 }  // namespace compat

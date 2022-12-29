@@ -13,15 +13,15 @@ class Instance {
  public:
   // Driver should call this once at startup before any logging calls are made.
   // Not thread safe
-  static void Init(uint32_t filter, driver::Logger&& logger);
+  static void Init(uint32_t filter, fdf::Logger&& logger);
   static bool IsFilterOn(uint32_t filter);
-  static driver::Logger& GetLogger();
+  static fdf::Logger& GetLogger();
 
  private:
   static Instance& get();
 
   uint32_t filter_{};
-  driver::Logger logger_{};
+  fdf::Logger logger_{};
   bool initialized_{false};
 };
 

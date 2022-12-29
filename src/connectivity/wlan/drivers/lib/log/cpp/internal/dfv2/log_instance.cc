@@ -8,7 +8,7 @@
 namespace wlan::drivers::log {
 
 // static
-void Instance::Init(uint32_t filter, driver::Logger&& logger) {
+void Instance::Init(uint32_t filter, fdf::Logger&& logger) {
   Instance& inst = get();
 
   ZX_ASSERT(!inst.initialized_);
@@ -25,7 +25,7 @@ bool Instance::IsFilterOn(uint32_t filter) {
 }
 
 // static
-driver::Logger& Instance::GetLogger() {
+fdf::Logger& Instance::GetLogger() {
   Instance& inst = get();
   ZX_ASSERT(inst.initialized_);
   return inst.logger_;

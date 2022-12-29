@@ -27,20 +27,19 @@ const std::string_view kOptionalName = "optional-node";
 // Group 1 is created before creating both the left and right nodes.
 fdf::NodeGroup NodeGroupOne() {
   auto bind_rules_left = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_LEFT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_LEFT),
   };
 
   auto bind_properties_left = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
   auto bind_rules_right = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_ONE_RIGHT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_RIGHT),
   };
 
   auto bind_properties_right = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
@@ -60,20 +59,19 @@ fdf::NodeGroup NodeGroupOne() {
 // Group 2 is created after creating the right node, but before creating the left node.
 fdf::NodeGroup NodeGroupTwo() {
   auto bind_rules_left = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_LEFT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_LEFT),
   };
 
   auto bind_properties_left = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
   auto bind_rules_right = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_TWO_RIGHT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_RIGHT),
   };
 
   auto bind_properties_right = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
@@ -93,21 +91,19 @@ fdf::NodeGroup NodeGroupTwo() {
 // Group 3 is created after creating both the left and right nodes.
 fdf::NodeGroup NodeGroupThree() {
   auto bind_rules_left = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_THREE_LEFT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_THREE_LEFT),
   };
 
   auto bind_properties_left = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
   auto bind_rules_right = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_THREE_RIGHT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_THREE_RIGHT),
   };
 
   auto bind_properties_right = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
@@ -127,31 +123,28 @@ fdf::NodeGroup NodeGroupThree() {
 // Group 4 is created before creating the left, optional, and right nodes.
 fdf::NodeGroup NodeGroupFour() {
   auto bind_rules_left = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_FOUR_LEFT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_FOUR_LEFT),
   };
 
   auto bind_properties_left = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
   auto bind_rules_right = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_FOUR_RIGHT),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_FOUR_RIGHT),
   };
 
   auto bind_properties_right = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto bind_rules_optional = std::vector{
-      driver::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
-                                 bindlib::TEST_BIND_PROPERTY_FOUR_OPTIONAL),
+      fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY,
+                              bindlib::TEST_BIND_PROPERTY_FOUR_OPTIONAL),
   };
 
   auto bind_properties_optional = std::vector{
-      driver::MakeProperty(bindlib::TEST_BIND_PROPERTY,
-                           bindlib::TEST_BIND_PROPERTY_DRIVER_OPTIONAL),
+      fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_OPTIONAL),
   };
 
   auto nodes = std::vector{
@@ -182,10 +175,10 @@ class NumberServer : public fidl::WireServer<ft::Device> {
   uint32_t number_;
 };
 
-class RootDriver : public driver::DriverBase {
+class RootDriver : public fdf::DriverBase {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     node_client_.Bind(std::move(node()), dispatcher());
@@ -366,9 +359,9 @@ class RootDriver : public driver::DriverBase {
                 fit::closure callback) {
     auto node_name = std::string(name) + "-" + std::to_string(group);
     // Set the properties of the node that a driver will bind to.
-    fdf::NodeProperty node_property = driver::MakeProperty(bindlib::TEST_BIND_PROPERTY, property);
+    fdf::NodeProperty node_property = fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, property);
     fdf::NodeAddArgs args({.name = node_name,
-                           .offers = {{driver::MakeOffer<ft::Service>(name)}},
+                           .offers = {{fdf::MakeOffer<ft::Service>(name)}},
                            .properties = {{node_property}}});
 
     // Create endpoints of the `NodeController` for the node.
@@ -439,4 +432,4 @@ class RootDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

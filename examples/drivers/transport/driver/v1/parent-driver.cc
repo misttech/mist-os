@@ -23,7 +23,7 @@ class DriverTransportDevice : public DeviceType,
 
   explicit DriverTransportDevice(zx_device_t* parent, fdf_dispatcher_t* dispatcher)
       : DeviceType(parent),
-        outgoing_(driver::OutgoingDirectory::Create(dispatcher)),
+        outgoing_(fdf::OutgoingDirectory::Create(dispatcher)),
         dispatcher_(dispatcher) {}
   virtual ~DriverTransportDevice() = default;
 
@@ -37,7 +37,7 @@ class DriverTransportDevice : public DeviceType,
   void DdkRelease() { delete this; }
 
  private:
-  driver::OutgoingDirectory outgoing_;
+  fdf::OutgoingDirectory outgoing_;
   fdf_dispatcher_t* dispatcher_;
 };
 

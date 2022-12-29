@@ -84,21 +84,21 @@ TEST_F(DevfsExporterTest, Create) {
   // Setup namespace.
   auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
   EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = driver::testing::CreateNamespace(std::move(svc->client));
+  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup exporter.
   TestExporter exporter_server;
   fidl::Binding<fdfs::Exporter> exporter_binding(&exporter_server);
 
-  driver::testing::Directory svc_directory;
+  fdf::testing::Directory svc_directory;
   svc_directory.SetOpenHandler([this, &exporter_binding](std::string path, auto object) {
     EXPECT_EQ(path, fidl::DiscoverableProtocolName<fuchsia_device_fs::Exporter>);
     exporter_binding.Bind(object.TakeChannel(), dispatcher());
   });
   fidl::Binding<fio::Directory> svc_binding(&svc_directory);
 
-  driver::testing::Directory svc_directory2;
+  fdf::testing::Directory svc_directory2;
   svc_directory2.SetOpenHandler([this, &svc_binding](std::string path, auto object) {
     EXPECT_EQ(path, ".");
     svc_binding.Bind(object.TakeChannel(), dispatcher());
@@ -116,7 +116,7 @@ TEST_F(DevfsExporterTest, Create) {
   auto svc_client = ServeSvcDir(outgoing);
   ASSERT_EQ(ZX_OK, svc_client.status_value());
 
-  auto exporter = driver::DevfsExporter::Create(
+  auto exporter = fdf::DevfsExporter::Create(
       *ns, dispatcher(), fidl::WireSharedClient(std::move(*svc_client), dispatcher()));
   ASSERT_TRUE(exporter.is_ok());
 
@@ -149,21 +149,21 @@ TEST_F(DevfsExporterTest, Create_ServiceFailure) {
   // Setup namespace.
   auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
   EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = driver::testing::CreateNamespace(std::move(svc->client));
+  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup exporter.
   TestExporter exporter_server;
   fidl::Binding<fdfs::Exporter> exporter_binding(&exporter_server);
 
-  driver::testing::Directory svc_directory;
+  fdf::testing::Directory svc_directory;
   svc_directory.SetOpenHandler([this, &exporter_binding](std::string path, auto object) {
     EXPECT_EQ(path, fidl::DiscoverableProtocolName<fuchsia_device_fs::Exporter>);
     exporter_binding.Bind(object.TakeChannel(), dispatcher());
   });
   fidl::Binding<fio::Directory> svc_binding(&svc_directory);
 
-  driver::testing::Directory svc_directory2;
+  fdf::testing::Directory svc_directory2;
   svc_directory2.SetOpenHandler([this, &svc_binding](std::string path, auto object) {
     EXPECT_EQ(path, ".");
     svc_binding.Bind(object.TakeChannel(), dispatcher());
@@ -180,7 +180,7 @@ TEST_F(DevfsExporterTest, Create_ServiceFailure) {
   auto svc_client = ServeSvcDir(outgoing);
   ASSERT_EQ(ZX_OK, svc_client.status_value());
 
-  auto exporter = driver::DevfsExporter::Create(
+  auto exporter = fdf::DevfsExporter::Create(
       *ns, dispatcher(), fidl::WireSharedClient(std::move(*svc_client), dispatcher()));
   ASSERT_TRUE(exporter.is_ok());
 

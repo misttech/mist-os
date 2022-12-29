@@ -25,16 +25,16 @@ namespace ft = fuchsia_lifecycle_test;
 
 namespace {
 
-class LifecycleDriver : public driver::DriverBase, public fidl::WireServer<ft::Device> {
+class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
  public:
-  LifecycleDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  LifecycleDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("lifeycle-driver", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     FDF_LOG(INFO, "Starting lifecycle driver");
 
     // Get our parent banjo symbol.
-    auto parent_symbol = driver::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
+    auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
     if (parent_symbol->proto_ops.id != ZX_PROTOCOL_PARENT) {
       FDF_LOG(ERROR, "Didn't find PARENT banjo protocol, found protocol id: %d",
               parent_symbol->proto_ops.id);
@@ -125,4 +125,4 @@ class LifecycleDriver : public driver::DriverBase, public fidl::WireServer<ft::D
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<LifecycleDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<LifecycleDriver>);

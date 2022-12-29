@@ -38,7 +38,7 @@ class Dfv2Test : public gtest::TestLoopFixture, public fidl::Server<fint::Provid
         .directory = std::move(endpoints->client),
     }});
 
-    auto ns = driver::Namespace::Create(entries);
+    auto ns = fdf::Namespace::Create(entries);
     ASSERT_EQ(ZX_OK, ns.status_value());
     ns_ = std::move(*ns);
   }
@@ -53,7 +53,7 @@ class Dfv2Test : public gtest::TestLoopFixture, public fidl::Server<fint::Provid
   }
 
  protected:
-  driver::Namespace ns_;
+  fdf::Namespace ns_;
   component::OutgoingDirectory outgoing_ = component::OutgoingDirectory(dispatcher());
 };
 

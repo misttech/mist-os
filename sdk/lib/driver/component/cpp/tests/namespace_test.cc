@@ -26,12 +26,12 @@ TEST(NamespaceTest, CreateAndConnect) {
   ns_entries[0].set_path(arena, "/pkg").set_directory(std::move(pkg->client));
   ns_entries[1].Allocate(arena);
   ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc->client));
-  auto ns = driver::Namespace::Create(ns_entries);
+  auto ns = fdf::Namespace::Create(ns_entries);
   ASSERT_TRUE(ns.is_ok());
 
   svc->server.TakeChannel().reset();
 
-  driver::testing::Directory pkg_directory;
+  fdf::testing::Directory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
   pkg_binding.Bind(pkg->server.TakeChannel(), loop.dispatcher());
 
@@ -68,6 +68,6 @@ TEST(NamespaceTest, CreateFailed) {
   fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 1);
   ns_entries[0].Allocate(arena);
   ns_entries[0].set_path(arena, "/pkg").set_directory({});
-  auto ns = driver::Namespace::Create(ns_entries);
+  auto ns = fdf::Namespace::Create(ns_entries);
   ASSERT_TRUE(ns.is_error());
 }

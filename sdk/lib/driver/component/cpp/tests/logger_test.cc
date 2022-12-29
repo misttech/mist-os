@@ -107,7 +107,7 @@ TEST(LoggerTest, CreateAndLog) {
   // Setup namespace.
   auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
   EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = driver::testing::CreateNamespace(std::move(svc->client));
+  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup logger.
@@ -116,14 +116,14 @@ TEST(LoggerTest, CreateAndLog) {
   log_sink.SetConnectHandler([&log_socket](zx::socket socket) { log_socket = std::move(socket); });
   fidl::Binding<flogger::LogSink> log_binding(&log_sink);
 
-  driver::testing::Directory svc_directory;
+  fdf::testing::Directory svc_directory;
   svc_directory.SetOpenHandler([&loop, &log_binding](std::string path, auto object) {
     EXPECT_EQ(path, fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>);
     log_binding.Bind(object.TakeChannel(), loop.dispatcher());
   });
   fidl::Binding<fio::Directory> svc_binding(&svc_directory);
 
-  driver::testing::Directory svc_directory2;
+  fdf::testing::Directory svc_directory2;
   svc_directory2.SetOpenHandler([&loop, &svc_binding](std::string path, auto object) {
     EXPECT_EQ(path, ".");
     svc_binding.Bind(object.TakeChannel(), loop.dispatcher());
@@ -132,7 +132,7 @@ TEST(LoggerTest, CreateAndLog) {
 
   svc_binding2.Bind(svc->server.TakeChannel(), loop.dispatcher());
 
-  auto logger = driver::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
+  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_TRUE(logger.is_ok());
   loop.RunUntilIdle();
 
@@ -169,13 +169,13 @@ TEST(LoggerTest, Create_NoLogSink) {
   ns_entries[0].set_path(arena, "/pkg").set_directory(std::move(pkg->client));
   ns_entries[1].Allocate(arena);
   ns_entries[1].set_path(arena, "/svc").set_directory(std::move(svc->client));
-  auto ns = driver::Namespace::Create(ns_entries);
+  auto ns = fdf::Namespace::Create(ns_entries);
   ASSERT_TRUE(ns.is_ok());
 
   svc->server.TakeChannel().reset();
 
   // Setup logger.
-  auto logger = driver::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
+  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
   ASSERT_TRUE(logger.is_error());
 }
 
@@ -185,7 +185,7 @@ TEST(LoggerTest, SetSeverity) {
   // Setup namespace.
   auto svc = fidl::CreateEndpoints<fuchsia_io::Directory>();
   EXPECT_EQ(ZX_OK, svc.status_value());
-  auto ns = driver::testing::CreateNamespace(std::move(svc->client));
+  auto ns = fdf::testing::CreateNamespace(std::move(svc->client));
   ASSERT_TRUE(ns.is_ok());
 
   // Setup logger.
@@ -194,14 +194,14 @@ TEST(LoggerTest, SetSeverity) {
   log_sink.SetConnectHandler([&log_socket](zx::socket socket) { log_socket = std::move(socket); });
   fidl::Binding<flogger::LogSink> log_binding(&log_sink);
 
-  driver::testing::Directory svc_directory;
+  fdf::testing::Directory svc_directory;
   svc_directory.SetOpenHandler([&loop, &log_binding](std::string path, auto object) {
     EXPECT_EQ(path, fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>);
     log_binding.Bind(object.TakeChannel(), loop.dispatcher());
   });
   fidl::Binding<fio::Directory> svc_binding(&svc_directory);
 
-  driver::testing::Directory svc_directory2;
+  fdf::testing::Directory svc_directory2;
   svc_directory2.SetOpenHandler([&loop, &svc_binding](std::string path, auto object) {
     EXPECT_EQ(path, ".");
     svc_binding.Bind(object.TakeChannel(), loop.dispatcher());
@@ -210,7 +210,7 @@ TEST(LoggerTest, SetSeverity) {
 
   svc_binding2.Bind(svc->server.TakeChannel(), loop.dispatcher());
 
-  auto logger = driver::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
+  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_TRUE(logger.is_ok());
   loop.RunUntilIdle();
 

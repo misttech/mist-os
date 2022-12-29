@@ -19,9 +19,9 @@ class TestProtocolServer : public fidl::WireServer<fuchsia_gizmo_protocol::Testi
   void GetValue(GetValueCompleter::Sync& completer) { completer.Reply(0x1234); }
 };
 
-class ChildDriverTransportDriver : public driver::DriverBase {
+class ChildDriverTransportDriver : public fdf::DriverBase {
  public:
-  ChildDriverTransportDriver(driver::DriverStartArgs start_args,
+  ChildDriverTransportDriver(fdf::DriverStartArgs start_args,
                              fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("transport-child", std::move(start_args), std::move(driver_dispatcher)),
         arena_(fdf::Arena('EXAM')) {}
@@ -59,7 +59,7 @@ class ChildDriverTransportDriver : public driver::DriverBase {
   // Connect to the parent's offered service.
   zx::result<> ConnectGizmoService() {
     auto connect_result =
-        driver::Connect<fuchsia_examples_gizmo::Service::Device>(*context().incoming());
+        fdf::Connect<fuchsia_examples_gizmo::Service::Device>(*context().incoming());
     if (connect_result.is_error()) {
       FDF_SLOG(ERROR, "Failed to connect gizmo device protocol.",
                KV("status", connect_result.status_string()));
@@ -142,4 +142,4 @@ class ChildDriverTransportDriver : public driver::DriverBase {
 
 }  // namespace driver_transport
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<driver_transport::ChildDriverTransportDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<driver_transport::ChildDriverTransportDriver>);

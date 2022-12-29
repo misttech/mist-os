@@ -12,7 +12,7 @@ namespace audio::da7219 {
 // Indirection used for logging. Used to match DFv2 libraries and DFv1, could be removed after
 // DFv1 is no longer supported, see da7219-logging-dfv1.h.
 #define DA7219_LOG FDF_LOG
-#define Logger ::driver::Logger
+#define Logger ::fdf::Logger
 
 }  // namespace audio::da7219
 

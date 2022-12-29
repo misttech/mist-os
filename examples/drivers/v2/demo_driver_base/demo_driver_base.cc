@@ -4,9 +4,9 @@
 
 #include <lib/driver/component/cpp/driver_cpp.h>
 
-using driver::DriverBase;
-using driver::DriverStartArgs;
-using driver::Record;
+using fdf::DriverBase;
+using fdf::DriverStartArgs;
+using fdf::Record;
 
 // ----------------------------------Default BasicFactory------------------------------------------
 class MyDriver : public DriverBase {

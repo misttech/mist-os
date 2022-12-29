@@ -50,13 +50,13 @@ class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
 zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
     const fdf::DriverStartArgs& start_args, const fuchsia_data::wire::Dictionary& program) {
   const auto& ns = start_args.ns();
-  auto pkg = ns ? driver::NsValue(*ns, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
+  auto pkg = ns ? fdf::NsValue(*ns, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
   if (pkg.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
     return pkg.take_error();
   }
 
-  zx::result<std::string> binary = driver::ProgramValue(program, "binary");
+  zx::result<std::string> binary = fdf::ProgramValue(program, "binary");
   if (binary.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
     return binary.take_error();
@@ -216,7 +216,7 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
 }
 
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program) {
-  auto default_dispatcher_opts = driver::ProgramValueAsVector(program, "default_dispatcher_opts");
+  auto default_dispatcher_opts = fdf::ProgramValueAsVector(program, "default_dispatcher_opts");
 
   uint32_t opts = 0;
   if (default_dispatcher_opts.is_ok()) {

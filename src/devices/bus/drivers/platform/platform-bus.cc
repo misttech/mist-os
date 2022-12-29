@@ -921,7 +921,7 @@ zx_status_t PlatformBus::Create(zx_device_t* parent, const char* name, zx::chann
 PlatformBus::PlatformBus(zx_device_t* parent, zx::channel items_svc)
     : PlatformBusType(parent),
       items_svc_(fidl::ClientEnd<fuchsia_boot::Items>(std::move(items_svc))),
-      outgoing_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
+      outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
 
 zx::result<zbi_board_info_t> PlatformBus::GetBoardInfo() {
   zx::result result = GetBootItem(ZBI_TYPE_DRV_BOARD_INFO, 0);

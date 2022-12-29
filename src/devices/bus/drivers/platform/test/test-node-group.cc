@@ -28,17 +28,17 @@ zx_status_t TestBoard::NodeGroupInit() {
   fdf::Arena arena('DVGP');
 
   auto bind_rules = std::vector{
-      driver::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
-                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-      driver::MakeAcceptBindRule(BIND_PLATFORM_DEV_PID,
-                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
-      driver::MakeAcceptBindRule(
+      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
+                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_PID,
+                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
+      fdf::MakeAcceptBindRule(
           BIND_PLATFORM_DEV_DID,
           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_NODE_REPRESENTATION),
   };
 
   auto properties = std::vector{
-      driver::MakeProperty(BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
   };
 
   auto nodes = std::vector{

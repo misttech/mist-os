@@ -14,10 +14,10 @@ namespace ft = fuchsia_offers_test;
 
 namespace {
 
-class LeafDriver : public driver::DriverBase {
+class LeafDriver : public fdf::DriverBase {
  public:
-  LeafDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)) {}
+  LeafDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     auto handshake = context().incoming()->Connect<ft::Service::Device>();
@@ -64,4 +64,4 @@ class LeafDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<LeafDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<LeafDriver>);

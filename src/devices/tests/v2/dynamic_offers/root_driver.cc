@@ -20,10 +20,10 @@ namespace {
 
 const std::string_view kChildName = "leaf";
 
-class RootDriver : public driver::DriverBase, public fidl::Server<ft::Handshake> {
+class RootDriver : public fdf::DriverBase, public fidl::Server<ft::Handshake> {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     node_.Bind(std::move(node()), dispatcher());
@@ -54,11 +54,11 @@ class RootDriver : public driver::DriverBase, public fidl::Server<ft::Handshake>
   zx::result<> AddChild() {
     fidl::Arena arena;
 
-    auto offer = driver::MakeOffer<ft::Service>(kChildName);
+    auto offer = fdf::MakeOffer<ft::Service>(kChildName);
 
     // Set the properties of the node that a driver will bind to.
     fdf::NodeProperty property =
-        driver::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_DEVICE);
+        fdf::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_DEVICE);
 
     auto args = fdf::NodeAddArgs{{
         .name = std::string(kChildName),
@@ -97,4 +97,4 @@ class RootDriver : public driver::DriverBase, public fidl::Server<ft::Handshake>
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

@@ -3094,7 +3094,7 @@ TEST_F(DispatcherTest, ShutdownCallbackSequenceId) {
 TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
   auto fake_driver = CreateFakeDriver();
 
-  std::shared_ptr<driver::OutgoingDirectory> outgoing;
+  std::shared_ptr<fdf::OutgoingDirectory> outgoing;
 
   auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
       fake_driver, 0, "dispatcher", [](fdf_dispatcher_t* dispatcher) {});
@@ -3104,8 +3104,8 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
 
   libsync::Completion completion;
   ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [&] {
-    outgoing = std::make_shared<driver::OutgoingDirectory>(
-        driver::OutgoingDirectory::Create(dispatcher->get()));
+    outgoing =
+        std::make_shared<fdf::OutgoingDirectory>(fdf::OutgoingDirectory::Create(dispatcher->get()));
 
     auto result = fdf::Dispatcher::Create(0, "", [&](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(result.is_error());

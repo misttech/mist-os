@@ -31,7 +31,7 @@ class Root : public DeviceType, public fdf::Server<fuchsia_compat_runtime::Root>
  public:
   explicit Root(zx_device_t* root)
       : DeviceType(root),
-        outgoing_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
+        outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
   virtual ~Root() = default;
 
   static zx_status_t Bind(void* ctx, zx_device_t* dev) {
@@ -84,7 +84,7 @@ class Root : public DeviceType, public fdf::Server<fuchsia_compat_runtime::Root>
   }
 
  private:
-  driver::OutgoingDirectory outgoing_;
+  fdf::OutgoingDirectory outgoing_;
 };
 
 static zx_driver_ops_t root_driver_ops = []() -> zx_driver_ops_t {

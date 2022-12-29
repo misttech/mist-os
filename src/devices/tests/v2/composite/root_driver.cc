@@ -35,10 +35,10 @@ class NumberServer : public fidl::WireServer<ft::Device> {
   uint32_t number_;
 };
 
-class RootDriver : public driver::DriverBase {
+class RootDriver : public fdf::DriverBase {
  public:
-  RootDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     node_client_.Bind(std::move(node()), dispatcher());
@@ -100,13 +100,13 @@ class RootDriver : public driver::DriverBase {
     fidl::Arena arena;
 
     // Set the properties of the node that a driver will bind to.
-    fdf::wire::NodeProperty property = driver::MakeProperty(arena, 1 /* BIND_PROTOCOL */, protocol);
+    fdf::wire::NodeProperty property = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */, protocol);
 
     fdf::wire::NodeAddArgs args(arena);
 
     // Set the offers of the node.
     auto offers = fidl::VectorView<fcd::wire::Offer>(arena, 1);
-    offers[0] = driver::MakeOffer<ft::Service>(arena, name);
+    offers[0] = fdf::MakeOffer<ft::Service>(arena, name);
 
     args.set_offers(arena, offers);
 
@@ -155,4 +155,4 @@ class RootDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<RootDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);

@@ -10,10 +10,10 @@
 
 namespace {
 
-class PackagedDriver : public driver::DriverBase {
+class PackagedDriver : public fdf::DriverBase {
  public:
-  PackagedDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
-      : driver::DriverBase("packaged", std::move(start_args), std::move(driver_dispatcher)) {}
+  PackagedDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+      : fdf::DriverBase("packaged", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     exposed_inspector_.emplace(
@@ -32,4 +32,4 @@ class PackagedDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<PackagedDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<PackagedDriver>);

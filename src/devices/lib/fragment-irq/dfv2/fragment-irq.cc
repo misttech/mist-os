@@ -9,8 +9,7 @@
 namespace fragment_irq {
 namespace fint = fuchsia_hardware_interrupt;
 
-zx::result<zx::interrupt> GetInterrupt(const driver::Namespace& ns,
-                                       std::string_view instance_name) {
+zx::result<zx::interrupt> GetInterrupt(const fdf::Namespace& ns, std::string_view instance_name) {
   auto result = ns.Connect<fint::Service::Provider>(instance_name);
   if (result.is_error()) {
     return result.take_error();
@@ -27,7 +26,7 @@ zx::result<zx::interrupt> GetInterrupt(const driver::Namespace& ns,
   return zx::ok(std::move(call_result->value()->interrupt));
 }
 
-zx::result<zx::interrupt> GetInterrupt(const driver::Namespace& ns, uint32_t which) {
+zx::result<zx::interrupt> GetInterrupt(const fdf::Namespace& ns, uint32_t which) {
   char buffer[] = "irqXXX";
   snprintf(buffer, sizeof(buffer), "irq%03u", which);
   return GetInterrupt(ns, buffer);

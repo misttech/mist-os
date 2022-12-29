@@ -222,37 +222,37 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
   fidl::VectorView<fdf::wire::NodeProperty> fidl_props(allocator, size);
 
   size_t index = 0;
-  fidl_props[index++] = driver::MakeProperty(allocator, BIND_PROTOCOL, dev->protocol_id());
-  fidl_props[index++] = driver::MakeProperty(allocator, BIND_AUTOBIND, autobind);
+  fidl_props[index++] = fdf::MakeProperty(allocator, BIND_PROTOCOL, dev->protocol_id());
+  fidl_props[index++] = fdf::MakeProperty(allocator, BIND_AUTOBIND, autobind);
   // If we are looking for a specific driver, we add a property to the device with the
   // name of the driver we are looking for. Drivers can then bind to this.
   if (!autobind) {
-    fidl_props[index++] = driver::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.libname);
+    fidl_props[index++] = fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.libname);
   }
 
   for (size_t i = 0; i < props.size(); i++) {
-    fidl_props[index++] = driver::MakeProperty(allocator, props[i].id, props[i].value);
+    fidl_props[index++] = fdf::MakeProperty(allocator, props[i].id, props[i].value);
   }
 
   for (size_t i = 0; i < str_props.size(); i++) {
     switch (str_props[i].value.index()) {
       case StrPropValueType::Integer: {
-        fidl_props[index++] = driver::MakeProperty(
+        fidl_props[index++] = fdf::MakeProperty(
             allocator, str_props[i].key, std::get<StrPropValueType::Integer>(str_props[i].value));
         break;
       }
       case StrPropValueType::String: {
-        fidl_props[index++] = driver::MakeProperty(
+        fidl_props[index++] = fdf::MakeProperty(
             allocator, str_props[i].key, std::get<StrPropValueType::String>(str_props[i].value));
         break;
       }
       case StrPropValueType::Bool: {
-        fidl_props[index++] = driver::MakeProperty(
+        fidl_props[index++] = fdf::MakeProperty(
             allocator, str_props[i].key, std::get<StrPropValueType::Bool>(str_props[i].value));
         break;
       }
       case StrPropValueType::Enum: {
-        fidl_props[index++] = driver::MakeProperty(
+        fidl_props[index++] = fdf::MakeProperty(
             allocator, str_props[i].key, std::get<StrPropValueType::Enum>(str_props[i].value));
         break;
       }

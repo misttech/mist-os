@@ -117,7 +117,7 @@ class PlatformBus : public PlatformBusType,
     return board_info_;
   }
 
-  driver::OutgoingDirectory& outgoing() { return outgoing_; }
+  fdf::OutgoingDirectory& outgoing() { return outgoing_; }
 
   fdf::UnownedDispatcher dispatcher() { return dispatcher_->borrow(); }
 
@@ -172,7 +172,7 @@ class PlatformBus : public PlatformBusType,
   std::map<std::pair<uint32_t, uint32_t>, zx::bti> cached_btis_;
 
   zx_device_t* protocol_passthrough_ = nullptr;
-  driver::OutgoingDirectory outgoing_;
+  fdf::OutgoingDirectory outgoing_;
   fdf::UnownedDispatcher dispatcher_;
 };
 

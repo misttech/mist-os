@@ -30,9 +30,9 @@ using fpromise::result;
 
 namespace {
 
-class LeafDriver : public driver::DriverBase {
+class LeafDriver : public fdf::DriverBase {
  public:
-  LeafDriver(driver::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  LeafDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
       : DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)),
         executor_(dispatcher()),
         node_(fidl::WireSharedClient(std::move(node()), dispatcher())) {}
@@ -131,4 +131,4 @@ class LeafDriver : public driver::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(driver::Record<LeafDriver>);
+FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<LeafDriver>);

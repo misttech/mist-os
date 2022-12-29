@@ -21,8 +21,8 @@ TEST(StartArgsTest, SymbolValueWire) {
   fdf::wire::DriverStartArgs args(arena);
   args.set_symbols(arena, symbol_entries);
 
-  EXPECT_EQ(0xfeedu, *driver::SymbolValue<zx_vaddr_t>(args, "sym"));
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::SymbolValue<zx_vaddr_t>(args, "unknown").error_value());
+  EXPECT_EQ(0xfeedu, *fdf::SymbolValue<zx_vaddr_t>(args, "sym"));
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::SymbolValue<zx_vaddr_t>(args, "unknown").error_value());
 }
 
 TEST(StartArgsTest, SymbolValue) {
@@ -32,9 +32,9 @@ TEST(StartArgsTest, SymbolValue) {
       .address = 0xfeed,
   });
 
-  EXPECT_EQ(0xfeedu, *driver::SymbolValue<zx_vaddr_t>(symbol_entries, "sym"));
+  EXPECT_EQ(0xfeedu, *fdf::SymbolValue<zx_vaddr_t>(symbol_entries, "sym"));
   EXPECT_EQ(ZX_ERR_NOT_FOUND,
-            driver::SymbolValue<zx_vaddr_t>(symbol_entries, "unknown").error_value());
+            fdf::SymbolValue<zx_vaddr_t>(symbol_entries, "unknown").error_value());
 }
 
 TEST(StartArgsTest, ProgramValueWire) {
@@ -47,12 +47,12 @@ TEST(StartArgsTest, ProgramValueWire) {
   fdata::wire::Dictionary program(arena);
   program.set_entries(arena, std::move(program_entries));
 
-  EXPECT_EQ("value-for-str", *driver::ProgramValue(program, "key-for-str"));
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, driver::ProgramValue(program, "key-for-strvec").error_value());
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValue(program, "key-unkown").error_value());
+  EXPECT_EQ("value-for-str", *fdf::ProgramValue(program, "key-for-str"));
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, fdf::ProgramValue(program, "key-for-strvec").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValue(program, "key-unkown").error_value());
 
   fdata::wire::Dictionary empty_program;
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValue(empty_program, "").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValue(empty_program, "").error_value());
 }
 
 TEST(StartArgsTest, ProgramValue) {
@@ -69,12 +69,12 @@ TEST(StartArgsTest, ProgramValue) {
       .entries = std::move(program_entries),
   });
 
-  EXPECT_EQ("value-for-str", *driver::ProgramValue(program, "key-for-str"));
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, driver::ProgramValue(program, "key-for-strvec").error_value());
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValue(program, "key-unkown").error_value());
+  EXPECT_EQ("value-for-str", *fdf::ProgramValue(program, "key-for-str"));
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, fdf::ProgramValue(program, "key-for-strvec").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValue(program, "key-unkown").error_value());
 
   fdata::Dictionary empty_program;
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValue(empty_program, "").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValue(empty_program, "").error_value());
 }
 
 TEST(StartArgsTest, ProgramValueAsVectorWire) {
@@ -94,17 +94,17 @@ TEST(StartArgsTest, ProgramValueAsVectorWire) {
   fdata::wire::Dictionary program(arena);
   program.set_entries(arena, std::move(program_entries));
 
-  auto values = driver::ProgramValueAsVector(program, "key-for-strvec");
+  auto values = fdf::ProgramValueAsVector(program, "key-for-strvec");
   EXPECT_EQ(2lu, values->size());
   std::sort(values->begin(), values->end());
   EXPECT_EQ("test", (*values)[0]);
   EXPECT_EQ("test2", (*values)[1]);
 
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, driver::ProgramValueAsVector(program, "key-for-str").error_value());
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValueAsVector(program, "key-unkown").error_value());
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, fdf::ProgramValueAsVector(program, "key-for-str").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValueAsVector(program, "key-unkown").error_value());
 
   fdata::wire::Dictionary empty_program;
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValueAsVector(empty_program, "").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValueAsVector(empty_program, "").error_value());
 }
 
 TEST(StartArgsTest, ProgramValueAsVector) {
@@ -124,17 +124,17 @@ TEST(StartArgsTest, ProgramValueAsVector) {
       .entries = std::move(program_entries),
   });
 
-  auto values = driver::ProgramValueAsVector(program, "key-for-strvec");
+  auto values = fdf::ProgramValueAsVector(program, "key-for-strvec");
   EXPECT_EQ(2lu, values->size());
   std::sort(values->begin(), values->end());
   EXPECT_EQ("test", (*values)[0]);
   EXPECT_EQ("test2", (*values)[1]);
 
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, driver::ProgramValueAsVector(program, "key-for-str").error_value());
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValueAsVector(program, "key-unkown").error_value());
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, fdf::ProgramValueAsVector(program, "key-for-str").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValueAsVector(program, "key-unkown").error_value());
 
   fdata::Dictionary empty_program;
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, driver::ProgramValueAsVector(empty_program, "").error_value());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fdf::ProgramValueAsVector(empty_program, "").error_value());
 }
 
 TEST(StartArgsTest, NsValueWire) {
@@ -146,10 +146,10 @@ TEST(StartArgsTest, NsValueWire) {
   ns_entries[0].Allocate(arena);
   ns_entries[0].set_path(arena, "/svc").set_directory(std::move(endpoints->client));
 
-  auto svc = driver::NsValue(ns_entries, "/svc");
+  auto svc = fdf::NsValue(ns_entries, "/svc");
   ASSERT_EQ(svc->handle()->get(), client_handle);
 
-  auto pkg = driver::NsValue(ns_entries, "/pkg");
+  auto pkg = fdf::NsValue(ns_entries, "/pkg");
   EXPECT_EQ(ZX_ERR_NOT_FOUND, pkg.error_value());
 }
 
@@ -163,9 +163,9 @@ TEST(StartArgsTest, NsValue) {
       .directory = std::move(endpoints->client),
   });
 
-  auto svc = driver::NsValue(ns_entries, "/svc");
+  auto svc = fdf::NsValue(ns_entries, "/svc");
   ASSERT_EQ(svc->handle()->get(), client_handle);
 
-  auto pkg = driver::NsValue(ns_entries, "/pkg");
+  auto pkg = fdf::NsValue(ns_entries, "/pkg");
   EXPECT_EQ(ZX_ERR_NOT_FOUND, pkg.error_value());
 }
