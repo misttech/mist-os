@@ -24,7 +24,7 @@ func (p *Project) setSPDXFields() error {
 
 	pkg := &spdx.Package{
 		PackageName:                 p.Name,
-		PackageSPDXIdentifier:       spdx_common.ElementID(fmt.Sprintf("Package-%s", p.Name)),
+		PackageSPDXIdentifier:       spdx_common.ElementID(fmt.Sprintf("Package-%06d", spdxIndex)),
 		PackageDownloadLocation:     "NOASSERTION",
 		FilesAnalyzed:               true,
 		IsFilesAnalyzedTagPresent:   true,
@@ -34,6 +34,7 @@ func (p *Project) setSPDXFields() error {
 		PackageLicenseDeclared:      "NOASSERTION",
 		PackageCopyrightText:        "NOASSERTION",
 	}
+	spdxIndex = spdxIndex + 1
 
 	// Initialize these fields to make the online validator happy.
 	// https://tools.spdx.org/app/validate/

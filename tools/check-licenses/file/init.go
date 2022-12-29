@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	AllFiles     map[string]*File
-	urlRegex     *regexp.Regexp
-	SPDXID_INDEX int
+	AllFiles map[string]*File
+	urlRegex *regexp.Regexp
+
+	spdxIndex int
 )
 
 func init() {

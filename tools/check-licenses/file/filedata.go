@@ -157,8 +157,8 @@ func NewFileData(path string, relPath string, content []byte, filetype FileType,
 		}
 
 		d.SPDXName = fmt.Sprintf("%s", d.LibraryName)
-		d.SPDXID = fmt.Sprintf("LicenseRef-filedata-%06d", SPDXID_INDEX)
-		SPDXID_INDEX = SPDXID_INDEX + 1
+		d.SPDXID = fmt.Sprintf("LicenseRef-filedata-%06d", spdxIndex)
+		spdxIndex = spdxIndex + 1
 	}
 	return data, nil
 }

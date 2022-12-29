@@ -95,8 +95,8 @@ func NewFile(path string, ft FileType, project string) (*File, error) {
 	}
 
 	f.SPDXName = fmt.Sprintf("%s - %s", project, f.Name)
-	f.SPDXID = fmt.Sprintf("LicenseRef-file-%06d", SPDXID_INDEX)
-	SPDXID_INDEX = SPDXID_INDEX + 1
+	f.SPDXID = fmt.Sprintf("LicenseRef-file-%06d", spdxIndex)
+	spdxIndex = spdxIndex + 1
 
 	AllFiles[path] = f
 	return f, nil

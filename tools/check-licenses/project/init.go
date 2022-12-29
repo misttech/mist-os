@@ -21,6 +21,8 @@ var (
 
 	git *util.Git
 	ctx context.Context
+
+	spdxIndex int
 )
 
 func init() {
