@@ -37,24 +37,6 @@ struct FormatTypedTest : public testing::Test {
   using Name = FormatTypedTest<Elf>;  \
   TYPED_TEST_SUITE(Name, AllFormatsTypedTest)
 
-template <class... Elf>
-struct TestAllFormatsHelper {
-  template <typename Test>
-  void OneTest(Test&& test) const {
-    ASSERT_NO_FATAL_FAILURE((test(Elf{}), ...));
-  }
-
-  template <typename... Test>
-  void operator()(Test&&... tests) const {
-    ASSERT_NO_FATAL_FAILURE((OneTest(tests), ...));
-  }
-};
-
-template <typename... Test>
-inline void TestAllFormats(Test&&... test) {
-  elfldltl::AllFormats<TestAllFormatsHelper>{}(std::forward<Test>(test)...);
-}
-
 // This helper object is instantiated with the expected error string and its
 // diag() method returns a Diagnostics object.  When the helper object goes out
 // of scope, it will assert that the Diagnostics object got the expected one

@@ -12,16 +12,16 @@
 #include <lib/stdcompat/span.h>
 #include <lib/symbolizer-markup/writer.h>
 
-#include <gtest/gtest.h>
-
 #include "tests.h"
 
 namespace {
 
 constexpr size_t kPageSize = 0x1000;
 
-constexpr auto FailToAdd = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+FORMAT_TYPED_TEST_SUITE(ElfldltlLoadTests);
+
+TYPED_TEST(ElfldltlLoadTests, FailToAdd) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   ExpectedSingleError error("too many PT_LOAD segments", ": maximum 0 < requested ", 1);
@@ -30,12 +30,10 @@ constexpr auto FailToAdd = [](auto&& elf) {
 
   Phdr phdr{.memsz = 1};
   EXPECT_FALSE(loadInfo.AddSegment(error.diag(), kPageSize, phdr));
-};
+}
 
-TEST(ElfldltlLoadTests, FailToAdd) { TestAllFormats(FailToAdd); }
-
-constexpr auto AddEmptyPhdr = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, AddEmptyPhdr) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -44,12 +42,10 @@ constexpr auto AddEmptyPhdr = [](auto&& elf) {
 
   Phdr phdr{};
   EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
-};
+}
 
-TEST(ElfldltlLoadTests, EmptyPhdr) { TestAllFormats(AddEmptyPhdr); }
-
-constexpr auto CreateConstantSegment = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, CreateConstantSegment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -65,12 +61,10 @@ constexpr auto CreateConstantSegment = [](auto&& elf) {
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(variant));
   EXPECT_EQ(std::get<ConstantSegment>(variant).memsz(), phdr.memsz);
-};
+}
 
-TEST(ElfldltlLoadTests, CreateConstantSegment) { TestAllFormats(CreateConstantSegment); }
-
-constexpr auto CreateZeroFillSegment = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, CreateZeroFillSegment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -87,12 +81,10 @@ constexpr auto CreateZeroFillSegment = [](auto&& elf) {
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ZeroFillSegment>(variant));
   EXPECT_EQ(std::get<ZeroFillSegment>(variant).memsz(), phdr.memsz);
-};
+}
 
-TEST(ElfldltlLoadTests, CreateZeroFillSegment) { TestAllFormats(CreateZeroFillSegment); }
-
-constexpr auto CreateDataWithZeroFillSegment = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, CreateDataWithZeroFillSegment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -109,14 +101,10 @@ constexpr auto CreateDataWithZeroFillSegment = [](auto&& elf) {
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataWithZeroFillSegment>(variant));
   EXPECT_EQ(std::get<DataWithZeroFillSegment>(variant).memsz(), phdr.memsz());
-};
-
-TEST(ElfldltlLoadTests, CreateDataWithZeroFillSegment) {
-  TestAllFormats(CreateDataWithZeroFillSegment);
 }
 
-constexpr auto CreateDataSegment = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, CreateDataSegment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -133,56 +121,57 @@ constexpr auto CreateDataSegment = [](auto&& elf) {
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataSegment>(variant));
   EXPECT_EQ(std::get<DataSegment>(variant).memsz(), phdr.memsz());
-};
-
-TEST(ElfldltlLoadTests, CreateDataSegment) { TestAllFormats(CreateDataSegment); }
-
-template <bool Merged, template <typename Elf> typename Segment1,
-          template <typename Elf> typename Segment2, template <typename Elf> typename GetPhdr1,
-          template <typename Elf> typename GetPhdr2>
-constexpr auto CreateMergeTest() {
-  return [](auto&& elf) {
-    using Elf = std::decay_t<decltype(elf)>;
-    using Segment1T = Segment1<Elf>;
-    using Segment2T = Segment2<Elf>;
-    constexpr unsigned totalSegments = Merged ? 1 : 2;
-
-    auto diag = ExpectOkDiagnostics();
-
-    elfldltl::LoadInfo<Elf, elfldltl::StaticVector<2>::Container> loadInfo;
-    const auto& segments = loadInfo.segments();
-
-    int offset = 0;
-    auto phdr1 = GetPhdr1<Elf>{}(offset);
-    auto phdr2 = GetPhdr2<Elf>{}(offset);
-    auto expectedSize = Merged ? phdr1.memsz() + phdr2.memsz() : phdr2.memsz();
-
-    loadInfo.AddSegment(diag, kPageSize, phdr1);
-    ASSERT_EQ(segments.size(), 1u);
-    ASSERT_TRUE(std::holds_alternative<Segment1T>(segments.back()));
-    EXPECT_EQ(std::get<Segment1T>(segments.back()).memsz(), phdr1.memsz());
-    loadInfo.AddSegment(diag, kPageSize, phdr2);
-    ASSERT_EQ(segments.size(), totalSegments);
-    ASSERT_TRUE(std::holds_alternative<Segment2T>(segments.back()));
-    EXPECT_EQ(std::get<Segment2T>(segments.back()).memsz(), expectedSize);
-  };
 }
 
-template <template <typename Elf> typename Segment1, template <typename Elf> typename Segment2,
-          template <typename Elf> typename GetPhdr1, template <typename Elf> typename GetPhdr2>
-constexpr auto GetMergeTest() {
-  return CreateMergeTest<true, Segment1, Segment2, GetPhdr1, GetPhdr2>();
+template <class Elf, bool Merged, template <class ElfLayout> typename Segment1,
+          template <class ElfLayout> typename Segment2,
+          template <class ElfLayout> typename GetPhdr1,
+          template <class ElfLayout> typename GetPhdr2>
+void DoMergeTest() {
+  using Segment1T = Segment1<Elf>;
+  using Segment2T = Segment2<Elf>;
+  constexpr unsigned totalSegments = Merged ? 1 : 2;
+
+  auto diag = ExpectOkDiagnostics();
+
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<2>::Container> loadInfo;
+  const auto& segments = loadInfo.segments();
+
+  int offset = 0;
+  auto phdr1 = GetPhdr1<Elf>{}(offset);
+  auto phdr2 = GetPhdr2<Elf>{}(offset);
+  auto expectedSize = Merged ? phdr1.memsz() + phdr2.memsz() : phdr2.memsz();
+
+  loadInfo.AddSegment(diag, kPageSize, phdr1);
+  ASSERT_EQ(segments.size(), 1u);
+  ASSERT_TRUE(std::holds_alternative<Segment1T>(segments.back()));
+  EXPECT_EQ(std::get<Segment1T>(segments.back()).memsz(), phdr1.memsz());
+  loadInfo.AddSegment(diag, kPageSize, phdr2);
+  ASSERT_EQ(segments.size(), totalSegments);
+  ASSERT_TRUE(std::holds_alternative<Segment2T>(segments.back()));
+  EXPECT_EQ(std::get<Segment2T>(segments.back()).memsz(), expectedSize);
 }
 
-template <template <typename Elf> typename Segment1, template <typename Elf> typename Segment2,
-          template <typename Elf> typename GetPhdr1, template <typename Elf> typename GetPhdr2>
-constexpr auto GetNotMergedTest() {
-  return CreateMergeTest<false, Segment1, Segment2, GetPhdr1, GetPhdr2>();
+template <class Elf, template <class ElfLayout> typename Segment1,
+          template <class ElfLayout> typename Segment2,
+          template <class ElfLayout> typename GetPhdr1,
+          template <class ElfLayout> typename GetPhdr2>
+void MergeTest() {
+  DoMergeTest<Elf, true, Segment1, Segment2, GetPhdr1, GetPhdr2>();
 }
 
-template <template <typename Elf> typename Segment, template <typename Elf> typename GetPhdr>
-constexpr auto GetMergeSameTest() {
-  return GetMergeTest<Segment, Segment, GetPhdr, GetPhdr>();
+template <class Elf, template <class ElfLayout> typename Segment1,
+          template <class ElfLayout> typename Segment2,
+          template <class ElfLayout> typename GetPhdr1,
+          template <class ElfLayout> typename GetPhdr2>
+void NotMergedTest() {
+  DoMergeTest<Elf, false, Segment1, Segment2, GetPhdr1, GetPhdr2>();
+}
+
+template <class Elf, template <class ElfLayout> typename Segment,
+          template <class ElfLayout> typename GetPhdr>
+void MergeSameTest() {
+  MergeTest<Elf, Segment, Segment, GetPhdr, GetPhdr>();
 }
 
 template <uint64_t Flags, uint64_t FileSz = kPageSize, uint64_t MemSz = kPageSize>
@@ -233,55 +222,59 @@ using DataSegment =
 template <typename Elf>
 using DataPhdr = CreatePhdr<elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite>::type<Elf>;
 
-TEST(ElfldltlLoadTests, MergeSameConstantSegment) {
-  TestAllFormats(GetMergeSameTest<ConstantSegment, ConstantPhdr>());
+TYPED_TEST(ElfldltlLoadTests, MergeSameConstantSegment) {
+  MergeSameTest<typename TestFixture::Elf, ConstantSegment, ConstantPhdr>();
 }
 
-TEST(ElfldltlLoadTests, MergeSameDataSegment) {
-  TestAllFormats(GetMergeSameTest<DataSegment, DataPhdr>());
+TYPED_TEST(ElfldltlLoadTests, MergeSameDataSegment) {
+  MergeSameTest<typename TestFixture::Elf, DataSegment, DataPhdr>();
 }
 
-TEST(ElfldltlLoadTests, MergeDataAndZeroFill) {
-  TestAllFormats(GetMergeTest<DataSegment, DataWithZeroFillSegment, DataPhdr, ZeroFillPhdr>());
+TYPED_TEST(ElfldltlLoadTests, MergeDataAndZeroFill) {
+  MergeTest<typename TestFixture::Elf, DataSegment, DataWithZeroFillSegment, DataPhdr,
+            ZeroFillPhdr>();
 }
 
-TEST(ElfldltlLoadTests, MergeDataAndDataWithZeroFill) {
-  TestAllFormats(
-      GetMergeTest<DataSegment, DataWithZeroFillSegment, DataPhdr, DataWithZeroFillPhdr>());
+TYPED_TEST(ElfldltlLoadTests, MergeDataAndDataWithZeroFill) {
+  MergeTest<typename TestFixture::Elf, DataSegment, DataWithZeroFillSegment, DataPhdr,
+            DataWithZeroFillPhdr>();
 }
 
-TEST(ElfldltlLoadTests, CantMergeConstant) {
-  TestAllFormats(GetNotMergedTest<ConstantSegment, ZeroFillSegment, ConstantPhdr, ZeroFillPhdr>());
-  TestAllFormats(GetNotMergedTest<ConstantSegment, DataWithZeroFillSegment, ConstantPhdr,
-                                  DataWithZeroFillPhdr>());
-  TestAllFormats(GetNotMergedTest<ConstantSegment, DataSegment, ConstantPhdr, DataPhdr>());
+TYPED_TEST(ElfldltlLoadTests, CantMergeConstant) {
+  NotMergedTest<typename TestFixture::Elf, ConstantSegment, ZeroFillSegment, ConstantPhdr,
+                ZeroFillPhdr>();
+  NotMergedTest<typename TestFixture::Elf, ConstantSegment, DataWithZeroFillSegment, ConstantPhdr,
+                DataWithZeroFillPhdr>();
+  NotMergedTest<typename TestFixture::Elf, ConstantSegment, DataSegment, ConstantPhdr, DataPhdr>();
 }
 
-TEST(ElfldltlLoadTests, CantMergeZeroFill) {
-  TestAllFormats(GetNotMergedTest<ZeroFillSegment, ConstantSegment, ZeroFillPhdr, ConstantPhdr>());
-  // Logically two ZeroFillSegment's could be merged but we don't currently do this because these
-  // are unlikely to exist in the wild.
-  TestAllFormats(GetNotMergedTest<ZeroFillSegment, ZeroFillSegment, ZeroFillPhdr, ZeroFillPhdr>());
-  TestAllFormats(GetNotMergedTest<ZeroFillSegment, DataWithZeroFillSegment, ZeroFillPhdr,
-                                  DataWithZeroFillPhdr>());
-  TestAllFormats(GetNotMergedTest<ZeroFillSegment, DataSegment, ZeroFillPhdr, DataPhdr>());
+TYPED_TEST(ElfldltlLoadTests, CantMergeZeroFill) {
+  NotMergedTest<typename TestFixture::Elf, ZeroFillSegment, ConstantSegment, ZeroFillPhdr,
+                ConstantPhdr>();
+  // Logically two ZeroFillSegment's could be merged but we don't currently do
+  // this because these are unlikely to exist in the wild.
+  NotMergedTest<typename TestFixture::Elf, ZeroFillSegment, ZeroFillSegment, ZeroFillPhdr,
+                ZeroFillPhdr>();
+  NotMergedTest<typename TestFixture::Elf, ZeroFillSegment, DataWithZeroFillSegment, ZeroFillPhdr,
+                DataWithZeroFillPhdr>();
+  NotMergedTest<typename TestFixture::Elf, ZeroFillSegment, DataSegment, ZeroFillPhdr, DataPhdr>();
 }
 
-TEST(ElfldltlLoadTests, CantMergeDataAndZeroFill) {
-  TestAllFormats(GetNotMergedTest<DataWithZeroFillSegment, ConstantSegment, DataWithZeroFillPhdr,
-                                  ConstantPhdr>());
-  TestAllFormats(GetNotMergedTest<DataWithZeroFillSegment, DataWithZeroFillSegment,
-                                  DataWithZeroFillPhdr, DataWithZeroFillPhdr>());
-  TestAllFormats(
-      GetNotMergedTest<DataWithZeroFillSegment, DataSegment, DataWithZeroFillPhdr, DataPhdr>());
+TYPED_TEST(ElfldltlLoadTests, CantMergeDataAndZeroFill) {
+  NotMergedTest<typename TestFixture::Elf, DataWithZeroFillSegment, ConstantSegment,
+                DataWithZeroFillPhdr, ConstantPhdr>();
+  NotMergedTest<typename TestFixture::Elf, DataWithZeroFillSegment, DataWithZeroFillSegment,
+                DataWithZeroFillPhdr, DataWithZeroFillPhdr>();
+  NotMergedTest<typename TestFixture::Elf, DataWithZeroFillSegment, DataSegment,
+                DataWithZeroFillPhdr, DataPhdr>();
 }
 
-TEST(ElfldltlLoadTests, CantMergeData) {
-  TestAllFormats(GetNotMergedTest<DataSegment, ConstantSegment, DataPhdr, ConstantPhdr>());
+TYPED_TEST(ElfldltlLoadTests, CantMergeData) {
+  NotMergedTest<typename TestFixture::Elf, DataSegment, ConstantSegment, DataPhdr, ConstantPhdr>();
 }
 
-constexpr auto GetPhdrObserver = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -305,12 +298,10 @@ constexpr auto GetPhdrObserver = [](auto&& elf) {
   ASSERT_TRUE(std::holds_alternative<DataWithZeroFillSegment>(segments[1]));
   EXPECT_EQ(std::get<DataWithZeroFillSegment>(segments[1]).memsz(),
             kPhdrs[2].memsz + kPhdrs[3].memsz + kPhdrs[4].memsz);
-};
+}
 
-TEST(ElfldltlLoadTests, GetPhdrObserver) { TestAllFormats(GetPhdrObserver); }
-
-constexpr auto VisitSegments = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -344,12 +335,10 @@ constexpr auto VisitSegments = [](auto&& elf) {
     EXPECT_EQ(currentIndex++, 0);
     return false;
   }));
-};
+}
 
-TEST(ElfldltlLoadTests, VisitSegments) { TestAllFormats(VisitSegments); }
-
-constexpr auto RelroBounds = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, RelroBounds) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
@@ -380,12 +369,10 @@ constexpr auto RelroBounds = [](auto&& elf) {
     EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, kPageSize);
   }
-};
+}
 
-TEST(ElfldltlLoadTests, RelroBounds) { TestAllFormats(RelroBounds); }
-
-constexpr auto ApplyRelroMissing = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -414,12 +401,10 @@ constexpr auto ApplyRelroMissing = [](auto&& elf) {
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
     EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
   }
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroMissing) { TestAllFormats(ApplyRelroMissing); }
-
-constexpr auto ApplyRelroBadStart = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroBadStart) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -441,12 +426,10 @@ constexpr auto ApplyRelroBadStart = [](auto&& elf) {
 
   ExpectedSingleError expected("PT_GNU_RELRO not at segment start");
   EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroBadStart) { TestAllFormats(ApplyRelroBadStart); }
-
-constexpr auto ApplyRelroTooManyLoads = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -466,9 +449,7 @@ constexpr auto ApplyRelroTooManyLoads = [](auto&& elf) {
 
   auto expected = ExpectedSingleError("too many PT_LOAD segments", ": maximum 1 < requested ", 2);
   loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false);
-};
-
-TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) { TestAllFormats(ApplyRelroTooManyLoads); }
+}
 
 using SomeLI = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container>;
 enum SegmentType {
@@ -579,18 +560,16 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
   RelroTest<Elf>(input, expected, strategy, false, loc);
 }
 
-constexpr auto ApplyRelroBasic = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroBasic) {
+  using Elf = typename TestFixture::Elf;
   RelroTest<Elf>({RO}, {C}, {});
   RelroTest<Elf>({RO}, {C, D}, D);
   RelroTest<Elf>({RO}, {C, DWZF}, DWZF);
   RelroTest<Elf>({RO}, {C, ZF}, ZF);
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroBasic) { TestAllFormats(ApplyRelroBasic); }
-
-constexpr auto ApplyRelroMergeRight = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroMergeRight) {
+  using Elf = typename TestFixture::Elf;
 
   RelroTest<Elf>({RO, C}, {C, C}, {}, false);
   RelroTest<Elf>({RO, C}, {C}, {}, true);
@@ -616,30 +595,24 @@ constexpr auto ApplyRelroMergeRight = [](auto&& elf) {
   // but we don't have Merge overloads for (*, ZF) because these are unlikely to exist in the wild.
   RelroTest<Elf>({RO, ZF}, {C, DWZF, ZF}, DWZF);
   RelroTest<Elf>({RO, ZF}, {C, ZF, ZF}, ZF);
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroMergeRight) { TestAllFormats(ApplyRelroMergeRight); }
-
-constexpr auto ApplyRelroMergeLeft = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroMergeLeft) {
+  using Elf = typename TestFixture::Elf;
 
   RelroTest<Elf>({C, RO}, {C, C}, {}, false);
   RelroTest<Elf>({C, RO}, {C}, {}, true);
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroMergeLeft) { TestAllFormats(ApplyRelroMergeLeft); }
-
-constexpr auto ApplyRelroMergeBoth = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroMergeBoth) {
+  using Elf = typename TestFixture::Elf;
 
   RelroTest<Elf>({C, RO, C}, {C, C, C}, {}, false);
   RelroTest<Elf>({C, RO, C}, {C}, {}, true);
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroMergeBoth) { TestAllFormats(ApplyRelroMergeBoth); }
-
-constexpr auto ApplyRelroCantMerge = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMerge) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   auto diag = ExpectOkDiagnostics();
@@ -673,12 +646,10 @@ constexpr auto ApplyRelroCantMerge = [](auto&& elf) {
     auto expected_flags = elfldltl::PhdrBase::kRead | (!merge_ro ? elfldltl::PhdrBase::kWrite : 0);
     EXPECT_EQ(std::get<ConstantSegment>(segments[1]).flags(), expected_flags);
   }
-};
+}
 
-TEST(ElfldltlLoadTests, ApplyRelroCantMerge) { TestAllFormats(ApplyRelroCantMerge); }
-
-constexpr auto SymbolizerContext = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlLoadTests, SymbolizerContext) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -718,8 +689,6 @@ foo: {{{mmap:0x12342000:0x1000:load:17:rw:0x2000}}}
                                               "foo: ")));
 
   EXPECT_EQ(kExpectedContext, markup);
-};
-
-TEST(ElfldltlLoadTests, SymbolizerContext) { TestAllFormats(SymbolizerContext); }
+}
 
 }  // namespace
