@@ -482,17 +482,17 @@ func tempFilePath(dir, template string) (string, error) {
 //
 //   - amalgamate the given ZBI into a larger one that includes an additional
 //     entry of a script which includes commands to run.
-//   - that script mounts a disk created on the host in /tmp, and runs the
-//     given command with output redirected to a file also on the /tmp disk
+//   - that script runs the given command with output written to a file on
+//     the /tmp disk
 //   - the script triggers shutdown of the machine
 //   - after emulator shutdown, the log file is extracted and returned.
 //
-// In order to achieve this, here we need to create the host minfs
-// file system, write the commands to run, build the augmented .zbi to
+// In order to achieve this, here we need to create the host block
+// device, write the commands to run, build the augmented .zbi to
 // be used to boot. We then use Start() and wait for shutdown.
-// Finally, extract and return the log from the minfs disk.
+// Finally, extract and return the log from the block device.
 func (d *Distribution) RunNonInteractive(
-	toRun, hostPathMinfsBinary, hostPathZbiBinary string,
+	toRun, hostPathExtractLogsBinary, hostPathZbiBinary string,
 	fvd *fvdpb.VirtualDevice,
 ) (string, string, error) {
 	root, err := os.MkdirTemp("", "qemu")
@@ -502,7 +502,7 @@ func (d *Distribution) RunNonInteractive(
 	log, logerr, err := d.runNonInteractive(
 		root,
 		toRun,
-		hostPathMinfsBinary,
+		hostPathExtractLogsBinary,
 		hostPathZbiBinary,
 		fvd,
 	)
@@ -513,29 +513,31 @@ func (d *Distribution) RunNonInteractive(
 }
 
 func (d *Distribution) runNonInteractive(
-	root, toRun, hostPathMinfsBinary, hostPathZbiBinary string,
+	root, toRun, hostPathExtractLogsBinary, hostPathZbiBinary string,
 	fvd *fvdpb.VirtualDevice,
 ) (string, string, error) {
 	// Write runcmds that mounts the results disk, runs the requested command, and
 	// shuts down.
 	script := `DEV=$(waitfor class=block topo=/pci-00:06.0-fidl/virtio-block/block timeout=60000 print)
-mount "$DEV" /mnt/testdata-fs
-` + toRun + ` 2>/mnt/testdata-fs/err.txt >/mnt/testdata-fs/log.txt
-umount /mnt/testdata-fs
+run-with-logs "$DEV" ` + toRun + `
 dm poweroff
 `
 	runcmds := filepath.Join(root, "runcmds.txt")
 	if err := os.WriteFile(runcmds, []byte(script), 0666); err != nil {
 		return "", "", err
 	}
-	// Make a minfs filesystem to mount in the target.
+	// Make a block device to write to in the target.
 	fs := filepath.Join(root, "a.fs")
 	{
-		cmd := exec.Command(hostPathMinfsBinary, fs+"@100M", "mkfs")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return "", "", fmt.Errorf("error running %q: %w", cmd, err)
+		fs_file, err := os.Create(fs)
+		if err != nil {
+			return "", "", err
+		}
+		if err := fs_file.Truncate(100 * 1000 * 1000); err != nil {
+			return "", "", err
+		}
+		if err := fs_file.Close(); err != nil {
+			return "", "", err
 		}
 	}
 
@@ -589,15 +591,7 @@ dm poweroff
 	log := filepath.Join(root, "log.txt")
 	logerr := filepath.Join(root, "err.txt")
 	{
-		cmd := exec.Command(hostPathMinfsBinary, fs, "cp", "::/log.txt", log)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return "", "", fmt.Errorf("error running %q: %w", cmd, err)
-		}
-	}
-	{
-		cmd := exec.Command(hostPathMinfsBinary, fs, "cp", "::/err.txt", logerr)
+		cmd := exec.Command(hostPathExtractLogsBinary, fs, log, logerr)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {

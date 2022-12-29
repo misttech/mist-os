@@ -33,12 +33,12 @@ if (is_linux) {
     visibility = [ ":*" ]
 
     deps = [
-      "//src/storage/minfs/tools:minfs",
+      "//src/storage/tools/logs/extract-logs",
       "//zircon/tools/zbi",
     ]
 
     sources = [
-      "$root_out_dir/minfs",
+      "$root_out_dir/extract-logs",
       "$root_out_dir/zbi",
     ]
     outputs = [ "$root_out_dir/test_data/tools/{{source_file_part}}" ]

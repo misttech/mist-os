@@ -25,7 +25,7 @@ func TestDisabledMakesKtraceFail(t *testing.T) {
 	device.KernelArgs = append(device.KernelArgs, "kernel.enable-debugging-syscalls=false")
 	stdout, stderr := distro.RunNonInteractive(
 		"/boot/bin/ktrace start 0xff",
-		filepath.Join(exDir, "test_data", "tools", "minfs"),
+		filepath.Join(exDir, "test_data", "tools", "extract-logs"),
 		filepath.Join(exDir, "test_data", "tools", "zbi"),
 		device)
 

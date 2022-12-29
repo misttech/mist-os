@@ -26,7 +26,7 @@ func TestDisableDebuggingDisableSerialSyscalls(t *testing.T) {
 
 	stdout, stderr := distro.RunNonInteractive(
 		"/boot/bin/syscall-check",
-		filepath.Join(exDir, "test_data", "tools", "minfs"),
+		filepath.Join(exDir, "test_data", "tools", "extract-logs"),
 		filepath.Join(exDir, "test_data", "tools", "zbi"),
 		device,
 	)

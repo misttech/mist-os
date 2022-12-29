@@ -64,6 +64,7 @@ assembled_system("zedboot_assembly") {
     "//src/security/bin/syscall-check",
     "//src/storage/bin/dd",
     "//src/storage/bin/umount",
+    "//src/storage/tools/logs/run-with-logs",
     "//src/sys/bin/psutils:killall",
     "//src/sys/bin/psutils:ps",
     "//src/sys/bin/psutils:threads",

@@ -51,8 +51,8 @@ func (d *Distribution) CreateContext(ctx context.Context, fvd *fvdpb.VirtualDevi
 }
 
 // RunNonInteractive reimplements emulator.Distribution.
-func (d *Distribution) RunNonInteractive(toRun, hostPathMinfsBinary, hostPathZbiBinary string, fvd *fvdpb.VirtualDevice) (string, string) {
-	log, logerr, err := d.d.RunNonInteractive(toRun, hostPathMinfsBinary, hostPathZbiBinary, fvd)
+func (d *Distribution) RunNonInteractive(toRun, hostPathExtractLogsBinary, hostPathZbiBinary string, fvd *fvdpb.VirtualDevice) (string, string) {
+	log, logerr, err := d.d.RunNonInteractive(toRun, hostPathExtractLogsBinary, hostPathZbiBinary, fvd)
 	if err != nil {
 		d.t.Fatal(err)
 	}
