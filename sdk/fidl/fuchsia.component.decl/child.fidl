@@ -19,23 +19,22 @@ type Child = table {
     2: url fuchsia.url.Url;
 
     /// The startup mode for the component instance.
+    ///
+    /// May be unset, in which case defaults to 'LAZY'.
     3: startup StartupMode;
 
     /// The environment assigned to this child.
     ///
-    /// Must reference an environment defined in the `ComponentDecl`.
-    /// Contains only the following characters: [a-z0-9-_.].
+    /// May be unset, in which case the child will inherit the parent component's
+    /// environment. If set, the name must reference an environment defined in
+    /// the `ComponentDecl` and it must contain only the following characters:
+    /// [a-z0-9-_.].
     4: environment name;
 
     /// The action to take if this component instance terminates unexpectedly.
     ///
     /// May be unset, in which case defaults to `NONE`.
     5: on_terminate OnTerminate;
-
-    // TODO(fxbug.dev/4051): Provide a way to supply parameters to the child, possibly
-    // as command-line arguments, by URL, or maybe in some other way which is
-    // orthogonal to other inputs to mitigate confused deputy issues.  Perhaps
-    // as a dictionary like we do for runners?
 };
 
 /// Describes under what conditions the component may be started.
