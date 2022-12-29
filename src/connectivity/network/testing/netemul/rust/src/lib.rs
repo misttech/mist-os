@@ -6,12 +6,10 @@
 
 //! Netemul utilities.
 
-use std::{borrow::Cow, convert::TryFrom as _, path::Path};
+use std::{borrow::Cow, path::Path};
 
-use fidl_fuchsia_hardware_ethernet as fethernet;
 use fidl_fuchsia_hardware_network as fnetwork;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
@@ -21,7 +19,6 @@ use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use fidl_fuchsia_netstack as fnetstack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_zircon as zx;
@@ -197,12 +194,7 @@ impl TestSandbox {
         name: impl Into<Cow<'a, str>>,
         mut config: fnetemul_network::EndpointConfig,
     ) -> Result<TestEndpoint<'a>> {
-        let name = {
-            let max_len = usize::try_from(fidl_fuchsia_hardware_ethertap::MAX_NAME_LENGTH)
-                .context("fuchsia.hardware.ethertap/MAX_NAME_LENGTH does not fit in usize")?;
-            truncate_dropping_front(name.into(), max_len)
-        };
-
+        let name = name.into();
         let epm = self.get_endpoint_manager()?;
         let (status, endpoint) =
             epm.create_endpoint(&name, &mut config).await.context("create_endpoint FIDL error")?;
@@ -822,25 +814,6 @@ impl<'a> TestEndpoint<'a> {
         endpoint
     }
 
-    /// Gets access to this device's virtual Ethernet device.
-    ///
-    /// Note that an error is returned if the Endpoint is not a
-    /// [`fnetemul_network::DeviceConnection::Ethernet`].
-    pub async fn get_ethernet(
-        &self,
-    ) -> Result<fidl::endpoints::ClientEnd<fethernet::DeviceMarker>> {
-        match self
-            .get_device()
-            .await
-            .with_context(|| format!("failed to get device connection for {}", self.name))?
-        {
-            fnetemul_network::DeviceConnection::Ethernet(e) => Ok(e),
-            fnetemul_network::DeviceConnection::NetworkDevice(_) => {
-                Err(anyhow::anyhow!("Endpoint {} is not an Ethernet device", self.name))
-            }
-        }
-    }
-
     /// Gets access to this device's virtual Network device.
     ///
     /// Note that an error is returned if the Endpoint is not a
@@ -854,9 +827,6 @@ impl<'a> TestEndpoint<'a> {
             .with_context(|| format!("failed to get device connection for {}", self.name))?
         {
             fnetemul_network::DeviceConnection::NetworkDevice(n) => to_netdevice_inner(n).await,
-            fnetemul_network::DeviceConnection::Ethernet(_) => {
-                Err(anyhow::anyhow!("Endpoint {} is not a Network Device", self.name))
-            }
         }
     }
 
@@ -877,48 +847,7 @@ impl<'a> TestEndpoint<'a> {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
                 .to_string()
         });
-        // TODO(https://fxbug.dev/34719) remove support for Ethernet once the
-        // netdevice migration is complete.
         match self.get_device().await.context("get_device failed")? {
-            fnetemul_network::DeviceConnection::Ethernet(eth) => {
-                let id = {
-                    // NB: Use different stack APIs based on name because
-                    // fuchsia.net.stack doesn't allow the name to be set, and
-                    // netstack3 doesn't support fuchsia.netstack.
-                    if let Some(name) = name {
-                        let netstack = realm
-                            .connect_to_protocol::<fnetstack::NetstackMarker>()
-                            .context("failed to connect to netstack")?;
-                        netstack
-                            .add_ethernet_device(
-                                &self.name,
-                                &mut fnetstack::InterfaceConfig {
-                                    name,
-                                    filepath: String::new(),
-                                    metric: metric.unwrap_or(0),
-                                },
-                                eth,
-                            )
-                            .await
-                            .context("add_ethernet_device FIDL error")?
-                            .map_err(fuchsia_zircon::Status::from_raw)
-                            .map(u64::from)
-                            .context("add_ethernet_device failed")?
-                    } else {
-                        let stack = realm
-                            .connect_to_protocol::<fnet_stack::StackMarker>()
-                            .context("failed to connect to stack")?;
-                        stack.add_ethernet_interface(&self.name, eth).await.squash_result()?
-                    }
-                };
-                let debug = realm
-                    .connect_to_protocol::<fnet_debug::InterfacesMarker>()
-                    .context("connect to protocol")?;
-                let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
-                    .context("create endpoints")?;
-                let () = debug.get_admin(id, server_end).context("get admin")?;
-                Ok((id, control, None))
-            }
             fnetemul_network::DeviceConnection::NetworkDevice(netdevice) => {
                 let (device, mut port_id) = to_netdevice_inner(netdevice).await?;
                 let installer = realm
@@ -983,6 +912,8 @@ impl<'a> TestEndpoint<'a> {
 pub struct TestInterface<'a> {
     endpoint: TestEndpoint<'a>,
     id: u64,
+    // TODO(https://fxbug.dev/109169): We can remove this as part of Ethernet
+    // removal.
     stack: fnet_stack::StackProxy,
     interface_state: fnet_interfaces::StateProxy,
     control: fnet_interfaces_ext::admin::Control,
@@ -1218,8 +1149,8 @@ impl<'a> TestInterface<'a> {
     {
         let Self {
             endpoint: TestEndpoint { endpoint, name: _, _sandbox: _ },
-            id,
-            stack,
+            id: _,
+            stack: _,
             interface_state: _,
             control,
             device_control,
@@ -1235,13 +1166,6 @@ impl<'a> TestInterface<'a> {
         // TODO(https://fxbug.dev/102064): Remove this once Ethernet devices are
         // no longer supported.
         match endpoint.get_device().await.context("get_device failed")? {
-            fnetemul_network::DeviceConnection::Ethernet(_) => {
-                let () = stack
-                    .del_ethernet_interface(id)
-                    .await
-                    .squash_result()
-                    .context("delete ethernet interface failed")?;
-            }
             fnetemul_network::DeviceConnection::NetworkDevice(_) => {}
         }
         Ok((endpoint, device_control))

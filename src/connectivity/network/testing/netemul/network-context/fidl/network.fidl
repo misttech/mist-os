@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 library fuchsia.netemul.network;
 
-using fuchsia.hardware.ethernet;
-using fuchsia.hardware.ethertap;
 using fuchsia.hardware.network;
 using fuchsia.net.virtualization;
 using fuchsia.net;
 using zx;
+
+const MAX_NAME_LENGTH uint32 = 256;
 
 /// Provides emulated latency configuration.
 type LatencyConfig = struct {
@@ -48,11 +48,11 @@ type NetworkConfig = table {
 protocol NetworkManager {
     /// Lists emulated networks by name.
     ListNetworks() -> (struct {
-        nets vector<string:MAX>:MAX;
+        nets vector<string:MAX_NAME_LENGTH>:MAX;
     });
     /// Creates a new network with given name and config.
     CreateNetwork(struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
         config NetworkConfig;
     }) -> (resource struct {
         status zx.status;
@@ -60,7 +60,7 @@ protocol NetworkManager {
     });
     /// Gets a handle to a network.
     GetNetwork(struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
     }) -> (resource struct {
         net client_end:<Network, optional>;
     });
@@ -68,11 +68,9 @@ protocol NetworkManager {
 
 /// Backing of an emulated endpoint.
 type EndpointBacking = strict enum {
-    /// Endpoint backed by ethertap device.
-    ETHERTAP = 1;
     /// Endpoint backed by a network-tun device.
     /// The created `fuchsia.hardware.network.Device` always acts as a virtual ethernet device.
-    NETWORK_DEVICE = 2;
+    NETWORK_DEVICE = 1;
 };
 
 /// Configuration used to create an endpoint.
@@ -90,11 +88,11 @@ type EndpointConfig = struct {
 protocol EndpointManager {
     /// Lists endpoints by name.
     ListEndpoints() -> (struct {
-        endp vector<string:MAX>:MAX;
+        endp vector<string:MAX_NAME_LENGTH>:MAX;
     });
     /// Creates endpoint with given name and config.
     CreateEndpoint(struct {
-        name string:fuchsia.hardware.ethertap.MAX_NAME_LENGTH;
+        name string:MAX_NAME_LENGTH;
         config EndpointConfig;
     }) -> (resource struct {
         status zx.status;
@@ -102,7 +100,7 @@ protocol EndpointManager {
     });
     /// Gets a handle to an endpoint.
     GetEndpoint(struct {
-        name string:fuchsia.hardware.ethertap.MAX_NAME_LENGTH;
+        name string:MAX_NAME_LENGTH;
     }) -> (resource struct {
         endpoint client_end:<Endpoint, optional>;
     });
@@ -139,7 +137,7 @@ protocol Network {
     });
     /// Gets network name.
     GetName() -> (struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
     });
     /// Updates network configuration.
     SetConfig(struct {
@@ -149,13 +147,13 @@ protocol Network {
     });
     /// Attaches endpoint with given name to network.
     AttachEndpoint(struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
     }) -> (struct {
         status zx.status;
     });
     /// Removes endpoint with given name from network.
     RemoveEndpoint(struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
     }) -> (struct {
         status zx.status;
     });
@@ -176,13 +174,11 @@ protocol DeviceProxy {
 
 /// A connection to an endpoint's underlying protocol.
 type DeviceConnection = strict resource union {
-    /// Set if the endpoint's backing is `ETHERTAP`.
-    1: ethernet client_end:fuchsia.hardware.ethernet.Device;
     /// Set if the endpoint's backing is `NETWORK_DEVICE`.
     // NOTE(brunodalbo) the DeviceInstance protocol is a transient protocol that is exposed by devfs.
     // As documented in its definition, users should avoid passing this forward, but connect to its
     // internal protocols instead.
-    2: network_device client_end:fuchsia.hardware.network.DeviceInstance;
+    1: network_device client_end:fuchsia.hardware.network.DeviceInstance;
 };
 
 /// Virtual ethernet endpoint.
@@ -193,7 +189,7 @@ protocol Endpoint {
     });
     /// Gets endpoint name.
     GetName() -> (struct {
-        name string:MAX;
+        name string:MAX_NAME_LENGTH;
     });
     /// Sends link up or down signal
     SetLinkUp(struct {
@@ -213,7 +209,7 @@ protocol Endpoint {
 /// Convenience struct for creating entire network setups.
 type NetworkSetup = struct {
     /// Network name, must be unique in network context.
-    name string:MAX;
+    name string:MAX_NAME_LENGTH;
     /// NetworkConfig to use when creating network.
     config NetworkConfig;
     /// Collection of endpoints to create and attach to network.
@@ -223,9 +219,9 @@ type NetworkSetup = struct {
 /// Convenience struct for creating endpoints along with network setup.
 type EndpointSetup = struct {
     /// Endpoint name, must be unique in network context.
-    name string:MAX;
-    /// Optional endpoint config, if not provided defaults will be used.
-    /// Default values are: mtu = 1500, backing = ETHERTAP, mac = randomized.
+    name string:MAX_NAME_LENGTH;
+    /// Optional endpoint config, if not provided defaults will be used. Default
+    /// values are: mtu = 1500, backing = NETWORK_DEVICE, mac = randomized.
     config box<EndpointConfig>;
     /// Start endpoint with link status up.
     link_up bool;

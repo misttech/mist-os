@@ -10,7 +10,6 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
     "lib:network_service",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl/cpp",
@@ -34,7 +33,6 @@ fuchsia_component("network-test") {
   deps = [
     "lib:network_test_bin",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/connectivity/network/testing/netemul/service:netemul-driver-test-realm",
     "//src/connectivity/network/tun/network-tun:component-v2",
   ]
 }

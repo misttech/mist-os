@@ -12,15 +12,7 @@
     ],
     use: [
         {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
-        {
-            protocol: [
-                "fuchsia.driver.test.Realm",
-                "fuchsia.net.tun.Control",
-            ],
+            protocol: [ "fuchsia.net.tun.Control" ],
             from: "parent",
         },
     ],

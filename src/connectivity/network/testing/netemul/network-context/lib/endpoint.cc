@@ -5,7 +5,6 @@
 #include "endpoint.h"
 
 #include <fcntl.h>
-#include <fidl/fuchsia.hardware.ethertap/cpp/wire.h>
 #include <fuchsia/netemul/internal/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -18,8 +17,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "ethernet_client.h"
-#include "ethertap_client.h"
 #include "network_context.h"
 #include "src/lib/fostr/hex_dump.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -91,132 +88,6 @@ class EndpointImpl : public data::Consumer {
   std::vector<data::BusConsumer::Ptr> sinks_;
   fxl::WeakPtrFactory<data::Consumer> weak_ptr_factory_;
   fit::callback<void()> closed_callback_;
-};
-
-class EthertapImpl : public EndpointImpl {
- public:
-  explicit EthertapImpl(Endpoint::Config config) : EndpointImpl(std::move(config)) {}
-
-  zx_status_t Setup(const std::string& name, bool start_online, const NetworkContext& context,
-                    size_t id) override {
-    EthertapConfig tap_cfg;
-    if (config().mac) {
-      tap_cfg.tap_cfg.mac.octets = config().mac->octets;
-    } else {
-      // if mac is not provided, random mac is assigned with a seed based on
-      // name
-      tap_cfg.RandomLocalUnicast(name);
-    }
-
-    tap_cfg.name = name;
-    // Because device cleanup is asynchronous for ethertap devices, it's
-    // possible that an existing device with this name has been removed by the
-    // client but not yet fully cleaned up. This would lead to a name collision.
-    //
-    // To avoid this issue, append a unique integer ID to the endpoint name
-    // (overwriting the end of the name if necessary to avoid surpassing the
-    // maximum ethertap interface name length).
-    AppendSuffix(tap_cfg.name, id);
-    tap_cfg.tap_cfg.mtu = config().mtu;
-    fuchsia::hardware::ethernet::MacAddress mac;
-    tap_cfg.tap_cfg.mac.Clone(&mac);
-    tap_cfg.tap_cfg.options = fuchsia::hardware::ethertap::OPT_REPORT_PARAM;
-    if (start_online) {
-      tap_cfg.tap_cfg.options |= fuchsia::hardware::ethertap::OPT_ONLINE;
-    }
-    tap_cfg.devfs_root = context.ConnectDevfs();
-    zx_status_t status = EthertapClient::Create(std::move(tap_cfg), &ethertap_);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    auto devfs_root = context.ConnectDevfs();
-    if (devfs_root.is_valid()) {
-      ethernet_factory_ = std::make_unique<EthernetClientFactory>(
-          EthernetClientFactory::kDevfsEthernetRoot, std::move(devfs_root));
-    } else {
-      ethernet_factory_ = std::make_unique<EthernetClientFactory>();
-    }
-
-    // We add a 2 min timeout to this so that it's easier to debug problems with enumerating devices
-    // from devfs. By default, MountPointWithMAC would hang forever and would make debugging
-    // problems here really hard.
-    zx::result path = ethernet_factory_->MountPointWithMAC(mac, zx::sec(120));
-
-    // can't find mount path for ethernet!!
-    if (path.is_error()) {
-      FX_PLOGS(WARNING, path.error_value())
-          << "failed to locate ethertap device " << name << " "
-          << fxl::StringPrintf("%02X:%02X:%02X:%02X:%02X:%02X", mac.octets[0], mac.octets[1],
-                               mac.octets[2], mac.octets[3], mac.octets[4], mac.octets[5]);
-      return ZX_ERR_INTERNAL;
-    }
-    ethernet_mount_path_ = std::move(path.value());
-
-    ethertap_->SetPacketCallback(
-        [this](std::vector<uint8_t> data) { ForwardData(data.data(), data.size()); });
-
-    ethertap_->SetPeerClosedCallback([this]() { Closed(); });
-    return ZX_OK;
-  }
-
-  void SetLinkUp(bool up, fit::callback<void()> done) override {
-    ethertap_->SetLinkUp(up);
-    done();
-  }
-
-  fuchsia::netemul::network::DeviceConnection GetDevice() override {
-    if (ethernet_factory_ == nullptr) {
-      return fuchsia::netemul::network::DeviceConnection::WithEthernet({});
-    }
-    fidl::SynchronousInterfacePtr<fuchsia::hardware::ethernet::Controller> controller;
-    if (ethernet_factory_->Connect(ethernet_mount_path_, controller.NewRequest()) != ZX_OK) {
-      return fuchsia::netemul::network::DeviceConnection::WithEthernet({});
-    }
-    fidl::InterfaceHandle<fuchsia::hardware::ethernet::Device> device;
-    if (zx_status_t status = controller->OpenSession(device.NewRequest()); status != ZX_OK) {
-      return fuchsia::netemul::network::DeviceConnection::WithEthernet({});
-    }
-    return fuchsia::netemul::network::DeviceConnection::WithEthernet(std::move(device));
-  }
-
-  void ServeDevice(zx::channel channel) override {
-    if (ethernet_factory_) {
-      ethernet_factory_->Connect(
-          ethernet_mount_path_,
-          fidl::InterfaceRequest<fuchsia::hardware::ethernet::Controller>(std::move(channel)));
-    }
-  }
-
-  void Consume(const void* data, size_t len) override {
-    auto status = ethertap_->Send(data, len);
-    if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "ethertap couldn't push data";
-    }
-  }
-
- private:
-  static void AppendSuffix(std::string& name, size_t id) {
-    std::string suffix = std::to_string(id);
-    if (name.size() <= fuchsia_hardware_ethertap::wire::kMaxNameLength - suffix.size()) {
-      name.append(suffix);
-    } else {
-      // The endpoint name is too long to append the entire suffix without
-      // overflowing the maximum ethertap name length. Overwrite the end of the
-      // endpoint name and then append any remaining characters in the suffix.
-      auto it = suffix.begin();
-      for (size_t i = fuchsia_hardware_ethertap::wire::kMaxNameLength - suffix.size();
-           i < name.size(); i++) {
-        name[i] = *it;
-        it++;
-      }
-      name.append(it, suffix.end());
-    }
-  }
-
-  std::string ethernet_mount_path_;
-  std::unique_ptr<EthernetClientFactory> ethernet_factory_;
-  std::unique_ptr<EthertapClient> ethertap_;
 };
 
 class NetworkDeviceImpl : public EndpointImpl,
@@ -395,8 +266,6 @@ class NetworkDeviceImpl : public EndpointImpl,
 
 std::unique_ptr<EndpointImpl> MakeImpl(Endpoint::Config config) {
   switch (config.backing) {
-    case Endpoint::Backing::ETHERTAP:
-      return std::make_unique<EthertapImpl>(std::move(config));
     case Endpoint::Backing::NETWORK_DEVICE:
       return std::make_unique<NetworkDeviceImpl>(std::move(config));
   }

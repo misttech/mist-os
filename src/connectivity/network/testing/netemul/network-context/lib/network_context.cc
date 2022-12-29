@@ -94,7 +94,7 @@ zx_status_t NetworkContext::Setup(std::vector<NetworkSetup> setup,
         endp_setup.config = std::make_unique<Endpoint::Config>();
         endp_setup.config->mtu = kDefaultMtu;
         endp_setup.config->mac = nullptr;
-        endp_setup.config->backing = fuchsia::netemul::network::EndpointBacking::ETHERTAP;
+        endp_setup.config->backing = fuchsia::netemul::network::EndpointBacking::NETWORK_DEVICE;
       }
       status = endpoint_manager_.CreateEndpoint(endp_setup.name, std::move(*endp_setup.config),
                                                 endp_setup.link_up,
@@ -127,17 +127,6 @@ NetworkContext::GetHandler() {
   return [this](fidl::InterfaceRequest<FNetworkContext> request) {
     bindings_.AddBinding(this, std::move(request), dispatcher_);
   };
-}
-
-zx::channel NetworkContext::ConnectDevfs() const {
-  if (devfs_handler_) {
-    zx::channel cli, req;
-    zx::channel::create(0, &cli, &req);
-    devfs_handler_(std::move(req));
-    return cli;
-  } else {
-    return zx::channel();
-  }
 }
 
 fidl::InterfaceHandle<fuchsia::net::tun::Control> NetworkContext::ConnectNetworkTun() const {

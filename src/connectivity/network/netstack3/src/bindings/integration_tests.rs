@@ -279,9 +279,6 @@ impl TestSetup {
         };
 
         let device_instance = match ep.get_device().await? {
-            fidl_fuchsia_netemul_network::DeviceConnection::Ethernet(_) => {
-                panic!("unexpected Ethernet endpoint {}", ep_name)
-            }
             fidl_fuchsia_netemul_network::DeviceConnection::NetworkDevice(n) => n,
         };
 
@@ -346,17 +343,7 @@ pub(crate) fn test_ep_name(i: usize) -> String {
 }
 
 fn new_endpoint_setup(name: String) -> net::EndpointSetup {
-    // TODO(https://fxbug.dev/109169): Use defaults once netemul moves to
-    // netdevice only.
-    net::EndpointSetup {
-        config: Some(Box::new(net::EndpointConfig {
-            mtu: 1500,
-            mac: None,
-            backing: net::EndpointBacking::NetworkDevice,
-        })),
-        link_up: true,
-        name,
-    }
+    net::EndpointSetup { config: None, link_up: true, name }
 }
 
 /// A builder structure for [`TestSetup`].

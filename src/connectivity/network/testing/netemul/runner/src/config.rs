@@ -43,7 +43,6 @@ impl Endpoint {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum EndpointBacking {
-    Ethertap,
     NetworkDevice,
 }
 
@@ -58,7 +57,6 @@ impl FromStr for EndpointBacking {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "ethertap" => Ok(EndpointBacking::Ethertap),
             "network_device" => Ok(EndpointBacking::NetworkDevice),
             other => Err(anyhow!("unknown endpoint backing '{}'", other)),
         }
@@ -68,7 +66,6 @@ impl FromStr for EndpointBacking {
 impl From<EndpointBacking> for fnetemul_network::EndpointBacking {
     fn from(backing: EndpointBacking) -> Self {
         match backing {
-            EndpointBacking::Ethertap => Self::Ethertap,
             EndpointBacking::NetworkDevice => Self::NetworkDevice,
         }
     }
@@ -624,7 +621,7 @@ mod tests {
                         mac: Some(fidl_mac!("aa:bb:cc:dd:ee:ff").into()),
                         mtu: 999,
                         up: false,
-                        backing: EndpointBacking::Ethertap,
+                        backing: EndpointBacking::NetworkDevice,
                     },
                     Endpoint {
                         name: "local-ep2".to_string(),
@@ -697,7 +694,7 @@ mod tests {
                         "mac": "aa:bb:cc:dd:ee:ff",
                         "mtu": "999",
                         "up": "false",
-                        "backing": "ethertap"
+                        "backing": "network_device"
                     },
                     {
                         "name": "local-ep2"

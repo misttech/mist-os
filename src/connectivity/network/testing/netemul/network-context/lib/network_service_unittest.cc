@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.network/cpp/hlcpp_conversion.h>
-#include <fuchsia/netemul/devmgr/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/sys/cpp/service_directory.h>
@@ -12,12 +11,10 @@
 #include <unordered_set>
 
 #include "src/connectivity/lib/network-device/cpp/network_device_client.h"
-#include "src/connectivity/network/testing/netemul/network-context/lib/ethernet_client.h"
 #include "src/connectivity/network/testing/netemul/network-context/lib/fake_endpoint.h"
 #include "src/connectivity/network/testing/netemul/network-context/lib/netdump.h"
 #include "src/connectivity/network/testing/netemul/network-context/lib/netdump_parser.h"
 #include "src/connectivity/network/testing/netemul/network-context/lib/network_context.h"
-#include "src/connectivity/network/testing/netemul/network-context/lib/realm_setup.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -36,8 +33,6 @@ constexpr fuchsia_hardware_network::wire::FrameType kEndpointFrameType =
 
 namespace netemul {
 namespace testing {
-
-static const EthernetConfig TestEthBuffConfig = {.nbufs = 10, .buff_size = 512};
 
 class NetworkServiceTest : public gtest::RealLoopFixture {
  public:
@@ -61,16 +56,6 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     ASSERT_OK(svc_loop_->StartThread("testloop"));
     svc_ = std::make_unique<NetworkContext>(svc_loop_->dispatcher());
 
-    zx::result result = StartDriverTestRealm();
-    ASSERT_OK(result.status_value()) << "driver test realm failed to start";
-    devfs_root_.reset(std::move(result.value()));
-    svc_->SetDevfsHandler([this](zx::channel req) {
-      ASSERT_OK(fidl::WireCall(devfs_root_.directory())
-                    ->Clone(fuchsia_io::wire::OpenFlags::kCloneSameRights,
-                            fidl::ServerEnd<fuchsia_io::Node>(std::move(req)))
-                    .status())
-          << "failed to connect request to /dev";
-    });
     svc_->SetNetworkTunHandler([this](fidl::InterfaceRequest<fuchsia::net::tun::Control> req) {
       real_services_->Connect(std::move(req));
     });
@@ -89,7 +74,7 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   }
 
   static Endpoint::Config GetDefaultEndpointConfig(
-      Endpoint::Backing backing = Endpoint::Backing::ETHERTAP) {
+      Endpoint::Backing backing = Endpoint::Backing::NETWORK_DEVICE) {
     Endpoint::Config ret;
     ret.mtu = 1500;
     ret.backing = backing;
@@ -139,14 +124,75 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   }
 
   void CreateEndpoint(const char* name, fidl::SynchronousInterfacePtr<FEndpoint>* netout,
-                      Endpoint::Backing backing = Endpoint::Backing::ETHERTAP) {
+                      Endpoint::Backing backing = Endpoint::Backing::NETWORK_DEVICE) {
     CreateEndpoint(name, netout, GetDefaultEndpointConfig(backing));
+  }
+
+  struct ClientWithAttachedPort {
+    std::unique_ptr<network::client::NetworkDeviceClient> client;
+    fuchsia_hardware_network::wire::PortId port_id;
+
+    void Send(const uint8_t* data, const size_t len) {
+      network::client::NetworkDeviceClient::Buffer buffer = client->AllocTx();
+      ASSERT_TRUE(buffer.is_valid());
+      ASSERT_EQ(buffer.data().part(0).Write(data, len), len);
+      buffer.data().SetFrameType(fuchsia_hardware_network::wire::FrameType::kEthernet);
+      buffer.data().SetPortId(port_id);
+      ASSERT_OK(buffer.Send());
+    }
+  };
+
+  void StartNetdeviceClient(
+      fidl::InterfaceHandle<fuchsia::hardware::network::DeviceInstance> instance,
+      ClientWithAttachedPort* out_client) {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
+    ASSERT_OK(endpoints.status_value());
+    auto& [client_end, server_end] = endpoints.value();
+    ASSERT_OK(instance.BindSync()->GetDevice(
+        fidl::InterfaceRequest<fuchsia::hardware::network::Device>(server_end.TakeChannel())));
+    std::unique_ptr client =
+        std::make_unique<network::client::NetworkDeviceClient>(std::move(client_end), dispatcher());
+
+    fuchsia_hardware_network::wire::PortId port_id;
+    {
+      std::optional<zx_status_t> status;
+      client->OpenSession("network-context-test", [&status](zx_status_t s) { status = s; });
+      std::optional<zx::result<std::vector<fuchsia_hardware_network::wire::PortId>>> ports;
+      client->GetPorts([&ports](zx::result<std::vector<fuchsia_hardware_network::wire::PortId>> p) {
+        ports = std::move(p);
+      });
+      ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
+          [&status, &ports]() { return status.has_value() && ports.has_value(); }, kTestTimeout));
+      ASSERT_OK(status.value());
+      ASSERT_OK(ports.value().status_value());
+      ASSERT_EQ(ports.value().value().size(), 1ul);
+      port_id = ports.value().value()[0];
+    }
+    {
+      std::optional<zx_status_t> status;
+      client->AttachPort(port_id, {fuchsia_hardware_network::wire::FrameType::kEthernet},
+                         [&status](zx_status_t s) { status = s; });
+      ASSERT_TRUE(
+          RunLoopWithTimeoutOrUntil([&status]() { return status.has_value(); }, kTestTimeout));
+      ASSERT_OK(status.value());
+    }
+    {
+      bool port_online = false;
+      auto _watcher = client->WatchStatus(
+          port_id, [&port_online](fuchsia_hardware_network::wire::PortStatus status) {
+            port_online = static_cast<bool>(status.flags() &
+                                            fuchsia_hardware_network::wire::StatusFlags::kOnline);
+          });
+      WAIT_FOR_OK(port_online);
+    }
+
+    out_client->client = std::move(client);
+    out_client->port_id = port_id;
   }
 
   void CreateSimpleNetwork(Network::Config config,
                            fidl::InterfaceHandle<NetworkContext::FSetupHandle>* setup_handle,
-                           std::unique_ptr<EthernetClient>* eth1,
-                           std::unique_ptr<EthernetClient>* eth2) {
+                           ClientWithAttachedPort* dev1, ClientWithAttachedPort* dev2) {
     fidl::SynchronousInterfacePtr<FNetworkContext> context;
     GetNetworkContext(context.NewRequest());
     zx_status_t status;
@@ -176,27 +222,12 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     fuchsia::netemul::network::DeviceConnection conn1;
     fuchsia::netemul::network::DeviceConnection conn2;
     ASSERT_OK(ep1->GetDevice(&conn1));
-    ASSERT_TRUE(conn1.is_ethernet() && conn1.ethernet().is_valid());
+    ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
     ASSERT_OK(ep2->GetDevice(&conn2));
-    ASSERT_TRUE(conn2.is_ethernet() && conn2.ethernet().is_valid());
-    *eth1 = std::make_unique<EthernetClient>(dispatcher(), conn1.ethernet().Bind());
-    *eth2 = std::make_unique<EthernetClient>(dispatcher(), conn2.ethernet().Bind());
+    ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
 
-    bool eth_ready = false;
-    // configure both ethernet clients:
-    (*eth1)->Setup(TestEthBuffConfig, [&eth_ready](zx_status_t status) {
-      ASSERT_OK(status);
-      eth_ready = true;
-    });
-    WAIT_FOR_OK_AND_RESET(eth_ready);
-    (*eth2)->Setup(TestEthBuffConfig, [&eth_ready](zx_status_t status) {
-      ASSERT_OK(status);
-      eth_ready = true;
-    });
-    WAIT_FOR_OK_AND_RESET(eth_ready);
-
-    ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
-        [&eth1, &eth2]() { return (*eth1)->online() && (*eth2)->online(); }, kTestTimeout));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), dev1));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), dev2));
   }
 
   zx::result<fuchsia_hardware_network::wire::PortId> GetSinglePortId(
@@ -227,7 +258,6 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
   }
 
   std::shared_ptr<sys::ServiceDirectory> real_services_;
-  fdio_cpp::FdioCaller devfs_root_;
   std::unique_ptr<async::Loop> svc_loop_;
   std::unique_ptr<NetworkContext> svc_;
   fidl::SynchronousInterfacePtr<FNetworkManager> net_manager_;
@@ -354,19 +384,12 @@ TEST_F(NetworkServiceTest, BadEndpointConfigurations) {
                 ZX_ERR_INVALID_ARGS);
   ASSERT_FALSE(eph.is_valid());
 
-  constexpr fuchsia::netemul::network::EndpointBacking kBackingTypes[] = {
-      fuchsia::netemul::network::EndpointBacking::ETHERTAP,
-      fuchsia::netemul::network::EndpointBacking::NETWORK_DEVICE};
   // Can't create endpoint which violates maximum MTU.
-  for (auto backing : kBackingTypes) {
-    SCOPED_TRACE(static_cast<uint32_t>(backing));
-    auto badMtu = GetDefaultEndpointConfig();
-    badMtu.mtu = fuchsia::net::tun::MAX_MTU + 1;
-    badMtu.backing = backing;
-    ASSERT_OK(epm->CreateEndpoint(epname, std::move(badMtu), &status, &eph));
-    ASSERT_STATUS(status, ZX_ERR_INVALID_ARGS);
-    ASSERT_FALSE(eph.is_valid());
-  }
+  auto badMtu = GetDefaultEndpointConfig();
+  badMtu.mtu = fuchsia::net::tun::MAX_MTU + 1;
+  ASSERT_OK(epm->CreateEndpoint(epname, std::move(badMtu), &status, &eph));
+  ASSERT_STATUS(status, ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(eph.is_valid());
 
   // create a good endpoint:
   fidl::InterfaceHandle<FEndpoint> good_eph;
@@ -435,30 +458,18 @@ TEST_F(NetworkServiceTest, TransitData) {
   fuchsia::netemul::network::DeviceConnection conn1;
   fuchsia::netemul::network::DeviceConnection conn2;
   ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_ethernet() && conn1.ethernet().is_valid());
+  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
   ASSERT_OK(ep2->GetDevice(&conn2));
-  ASSERT_TRUE(conn2.is_ethernet() && conn2.ethernet().is_valid());
-  // create both clients
-  EthernetClient eth1(dispatcher(), conn1.ethernet().Bind());
-  EthernetClient eth2(dispatcher(), conn2.ethernet().Bind());
+  ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+
+  ClientWithAttachedPort dev1;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+  ClientWithAttachedPort dev2;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+  // Create both clients.
   bool ok = false;
 
-  // configure both ethernet clients:
-  eth1.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  eth2.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  // wait for both ethernets to come online
-  ASSERT_TRUE(RunLoopWithTimeoutOrUntil([&eth1, &eth2]() { return eth1.online() && eth2.online(); },
-                                        kTestTimeout));
-
-  // create some test buffs
+  // Create some test buffs.
   uint8_t test_buff1[TEST_BUF_SIZE];
   uint8_t test_buff2[TEST_BUF_SIZE];
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
@@ -466,31 +477,34 @@ TEST_F(NetworkServiceTest, TransitData) {
     test_buff2[i] = ~static_cast<uint8_t>(i);
   }
 
-  // install callbacks on the ethernet interfaces:
-  eth1.SetDataCallback([&ok, &test_buff1](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff1, len));
-    ok = true;
-  });
-  eth2.SetDataCallback([&ok, &test_buff2](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff2, len));
-    ok = true;
-  });
+  dev1.client->SetRxCallback(
+      [&ok, &test_buff1](network::client::NetworkDeviceClient::Buffer buffer) {
+        EXPECT_EQ(buffer.data().parts(), 1u);
+        ASSERT_EQ(TEST_BUF_SIZE, buffer.data().len());
+        ASSERT_EQ(0, memcmp(test_buff1, buffer.data().part(0).data().data(), buffer.data().len()));
+        ok = true;
+      });
+  dev2.client->SetRxCallback(
+      [&ok, &test_buff2](network::client::NetworkDeviceClient::Buffer buffer) {
+        EXPECT_EQ(buffer.data().parts(), 1u);
+        ASSERT_EQ(TEST_BUF_SIZE, buffer.data().len());
+        ASSERT_EQ(0, memcmp(test_buff2, buffer.data().part(0).data().data(), buffer.data().len()));
+        ok = true;
+      });
 
-  // send data from eth2 to eth1
-  ASSERT_OK(eth2.Send(test_buff1, TEST_BUF_SIZE));
+  // Send data from dev2 to dev1.
+  ASSERT_NO_FATAL_FAILURE(dev2.Send(test_buff1, TEST_BUF_SIZE));
   WAIT_FOR_OK_AND_RESET(ok);
 
-  // send data from eth1 to eth2
-  ASSERT_OK(eth1.Send(test_buff2, TEST_BUF_SIZE));
+  // Send data from dev1 to dev2.
+  ASSERT_NO_FATAL_FAILURE(dev1.Send(test_buff2, TEST_BUF_SIZE));
   WAIT_FOR_OK_AND_RESET(ok);
 
-  // try removing an endpoint:
+  // Try removing an endpoint.
   ASSERT_OK(net->RemoveEndpoint(ep2name, &status));
   ASSERT_OK(status);
-  // can still send, but should not trigger anything on the other side:
-  ASSERT_OK(eth1.Send(test_buff1, TEST_BUF_SIZE));
+  // Can still send, but should not trigger anything on the other side.
+  ASSERT_NO_FATAL_FAILURE(dev1.Send(test_buff2, TEST_BUF_SIZE));
   RunLoopUntilIdle();
   ASSERT_FALSE(ok);
 }
@@ -528,44 +542,23 @@ TEST_F(NetworkServiceTest, Flooding) {
   ASSERT_OK(net->AttachEndpoint(ep3name, &status));
   ASSERT_OK(status);
 
-  // start ethernet clients on all endpoints:
   fuchsia::netemul::network::DeviceConnection conn1;
   fuchsia::netemul::network::DeviceConnection conn2;
   fuchsia::netemul::network::DeviceConnection conn3;
   ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_ethernet() && conn1.ethernet().is_valid());
+  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
   ASSERT_OK(ep2->GetDevice(&conn2));
-  ASSERT_TRUE(conn2.is_ethernet() && conn2.ethernet().is_valid());
+  ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
   ASSERT_OK(ep3->GetDevice(&conn3));
-  ASSERT_TRUE(conn3.is_ethernet() && conn3.ethernet().is_valid());
-  // create all ethernet clients
-  EthernetClient eth1(dispatcher(), conn1.ethernet().Bind());
-  EthernetClient eth2(dispatcher(), conn2.ethernet().Bind());
-  EthernetClient eth3(dispatcher(), conn3.ethernet().Bind());
-  bool ok = false;
+  ASSERT_TRUE(conn3.is_network_device() && conn3.network_device().is_valid());
+  // Create all clients.
+  ClientWithAttachedPort dev1;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+  ClientWithAttachedPort dev2;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+  ClientWithAttachedPort dev3;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn3.network_device()), &dev3));
 
-  // configure all ethernet clients:
-  eth1.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  eth2.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  eth3.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  // Wait for all ethernets to come online
-  ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
-      [&eth1, &eth2, &eth3]() { return eth1.online() && eth2.online() && eth3.online(); },
-      kTestTimeout));
-
-  // create a test buff
   uint8_t test_buff[TEST_BUF_SIZE];
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
     test_buff[i] = static_cast<uint8_t>(i);
@@ -575,33 +568,40 @@ TEST_F(NetworkServiceTest, Flooding) {
   bool ok_eth1 = false;
   bool ok_eth2 = false;
   bool ok_eth3 = false;
-  eth1.SetDataCallback([&ok_eth1, &test_buff](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff, len));
-    ok_eth1 = true;
-  });
-  eth2.SetDataCallback([&ok_eth2, &test_buff](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff, len));
-    ok_eth2 = true;
-  });
-  eth3.SetDataCallback([&ok_eth3, &test_buff](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff, len));
-    ok_eth3 = true;
-  });
+
+  auto assert_buffer_matches = [&test_buff](network::client::NetworkDeviceClient::Buffer buffer) {
+    ASSERT_EQ(TEST_BUF_SIZE, buffer.data().len());
+    EXPECT_EQ(buffer.data().parts(), 1u);
+    ASSERT_EQ(0, memcmp(buffer.data().part(0).data().data(), test_buff, buffer.data().len()));
+  };
+
+  dev1.client->SetRxCallback(
+      [&assert_buffer_matches, &ok_eth1](network::client::NetworkDeviceClient::Buffer buffer) {
+        assert_buffer_matches(std::move(buffer));
+        ok_eth1 = true;
+      });
+  dev2.client->SetRxCallback(
+      [&assert_buffer_matches, &ok_eth2](network::client::NetworkDeviceClient::Buffer buffer) {
+        assert_buffer_matches(std::move(buffer));
+        ok_eth2 = true;
+      });
+  dev3.client->SetRxCallback(
+      [&assert_buffer_matches, &ok_eth3](network::client::NetworkDeviceClient::Buffer buffer) {
+        assert_buffer_matches(std::move(buffer));
+        ok_eth3 = true;
+      });
 
   for (int i = 0; i < 3; i++) {
-    // flood network from eth1:
-    ASSERT_OK(eth1.Send(test_buff, TEST_BUF_SIZE));
-    // wait for corrrect data on both endpoints:
+    // Flood network from dev1.
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(test_buff, TEST_BUF_SIZE));
+    // Wait for correct data on both endpoints.
     WAIT_FOR_OK_AND_RESET(ok_eth2);
     WAIT_FOR_OK_AND_RESET(ok_eth3);
-    // eth1 should have received NO data at this point:
+    // dev1 should have received NO data at this point.
     ASSERT_FALSE(ok_eth1);
-    // now flood from eth2:
-    ASSERT_OK(eth2.Send(test_buff, TEST_BUF_SIZE));
-    // wait for corrrect data on both endpoints:
+    // Now flood from eth2.
+    ASSERT_NO_FATAL_FAILURE(dev2.Send(test_buff, TEST_BUF_SIZE));
+    // Wait for correct data on both endpoints.
     WAIT_FOR_OK_AND_RESET(ok_eth1);
     WAIT_FOR_OK_AND_RESET(ok_eth3);
     ASSERT_FALSE(ok_eth2);
@@ -661,21 +661,12 @@ TEST_F(NetworkServiceTest, FakeEndpoints) {
   // start ethernet clients on endpoint:
   fuchsia::netemul::network::DeviceConnection conn1;
   ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_ethernet() && conn1.ethernet().is_valid());
-  // create client
-  EthernetClient eth1(dispatcher(), conn1.ethernet().Bind());
+  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
+
+  ClientWithAttachedPort dev1;
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
   bool ok = false;
 
-  // configure ethernet client:
-  eth1.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  // and wait for it to come online:
-  ASSERT_TRUE(RunLoopWithTimeoutOrUntil([&eth1]() { return eth1.online(); }, kTestTimeout));
-
-  // create some test buffs
   std::vector<uint8_t> test_buff1(TEST_BUF_SIZE);
   std::vector<uint8_t> test_buff2(TEST_BUF_SIZE);
   test_buff2.reserve(TEST_BUF_SIZE);
@@ -684,21 +675,23 @@ TEST_F(NetworkServiceTest, FakeEndpoints) {
     test_buff2[i] = ~static_cast<uint8_t>(i);
   }
 
-  // install callbacks on the ethernet interface:
-  eth1.SetDataCallback([&ok, &test_buff1](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff1.data(), len));
-    ok = true;
-  });
+  dev1.client->SetRxCallback(
+      [&test_buff1, &ok](network::client::NetworkDeviceClient::Buffer buffer) {
+        ASSERT_EQ(TEST_BUF_SIZE, buffer.data().len());
+        EXPECT_EQ(buffer.data().parts(), 1u);
+        ASSERT_EQ(
+            0, memcmp(test_buff1.data(), buffer.data().part(0).data().data(), buffer.data().len()));
+        ok = true;
+      });
 
-  // create and inject a fake endpoint:
+  // Create and inject a fake endpoint.
   fidl::InterfacePtr<FFakeEndpoint> fake_ep;
   ASSERT_OK(net->CreateFakeEndpoint(fake_ep.NewRequest()));
   ASSERT_TRUE(fake_ep.is_bound());
 
   for (int i = 0; i < 3; i++) {
-    // send buff 2 from eth endpoint:
-    eth1.Send(test_buff2.data(), static_cast<uint16_t>(test_buff2.size()));
+    // Send buff 2 from eth endpoint.
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(test_buff2.data(), static_cast<uint16_t>(test_buff2.size())));
     // Read the next frame.
     fake_ep->Read([&ok, &test_buff2](std::vector<uint8_t> data, uint64_t dropped) {
       EXPECT_EQ(dropped, 0u);
@@ -707,7 +700,7 @@ TEST_F(NetworkServiceTest, FakeEndpoints) {
       ok = true;
     });
     WAIT_FOR_OK_AND_RESET(ok);
-    // send buff 1 from fake endpoint:
+    // Send buff 1 from fake endpoint.
     fake_ep->Write(test_buff1, []() {});
     WAIT_FOR_OK_AND_RESET(ok);
   }
@@ -815,46 +808,36 @@ TEST_F(NetworkServiceTest, NetworkContext) {
     fuchsia::netemul::network::DeviceConnection conn1;
     fuchsia::netemul::network::DeviceConnection conn2;
     ASSERT_OK(ep1->GetDevice(&conn1));
-    ASSERT_TRUE(conn1.is_ethernet() && conn1.ethernet().is_valid());
+    ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
     ASSERT_OK(ep2->GetDevice(&conn2));
-    ASSERT_TRUE(conn2.is_ethernet() && conn2.ethernet().is_valid());
-    // create both clients
-    EthernetClient eth1(dispatcher(), conn1.ethernet().Bind());
-    EthernetClient eth2(dispatcher(), conn2.ethernet().Bind());
+    ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+
+    ClientWithAttachedPort dev1;
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+    ClientWithAttachedPort dev2;
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+
     bool ok = false;
 
-    // configure both ethernet clients:
-    eth1.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-      ASSERT_OK(status);
-      ok = true;
-    });
-    WAIT_FOR_OK_AND_RESET(ok);
-    eth2.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-      ASSERT_OK(status);
-      ok = true;
-    });
-    WAIT_FOR_OK_AND_RESET(ok);
-    // and wait for them to come online:
-    ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
-        [&eth1, &eth2]() { return eth1.online() && eth2.online(); }, kTestTimeout));
-
-    // create some test buffs
     uint8_t test_buff[TEST_BUF_SIZE];
     for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
       test_buff[i] = static_cast<uint8_t>(i);
     }
-    // install callbacks on the ethernet interface:
-    eth2.SetDataCallback([&ok, &test_buff](const void* data, size_t len) {
-      ASSERT_EQ(TEST_BUF_SIZE, len);
-      ASSERT_EQ(0, memcmp(data, test_buff, len));
-      ok = true;
-    });
-    ASSERT_OK(eth1.Send(test_buff, TEST_BUF_SIZE));
+    // Install callbacks on the interface.
+    dev2.client->SetRxCallback(
+        [&test_buff, &ok](network::client::NetworkDeviceClient::Buffer buffer) {
+          ASSERT_EQ(TEST_BUF_SIZE, buffer.data().len());
+          EXPECT_EQ(buffer.data().parts(), 1u);
+          ASSERT_EQ(0, memcmp(test_buff, buffer.data().part(0).data().data(), buffer.data().len()));
+          ok = true;
+        });
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(test_buff, TEST_BUF_SIZE));
     WAIT_FOR_OK_AND_RESET(ok);
-  }  // test above performed in closed scope so all bindings are destroyed after
-  // it's done
+  }
+  // The test above performed in closed scope so all bindings are destroyed
+  // after it's done.
 
-  // check that attempting to set up with repeated network name will fail:
+  // Check that attempting to set up with repeated network name will fail.
   std::vector<NetworkSetup> repeated_net_name;
   fidl::InterfaceHandle<NetworkContext::FSetupHandle> dummy_handle;
   auto& repeated_cfg = repeated_net_name.emplace_back();
@@ -928,7 +911,7 @@ TEST_F(NetworkServiceTest, NetworkSetInvalidConfig) {
 TEST_F(NetworkServiceTest, NetworkConfigChains) {
   StartServices();
   constexpr int packet_count = 3;
-  std::unique_ptr<EthernetClient> eth1, eth2;
+  ClientWithAttachedPort dev1, dev2;
   fidl::InterfaceHandle<NetworkContext::FSetupHandle> setup_handle;
   Network::Config config;
   config.mutable_packet_loss()->set_random_rate(0);
@@ -937,20 +920,21 @@ TEST_F(NetworkServiceTest, NetworkConfigChains) {
   config.mutable_reorder()->store_buff = packet_count;
   config.mutable_reorder()->tick = 0;
 
-  CreateSimpleNetwork(std::move(config), &setup_handle, &eth1, &eth2);
-  ASSERT_TRUE(eth1 && eth2);
+  ASSERT_NO_FATAL_FAILURE(CreateSimpleNetwork(std::move(config), &setup_handle, &dev1, &dev2));
 
   std::unordered_set<uint8_t> received;
   zx::time after;
-  eth2->SetDataCallback([&received, &after](const void* data, size_t len) {
-    EXPECT_EQ(len, 1ul);
-    received.insert(*reinterpret_cast<const uint8_t*>(data));
-    after = zx::clock::get_monotonic();
-  });
+  dev2.client->SetRxCallback(
+      [&received, &after](network::client::NetworkDeviceClient::Buffer buffer) {
+        EXPECT_EQ(buffer.data().len(), 1ul);
+        EXPECT_EQ(buffer.data().parts(), 1u);
+        received.insert(buffer.data().part(0).data()[0]);
+        after = zx::clock::get_monotonic();
+      });
 
   auto bef = zx::clock::get_monotonic();
   for (uint8_t i = 0; i < packet_count; i++) {
-    ASSERT_OK(eth1->Send(&i, 1));
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(&i, 1));
   }
 
   ASSERT_TRUE(RunLoopWithTimeoutOrUntil([&received]() { return received.size() == packet_count; },
@@ -970,25 +954,26 @@ TEST_F(NetworkServiceTest, NetworkConfigChanges) {
   StartServices();
   constexpr int reorder_threshold = 3;
   constexpr int packet_count = 5;
-  std::unique_ptr<EthernetClient> eth1, eth2;
+  ClientWithAttachedPort dev1, dev2;
   fidl::InterfaceHandle<NetworkContext::FSetupHandle> setup_handle;
   Network::Config config;
   config.mutable_reorder()->store_buff = reorder_threshold;
   config.mutable_reorder()->tick = 0;
 
-  // start with creating a network with a reorder threshold lower than the sent
-  // packet count
-  CreateSimpleNetwork(std::move(config), &setup_handle, &eth1, &eth2);
-  ASSERT_TRUE(eth1 && eth2 && setup_handle.is_valid());
+  // Start with creating a network with a reorder threshold lower than the sent
+  // packet count.
+  ASSERT_NO_FATAL_FAILURE(CreateSimpleNetwork(std::move(config), &setup_handle, &dev1, &dev2));
 
   std::unordered_set<uint8_t> received;
-  eth2->SetDataCallback([&received](const void* data, size_t len) {
-    EXPECT_EQ(len, 1ul);
-    received.insert(*reinterpret_cast<const uint8_t*>(data));
+
+  dev2.client->SetRxCallback([&received](network::client::NetworkDeviceClient::Buffer buffer) {
+    EXPECT_EQ(buffer.data().len(), 1ul);
+    EXPECT_EQ(buffer.data().parts(), 1u);
+    received.insert(buffer.data().part(0).data()[0]);
   });
 
   for (uint8_t i = 0; i < packet_count; i++) {
-    ASSERT_OK(eth1->Send(&i, 1));
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(&i, 1));
   }
 
   // wait until |reorder_threshold| is hit
@@ -1022,7 +1007,7 @@ TEST_F(NetworkServiceTest, NetworkConfigChanges) {
   // go again to verify that the configuration changed into packet loss with 0%
   // loss:
   for (uint8_t i = 0; i < packet_count; i++) {
-    ASSERT_OK(eth1->Send(&i, 1));
+    ASSERT_NO_FATAL_FAILURE(dev1.Send(&i, 1));
   }
   // wait until |packet_count| is hit
   ASSERT_TRUE(RunLoopWithTimeoutOrUntil([&received]() { return received.size() == packet_count; },
@@ -1071,134 +1056,6 @@ TEST_F(NetworkServiceTest, NetWatcher) {
     EXPECT_EQ(pkt.interface, 0u);
     EXPECT_EQ(memcmp(pkt.data, &i, sizeof(i)), 0);
   }
-}
-
-// Tests creating a NetworkDevice and an Ethertap device and that they can communicate over a
-// network.
-TEST_F(NetworkServiceTest, HybridNetworkDevice) {
-  const char* netname = "mynet";
-  const char* eth_ep_name = "ep-eth";
-  const char* netdev_ep_name = "ep-netdev";
-  StartServices();
-
-  // Create a network.
-  fidl::SynchronousInterfacePtr<FNetwork> net;
-  CreateNetwork(netname, &net);
-
-  // Create first endpoint.
-  fidl::SynchronousInterfacePtr<FEndpoint> eth_ep;
-  CreateEndpoint(eth_ep_name, &eth_ep, Endpoint::Backing::ETHERTAP);
-
-  // Create second endpoint.
-  fidl::SynchronousInterfacePtr<FEndpoint> netdev_ep;
-  CreateEndpoint(netdev_ep_name, &netdev_ep, Endpoint::Backing::NETWORK_DEVICE);
-  ASSERT_OK(eth_ep->SetLinkUp(true));
-  ASSERT_OK(netdev_ep->SetLinkUp(true));
-
-  // Attach both endpoints.
-  zx_status_t status;
-  ASSERT_OK(net->AttachEndpoint(eth_ep_name, &status));
-  ASSERT_OK(status);
-  ASSERT_OK(net->AttachEndpoint(netdev_ep_name, &status));
-  ASSERT_OK(status);
-
-  // Start ethernet clients on both endpoints.
-  fuchsia::netemul::network::DeviceConnection conn_eth;
-  fuchsia::netemul::network::DeviceConnection conn_netdev;
-  ASSERT_OK(eth_ep->GetDevice(&conn_eth));
-  ASSERT_TRUE(conn_eth.is_ethernet() && conn_eth.ethernet().is_valid());
-  ASSERT_OK(netdev_ep->GetDevice(&conn_netdev));
-  ASSERT_TRUE(conn_netdev.is_network_device());
-  ASSERT_TRUE(conn_netdev.network_device().is_valid());
-  // Create both clients.
-  EthernetClient eth_cli(dispatcher(), conn_eth.ethernet().Bind());
-  fidl::InterfaceHandle<fuchsia::hardware::network::Device> device;
-  conn_netdev.network_device().Bind()->GetDevice(device.NewRequest());
-  network::client::NetworkDeviceClient netdev_cli(fidl::HLCPPToNatural(device));
-  bool ok = false;
-
-  // Configure both ethernet clients.
-  eth_cli.Setup(TestEthBuffConfig, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-  netdev_cli.OpenSession("test_session", [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-
-  zx::result maybe_port_id = GetSinglePortId(netdev_cli);
-  ASSERT_OK(maybe_port_id.status_value());
-  const fuchsia_hardware_network::wire::PortId port_id = maybe_port_id.value();
-
-  netdev_cli.AttachPort(port_id, {kEndpointFrameType}, [&ok](zx_status_t status) {
-    ASSERT_OK(status);
-    ok = true;
-  });
-  WAIT_FOR_OK_AND_RESET(ok);
-
-  // Wait for both to come online.
-  {
-    bool netdev_online = false;
-    auto watcher = netdev_cli.WatchStatus(
-        port_id, [&netdev_online](fuchsia_hardware_network::wire::PortStatus status) {
-          if (status.flags() & fuchsia_hardware_network::wire::StatusFlags::kOnline) {
-            netdev_online = true;
-          }
-        });
-    ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
-        [&eth_cli, &netdev_online]() { return eth_cli.online() && netdev_online; }, kTestTimeout))
-        << "Test timed out, eth_cli online=" << eth_cli.online()
-        << ", netdev_online=" << netdev_online;
-  }
-
-  // Create some test buffs.
-  uint8_t test_buff1[TEST_BUF_SIZE];
-  uint8_t test_buff2[TEST_BUF_SIZE];
-  for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
-    test_buff1[i] = static_cast<uint8_t>(i);
-    test_buff2[i] = ~static_cast<uint8_t>(i);
-  }
-
-  // Install callbacks on the ethernet interfaces.
-  bool rx_eth = false;
-  bool rx_netdev = false;
-  eth_cli.SetDataCallback([&rx_eth, &test_buff1](const void* data, size_t len) {
-    ASSERT_EQ(TEST_BUF_SIZE, len);
-    ASSERT_EQ(0, memcmp(data, test_buff1, len));
-    rx_eth = true;
-  });
-
-  netdev_cli.SetRxCallback(
-      [&rx_netdev, &test_buff2](network::client::NetworkDeviceClient::Buffer buff) {
-        ASSERT_EQ(TEST_BUF_SIZE, buff.data().len());
-        ASSERT_EQ(buff.data().parts(), 1u);
-        ASSERT_EQ(0, memcmp(buff.data().part(0).data().data(), test_buff2, TEST_BUF_SIZE));
-        rx_netdev = true;
-      });
-
-  // Send data from netdev to eth.
-  auto tx = netdev_cli.AllocTx();
-  ASSERT_TRUE(tx.is_valid());
-  tx.data().SetFrameType(fuchsia_hardware_network::wire::FrameType::kEthernet);
-  tx.data().SetPortId(port_id);
-  ASSERT_EQ(tx.data().Write(test_buff1, TEST_BUF_SIZE), TEST_BUF_SIZE);
-  ASSERT_OK(tx.Send());
-  WAIT_FOR_OK_AND_RESET(rx_eth);
-
-  // Send data from eth to netdev.
-  ASSERT_OK(eth_cli.Send(test_buff2, TEST_BUF_SIZE));
-  WAIT_FOR_OK_AND_RESET(rx_netdev);
-
-  // Try removing an endpoint.
-  ASSERT_OK(net->RemoveEndpoint(netdev_ep_name, &status));
-  ASSERT_OK(status);
-  // Can still send, but should not trigger anything on the other side.
-  ASSERT_OK(eth_cli.Send(test_buff1, TEST_BUF_SIZE));
-  RunLoopUntilIdle();
-  ASSERT_FALSE(rx_netdev) << "Unexpectedly triggered netdev_cli callback";
 }
 
 TEST_F(NetworkServiceTest, DualNetworkDevice) {

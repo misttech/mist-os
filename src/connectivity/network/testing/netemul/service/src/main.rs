@@ -17,7 +17,6 @@ use {
         self as fcomponent, Capability, ChildOptions, LocalComponentHandles, RealmBuilder,
         RealmInstance, Ref, Route,
     },
-    fuchsia_driver_test::DriverTestRealmBuilder as _,
     fuchsia_zircon as zx,
     futures::pin_mut,
     futures::{
@@ -822,10 +821,6 @@ async fn setup_network_realm(sandbox_name: impl std::fmt::Display) -> Result<Rea
     let builder = RealmBuilder::new_with_collection(REALM_COLLECTION_NAME.to_string())
         .await
         .context("error creating new realm builder")?;
-    let _: &RealmBuilder = builder
-        .driver_test_realm_setup()
-        .await
-        .context("error setting up the driver test realm")?;
     let network_context_child = builder
         .add_child(NETWORK_CONTEXT_COMPONENT_NAME, network_context_package_url, ChildOptions::new())
         .await
@@ -842,23 +837,6 @@ async fn setup_network_realm(sandbox_name: impl std::fmt::Display) -> Result<Rea
             format!(
                 "error adding route exposing capability '{}' from component '{}'",
                 fnetemul_network::NetworkContextMarker::PROTOCOL_NAME,
-                NETWORK_CONTEXT_COMPONENT_NAME
-            )
-        })?;
-    let () = builder
-        .add_route(
-            Route::new()
-                .capability(Capability::directory(DEVFS_CAPABILITY).path(DEVFS_PATH).rights(fio::R_STAR_DIR))
-                .capability(Capability::protocol::<fidl_fuchsia_driver_test::RealmMarker>())
-                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                .to(&network_context_child),
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "error adding route offering directory 'dev' and protocol '{}' from component '{}' to '{}'",
-                fidl_fuchsia_driver_test::RealmMarker::PROTOCOL_NAME,
-                fuchsia_driver_test::COMPONENT_NAME,
                 NETWORK_CONTEXT_COMPONENT_NAME
             )
         })?;
@@ -1394,10 +1372,7 @@ mod tests {
         let endpoints = endpoint_mgr.list_endpoints().await.expect("calling list endpoints");
         assert_eq!(endpoints, Vec::<String>::new());
 
-        let backings = [
-            fnetemul_network::EndpointBacking::Ethertap,
-            fnetemul_network::EndpointBacking::NetworkDevice,
-        ];
+        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
         for (i, backing) in backings.iter().enumerate() {
             let name = format!("ep{}", i);
             let (status, endpoint) = endpoint_mgr
@@ -1963,10 +1938,7 @@ mod tests {
         let mut watcher = get_devfs_watcher(&realm).await;
 
         const TEST_DEVICE_NAME: &str = "test";
-        let backings = [
-            fnetemul_network::EndpointBacking::Ethertap,
-            fnetemul_network::EndpointBacking::NetworkDevice,
-        ];
+        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
         for (i, backing) in backings.iter().enumerate() {
             let name = format!("{}{}", TEST_DEVICE_NAME, i);
             let endpoint = create_endpoint(
@@ -2135,13 +2107,9 @@ mod tests {
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
 
-        let backings = [
-            fnetemul_network::EndpointBacking::Ethertap,
-            fnetemul_network::EndpointBacking::NetworkDevice,
-        ];
+        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
         for (i, backing) in backings.iter().enumerate() {
             let class = match backing {
-                fnetemul_network::EndpointBacking::Ethertap => "ethernet",
                 fnetemul_network::EndpointBacking::NetworkDevice => "network",
             };
             let name = format!("{}_test_{}", class, i);
@@ -2319,17 +2287,17 @@ mod tests {
             },
         );
         const CLASS_DIR: &str = "class";
-        const ETHERNET_DIR: &str = "ethernet";
+        const NETWORK_DIR: &str = "network";
         const TEST_DEVICE_NAME: &str = "ep0";
-        let ethernet_path = format!("{}/{}", CLASS_DIR, ETHERNET_DIR);
-        let test_device_path = format!("{}/{}/{}", CLASS_DIR, ETHERNET_DIR, TEST_DEVICE_NAME);
+        let ethernet_path = format!("{}/{}", CLASS_DIR, NETWORK_DIR);
+        let test_device_path = format!("{}/{}/{}", CLASS_DIR, NETWORK_DIR, TEST_DEVICE_NAME);
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
             fnetemul_network::EndpointConfig {
                 mtu: 1500,
                 mac: None,
-                backing: fnetemul_network::EndpointBacking::Ethertap,
+                backing: fnetemul_network::EndpointBacking::NetworkDevice,
             },
         )
         .await;
@@ -2351,7 +2319,7 @@ mod tests {
         )
         .await;
 
-        let (ethernet, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+        let (network, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         let () = devfs
             .open(
@@ -2361,10 +2329,9 @@ mod tests {
                 server_end.into_channel().into(),
             )
             .expect("calling open");
-        let mut ethernet_watcher =
-            fvfs_watcher::Watcher::new(&ethernet).await.expect("watcher creation");
+        let mut watcher = fvfs_watcher::Watcher::new(&network).await.expect("watcher creation");
         let () = wait_for_event_on_path(
-            &mut ethernet_watcher,
+            &mut watcher,
             fvfs_watcher::WatchEvent::EXISTING,
             &std::path::Path::new(TEST_DEVICE_NAME),
         )
@@ -2376,7 +2343,7 @@ mod tests {
             .map_err(zx::Status::from_raw)
             .expect("error removing device");
         let () = wait_for_event_on_path(
-            &mut ethernet_watcher,
+            &mut watcher,
             fvfs_watcher::WatchEvent::REMOVE_FILE,
             &std::path::Path::new(TEST_DEVICE_NAME),
         )

@@ -7,7 +7,6 @@ use async_utils::{hanging_get::client::HangingGetStream, stream::FlattenUnordere
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
@@ -15,12 +14,10 @@ use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use fidl_fuchsia_netstack as fnetstack;
 use fuchsia_component::{
     client::connect_to_protocol,
     server::{ServiceFs, ServiceFsDir},
 };
-use fuchsia_zircon_status as zx;
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use log::{error, info, warn};
 
@@ -80,8 +77,6 @@ enum InterfaceConfigError {
 
 #[derive(thiserror::Error, Debug)]
 enum NetstackError {
-    #[error("failed to add ethernet device with config {config:?}: {status}")]
-    AddEthernetDevice { status: zx::Status, config: fnetstack::InterfaceConfig },
     #[error("the interface control channel was closed: {0:?}")]
     InterfaceControl(
         fnet_interfaces_ext::admin::TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
@@ -139,26 +134,6 @@ async fn configure_interface(
     let (control, server_end) =
         fnet_interfaces_ext::admin::Control::create_endpoints().context("create endpoints")?;
     let nicid = match device {
-        fnetemul_network::DeviceConnection::Ethernet(device) => {
-            let netstack = connect_to_protocol::<fnetstack::NetstackMarker>()
-                .context("connect to protocol")?;
-            let mut config = fnetstack::InterfaceConfig {
-                name: name.clone(),
-                filepath: format!("/dev/{}", name),
-                metric: DEFAULT_METRIC,
-            };
-            let nicid = netstack
-                .add_ethernet_device(&format!("/dev/{}", name), &mut config, device)
-                .await?
-                .map_err(zx::Status::from_raw)
-                .map_err(|status| NetstackError::AddEthernetDevice { status, config })?
-                .into();
-
-            let debug_interfaces = connect_to_protocol::<fnet_debug::InterfacesMarker>()
-                .context("connect to protocol")?;
-            debug_interfaces.get_admin(nicid, server_end)?;
-            nicid
-        }
         fnetemul_network::DeviceConnection::NetworkDevice(device_instance) => {
             let device = {
                 let (proxy, server_end) =
