@@ -241,6 +241,10 @@ class NetworkDeviceImpl : public EndpointImpl,
     }
     tun_device_.set_error_handler([this](zx_status_t err) { Closed(); });
 
+    if (config().mtu > fuchsia::net::tun::MAX_MTU) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+
     fuchsia::net::tun::DevicePortConfig port_config;
     port_config.mutable_base()->set_id(Endpoint::kPortId);
     port_config.mutable_base()->set_mtu(config().mtu);

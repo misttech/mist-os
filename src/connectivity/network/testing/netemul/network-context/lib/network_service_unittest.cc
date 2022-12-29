@@ -354,12 +354,19 @@ TEST_F(NetworkServiceTest, BadEndpointConfigurations) {
                 ZX_ERR_INVALID_ARGS);
   ASSERT_FALSE(eph.is_valid());
 
-  // can't create endpoint which violates maximum MTU
-  auto badMtu = GetDefaultEndpointConfig();
-  badMtu.mtu = 65535;  // 65k too large
-  ASSERT_OK(epm->CreateEndpoint(epname, std::move(badMtu), &status, &eph));
-  ASSERT_STATUS(status, ZX_ERR_INVALID_ARGS);
-  ASSERT_FALSE(eph.is_valid());
+  constexpr fuchsia::netemul::network::EndpointBacking kBackingTypes[] = {
+      fuchsia::netemul::network::EndpointBacking::ETHERTAP,
+      fuchsia::netemul::network::EndpointBacking::NETWORK_DEVICE};
+  // Can't create endpoint which violates maximum MTU.
+  for (auto backing : kBackingTypes) {
+    SCOPED_TRACE(static_cast<uint32_t>(backing));
+    auto badMtu = GetDefaultEndpointConfig();
+    badMtu.mtu = fuchsia::net::tun::MAX_MTU + 1;
+    badMtu.backing = backing;
+    ASSERT_OK(epm->CreateEndpoint(epname, std::move(badMtu), &status, &eph));
+    ASSERT_STATUS(status, ZX_ERR_INVALID_ARGS);
+    ASSERT_FALSE(eph.is_valid());
+  }
 
   // create a good endpoint:
   fidl::InterfaceHandle<FEndpoint> good_eph;
