@@ -1,7 +1,6 @@
 {
     "world": {
         "target": "{TARGET}",
-        "diffNotice": "{DIFF_TARGET}",
         "fuchsiaDir": "{FUCHSIA_DIR}",
         "buildDir": "{BUILD_DIR}",
         "gnPath": "{GN_PATH}",

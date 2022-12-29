@@ -12,7 +12,6 @@
     "outputs": [
       "compliance.csv",
       "summary.csv",
-      "summary_diff.csv",
       "license_texts_grouped_by_project.txt",
       "license_texts_grouped_by_project_deduped.txt",
       "license_all_grouped_by_license_pattern_deduped.txt",
@@ -29,7 +28,6 @@
         "notes": []
       }
     ],
-    "diffNotice": "{DIFF_TARGET}",
     "exitOnError": true,
     "zip": true,
     "checks": [

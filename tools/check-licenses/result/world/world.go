@@ -5,7 +5,6 @@
 package world
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -25,8 +24,6 @@ type World struct {
 	Projects         []*project.Project
 	Patterns         []*license.Pattern
 	FilteredProjects []*project.Project
-
-	Diff *DiffInfo
 }
 
 func NewWorld() (*World, error) {
@@ -79,11 +76,6 @@ func NewWorld() (*World, error) {
 
 	if err := w.AddLicenseUrls(); err != nil {
 		return nil, err
-	}
-
-	if Config.DiffNotice != "" {
-		w.Status.WriteString(fmt.Sprintf("Diffing current workspace against `%s`\n", Config.DiffNotice))
-		w.SetDiffInfo()
 	}
 
 	return w, nil

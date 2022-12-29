@@ -21,19 +21,12 @@ type ResultConfig struct {
 	BuildInfoProduct  string      `json:"buildInfoProduct"`
 	BuildInfoBoard    string      `json:"buildInfoBoard"`
 
-	DiffNotice string `json:"diffnotice"`
-
 	Checks []*Check `json:"checks"`
 }
 
 type Template struct {
 	Paths []string `json:"paths"`
 	Notes []string `json:"notes"`
-}
-
-type DiffNotice struct {
-	Type string `json:"type"`
-	Path string `json:"path"`
 }
 
 var Config *ResultConfig
@@ -66,9 +59,6 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 	c.Templates = append(c.Templates, other.Templates...)
 	c.Outputs = append(c.Outputs, other.Outputs...)
 	c.Zip = c.Zip || other.Zip
-	if c.DiffNotice == "" {
-		c.DiffNotice = other.DiffNotice
-	}
 	c.ExitOnError = c.ExitOnError || other.ExitOnError
 	if c.GnGenOutputFile == "" {
 		c.GnGenOutputFile = other.GnGenOutputFile

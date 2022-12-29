@@ -15,8 +15,6 @@ type WorldConfig struct {
 	BuildInfoBoard   string `json:"buildInfoBoard"`
 
 	Filters []string `json:"filters"`
-
-	DiffNotice string `json:"diffnotice"`
 }
 
 var Config *WorldConfig
@@ -39,9 +37,6 @@ func (c *WorldConfig) Merge(other *WorldConfig) {
 	}
 	if c.GnPath == "" {
 		c.GnPath = other.GnPath
-	}
-	if c.DiffNotice == "" {
-		c.DiffNotice = other.DiffNotice
 	}
 	c.Filters = append(c.Filters, other.Filters...)
 	if c.BuildInfoVersion == "" {

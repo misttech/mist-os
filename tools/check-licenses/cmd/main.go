@@ -28,8 +28,6 @@ var (
 var (
 	configFile_deprecated = flag.String("config_file", "", "Deprecated, but kept around for backwards compatibility.")
 
-	diffTarget = flag.String("diff_target", "", "Notice file to diff the current licenses against.")
-
 	fuchsiaDir     = flag.String("fuchsia_dir", os.Getenv("FUCHSIA_DIR"), "Location of the fuchsia root directory (//).")
 	buildDir       = flag.String("build_dir", os.Getenv("FUCHSIA_BUILD_DIR"), "Location of GN build directory.")
 	outDir         = flag.String("out_dir", "/tmp/check-licenses", "Directory to write outputs to.")
@@ -163,15 +161,6 @@ func mainImpl() error {
 		spdxDocName = target
 	}
 	ConfigVars["{SPDX_DOC_NAME}"] = spdxDocName
-
-	// diffTarget
-	if *diffTarget != "" {
-		*diffTarget, err = filepath.Abs(*diffTarget)
-		if err != nil {
-			return fmt.Errorf("Failed to get absolute directory for *diffTarget %v: %v", *diffTarget, err)
-		}
-	}
-	ConfigVars["{DIFF_TARGET}"] = *diffTarget
 
 	// configFile
 	configFile := strings.ReplaceAll(defaultConfigFile, "{FUCHSIA_DIR}", *fuchsiaDir)

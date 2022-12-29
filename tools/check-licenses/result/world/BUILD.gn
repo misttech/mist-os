@@ -11,7 +11,6 @@ go_library("world") {
     "by_project.go",
     "config.go",
     "csv.go",
-    "diff.go",
     "init.go",
     "metrics.go",
     "url.go",
