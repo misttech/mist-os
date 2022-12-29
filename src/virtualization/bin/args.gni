@@ -8,5 +8,5 @@ declare_args() {
 
   # If true, use a wayland server linked into the virtio_wl device instead of using
   # a wayland_bridge component.
-  virtio_wl_local_wayland_server = true
+  virtio_wl_local_wayland_server = false
 }
