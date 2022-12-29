@@ -13,7 +13,7 @@
     children: [
         {
             name: "trace_manager",
-            url: "fuchsia-pkg://fuchsia.com/trace_manager#meta/trace_manager.cm",
+            url: "trace_manager#meta/trace_manager.cm",
         },
     ],
     use: [
@@ -53,9 +53,4 @@
             to: "#trace_manager",
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [ "trace_manager" ],
-        },
-    },
 }
