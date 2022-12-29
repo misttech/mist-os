@@ -8,9 +8,6 @@ _imports = {  # Import into hidden scope, to avoid importing into args.gn.
   import("//boards/emulation/virtio_drivers.gni")
 }
 
-# BoardInformation for Product Assembly
-board_information_for_assembly = "//boards/x64/board_information.json5"
-
 board_name = "x64"
 board_description = "A generic x64 device"
 

@@ -4,9 +4,6 @@
 
 // BoardInformation for ProductAssembly
 {
-    name: "chromebook-x64",
-    provided_features: [
-        "fuchsia::cr50",
-        "fuchsia::wlan_softmac",
-    ],
+  name: "chromebook-x64",
+  provided_features: [ "fuchsia::cr50" ],
 }

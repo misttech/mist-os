@@ -376,11 +376,6 @@ template("assembled_system") {
       "omaha-client",
       "kernel_args_user",
       "kernel_args_userdebug",
-      "wlan_base",
-      "wlan_legacy_privacy_support",
-      "wlan_contemporary_privacy_only_support",
-      "wlan_fullmac_support",
-      "wlan_softmac_support",
     ]
 
     # The names of all of the platform's 'testonly=true' Assembly Input Bundles

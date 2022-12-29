@@ -213,3 +213,10 @@ group("wlan_softmac_core_drivers") {
     "//src/connectivity/wlan/drivers/wlansoftmac",
   ]
 }
+
+group("wifi_intel") {
+  public_deps = [
+    ":wlan_softmac_core_drivers",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
+  ]
+}
