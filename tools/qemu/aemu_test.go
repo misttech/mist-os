@@ -25,7 +25,7 @@ func TestAEMUCommandBuilder(t *testing.T) {
 	cmd, err = b.Build()
 	check(t, expected{
 		cmd: []string{},
-		err: fmt.Errorf("precisely one of QEMU kernel path or a UEFI image must be set."),
+		err: fmt.Errorf("one of QEMU kernel path or a UEFI disk image must be set."),
 	}, cmd, err)
 
 	b.SetKernel("./data/qemu-kernel")

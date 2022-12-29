@@ -47,12 +47,12 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 	// to select among the images that could be overridden.
 	overrides := s.Env.ImageOverrides
 	if !overrides.IsEmpty() {
-		if image.Label == overrides.ZBI || image.Label == overrides.VBMeta || image.Label == overrides.QEMUKernel || image.Label == overrides.EFI {
+		if image.Label == overrides.ZBI || image.Label == overrides.VBMeta || image.Label == overrides.QEMUKernel || image.Label == overrides.EFIDisk {
 			return true
 		}
 
 		// Emulators always need a kernel or a UEFI filesystem/disk image.
-		if s.Env.TargetsEmulator() && image.Name == "qemu-kernel" && overrides.QEMUKernel == "" && overrides.EFI == "" {
+		if s.Env.TargetsEmulator() && image.Name == "qemu-kernel" && overrides.QEMUKernel == "" && overrides.EFIDisk == "" {
 			return true
 		}
 

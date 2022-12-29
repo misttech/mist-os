@@ -74,7 +74,7 @@ _max_severity_allowed_val = [
 #         only be used by boot_test() defined in //build/testing/zbi_test.gni
 #         which requires different images to boot the target with.
 #
-#         zbi, vbmeta, qemu_kernel, efi (optional)
+#         zbi, vbmeta, qemu_kernel, efi_disk (optional)
 #           [label_with_toolchain] Specifies an override via label. One of
 #           these values must be set.
 #

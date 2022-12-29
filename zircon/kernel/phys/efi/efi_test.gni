@@ -6,7 +6,7 @@
 
 import("//build/testing/boot_test.gni")
 import("efi_executable.gni")
-import("fat_filesystem.gni")
+import("toolchain.gni")
 
 # Defines a UEFI test application.
 #
@@ -34,9 +34,10 @@ import("fat_filesystem.gni")
 #
 template("efi_test") {
   executable_target = "$target_name.executable"
-  fs_target = "$target_name.fatfs"
   main_target = target_name
 
+  efi_label = get_label_info(":$executable_target($efi_toolchain)",
+                             "label_with_toolchain")
   efi_executable(executable_target) {
     testonly = true
 
@@ -51,21 +52,24 @@ template("efi_test") {
                              "testonly",
                            ])
     if (defined(visibility)) {
-      visibility += [ ":$fs_target" ]
+      visibility += [ ":$main_target" ]
     }
     if (!defined(output_name)) {
       output_name = main_target
     }
-  }
 
-  fat_filesystem(fs_target) {
-    testonly = true
-    forward_variables_from(invoker, [ "visibility" ])
-
-    # The metadata collection for the manifest will reach the data deps of the
-    # executable.
-    deps = [ ":$executable_target" ]
-    outputs = [ "$target_out_dir/$main_target.fat" ]
+    metadata = {
+      images = [
+        {
+          label = efi_label
+          name = output_name
+          path = rebase_path("$root_out_dir/$output_name.efi", root_build_dir)
+          type = "kernel"
+          cpu = current_cpu
+          testonly = true
+        },
+      ]
+    }
   }
 
   boot_test(main_target) {
@@ -77,6 +81,6 @@ template("efi_test") {
         "AEMU",
       ]
     }
-    efi = ":$fs_target"
+    qemu_kernel = efi_label
   }
 }

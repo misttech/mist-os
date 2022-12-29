@@ -7,6 +7,7 @@ package targets
 import (
 	"bytes"
 	"context"
+	"debug/pe"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -244,23 +245,28 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	}
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
+	// If a QEMU kernel override was specified, use that; else, unless we want
+	// to boot via a UEFI disk image (which does not require one), then we
+	// surely want a QEMU kernel, so use the default.
 	var qemuKernel *bootserver.Image
-	if t.imageOverrides.QEMUKernel == "" && t.imageOverrides.EFI == "" {
-		qemuKernel = getImageByName(images, "kernel_qemu-kernel")
-	} else {
+	if t.imageOverrides.QEMUKernel != "" {
 		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
+	} else if t.imageOverrides.EFIDisk == "" {
+		qemuKernel = getImageByName(images, "kernel_qemu-kernel")
 	}
 
+	// If a ZBI override is specified, use that; else if no overrides were
+	// specified, then we surely want a ZBI, so use the default.
 	var zbi *bootserver.Image
-	if t.imageOverrides.ZBI == "" && t.imageOverrides.EFI == "" {
-		zbi = getImageByName(images, "zbi_zircon-a")
-	} else {
+	if t.imageOverrides.ZBI != "" {
 		zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
+	} else if t.imageOverrides.IsEmpty() {
+		zbi = getImageByName(images, "zbi_zircon-a")
 	}
 
-	var efi *bootserver.Image
-	if t.imageOverrides.EFI != "" {
-		efi = getImage(images, t.imageOverrides.EFI, build.ImageTypeFAT)
+	var efiDisk *bootserver.Image
+	if t.imageOverrides.EFIDisk != "" {
+		efiDisk = getImage(images, t.imageOverrides.EFIDisk, build.ImageTypeFAT)
 	}
 
 	// The QEMU command needs to be invoked within an empty directory, as QEMU
@@ -278,7 +284,7 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 
 	storageFull := getImageByName(images, "blk_storage-full")
 
-	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efi, storageFull); err != nil {
+	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, storageFull); err != nil {
 		return err
 	}
 
@@ -315,7 +321,16 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	if zbi != nil {
 		qemuCmd.SetInitrd(zbi.Path)
 	}
-	if efi != nil {
+
+	// Checks whether the reader represents a PE (Portable Executable) file, the
+	// format of UEFI applications.
+	isPE := func(r io.ReaderAt) bool {
+		_, err := pe.NewFile(r)
+		return err == nil
+	}
+	// If a UEFI filesystem/disk image was specified, or if the provided QEMU
+	// kernel is a UEFI application, ensure that QEMU boots through UEFI.
+	if efiDisk != nil || (qemuKernel != nil && isPE(qemuKernel.Reader)) {
 		edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+t.config.Target)
 		var code, data string
 		switch t.config.Target {
@@ -334,7 +349,11 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 		if err != nil {
 			return err
 		}
-		qemuCmd.SetUEFIVolumes(code, data, efi.Path)
+		diskPath := ""
+		if efiDisk != nil {
+			diskPath = efiDisk.Path
+		}
+		qemuCmd.SetUEFIVolumes(code, data, diskPath)
 	}
 
 	if storageFull != nil {

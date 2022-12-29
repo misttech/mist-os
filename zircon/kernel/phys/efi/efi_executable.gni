@@ -4,21 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/toolchain/toolchain_environment.gni")
-
-_is_efi = toolchain_environment == "kernel.efi"
-
-_efi_toolchain = "//zircon/kernel/phys/efi:kernel.efi_$current_cpu"
-
-# This is the UEFI-specified "machine type short-name", as used in
-# the canonical file name "\efi\boot\boot${efi_cpu}.efi".
-if (current_cpu == "arm64") {
-  efi_cpu = "aa64"
-} else if (current_cpu == "x86") {
-  efi_cpu = "ia32"
-} else {
-  efi_cpu = current_cpu
-}
+import("toolchain.gni")
 
 # Build an executable for the kernel.efi environment.
 #
@@ -40,14 +26,14 @@ if (current_cpu == "arm64") {
 #
 # See executable() for other parameters.
 template("efi_executable") {
-  if (!_is_efi) {
+  if (!is_efi) {
     group(target_name) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
                              ])
-      public_deps = [ ":$target_name($_efi_toolchain)" ]
+      public_deps = [ ":$target_name($efi_toolchain)" ]
     }
     not_needed(invoker, "*")
   } else {
@@ -93,7 +79,7 @@ template("efi_executable") {
   }
 }
 
-if (_is_efi) {
+if (is_efi) {
   set_defaults("efi_executable") {
     configs = default_executable_configs
   }

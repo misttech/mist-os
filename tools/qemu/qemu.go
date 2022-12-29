@@ -180,12 +180,12 @@ func (q *QEMUCommandBuilder) SetInitrd(initrd string) {
 	q.initrd = initrd
 }
 
-// SetUEFIVolumes specifies three storage volumes necessary for booting through
-// UEFI: the ROM image implementing UEFI itself, a NVRAM image containing the
-// EFI global variable store, and a bootable (FAT) filesystem image containing
-// the desired application.
-func (q *QEMUCommandBuilder) SetUEFIVolumes(rom, nvram, fileystem string) {
-	q.uefi = &uefiVolumes{rom, nvram, fileystem}
+// SetUEFIVolumes specifies the two storage volumes necessary for booting
+// through UEFI - the ROM image implementing UEFI itself and a NVRAM image
+// containing the EFI global variable store - as well as an optional,
+// bootable (FAT) filesystem image containing the desired application.
+func (q *QEMUCommandBuilder) SetUEFIVolumes(rom, nvram, filesystem string) {
+	q.uefi = &uefiVolumes{rom, nvram, filesystem}
 }
 
 func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
@@ -309,10 +309,11 @@ func (q *QEMUCommandBuilder) validate() error {
 		return fmt.Errorf("multiple errors: [\n%s\n]", strings.Join(q.errs, ",\n"))
 	}
 	if q.kernel == "" && q.uefi == nil {
-		return fmt.Errorf("precisely one of QEMU kernel path or a UEFI image must be set.")
+		return fmt.Errorf("one of QEMU kernel path or a UEFI disk image must be set.")
 	}
-	if q.uefi != nil && (q.kernel != "" || q.initrd != "") {
-		return fmt.Errorf("specifying a UEFI image is mutually exclusive with QEMU kernel and initrd.")
+	uefiDiskBoot := q.uefi != nil && q.uefi.filesystem != ""
+	if uefiDiskBoot && (q.kernel != "" || q.initrd != "") {
+		return fmt.Errorf("specifying a UEFI filesystem/disk image is mutually exclusive with QEMU kernel and initrd.")
 	}
 	return nil
 }
@@ -363,26 +364,36 @@ func (q *QEMUCommandBuilder) BuildConfig() (Config, error) {
 			// state does not persist across invocations.
 			"-drive",
 			fmt.Sprintf("if=pflash,format=raw,snapshot=on,file=%s", q.uefi.nvram),
-			"-drive",
-			fmt.Sprintf("if=none,format=raw,file=%s,id=uefi", q.uefi.filesystem),
 		)
 
-		// `bootindex=0` ensures that the provided storage device is regarded
-		// as the highest priority boot option.
-		if q.hasDisk {
-			config.Args = append(config.Args, "-device", "virtio-blk-pci,drive=uefi,bootindex=0")
-		} else {
+		if q.uefi.filesystem != "" {
 			config.Args = append(
-				config.Args,
-				"-device",
-				"nec-usb-xhci,id=xhci0",
-				"-device",
-				"usb-storage,bus=xhci0.0,drive=uefi,removable=on,bootindex=0",
+				config.Args, "-drive",
+				fmt.Sprintf("if=none,format=raw,file=%s,id=uefi", q.uefi.filesystem),
 			)
+			// `bootindex=0` ensures that the provided storage device is
+			// regarded as the highest priority boot option.
+			bootindex := ""
+			if q.kernel == "" {
+				bootindex = ",bootindex=0"
+			}
+			// If no disk is present, put the filesystem image on a USB drive.
+			if q.hasDisk {
+				config.Args = append(
+					config.Args,
+					"-device",
+					fmt.Sprintf("virtio-blk-pci,drive=uefi%s", bootindex),
+				)
+			} else {
+				config.Args = append(
+					config.Args,
+					"-device",
+					"nec-usb-xhci,id=xhci0",
+					"-device",
+					fmt.Sprintf("usb-storage,bus=xhci0.0,drive=uefi,removable=on%s", bootindex),
+				)
+			}
 		}
-	} else {
-		// `-append`` is mutually exclusive with UEFI specification.
-		config.KernelArgs = q.kernelArgs
 	}
 	config.Args = append(config.Args, q.args...)
 	config.Options = []string{}
@@ -390,6 +401,11 @@ func (q *QEMUCommandBuilder) BuildConfig() (Config, error) {
 	// Treat the absence of specified networks as a directive to disable networking entirely.
 	if !q.hasNetwork {
 		config.Args = append(config.Args, "-net", "none")
+	}
+
+	// `-append` requires `-kernel`.
+	if q.kernel != "" {
+		config.KernelArgs = q.kernelArgs
 	}
 
 	return config, nil

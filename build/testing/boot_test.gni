@@ -81,8 +81,8 @@ template("_boot_test") {
 
     deps = [ ":$script_target" ]
 
-    if (defined(invoker.efi)) {
-      deps += [ invoker.efi ]
+    if (defined(invoker.efi_disk)) {
+      deps += [ invoker.efi_disk ]
     }
     if (defined(invoker.qemu_kernel)) {
       deps += [ invoker.qemu_kernel ]
@@ -104,15 +104,15 @@ template("_boot_test") {
           image_overrides = {
             forward_variables_from(invoker,
                                    [
-                                     "efi",
+                                     "efi_disk",
                                      "qemu_kernel",
                                      "vbmeta",
                                      "zbi",
                                    ])
 
             # Absolutize the path part in any provided labels.
-            if (defined(efi)) {
-              efi = get_label_info(efi, "label_with_toolchain")
+            if (defined(efi_disk)) {
+              efi_disk = get_label_info(efi_disk, "label_with_toolchain")
             }
             if (defined(qemu_kernel)) {
               qemu_kernel = get_label_info(qemu_kernel, "label_with_toolchain")
@@ -158,10 +158,11 @@ template("_boot_test") {
 #      test.
 #    - Type: list of strings
 #
-#  * zbi, qemu_kernel, vbmeta, efi
-#    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, or UEFI
-#      filesystem to boot, respectively. At least one of these parameters must
-#      be set, but each on their own is optional.
+#  * zbi, qemu_kernel, vbmeta, efi_disk
+#    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, UEFI
+#      executable, or a bootable UEFI filesystem or disk image, respectively.
+#      At least one of these parameters must be set, but each on their own is
+#      optional.
 #    - Type: label
 #
 #  * timeout
@@ -179,8 +180,8 @@ template("boot_test") {
          "boot_test(\"$target_name\") must define `device_types`")
   assert(
       defined(invoker.zbi) || defined(invoker.qemu_kernel) ||
-          defined(invoker.vbmeta) || defined(invoker.efi),
-      "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, or `efi`")
+          defined(invoker.vbmeta) || defined(invoker.efi_disk),
+      "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
 
   hw_types = invoker.device_types + _all_emu_types - _all_emu_types
   emu_types = invoker.device_types - hw_types
@@ -189,14 +190,14 @@ template("boot_test") {
       testonly = true
       forward_variables_from(invoker,
                              [
-                               "efi",
+                               "efi_disk",
                                "qemu_kernel",
                                "vbmeta",
                                "zbi",
                              ])
       deps = []
-      if (defined(efi)) {
-        deps += [ efi ]
+      if (defined(efi_disk)) {
+        deps += [ efi_disk ]
       }
       if (defined(qemu_kernel)) {
         deps += [ qemu_kernel ]

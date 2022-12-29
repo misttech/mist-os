@@ -67,6 +67,6 @@ template("efi_shell_test") {
         "AEMU",
       ]
     }
-    efi = ":$fs_target"
+    efi_disk = ":$fs_target"
   }
 }

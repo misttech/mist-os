@@ -116,12 +116,12 @@ type ImageOverrides struct {
 	VBMeta     string `json:"vbmeta,omitempty"`
 	QEMUKernel string `json:"qemu_kernel,omitempty"`
 
-	// EFI is the label of a bootable, UEFI (FAT) filesystem image.
-	EFI string `json:"efi,omitempty"`
+	// EFIDisk is the label of a bootable, UEFI (FAT) filesystem or disk image.
+	EFIDisk string `json:"efi_disk,omitempty"`
 }
 
 func (o ImageOverrides) IsEmpty() bool {
-	return o.ZBI == "" && o.VBMeta == "" && o.QEMUKernel == "" && o.EFI == ""
+	return o.ZBI == "" && o.VBMeta == "" && o.QEMUKernel == "" && o.EFIDisk == ""
 }
 
 // DimensionSet encapsulates the Swarming dimensions a test wishes to target.

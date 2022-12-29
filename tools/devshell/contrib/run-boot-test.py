@@ -12,10 +12,34 @@ import shlex
 import subprocess
 import sys
 
+# Special values identifying a PE (i.e., Portable Executable) image, of which
+# UEFI executables are examples.
+#
+# In identifying a UEFI executable, it is insufficient to match based on magic
+# alone; ARM Linux boot firmware (e.g., our arm64 boot shim) uses that same
+# value.
+#
+# See https://learn.microsoft.com/en-us/windows/win32/debug/pe-format.
+PE_MAGIC = b'MZ'
+PE_SIGNATURE = b'PE\0\0'
+
+
+def is_pe(filepath):
+    with open(filepath, 'rb') as f:
+        if not os.path.exists(filepath):
+            return False
+        if f.read(2) != PE_MAGIC:
+            return False
+        f.seek(0x3c)
+        signature_offset = int.from_bytes(f.read(4), byteorder="little")
+        f.seek(signature_offset)
+        return f.read(4) == PE_SIGNATURE
+
 
 class BootTest(object):
 
-    def __init__(self, images_by_label, test_json):
+    def __init__(self, images_by_label, test_json, build_dir):
+        self.build_dir = build_dir
         test = test_json["test"]
 
         # The "name" JSON field is a path, so just use the extensionless
@@ -34,7 +58,8 @@ class BootTest(object):
         self.qemu_kernel = (
             images_by_label[images["qemu_kernel"]]
             if "qemu_kernel" in images else None)
-        self.efi = images_by_label[images["efi"]] if "efi" in images else None
+        self.efi_disk = images_by_label[
+            images["efi_disk"]] if "efi_disk" in images else None
 
     # Enables sorting by name.
     def __lt__(self, other):
@@ -45,22 +70,33 @@ class BootTest(object):
         envs = test_json.get("environments", [])
         return "image_overrides" in envs[0] if len(envs) else False
 
+    def is_uefi_boot(self):
+        if self.efi_disk:
+            return True
+        # The QEMU kernel might be a UEFI executable. Look for PE magic.
+        if not self.qemu_kernel:
+            return False
+        kernel = os.path.join(self.build_dir, self.qemu_kernel["path"])
+        return is_pe(kernel)
+
     def print(self, command=None):
         kinds = []
+        if self.is_uefi_boot():
+            kinds.append("UEFI")
         if self.qemu_kernel:
             kinds.append("QEMU kernel")
         if self.zbi:
             kinds.append("ZBI")
-        if self.efi:
-            kinds.append("EFI")
+        if self.efi_disk:
+            kinds.append("EFI disk")
         print("* %s (%s)" % (self.name, ", ".join(kinds)))
         print("    label: %s" % self.label)
         if self.qemu_kernel:
             print("    qemu kernel: %s" % self.qemu_kernel["path"])
         if self.zbi:
             print("    zbi: %s" % self.zbi["path"])
-        if self.efi:
-            print("    efi: %s" % self.efi["path"])
+        if self.efi_disk:
+            print("    efi disk: %s" % self.efi_disk["path"])
         if command:
             print("    command: %s" % " ".join(map(shlex.quote, command)))
 
@@ -152,7 +188,7 @@ def main():
         boot_tests = {}
         for test in json.load(file):
             if BootTest.is_boot_test(test):
-                boot_test = BootTest(images, test)
+                boot_test = BootTest(images, test, build_dir)
                 boot_tests[boot_test.name] = boot_test
 
     if not boot_tests:
@@ -193,12 +229,15 @@ def main():
         cmd = [bootserver, "--boot"] + test.zbi["path"] + args.args
     else:
         cmd = ["fx", "qemu"] + args.args
+
+        if test.is_uefi_boot():
+            cmd += ["--uefi"]
         if test.qemu_kernel:
             cmd += ["-t", test.qemu_kernel["path"]]
         if test.zbi:
             cmd += ["-z", test.zbi["path"]]
-        if test.efi:
-            cmd += ["--uefi", "-D", test.efi["path"]]
+        if test.efi_disk:
+            cmd += ["-D", test.efi_disk["path"]]
 
     for arg in args.cmdline:
         cmd += ["-c", arg]
