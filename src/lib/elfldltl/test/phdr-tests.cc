@@ -12,8 +12,6 @@
 #include <string>
 #include <vector>
 
-#include <gtest/gtest.h>
-
 #include "tests.h"
 
 namespace {
@@ -44,8 +42,10 @@ constexpr Phdr OnePageStack(uint32_t flags) {
   return phdr;
 }
 
-constexpr auto EmptyTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+FORMAT_TYPED_TEST_SUITE(ElfldltlPhdrTests);
+
+TYPED_TEST(ElfldltlPhdrTests, Empty) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   std::vector<std::string> errors;
@@ -56,13 +56,11 @@ constexpr auto EmptyTest = [](auto&& elf) {
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, Empty) { TestAllFormats(EmptyTest); }
+}
 
 // No PT_NULL headers.
-constexpr auto NullObserverNoNullsTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, NullObserverNoNulls) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {{.type = ElfPhdrType::kLoad}};
@@ -73,13 +71,11 @@ constexpr auto NullObserverNoNullsTest = [](auto&& elf) {
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, NullObserverNoNulls) { TestAllFormats(NullObserverNoNullsTest); }
+}
 
 // One PT_NULL header.
-constexpr auto NullObserverOneNullTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, NullObserverOneNull) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -96,13 +92,11 @@ constexpr auto NullObserverOneNullTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.warnings());
   ASSERT_EQ(1u, warnings.size());
   EXPECT_EQ(kNullWarning, warnings[0]);
-};
-
-TEST(ElfldltlPhdrTests, NullObserverOneNull) { TestAllFormats(NullObserverOneNullTest); }
+}
 
 // Three PT_NULL headers.
-constexpr auto NullObserverThreeNullsTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, NullObserverThreeNulls) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -120,13 +114,11 @@ constexpr auto NullObserverThreeNullsTest = [](auto&& elf) {
   EXPECT_EQ(kNullWarning, warnings[0]);
   EXPECT_EQ(kNullWarning, warnings[1]);
   EXPECT_EQ(kNullWarning, warnings[2]);
-};
-
-TEST(ElfldltlPhdrTests, NullObserverThreeNulls) { TestAllFormats(NullObserverThreeNullsTest); }
+}
 
 // At most one header per type.
-constexpr auto SingletonObserverAtMostOneHeaderPerTypeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, SingletonObserverAtMostOneHeaderPerType) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -158,15 +150,11 @@ constexpr auto SingletonObserverAtMostOneHeaderPerTypeTest = [](auto&& elf) {
 
   ASSERT_TRUE(relro);
   EXPECT_EQ(ElfPhdrType::kRelro, relro->type);
-};
-
-TEST(ElfldltlPhdrTests, SingletonObserverAtMostOneHeaderPerType) {
-  TestAllFormats(SingletonObserverAtMostOneHeaderPerTypeTest);
 }
 
 // Multiple headers per type.
-constexpr auto SingletonObserverMultipleHeadersPerTypeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, SingletonObserverMultipleHeadersPerType) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -190,14 +178,10 @@ constexpr auto SingletonObserverMultipleHeadersPerTypeTest = [](auto&& elf) {
   ASSERT_EQ(warnings.size(), 2u);
   EXPECT_EQ(warnings[0], "too many PT_GNU_RELRO headers; expected at most one");
   EXPECT_EQ(warnings[1], "too many PT_INTERP headers; expected at most one");
-};
-
-TEST(ElfldltlPhdrTests, SingletonObserverMultipleHeadersPerType) {
-  TestAllFormats(SingletonObserverMultipleHeadersPerTypeTest);
 }
 
-constexpr auto UnknownFlagsTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, UnknownFlags) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -229,12 +213,10 @@ constexpr auto UnknownFlagsTest = [](auto&& elf) {
             "PT_GNU_STACK header has unrecognized flags (other than PF_R, PF_W, PF_X)");
   EXPECT_EQ(warnings[3],
             "PT_GNU_RELRO header has unrecognized flags (other than PF_R, PF_W, PF_X)");
-};
+}
 
-TEST(ElfldltlPhdrTests, UnknownFlags) { TestAllFormats(UnknownFlagsTest); }
-
-constexpr auto BadAlignmentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BadAlignment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -263,30 +245,25 @@ constexpr auto BadAlignmentTest = [](auto&& elf) {
   EXPECT_EQ(errors[0], "PT_INTERP header has `p_align` that is not zero or a power of two");
   EXPECT_EQ(errors[1], "PT_NOTE header has `p_align` that is not zero or a power of two");
   EXPECT_EQ(errors[2], "PT_GNU_RELRO header has `p_align` that is not zero or a power of two");
-};
+}
 
-TEST(ElfldltlPhdrTests, BadAlignment) { TestAllFormats(BadAlignmentTest); }
-
-constexpr auto OffsetNotEquivVaddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, OffsetNotEquivVaddr) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
-      // OK
       {
           .type = ElfPhdrType::kLoad,
           .offset = kAlign,
           .vaddr = kAlign,
           .align = kAlign,
       },
-      // OK
       {
           .type = ElfPhdrType::kDynamic,
           .offset = 17 * kAlign,
           .vaddr = kAlign,
           .align = kAlign,
       },
-      // OK
       {
           .type = ElfPhdrType::kInterp,
           .offset = 100,
@@ -304,7 +281,8 @@ constexpr auto OffsetNotEquivVaddrTest = [](auto&& elf) {
           .offset = kAlign + 1,
           .vaddr = kAlign,
           .align = kAlign,
-      }};
+      },
+  };
 
   std::vector<std::string> errors;
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
@@ -324,13 +302,11 @@ constexpr auto OffsetNotEquivVaddrTest = [](auto&& elf) {
   EXPECT_EQ(errors[0], "PT_NOTE header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
   EXPECT_EQ(errors[1],
             "PT_GNU_RELRO header has incongruent `p_offset` and `p_vaddr` modulo `p_align`");
-};
-
-TEST(ElfldltlPhdrTests, OffsetNotEquivVaddrVaddr) { TestAllFormats(OffsetNotEquivVaddrTest); }
+}
 
 // Executable stack permitted; non-zero memsz.
-constexpr auto StackObserverExecOkPhdrNonzeroSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrNonzeroSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -347,15 +323,11 @@ constexpr auto StackObserverExecOkPhdrNonzeroSizeTest = [](auto&& elf) {
 
   ASSERT_TRUE(size);
   EXPECT_EQ(0x1000u, *size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrNonzeroSize) {
-  TestAllFormats(StackObserverExecOkPhdrNonzeroSizeTest);
 }
 
 // Executable stack permitted; zero memsz.
-constexpr auto StackObserverExecOkPhdrZeroSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrZeroSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -371,15 +343,11 @@ constexpr auto StackObserverExecOkPhdrZeroSizeTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_FALSE(size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrZeroSize) {
-  TestAllFormats(StackObserverExecOkPhdrZeroSizeTest);
 }
 
 // Executable stack permitted; no header to report size.
-constexpr auto StackObserverExecOkNoPhdrSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdrSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -393,15 +361,11 @@ constexpr auto StackObserverExecOkNoPhdrSizeTest = [](auto&& elf) {
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_FALSE(size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdrSize) {
-  TestAllFormats(StackObserverExecOkNoPhdrSizeTest);
 }
 
 // Executable stack permitted; header present and reports PF_X.
-constexpr auto StackObserverExecOkPhdrWithXTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithX) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -421,15 +385,11 @@ constexpr auto StackObserverExecOkPhdrWithXTest = [](auto&& elf) {
   EXPECT_TRUE(executable);
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithX) {
-  TestAllFormats(StackObserverExecOkPhdrWithXTest);
 }
 
 // Executable stack permitted; header present and does not report PF_X.
-constexpr auto StackObserverExecOkPhdrWithoutXTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithoutX) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -447,15 +407,11 @@ constexpr auto StackObserverExecOkPhdrWithoutXTest = [](auto&& elf) {
   EXPECT_FALSE(executable);
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithoutX) {
-  TestAllFormats(StackObserverExecOkPhdrWithoutXTest);
 }
 
 // Executable stack permitted; header not present.
-constexpr auto StackObserverExecOkNoPhdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -471,15 +427,11 @@ constexpr auto StackObserverExecOkNoPhdrTest = [](auto&& elf) {
   EXPECT_TRUE(executable);
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdr) {
-  TestAllFormats(StackObserverExecOkNoPhdrTest);
 }
 
 // Executable stack not permitted; non-zero memsz.
-constexpr auto StackObserverExecNotOkPhdrNonzeroSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrNonzeroSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -495,15 +447,11 @@ constexpr auto StackObserverExecNotOkPhdrNonzeroSizeTest = [](auto&& elf) {
 
   ASSERT_TRUE(size);
   EXPECT_EQ(0x1000u, *size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrNonzeroSize) {
-  TestAllFormats(StackObserverExecNotOkPhdrNonzeroSizeTest);
 }
 
 // Executable stack not permitted; zero memsz.
-constexpr auto StackObserverExecNotOkPhdrZeroSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrZeroSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -518,15 +466,11 @@ constexpr auto StackObserverExecNotOkPhdrZeroSizeTest = [](auto&& elf) {
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_FALSE(size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrZeroSize) {
-  TestAllFormats(StackObserverExecNotOkPhdrZeroSizeTest);
 }
 
 // Executable stack not permitted; no header to report size.
-constexpr auto StackObserverExecNotOkNoPhdrSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdrSize) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -539,15 +483,11 @@ constexpr auto StackObserverExecNotOkNoPhdrSizeTest = [](auto&& elf) {
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_FALSE(size);
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdrSize) {
-  TestAllFormats(StackObserverExecNotOkNoPhdrSizeTest);
 }
 
 // Executable stack not permitted; header present and reports PF_X.
-constexpr auto StackObserverExecNotOkPhdrWithXTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithX) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -565,15 +505,11 @@ constexpr auto StackObserverExecNotOkPhdrWithXTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(errors.size(), 1u);
   EXPECT_EQ(errors.front(), "executable stack not supported: PF_X is set");
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithX) {
-  TestAllFormats(StackObserverExecNotOkPhdrWithXTest);
 }
 
 // Executable stack not permitted; header present and does not report PF_X.
-constexpr auto StackObserverExecNotOkPhdrWithoutXTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithoutX) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -589,15 +525,11 @@ constexpr auto StackObserverExecNotOkPhdrWithoutXTest = [](auto&& elf) {
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithoutX) {
-  TestAllFormats(StackObserverExecNotOkPhdrWithoutXTest);
 }
 
 // Executable stack not permitted; header not present.
-constexpr auto StackObserverExecNotOkNoPhdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdr) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -613,15 +545,11 @@ constexpr auto StackObserverExecNotOkNoPhdrTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(errors.size(), 1u);
   EXPECT_EQ(errors.front(), "executable stack not supported: PT_GNU_STACK header required");
-};
-
-TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdr) {
-  TestAllFormats(StackObserverExecNotOkNoPhdrTest);
 }
 
 // Non-readable stacks are disallowed.
-constexpr auto StackObserverNonReadableTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverNonReadable) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -638,13 +566,11 @@ constexpr auto StackObserverNonReadableTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(errors.size(), 1u);
   EXPECT_EQ(errors.front(), "stack is not readable: PF_R is not set");
-};
-
-TEST(ElfldltlPhdrTests, StackObserverNonReadable) { TestAllFormats(StackObserverNonReadableTest); }
+}
 
 // Non-writable stacks are disallowed.
-constexpr auto StackObserverNonWritableTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, StackObserverNonWritable) {
+  using Elf = typename TestFixture::Elf;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
 
@@ -661,12 +587,10 @@ constexpr auto StackObserverNonWritableTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(errors.size(), 1u);
   EXPECT_EQ(errors.front(), "stack is not writable: PF_W is not set");
-};
+}
 
-TEST(ElfldltlPhdrTests, StackObserverNonWritable) { TestAllFormats(StackObserverNonWritableTest); }
-
-constexpr auto MetadataObserverNoPhdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, MetadataObserverNoPhdr) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   std::vector<std::string> errors;
@@ -680,12 +604,10 @@ constexpr auto MetadataObserverNoPhdrTest = [](auto&& elf) {
   EXPECT_FALSE(phdr);
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
+}
 
-TEST(ElfldltlPhdrTests, MetadataObserverNoPhdr) { TestAllFormats(MetadataObserverNoPhdrTest); }
-
-constexpr auto MetadataObserverUnalignedVaddrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, MetadataObserverUnalignedVaddr) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -708,14 +630,10 @@ constexpr auto MetadataObserverUnalignedVaddrTest = [](auto&& elf) {
 
   ASSERT_EQ(errors.size(), 1u);
   EXPECT_EQ(errors[0], "PT_INTERP header has `p_vaddr % p_align != 0`");
-};
-
-TEST(ElfldltlPhdrTests, MetadataObserverUnalignedVaddr) {
-  TestAllFormats(MetadataObserverUnalignedVaddrTest);
 }
 
-constexpr auto MetadataObserverFileszNotEqMemszTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, MetadataObserverFileszNotEqMemsz) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
   constexpr Phdr kPhdrs[] = {
@@ -739,14 +657,10 @@ constexpr auto MetadataObserverFileszNotEqMemszTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_INTERP header has `p_filesz != p_memsz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, MetadataObserverFileszNotEqMemsz) {
-  TestAllFormats(MetadataObserverFileszNotEqMemszTest);
 }
 
-constexpr auto MetadataObserverIncompatibleEntrySizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntrySize) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using Dyn = typename Elf::Dyn;
 
@@ -772,14 +686,10 @@ constexpr auto MetadataObserverIncompatibleEntrySizeTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_DYNAMIC segment size is not a multiple of entry size", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntrySize) {
-  TestAllFormats(MetadataObserverIncompatibleEntrySizeTest);
 }
 
-constexpr auto MetadataObserverIncompatibleEntryAlignmentTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntryAlignment) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using Dyn = typename Elf::Dyn;
 
@@ -803,14 +713,10 @@ constexpr auto MetadataObserverIncompatibleEntryAlignmentTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_DYNAMIC segment alignment is not a multiple of entry alignment", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleAlignmentSize) {
-  TestAllFormats(MetadataObserverIncompatibleEntryAlignmentTest);
 }
 
-constexpr auto LoadObserverNoPhdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, LoadObserverNoPhdr) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -827,12 +733,10 @@ constexpr auto LoadObserverNoPhdrTest = [](auto&& elf) {
   EXPECT_EQ(0u, vaddr_size);
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
-};
+}
 
-TEST(ElfldltlPhdrTests, LoadObserverNoPhdr) { TestAllFormats(LoadObserverNoPhdrTest); }
-
-constexpr auto BasicLoadObserverSmallAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverSmallAlign) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -853,14 +757,10 @@ constexpr auto BasicLoadObserverSmallAlignTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD's `p_align` is not page-aligned", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverSmallAlign) {
-  TestAllFormats(BasicLoadObserverSmallAlignTest);
 }
 
-constexpr auto BasicLoadObserverZeroMemszTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverZeroMemsz) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -881,14 +781,10 @@ constexpr auto BasicLoadObserverZeroMemszTest = [](auto&& elf) {
   EXPECT_EQ(1u, diag.warnings());
   ASSERT_EQ(1u, warnings.size());
   EXPECT_EQ("PT_LOAD has `p_memsz == 0`", warnings.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverZeroMemsz) {
-  TestAllFormats(BasicLoadObserverZeroMemszTest);
 }
 
-constexpr auto BasicLoadObserverMemszTooSmallTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverMemszTooSmall) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -909,14 +805,10 @@ constexpr auto BasicLoadObserverMemszTooSmallTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has `p_memsz < p_filesz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverMemszTooSmall) {
-  TestAllFormats(BasicLoadObserverMemszTooSmallTest);
 }
 
-constexpr auto BasicLoadObserverMemEndOverflowTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverMemEndOverflow) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -939,14 +831,10 @@ constexpr auto BasicLoadObserverMemEndOverflowTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has overflowing `p_vaddr + p_memsz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverMemEndOverflow) {
-  TestAllFormats(BasicLoadObserverMemEndOverflowTest);
 }
 
-constexpr auto BasicLoadObserverAlignedMemEndOverflowTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedMemEndOverflow) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -969,14 +857,10 @@ constexpr auto BasicLoadObserverAlignedMemEndOverflowTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has overflowing `p_align`-aligned `p_vaddr + p_memsz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedMemEndOverflows) {
-  TestAllFormats(BasicLoadObserverAlignedMemEndOverflowTest);
 }
 
-constexpr auto BasicLoadObserverFileEndOverflowTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverFileEndOverflow) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -1005,14 +889,10 @@ constexpr auto BasicLoadObserverFileEndOverflowTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has overflowing `p_offset + p_filesz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverFileEndOverflow) {
-  TestAllFormats(BasicLoadObserverFileEndOverflowTest);
 }
 
-constexpr auto BasicLoadObserverAlignedFileEndOverflowTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedFileEndOverflow) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -1041,14 +921,10 @@ constexpr auto BasicLoadObserverAlignedFileEndOverflowTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has overflowing `p_align`-aligned `p_offset + p_filesz`", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedFileEndOverflows) {
-  TestAllFormats(BasicLoadObserverAlignedFileEndOverflowTest);
 }
 
-constexpr auto BasicLoadObserverUnorderedTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverUnordered) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -1074,14 +950,10 @@ constexpr auto BasicLoadObserverUnorderedTest = [](auto&& elf) {
       "PT_LOAD has `p_align`-aligned memory ranges that overlap or do not increase "
       "monotonically",
       errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverUnordered) {
-  TestAllFormats(BasicLoadObserverUnorderedTest);
 }
 
-constexpr auto BasicLoadObserverOverlappingMemoryRangeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverOverlappingMemoryRange) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -1106,14 +978,10 @@ constexpr auto BasicLoadObserverOverlappingMemoryRangeTest = [](auto&& elf) {
       "PT_LOAD has `p_align`-aligned memory ranges that overlap or do not increase "
       "monotonically",
       errors.front());
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverOverlappingMemoryRange) {
-  TestAllFormats(BasicLoadObserverOverlappingMemoryRangeTest);
 }
 
-constexpr auto BasicLoadObserverCompliantTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverCompliant) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kBasic>;
@@ -1158,14 +1026,10 @@ constexpr auto BasicLoadObserverCompliantTest = [](auto&& elf) {
 
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(99 * kAlign, vaddr_size);
-};
-
-TEST(ElfldltlPhdrTests, BasicLoadObserverCompliant) {
-  TestAllFormats(BasicLoadObserverCompliantTest);
 }
 
-constexpr auto FileRangeMonotonicLoadObserverUnorderedTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverUnordered) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver =
@@ -1210,14 +1074,10 @@ constexpr auto FileRangeMonotonicLoadObserverUnorderedTest = [](auto&& elf) {
       "PT_LOAD has `p_align`-aligned file offset ranges that overlap or do not "
       "increase monotonically",
       errors.front());
-};
-
-TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverUnordered) {
-  TestAllFormats(FileRangeMonotonicLoadObserverUnorderedTest);
 }
 
-constexpr auto FileRangeMonotonicLoadObserverOverlappingAlignedFileRangeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverOverlappingAlignedFileRange) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver =
@@ -1257,14 +1117,10 @@ constexpr auto FileRangeMonotonicLoadObserverOverlappingAlignedFileRangeTest = [
       "PT_LOAD has `p_align`-aligned file offset ranges that overlap or do not "
       "increase monotonically",
       errors.front());
-};
-
-TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverOverlappingAlignedFileRange) {
-  TestAllFormats(FileRangeMonotonicLoadObserverOverlappingAlignedFileRangeTest);
 }
 
-constexpr auto FileRangeMonotonicLoadObserverCompliantTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverCompliant) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver =
@@ -1316,14 +1172,10 @@ constexpr auto FileRangeMonotonicLoadObserverCompliantTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(99 * kAlign, vaddr_size);
-};
-
-TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverCompliant) {
-  TestAllFormats(FileRangeMonotonicLoadObserverCompliantTest);
 }
 
-constexpr auto ContiguousLoadObserverHighFirstOffsetTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverHighFirstOffset) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kContiguous>;
@@ -1360,14 +1212,10 @@ constexpr auto ContiguousLoadObserverHighFirstOffsetTest = [](auto&& elf) {
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("PT_LOAD has `p_align`-aligned file offset ranges that are not contiguous",
             errors.front());
-};
-
-TEST(ElfldltlPhdrTests, ContiguousLoadObserverHighFirstOffset) {
-  TestAllFormats(ContiguousLoadObserverHighFirstOffsetTest);
 }
 
-constexpr auto ContiguousLoadObserverNonContiguousFileRangesTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverNonContiguousFileRanges) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kContiguous>;
@@ -1394,14 +1242,10 @@ constexpr auto ContiguousLoadObserverNonContiguousFileRangesTest = [](auto&& elf
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_EQ(1u, errors.size());
   EXPECT_EQ("first PT_LOAD's `p_offset` does not lie within the first page", errors.front());
-};
-
-TEST(ElfldltlPhdrTests, ContiguousLoadObserverNonContiguousFileRanges) {
-  TestAllFormats(ContiguousLoadObserverNonContiguousFileRangesTest);
 }
 
-constexpr auto ContiguousLoadObserverCompliantTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverCompliant) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
   using LoadObserver = elfldltl::PhdrLoadObserver<Elf, elfldltl::PhdrLoadPolicy::kContiguous>;
@@ -1451,14 +1295,10 @@ constexpr auto ContiguousLoadObserverCompliantTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_EQ(kAlign, vaddr_start);
   EXPECT_EQ(6 * kAlign, vaddr_size);
-};
-
-TEST(ElfldltlPhdrTests, ContiguousLoadObserverCompliant) {
-  TestAllFormats(ContiguousLoadObserverCompliantTest);
 }
 
-constexpr auto LoadObserverCallbackTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, LoadObserverCallback) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
 
@@ -1541,12 +1381,10 @@ constexpr auto LoadObserverCallbackTest = [](auto&& elf) {
   EXPECT_EQ(kAlign * 2, vaddr_size);
 
   ASSERT_EQ(count, 2u);
-};
+}
 
-TEST(ElfldltlPhdrTests, LoadObserverCallback) { TestAllFormats(LoadObserverCallbackTest); }
-
-constexpr auto LoadObserverCallbackBailoutTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, LoadObserverCallbackBailout) {
+  using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
   using size_type = typename Elf::size_type;
 
@@ -1597,14 +1435,10 @@ constexpr auto LoadObserverCallbackBailoutTest = [](auto&& elf) {
   // generic code updated the vaddr_size.  It's still before the second PT_LOAD
   // gets processed, so the vaddr_size shouldn't have its final value yet.
   EXPECT_EQ(kAlign, vaddr_size);
-};
-
-TEST(ElfldltlPhdrTests, LoadObserverCallbackBailout) {
-  TestAllFormats(LoadObserverCallbackBailoutTest);
 }
 
-constexpr auto ReadPhdrsFromFileBadSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadSize) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1620,12 +1454,10 @@ constexpr auto ReadPhdrsFromFileBadSizeTest = [](auto&& elf) {
   EXPECT_EQ("e_phentsize has unexpected value", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
+}
 
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadSize) { TestAllFormats(ReadPhdrsFromFileBadSizeTest); }
-
-constexpr auto ReadPhdrsFromFileBadOffsetTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadOffset) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1641,14 +1473,10 @@ constexpr auto ReadPhdrsFromFileBadOffsetTest = [](auto&& elf) {
   EXPECT_EQ("e_phoff overlaps with ELF file header", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadOffset) {
-  TestAllFormats(ReadPhdrsFromFileBadOffsetTest);
 }
 
-constexpr auto ReadPhdrsFromFileBadAlignTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadAlign) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1664,14 +1492,10 @@ constexpr auto ReadPhdrsFromFileBadAlignTest = [](auto&& elf) {
   EXPECT_EQ("e_phoff has insufficient alignment", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFileBadAlign) {
-  TestAllFormats(ReadPhdrsFromFileBadAlignTest);
 }
 
-constexpr auto ReadPhdrsFromFilePhXNumBadShSizeTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumBadShSize) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Shdr = typename Elf::Shdr;
@@ -1692,14 +1516,10 @@ constexpr auto ReadPhdrsFromFilePhXNumBadShSizeTest = [](auto&& elf) {
   EXPECT_EQ("e_shentsize has unexpected value", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumBadShSize) {
-  TestAllFormats(ReadPhdrsFromFilePhXNumBadShSizeTest);
 }
 
-constexpr auto ReadPhdrsFromFilePhXNumBadShOffTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumBadShOff) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Shdr = typename Elf::Shdr;
@@ -1721,14 +1541,10 @@ constexpr auto ReadPhdrsFromFilePhXNumBadShOffTest = [](auto&& elf) {
   EXPECT_EQ("e_shoff overlaps with ELF file header", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumBadShOff) {
-  TestAllFormats(ReadPhdrsFromFilePhXNumBadShOffTest);
 }
 
-constexpr auto ReadPhdrsFromFilePhXNumNoShdrsTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumNoShdrs) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Shdr = typename Elf::Shdr;
@@ -1750,14 +1566,10 @@ constexpr auto ReadPhdrsFromFilePhXNumNoShdrsTest = [](auto&& elf) {
   EXPECT_EQ("PN_XNUM with no section headers", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumNoShdrs) {
-  TestAllFormats(ReadPhdrsFromFilePhXNumNoShdrsTest);
 }
 
-constexpr auto ReadPhdrsFromFilePhXNumCantReadShdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumCantReadShdr) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Shdr = typename Elf::Shdr;
@@ -1779,14 +1591,10 @@ constexpr auto ReadPhdrsFromFilePhXNumCantReadShdrTest = [](auto&& elf) {
   EXPECT_EQ("cannot read section header 0 from ELF file", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNumCantReadShdr) {
-  TestAllFormats(ReadPhdrsFromFilePhXNumCantReadShdrTest);
 }
 
-constexpr auto ReadPhdrsFromFileCantReadPhdrTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFileCantReadPhdr) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1802,14 +1610,10 @@ constexpr auto ReadPhdrsFromFileCantReadPhdrTest = [](auto&& elf) {
   EXPECT_EQ("cannot read program headers from ELF file", errors[0]);
   EXPECT_EQ(0u, diag.warnings());
   EXPECT_FALSE(result);
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFileCantReadPhdr) {
-  TestAllFormats(ReadPhdrsFromFileCantReadPhdrTest);
 }
 
-constexpr auto ReadPhdrsFromFileNoPhdrsTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFileNoPhdrs) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1824,12 +1628,10 @@ constexpr auto ReadPhdrsFromFileNoPhdrsTest = [](auto&& elf) {
   EXPECT_EQ(0u, diag.warnings());
   ASSERT_TRUE(result);
   EXPECT_EQ(0u, result->size());
-};
+}
 
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFileNoPhdrs) { TestAllFormats(ReadPhdrsFromFileNoPhdrsTest); }
-
-constexpr auto ReadPhdrsFromFileTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFile) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
 
@@ -1850,12 +1652,10 @@ constexpr auto ReadPhdrsFromFileTest = [](auto&& elf) {
   auto& phdrs = *result;
   EXPECT_EQ(1u, phdrs.size());
   EXPECT_FALSE((memcmp(elfbytes.phdrs, std::addressof(phdrs[0]), sizeof(Phdr))));
-};
+}
 
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFile) { TestAllFormats(ReadPhdrsFromFileTest); }
-
-constexpr auto ReadPhdrsFromFilePhXNumTest = [](auto&& elf) {
-  using Elf = std::decay_t<decltype(elf)>;
+TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNum) {
+  using Elf = typename TestFixture::Elf;
   using Ehdr = typename Elf::Ehdr;
   using Phdr = typename Elf::Phdr;
   using Shdr = typename Elf::Shdr;
@@ -1883,8 +1683,6 @@ constexpr auto ReadPhdrsFromFilePhXNumTest = [](auto&& elf) {
   auto& phdrs = *result;
   EXPECT_EQ(1u, phdrs.size());
   EXPECT_FALSE((memcmp(elfbytes.phdrs, std::addressof(phdrs[0]), sizeof(Phdr))));
-};
-
-TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNum) { TestAllFormats(ReadPhdrsFromFilePhXNumTest); }
+}
 
 }  // namespace
