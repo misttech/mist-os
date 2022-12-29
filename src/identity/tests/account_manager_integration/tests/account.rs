@@ -139,30 +139,17 @@ async fn provision_new_account_and_enroll(
     account_task.await
 }
 
-/// Convenience function to calls get_account on the supplied account_manager.
-async fn get_account(
-    account_manager: &AccountManagerProxy,
-    account_id: u64,
-    account_server_end: ServerEnd<AccountMarker>,
-) -> Result<Result<(), ApiError>, fidl::Error> {
-    account_manager
-        .get_account(AccountManagerGetAccountRequest {
-            id: Some(account_id),
-            account: Some(account_server_end),
-            ..AccountManagerGetAccountRequest::EMPTY
-        })
-        .await
-}
-
 enum InteractionOutcome {
     Succeed,
     Fail,
 }
 
-// TODO(fxb/104199): Start using Interaction protocol for authentication and
-// make this the default version by removing the original function and renaming
-// it to get_account.
-async fn get_account_interaction(
+/// Convenience function to calls get_account on the supplied account_manager.
+/// If `interaction_outcome` is set to InteractionOutcome::Succeed, we call
+/// `SetSuccess` to indicate a successful authentication. Otherwise, we drop the
+/// `Interaction` and `TestInteraction` proxies and close the client channel,
+/// eventually leading to a failed authentication.
+async fn get_account(
     account_manager: &Arc<Mutex<NestedAccountManagerProxy>>,
     account_id: u64,
     account_server_end: ServerEnd<AccountMarker>,
@@ -466,48 +453,31 @@ async fn test_provision_one_new_account() -> Result<(), Error> {
     Ok(())
 }
 
-// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
 #[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_provision_many_new_accounts() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
     // Verify we initially have no accounts.
-    assert_eq!(account_manager.get_account_ids().await?, vec![]);
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
-    // Provision a new account.
-    let account_1 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test1"),
-    )
-    .await?;
-    assert_eq!(account_manager.get_account_ids().await?, vec![account_1]);
+    let account_1 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![account_1]);
 
     // Provision a second new account and verify it has a different ID.
-    let account_2 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test2"),
-    )
-    .await?;
+    let account_2 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
     assert_ne!(account_1, account_2);
 
-    // Provision third account.
-    let account_3 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        Some(ALWAYS_SUCCEED_AUTH_MECHANISM_ID),
-        create_account_metadata("test3"),
-    )
-    .await?;
+    // Provision a third Persistent account
+    let account_3 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    let account_ids = account_manager.get_account_ids().await?;
+    let account_ids = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(account_ids.len(), 3);
     assert!(account_ids.contains(&account_1));
     assert!(account_ids.contains(&account_2));
@@ -525,13 +495,8 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
 
     let (account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
     let account_proxy = account_client_end.into_proxy()?;
@@ -542,13 +507,8 @@ async fn test_provision_then_lock_then_unlock_account() -> Result<(), Error> {
     // Unlock the account and re-acquire a channel
     let (account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
     let account_proxy = account_client_end.into_proxy()?;
@@ -569,13 +529,8 @@ async fn test_unlock_account() -> Result<(), Error> {
     let (account_client_end, account_server_end) = create_endpoints()?;
 
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
 
@@ -592,13 +547,8 @@ async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<()
         provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
     let (account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Fail
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
+            .await?,
         Ok(())
     );
     let account_proxy = account_client_end.into_proxy()?;
@@ -610,13 +560,8 @@ async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<()
     // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Fail
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
+            .await?,
         Err(ApiError::FailedPrecondition)
     );
     Ok(())
@@ -636,13 +581,8 @@ async fn test_unlock_account_fail_authentication() -> Result<(), Error> {
     // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Fail
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
+            .await?,
         Err(ApiError::FailedPrecondition)
     );
     Ok(())
@@ -659,13 +599,8 @@ async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error>
     // Connect a channel to the newly created account and verify it's usable.
     let (account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
     let account_proxy = account_client_end.into_proxy()?;
@@ -710,69 +645,54 @@ async fn test_one_account_deletion() -> Result<(), Error> {
     let account_1 =
         provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    let account_manager_lock = account_manager.lock().await;
-    let existing_accounts = account_manager_lock.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert!(existing_accounts.contains(&account_1));
     assert_eq!(existing_accounts.len(), 1);
 
     // Delete an account and verify it is removed.
-    assert_eq!(account_manager_lock.remove_account(account_1).await?, Ok(()));
-    assert_eq!(account_manager_lock.get_account_ids().await?, vec![]);
-    drop(account_manager_lock);
+    assert_eq!(account_manager.lock().await.remove_account(account_1).await?, Ok(()));
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
     // Connecting to the deleted account should fail.
     let (_account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_1,
-            account_server_end,
-            InteractionOutcome::Fail
-        )
-        .await?,
+        get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Err(ApiError::NotFound)
     );
     Ok(())
 }
 
-// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
 #[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_many_account_deletions() -> Result<(), Error> {
-    let account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    assert_eq!(account_manager.get_account_ids().await?, vec![]);
+    // Verify we initially have no accounts.
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
-    let account_1 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test1"),
-    )
-    .await?;
+    let account_1 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    let account_2 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test2"),
-    )
-    .await?;
-    let existing_accounts = account_manager.get_account_ids().await?;
+    let account_2 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert!(existing_accounts.contains(&account_1));
     assert!(existing_accounts.contains(&account_2));
     assert_eq!(existing_accounts.len(), 2);
 
     // Delete an account and verify it is removed.
-    assert_eq!(account_manager.remove_account(account_1).await?, Ok(()));
-    assert_eq!(account_manager.get_account_ids().await?, vec![account_2]);
+    assert_eq!(account_manager.lock().await.remove_account(account_1).await?, Ok(()));
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![account_2]);
+
     // Connecting to the deleted account should fail.
     let (_account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account(&account_manager, account_1, account_server_end).await?,
+        get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Err(ApiError::NotFound)
     );
 
@@ -790,37 +710,26 @@ async fn test_one_lifecycle_persistent() -> Result<(), Error> {
 
     let account = provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
 
-    let mut account_manager_lock = account_manager.lock().await;
-
-    let existing_accounts = account_manager_lock.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 1);
 
     // Restart account manager
-    account_manager_lock.restart().await?;
+    account_manager.lock().await.restart().await?;
 
-    let existing_accounts = account_manager_lock.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 1); // The persistent account was kept.
-
-    drop(account_manager_lock);
 
     // Retrieve a persistent account that was created in the earlier lifetime
     let (_account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
 
-    let account_manager_lock = account_manager.lock().await;
-
     // Delete an account and verify it is removed.
-    assert_eq!(account_manager_lock.remove_account(account).await?, Ok(()));
-    assert_eq!(account_manager_lock.get_account_ids().await?, vec![]);
+    assert_eq!(account_manager.lock().await.remove_account(account).await?, Ok(()));
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
     Ok(())
 }
 
@@ -832,91 +741,70 @@ async fn test_one_lifecycle_ephemeral() -> Result<(), Error> {
 
     let account = provision_new_account_and_enroll(&account_manager, Lifetime::Ephemeral).await?;
 
-    let mut account_manager_lock = account_manager.lock().await;
-
-    let existing_accounts = account_manager_lock.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 1);
 
     // Restart account manager
-    account_manager_lock.restart().await?;
+    account_manager.lock().await.restart().await?;
 
-    let existing_accounts = account_manager_lock.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 0); // The ephemeral account was dropped
-
-    drop(account_manager_lock);
 
     // Make sure we can't retrieve the ephemeral account
     let (_account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account,
-            account_server_end,
-            InteractionOutcome::Fail
-        )
-        .await?,
+        get_account(&account_manager, account, account_server_end, InteractionOutcome::Fail)
+            .await?,
         Err(ApiError::NotFound)
     );
 
     Ok(())
 }
 
-// TODO(fxb/104199): Start using Interaction protocol for authentication.
 // Since we only have one zxcrypt-backed partition, provisioning a second
 // account will fail (since the disk is already formatted). When we switch to a
 // fxfs-backed AccountManager, we can reenable this test.
 #[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_many_lifecycles() -> Result<(), Error> {
-    let mut account_manager = create_account_manager().await?;
+    let account_manager = create_account_manager_arc_mutex().await?;
 
-    assert_eq!(account_manager.get_account_ids().await?, vec![]);
+    // Verify we initially have no accounts.
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![]);
 
-    let account_1 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test1"),
-    )
-    .await?;
+    let account_1 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
+    let account_2 =
+        provision_new_account_and_enroll(&account_manager, Lifetime::Persistent).await?;
+    let account_3 = provision_new_account_and_enroll(&account_manager, Lifetime::Ephemeral).await?;
 
-    let account_2 = provision_new_account(
-        &account_manager,
-        Lifetime::Persistent,
-        None,
-        create_account_metadata("test2"),
-    )
-    .await?;
-    let account_3 = provision_new_account(
-        &account_manager,
-        Lifetime::Ephemeral,
-        None,
-        create_account_metadata("test3"),
-    )
-    .await?;
-
-    let existing_accounts = account_manager.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 3);
 
     // Restart account manager
-    account_manager.restart().await?;
+    account_manager.lock().await.restart().await?;
 
-    let existing_accounts = account_manager.get_account_ids().await?;
+    let existing_accounts = account_manager.lock().await.get_account_ids().await?;
     assert_eq!(existing_accounts.len(), 2); // The ephemeral account was dropped
 
     // Make sure we can't retrieve the ephemeral account
     let (_account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account(&account_manager, account_3, account_server_end).await?,
+        get_account(&account_manager, account_3, account_server_end, InteractionOutcome::Fail)
+            .await?,
         Err(ApiError::NotFound)
     );
     // Retrieve a persistent account that was created in the earlier lifetime
     let (_account_client_end, account_server_end) = create_endpoints()?;
-    assert_eq!(get_account(&account_manager, account_1, account_server_end).await?, Ok(()));
+    assert_eq!(
+        get_account(&account_manager, account_1, account_server_end, InteractionOutcome::Succeed)
+            .await?,
+        Ok(())
+    );
 
     // Delete an account and verify it is removed.
-    assert_eq!(account_manager.remove_account(account_2).await?, Ok(()));
-    assert_eq!(account_manager.get_account_ids().await?, vec![account_1]);
+    assert_eq!(account_manager.lock().await.remove_account(account_2).await?, Ok(()));
+    assert_eq!(account_manager.lock().await.get_account_ids().await?, vec![account_1]);
 
     Ok(())
 }
@@ -989,13 +877,8 @@ async fn test_get_data_directory() -> Result<(), Error> {
 
     let (account_client_end, account_server_end) = create_endpoints()?;
     assert_eq!(
-        get_account_interaction(
-            &account_manager,
-            account_id,
-            account_server_end,
-            InteractionOutcome::Succeed
-        )
-        .await?,
+        get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Succeed)
+            .await?,
         Ok(())
     );
     let account_proxy = account_client_end.into_proxy()?;
