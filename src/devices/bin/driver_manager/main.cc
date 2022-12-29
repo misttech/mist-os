@@ -238,15 +238,6 @@ int RunDfv1(DriverManagerParams driver_manager_params,
     config.mexec_resource = std::move(mexec_resource.value());
   }
 
-  zx_handle_t oom_event;
-  zx_status_t status =
-      zx_system_get_event(root_job.value().get(), ZX_SYSTEM_EVENT_OUT_OF_MEMORY, &oom_event);
-  if (status != ZX_OK) {
-    LOGF(INFO, "Failed to get OOM event, assuming test environment and continuing");
-  } else {
-    config.oom_event = zx::event(oom_event);
-  }
-
   async::Loop firmware_loop(&kAsyncLoopConfigNeverAttachToThread);
   firmware_loop.StartThread("firmware-loop");
 
@@ -278,11 +269,11 @@ int RunDfv1(DriverManagerParams driver_manager_params,
 
   fbl::unique_fd lib_fd;
   {
-    status = fdio_open_fd("/boot/lib/",
-                          static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
-                                                fio::wire::OpenFlags::kRightReadable |
-                                                fio::wire::OpenFlags::kRightExecutable),
-                          lib_fd.reset_and_get_address());
+    zx_status_t status = fdio_open_fd("/boot/lib/",
+                                      static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
+                                                            fio::wire::OpenFlags::kRightReadable |
+                                                            fio::wire::OpenFlags::kRightExecutable),
+                                      lib_fd.reset_and_get_address());
     if (status != ZX_OK) {
       LOGF(ERROR, "Failed to open /boot/lib/ : %s", zx_status_get_string(status));
       return status;
@@ -306,7 +297,8 @@ int RunDfv1(DriverManagerParams driver_manager_params,
   coordinator.PublishDriverDevelopmentService(outgoing);
 
   // V1 Drivers.
-  status = system_instance.CreateDriverHostJob(root_job.value(), &config.driver_host_job);
+  zx_status_t status =
+      system_instance.CreateDriverHostJob(root_job.value(), &config.driver_host_job);
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to create driver_host job: %s", zx_status_get_string(status));
     return status;

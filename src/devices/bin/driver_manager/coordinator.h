@@ -95,8 +95,6 @@ struct CoordinatorConfig {
   zx::resource mexec_resource;
   // Job for all driver_hosts.
   zx::job driver_host_job;
-  // Event that is signaled by the kernel in OOM situation.
-  zx::event oom_event;
   // Client for the Arguments service.
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args;
   // Client for the DriverIndex.
