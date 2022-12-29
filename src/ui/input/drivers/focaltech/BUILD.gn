@@ -76,8 +76,7 @@ fuchsia_driver_component("focaltech") {
   component_name = "focaltech"
   deps = [ ":focaltech-driver" ]
   info = "focaltech-info.json"
-  colocate = true
-  uses_profiles = true
+  manifest = "meta/focaltech.cml"
 }
 
 fuchsia_driver("focaltech-sherlock-driver") {
@@ -103,8 +102,7 @@ fuchsia_driver_component("focaltech-sherlock") {
   component_name = "focaltech-sherlock"
   deps = [ ":focaltech-sherlock-driver" ]
   info = "focaltech-sherlock-info.json"
-  colocate = true
-  uses_profiles = true
+  manifest = "meta/focaltech-sherlock.cml"
 }
 
 test("focaltech-test-bin") {
@@ -118,6 +116,7 @@ test("focaltech-test-bin") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

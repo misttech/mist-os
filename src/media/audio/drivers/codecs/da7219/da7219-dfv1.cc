@@ -53,8 +53,9 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
     return i2c_endpoints.error_value();
   }
 
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent, "i2c000", fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
+  zx_status_t status = device_connect_fragment_fidl_protocol2(
+      parent, "i2c000", fuchsia_hardware_i2c::Service::Name,
+      fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
       i2c_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not get i2c protocol");

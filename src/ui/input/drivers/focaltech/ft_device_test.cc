@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/focaltech/focaltech.h>
@@ -144,22 +145,27 @@ class FakeFtDevice : public fake_i2c::FakeI2c {
 class FocaltechTest : public zxtest::Test {
  public:
   FocaltechTest()
-      : fake_parent_(MockDevice::FakeRootParent()), loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+      : fake_parent_(MockDevice::FakeRootParent()),
+        loop_(&kAsyncLoopConfigNeverAttachToThread),
+        outgoing_(loop_.dispatcher()) {}
 
   void SetUp() override {
     fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, interrupt_gpio_.GetProto()->ops,
                               interrupt_gpio_.GetProto()->ctx, "gpio-int");
     fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, reset_gpio_.GetProto()->ops,
                               reset_gpio_.GetProto()->ctx, "gpio-reset");
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-        [&](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)),
-                           &i2c_);
-          return ZX_OK;
-        },
-        "i2c");
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+        fuchsia_hardware_i2c::Service::InstanceHandler(
+            {.device = i2c_.bind_handler(loop_.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
+                                 "i2c");
 
     zx::interrupt interrupt;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
@@ -171,6 +177,8 @@ class FocaltechTest : public zxtest::Test {
     EXPECT_OK(loop_.StartThread());
   }
 
+  void TearDown() override { loop_.Shutdown(); }
+
  protected:
   std::shared_ptr<MockDevice> fake_parent_;
   FakeFtDevice i2c_;
@@ -179,6 +187,7 @@ class FocaltechTest : public zxtest::Test {
   ddk::MockGpio interrupt_gpio_;
   ddk::MockGpio reset_gpio_;
   async::Loop loop_;
+  component::OutgoingDirectory outgoing_;
 };
 
 TEST_F(FocaltechTest, Metadata3x27) {

@@ -74,7 +74,7 @@ fuchsia_driver_component("driver") {
   component_name = "imx227"
   deps = [ ":fuchsia_driver" ]
   info = "driver-info.json"
-  colocate = true
+  manifest = "meta/imx227.cml"
 }
 
 fuchsia_driver_package("imx227") {

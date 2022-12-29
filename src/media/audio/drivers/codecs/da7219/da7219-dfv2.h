@@ -71,7 +71,6 @@ class Driver : public fdf::DriverBase {
 
  private:
   zx::result<> Serve(std::string_view name, bool is_input);
-  zx::result<fidl::ClientEnd<fuchsia_hardware_i2c::Device>> GetI2cClient() const;
   zx::result<zx::interrupt> GetIrq() const;
 
   std::shared_ptr<Core> core_;

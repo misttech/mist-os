@@ -49,7 +49,7 @@ fuchsia_driver_component("as370-sdhci") {
   component_name = "as370-sdhci"
   deps = [ ":as370-sdhci-driver" ]
   info = "as370-sdhci-info.json"
-  colocate = true
+  manifest = "meta/as370-sdhci.cml"
 }
 
 group("tests") {

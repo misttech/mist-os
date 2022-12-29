@@ -101,7 +101,7 @@ fuchsia_driver_component("gt6853-module") {
   info = "gt6853-module-info.json"
   component_name = "gt6853"
   deps = [ ":gt6853-module-driver" ]
-  colocate = true
+  manifest = "meta/gt6853.cml"
 }
 
 test("gt6853-test") {
@@ -115,6 +115,7 @@ test("gt6853-test") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",

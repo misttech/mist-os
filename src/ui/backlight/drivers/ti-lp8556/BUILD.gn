@@ -58,7 +58,7 @@ fuchsia_driver_component("ti-lp8556") {
   component_name = "ti-lp8556"
   deps = [ ":ti-lp8556-driver" ]
   info = "ti-lp8556-info.json"
-  colocate = true
+  manifest = "meta/ti-lp8556.cml"
 }
 
 test("ti-lp8556-test") {

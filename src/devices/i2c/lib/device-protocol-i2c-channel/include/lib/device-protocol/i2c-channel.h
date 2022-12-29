@@ -148,13 +148,13 @@ class I2cChannel {
 
     zx_status_t status;
     if (fragment_name == nullptr) {
-      status = device_connect_fidl_protocol(
-          parent, fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-          endpoints->server.TakeChannel().release());
+      status = device_connect_fidl_protocol2(
+          parent, fuchsia_hardware_i2c::Service::Device::ServiceName,
+          fuchsia_hardware_i2c::Service::Device::Name, endpoints->server.TakeChannel().release());
     } else {
-      status = device_connect_fragment_fidl_protocol(
-          parent, fragment_name, fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-          endpoints->server.TakeChannel().release());
+      status = device_connect_fragment_fidl_protocol2(
+          parent, fragment_name, fuchsia_hardware_i2c::Service::Device::ServiceName,
+          fuchsia_hardware_i2c::Service::Device::Name, endpoints->server.TakeChannel().release());
     }
 
     if (status != ZX_OK) {

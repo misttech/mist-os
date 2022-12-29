@@ -604,18 +604,11 @@ zx_status_t Fusb302::InitInspect() {
 }
 
 zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create I2C endpoints");
-    return endpoints.error_value();
-  }
-
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent, "i2c", fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get I2C");
-    return status;
+  auto client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>(parent, "i2c");
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Failed to get I2C %s", client_end.status_string());
+    return client_end.status_value();
   }
 
   ddk::GpioProtocolClient gpio(parent, "gpio");
@@ -623,7 +616,7 @@ zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
     zxlogf(ERROR, "Failed to get GPIO");
     return ZX_ERR_INTERNAL;
   }
-  status = gpio.ConfigIn(GPIO_PULL_UP);
+  zx_status_t status = gpio.ConfigIn(GPIO_PULL_UP);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ConfigIn failed, status = %d", status);
   }
@@ -634,8 +627,8 @@ zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<Fusb302> device(
-      new (&ac) Fusb302(parent, std::move(endpoints->client), std::move(irq)));
+  std::unique_ptr<Fusb302> device(new (&ac)
+                                      Fusb302(parent, std::move(*client_end), std::move(irq)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -668,4 +661,3 @@ static constexpr zx_driver_ops_t fusb302_driver_ops = []() {
 
 // clang-format off
 ZIRCON_DRIVER(fusb302, fusb302_driver_ops, "zircon", "0.1");
-

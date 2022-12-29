@@ -39,7 +39,7 @@ fuchsia_driver_component("tmp112") {
   info = "tmp112-info.json"
   component_name = "tmp112"
   deps = [ ":tmp112-driver" ]
-  colocate = true
+  manifest = "meta/tmp112.cml"
 }
 
 test("tmp112-test-bin") {

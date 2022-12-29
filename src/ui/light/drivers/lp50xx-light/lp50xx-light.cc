@@ -499,19 +499,13 @@ void Lp50xxLight::DdkRelease() { delete this; }
 
 zx_status_t Lp50xxLight::InitHelper() {
   // Get Pdev and I2C protocol.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "CreateEndpoints failed: %d", endpoints.error_value());
-    return endpoints.error_value();
+  auto i2c_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>("i2c");
+  if (i2c_client.is_error()) {
+    zxlogf(ERROR, "DdkConnectFragmentFidlProtocol failed: %s", i2c_client.status_string());
+    return i2c_client.status_value();
   }
 
-  zx_status_t status = DdkConnectFragmentFidlProtocol("i2c", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkConnectFragmentFidlProtocol failed: %d", status);
-    return status;
-  }
-
-  i2c_ = std::move(endpoints->client);
+  i2c_ = std::move(*i2c_client);
 
   auto pdev = ddk::PDev::FromFragment(parent());
   if (!pdev.is_valid()) {
@@ -520,7 +514,7 @@ zx_status_t Lp50xxLight::InitHelper() {
   }
 
   pdev_device_info info = {};
-  status = pdev.GetDeviceInfo(&info);
+  zx_status_t status = pdev.GetDeviceInfo(&info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "GetDeviceInfo failed: %d", status);
     return status;

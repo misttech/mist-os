@@ -237,19 +237,13 @@ void Cy8cmbr3108::DdkRelease() { delete this; }
 
 zx_status_t Cy8cmbr3108::InitializeProtocols() {
   // Get I2C and GPIO protocol.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create I2C endpoints");
-    return endpoints.error_value();
+  auto i2c_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>("i2c");
+  if (i2c_client.is_error()) {
+    zxlogf(ERROR, "fuchsia.hardware.i2c/Device not found");
+    return i2c_client.status_value();
   }
 
-  zx_status_t status = DdkConnectFragmentFidlProtocol("i2c", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ZX_PROTOCOL_I2C not found");
-    return status;
-  }
-
-  i2c_ = std::move(endpoints->client);
+  i2c_ = std::move(*i2c_client);
 
   touch_gpio_ = ddk::GpioProtocolClient(parent(), "gpio");
   if (!touch_gpio_.is_valid()) {

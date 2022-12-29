@@ -49,7 +49,7 @@ fuchsia_driver_component("alc5663") {
   component_name = "alc5663"
   deps = [ ":alc5663-driver" ]
   info = "alc5663-info.json"
-  colocate = true
+  manifest = "meta/alc5663.cml"
 }
 
 group("tests") {

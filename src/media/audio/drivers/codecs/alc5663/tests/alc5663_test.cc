@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <zircon/errors.h>
@@ -36,12 +37,15 @@ class FakeAlc5663 {
   FakeAlc5663()
       : fake_i2c_([this](uint16_t addr) { return OnRead(addr); },
                   [this](uint16_t addr, uint16_t data) { OnWrite(addr, data); }),
-        loop_(&kAsyncLoopConfigNeverAttachToThread) {
+        loop_(&kAsyncLoopConfigNeverAttachToThread),
+        outgoing_(loop_.dispatcher()) {
     // Setup some register defaults.
     registers_.resize(kNumRegisters);
     registers_.at(VendorIdReg::kAddress) = VendorIdReg::kVendorRealtek;
     loop_.StartThread();
   }
+
+  ~FakeAlc5663() { loop_.Shutdown(); }
 
   // Install an override allowing a custom callback to be issued when a given
   // I2C bus address is accessed.
@@ -102,6 +106,7 @@ class FakeAlc5663 {
   }
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+  component::OutgoingDirectory& outgoing() { return outgoing_; }
 
  private:
   // Read via the I2C bus.
@@ -139,6 +144,7 @@ class FakeAlc5663 {
   std::unordered_map<uint16_t, std::function<void(uint16_t)>> write_overrides_;
 
   async::Loop loop_;
+  component::OutgoingDirectory outgoing_;
 };
 
 // Convert a ClockDivisionRate enum into a divisor.
@@ -293,14 +299,18 @@ FakeAlc5663Hardware CreateFakeAlc5663() {
   // the fake hardware.
 
   auto* proto = result.codec->GetProto();
-  result.fake_parent->AddFidlProtocol(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-      [=, dispatcher = result.codec->dispatcher()](zx::channel channel) {
-        fidl::BindServer(dispatcher,
-                         fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)), proto);
-        return ZX_OK;
-      },
-      "i2c000");
+
+  auto service_result = result.codec->outgoing().AddService<fuchsia_hardware_i2c::Service>(
+      fuchsia_hardware_i2c::Service::InstanceHandler(
+          {.device = proto->bind_handler(result.codec->dispatcher())}));
+  ZX_ASSERT(service_result.is_ok());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(endpoints.is_ok());
+  ZX_ASSERT(result.codec->outgoing().Serve(std::move(endpoints->server)).is_ok());
+
+  result.fake_parent->AddFidlService(fuchsia_hardware_i2c::Service::Name,
+                                     std::move(endpoints->client), "i2c000");
 
   // Expose the parent device.
   result.parent = result.fake_parent.get();

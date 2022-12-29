@@ -48,7 +48,7 @@ fuchsia_driver_component("tas58xx") {
   component_name = "tas58xx"
   deps = [ ":tas58xx-driver" ]
   info = "tas58xx-info.json"
-  colocate = true
+  manifest = "meta/tas58xx.cml"
 }
 
 test("tas58xx-test") {

@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
@@ -99,7 +100,7 @@ class FakeLightSensor : public fake_i2c::FakeI2c {
 
 class Tcs3400Test : public zxtest::Test {
  public:
-  Tcs3400Test() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  Tcs3400Test() : loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_(loop_.dispatcher()) {}
 
   void SetUp() override {
     constexpr metadata::LightSensorParams kLightSensorMetadata = {
@@ -112,15 +113,17 @@ class Tcs3400Test : public zxtest::Test {
     fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kLightSensorMetadata,
                               sizeof(kLightSensorMetadata));
 
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-        [&](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)),
-                           &fake_i2c_);
-          return ZX_OK;
-        },
-        "i2c");
+    auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+        fuchsia_hardware_i2c::Service::InstanceHandler(
+            {.device = fake_i2c_.bind_handler(loop_.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    fake_parent_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
+                                 "i2c");
 
     fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio_.GetProto()->ops,
                               mock_gpio_.GetProto()->ctx, "gpio");
@@ -149,6 +152,7 @@ class Tcs3400Test : public zxtest::Test {
   void TearDown() override {
     device_async_remove(device_->zxdev());
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
+    loop_.Shutdown();
   }
 
   fidl::ClientEnd<fuchsia_input_report::InputDevice> FidlClient() {
@@ -244,6 +248,7 @@ class Tcs3400Test : public zxtest::Test {
   ddk::MockGpio mock_gpio_;
   std::shared_ptr<MockDevice> fake_parent_;
   async::Loop loop_;
+  component::OutgoingDirectory outgoing_;
 };
 
 TEST_F(Tcs3400Test, GetInputReport) {
@@ -866,16 +871,19 @@ class Tcs3400MetadataTest : public zxtest::Test {
     ddk::MockGpio mock_gpio;
 
     async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+    component::OutgoingDirectory outgoing(loop.dispatcher());
 
-    fake_parent->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-        [&](zx::channel channel) {
-          fidl::BindServer(loop.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)),
-                           &fake_i2c);
-          return ZX_OK;
-        },
-        "i2c");
+    auto service_result = outgoing.AddService<fuchsia_hardware_i2c::Service>(
+        fuchsia_hardware_i2c::Service::InstanceHandler(
+            {.device = fake_i2c.bind_handler(loop.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing.Serve(std::move(endpoints->server)).is_ok());
+
+    fake_parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
+                                "i2c");
 
     fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, mock_gpio.GetProto()->ops, mock_gpio.GetProto()->ctx,
                              "gpio");
@@ -905,6 +913,7 @@ class Tcs3400MetadataTest : public zxtest::Test {
 
     device_async_remove(status.value()->zxdev());
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent.get()));
+    loop.Shutdown();
   }
 };
 

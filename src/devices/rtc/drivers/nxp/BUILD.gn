@@ -33,7 +33,7 @@ fuchsia_driver_component("nxp") {
   info = "nxp-info.json"
   component_name = "nxp"
   deps = [ ":nxp-driver" ]
-  colocate = false
+  manifest = "meta/nxp.cml"
 }
 
 group("tests") {

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <zircon/errors.h>
@@ -123,7 +124,7 @@ class I2cDevice : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
 
 class I2cChannelTest : public zxtest::Test {
  public:
-  I2cChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  I2cChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_(loop_.dispatcher()) {}
 
   void SetUp() override { loop_.StartThread(); }
 
@@ -140,6 +141,7 @@ class I2cChannelTest : public zxtest::Test {
   }
 
   async::Loop loop_;
+  component::OutgoingDirectory outgoing_;
 };
 
 TEST_F(I2cChannelTest, NoRetries) {
@@ -266,22 +268,19 @@ TEST_F(I2cChannelTest, FidlWriteRead) {
 }
 
 TEST_F(I2cChannelTest, GetFidlProtocolFromParent) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  ASSERT_TRUE(endpoints.is_ok());
-
   I2cDevice i2c_dev;
-  auto binding = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &i2c_dev);
-
   auto parent = MockDevice::FakeRootParent();
 
-  parent->AddFidlProtocol(fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-                          [this, &i2c_dev](zx::channel channel) {
-                            fidl::BindServer(
-                                loop_.dispatcher(),
-                                fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)),
-                                &i2c_dev);
-                            return ZX_OK;
-                          });
+  auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+      fuchsia_hardware_i2c::Service::InstanceHandler(
+          {.device = i2c_dev.bind_handler(loop_.dispatcher())}));
+  ZX_ASSERT(service_result.is_ok());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(endpoints.is_ok());
+  ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client));
 
   ddk::I2cChannel client(parent.get());
   ASSERT_TRUE(client.is_valid());
@@ -306,23 +305,20 @@ TEST_F(I2cChannelTest, GetFidlProtocolFromParent) {
 }
 
 TEST_F(I2cChannelTest, GetFidlProtocolFromFragment) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  ASSERT_TRUE(endpoints.is_ok());
-
   I2cDevice i2c_dev;
-  auto binding = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &i2c_dev);
-
   auto parent = MockDevice::FakeRootParent();
 
-  parent->AddFidlProtocol(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_i2c::Device>,
-      [this, &i2c_dev](zx::channel channel) {
-        fidl::BindServer(loop_.dispatcher(),
-                         fidl::ServerEnd<fuchsia_hardware_i2c::Device>(std::move(channel)),
-                         &i2c_dev);
-        return ZX_OK;
-      },
-      "fragment-name");
+  auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+      fuchsia_hardware_i2c::Service::InstanceHandler(
+          {.device = i2c_dev.bind_handler(loop_.dispatcher())}));
+  ZX_ASSERT(service_result.is_ok());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(endpoints.is_ok());
+  ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
+                         "fragment-name");
 
   ddk::I2cChannel client(parent.get(), "fragment-name");
   ASSERT_TRUE(client.is_valid());

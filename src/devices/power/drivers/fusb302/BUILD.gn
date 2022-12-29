@@ -51,7 +51,7 @@ fuchsia_driver_component("fusb302") {
   info = "fusb302-info.json"
   component_name = "fusb302"
   deps = [ ":fusb302-driver" ]
-  colocate = true
+  manifest = "meta/fusb302.cml"
 }
 
 test("fusb302-test-bin") {
