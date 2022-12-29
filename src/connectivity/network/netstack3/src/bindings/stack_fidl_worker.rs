@@ -8,8 +8,7 @@ use super::{
     devices::{self, CommonInfo, DeviceSpecificInfo, Devices, EthernetInfo, FidlWorkerInfo},
     ethernet_worker, interfaces_admin,
     util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _, TryIntoFidlWithContext as _},
-    InterfaceControl as _, InterfaceControlRunner, InterfaceEventProducerFactory, Lockable,
-    LockableContext, StackTime,
+    BindingsNonSyncCtxImpl,
 };
 
 use fidl_fuchsia_hardware_ethernet as fhardware_ethernet;
@@ -23,36 +22,30 @@ use fidl_fuchsia_net_stack::{
 use futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error};
 use net_types::{ethernet::Mac, UnicastAddr};
-use netstack3_core::{add_route, del_route, device::DeviceId, ip::types::AddableEntryEither, Ctx};
+use netstack3_core::{add_route, del_route, ip::types::AddableEntryEither, Ctx};
 use std::collections::HashMap;
 
-pub(crate) struct StackFidlWorker<C> {
-    ctx: C,
+pub(crate) struct StackFidlWorker {
+    netstack: crate::bindings::Netstack,
 }
 
-struct LockedFidlWorker<'a, C: LockableContext> {
-    ctx: <C as Lockable<'a, Ctx<C::NonSyncCtx>>>::Guard,
-    worker: &'a StackFidlWorker<C>,
+struct LockedFidlWorker<'a> {
+    ctx: futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>,
+    worker: &'a StackFidlWorker,
 }
 
-impl<C: LockableContext> StackFidlWorker<C> {
-    async fn lock_worker(&self) -> LockedFidlWorker<'_, C> {
-        let ctx = self.ctx.lock().await;
+impl StackFidlWorker {
+    async fn lock_worker(&self) -> LockedFidlWorker<'_> {
+        let ctx = self.netstack.ctx.lock().await;
         LockedFidlWorker { ctx, worker: self }
     }
-}
 
-impl<C> StackFidlWorker<C>
-where
-    C: ethernet_worker::EthernetWorkerContext
-        + InterfaceEventProducerFactory
-        + InterfaceControlRunner,
-    C: Clone,
-    Ctx<<C as ethernet_worker::EthernetWorkerContext>::NonSyncCtx>: Send,
-{
-    pub(crate) async fn serve(ctx: C, stream: StackRequestStream) -> Result<(), fidl::Error> {
+    pub(crate) async fn serve(
+        netstack: crate::bindings::Netstack,
+        stream: StackRequestStream,
+    ) -> Result<(), fidl::Error> {
         stream
-            .try_fold(Self { ctx }, |worker, req| async {
+            .try_fold(Self { netstack }, |worker, req| async {
                 match req {
                     StackRequest::AddEthernetInterface { topological_path, device, responder } => {
                         responder_send!(
@@ -131,19 +124,12 @@ where
                 }
                 Ok(worker)
             })
-            .map_ok(|Self { ctx: _ }| ())
+            .map_ok(|Self { netstack: _ }| ())
             .await
     }
 }
 
-impl<'a, C> LockedFidlWorker<'a, C>
-where
-    C: ethernet_worker::EthernetWorkerContext
-        + InterfaceEventProducerFactory
-        + InterfaceControlRunner,
-    C: Clone,
-    Ctx<<C as ethernet_worker::EthernetWorkerContext>::NonSyncCtx>: Send,
-{
+impl<'a> LockedFidlWorker<'a> {
     async fn fidl_add_ethernet_interface(
         self,
         _topological_path: String,
@@ -207,7 +193,7 @@ where
                         common_info: CommonInfo {
                             mtu,
                             admin_enabled: true,
-                            events: worker.ctx.create_interface_event_producer(
+                            events: worker.netstack.create_interface_event_producer(
                                 id,
                                 super::InterfaceProperties { name: name.clone(), device_class },
                             ),
@@ -222,7 +208,7 @@ where
                         interface_control: FidlWorkerInfo {
                             worker: self
                                 .worker
-                                .ctx
+                                .netstack
                                 .spawn_interface_control(
                                     id,
                                     interface_control_stop_receiver,
@@ -239,20 +225,15 @@ where
         };
 
         if online {
-            ctx.enable_interface(id)?;
+            crate::bindings::set_interface_enabled(&mut ctx, id, true)?;
         }
 
-        ethernet_worker::EthernetWorker::new(id, self.worker.ctx.clone()).spawn(client_stream);
+        ethernet_worker::EthernetWorker::new(id, self.worker.netstack.ctx.clone())
+            .spawn(client_stream);
 
         Ok(id)
     }
-}
 
-impl<'a, C> LockedFidlWorker<'a, C>
-where
-    C: LockableContext,
-    C::NonSyncCtx: AsMut<Devices<DeviceId<StackTime>>>,
-{
     /// Cancels the `fuchsia.net.interfaces.admin/Control` task.
     ///
     /// Returns a [`Future`] resolving on task completion, or a NotFound error.
@@ -260,7 +241,7 @@ where
         mut self,
         id: u64,
     ) -> Result<impl futures::Future<Output = ()>, fidl_net_stack::Error> {
-        let info = match self.ctx.non_sync_ctx.as_mut().get_device_mut(id) {
+        let info = match self.ctx.non_sync_ctx.devices.get_device_mut(id) {
             Some(info) => info,
             None => return Err(fidl_net_stack::Error::NotFound),
         };
@@ -290,7 +271,7 @@ where
 
     // Remove the given interface from core.
     fn remove_ethernet_interface(mut self, id: u64) -> Result<(), fidl_net_stack::Error> {
-        match self.ctx.non_sync_ctx.as_mut().remove_device(id) {
+        match self.ctx.non_sync_ctx.devices.remove_device(id) {
             Some(info) => match info.into_info() {
                 devices::DeviceSpecificInfo::Ethernet(_) => Ok(()),
                 i @ devices::DeviceSpecificInfo::Loopback(_)
@@ -305,13 +286,7 @@ where
             }
         }
     }
-}
 
-impl<'a, C> LockedFidlWorker<'a, C>
-where
-    C: LockableContext,
-    C::NonSyncCtx: AsRef<Devices<DeviceId<StackTime>>>,
-{
     fn fidl_get_forwarding_table(self) -> Vec<fidl_net_stack::ForwardingEntry> {
         let Ctx { sync_ctx, non_sync_ctx } = self.ctx.deref();
 
@@ -339,12 +314,7 @@ where
         };
         add_route(sync_ctx, non_sync_ctx, entry).map_err(IntoFidl::into_fidl)
     }
-}
 
-impl<'a, C> LockedFidlWorker<'a, C>
-where
-    C: LockableContext,
-{
     fn fidl_del_forwarding_entry(
         mut self,
         subnet: fidl_net::Subnet,

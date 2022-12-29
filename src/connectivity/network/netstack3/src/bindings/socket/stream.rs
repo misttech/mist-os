@@ -30,7 +30,6 @@ use net_types::{
     SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
-    device::DeviceId,
     ip::IpExt,
     transport::tcp::{
         self,
@@ -53,10 +52,8 @@ use nonzero_ext::nonzero;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::bindings::{
-    devices::Devices,
     socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
     util::{IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl},
-    LockableContext, StackTime,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
@@ -396,30 +393,25 @@ impl SendBuffer for SendBufferWithZirconSocket {
     }
 }
 
-struct SocketWorker<I: IpExt, C> {
+struct SocketWorker<I: IpExt> {
     id: SocketId<I>,
-    ctx: C,
+    ctx: crate::bindings::NetstackContext,
     peer: zx::Socket,
     _marker: IpVersionMarker<I>,
 }
 
-impl<I: IpExt, C> SocketWorker<I, C> {
-    fn new(id: SocketId<I>, ctx: C, peer: zx::Socket) -> Self {
+impl<I: IpExt> SocketWorker<I> {
+    fn new(id: SocketId<I>, ctx: crate::bindings::NetstackContext, peer: zx::Socket) -> Self {
         Self { id, ctx, peer, _marker: Default::default() }
     }
 }
 
-pub(super) async fn spawn_worker<C>(
+pub(super) async fn spawn_worker(
     domain: fposix_socket::Domain,
     proto: fposix_socket::StreamSocketProtocol,
-    ctx: C,
+    ctx: crate::bindings::NetstackContext,
     request_stream: fposix_socket::StreamSocketRequestStream,
-) -> Result<(), fposix::Errno>
-where
-    C: LockableContext,
-    C: Clone + Send + Sync + 'static,
-    C::NonSyncCtx: SocketWorkerDispatcher + AsRef<Devices<DeviceId<StackTime>>>,
-{
+) -> Result<(), fposix::Errno> {
     let (local, peer) = zx::Socket::create(zx::SocketOpts::STREAM)
         .map_err(|_: zx::Status| fposix::Errno::Enobufs)?;
     let socket = Arc::new(local);
@@ -433,7 +425,7 @@ where
                     LocalZirconSocketAndNotifier(Arc::clone(&socket), NeedsDataNotifier::default()),
                 )
             };
-            let worker = SocketWorker::<Ipv4, C>::new(id, ctx.clone(), peer);
+            let worker = SocketWorker::<Ipv4>::new(id, ctx.clone(), peer);
             Ok(worker.spawn(request_stream))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
@@ -445,7 +437,7 @@ where
                     LocalZirconSocketAndNotifier(Arc::clone(&socket), NeedsDataNotifier::default()),
                 )
             };
-            let worker = SocketWorker::<Ipv6, C>::new(id, ctx.clone(), peer);
+            let worker = SocketWorker::<Ipv6>::new(id, ctx.clone(), peer);
             Ok(worker.spawn(request_stream))
         }
     }
@@ -476,16 +468,12 @@ impl IntoErrno for NoConnection {
 
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
-fn spawn_send_task<I: IpExt, C>(
-    ctx: C,
+fn spawn_send_task<I: IpExt>(
+    ctx: crate::bindings::NetstackContext,
     socket: Arc<zx::Socket>,
     watcher: NeedsDataWatcher,
     id: ConnectionId<I>,
-) where
-    C: LockableContext,
-    C: Clone + Send + Sync + 'static,
-    C::NonSyncCtx: SocketWorkerDispatcher,
-{
+) {
     fasync::Task::spawn(async move {
         watcher
             .for_each(|()| async {
@@ -506,12 +494,7 @@ fn spawn_send_task<I: IpExt, C>(
     .detach();
 }
 
-impl<I: IpSockAddrExt + IpExt, C> SocketWorker<I, C>
-where
-    C: LockableContext,
-    C: Clone + Send + Sync + 'static,
-    C::NonSyncCtx: SocketWorkerDispatcher + AsRef<Devices<DeviceId<StackTime>>>,
-{
+impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
     fn spawn(mut self, request_stream: fposix_socket::StreamSocketRequestStream) {
         fasync::Task::spawn(async move {
             // Keep a set of futures, one per pollable stream. Each future is a
@@ -637,7 +620,7 @@ where
             SocketId::Listener(_) => Err(fposix::Errno::Einval),
             SocketId::Connection(_) => Err(fposix::Errno::Eisconn),
         }?;
-        spawn_send_task::<I, _>(self.ctx.clone(), socket, watcher, connection);
+        spawn_send_task::<I>(self.ctx.clone(), socket, watcher, connection);
         self.id = SocketId::Connection(connection);
         Ok(())
     }
@@ -749,12 +732,9 @@ where
                 let (client, request_stream) =
                     fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
                         .expect("failed to create new fidl endpoints");
-                spawn_send_task::<I, _>(self.ctx.clone(), socket, watcher, accepted);
-                let worker = SocketWorker::<I, C>::new(
-                    SocketId::Connection(accepted),
-                    self.ctx.clone(),
-                    peer,
-                );
+                spawn_send_task::<I>(self.ctx.clone(), socket, watcher, accepted);
+                let worker =
+                    SocketWorker::<I>::new(SocketId::Connection(accepted), self.ctx.clone(), peer);
                 worker.spawn(request_stream);
                 Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
             }
@@ -807,7 +787,7 @@ where
         let device = device
             .map(|name| {
                 non_sync_ctx
-                    .as_ref()
+                    .devices
                     .get_device_by_name(name)
                     .map(|d| d.core_id().clone())
                     .ok_or(fposix::Errno::Enodev)

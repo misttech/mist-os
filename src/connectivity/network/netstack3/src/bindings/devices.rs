@@ -16,7 +16,7 @@ use netstack3_core::{
     Ctx,
 };
 
-use crate::bindings::{interfaces_admin, util::NeedsDataNotifier, LockableContext, StackTime};
+use crate::bindings::{interfaces_admin, util::NeedsDataNotifier, Netstack, StackTime};
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -160,17 +160,18 @@ impl DeviceSpecificInfo {
     }
 }
 
-pub(crate) fn spawn_rx_task<C: LockableContext + Send + Sync + 'static>(
+pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
-    ns: C,
+    ns: &Netstack,
     device_id: DeviceId<StackTime>,
 ) {
     let mut watcher = notifier.watcher();
 
+    let ns = ns.clone();
     fuchsia_async::Task::spawn(async move {
         // Loop while we are woken up to handle enqueued RX packets.
         while let Some(()) = watcher.next().await {
-            let mut ctx = ns.lock().await;
+            let mut ctx = ns.ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = &mut *ctx;
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
         }

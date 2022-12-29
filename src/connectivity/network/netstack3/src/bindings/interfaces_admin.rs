@@ -51,7 +51,7 @@ use netstack3_core::Ctx;
 
 use crate::bindings::{
     devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId,
-    InterfaceControl as _, Netstack, NetstackContext,
+    Netstack, NetstackContext,
 };
 
 pub(crate) fn serve(
@@ -380,11 +380,9 @@ async fn run_link_state_watcher<
                 // Enable or disable interface with context depending on new online
                 // status. The helper functions take care of checking if admin
                 // enable is the expected value.
-                if online {
-                    ctx.enable_interface(id).expect("failed to enable interface");
-                } else {
-                    ctx.disable_interface(id).expect("failed to enable interface");
-                }
+                crate::bindings::set_interface_enabled(&mut ctx, id, online).unwrap_or_else(|e| {
+                    panic!("failed to set interface enabled={}: {:?}", online, e)
+                });
                 Ok(())
             }
         })
@@ -662,11 +660,8 @@ async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: Binding
             }
         }
     }
-    if enabled {
-        ctx.enable_interface(id).expect("failed to enable interface");
-    } else {
-        ctx.disable_interface(id).expect("failed to disable interface");
-    }
+    crate::bindings::set_interface_enabled(&mut ctx, id, enabled)
+        .unwrap_or_else(|e| panic!("failed to set interface enabled={}: {:?}", enabled, e));
     true
 }
 

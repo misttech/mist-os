@@ -14,9 +14,9 @@ use futures::{
     future::{AbortHandle, Abortable, Aborted},
     stream::{FuturesUnordered, StreamExt as _},
 };
-use log::trace;
+use log::{trace, warn};
 
-use super::{context::Lockable, StackTime};
+use super::StackTime;
 
 /// A possible timer event that may be fulfilled by calling
 /// [`TimerDispatcher::commit_timer`].
@@ -36,7 +36,7 @@ struct TimerInfo {
 /// A context for specified for a timer type `T` that provides asynchronous
 /// locking to a [`TimerHandler`].
 pub(crate) trait TimerContext<T: Hash + Eq>:
-    'static + for<'a> Lockable<'a, <Self as TimerContext<T>>::Handler> + Clone
+    'static + for<'a> crate::bindings::context::Lockable<'a, <Self as TimerContext<T>>::Handler> + Clone
 {
     type Handler: TimerHandler<T>;
 }
@@ -183,13 +183,6 @@ where
     pub(crate) fn schedule_timer(&mut self, timer_id: T, time: StackTime) -> Option<StackTime> {
         let next_id = self.next_id;
 
-        let sender = if let Some(s) = self.futures_sender.as_mut() {
-            s
-        } else {
-            trace!("TimerDispatcher not spawned, ignoring timer {:?}", timer_id);
-            return None;
-        };
-
         // Overflowing next_id should be safe enough to hold TimerDispatcher's
         // invariant about around "versioning" timer identifiers. We'll
         // overlflow after 2^64 timers are scheduled (which can take a while)
@@ -207,7 +200,12 @@ where
             Abortable::new(fasync::Timer::new(time).replace_value(event), abort_registration)
         };
 
-        sender.unbounded_send(timeout).expect("TimerDispatcher's task receiver is gone");
+        if let Some(sender) = self.futures_sender.as_mut() {
+            sender.unbounded_send(timeout).expect("TimerDispatcher's task receiver is gone");
+        } else {
+            // Timers are always stopped in tests.
+            warn!("TimerDispatcher not spawned, timer {:?} will not fire", timer_id);
+        }
 
         match self.timers.entry(timer_id) {
             Entry::Vacant(e) => {

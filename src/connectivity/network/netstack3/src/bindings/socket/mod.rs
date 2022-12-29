@@ -23,7 +23,6 @@ use net_types::{
     ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_core::{
-    device::DeviceId,
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
@@ -34,7 +33,6 @@ use netstack3_core::{
 use crate::bindings::{
     devices::Devices,
     util::{IntoCore as _, IntoFidl as _},
-    LockableContext, StackTime,
 };
 
 const ZXSIO_SIGNAL_INCOMING: zx::Signals =
@@ -48,17 +46,10 @@ const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
 #[derive(Debug)]
 struct SocketWorkerProperties {}
 
-pub(crate) async fn serve<C>(
-    ctx: C,
+pub(crate) async fn serve(
+    ctx: crate::bindings::NetstackContext,
     stream: psocket::ProviderRequestStream,
-) -> Result<(), fidl::Error>
-where
-    C: LockableContext,
-    C::NonSyncCtx: AsRef<Devices<DeviceId<StackTime>>>
-        + datagram::SocketWorkerDispatcher
-        + stream::SocketWorkerDispatcher,
-    C: Clone + Send + Sync + 'static,
-{
+) -> Result<(), fidl::Error> {
     stream
         .try_fold(ctx, |ctx, req| async {
             match req {
@@ -148,7 +139,7 @@ where
             }
             Ok(ctx)
         })
-        .map_ok(|_: C| ())
+        .map_ok(|_: crate::bindings::NetstackContext| ())
         .await
 }
 

@@ -54,12 +54,11 @@ use packet_formats::{
 use thiserror::Error;
 
 use crate::bindings::{
-    devices::Devices,
     util::{
         self, DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    CommonInfo, LockableContext, StackTime,
+    BindingsNonSyncCtxImpl, CommonInfo, StackTime,
 };
 
 use super::{
@@ -1425,36 +1424,31 @@ where
 {
 }
 
-pub(super) fn spawn_worker<C>(
+pub(super) fn spawn_worker(
     domain: fposix_socket::Domain,
     proto: fposix_socket::DatagramSocketProtocol,
-    ctx: C,
+    ctx: crate::bindings::NetstackContext,
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
-) -> Result<(), fposix::Errno>
-where
-    C: LockableContext,
-    C::NonSyncCtx: SocketWorkerDispatcher + AsRef<Devices<DeviceId<StackTime>>>,
-    C: Clone + Send + Sync + 'static,
-{
+) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<Ipv4, Udp, C>::spawn(ctx, properties, events)
+            SocketWorker::<Ipv4, Udp>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<Ipv6, Udp, C>::spawn(ctx, properties, events)
+            SocketWorker::<Ipv6, Udp>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<Ipv4, IcmpEcho, C>::spawn(ctx, properties, events)
+            SocketWorker::<Ipv4, IcmpEcho>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<Ipv6, IcmpEcho, C>::spawn(ctx, properties, events)
+            SocketWorker::<Ipv6, IcmpEcho>::spawn(ctx, properties, events)
         }
     }
 }
 
-struct SocketWorker<I: Ip, T: Transport<I>, C> {
-    ctx: C,
+struct SocketWorker<I: Ip, T: Transport<I>> {
+    ctx: crate::bindings::NetstackContext,
     data: BindingData<I, T>,
     _marker: PhantomData<(I, T)>,
 }
@@ -1463,23 +1457,21 @@ struct NewStream {
     stream: fposix_socket::SynchronousDatagramSocketRequestStream,
 }
 
-impl<I, T, SC> SocketWorker<I, T, SC>
+impl<I, T> SocketWorker<I, T>
 where
     I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
-    SC: RequestHandlerContext<I, T>,
     T: Send + Sync + 'static,
-    SC: Clone + Send + Sync + 'static,
     DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
         + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
-    <SC as RequestHandlerContext<I, T>>::NonSyncCtx: AsRef<Devices<DeviceId<StackTime>>>,
+    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     /// Starts servicing events from the provided event stream.
     fn spawn(
-        ctx: SC,
+        ctx: crate::bindings::NetstackContext,
         properties: SocketWorkerProperties,
         events: fposix_socket::SynchronousDatagramSocketRequestStream,
     ) -> Result<(), fposix::Errno> {
@@ -1633,65 +1625,30 @@ where
     D: AsRef<SocketCollectionPair<T>> + AsMut<SocketCollectionPair<T>>,
 {
 }
-
-// TODO(https://github.com/rust-lang/rust/issues/20671): Replace the duplicate associated type with
-// a where clause bounding the parent trait's associated type.
-//
-// OR
-//
-// TODO(https://github.com/rust-lang/rust/issues/52662): Replace the duplicate associated type with
-// a bound on the parent trait's associated type.
-trait RequestHandlerContext<I, T>:
-    LockableContext<NonSyncCtx = <Self as RequestHandlerContext<I, T>>::NonSyncCtx>
-where
-    I: IpExt,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-    T: Transport<I>,
-{
-    type NonSyncCtx: RequestHandlerDispatcher<I, T>
-        + NonSyncContext<Instant = StackTime>
-        + AsRef<Devices<DeviceId<StackTime>>>;
-}
-
-impl<I, T, C> RequestHandlerContext<I, T> for C
-where
-    I: IpExt,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-    T: Transport<I>,
-    C: LockableContext,
-    C::NonSyncCtx: RequestHandlerDispatcher<I, T> + AsRef<Devices<DeviceId<StackTime>>>,
-{
-    type NonSyncCtx = C::NonSyncCtx;
-}
-
 /// A borrow into a [`SocketWorker`]'s state.
-struct RequestHandler<'a, I: Ip, T: Transport<I>, C> {
-    ctx: &'a mut C,
+struct RequestHandler<'a, I: Ip, T: Transport<I>> {
+    ctx: &'a crate::bindings::NetstackContext,
     data: &'a mut BindingData<I, T>,
 }
 
-impl<'a, I: Ip, T: Transport<I>, SC> RequestHandler<'a, I, T, SC> {
-    fn new(worker: &'a mut SocketWorker<I, T, SC>) -> Self {
+impl<'a, I: Ip, T: Transport<I>> RequestHandler<'a, I, T> {
+    fn new(worker: &'a mut SocketWorker<I, T>) -> Self {
         let SocketWorker { ctx, data, _marker } = worker;
         Self { ctx, data }
     }
 }
 
-impl<'a, I, T, SC> RequestHandler<'a, I, T, SC>
+impl<'a, I, T> RequestHandler<'a, I, T>
 where
     I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
     T: BufferTransportState<I, Buf<Vec<u8>>>,
-    SC: RequestHandlerContext<I, T>,
     T: Send + Sync + 'static,
-    SC: Clone + Send + Sync + 'static,
     DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
         + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
-    <SC as RequestHandlerContext<I, T>>::NonSyncCtx: AsRef<Devices<DeviceId<StackTime>>>,
+    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     async fn handle_request(
         mut self,
@@ -2259,8 +2216,8 @@ where
 
     /// Helper function for common functionality to self.bind() and self.send_msg().
     fn bind_inner(
-        sync_ctx: &SyncCtx<<SC as RequestHandlerContext<I, T>>::NonSyncCtx>,
-        non_sync_ctx: &mut <SC as RequestHandlerContext<I, T>>::NonSyncCtx,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         unbound_id: <T as Transport<I>>::UnboundId,
         available_data: &Arc<Mutex<MessageQueue<I, T>>>,
         local_addr: Option<ZonedAddr<I::Addr, DeviceId<StackTime>>>,
@@ -2519,7 +2476,7 @@ where
         let device = device
             .map(|name| {
                 non_sync_ctx
-                    .as_ref()
+                    .devices
                     .get_device_by_name(name)
                     .map(|d| d.core_id().clone())
                     .ok_or(fposix::Errno::Enodev)
@@ -2544,7 +2501,7 @@ where
         };
         let index = TryIntoFidlWithContext::<u64>::try_into_fidl_with_ctx(device, &non_sync_ctx)
             .map_err(IntoErrno::into_errno)?;
-        Ok(non_sync_ctx.as_ref().get_device(index).map(|device_info| {
+        Ok(non_sync_ctx.devices.get_device(index).map(|device_info| {
             let CommonInfo {
                 name,
                 mtu: _,

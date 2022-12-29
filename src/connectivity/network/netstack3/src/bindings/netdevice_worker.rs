@@ -17,8 +17,7 @@ use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use netstack3_core::Ctx;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, DeviceId, InterfaceEventProducerFactory as _, Netstack,
-    NetstackContext, StackTime,
+    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, StackTime,
 };
 
 #[derive(Clone)]

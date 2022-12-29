@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU16;
 use std::ops::{Deref as _, DerefMut as _};
-use std::sync::{Arc, Once};
+use std::sync::Once;
 
 use anyhow::{format_err, Context as _, Error};
 use assert_matches::assert_matches;
@@ -15,7 +14,7 @@ use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
-use futures::lock::Mutex;
+use futures::FutureExt as _;
 use net_types::ip::{Ip, Ipv4, Ipv6, Subnet};
 use net_types::{
     ip::{AddrSubnetEither, Ipv4Addr},
@@ -23,39 +22,43 @@ use net_types::{
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
-    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
-    ip::{
-        icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
-        types::{AddableEntry, AddableEntryEither},
-        IpExt,
-    },
-    transport::{
-        tcp::{self, socket::ListenerId, BufferSizes},
-        udp,
-    },
-    Ctx, NonSyncContext, TimerId,
+    device::DeviceId,
+    ip::types::{AddableEntry, AddableEntryEither},
+    Ctx, NonSyncContext,
 };
-use packet::{Buf, BufferMut, Serializer};
-use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
-use rand::rngs::OsRng;
+use packet::Buf;
 
 use crate::bindings::{
-    context::Lockable,
-    devices::{
-        BindingId, CommonInfo, DeviceInfo, DeviceSpecificInfo, Devices, EthernetInfo, LoopbackInfo,
-        NetdeviceInfo,
-    },
-    interfaces_admin,
-    socket::{
-        datagram::{IcmpEcho, SocketCollectionIpExt, Udp},
-        stream,
-    },
+    devices::{CommonInfo, DeviceSpecificInfo, EthernetInfo},
     util::{ConversionContext as _, IntoFidl as _, TryFromFidlWithContext as _},
-    BindingsNonSyncCtxImpl, DeviceStatusNotifier, InterfaceControlRunner,
-    InterfaceEventProducerFactory as _, InterfaceProperties, InterfaceUpdate, LockableContext,
-    RequestStreamExt as _, StackTime, DEFAULT_LOOPBACK_MTU, LOOPBACK_NAME,
+    BindingsNonSyncCtxImpl, RequestStreamExt as _, LOOPBACK_NAME,
 };
+
+mod util {
+    use fuchsia_async as fasync;
+    use netstack3_core::sync::Mutex;
+    use std::sync::Arc;
+
+    /// A thread-safe collection of [`fasync::Task`].
+    #[derive(Clone, Default)]
+    pub(super) struct TaskCollection(Arc<Mutex<Vec<fasync::Task<()>>>>);
+
+    impl TaskCollection {
+        /// Creates a new `TaskCollection` with the tasks in `i`.
+        pub(super) fn new(i: impl Iterator<Item = fasync::Task<()>>) -> Self {
+            Self(Arc::new(Mutex::new(i.collect())))
+        }
+
+        /// Pushes `task` into the collection.
+        ///
+        /// Hiding this in a method ensures that the task lock can't be
+        /// interleaved with executor yields.
+        pub(super) fn push(&self, task: fasync::Task<()>) {
+            let Self(t) = self;
+            t.lock().push(task);
+        }
+    }
+}
 
 /// log::Log implementation that uses stdout.
 ///
@@ -88,272 +91,28 @@ pub(crate) fn set_logger_for_test() {
     })
 }
 
-/// A dispatcher that can be used for tests with the ability to optionally
-/// intercept events to use as signals during testing.
-///
-/// `TestDispatcher` implements [`StackDispatcher`] and keeps an internal
-/// [`BindingsDispatcherState`]. All the traits that are needed to have a
-/// correct [`EventDispatcher`] are re-implemented by it so any events can be
-/// short circuited into internal event watchers as opposed to routing into the
-/// internal [`BindingsDispatcherState]`.
-#[derive(Default)]
-pub(crate) struct TestNonSyncCtx {
-    ctx: BindingsNonSyncCtxImpl,
-    /// A oneshot signal that is hit whenever changes to interface status occur
-    /// and it is set.
-    status_changed_signal: Option<futures::channel::oneshot::Sender<()>>,
-    /// Holds when timers are scheduled to fire.
-    ///
-    /// Note that the timers will not actually fire/be dispatched.
-    scheduled_timers: HashMap<TimerId<StackTime>, StackTime>,
-}
-
-impl TestNonSyncCtx {
-    /// Shorthand method to get a [`DeviceInfo`] from the device's bindings
-    /// identifier.
-    fn get_device_info(&self, id: u64) -> Option<&DeviceInfo<DeviceId<StackTime>>> {
-        AsRef::<Devices<_>>::as_ref(self).get_device(id)
-    }
-}
-
-impl DeviceStatusNotifier for TestNonSyncCtx {
-    fn device_status_changed(&mut self, id: u64) {
-        if let Some(s) = self.status_changed_signal.take() {
-            s.send(()).unwrap();
-        }
-        // we can always send that forward to the real dispatcher, no need to
-        // short-circuit it.
-        self.ctx.device_status_changed(id);
-    }
-}
-
-impl<T> AsRef<T> for TestNonSyncCtx
-where
-    BindingsNonSyncCtxImpl: AsRef<T>,
-{
-    fn as_ref(&self) -> &T {
-        self.ctx.as_ref()
-    }
-}
-
-impl<T> AsMut<T> for TestNonSyncCtx
-where
-    BindingsNonSyncCtxImpl: AsMut<T>,
-{
-    fn as_mut(&mut self) -> &mut T {
-        self.ctx.as_mut()
-    }
-}
-
-impl stream::SocketWorkerDispatcher for TestNonSyncCtx {
-    fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: fuchsia_zircon::Socket) {
-        self.ctx.register_listener(id, socket)
-    }
-
-    fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> fuchsia_zircon::Socket {
-        self.ctx.unregister_listener(id)
-    }
-}
-
-impl CounterContext for TestNonSyncCtx {
-    fn increment_debug_counter(&mut self, key: &'static str) {
-        self.ctx.increment_debug_counter(key)
-    }
-}
-
-impl RngContext for TestNonSyncCtx {
-    type Rng = OsRng;
-
-    fn rng(&self) -> &OsRng {
-        &self.ctx.rng
-    }
-
-    fn rng_mut(&mut self) -> &mut OsRng {
-        &mut self.ctx.rng
-    }
-}
-
-impl InstantContext for TestNonSyncCtx {
-    type Instant = StackTime;
-
-    fn now(&self) -> StackTime {
-        self.ctx.now()
-    }
-}
-
-impl tcp::socket::NonSyncContext for TestNonSyncCtx {
-    type ReceiveBuffer = stream::ReceiveBufferWithZirconSocket;
-    type SendBuffer = stream::SendBufferWithZirconSocket;
-    type ReturnedBuffers = stream::PeerZirconSocketAndWatcher;
-    type ProvidedBuffers = stream::LocalZirconSocketAndNotifier;
-
-    fn on_new_connection<I: Ip>(&mut self, _listener: ListenerId<I>) {}
-
-    fn new_passive_open_buffers(
-        buffer_sizes: BufferSizes,
-    ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {
-        BindingsNonSyncCtxImpl::new_passive_open_buffers(buffer_sizes)
-    }
-}
-
-// An implementation that keeps track of when timers are scheduled to fire but
-// does not actually fire timers.
-//
-// This is OK as current tests do not expect to fire timers.
-impl TimerContext<TimerId<StackTime>> for TestNonSyncCtx {
-    fn schedule_timer_instant(
-        &mut self,
-        time: StackTime,
-        id: TimerId<StackTime>,
-    ) -> Option<StackTime> {
-        self.scheduled_timers.insert(id, time)
-    }
-
-    fn cancel_timer(&mut self, id: TimerId<StackTime>) -> Option<StackTime> {
-        self.scheduled_timers.remove(&id)
-    }
-
-    fn cancel_timers_with<F: FnMut(&TimerId<StackTime>) -> bool>(&mut self, mut f: F) {
-        self.scheduled_timers.retain(|id, _time| !f(id))
-    }
-
-    fn scheduled_instant(&self, id: TimerId<StackTime>) -> Option<StackTime> {
-        self.scheduled_timers.get(&id).cloned()
-    }
-}
-
-impl DeviceLayerEventDispatcher for TestNonSyncCtx {
-    fn wake_rx_task(&mut self, device: &DeviceId<StackTime>) {
-        self.ctx.wake_rx_task(device)
-    }
-}
-
-impl<B: BufferMut> BufferDeviceLayerEventDispatcher<B> for TestNonSyncCtx {
-    fn send_frame<S: Serializer<Buffer = B>>(
-        &mut self,
-        device: &DeviceId<StackTime>,
-        frame: S,
-    ) -> Result<(), S> {
-        self.ctx.send_frame(device, frame)
-    }
-}
-
-impl<T: 'static + Send> EventContext<T> for TestNonSyncCtx {
-    fn on_event(&mut self, _event: T) {}
-}
-
-impl<I: SocketCollectionIpExt<Udp> + IcmpIpExt> udp::NonSyncContext<I> for TestNonSyncCtx {
-    fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
-        udp::NonSyncContext::receive_icmp_error(&mut self.ctx, id, err)
-    }
-}
-
-impl<I: SocketCollectionIpExt<Udp> + IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B>
-    for TestNonSyncCtx
-{
-    fn receive_udp_from_conn(
-        &mut self,
-        conn: netstack3_core::transport::udp::ConnId<I>,
-        src_ip: I::Addr,
-        src_port: NonZeroU16,
-        body: &B,
-    ) {
-        self.ctx.receive_udp_from_conn(conn, src_ip, src_port, body)
-    }
-
-    /// Receive a UDP packet for a listener.
-    fn receive_udp_from_listen(
-        &mut self,
-        listener: netstack3_core::transport::udp::ListenerId<I>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        src_port: Option<NonZeroU16>,
-        body: &B,
-    ) {
-        self.ctx.receive_udp_from_listen(listener, src_ip, dst_ip, src_port, body)
-    }
-}
-
-impl<I: SocketCollectionIpExt<IcmpEcho> + IcmpIpExt> IcmpContext<I> for TestNonSyncCtx {
-    fn receive_icmp_error(&mut self, conn: IcmpConnId<I>, seq_num: u16, err: I::ErrorCode) {
-        IcmpContext::<I>::receive_icmp_error(&mut self.ctx, conn, seq_num, err)
-    }
-}
-
-impl<I, B> BufferIcmpContext<I, B> for TestNonSyncCtx
-where
-    I: SocketCollectionIpExt<IcmpEcho> + IcmpIpExt,
-    B: BufferMut,
-    IcmpEchoReply: for<'a> IcmpMessage<I, &'a [u8], Code = IcmpUnusedCode>,
-{
-    fn receive_icmp_echo_reply(
-        &mut self,
-        conn: IcmpConnId<I>,
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
-        id: u16,
-        seq_num: u16,
-        data: B,
-    ) {
-        self.ctx.receive_icmp_echo_reply(conn, src_ip, dst_ip, id, seq_num, data)
-    }
-}
-
 #[derive(Clone)]
 /// A netstack context for testing.
 pub(crate) struct TestContext {
-    ctx: Arc<Mutex<Ctx<TestNonSyncCtx>>>,
-    _interfaces_worker: Arc<super::interfaces_watcher::Worker>,
-    interfaces_sink: super::interfaces_watcher::WorkerInterfaceSink,
+    netstack: crate::bindings::Netstack,
+    interfaces_watcher_sink: crate::bindings::interfaces_watcher::WorkerWatcherSink,
+    tasks: util::TaskCollection,
 }
 
 impl TestContext {
     fn new() -> Self {
-        let (worker, _, interfaces_sink) = super::interfaces_watcher::Worker::new();
+        let crate::bindings::NetstackSeed { netstack, interfaces_worker, interfaces_watcher_sink } =
+            crate::bindings::NetstackSeed::default();
+
         Self {
-            ctx: Arc::new(Mutex::new(Ctx::default())),
-            _interfaces_worker: Arc::new(worker),
-            interfaces_sink,
+            netstack,
+            interfaces_watcher_sink,
+            tasks: util::TaskCollection::new(std::iter::once(fasync::Task::spawn(
+                interfaces_worker.run().map(|r| {
+                    let _: futures::stream::FuturesUnordered<_> = r.expect("watcher failed");
+                }),
+            ))),
         }
-    }
-}
-
-impl super::InterfaceEventProducerFactory for TestContext {
-    fn create_interface_event_producer(
-        &self,
-        id: super::devices::BindingId,
-        properties: super::interfaces_watcher::InterfaceProperties,
-    ) -> super::interfaces_watcher::InterfaceEventProducer {
-        self.interfaces_sink.add_interface(id, properties).expect("interfaces worker not running")
-    }
-}
-
-impl<'a> Lockable<'a, Ctx<TestNonSyncCtx>> for TestContext {
-    type Guard = futures::lock::MutexGuard<'a, Ctx<TestNonSyncCtx>>;
-    type Fut = futures::lock::MutexLockFuture<'a, Ctx<TestNonSyncCtx>>;
-    fn lock(&'a self) -> Self::Fut {
-        self.ctx.lock()
-    }
-}
-
-impl LockableContext for TestContext {
-    type NonSyncCtx = TestNonSyncCtx;
-}
-
-impl InterfaceControlRunner for TestContext {
-    fn spawn_interface_control(
-        &self,
-        _id: BindingId,
-        stop_receiver: futures::channel::oneshot::Receiver<
-            fnet_interfaces_admin::InterfaceRemovedReason,
-        >,
-        _control_receiver: futures::channel::mpsc::Receiver<interfaces_admin::OwnedControlHandle>,
-    ) -> fuchsia_async::Task<()> {
-        // Placeholder interface_control implementation that waits to be canceled.
-        fuchsia_async::Task::spawn(async move {
-            let _removed_reason: fnet_interfaces_admin::InterfaceRemovedReason =
-                stop_receiver.await.expect("failed to receive stop");
-        })
     }
 }
 
@@ -364,6 +123,10 @@ impl InterfaceControlRunner for TestContext {
 pub(crate) struct TestStack {
     ctx: TestContext,
     endpoint_ids: HashMap<String, u64>,
+    // We must keep this sender around to prevent the control task from removing
+    // the loopback interface.
+    loopback_termination_sender:
+        Option<futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>>,
 }
 
 struct InterfaceInfo {
@@ -377,10 +140,24 @@ impl TestStack {
         let (stack, rs) =
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_net_stack::StackMarker>()?;
         fasync::Task::spawn(rs.serve_with(|rs| {
-            crate::bindings::stack_fidl_worker::StackFidlWorker::serve(self.ctx.clone(), rs)
+            crate::bindings::stack_fidl_worker::StackFidlWorker::serve(
+                self.ctx.netstack.clone(),
+                rs,
+            )
         }))
         .detach();
         Ok(stack)
+    }
+
+    /// Creates a new `fuchsia.net.interfaces/Watcher` for this stack.
+    pub(crate) async fn new_interfaces_watcher(&self) -> fidl_fuchsia_net_interfaces::WatcherProxy {
+        let (watcher, rs) = fidl::endpoints::create_proxy_and_stream::<
+            fidl_fuchsia_net_interfaces::WatcherMarker,
+        >()
+        .expect("create proxy");
+        let mut sender = self.ctx.interfaces_watcher_sink.clone();
+        sender.add_watcher(rs).await.expect("add watcher");
+        watcher
     }
 
     /// Connects to the `fuchsia.posix.socket.Provider` service.
@@ -391,62 +168,48 @@ impl TestStack {
             fidl_fuchsia_posix_socket::ProviderMarker,
         >()?;
         fasync::Task::spawn(
-            rs.serve_with(|rs| crate::bindings::socket::serve(self.ctx.clone(), rs)),
+            rs.serve_with(|rs| crate::bindings::socket::serve(self.ctx.netstack.ctx.clone(), rs)),
         )
         .detach();
         Ok(stack)
     }
 
-    fn is_interface_link_up(info: &DeviceInfo<DeviceId<StackTime>>) -> bool {
-        match info.info() {
-            DeviceSpecificInfo::Ethernet(EthernetInfo {
-                common_info: _,
-                client: _,
-                mac: _,
-                features: _,
-                phy_up,
-                interface_control: _,
-            })
-            | DeviceSpecificInfo::Netdevice(NetdeviceInfo {
-                common_info: _,
-                handler: _,
-                mac: _,
-                phy_up,
-            }) => *phy_up,
-            DeviceSpecificInfo::Loopback(LoopbackInfo { common_info: _, rx_notifier: _ }) => true,
-        }
-    }
-
     /// Waits for interface with given `if_id` to come online.
     pub(crate) async fn wait_for_interface_online(&mut self, if_id: u64) {
-        self.wait_for_interface_status(if_id, Self::is_interface_link_up).await;
+        self.wait_for_interface_online_status(if_id, true).await;
     }
 
     /// Waits for interface with given `if_id` to go offline.
     pub(crate) async fn wait_for_interface_offline(&mut self, if_id: u64) {
-        self.wait_for_interface_status(if_id, |info| !Self::is_interface_link_up(info)).await;
+        self.wait_for_interface_online_status(if_id, false).await;
     }
 
-    async fn wait_for_interface_status<F: Fn(&DeviceInfo<DeviceId<StackTime>>) -> bool>(
-        &mut self,
-        if_id: u64,
-        check_status: F,
-    ) {
+    async fn wait_for_interface_online_status(&mut self, if_id: u64, want_online: bool) {
+        let watcher = self.new_interfaces_watcher().await;
         loop {
-            let signal = {
-                let mut ctx = self.ctx.lock().await;
-                if check_status(
-                    ctx.non_sync_ctx
-                        .get_device_info(if_id)
-                        .expect("Wait for interface status on unknown device"),
-                ) {
-                    return;
+            let event = watcher.watch().await.expect("failed to watch");
+            let fidl_fuchsia_net_interfaces::Properties { id, online, .. } = match event {
+                fidl_fuchsia_net_interfaces::Event::Added(props)
+                | fidl_fuchsia_net_interfaces::Event::Changed(props)
+                | fidl_fuchsia_net_interfaces::Event::Existing(props) => props,
+                fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {}) => {
+                    continue;
                 }
-                let (sender, receiver) = futures::channel::oneshot::channel();
-                ctx.non_sync_ctx.status_changed_signal = Some(sender);
-                receiver
+                fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                    assert_ne!(
+                        id, if_id,
+                        "interface {} removed while waiting online = {}",
+                        if_id, want_online
+                    );
+                    continue;
+                }
             };
-            let () = signal.await.expect("Stream ended before it was signalled");
+            if id.expect("missing id") != if_id {
+                continue;
+            }
+            if online.map(|online| online == want_online).unwrap_or(false) {
+                break;
+            }
         }
     }
 
@@ -465,28 +228,30 @@ impl TestStack {
     /// Creates a new `TestStack`.
     pub(crate) fn new() -> Self {
         let ctx = TestContext::new();
-        TestStack { ctx, endpoint_ids: HashMap::new() }
+        TestStack { ctx, endpoint_ids: HashMap::new(), loopback_termination_sender: None }
     }
 
     /// Helper function to invoke a closure that provides a locked
     /// [`Ctx< BindingsContext>`] provided by this `TestStack`.
-    pub(crate) async fn with_ctx<R, F: FnOnce(&mut Ctx<TestNonSyncCtx>) -> R>(
+    pub(crate) async fn with_ctx<R, F: FnOnce(&mut Ctx<BindingsNonSyncCtxImpl>) -> R>(
         &mut self,
         f: F,
     ) -> R {
-        let mut ctx = self.ctx.lock().await;
+        let mut ctx = self.ctx.netstack.ctx.lock().await;
         f(ctx.deref_mut())
     }
 
     /// Acquire a lock on this `TestStack`'s context.
-    pub(crate) async fn ctx(&self) -> <TestContext as Lockable<'_, Ctx<TestNonSyncCtx>>>::Guard {
-        self.ctx.lock().await
+    pub(crate) async fn ctx(
+        &self,
+    ) -> impl std::ops::DerefMut<Target = Ctx<BindingsNonSyncCtxImpl>> + '_ {
+        self.ctx.netstack.ctx.lock().await
     }
 
     async fn get_interface_info(&self, id: u64) -> InterfaceInfo {
         let ctx = self.ctx().await;
         let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
-        let device = non_sync_ctx.get_device_info(id).expect("device");
+        let device = non_sync_ctx.devices.get_device(id).expect("device");
 
         let (admin_enabled, phy_up) = assert_matches::assert_matches!(
             device.info(),
@@ -530,8 +295,8 @@ impl TestSetup {
     pub(crate) async fn ctx(
         &mut self,
         i: usize,
-    ) -> <TestContext as Lockable<'_, Ctx<TestNonSyncCtx>>>::Guard {
-        self.get(i).ctx.lock().await
+    ) -> impl std::ops::DerefMut<Target = Ctx<BindingsNonSyncCtxImpl>> + '_ {
+        self.get(i).ctx.netstack.ctx.lock().await
     }
 
     async fn get_endpoint(
@@ -668,74 +433,11 @@ impl TestSetupBuilder {
         for stack_cfg in self.stacks.into_iter() {
             println!("Adding stack: {:?}", stack_cfg);
             let mut stack = TestStack::new();
-            let netstack = stack.ctx.clone();
-            let binding_id = stack
-                .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-                    let loopback = netstack3_core::device::add_loopback_device(
-                        sync_ctx,
-                        non_sync_ctx,
-                        DEFAULT_LOOPBACK_MTU,
-                    )
-                    .expect("add loopback device");
-                    crate::bindings::add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
-                        .expect("add loopback addresses");
+            let (loopback_termination_sender, binding_id, loopback_interface_control_task) =
+                stack.ctx.netstack.add_loopback().await;
 
-                    netstack3_core::device::update_ipv4_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &loopback,
-                        |config| {
-                            config.ip_config.ip_enabled = true;
-                        },
-                    );
-                    netstack3_core::device::update_ipv6_configuration(
-                        sync_ctx,
-                        non_sync_ctx,
-                        &loopback,
-                        |config| {
-                            config.ip_config.ip_enabled = true;
-                        },
-                    );
-
-                    let devices: &mut Devices<_> = non_sync_ctx.as_mut();
-                    let (control_sender, _control_receiver) =
-                        interfaces_admin::OwnedControlHandle::new_channel();
-                    let loopback_rx_notifier = Default::default();
-                    crate::bindings::devices::spawn_rx_task(
-                        &loopback_rx_notifier,
-                        netstack.clone(),
-                        loopback.clone(),
-                    );
-                    devices
-                        .add_device(loopback, |id| {
-                            let events = netstack.create_interface_event_producer(
-                                id,
-                                InterfaceProperties {
-                                    name: LOOPBACK_NAME.to_string(),
-                                    device_class:
-                                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                                            fidl_fuchsia_net_interfaces::Empty {},
-                                        ),
-                                },
-                            );
-                            events
-                                .notify(InterfaceUpdate::OnlineChanged(true))
-                                .expect("interfaces worker not running");
-                            DeviceSpecificInfo::Loopback(LoopbackInfo {
-                                common_info: CommonInfo {
-                                    mtu: DEFAULT_LOOPBACK_MTU,
-                                    admin_enabled: true,
-                                    events,
-                                    name: LOOPBACK_NAME.to_string(),
-                                    control_hook: control_sender,
-                                    addresses: HashMap::new(),
-                                },
-                                rx_notifier: loopback_rx_notifier,
-                            })
-                        })
-                        .expect("error adding loopback device")
-                })
-                .await;
+            stack.loopback_termination_sender = Some(loopback_termination_sender);
+            stack.ctx.tasks.push(loopback_interface_control_task);
 
             assert_eq!(stack.endpoint_ids.insert(LOOPBACK_NAME.to_string(), binding_id), None);
 
@@ -758,7 +460,7 @@ impl TestSetupBuilder {
                     stack
                         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
                             let device_info =
-                                non_sync_ctx.get_device_info(if_id).ok_or_else(|| {
+                                non_sync_ctx.devices.get_device(if_id).ok_or_else(|| {
                                     format_err!("Failed to get device {} info", if_id)
                                 })?;
 
@@ -840,7 +542,10 @@ async fn test_add_remove_interface() {
     // remove the interface:
     let () = stack.del_ethernet_interface(if_id).await.squash_result().expect("Remove interface");
     // ensure the interface disappeared from records:
-    assert_matches!(test_stack.ctx.lock().await.non_sync_ctx.get_device_info(if_id), None);
+    assert_matches!(
+        test_stack.ctx.netstack.ctx.lock().await.non_sync_ctx.devices.get_device(if_id),
+        None
+    );
 
     // if we try to remove it again, NotFound should be returned:
     let res =
@@ -870,7 +575,7 @@ async fn test_ethernet_link_up_down() {
     // Ensure that the device has been enabled in the core.
     let core_id = {
         let mut ctx = test_stack.ctx().await;
-        let core_id = ctx.non_sync_ctx.get_device_info(if_id).unwrap().core_id().clone();
+        let core_id = ctx.non_sync_ctx.devices.get_device(if_id).unwrap().core_id().clone();
         check_ip_enabled(ctx.deref_mut(), &core_id, true);
         core_id
     };
@@ -930,7 +635,7 @@ async fn test_ethernet_link_up_down() {
     let core_id = t
         .get(0)
         .with_ctx(|ctx| {
-            let core_id = ctx.non_sync_ctx.get_device_info(if_id).unwrap().core_id().clone();
+            let core_id = ctx.non_sync_ctx.devices.get_device(if_id).unwrap().core_id().clone();
             check_ip_enabled(ctx, &core_id, true);
             core_id
         })

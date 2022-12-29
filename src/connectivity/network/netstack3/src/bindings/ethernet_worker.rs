@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    devices::{BindingId, DeviceSpecificInfo, Devices, EthernetInfo},
-    DeviceStatusNotifier, InterfaceControl as _, LockableContext, MutableDeviceState as _,
-    StackTime,
-};
+use super::devices::{BindingId, DeviceSpecificInfo, Devices, EthernetInfo};
 use anyhow::Error;
 use assert_matches::assert_matches;
 use ethernet as eth;
@@ -16,10 +12,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, trace};
-use netstack3_core::{
-    device::{receive_frame, DeviceId},
-    BufferNonSyncContext, Ctx,
-};
+use netstack3_core::{device::receive_frame, Ctx};
 use packet::serialize::Buf;
 use std::ops::DerefMut as _;
 
@@ -35,53 +28,17 @@ pub async fn setup_ethernet(
 
 /// The worker that receives messages from the ethernet device, and passes them
 /// on to the main event loop.
-pub(crate) struct EthernetWorker<C> {
+pub(crate) struct EthernetWorker {
     id: BindingId,
-    ctx: C,
+    ctx: crate::bindings::NetstackContext,
 }
 
-impl<C> EthernetWorker<C> {
-    pub(crate) fn new(id: BindingId, ctx: C) -> Self {
+impl EthernetWorker {
+    pub(crate) fn new(id: BindingId, ctx: crate::bindings::NetstackContext) -> Self {
         EthernetWorker { id, ctx }
     }
-}
 
-// TODO(https://github.com/rust-lang/rust/issues/20671): Replace the duplicate associated type with
-// a where clause bounding the parent trait's associated type.
-//
-// OR
-//
-// TODO(https://github.com/rust-lang/rust/issues/52662): Replace the duplicate associated type with
-// a bound on the parent trait's associated type.
-pub(crate) trait EthernetWorkerContext:
-    LockableContext<NonSyncCtx = <Self as EthernetWorkerContext>::NonSyncCtx> + Send + Sync + 'static
-{
-    type NonSyncCtx: for<'a> BufferNonSyncContext<Buf<&'a mut [u8]>, Instant = StackTime>
-        + AsRef<Devices<DeviceId<StackTime>>>
-        + AsMut<Devices<DeviceId<StackTime>>>
-        + DeviceStatusNotifier
-        + Send
-        + Sync;
-}
-
-impl<T> EthernetWorkerContext for T
-where
-    T: LockableContext + Send + Sync + 'static,
-    T::NonSyncCtx: for<'a> BufferNonSyncContext<Buf<&'a mut [u8]>, Instant = StackTime>
-        + AsRef<Devices<DeviceId<StackTime>>>
-        + AsMut<Devices<DeviceId<StackTime>>>
-        + DeviceStatusNotifier
-        + Send
-        + Sync,
-{
-    type NonSyncCtx = T::NonSyncCtx;
-}
-
-impl<C: EthernetWorkerContext> EthernetWorker<C> {
-    pub fn spawn(self, mut events: eth::EventStream)
-    where
-        Ctx<<C as EthernetWorkerContext>::NonSyncCtx>: Send,
-    {
+    pub fn spawn(self, mut events: eth::EventStream) {
         fasync::Task::spawn(
             async move {
                 let Self { ref ctx, id } = self;
@@ -99,7 +56,7 @@ impl<C: EthernetWorkerContext> EthernetWorker<C> {
                             // We need to call get_status even if we don't use the output, since
                             // calling it acks the message, and prevents the device from sending
                             // more status changed messages.
-                            if let Some(device) = ctx.non_sync_ctx.as_ref().get_device(id) {
+                            if let Some(device) = ctx.non_sync_ctx.devices.get_device(id) {
                                 let device = assert_matches!(
                                     device.info(),
                                     DeviceSpecificInfo::Ethernet(device) => device
@@ -110,25 +67,27 @@ impl<C: EthernetWorkerContext> EthernetWorker<C> {
                                     // Handle the new device state. If this results in no change, no
                                     // state will be modified.
                                     if status.contains(fidl_ethernet::DeviceStatus::ONLINE) {
-                                        ctx.update_device_state(id, |dev_info| {
+                                        let dev_info = ctx.non_sync_ctx.devices.get_device_mut(id);
+                                        if let Some(dev_info) = dev_info {
                                             let phy_up: &mut bool = assert_matches!(
                                                 dev_info.info_mut(),
                                                 DeviceSpecificInfo::Ethernet(EthernetInfo { common_info: _, client: _, mac: _, features: _, phy_up, interface_control: _}) => phy_up
                                             );
                                             *phy_up = true;
-                                        });
-                                        ctx.enable_interface(id).unwrap_or_else(|e| {
+                                        }
+                                        crate::bindings::set_interface_enabled(&mut ctx, id, true).unwrap_or_else(|e| {
                                             trace!("phy enable interface failed: {:?}", e)
                                         });
                                     } else {
-                                        ctx.update_device_state(id, |dev_info| {
+                                        let dev_info = ctx.non_sync_ctx.devices.get_device_mut(id);
+                                        if let Some(dev_info) = dev_info {
                                             let phy_up: &mut bool = assert_matches!(
                                                 dev_info.info_mut(),
                                                 DeviceSpecificInfo::Ethernet(EthernetInfo { common_info: _, client: _, mac: _, features: _, phy_up, interface_control: _}) => phy_up
                                             );
                                             *phy_up = false;
-                                        });
-                                        ctx.disable_interface(id).unwrap_or_else(|e| {
+                                        }
+                                        crate::bindings::set_interface_enabled(&mut ctx, id, false).unwrap_or_else(|e| {
                                             trace!("phy enable disable failed: {:?}", e)
                                         });
                                     }

@@ -48,10 +48,8 @@ use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
 use rand::rngs::OsRng;
 use util::{ConversionContext, IntoFidl as _};
 
-use context::Lockable;
 use devices::{
-    BindingId, CommonInfo, DeviceInfo, DeviceSpecificInfo, Devices, EthernetInfo, LoopbackInfo,
-    NetdeviceInfo,
+    BindingId, CommonInfo, DeviceSpecificInfo, Devices, EthernetInfo, LoopbackInfo, NetdeviceInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -92,39 +90,8 @@ const LOOPBACK_NAME: &'static str = "lo";
 /// ```
 const DEFAULT_LOOPBACK_MTU: u32 = 65536;
 
-pub(crate) trait LockableContext: for<'a> Lockable<'a, Ctx<Self::NonSyncCtx>> {
-    type NonSyncCtx: NonSyncContext<Instant = StackTime> + Send;
-}
-
-pub(crate) trait DeviceStatusNotifier {
-    /// A notification that the state of the device with binding Id `id`
-    /// changed.
-    ///
-    /// This method is called by workers that observe devices, such as
-    /// [`EthernetWorker`]. This method is called after all the internal
-    /// structures that cache or store device state are already up to date. The
-    /// only side effect should be notifying other workers or external
-    /// applications that are listening for status changes.
-    fn device_status_changed(&mut self, id: u64);
-}
-
-pub(crate) trait InterfaceEventProducerFactory {
-    fn create_interface_event_producer(
-        &self,
-        id: BindingId,
-        properties: InterfaceProperties,
-    ) -> InterfaceEventProducer;
-}
-
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
-
-impl DeviceStatusNotifier for BindingsNonSyncCtxImpl {
-    fn device_status_changed(&mut self, _id: u64) {
-        // NOTE(brunodalbo) we may want to do more things here in the future,
-        // for now this is only intercepted for testing
-    }
-}
 
 /// Provides an implementation of [`NonSyncContext`].
 #[derive(Default)]
@@ -162,7 +129,7 @@ impl AsMut<Devices<DeviceId<StackTime>>> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl<'a> Lockable<'a, Ctx<BindingsNonSyncCtxImpl>> for Netstack {
+impl<'a> context::Lockable<'a, Ctx<BindingsNonSyncCtxImpl>> for Netstack {
     type Guard = futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>;
     type Fut = futures::lock::MutexLockFuture<'a, Ctx<BindingsNonSyncCtxImpl>>;
     fn lock(&'a self) -> Self::Fut {
@@ -194,32 +161,19 @@ impl AsMut<UdpSockets> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl<NonSyncCtx> timers::TimerHandler<TimerId<NonSyncCtx::Instant>> for Ctx<NonSyncCtx>
-where
-    NonSyncCtx: NonSyncContext
-        + AsMut<timers::TimerDispatcher<TimerId<NonSyncCtx::Instant>>>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn handle_expired_timer(&mut self, timer: TimerId<NonSyncCtx::Instant>) {
+impl timers::TimerHandler<TimerId<StackTime>> for Ctx<BindingsNonSyncCtxImpl> {
+    fn handle_expired_timer(&mut self, timer: TimerId<StackTime>) {
         let Ctx { sync_ctx, non_sync_ctx } = self;
         handle_timer(sync_ctx, non_sync_ctx, timer)
     }
 
-    fn get_timer_dispatcher(
-        &mut self,
-    ) -> &mut timers::TimerDispatcher<TimerId<NonSyncCtx::Instant>> {
+    fn get_timer_dispatcher(&mut self) -> &mut timers::TimerDispatcher<TimerId<StackTime>> {
         self.non_sync_ctx.as_mut()
     }
 }
 
-impl<C> timers::TimerContext<TimerId<StackTime>> for C
-where
-    C: LockableContext + Clone + Send + Sync + 'static,
-    C::NonSyncCtx: AsMut<timers::TimerDispatcher<TimerId<StackTime>>> + Send + Sync + 'static,
-{
-    type Handler = Ctx<C::NonSyncCtx>;
+impl timers::TimerContext<TimerId<StackTime>> for Netstack {
+    type Handler = Ctx<BindingsNonSyncCtxImpl>;
 }
 
 impl<D> ConversionContext for D
@@ -584,57 +538,12 @@ impl BindingsNonSyncCtxImpl {
     }
 }
 
-trait MutableDeviceState {
-    /// Invoke a function on the state associated with the device `id`.
-    fn update_device_state<F: FnOnce(&mut DeviceInfo<DeviceId<StackTime>>)>(
-        &mut self,
-        id: u64,
-        f: F,
-    );
-}
-
-impl<NonSyncCtx> MutableDeviceState for Ctx<NonSyncCtx>
-where
-    NonSyncCtx: NonSyncContext<Instant = StackTime>
-        + DeviceStatusNotifier
-        + AsRef<Devices<DeviceId<StackTime>>>
-        + AsMut<Devices<DeviceId<StackTime>>>,
-{
-    fn update_device_state<F: FnOnce(&mut DeviceInfo<DeviceId<StackTime>>)>(
-        &mut self,
-        id: u64,
-        f: F,
-    ) {
-        if let Some(device_info) = self.non_sync_ctx.as_mut().get_device_mut(id) {
-            f(device_info);
-            self.non_sync_ctx.device_status_changed(id)
-        }
-    }
-}
-
-trait InterfaceControl {
-    /// Enables an interface.
-    ///
-    /// Both `admin_enabled` and `phy_up` must be true for the interface to be
-    /// enabled.
-    fn enable_interface(&mut self, id: u64) -> Result<(), fidl_net_stack::Error>;
-
-    /// Disables an interface.
-    ///
-    /// Either an Admin (fidl) or Phy change can disable an interface.
-    fn disable_interface(&mut self, id: u64) -> Result<(), fidl_net_stack::Error>;
-}
-
-fn set_interface_enabled<
-    NonSyncCtx: NonSyncContext
-        + AsRef<Devices<DeviceId<NonSyncCtx::Instant>>>
-        + AsMut<Devices<DeviceId<NonSyncCtx::Instant>>>,
->(
-    Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
+fn set_interface_enabled(
+    Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<crate::bindings::BindingsNonSyncCtxImpl>,
     id: u64,
     should_enable: bool,
 ) -> Result<(), fidl_net_stack::Error> {
-    let device = non_sync_ctx.as_mut().get_device_mut(id).ok_or(fidl_net_stack::Error::NotFound)?;
+    let device = non_sync_ctx.devices.get_device_mut(id).ok_or(fidl_net_stack::Error::NotFound)?;
     let core_id = device.core_id().clone();
 
     let dev_enabled = match device.info_mut() {
@@ -704,21 +613,6 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
-impl<NonSyncCtx> InterfaceControl for Ctx<NonSyncCtx>
-where
-    NonSyncCtx: NonSyncContext
-        + AsRef<Devices<DeviceId<NonSyncCtx::Instant>>>
-        + AsMut<Devices<DeviceId<NonSyncCtx::Instant>>>,
-{
-    fn enable_interface(&mut self, id: u64) -> Result<(), fidl_net_stack::Error> {
-        set_interface_enabled(self, id, true /* should_enable */)
-    }
-
-    fn disable_interface(&mut self, id: u64) -> Result<(), fidl_net_stack::Error> {
-        set_interface_enabled(self, id, false /* should_enable */)
-    }
-}
-
 type NetstackContext = Arc<Mutex<Ctx<BindingsNonSyncCtxImpl>>>;
 
 /// The netstack.
@@ -750,11 +644,7 @@ impl Default for NetstackSeed {
     }
 }
 
-impl LockableContext for Netstack {
-    type NonSyncCtx = BindingsNonSyncCtxImpl;
-}
-
-impl InterfaceEventProducerFactory for Netstack {
+impl Netstack {
     fn create_interface_event_producer(
         &self,
         id: BindingId,
@@ -764,20 +654,7 @@ impl InterfaceEventProducerFactory for Netstack {
             .add_interface(id, properties)
             .expect("interface worker not running")
     }
-}
 
-pub(crate) trait InterfaceControlRunner {
-    fn spawn_interface_control(
-        &self,
-        id: BindingId,
-        stop_receiver: futures::channel::oneshot::Receiver<
-            fnet_interfaces_admin::InterfaceRemovedReason,
-        >,
-        control_receiver: futures::channel::mpsc::Receiver<interfaces_admin::OwnedControlHandle>,
-    ) -> fuchsia_async::Task<()>;
-}
-
-impl InterfaceControlRunner for Netstack {
     fn spawn_interface_control(
         &self,
         id: BindingId,
@@ -792,6 +669,92 @@ impl InterfaceControlRunner for Netstack {
             stop_receiver,
             control_receiver,
         ))
+    }
+
+    async fn add_loopback(
+        &self,
+    ) -> (
+        futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
+        BindingId,
+        fasync::Task<()>,
+    ) {
+        let mut ctx = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+
+        // Add and initialize the loopback interface with the IPv4 and IPv6
+        // loopback addresses and on-link routes to the loopback subnets.
+        let loopback = netstack3_core::device::add_loopback_device(
+            sync_ctx,
+            non_sync_ctx,
+            DEFAULT_LOOPBACK_MTU,
+        )
+        .expect("error adding loopback device");
+        let devices: &mut Devices<_> = non_sync_ctx.as_mut();
+        let (control_sender, control_receiver) =
+            interfaces_admin::OwnedControlHandle::new_channel();
+        let loopback_rx_notifier = Default::default();
+        crate::bindings::devices::spawn_rx_task(&loopback_rx_notifier, self, loopback.clone());
+        let binding_id = devices
+            .add_device(loopback.clone(), |id| {
+                let events = self.create_interface_event_producer(
+                    id,
+                    InterfaceProperties {
+                        name: LOOPBACK_NAME.to_string(),
+                        device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                            fidl_fuchsia_net_interfaces::Empty {},
+                        ),
+                    },
+                );
+                events
+                    .notify(InterfaceUpdate::OnlineChanged(true))
+                    .expect("interfaces worker not running");
+                DeviceSpecificInfo::Loopback(LoopbackInfo {
+                    common_info: CommonInfo {
+                        mtu: DEFAULT_LOOPBACK_MTU,
+                        admin_enabled: true,
+                        events,
+                        name: LOOPBACK_NAME.to_string(),
+                        control_hook: control_sender,
+                        addresses: HashMap::new(),
+                    },
+                    rx_notifier: loopback_rx_notifier,
+                })
+            })
+            .expect("error adding loopback device");
+        // Don't need DAD and IGMP/MLD on loopback.
+        netstack3_core::device::update_ipv4_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &loopback,
+            |config| {
+                *config = Ipv4DeviceConfiguration {
+                    ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
+                };
+            },
+        );
+        netstack3_core::device::update_ipv6_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &loopback,
+            |config| {
+                *config = Ipv6DeviceConfiguration {
+                    dad_transmits: None,
+                    max_router_solicitations: None,
+                    slaac_config: SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: None,
+                    },
+                    ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
+                };
+            },
+        );
+        add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
+            .expect("error adding loopback addresses");
+
+        let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
+
+        let task = self.spawn_interface_control(binding_id, stop_receiver, control_receiver);
+        (stop_sender, binding_id, task)
     }
 }
 
@@ -841,105 +804,15 @@ impl NetstackSeed {
 
         let Self { netstack, interfaces_worker, interfaces_watcher_sink } = self;
 
+        // Start servicing timers.
+        netstack.ctx.lock().await.non_sync_ctx.timers.spawn(netstack.clone());
+
         // The Sender is unused because Loopback should never be canceled.
-        let (_loopback_interface_control_stop_sender, loopback_interface_control_stop_receiver) =
-            futures::channel::oneshot::channel();
-        let loopback_interface_control_task = {
-            let mut ctx = netstack.lock().await;
-            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-
-            // Add and initialize the loopback interface with the IPv4 and IPv6
-            // loopback addresses and on-link routes to the loopback subnets.
-            let loopback = netstack3_core::device::add_loopback_device(
-                sync_ctx,
-                non_sync_ctx,
-                DEFAULT_LOOPBACK_MTU,
-            )
-            .expect("error adding loopback device");
-            let devices: &mut Devices<_> = non_sync_ctx.as_mut();
-            let (control_sender, control_receiver) =
-                interfaces_admin::OwnedControlHandle::new_channel();
-            let loopback_rx_notifier = Default::default();
-            crate::bindings::devices::spawn_rx_task(
-                &loopback_rx_notifier,
-                netstack.clone(),
-                loopback.clone(),
-            );
-            let binding_id = devices
-                .add_device(loopback.clone(), |id| {
-                    let events = netstack.create_interface_event_producer(
-                        id,
-                        InterfaceProperties {
-                            name: LOOPBACK_NAME.to_string(),
-                            device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                                fidl_fuchsia_net_interfaces::Empty {},
-                            ),
-                        },
-                    );
-                    events
-                        .notify(InterfaceUpdate::OnlineChanged(true))
-                        .expect("interfaces worker not running");
-                    DeviceSpecificInfo::Loopback(LoopbackInfo {
-                        common_info: CommonInfo {
-                            mtu: DEFAULT_LOOPBACK_MTU,
-                            admin_enabled: true,
-                            events,
-                            name: LOOPBACK_NAME.to_string(),
-                            control_hook: control_sender,
-                            addresses: HashMap::new(),
-                        },
-                        rx_notifier: loopback_rx_notifier,
-                    })
-                })
-                .expect("error adding loopback device");
-            // Don't need DAD and IGMP/MLD on loopback.
-            netstack3_core::device::update_ipv4_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &loopback,
-                |config| {
-                    *config = Ipv4DeviceConfiguration {
-                        ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
-                    };
-                },
-            );
-            netstack3_core::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &loopback,
-                |config| {
-                    *config = Ipv6DeviceConfiguration {
-                        dad_transmits: None,
-                        max_router_solicitations: None,
-                        slaac_config: SlaacConfiguration {
-                            enable_stable_addresses: true,
-                            temporary_address_configuration: None,
-                        },
-                        ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
-                    };
-                },
-            );
-            add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
-                .expect("error adding loopback addresses");
-
-            // Start servicing timers.
-            let BindingsNonSyncCtxImpl {
-                rng: _,
-                timers,
-                devices: _,
-                icmp_echo_sockets: _,
-                udp_sockets: _,
-                tcp_v4_listeners: _,
-                tcp_v6_listeners: _,
-            } = non_sync_ctx;
-            timers.spawn(netstack.clone());
-
-            netstack.spawn_interface_control(
-                binding_id,
-                loopback_interface_control_stop_receiver,
-                control_receiver,
-            )
-        };
+        let (_sender, _, loopback_interface_control_task): (
+            futures::channel::oneshot::Sender<_>,
+            BindingId,
+            _,
+        ) = netstack.add_loopback().await;
 
         let interfaces_worker_task = fuchsia_async::Task::spawn(async move {
             let result = interfaces_worker.run().await;
@@ -981,7 +854,7 @@ impl NetstackSeed {
                         .await
                 }
                 WorkItem::Incoming(Service::Socket(socket)) => {
-                    socket.serve_with(|rs| socket::serve(netstack.clone(), rs)).await
+                    socket.serve_with(|rs| socket::serve(netstack.ctx.clone(), rs)).await
                 }
                 WorkItem::Incoming(Service::PacketSocket(socket)) => {
                     socket.serve_with(|rs| socket::packet::serve(rs)).await
