@@ -58,8 +58,8 @@ namespace {
 //     values for non-running futures, the information is limited to the state stored in the memory.
 //   * Since any data types in Rust can be futures and the implementation of their poll methods can
 //     be arbitrary, it's impossible for us to find all futures and detect every dependency between
-//     them. Instead, we only focus on the GenFuture types because they are generated from the async
-//     functions and are usually the more interesting part during debugging.
+//     them. Instead, we only focus on the async functions or async blocks that are usually the more
+//     interesting part during debugging.
 
 constexpr int kVerbose = 1;
 constexpr int kMoreVerbose = 2;
@@ -118,22 +118,25 @@ fxl::RefPtr<AsyncOutputBuffer> FormatError(std::string msg, const Err& err = Err
   return FormatMessage(Syntax::kWarning, msg);
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatGenFuture(const ExprValue& future,
-                                               const FormatFutureOptions& options,
-                                               const fxl::RefPtr<EvalContext>& context,
-                                               int indent) {
+bool IsAsyncFunctionOrBlock(Type* type) {
+  if (type->GetIdentifier().components().empty())
+    return false;
+
+  // {async_fn_env#0} or {async_block_env#0}
+  return StringStartsWith(type->GetIdentifier().components().back().name(), "{async_");
+}
+
+fxl::RefPtr<AsyncOutputBuffer> FormatAsyncFunctionOrBlock(const ExprValue& future,
+                                                          const FormatFutureOptions& options,
+                                                          const fxl::RefPtr<EvalContext>& context,
+                                                          int indent) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
 
-  // GenFuture should be a tuple of a single enum.
-  ErrOrValue enum_val = ResolveNonstaticMember(context, future, {"__0"});
-  if (enum_val.has_error())
-    return FormatError("Invalid GenFuture", enum_val.err());
-
-  // Resolve the current value of GenFuture.
+  // Resolve the current value of the async function.
   fxl::RefPtr<DataMember> member;
-  ErrOrValue varient_val = ResolveSingleVariantValue(context, enum_val.take_value(), &member);
+  ErrOrValue varient_val = ResolveSingleVariantValue(context, future, &member);
   if (varient_val.has_error())
-    return FormatError("Cannot resolve GenFuture", enum_val.err());
+    return FormatError("Cannot resolve async function", varient_val.err());
 
   // This should be a struct, e.g., async_rust::main::func::λ::Suspend0.
   ExprValue value = varient_val.take_value();
@@ -317,9 +320,10 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
     return out;
   }
 
+  if (IsAsyncFunctionOrBlock(future.type()))
+    return FormatAsyncFunctionOrBlock(future, options, context, indent);
+
   std::string_view type = StripTemplate(future.type()->GetFullName());
-  if (type == "core::future::from_generator::GenFuture")
-    return FormatGenFuture(future, options, context, indent);
   if (type == "futures_util::future::future::fuse::Fuse")
     return FormatFuse(future, options, context, indent);
   if (type == "futures_util::future::maybe_done::MaybeDone")
