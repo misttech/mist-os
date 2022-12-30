@@ -11,7 +11,7 @@ mod write_csv_output;
 mod write_human_readable_output;
 
 use {
-    crate::plugin_output::filter_digest_by_process_koids,
+    crate::plugin_output::filter_digest_by_process,
     crate::write_csv_output::write_csv_output,
     crate::write_human_readable_output::write_human_readable_output,
     anyhow::Result,
@@ -58,9 +58,10 @@ pub async fn print_output(
         let memory_monitor_output = get_output(monitor_proxy).await?;
         let processed_digest =
             processed::digest_from_memory_monitor_output(memory_monitor_output, cmd.buckets);
-        let output = match cmd.process_koids.len() {
-            0 => ProfileMemoryOutput::CompleteDigest(processed_digest),
-            _ => filter_digest_by_process_koids(processed_digest, &cmd.process_koids),
+        let output = if cmd.process_koids.is_empty() && cmd.process_names.is_empty() {
+            ProfileMemoryOutput::CompleteDigest(processed_digest)
+        } else {
+            filter_digest_by_process(processed_digest, &cmd.process_koids, &cmd.process_names)
         };
         if cmd.csv {
             write_csv_output(writer, output, cmd.buckets)
