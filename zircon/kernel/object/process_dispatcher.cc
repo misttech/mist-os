@@ -936,7 +936,7 @@ void ProcessDispatcher::OnProcessStartForJobDebugger(ThreadDispatcher* t,
                                                      const arch_exception_context_t* context) {
   auto job = job_;
   while (job) {
-    if (job->ForEachDebuExceptionate([t, context](Exceptionate* exceptionate) {
+    if (job->ForEachDebugExceptionate([t, context](Exceptionate* exceptionate) {
           t->HandleSingleShotException(exceptionate, ZX_EXCP_PROCESS_STARTING, *context);
         }) != ZX_OK) {
       printf("KERN: failed to allocate memory to notify process starts in %lu\n", get_koid());

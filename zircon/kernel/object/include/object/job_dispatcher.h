@@ -160,7 +160,7 @@ class JobDispatcher final
   Exceptionate* exceptionate();
 
   // Enumerate over a snapshot of debug exceptionates. |func| will be called without the lock held.
-  zx_status_t ForEachDebuExceptionate(fit::inline_function<void(Exceptionate*)> func);
+  zx_status_t ForEachDebugExceptionate(fit::inline_function<void(Exceptionate*)> func);
 
   // Create a new debug exceptionate. Possible errors are ZX_ERR_NO_MEMORY and ZX_ERR_ALREADY_BOUND.
   // Instead of return an exceptionate, this function calls SetChannel directly because it needs to

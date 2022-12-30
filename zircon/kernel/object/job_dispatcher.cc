@@ -681,7 +681,8 @@ Exceptionate* JobDispatcher::exceptionate() {
   return &exceptionate_;
 }
 
-zx_status_t JobDispatcher::ForEachDebuExceptionate(fit::inline_function<void(Exceptionate*)> func) {
+zx_status_t JobDispatcher::ForEachDebugExceptionate(
+    fit::inline_function<void(Exceptionate*)> func) {
   Guard<CriticalMutex> guard{get_lock()};
   // Remove disconnected exceptionates and get the count.
   size_t count = 0;
