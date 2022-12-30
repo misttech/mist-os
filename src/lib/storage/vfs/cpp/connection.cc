@@ -26,7 +26,6 @@
 #include <fbl/string_buffer.h>
 
 #include "src/lib/storage/vfs/cpp/debug.h"
-#include "src/lib/storage/vfs/cpp/fidl_transaction.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -41,9 +40,6 @@ static_assert(NAME_MAX == fio::wire::kMaxFilename,
               "POSIX NAME_MAX inconsistent with Fuchsia MAX_FILENAME");
 
 namespace fs {
-
-constexpr zx_signals_t kWakeSignals =
-    ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED | kLocalTeardownSignal;
 
 namespace internal {
 
@@ -83,14 +79,6 @@ zx_status_t EnforceHierarchicalRights(Rights parent_rights, VnodeConnectionOptio
   return ZX_OK;
 }
 
-Binding::Binding(Connection& connection, async_dispatcher_t* dispatcher, zx::channel channel)
-    : wait_(this, channel.get(), kWakeSignals, 0),
-      connection_(connection),
-      dispatcher_(dispatcher),
-      channel_(std::move(channel)) {}
-
-Binding::~Binding() { CancelDispatching(); }
-
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
                        VnodeConnectionOptions options)
     : vnode_is_open_(!options.flags.node_reference),
@@ -113,116 +101,16 @@ Connection::~Connection() {
   }
 }
 
-void Connection::AsyncTeardown() {
-  OnTeardown();
-  if (std::shared_ptr<Binding> binding = binding_; binding) {
-    binding->AsyncTeardown();
-  }
-}
+void Connection::Unbind() { binding_.reset(); }
 
-void Binding::AsyncTeardown() {
-  // This will wake up the dispatcher to call |Binding::HandleSignals| and eventually result in
-  // |Connection::SyncTeardown|.
-  ZX_ASSERT(channel_.signal(0, kLocalTeardownSignal) == ZX_OK);
-}
-
-zx_status_t Connection::StartDispatching(zx::channel channel) {
+void Connection::StartDispatching(zx::channel channel, OnUnbound on_unbound) {
   ZX_DEBUG_ASSERT(channel);
   ZX_DEBUG_ASSERT(!binding_);
   ZX_DEBUG_ASSERT(vfs_->dispatcher());
   ZX_DEBUG_ASSERT_MSG(InContainer(),
                       "Connection must be managed by the Vfs when dispatching FIDL messages.");
 
-  binding_ = std::make_shared<Binding>(*this, vfs_->dispatcher(), std::move(channel));
-  zx_status_t status = binding_->StartDispatching();
-  if (status != ZX_OK) {
-    binding_.reset();
-    return status;
-  }
-  return ZX_OK;
-}
-
-zx_status_t Binding::StartDispatching() {
-  ZX_DEBUG_ASSERT(!wait_.is_pending());
-  return wait_.Begin(dispatcher_);
-}
-
-void Binding::CancelDispatching() {
-  // Stop waiting and clean up if still connected.
-  if (wait_.is_pending()) {
-    zx_status_t status = wait_.Cancel();
-    ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Could not cancel wait: status=%d", status);
-  }
-}
-
-void Binding::HandleSignals(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                            zx_status_t status, const zx_packet_signal_t* signal) {
-  if (status != ZX_OK || !(signal->observed & ZX_CHANNEL_READABLE)) {
-    connection_.SyncTeardown();
-    return;
-  }
-  bool handling_ok = connection_.OnMessage();
-  if (!handling_ok) {
-    connection_.SyncTeardown();
-  }
-}
-
-bool Connection::OnMessage() {
-  if (vfs_->IsTerminating()) {
-    // Short-circuit locally destroyed connections, rather than servicing requests on their behalf.
-    // This prevents new requests from being served while filesystems are torn down.
-    return false;
-  }
-  if (closing_) {
-    // This prevents subsequent requests from being served after the
-    // observation of a |Node.Close| call.
-    return false;
-  }
-  std::shared_ptr<Binding> binding = binding_;
-  uint8_t bytes[ZX_CHANNEL_MAX_MSG_BYTES];
-  zx_handle_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
-  fidl_channel_handle_metadata_t handle_metadata[ZX_CHANNEL_MAX_MSG_HANDLES];
-  fidl::IncomingHeaderAndMessage msg =
-      fidl::MessageRead(binding->channel(), fidl::ChannelMessageStorageView{
-                                                .bytes = fidl::BufferSpan(bytes, sizeof(bytes)),
-                                                .handles = handles,
-                                                .handle_metadata = handle_metadata,
-                                                .handle_capacity = ZX_CHANNEL_MAX_MSG_HANDLES,
-                                            });
-  if (!msg.ok()) {
-    return false;
-  }
-
-  auto* header = msg.header();
-  FidlTransaction txn(header->txid, binding);
-  Dispatch(std::move(msg), &txn);
-
-  switch (txn.ToResult()) {
-    case FidlTransaction::Result::kRepliedSynchronously:
-      // If we get here, the message was successfully handled, synchronously.
-      return binding->StartDispatching() == ZX_OK;
-    case FidlTransaction::Result::kPendingAsyncReply:
-      // If we get here, the transaction was converted to an async one. Dispatching will be resumed
-      // by the transaction when it is completed.
-      return true;
-    case FidlTransaction::Result::kClosed:
-      return false;
-  }
-#ifdef __GNUC__
-  // GCC does not infer that the above switch statement will always return by handling all defined
-  // enum members.
-  __builtin_abort();
-#endif
-}
-
-void Connection::SyncTeardown() {
-  OnTeardown();
-  EnsureVnodeClosed();
-  binding_.reset();
-
-  // Tell the VFS that the connection closed remotely. This might have the side-effect of destroying
-  // this object, so this must be the last statement.
-  vfs_->OnConnectionClosedRemotely(this);
+  binding_ = Bind(vfs_->dispatcher(), std::move(channel), std::move(on_unbound));
 }
 
 zx_status_t Connection::EnsureVnodeClosed() {
@@ -286,10 +174,8 @@ void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node
 }
 
 zx::result<> Connection::NodeClose() {
-  zx::result result = zx::make_result(EnsureVnodeClosed());
-  closing_ = true;
-  AsyncTeardown();
-  return result;
+  Unbind();
+  return zx::make_result(EnsureVnodeClosed());
 }
 
 fidl::VectorView<uint8_t> Connection::NodeQuery() {
@@ -375,25 +261,6 @@ zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
   auto options = VnodeConnectionOptions::FromIoV1Flags(flags);
   set_append(options.flags.append);
   return zx::ok();
-}
-
-zx_koid_t Connection::GetChannelOwnerKoid() {
-  if (binding_ == nullptr) {
-    return ZX_KOID_INVALID;
-  }
-  auto& channel = binding_->channel();
-
-  if (!channel.is_valid()) {
-    return ZX_KOID_INVALID;
-  }
-
-  zx_info_handle_basic_t owner_info;
-  if (zx_object_get_info(channel.get(), ZX_INFO_HANDLE_BASIC, &owner_info, sizeof(owner_info),
-                         nullptr, nullptr) != ZX_OK) {
-    return ZX_KOID_INVALID;
-  }
-
-  return owner_info.koid;
 }
 
 zx::result<fuchsia_io::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {

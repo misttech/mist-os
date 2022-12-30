@@ -341,25 +341,31 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
   std::unique_ptr<internal::Connection> connection;
   zx_status_t status = ([&] {
+    zx_info_handle_basic_t info;
+    if (zx_status_t status =
+            server_end.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+        status != ZX_OK) {
+      return status;
+    }
     switch (protocol) {
       case VnodeProtocol::kFile: {
         zx::stream stream;
         zx_status_t status = vnode->CreateStream(ToStreamOptions(*options), &stream);
         if (status == ZX_OK) {
           connection = std::make_unique<internal::StreamFileConnection>(
-              this, std::move(vnode), std::move(stream), protocol, *options);
+              this, std::move(vnode), std::move(stream), protocol, *options, info.koid);
           return ZX_OK;
         }
         if (status == ZX_ERR_NOT_SUPPORTED) {
-          connection = std::make_unique<internal::RemoteFileConnection>(this, std::move(vnode),
-                                                                        protocol, *options);
+          connection = std::make_unique<internal::RemoteFileConnection>(
+              this, std::move(vnode), protocol, *options, info.koid);
           return ZX_OK;
         }
         return status;
       }
       case VnodeProtocol::kDirectory:
         connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),
-                                                                     protocol, *options);
+                                                                     protocol, *options, info.koid);
         return ZX_OK;
       case VnodeProtocol::kConnector:
         connection =
@@ -401,12 +407,6 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
   }
 
   return RegisterConnection(std::move(connection), std::move(server_end));
-}
-
-void FuchsiaVfs::OnConnectionClosedRemotely(internal::Connection* connection) {
-  ZX_DEBUG_ASSERT(connection);
-
-  UnregisterConnection(connection);
 }
 
 zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,

@@ -8,28 +8,26 @@
 #include <lib/sync/completion.h>
 
 #include <memory>
+#include <mutex>
 #include <utility>
 
 namespace fs {
 
-SynchronousVfs::SynchronousVfs() : is_shutting_down_(false) {}
-
-SynchronousVfs::SynchronousVfs(async_dispatcher_t* dispatcher)
-    : FuchsiaVfs(dispatcher), is_shutting_down_(false) {}
+SynchronousVfs::SynchronousVfs(async_dispatcher_t* dispatcher) : FuchsiaVfs(dispatcher) {}
 
 SynchronousVfs::~SynchronousVfs() {
   Shutdown(nullptr);
-  ZX_DEBUG_ASSERT(connections_.is_empty());
+  ZX_DEBUG_ASSERT(connections_ == nullptr);
 }
 
-// Synchronously drop all connections.
 void SynchronousVfs::Shutdown(ShutdownCallback handler) {
-  is_shutting_down_ = true;
-
-  while (!connections_.is_empty()) {
-    connections_.front().SyncTeardown();
+  ZX_DEBUG_ASSERT(connections_ != nullptr);
+  {
+    std::lock_guard<std::mutex> lock(connections_->lock);
+    std::for_each(connections_->inner.begin(), connections_->inner.end(),
+                  std::mem_fn(&internal::Connection::Unbind));
   }
-  ZX_ASSERT_MSG(connections_.is_empty(), "Failed to complete VFS shutdown");
+  connections_.reset();
   if (handler) {
     handler(ZX_OK);
   }
@@ -37,11 +35,13 @@ void SynchronousVfs::Shutdown(ShutdownCallback handler) {
 
 void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
                                                  CloseAllConnectionsForVnodeCallback callback) {
-  for (auto connection = connections_.begin(); connection != connections_.end();) {
-    auto c = connection;
-    connection++;
-    if (c->vnode().get() == &node) {
-      c->SyncTeardown();
+  ZX_DEBUG_ASSERT(connections_ != nullptr);
+  {
+    std::lock_guard<std::mutex> lock(connections_->lock);
+    for (internal::Connection& connection : connections_->inner) {
+      if (connection.vnode().get() == &node) {
+        connection.Unbind();
+      }
     }
   }
   if (callback) {
@@ -51,21 +51,40 @@ void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
 
 zx_status_t SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                                zx::channel channel) {
-  ZX_DEBUG_ASSERT(!is_shutting_down_);
-  connections_.push_back(std::move(connection));
-  zx_status_t status = connections_.back().StartDispatching(std::move(channel));
-  if (status != ZX_OK) {
-    connections_.pop_back();
-    return status;
-  }
+  ZX_DEBUG_ASSERT(connections_ != nullptr);
+  // Release the lock before doing additional work on the connection.
+  internal::Connection& added = [&]() -> internal::Connection& {
+    std::lock_guard<std::mutex> lock(connections_->lock);
+    connections_->inner.push_back(std::move(connection));
+    return connections_->inner.back();
+  }();
+
+  // Subtle behavior warning.
+  //
+  // Connections must not outlive the VFS; this is because they may call into the VFS during normal
+  // operations, including during their destructors.
+  //
+  // Callbacks are provided weak references to the connections container as a best-effort attempt to
+  // ensure this; destroying the VFS drops the strong reference, nullifying the callback.
+  //
+  // However if a callback has already upgraded its reference when the VFS is destroyed then a race
+  // results; the VFS attempts to iterate over the connections to call
+  // `internal::Connection::Unbind` at the same time that (a) the connections container is being
+  // modified and (b) a particular connection is being destroyed. Access to the connections
+  // container is guarded by a lock to mitigate this.
+  added.StartDispatching(std::move(channel),
+                         [weak = std::weak_ptr(connections_)](internal::Connection* connection) {
+                           if (std::shared_ptr connections = weak.lock(); connections != nullptr) {
+                             // Release the lock before dropping the connection.
+                             std::unique_ptr removed = [&]() {
+                               std::lock_guard<std::mutex> lock(connections->lock);
+                               return connections->inner.erase(*connection);
+                             }();
+                           }
+                         });
   return ZX_OK;
 }
 
-void SynchronousVfs::UnregisterConnection(internal::Connection* connection) {
-  // We drop the result of |erase| on the floor, effectively destroying the connection.
-  connections_.erase(*connection);
-}
-
-bool SynchronousVfs::IsTerminating() const { return is_shutting_down_; }
+bool SynchronousVfs::IsTerminating() const { return connections_ == nullptr; }
 
 }  // namespace fs

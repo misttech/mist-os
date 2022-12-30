@@ -12,7 +12,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 
 #include "src/lib/storage/vfs/cpp/connection.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
 
@@ -29,7 +28,7 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   ~NodeConnection() final = default;
 
  private:
-  void Dispatch(fidl::IncomingHeaderAndMessage&&, fidl::Transaction*) override;
+  std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
 
   //
   // |fuchsia.io/Node| operations.

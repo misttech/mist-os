@@ -66,7 +66,6 @@ class ManagedVfs : public FuchsiaVfs {
 
   zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                  zx::channel channel) final __TA_EXCLUDES(lock_);
-  void UnregisterConnection(internal::Connection* connection) final __TA_EXCLUDES(lock_);
 
   // Called when all connections to the VFS are closed.
   virtual void OnNoConnections() {}

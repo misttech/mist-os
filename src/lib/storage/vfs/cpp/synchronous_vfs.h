@@ -12,6 +12,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
+#include <zircon/compiler.h>
 
 #include <memory>
 
@@ -36,9 +37,7 @@ namespace fs {
 // destruction.
 class SynchronousVfs : public FuchsiaVfs {
  public:
-  SynchronousVfs();
-
-  explicit SynchronousVfs(async_dispatcher_t* dispatcher);
+  explicit SynchronousVfs(async_dispatcher_t* dispatcher = nullptr);
 
   // The SynchronousVfs destructor terminates all open connections.
   ~SynchronousVfs() override;
@@ -57,10 +56,15 @@ class SynchronousVfs : public FuchsiaVfs {
 
   zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                  zx::channel channel) final;
-  void UnregisterConnection(internal::Connection* connection) final;
 
-  fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>> connections_;
-  bool is_shutting_down_;
+  struct Connections {
+    std::mutex lock;
+    fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>> inner __TA_GUARDED(lock);
+  };
+
+  // Held by shared_ptr to allow connections to unbind asynchronously even as the VFS is being
+  // destroyed. Reset when the VFS is shutting down.
+  std::shared_ptr<Connections> connections_{std::make_shared<Connections>()};
 };
 
 }  // namespace fs

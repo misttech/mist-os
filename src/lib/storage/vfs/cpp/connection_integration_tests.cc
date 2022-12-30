@@ -10,6 +10,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <stdio.h>
+#include <zircon/errors.h>
 
 #include <atomic>
 #include <string_view>
@@ -60,42 +61,44 @@ class FileOrDirectory : public fs::Vnode {
 // OPEN_FLAG_DESCRIBE is used.
 zx::result<fio::wire::NodeInfoDeprecated> GetOnOpenResponse(
     fidl::UnownedClientEnd<fio::Node> channel) {
-  zx::result<fio::wire::NodeInfoDeprecated> node_info{};
-  auto get_on_open_response = [](fidl::UnownedClientEnd<fio::Node> channel,
-                                 zx::result<fio::wire::NodeInfoDeprecated>& node_info) {
-    class EventHandler final : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
-     public:
-      explicit EventHandler() = default;
-
-      void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
-        ASSERT_NE(event, nullptr);
-        response_ = std::move(*event);
-      }
-
-      void NotImplemented_(const std::string& name) override {
-        ADD_FAILURE("Unexpected %s", name.c_str());
-      }
-
-      fidl::WireEvent<fio::Node::OnOpen> GetResponse() { return std::move(response_); }
-
-     private:
-      fidl::WireEvent<fio::Node::OnOpen> response_;
-    };
-
-    EventHandler event_handler{};
-    fidl::Status event_result = event_handler.HandleOneEvent(channel);
-    // Expect that |on_open| was received
-    ASSERT_TRUE(event_result.ok());
-    fidl::WireEvent<fio::Node::OnOpen> response = event_handler.GetResponse();
-    if (response.s != ZX_OK) {
-      node_info = zx::error(response.s);
-      return;
+  class EventHandler final : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
+   public:
+    void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
+      ASSERT_NE(event, nullptr);
+      response = std::move(*event);
     }
-    ASSERT_TRUE(response.info.has_value());
-    node_info = zx::ok(std::move(response.info.value()));
+
+    void NotImplemented_(const std::string& name) override {
+      ADD_FAILURE("unexpected %s", name.c_str());
+    }
+
+    fidl::WireEvent<fio::Node::OnOpen> response;
   };
-  get_on_open_response(std::move(channel), node_info);
-  return node_info;
+
+  EventHandler event_handler;
+  const fidl::Status result = event_handler.HandleOneEvent(channel);
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  fidl::WireEvent<fio::Node::OnOpen>& response = event_handler.response;
+  if (response.s != ZX_OK) {
+    return zx::error(response.s);
+  }
+  if (!response.info.has_value()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  // In the success case, dispatch a trivial method to synchronize with the VFS; at the time of
+  // writing, the VFS implementation sends the event *before* starting to service the channel. This
+  // can lead to races with test teardown where binding the channel happens after the dispatcher has
+  // been shutdown, which results in a panic in the FIDL runtime.
+  {
+    const fidl::WireResult result = fidl::WireCall(channel)->Sync();
+    EXPECT_OK(result.status());
+    const fit::result response = result.value();
+    EXPECT_TRUE(response.is_error());
+    EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, response.error_value());
+  }
+  return zx::ok(std::move(response.info.value()));
 }
 
 class VfsTestSetup : public zxtest::Test {
