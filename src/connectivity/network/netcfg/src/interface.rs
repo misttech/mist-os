@@ -8,6 +8,9 @@ use {
     std::{fs, io, path},
 };
 
+const INTERFACE_PREFIX_WLAN: &str = "wlan";
+const INTERFACE_PREFIX_ETHERNET: &str = "eth";
+
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 enum PersistentIdentifier {
     MacAddress(fidl_fuchsia_net_ext::MacAddress),
@@ -85,15 +88,20 @@ impl Config {
         octets: [u8; 6],
         interface_type: crate::InterfaceType,
     ) -> Result<String, anyhow::Error> {
-        let prefix = match interface_type {
-            crate::InterfaceType::Wlan => "wlanx",
-            crate::InterfaceType::Ethernet => "ethx",
-        };
+        let prefix = format!(
+            "{}{}",
+            match interface_type {
+                crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
+                crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
+            },
+            "x"
+        );
+
         let last_byte = octets[octets.len() - 1];
         for i in 0u8..255u8 {
             let candidate = ((last_byte as u16 + i as u16) % 256 as u16) as u8;
             if self.names.iter().any(|(_key, name)| {
-                name.starts_with(prefix)
+                name.starts_with(&prefix)
                     && u8::from_str_radix(&name[prefix.len()..], 16) == Ok(candidate)
             }) {
                 continue; // if the candidate is used, try next one
@@ -114,8 +122,8 @@ impl Config {
         interface_type: crate::InterfaceType,
     ) -> Result<String, anyhow::Error> {
         let prefix = match interface_type {
-            crate::InterfaceType::Wlan => "wlan",
-            crate::InterfaceType::Ethernet => "eth",
+            crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
+            crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
         };
         let (suffix, pat) =
             if topological_path.contains("/pci-") { ("p", "/pci-") } else { ("s", "/platform/") };
@@ -160,6 +168,15 @@ impl Config {
                 self.generate_name_from_topological_path(&topological_path, interface_type)
             }
         }
+    }
+}
+
+/// Checks the interface and device class to check that they match.
+// TODO(https://fxbug.dev/118197): Remove this function once we save the device class.
+fn name_matches_interface_type(name: &str, interface_type: &crate::InterfaceType) -> bool {
+    match interface_type {
+        crate::InterfaceType::Wlan => name.starts_with(INTERFACE_PREFIX_WLAN),
+        crate::InterfaceType::Ethernet => name.starts_with(INTERFACE_PREFIX_ETHERNET),
     }
 }
 
@@ -233,18 +250,23 @@ impl<'a> FileBackedConfig<'a> {
 
         if let Some(index) = self.config.lookup_by_identifier(&persistent_id) {
             let (_key, name) = &self.config.names[index];
-            Ok(name)
-        } else {
-            let name = self
-                .config
-                .generate_name(&persistent_id, interface_type)
-                .map_err(NameGenerationError::GenerationError)?;
-            let () = self.config.names.push((persistent_id, name));
-            let (_key, name) = &self.config.names[self.config.names.len() - 1];
-            let () =
-                self.store().map_err(|err| NameGenerationError::FileUpdateError { name, err })?;
-            Ok(name)
+            if name_matches_interface_type(name, &interface_type) {
+                // Need to take a new reference to appease the borrow checker.
+                let (_key, name) = &self.config.names[index];
+                return Ok(name);
+            }
+            // Identifier was found in the vector, but device class does not match interface
+            // name. Remove and generate a new name.
+            let (_key, _name) = self.config.names.remove(index);
         }
+        let generated_name = self
+            .config
+            .generate_name(&persistent_id, interface_type)
+            .map_err(NameGenerationError::GenerationError)?;
+        let () = self.config.names.push((persistent_id, generated_name));
+        let (_key, name) = &self.config.names[self.config.names.len() - 1];
+        let () = self.store().map_err(|err| NameGenerationError::FileUpdateError { name, err })?;
+        Ok(name)
     }
 
     /// Returns a temporary name for an interface.
@@ -363,26 +385,75 @@ mod tests {
 
     #[test]
     fn test_generate_stable_name() {
-        let test1 = TestCase {
-            topological_path: String::from("/dev/pci-00:14.0/ethernet"),
-            mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-            interface_type: crate::InterfaceType::Wlan,
-            want_name: "wlanp0014",
-        };
-        let mut test2 = test1.clone();
-        test2.mac[0] ^= 0xff;
-        let test_cases = vec![test1, test2];
+        #[derive(Clone)]
+        struct FileBackedConfigTestCase {
+            topological_path: String,
+            mac: [u8; 6],
+            interface_type: crate::InterfaceType,
+            want_name: &'static str,
+            expected_size: usize,
+        }
+
+        let test_cases = vec![
+            // Base case.
+            FileBackedConfigTestCase {
+                topological_path: String::from("/dev/pci-00:14.0/ethernet"),
+                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+                interface_type: crate::InterfaceType::Wlan,
+                want_name: "wlanp0014",
+                expected_size: 1,
+            },
+            // Same topological path as the base case, different MAC address.
+            FileBackedConfigTestCase {
+                topological_path: String::from("/dev/pci-00:14.0/ethernet"),
+                mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
+                interface_type: crate::InterfaceType::Wlan,
+                want_name: "wlanp0014",
+                expected_size: 1,
+            },
+            // Test case that labels iwilwifi as ethernet.
+            FileBackedConfigTestCase {
+                topological_path: String::from(
+                    "/dev/sys/platform/platform-passthrough/PCI0/bus/01:00.0_\
+/pci-01:00.0-fidl/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                ),
+                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+                interface_type: crate::InterfaceType::Ethernet,
+                want_name: "ethp01000fd",
+                expected_size: 2,
+            },
+            // Test case that changes the previous test case's device class to wlan.
+            // The test should detect that the device class doesn't match the interface
+            // name, and overwrite with the new interface name that does match.
+            FileBackedConfigTestCase {
+                topological_path: String::from(
+                    "/dev/sys/platform/platform-passthrough/PCI0/bus/01:00.0_\
+/pci-01:00.0-fidl/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+                ),
+                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+                interface_type: crate::InterfaceType::Wlan,
+                want_name: "wlanp01000fd",
+                expected_size: 2,
+            },
+        ];
 
         let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
         let path = temp_dir.path().join("net.config.json");
 
         // query an existing interface with the same topo path and a different mac address
-        for (i, TestCase { topological_path, mac, interface_type, want_name }) in
-            test_cases.into_iter().enumerate()
+        for (
+            _i,
+            FileBackedConfigTestCase {
+                topological_path,
+                mac,
+                interface_type,
+                want_name,
+                expected_size,
+            },
+        ) in test_cases.into_iter().enumerate()
         {
             let mut interface_config =
                 FileBackedConfig::load(&path).expect("failed to load the interface config");
-            assert_eq!(interface_config.config.names.len(), i);
 
             let name = interface_config
                 .generate_stable_name(
@@ -392,7 +463,10 @@ mod tests {
                 )
                 .expect("failed to get the interface name");
             assert_eq!(name, want_name);
-            assert_eq!(interface_config.config.names.len(), 1);
+            // Load the file again to ensure that generate_stable_name saved correctly.
+            interface_config =
+                FileBackedConfig::load(&path).expect("failed to load the interface config");
+            assert_eq!(interface_config.config.names.len(), expected_size);
         }
     }
 
