@@ -12,9 +12,7 @@ running in the system to a few core functions:
 * Inter-process communication
 
 ![Data table showing a comparison between kernel services in Fuchsia and a
-typical operating system, indicating Fuchsia includes fewer services in its
-kernel.]
-(/docs/get-started/images/intro/kernel-services.png){: width="799"}
-
+ typical operating system, indicating Fuchsia includes fewer services in its
+ kernel.](/docs/get-started/images/intro/kernel-services.png){: width="799"}
 
 [glossary.zircon]: /docs/glossary/README.md#zircon

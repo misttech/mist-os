@@ -33,8 +33,8 @@ following two items:
   their content addresses.
 
 ![Diagram showing the contents of a Fuchsia package consisting of "meta.far"
-metadata and a collection of content BLOBs.]
-(/docs/get-started/images/intro/meta-far.png){: width="544"}
+  metadata and a collection of content BLOBs.](
+    /docs/get-started/images/intro/meta-far.png){: width="544"}
 
 If two or more packages share the same content (such as a library dependency,
 or font resource), their metadata will point to the same content address for

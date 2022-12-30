@@ -6,5 +6,5 @@ of the device hardware and user experience. In this section, you'll explore how
 Fuchsia builds on components to enable product-level customization.
 
 ![Data table showing how Fuchsia enables product customization on top of the
-core platform through the Session Framework and Driver Framework.]
-(/docs/get-started/images/components/product.png){: width="582"}
+core platform through the Session Framework and Driver Framework.](
+    /docs/get-started/images/components/product.png){: width="582"}

@@ -26,8 +26,8 @@ channel, they are removed from the sending process. When a message with handles
 is read from a channel, the handles are added to the receiving process.
 
 ![Diagram showing how processes communicate through shared objects found in the
-kernel. The most common of these connections is the channel.]
-(/docs/get-started/images/intro/ipc.png){: width="582"}
+ kernel. The most common of these connections is the channel.](
+  /docs/get-started/images/intro/ipc.png){: width="582"}
 
 Note: You can find more of Zircon's deep technical details in the
 [kernel documentation](/docs/concepts/kernel/README.md).

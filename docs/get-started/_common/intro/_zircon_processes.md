@@ -9,9 +9,9 @@ Zircon exposes three main kernel objects for running code:
 * [Job](/docs/reference/kernel_objects/job.md):
   Group of related processes and jobs. All jobs form a single rooted tree.
 
-![Tree diagram illustrating Fuchsia's process hierarchy. Processes are
-grouped into jobs, which are ultimately owned by the Root Job.]
-(/docs/get-started/images/intro/processes-jobs.png){: width="549"}
+![Tree diagram illustrating Fuchsia's process hierarchy.
+  Processes are grouped into jobs, which are ultimately owned by the Root Job.](
+  /docs/get-started/images/intro/processes-jobs.png){: width="549"}
 
 Processes form the basis for system capabilities. Each process is granted a set
 of capabilities through the various handles it holds.

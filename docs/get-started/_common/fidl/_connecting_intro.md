@@ -12,8 +12,8 @@ Consider the following example for a `fuchsia.example.Foo` protocol:
 
 ![Diagram showing how connecting components is a combination of capability
 routing and protocol serving. Components must serve the implementation of a
-protocol they offer to other components.]
-(/docs/get-started/images/fidl/protocol-serving.png){: width="629"}
+protocol they offer to other components.](
+    /docs/get-started/images/fidl/protocol-serving.png){: width="629"}
 
 The diagram highlights the main elements involved in performing the connection:
 

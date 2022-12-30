@@ -99,9 +99,8 @@ Once a device is tracked in the target list, `ffx` interacts with the Remove
 Control Service (RCS) on the target to enable you to send additional commands.
 
 ![Diagram showing how "ffx" is a developer tool that communicates with the
-Remote Control Service (RCS) on the Fuchsia Device.]
-(/docs/get-started/images/build/ffx-rcs.png){: width="591"}
-
+ Remote Control Service (RCS) on the Fuchsia Device.](
+    /docs/get-started/images/build/ffx-rcs.png){: width="591"}
 
 Note: For a complete list of the developer commands supported by `ffx`, see
 the [`ffx` reference](https://fuchsia.dev/reference/tools/sdk/ffx.md).

@@ -7,9 +7,8 @@ to be **de-duplicated** across all packages and
 service on top of `blobfs` to facilitate package management.
 
 ![Diagram illustrating how the package cache is built on top of "blobfs" — a
-content-addressable filesystem that de-duplicates BLOBs allowing them to be
-shared between packages.]
-(/docs/get-started/images/intro/blobfs.png){: width="632"}
+ content-addressable filesystem that de-duplicates BLOBs allowing them to be
+ shared between packages.](/docs/get-started/images/intro/blobfs.png){: width="632"}
 
 The `pkg-cache` layer tracks which packages in the system are currently
 active. **Packages are not explicitly installed or removed in Fuchsia**.

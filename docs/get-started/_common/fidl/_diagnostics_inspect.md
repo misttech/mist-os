@@ -13,8 +13,7 @@ attach additional properties of interest to your application.
 
 ![Tree diagram showing how component inspection provides structured metrics
 data as a tree of "nodes," where each node can contain one or more key/value
-"properties."]
-(/docs/get-started/images/fidl/component-inspect.png){: width="583"}
+"properties."](/docs/get-started/images/fidl/component-inspect.png){: width="583"}
 
 You can retrieve the current set of metrics published to Inspect using the
 developer tools:

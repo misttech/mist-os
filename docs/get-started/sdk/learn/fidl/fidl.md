@@ -47,8 +47,8 @@ bindings process incoming request messages and deliver them through an abstract
 interface for components to implement.
 
 ![Diagram showing how FIDL bindings provide generated library code to translate
-function calls into FIDL messages for transport across process boundaries.]
-(/docs/get-started/images/fidl/fidl-bindings.png){: width="574"}
+ function calls into FIDL messages for transport across
+  process boundaries.](/docs/get-started/images/fidl/fidl-bindings.png){: width="574"}
 
 Note: For more details on the bindings specification and supported programming
 languages, see the [Bindings Reference](/docs/reference/fidl/bindings/overview.md).
