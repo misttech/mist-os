@@ -72,6 +72,7 @@ class SynAudioInDevice {
   zx::vmo ring_buffer_;
   zx::vmo dma_buffer_[kNumberOfDmas];
   thrd_t thread_;
+  bool thread_done_ = false;
   bool enabled_ = false;
   // clang-format off
   uint32_t  ring_buffer_size_             = 0;

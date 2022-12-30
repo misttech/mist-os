@@ -97,6 +97,19 @@ class SynAudioInTest : public zxtest::Test {
 
 namespace audio {
 
+TEST_F(SynAudioInTest, ShutdownWithStoppedThread) {
+  Init(4);
+
+  dma().ExpectStop(DmaId::kDmaIdPdmW0);
+  dma().ExpectStop(DmaId::kDmaIdPdmW1);
+  device()->Shutdown();  // Stops the thread.
+
+  dma().ExpectStop(DmaId::kDmaIdPdmW0);
+  dma().ExpectStop(DmaId::kDmaIdPdmW1);
+  device()->Shutdown();  // Must still work with the thread stopped.
+  // TeadDown() may Shutdown() even another time, that must work as well.
+}
+
 TEST_F(SynAudioInTest, ProcessDmaSimple) {
   Init(4);
 

@@ -202,7 +202,12 @@ zx_status_t SynAudioInDevice::Init() {
   ZX_DEBUG_ASSERT(size_per_notification_ != 0);
   // Only need notification for PDM0, PDM1 piggybacks onto it.
 
-  auto cb = [](void* arg) -> int { return reinterpret_cast<SynAudioInDevice*>(arg)->Thread(); };
+  auto cb = [](void* arg) -> int {
+    auto thiz = reinterpret_cast<SynAudioInDevice*>(arg);
+    int ret = thiz->Thread();
+    thiz->thread_done_ = true;
+    return ret;
+  };
   int rc = thrd_create_with_name(&thread_, cb, this, "synaptics-audio-in-thread");
   if (rc != thrd_success) {
     return ZX_ERR_INTERNAL;
@@ -312,9 +317,11 @@ uint64_t SynAudioInDevice::Stop() {
 }
 
 void SynAudioInDevice::Shutdown() {
-  zx_port_packet packet = {kPortShutdown, ZX_PKT_TYPE_USER, ZX_OK, {}};
-  zx_status_t status = port_.queue(&packet);
-  ZX_ASSERT(status == ZX_OK);
-  thrd_join(thread_, NULL);
+  if (!thread_done_) {
+    zx_port_packet packet = {kPortShutdown, ZX_PKT_TYPE_USER, ZX_OK, {}};
+    zx_status_t status = port_.queue(&packet);
+    ZX_ASSERT(status == ZX_OK);
+    thrd_join(thread_, NULL);
+  }
   Stop();
 }
