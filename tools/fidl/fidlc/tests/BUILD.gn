@@ -495,6 +495,7 @@ test("fidlc-test") {
     "c_generator_tests.cc",
     "canonical_names_tests.cc",
     "coded_types_generator_tests.cc",
+    "compiled_transformer_tests.cc",
     "consts_tests.cc",
     "declaration_order_tests.cc",
     "decomposition_tests.cc",

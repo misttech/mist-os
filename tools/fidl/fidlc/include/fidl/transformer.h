@@ -14,14 +14,19 @@
 #include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
+#include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 #include "tools/fidl/fidlc/include/fidl/formatter.h"
 #include "tools/fidl/fidlc/include/fidl/lexer.h"
+#include "tools/fidl/fidlc/include/fidl/ordinals.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
+#include "tools/fidl/fidlc/include/fidl/source_map.h"
 #include "tools/fidl/fidlc/include/fidl/token.h"
 #include "tools/fidl/fidlc/include/fidl/token_list.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
+#include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
 
 // A macro containing the logic of calling any particular user-supplied |When*| function, which
 // should be the same regardless of the particular |NodeKind| being visited.
@@ -1085,6 +1090,167 @@ class ParsedTransformer : public Transformer {
   void OnTypeConstructor(const std::unique_ptr<raw::TypeConstructor>&) final;
   void OnTypeLayoutParameter(const std::unique_ptr<raw::TypeLayoutParameter>&) final;
   void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>&) final;
+
+  // Privatize some previously "protected" methods from the base class, so that derived classes
+  // cannot access them.
+  using Transformer::BuildTransformStates;
+  using Transformer::CurrentlyTransforming;
+  using Transformer::GetAsMutable;
+  using Transformer::GetTokenPointerResolver;
+  using Transformer::GetTokenSlice;
+  using Transformer::NextStep;
+  using Transformer::ParseSource;
+  using Transformer::reporter;
+  using Transformer::step;
+};
+
+// A |Transformer| that transforms an also-compiled raw AST. Implementors are expected to use this
+// class by deriving it to make their own |*Transformer|, with the appropriate |When*| methods
+// overwritten. Each |When*| method received mutable access to the underlying |SourceElement| it is
+// visiting, as well as a mutable |TokenSlice| representing the |Token|s contained therein.
+// Additionally, it receives an immutable |SourceMapEntry| containing all known flat AST nodes that
+// were "sourced" from the |SourceElement| being visited.
+//
+// Users are expected to pass in a list of |SourceFile|s for the library being converted, plus an
+// optional list of (topologically sorted) dependency |SourceFile| lists for libraries that require
+// them, at construction time.
+class CompiledTransformer : public Transformer {
+ public:
+  CompiledTransformer(const std::vector<const SourceFile*>& library_source_files,
+                      const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+                      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
+      : Transformer(library_source_files, experimental_flags, reporter),
+        virtual_file_("generated"),
+        all_libraries_(reporter, &virtual_file_),
+        dependencies_source_files_(dependencies_source_files) {}
+  CompiledTransformer(const std::vector<const SourceFile*>& library_source_files,
+                      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
+      : CompiledTransformer(library_source_files, {}, experimental_flags, reporter) {}
+
+  // This operation readies the passed in source files for transformation. It performs all of the
+  // same operations as |ParsedTransformer::Prepare()|, but then it also compiles the files and
+  // produces a |SourceMap| as well.
+  bool Prepare() final;
+
+ protected:
+  // Derivations of this class should override at least one of these noop methods to perform the
+  // actual transforms in question. Each such method receives three arguments: a mutable copy of the
+  // raw AST node to be transformed, a slice of |Token| pointers that occur between the |start()|
+  // and |end()| token of that raw AST node, inclusive, and finally an immutable |SourceMapEntry|
+  // containing all flat AST nodes derived from the raw AST node being visited. Transforms are
+  // implemented by adjusting the first two data structures in tandem, taking care to ensure that
+  // the changes applied are reflected in both.
+  virtual void WhenAliasDeclaration(raw::AliasDeclaration*, TokenSlice&,
+                                    const VersionedEntry<flat::Alias>*) {}
+  virtual void WhenAttributeArg(raw::AttributeArg*, TokenSlice&,
+                                const UniqueEntry<flat::AttributeArg>*) {}
+  virtual void WhenAttribute(raw::Attribute*, TokenSlice&, const UniqueEntry<flat::Attribute>*) {}
+  virtual void WhenBinaryOperatorConstant(raw::BinaryOperatorConstant*, TokenSlice&,
+                                          const UniqueEntry<flat::BinaryOperatorConstant>*) {}
+  virtual void WhenBitsDeclaration(raw::Layout*, TokenSlice&, const VersionedEntry<flat::Bits>*) {}
+  virtual void WhenBitsMember(raw::ValueLayoutMember*, TokenSlice&,
+                              const VersionedEntry<flat::Bits::Member>*) {}
+  virtual void WhenBoolLiteral(raw::BoolLiteral*, TokenSlice&,
+                               const UniqueEntry<flat::LiteralConstant>*) {}
+  virtual void WhenConstDeclaration(raw::ConstDeclaration*, TokenSlice&,
+                                    const VersionedEntry<flat::Const>*) {}
+  virtual void WhenDocCommentLiteral(raw::DocCommentLiteral*, TokenSlice&,
+                                     const UniqueEntry<flat::LiteralConstant>*) {}
+  virtual void WhenEnumDeclaration(raw::Layout*, TokenSlice&, const VersionedEntry<flat::Enum>*) {}
+  virtual void WhenEnumMember(raw::ValueLayoutMember*, TokenSlice&,
+                              const VersionedEntry<flat::Enum::Member>*) {}
+  virtual void WhenIdentifierConstant(raw::IdentifierConstant*, TokenSlice&,
+                                      const UniqueEntry<flat::IdentifierConstant>*) {}
+  virtual void WhenIdentifierLayoutParameter(raw::IdentifierLayoutParameter*, TokenSlice&,
+                                             const UniqueEntry<flat::IdentifierLayoutParameter>*) {}
+  virtual void WhenLayoutParameterList(raw::LayoutParameterList*, TokenSlice&,
+                                       const UniqueEntry<flat::LayoutParameterList>*) {}
+  virtual void WhenLiteralLayoutParameter(raw::LiteralLayoutParameter*, TokenSlice&,
+                                          const UniqueEntry<flat::LiteralLayoutParameter>*) {}
+  virtual void WhenNumericLiteral(raw::NumericLiteral*, TokenSlice&,
+                                  const UniqueEntry<flat::LiteralConstant>*) {}
+  virtual void WhenProtocolCompose(raw::ProtocolCompose*, TokenSlice&,
+                                   const VersionedEntry<flat::Protocol::ComposedProtocol>*) {}
+  virtual void WhenProtocolDeclaration(raw::ProtocolDeclaration*, TokenSlice&,
+                                       const VersionedEntry<flat::Protocol>*) {}
+  virtual void WhenProtocolMethod(raw::ProtocolMethod*, TokenSlice&,
+                                  const VersionedEntry<flat::Protocol::Method>*) {}
+  virtual void WhenResourceDeclaration(raw::ResourceDeclaration*, TokenSlice&,
+                                       const VersionedEntry<flat::Resource>*) {}
+  virtual void WhenResourceProperty(raw::ResourceProperty*, TokenSlice&,
+                                    const VersionedEntry<flat::Resource::Property>*) {}
+  virtual void WhenServiceDeclaration(raw::ServiceDeclaration*, TokenSlice&,
+                                      const VersionedEntry<flat::Service>*) {}
+  virtual void WhenServiceMember(raw::ServiceMember*, TokenSlice&,
+                                 const VersionedEntry<flat::Service::Member>*) {}
+  virtual void WhenStringLiteral(raw::StringLiteral*, TokenSlice&,
+                                 const UniqueEntry<flat::LiteralConstant>*) {}
+  virtual void WhenStructDeclaration(raw::Layout*, TokenSlice&,
+                                     const VersionedEntry<flat::Struct>*) {}
+  virtual void WhenStructMember(raw::StructLayoutMember*, TokenSlice&,
+                                const VersionedEntry<flat::Struct::Member>*) {}
+  virtual void WhenTableDeclaration(raw::Layout*, TokenSlice&, const VersionedEntry<flat::Table>*) {
+  }
+  virtual void WhenTableMember(raw::OrdinaledLayoutMember*, TokenSlice&,
+                               const VersionedEntry<flat::Table::Member>*) {}
+  virtual void WhenTypeConstraints(raw::TypeConstraints*, TokenSlice&,
+                                   const UniqueEntry<flat::TypeConstraints>*) {}
+  virtual void WhenTypeConstructor(raw::TypeConstructor*, TokenSlice&,
+                                   const UniqueEntry<flat::TypeConstructor>*) {}
+  virtual void WhenTypeLayoutParameter(raw::TypeLayoutParameter*, TokenSlice&,
+                                       const UniqueEntry<flat::TypeLayoutParameter>*) {}
+  virtual void WhenUnionDeclaration(raw::Layout*, TokenSlice&, const VersionedEntry<flat::Union>*) {
+  }
+  virtual void WhenUnionMember(raw::OrdinaledLayoutMember*, TokenSlice&,
+                               const VersionedEntry<flat::Union::Member>*) {}
+
+ private:
+  // A helper function that takes an unordered list of |SourceFile|s and compiles a |flat::Library|
+  // out of them.
+  bool CompileLibrary(const std::vector<const SourceFile*>&, const fidl::ExperimentalFlags&,
+                      fidl::flat::Compiler*, Reporter*);
+
+  // The visitation methods inherited from |DeclarationOrderTreeVisitor| are intentionally hidden,
+  // so that users extending this class cannot mess with the transformation state they are entrusted
+  // to manage. User specified transforms should be done via the corresponding |When*| methods
+  // instead.
+  void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>&) override final;
+  void OnAttributeArg(const std::unique_ptr<raw::AttributeArg>&) override final;
+  void OnAttribute(const std::unique_ptr<raw::Attribute>&) override final;
+  void OnBinaryOperatorConstant(const std::unique_ptr<raw::BinaryOperatorConstant>&) override final;
+  void OnBoolLiteral(raw::BoolLiteral&) override final;
+  void OnConstDeclaration(const std::unique_ptr<raw::ConstDeclaration>&) override final;
+  void OnDocCommentLiteral(raw::DocCommentLiteral&) override final;
+  void OnIdentifierConstant(const std::unique_ptr<raw::IdentifierConstant>&) override final;
+  void OnIdentifierLayoutParameter(
+      const std::unique_ptr<raw::IdentifierLayoutParameter>&) override final;
+  void OnLayout(const std::unique_ptr<raw::Layout>&) override final;
+  void OnLayoutParameterList(const std::unique_ptr<raw::LayoutParameterList>&) override final;
+  void OnLiteralLayoutParameter(const std::unique_ptr<raw::LiteralLayoutParameter>&) override final;
+  void OnNumericLiteral(raw::NumericLiteral&) override final;
+  void OnOrdinaledLayoutMember(const std::unique_ptr<raw::OrdinaledLayoutMember>&) override final;
+  void OnProtocolCompose(const std::unique_ptr<raw::ProtocolCompose>&) override final;
+  void OnProtocolDeclaration(const std::unique_ptr<raw::ProtocolDeclaration>&) override final;
+  void OnProtocolMethod(const std::unique_ptr<raw::ProtocolMethod>&) override final;
+  void OnResourceDeclaration(const std::unique_ptr<raw::ResourceDeclaration>&) override final;
+  void OnResourceProperty(const std::unique_ptr<raw::ResourceProperty>&) override final;
+  void OnServiceDeclaration(const std::unique_ptr<raw::ServiceDeclaration>&) override final;
+  void OnServiceMember(const std::unique_ptr<raw::ServiceMember>&) override final;
+  void OnStringLiteral(raw::StringLiteral&) override final;
+  void OnStructLayoutMember(const std::unique_ptr<raw::StructLayoutMember>&) override final;
+  void OnTypeConstraints(const std::unique_ptr<raw::TypeConstraints>&) override final;
+  void OnTypeConstructor(const std::unique_ptr<raw::TypeConstructor>&) override final;
+  void OnTypeLayoutParameter(const std::unique_ptr<raw::TypeLayoutParameter>&) override final;
+  void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>&) override final;
+
+  // Mutable internal state, meant to be populated by the |Prepare()| step.
+  fidl::VersionSelection version_selection_;
+  fidl::VirtualSourceFile virtual_file_;
+  fidl::flat::Libraries all_libraries_;
+  std::unique_ptr<SourceMap> source_map_ = nullptr;
+
+  // Const parameters ingested at construction time.
+  const std::vector<std::vector<const SourceFile*>> dependencies_source_files_;
 
   // Privatize some previously "protected" methods from the base class, so that derived classes
   // cannot access them.

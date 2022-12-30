@@ -992,10 +992,8 @@ class Dependencies {
 
 struct LibraryComparator;
 
-struct Library final : public MaybeSourced, public Element {
-  explicit Library(std::optional<raw::SourceElement::Signature> signature)
-      : MaybeSourced(signature),
-        Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
+struct Library final : public Element {
+  explicit Library() : Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
 
   // Creates the root library which holds all Builtin decls.
   static std::unique_ptr<Library> CreateRootLibrary();

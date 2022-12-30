@@ -197,7 +197,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   // to simulate what AvailabilityStep would do (set the platform, inherit the
   // availabilities). Perhaps we could make the root library less special and
   // compile it as well. That would require addressing circularity issues.
-  auto library = std::make_unique<Library>(std::nullopt);
+  auto library = std::make_unique<Library>();
   library->name = {"fidl"};
   library->platform = Platform::Parse("fidl").value();
   library->availability.Init({.added = Version::Head()});

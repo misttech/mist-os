@@ -6,6 +6,8 @@
 
 #include <zircon/assert.h>
 
+#include <algorithm>
+
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/attribute_schema.h"
 #include "tools/fidl/fidlc/include/fidl/flat/availability_step.h"
@@ -21,7 +23,7 @@ namespace fidl::flat {
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
                    ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags)
     : ReporterMixin(all_libraries->reporter()),
-      library_(std::make_unique<Library>(std::nullopt)),
+      library_(std::make_unique<Library>()),
       all_libraries_(all_libraries),
       version_selection(version_selection),
       method_hasher_(std::move(method_hasher)),

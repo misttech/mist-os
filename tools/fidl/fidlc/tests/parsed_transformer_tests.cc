@@ -22,41 +22,37 @@ using namespace fidl::fix;
 
 template <typename T>
 void GoodTransform(const std::string& before, const std::string& after) {
-  static_assert(std::is_base_of<ParsedTransformer, T>::value,
+  static_assert(std::is_base_of_v<ParsedTransformer, T>,
                 "Only classes derived from |ParsedTransformer| may be used by |GoodTransform()}");
 
   TestLibrary library(before);
   ExperimentalFlags experimental_flags;
   auto transformer = T(library.source_files(), experimental_flags, library.reporter());
   bool prepared = transformer.Prepare();
-  if (!prepared) {
-    for (const auto& error : transformer.GetErrors()) {
-      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
-    }
-    for (const auto& error : library.reporter()->errors()) {
-      ADD_FAILURE("reported error: %s\n",
-                  error->Print(library.reporter()->program_invocation()).c_str());
-    }
-    for (const auto& warning : library.reporter()->errors()) {
-      ADD_FAILURE("reported warning: %s\n",
-                  warning->Print(library.reporter()->program_invocation()).c_str());
-    }
+  for (const auto& error : transformer.GetErrors()) {
+    ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+  }
+  for (const auto& error : library.reporter()->errors()) {
+    ADD_FAILURE("reported error: %s\n",
+                error->Print(library.reporter()->program_invocation()).c_str());
+  }
+  for (const auto& warning : library.reporter()->warnings()) {
+    ADD_FAILURE("reported warning: %s\n",
+                warning->Print(library.reporter()->program_invocation()).c_str());
   }
   ASSERT_TRUE(prepared);
 
   bool transformed = transformer.Transform();
-  if (!transformed) {
-    for (const auto& error : transformer.GetErrors()) {
-      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
-    }
-    for (const auto& error : library.reporter()->errors()) {
-      ADD_FAILURE("reported error: %s\n",
-                  error->Print(library.reporter()->program_invocation()).c_str());
-    }
-    for (const auto& warning : library.reporter()->errors()) {
-      ADD_FAILURE("reported warning: %s\n",
-                  warning->Print(library.reporter()->program_invocation()).c_str());
-    }
+  for (const auto& error : transformer.GetErrors()) {
+    ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+  }
+  for (const auto& error : library.reporter()->errors()) {
+    ADD_FAILURE("reported error: %s\n",
+                error->Print(library.reporter()->program_invocation()).c_str());
+  }
+  for (const auto& warning : library.reporter()->warnings()) {
+    ADD_FAILURE("reported warning: %s\n",
+                warning->Print(library.reporter()->program_invocation()).c_str());
   }
   ASSERT_TRUE(transformed);
 

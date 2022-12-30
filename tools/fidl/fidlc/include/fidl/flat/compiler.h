@@ -115,6 +115,10 @@ class Libraries : private ReporterMixin {
   // Returns the root library, which defines builtin types.
   const Library* root_library() const { return root_library_.get(); }
 
+  // Returns the target library, i.e. the main one for which the others are
+  // dependencies. Must only be called after all libraries have been inserted.
+  const Library* target_library() const { return libraries_.back().get(); }
+
   // Returns libraries that were inserted but never used, i.e. that do not occur
   // in the target libary's dependency tree. Must have inserted at least one.
   std::set<const Library*, LibraryComparator> Unused() const;
