@@ -44,4 +44,7 @@
 // This tells <new> not to use `aligned_alloc` from <stdlib.h>.
 #define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC
 
+// This tells various headers to be strict about what includes what.
+#define _LIBCPP_REMOVE_TRANSITIVE_INCLUDES
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_SITE_

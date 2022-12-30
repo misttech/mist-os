@@ -11,10 +11,6 @@
 // these types and functions declared, but only for use in interfaces that
 // aren't supported in the kernel, so stub declarations are all they need.
 
-#include <chrono>
-#include <limits>
-#include <version>
-
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 struct __libcpp_timespec_t {

@@ -42,6 +42,12 @@ constexpr T frexp(T&& x, int* exponent) {
   return x;
 }
 
+template <typename T>
+constexpr auto ceil(T&& x) {
+  static_assert(!is_same_v<T, T>, "must not be instantiated in kernel code");
+  return x;
+}
+
 _LIBCPP_END_NAMESPACE_STD
 
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_CMATH_
