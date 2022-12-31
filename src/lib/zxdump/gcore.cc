@@ -208,12 +208,7 @@ constexpr auto CollectCommon = [](const Flags& flags, bool top,
   }
 
   if (flags.collect_kernel && (top || flags.repeat_kernel)) {
-    auto resource = zxdump::GetRootResource();
-    if (resource.is_error()) {
-      return resource.take_error();
-    }
-
-    auto result = dumper.CollectKernel(zx::unowned_resource{resource->get()});
+    auto result = dumper.CollectKernel();
     if (result.is_error()) {
       return result.take_error();
     }
@@ -234,8 +229,7 @@ constexpr auto CollectCommon = [](const Flags& flags, bool top,
 
 class ProcessDumper : public DumperBase {
  public:
-  ProcessDumper(zx::process process, zx_koid_t pid)
-      : DumperBase{pid}, dumper_{std::move(process)} {}
+  explicit ProcessDumper(zxdump::Process& process) : DumperBase{process.koid()}, dumper_{process} {}
 
   auto OutputFile(const Flags& flags, bool outer = true) const {
     return flags.OutputFile(koid(), outer);
@@ -317,13 +311,13 @@ class ProcessDumper : public DumperBase {
   }
 
  private:
-  zxdump::ProcessDump<zx::process> dumper_;
+  zxdump::ProcessDump dumper_;
 };
 
 // JobDumper handles dumping one job archive, either hierarchical or flattened.
 class JobDumper : public DumperBase {
  public:
-  JobDumper(zx::job job, zx_koid_t koid) : DumperBase{koid}, dumper_{std::move(job)} {}
+  explicit JobDumper(zxdump::Job& job) : DumperBase{job.koid()}, dumper_{job} {}
 
   auto OutputFile(const Flags& flags, bool outer = true) const {
     return flags.OutputFile(koid(), outer, kArchiveSuffix);
@@ -355,7 +349,7 @@ class JobDumper : public DumperBase {
         Error(result.error_value());
         return std::nullopt;
       } else {
-        children_ = std::move(result.value());
+        children_ = &(result.value().get());
       }
     }
     if (flags.collect_job_processes) {
@@ -363,7 +357,7 @@ class JobDumper : public DumperBase {
         Error(result.error_value());
         return std::nullopt;
       } else {
-        processes_ = std::move(result.value());
+        processes_ = &(result.value().get());
       }
     }
     return size;
@@ -374,10 +368,9 @@ class JobDumper : public DumperBase {
   bool Dump(Writer& writer, const Flags& flags);
 
  private:
-  using JobDump = zxdump::JobDump<zx::job>;
   class CollectedJob;
 
-  JobDumper(JobDump job, zx_koid_t koid) : DumperBase{koid}, dumper_{std::move(job)} {}
+  JobDumper(zxdump::JobDump job, zx_koid_t koid) : DumperBase{koid}, dumper_{std::move(job)} {}
 
   bool DumpHeaders(Writer& writer, const Flags& flags) {
     // File offset calculations start fresh in each archive.
@@ -398,21 +391,21 @@ class JobDumper : public DumperBase {
     return true;
   }
 
-  static size_t MemberHeaderSize() { return JobDump::MemberHeaderSize(); }
+  static size_t MemberHeaderSize() { return zxdump::JobDump::MemberHeaderSize(); }
 
   static bool DumpMemberHeader(Writer& writer, std::string_view name, size_t size, time_t mtime) {
     // File offset calculations start fresh with each member.
     writer.ResetOffset();
-    auto result = JobDump::DumpMemberHeader(writer.WriteCallback(), 0, name, size, mtime);
+    auto result = zxdump::JobDump::DumpMemberHeader(writer.WriteCallback(), 0, name, size, mtime);
     if (result.is_error()) {
       writer.Error(*result.error_value().dump_error_);
     }
     return result.is_ok();
   }
 
-  JobDump dumper_;
-  JobDump::JobVector children_;
-  JobDump::ProcessVector processes_;
+  zxdump::JobDump dumper_;
+  zxdump::Job::JobMap* children_ = nullptr;
+  zxdump::Job::ProcessMap* processes_ = nullptr;
   time_t date_ = 0;
 };
 
@@ -446,11 +439,15 @@ class JobDumper::CollectedJob {
       content_size_ += *collected_size;
 
       // Collect all its processes and children.
-      for (auto& [process, pid] : dumper_.processes_) {
-        CollectProcess(std::move(process), pid, flags);
+      if (dumper_.processes_) {
+        for (auto& [pid, process] : *dumper_.processes_) {
+          CollectProcess(process, flags);
+        }
       }
-      for (auto& [job, koid] : dumper_.children_) {
-        CollectJob(std::move(job), koid, flags);
+      if (dumper_.children_) {
+        for (auto& [koid, job] : *dumper_.children_) {
+          CollectJob(job, flags);
+        }
       }
       return true;
     }
@@ -506,8 +503,8 @@ class JobDumper::CollectedJob {
     time_t date_ = 0;
   };
 
-  void CollectProcess(zx::process process, zx_koid_t pid, const Flags& flags) {
-    ProcessDumper dump{std::move(process), pid};
+  void CollectProcess(zxdump::Process& process, const Flags& flags) {
+    ProcessDumper dump{process};
     time_t dump_date = dump.ClockIn(flags);
     if (auto collected_size = dump.Collect(flags, false)) {
       CollectedProcess core_file{std::move(dump), *collected_size, dump_date};
@@ -518,8 +515,8 @@ class JobDumper::CollectedJob {
     }
   }
 
-  void CollectJob(zx::job job, zx_koid_t koid, const Flags& flags) {
-    CollectedJob archive{{std::move(job), koid}};
+  void CollectJob(zxdump::Job& job, const Flags& flags) {
+    CollectedJob archive{JobDumper{job}};
     if (archive.DeepCollect(flags)) {
       content_size_ += archive.size_bytes();
       children_.push_back(std::move(archive));
@@ -541,45 +538,50 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags) {
   }
 
   bool ok = true;
-  for (auto& [process, pid] : processes_) {
-    // Collect the process and thus discover the ET_CORE file size.
-    ProcessDumper process_dump{std::move(process), pid};
-    time_t process_dump_date = process_dump.ClockIn(flags);
-    if (auto collected_size = process_dump.Collect(flags, false)) {
-      // Dump the member header, now complete with size.
-      if (!DumpMemberHeader(writer, process_dump.OutputFile(flags, false),  //
-                            *collected_size, process_dump_date)) {
-        // Bail early for a write error, since later writes would fail too.
-        return false;
+  if (processes_) {
+    for (auto& [pid, process] : *processes_) {
+      // Collect the process and thus discover the ET_CORE file size.
+      ProcessDumper process_dump{process};
+      time_t process_dump_date = process_dump.ClockIn(flags);
+      if (auto collected_size = process_dump.Collect(flags, false)) {
+        // Dump the member header, now complete with size.
+        if (!DumpMemberHeader(writer, process_dump.OutputFile(flags, false),  //
+                              *collected_size, process_dump_date)) {
+          // Bail early for a write error, since later writes would fail too.
+          return false;
+        }
+        // Now dump the member contents, the ET_CORE file for the process.
+        ok = process_dump.Dump(writer, flags) && ok;
       }
-      // Now dump the member contents, the ET_CORE file for the process.
-      ok = process_dump.Dump(writer, flags) && ok;
     }
   }
 
-  for (auto& [job, koid] : children_) {
-    if (flags.flatten_jobs) {
-      // Collect just this job first.
-      JobDumper child{std::move(job), koid};
-      auto collected_job_size = child.Collect(flags, false);
-      ok = collected_job_size &&
-           // Stream out the member header for just the stub archive alone.
-           DumpMemberHeader(writer, child.OutputFile(flags, false),  //
-                            *collected_job_size, child.date()) &&
-           // Now recurse to dump the stub archive followed by process and
-           // child members.  Since the member header for the inner archive
-           // only covers the stub archive, these become members in the outer
-           // (flat) archive rather than members of the inner job archive.
-           // Another inner recursion will do the same thing, so all the
-           // recursions stream out a single flat archive.
-           child.Dump(writer, flags) && ok;
-    } else {
-      // Pre-collect the whole job tree and thus discover the archive size.
-      // The pre-collected archive dumps its own member header first.
-      CollectedJob archive{{std::move(job), koid}};
-      ok = archive.DeepCollect(flags) && archive.Dump(writer, flags) && ok;
+  if (children_) {
+    for (auto& [koid, job] : *children_) {
+      if (flags.flatten_jobs) {
+        // Collect just this job first.
+        JobDumper child{job};
+        auto collected_job_size = child.Collect(flags, false);
+        ok = collected_job_size &&
+             // Stream out the member header for just the stub archive alone.
+             DumpMemberHeader(writer, child.OutputFile(flags, false),  //
+                              *collected_job_size, child.date()) &&
+             // Now recurse to dump the stub archive followed by process and
+             // child members.  Since the member header for the inner archive
+             // only covers the stub archive, these become members in the outer
+             // (flat) archive rather than members of the inner job archive.
+             // Another inner recursion will do the same thing, so all the
+             // recursions stream out a single flat archive.
+             child.Dump(writer, flags) && ok;
+      } else {
+        // Pre-collect the whole job tree and thus discover the archive size.
+        // The pre-collected archive dumps its own member header first.
+        CollectedJob archive{JobDumper{job}};
+        ok = archive.DeepCollect(flags) && archive.Dump(writer, flags) && ok;
+      }
     }
   }
+
   return ok;
 }
 
@@ -614,8 +616,8 @@ bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
       dumper.Error(result.error_value());
       ok = false;
     } else {
-      for (auto& [process, pid] : result.value()) {
-        ok = WriteDump(ProcessDumper{std::move(process), pid}, flags) && ok;
+      for (auto& [pid, process] : result.value().get()) {
+        ok = WriteDump(ProcessDumper{process}, flags) && ok;
       }
     }
   }
@@ -625,8 +627,8 @@ bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
       dumper.Error(result.error_value());
       ok = false;
     } else {
-      for (auto& [job, jid] : result.value()) {
-        ok = WriteManyCoreFiles({std::move(job), jid}, flags) && ok;
+      for (auto& [koid, job] : result.value().get()) {
+        ok = WriteManyCoreFiles(JobDumper{job}, flags) && ok;
       }
     }
   }
@@ -969,29 +971,29 @@ essential services.  PID arguments are not allowed with --root-job unless
     std::cerr << "cannot get root job: " << root.error_value() << std::endl;
     exit_status = EXIT_FAILURE;
   } else {
-    if (dump_root_job) {
-      zx_info_handle_basic_t info;
-      zx_status_t status = root.value().get_info(  //
-          ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-      if (status != ZX_OK) {
-        std::cerr << zxdump::Error{"zx_object_get_info", status} << std::endl;
-        status = EXIT_FAILURE;
-      } else {
-        zx::handle job;
-        zx_status_t status = root.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &job);
-        if (status != ZX_OK) {
-          std::cerr << zxdump::Error{"zx_handle_duplicate", status} << std::endl;
-          exit_status = EXIT_FAILURE;
-        } else if (!handle_job(JobDumper{zx::job{std::move(job)}, info.koid}, flags))
-          exit_status = EXIT_FAILURE;
-      }
-    }
-
     auto result = holder.Insert(std::move(root).value());
     if (result.is_error()) {
       std::cerr << "root job: " << root.error_value() << std::endl;
       exit_status = EXIT_FAILURE;
     }
+  }
+
+  if (flags.collect_kernel) {
+    auto root = zxdump::GetRootResource();
+    if (root.is_error()) {
+      std::cerr << "cannot get root resource: " << root.error_value() << std::endl;
+      exit_status = EXIT_FAILURE;
+    } else {
+      auto result = holder.Insert(std::move(root).value());
+      if (result.is_error()) {
+        std::cerr << "root resource: " << root.error_value() << std::endl;
+        exit_status = EXIT_FAILURE;
+      }
+    }
+  }
+
+  if (dump_root_job && !handle_job(JobDumper{holder.root_job()}, flags)) {
+    exit_status = EXIT_FAILURE;
   }
 
   for (int i = optind; i < argc; ++i) {
@@ -1012,14 +1014,14 @@ essential services.  PID arguments are not allowed with --root-job unless
     zxdump::Task& task = result.value();
     switch (task.type()) {
       case ZX_OBJ_TYPE_PROCESS:
-        if (!WriteDump(ProcessDumper{zx::process{task.Reap()}, pid}, flags)) {
+        if (!WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags)) {
           exit_status = EXIT_FAILURE;
         }
         break;
 
       case ZX_OBJ_TYPE_JOB:
         if (allow_jobs) {
-          if (!handle_job(JobDumper{zx::job{task.Reap()}, pid}, flags)) {
+          if (!handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags)) {
             exit_status = EXIT_FAILURE;
           }
           break;

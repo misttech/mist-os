@@ -69,6 +69,16 @@ class TestProcess {
 
   const zx::process& process() const { return process_; }
 
+  void AddToTaskHolder(TaskHolder& holder, Process*& holder_process) {
+    zx::process proc;
+    ASSERT_EQ(process_.duplicate(ZX_RIGHT_SAME_RIGHTS, &proc), ZX_OK);
+    auto result = holder.Insert(std::move(proc));
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    zxdump::Object& object = *result;
+    ASSERT_EQ(object.type(), ZX_OBJ_TYPE_PROCESS);
+    holder_process = &static_cast<zxdump::Process&>(object);
+  }
+
   zx_koid_t koid() const { return GetKoid(process_); }
 
   // Explicitly choose the job to use.
@@ -125,18 +135,19 @@ class TestProcess {
   bool kill_job_ = false;
 };
 
-using PrecollectFunction = fit::function<void(zxdump::ProcessDump<zx::unowned_process>& dump)>;
+using PrecollectFunction =
+    fit::function<void(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump)>;
 
 class TestProcessForPropertiesAndInfo : public TestProcess {
  public:
   // Start a child for basic property & info dump testing.
   void StartChild();
 
+  static void NoPrecollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {}
+
   // Do the basic dump using the dumper API.
   template <typename Writer>
-  void Dump(
-      Writer& writer,
-      PrecollectFunction precollect = [](zxdump::ProcessDump<zx::unowned_process>& dump) {});
+  void Dump(Writer& writer, PrecollectFunction precollect = NoPrecollect, bool dump_memory = false);
 
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder, bool threads_dumped = true);
@@ -146,8 +157,8 @@ class TestProcessForPropertiesAndInfo : public TestProcess {
 };
 
 // The template and its instantiations are defined in dump-tests.cc.
-extern template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction);
-extern template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction);
+extern template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction, bool);
+extern template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction, bool);
 
 class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
  public:
@@ -166,7 +177,7 @@ class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
  private:
   static constexpr const char* kChildName = "zxdump-system-test-child";
 
-  static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
+  static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
     auto result = dump.CollectSystem();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
   }
@@ -180,7 +191,7 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   // Do the basic dump using the dumper API.
   template <typename Writer>
   void Dump(Writer& writer) {
-    auto precollect = [this](auto& dump) { Precollect(dump); };
+    auto precollect = [this](auto& holder, auto& dump) { Precollect(holder, dump); };
     TestProcessForPropertiesAndInfo::Dump(writer, precollect);
   }
 
@@ -192,7 +203,7 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
  private:
   static constexpr const char* kChildName = "zxdump-kernel-test-child";
 
-  void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
+  void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
 
   LiveHandle root_resource_;
 };
@@ -237,7 +248,7 @@ class TestProcessForRemarks : public TestProcessForPropertiesAndInfo {
  private:
   static constexpr const char* kChildName = "zxdump-remarks-test-child";
 
-  static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
+  static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
 };
 
 class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
@@ -249,6 +260,12 @@ class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
 
   // Start a child for basic memory dump testing.
   void StartChild();
+
+  // Do the full-memory dump using the dumper API.
+  template <typename Writer>
+  void Dump(Writer& writer, bool dump_memory = true) {
+    TestProcessForPropertiesAndInfo::Dump(writer, NoPrecollect, dump_memory);
+  }
 
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder, bool memory_elided = false);
@@ -294,7 +311,7 @@ class TestProcessForThreads : public TestProcessForPropertiesAndInfo {
   static constexpr const char* kChildName = "zxdump-thread-test-child";
   std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
 
-  static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
+  static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
 };
 
 }  // namespace zxdump::testing

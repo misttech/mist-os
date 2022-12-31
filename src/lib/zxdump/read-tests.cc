@@ -62,24 +62,7 @@ TEST(ZxdumpTests, ReadMemoryElided) {
   zxdump::testing::TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
-
-  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::PruneAllMemory);
-  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
-
-  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
-  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
-
-  auto write_result = writer.WriteFragments();
-  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
-  const size_t bytes_written = write_result.value();
-
-  auto memory_result = dump.DumpMemory(writer.WriteCallback());
-  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
-  const size_t total_with_memory = memory_result.value();
-
-  // No memory should have been written to increase the size of the dump.
-  EXPECT_EQ(bytes_written, total_with_memory);
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, false));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());
@@ -94,24 +77,7 @@ TEST(ZxdumpTests, ReadMemoryString) {
   zxdump::testing::TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
-
-  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::DumpAllMemory);
-  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
-
-  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
-  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
-
-  auto write_result = writer.WriteFragments();
-  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
-  const size_t bytes_written = write_result.value();
-
-  auto memory_result = dump.DumpMemory(writer.WriteCallback());
-  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
-  const size_t total_with_memory = memory_result.value();
-
-  // Dumping the memory should have added a bunch to the dump.
-  EXPECT_LT(bytes_written, total_with_memory);
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());
@@ -155,24 +121,7 @@ TEST(ZxdumpTests, ReadMemoryStringElided) {
   zxdump::testing::TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
-
-  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::PruneAllMemory);
-  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
-
-  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
-  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
-
-  auto write_result = writer.WriteFragments();
-  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
-  const size_t bytes_written = write_result.value();
-
-  auto memory_result = dump.DumpMemory(writer.WriteCallback());
-  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
-  const size_t total_with_memory = memory_result.value();
-
-  // No memory should have been written to increase the size of the dump.
-  EXPECT_EQ(bytes_written, total_with_memory);
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, false));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());

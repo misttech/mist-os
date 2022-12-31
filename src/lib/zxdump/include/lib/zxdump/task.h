@@ -89,6 +89,11 @@ struct LiveHandle {
 };
 #endif
 
+// This is an opaque type used internally.
+namespace internal {
+class DumpFile;
+}  // namespace internal
+
 // Forward declarations for below.
 class Object;
 class Resource;
@@ -223,6 +228,14 @@ class TaskHolder {
 // All the methods here correspond to the generic zx::object methods.
 class Object {
  public:
+  struct WaitItem {
+    std::reference_wrapper<Object> handle;
+    zx_signals_t waitfor = 0;
+    zx_signals_t pending = 0;
+  };
+
+  using WaitItemVector = std::vector<WaitItem>;
+
   Object(Object&&) = default;
   Object& operator=(Object&&) = default;
 
@@ -266,18 +279,27 @@ class Object {
   // This gets the full info block for this topic, whatever its size.  Note the
   // data is not necessarily aligned in memory, so it can't be safely accessed
   // with reinterpret_cast.
-  fit::result<Error, ByteView> get_info(zx_object_info_topic_t topic, size_t record_size = 0);
+  //
+  // **Notes for live objects:** When called on a live object, this ordinarily
+  // gets each topic just once and then returns the cached value; the optional
+  // refresh_live flag says to ignore any cached data and always get fresh data
+  // now (which will be cached for later calls without the flag).  Note that a
+  // failed call with refresh_live will *not* remove old cached data, so it
+  // might be retrieved by calling again without the flag even if something
+  // prevents getting new info.
+  fit::result<Error, ByteView> get_info(zx_object_info_topic_t topic, bool refresh_live = false,
+                                        size_t record_size = 0);
 
   // Get statically-typed info for a topic chosen at a compile time.  Some
   // types return a single `zx_info_*_t` object.  Others return a span of const
   // type that points into storage permanently cached for the lifetime of the
   // containing TaskHolder.  See <lib/zxdump/types.h> for topic->type mappings.
   template <zx_object_info_topic_t Topic>
-  fit::result<Error, InfoTraitsType<Topic>> get_info() {
+  fit::result<Error, InfoTraitsType<Topic>> get_info(bool refresh_live = false) {
     using Info = typename InfoTraits<Topic>::type;
     if constexpr (kIsSpan<Info>) {
       using Element = typename RemoveSpan<Info>::type;
-      auto result = get_info_aligned(Topic, sizeof(Element), alignof(Element));
+      auto result = get_info_aligned(Topic, sizeof(Element), alignof(Element), refresh_live);
       if (result.is_error()) {
         return result.take_error();
       }
@@ -286,7 +308,7 @@ class Object {
           result.value().size() / sizeof(Element),
       });
     } else {
-      auto result = get_info(Topic, sizeof(Info));
+      auto result = get_info(Topic, refresh_live, sizeof(Info));
       if (result.is_error()) {
         return result.take_error();
       }
@@ -322,10 +344,15 @@ class Object {
     return fit::ok(data);
   }
 
+  static fit::result<Error> wait_many(WaitItemVector& wait_items);
+
   // Turn a live task into a postmortem task.  The postmortem task holds only
   // the basic information (KOID, type) and whatever has been cached by past
   // get_info or get_property calls.
   LiveHandle Reap() { return std::exchange(live_, {}); }
+
+  // As a convenience, TaskHolder::root_resource() is proxied by every Object.
+  Resource& root_resource();
 
   // A job or process can have dump remarks, stored as a vector of {name, data}
   // pairs.
@@ -351,7 +378,7 @@ class Object {
   void TakeBuffer(std::unique_ptr<std::byte[]> buffer);
 
   fit::result<Error, ByteView> get_info_aligned(zx_object_info_topic_t topic, size_t record_size,
-                                                size_t align);
+                                                size_t align, bool refresh_live);
   fit::result<Error, ByteView> GetSuperrootInfo(zx_object_info_topic_t topic);
 
   // A plain reference would make the type not movable.
@@ -364,12 +391,13 @@ class Object {
 };
 
 // As with zx::task, this is the superclass of Job, Process, and Thread.
-// All the common methods are just those common to all kernel objects.
-// But Task is a distinct type: a Task is always a Job, Process, or Thread.
 class Task : public Object {
  public:
   Task(Task&&) = default;
   Task& operator=(Task&&) = default;
+
+  // This returns a suspend token.
+  fit::result<Error, LiveHandle> suspend();
 
  protected:
   using Object::Object;

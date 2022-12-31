@@ -11,6 +11,7 @@
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
 #include <unistd.h>
+#include <zircon/status.h>
 
 #include <array>
 #include <cinttypes>
@@ -50,12 +51,18 @@ void TestProcessForPropertiesAndInfo::StartChild() {
 }
 
 template <typename Writer>
-void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction precollect) {
-  zxdump::ProcessDump<zx::unowned_process> dump(borrow());
+void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction precollect,
+                                           bool dump_memory) {
+  zxdump::TaskHolder holder;
+  auto insert_result = holder.Insert(handle());
+  ASSERT_TRUE(insert_result.is_ok()) << insert_result.error_value();
+  ASSERT_EQ(insert_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::ProcessDump dump(static_cast<zxdump::Process&>(insert_result->get()));
 
-  ASSERT_NO_FATAL_FAILURE(precollect(dump));
+  ASSERT_NO_FATAL_FAILURE(precollect(holder, dump));
 
-  auto collect_result = dump.CollectProcess(TestProcess::PruneAllMemory);
+  auto collect_result =
+      dump.CollectProcess(dump_memory ? TestProcess::DumpAllMemory : TestProcess::PruneAllMemory);
   ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
 
   auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
@@ -69,12 +76,17 @@ void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction pr
   ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
   const size_t total_with_memory = memory_result.value();
 
-  // We pruned all memory, so DumpMemory should not have added any output.
-  EXPECT_EQ(bytes_written, total_with_memory);
+  if (dump_memory) {
+    // Dumping the memory should have added a bunch to the dump.
+    EXPECT_LT(bytes_written, total_with_memory);
+  } else {
+    // We pruned all memory, so DumpMemory should not have added any output.
+    EXPECT_EQ(bytes_written, total_with_memory);
+  }
 }
 
-template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction);
-template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction);
+template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction, bool);
+template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction, bool);
 
 void TestProcessForPropertiesAndInfo::CheckDump(zxdump::TaskHolder& holder, bool threads_dumped) {
   auto find_result = holder.root_job().find(koid());
@@ -148,8 +160,13 @@ void TestProcessForKernelInfo::StartChild() {
   root_resource_ = *std::move(root_result);
 }
 
-void TestProcessForKernelInfo::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
-  auto result = dump.CollectKernel(zx::unowned_resource{root_resource_.get()});
+void TestProcessForKernelInfo::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
+  zxdump::LiveHandle root_resource_copy;
+  EXPECT_EQ(ZX_OK, root_resource().duplicate(ZX_RIGHT_SAME_RIGHTS, &root_resource_copy));
+  auto insert_result = holder.Insert(std::move(root_resource_copy));
+  EXPECT_TRUE(insert_result.is_ok()) << insert_result.error_value();
+
+  auto result = dump.CollectKernel();
   EXPECT_TRUE(result.is_ok()) << result.error_value();
 }
 
@@ -191,7 +208,7 @@ void TestProcessForRemarks::StartChild() {
   ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild());
 }
 
-void TestProcessForRemarks::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
+void TestProcessForRemarks::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
   {
     auto result = dump.Remarks(kDefaultRemarksName, kTextRemarksData);
     EXPECT_TRUE(result.is_ok()) << result.error_value();
@@ -465,7 +482,7 @@ void TestProcessForThreads::StartChild() {
   }
 }
 
-void TestProcessForThreads::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
+void TestProcessForThreads::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
   auto result = dump.SuspendAndCollectThreads();
   EXPECT_TRUE(result.is_ok()) << result.error_value();
 }
@@ -525,7 +542,17 @@ TEST(ZxdumpTests, ProcessDumpBasic) {
 
   TestProcess process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
-  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
+
+  zxdump::TaskHolder dump_holder;
+  zx::process process_dup;
+  zx_status_t status = process.process().duplicate(ZX_RIGHT_SAME_RIGHTS, &process_dup);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  auto insert_result = dump_holder.Insert(std::move(process_dup));
+  ASSERT_TRUE(insert_result.is_ok()) << insert_result.error_value();
+  zxdump::Object& inserted_object = *insert_result;
+  EXPECT_EQ(inserted_object.type(), ZX_OBJ_TYPE_PROCESS);
+
+  zxdump::ProcessDump dump(static_cast<zxdump::Process&>(inserted_object));
 
   auto collect_result = dump.CollectProcess(TestProcess::PruneAllMemory);
   ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
@@ -746,7 +773,7 @@ TEST(ZxdumpTests, ProcessDumpDate) {
   TestProcessForPropertiesAndInfo process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  constexpr auto precollect = [](zxdump::ProcessDump<zx::unowned_process>& dump) {
+  constexpr auto precollect = [](zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
     dump.set_date(kTestDate);
   };
   ASSERT_NO_FATAL_FAILURE(process.Dump(writer, precollect));
@@ -789,24 +816,7 @@ TEST(ZxdumpTests, ProcessDumpMemory) {
   TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
-
-  auto collect_result = dump.CollectProcess(TestProcess::DumpAllMemory);
-  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
-
-  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
-  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
-
-  auto write_result = writer.WriteFragments();
-  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
-  const size_t bytes_written = write_result.value();
-
-  auto memory_result = dump.DumpMemory(writer.WriteCallback());
-  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
-  const size_t total_with_memory = memory_result.value();
-
-  // Dumping the memory should have added a bunch to the dump.
-  EXPECT_LT(bytes_written, total_with_memory);
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());

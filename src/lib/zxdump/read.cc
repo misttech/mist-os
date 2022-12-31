@@ -490,6 +490,8 @@ Job& TaskHolder::root_job() const { return tree_->root_job(); }
 
 Resource& TaskHolder::root_resource() const { return tree_->root_resource(); }
 
+Resource& Object::root_resource() { return tree().root_resource(); }
+
 fit::result<Error> TaskHolder::Insert(fbl::unique_fd fd, bool read_memory) {
   return tree_->Insert(std::move(fd), read_memory);
 }
@@ -652,9 +654,9 @@ fit::result<Error, ByteView> Object::GetSuperrootInfo(zx_object_info_topic_t top
 }
 
 fit::result<Error, ByteView> Object::get_info_aligned(  //
-    zx_object_info_topic_t topic, size_t record_size, size_t align) {
+    zx_object_info_topic_t topic, size_t record_size, size_t align, bool refresh_live) {
   ByteView bytes;
-  if (auto result = get_info(topic, record_size); result.is_error()) {
+  if (auto result = get_info(topic, refresh_live, record_size); result.is_error()) {
     return result.take_error();
   } else {
     bytes = result.value();

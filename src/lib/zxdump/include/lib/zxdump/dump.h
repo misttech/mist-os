@@ -7,9 +7,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
-#include <lib/zx/job.h>
-#include <lib/zx/process.h>
-#include <lib/zx/resource.h>
 
 #include <cstdint>
 #include <limits>
@@ -18,6 +15,7 @@
 #include <string_view>
 #include <type_traits>
 
+#include "task.h"
 #include "types.h"
 
 namespace zxdump {
@@ -118,13 +116,16 @@ class DumpBase {
   DumpWrapper(Dump&&) -> DumpWrapper<std::decay_t<Dump>>;
 };
 
-// This defines the the public API methods for dumping (see above).
-class ProcessDumpBase : protected DumpBase {
+// This defines the public API methods for dumping (see above).
+class ProcessDump : protected DumpBase {
  public:
-  ProcessDumpBase(ProcessDumpBase&&) noexcept;
-  ProcessDumpBase& operator=(ProcessDumpBase&&) noexcept;
+  ProcessDump() = default;
+  ProcessDump(ProcessDump&&) noexcept;
+  ProcessDump& operator=(ProcessDump&&) noexcept;
 
-  ~ProcessDumpBase() noexcept;
+  explicit ProcessDump(Process& process) noexcept;
+
+  ~ProcessDump() noexcept;
 
   // Reset to initial state, except that if the process is already suspended,
   // it stays that way.
@@ -149,8 +150,11 @@ class ProcessDumpBase : protected DumpBase {
   // Collect privileged system-wide information from the kernel.  This is
   // always optional, but it must always be called before CollectProcess, if
   // called at all.  The kernel information is included in the total size
-  // returned by CollectProcess.
-  fit::result<Error> CollectKernel(zx::unowned_resource root_resource);
+  // returned by CollectProcess.  Note this only works if the
+  // zxdump::TaskHolder from which the zxdump::Process being dumped was loaded
+  // has had the root resource inserted (either the real live object or from a
+  // dump).
+  fit::result<Error> CollectKernel();
 
   // Add dump remarks.  This can be called any number of times, but must be
   // called before CollectProcess if it's called at all.
@@ -226,69 +230,44 @@ class ProcessDumpBase : protected DumpBase {
     return wrapper.error_or("DumpMemory"sv, DumpMemoryImpl(wrapper.callback(), limit));
   }
 
- protected:
+ private:
   class Collector;
 
   using DumpCallback = fit::function<bool(size_t offset, ByteView data)>;
 
-  ProcessDumpBase() = default;
-
-  void Emplace(zx::unowned_process process);
-
- private:
   fit::result<Error, size_t> DumpHeadersImpl(DumpCallback dump, size_t limit);
   fit::result<Error, size_t> DumpMemoryImpl(DumpCallback dump, size_t limit);
 
   std::unique_ptr<Collector> collector_;
 };
 
-template <typename Handle>
-class ProcessDump : public ProcessDumpBase {
- public:
-  static_assert(std::is_same_v<Handle, zx::process> || std::is_same_v<Handle, zx::unowned_process>);
+static_assert(std::is_default_constructible_v<ProcessDump>);
+static_assert(std::is_move_constructible_v<ProcessDump>);
+static_assert(std::is_move_assignable_v<ProcessDump>);
 
-  ProcessDump() = default;
-
-  // This takes ownership of the handle in the zx::process instantiation.
-  explicit ProcessDump(Handle process) noexcept;
-
- private:
-  Handle process_;
-};
-
-static_assert(std::is_default_constructible_v<ProcessDump<zx::process>>);
-static_assert(std::is_move_constructible_v<ProcessDump<zx::process>>);
-static_assert(std::is_move_assignable_v<ProcessDump<zx::process>>);
-
-static_assert(std::is_default_constructible_v<ProcessDump<zx::unowned_process>>);
-static_assert(std::is_move_constructible_v<ProcessDump<zx::unowned_process>>);
-static_assert(std::is_move_assignable_v<ProcessDump<zx::unowned_process>>);
-
-// zxdump::JobDump<zx::job> or zxdump::JobDump<zx::unowned_job> represents one
-// dump being made from the job whose handle is transferred or borrowed in the
-// constructor argument.  The same object can be reset and used again to make
+// This is the public API for dumping jobs.
+// The same object can be reset and used again to make
 // another dump from the same job, but most often this object is only kept
 // alive while one dump is being collected and written out.  These are
 // move-only, move-assignable, and default-constructible types.
-//
-// The JobDumpBase class defines the public API for dumping even though the
-// class isn't used directly.  The JobDump template class below adapts to using
-// this API with either an owned or an unowned job handle.
 //
 // A job is dumped into a "job archive".  This contains information about the
 // job itself, and can also contain multiple process dumps in `ET_CORE` files
 // as members of the archive.  A job archive is streamed out via callbacks like
 // process dumps are.  If process dumps are included, each is streamed out via
-// its own zxdump::ProcessDump object in turn.
-class JobDumpBase : protected DumpBase {
+// its own zxdump::DumpProcess object in turn.
+class JobDump : protected DumpBase {
  public:
-  using JobVector = std::vector<std::pair<zx::job, zx_koid_t>>;
-  using ProcessVector = std::vector<std::pair<zx::process, zx_koid_t>>;
+  using JobVector = std::vector<std::reference_wrapper<Job>>;
+  using ProcessVector = std::vector<std::reference_wrapper<Process>>;
 
-  JobDumpBase(JobDumpBase&&) noexcept;
-  JobDumpBase& operator=(JobDumpBase&&) noexcept;
+  JobDump() = default;
+  JobDump(JobDump&&) noexcept;
+  JobDump& operator=(JobDump&&) noexcept;
 
-  ~JobDumpBase() noexcept;
+  explicit JobDump(Job& job) noexcept;
+
+  ~JobDump() noexcept;
 
   // Collect system-wide information.  This is always optional, but it must
   // always be called first, before CollectJob, if called at all.  The system
@@ -298,8 +277,10 @@ class JobDumpBase : protected DumpBase {
   // Collect privileged system-wide information from the kernel.  This is
   // always optional, but it must always be called before CollectJob, if it's
   // called at all.  The kernel information is included in the total size
-  // returned by CollectJob.
-  fit::result<Error> CollectKernel(zx::unowned_resource root_resource);
+  // returned by CollectJob.  Note this only works if the zxdump::TaskHolder
+  // from which the zxdump::Job being dumped was loaded has had the root
+  // resource inserted (either the real live object or from a dump).
+  fit::result<Error> CollectKernel();
 
   // Add dump remarks.  This can be called any number of times, but must be
   // called before CollectJob if it's called at all.
@@ -368,7 +349,7 @@ class JobDumpBase : protected DumpBase {
   //
   // The caller can then create a JobDump object for each job and stream it out
   // after calling DumpMemberHeader.
-  fit::result<Error, JobVector> CollectChildren();
+  fit::result<Error, std::reference_wrapper<Job::JobMap>> CollectChildren();
 
   // This can be used either before or after using DumpHeaders or other calls.
   // This acquires process handles for all the direct-child processes
@@ -381,16 +362,11 @@ class JobDumpBase : protected DumpBase {
   //
   // The caller can then create a ProcessDump object for each process and
   // stream it out after calling DumpMemberHeader.
-  fit::result<Error, ProcessVector> CollectProcesses();
-
- protected:
-  class Collector;
-
-  JobDumpBase() = default;
-
-  void Emplace(zx::unowned_job job);
+  fit::result<Error, std::reference_wrapper<Job::ProcessMap>> CollectProcesses();
 
  private:
+  class Collector;
+
   fit::result<Error, size_t> DumpHeadersImpl(DumpCallback dump, time_t mtime);
   static fit::result<Error, size_t> DumpMemberHeaderImpl(DumpCallback dump, size_t offset,
                                                          std::string_view name, size_t size,
@@ -399,27 +375,9 @@ class JobDumpBase : protected DumpBase {
   std::unique_ptr<Collector> collector_;
 };
 
-template <typename Handle>
-class JobDump : public JobDumpBase {
- public:
-  static_assert(std::is_same_v<Handle, zx::job> || std::is_same_v<Handle, zx::unowned_job>);
-
-  JobDump() = default;
-
-  // This takes ownership of the handle in the zx::job instantiation.
-  explicit JobDump(Handle job) noexcept;
-
- private:
-  Handle job_;
-};
-
-static_assert(std::is_default_constructible_v<JobDump<zx::job>>);
-static_assert(std::is_move_constructible_v<JobDump<zx::job>>);
-static_assert(std::is_move_assignable_v<JobDump<zx::job>>);
-
-static_assert(std::is_default_constructible_v<JobDump<zx::unowned_job>>);
-static_assert(std::is_move_constructible_v<JobDump<zx::unowned_job>>);
-static_assert(std::is_move_assignable_v<JobDump<zx::unowned_job>>);
+static_assert(std::is_default_constructible_v<JobDump>);
+static_assert(std::is_move_constructible_v<JobDump>);
+static_assert(std::is_move_assignable_v<JobDump>);
 
 }  // namespace zxdump
 

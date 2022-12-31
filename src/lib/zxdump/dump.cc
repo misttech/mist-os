@@ -5,7 +5,9 @@
 #include "lib/zxdump/dump.h"
 
 #include <lib/stdcompat/span.h>
-#include <lib/zx/thread.h>
+#include <lib/stdcompat/string_view.h>
+#include <lib/zx/process.h>
+#include <lib/zxdump/dump.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
@@ -36,7 +38,8 @@ namespace {
 
 // This collects a bunch of note data, header and payload ByteView items.
 // There's one of these for each thread, and one for the process.  The actual
-// data the items point to is stored in Collector::notes_ and Thread::notes_.
+// data the items point to is stored in Collector::notes_ and
+// ThreadCollector::notes_.
 class NoteData {
  public:
   using Vector = std::vector<ByteView>;
@@ -352,120 +355,84 @@ constexpr auto kMakeMember = [](uint32_t type) {
 // nothing if it's already collected the data.  Each NoteBase subclass below
 // has a Collect(const Handle&)->fit::result<Error> method that should call
 // NoteBase::Emplace when it has acquired data, and then won't be called again.
-// The root_resource handle is only needed for kernel data, and might be
-// invalid if kernel data isn't being collected.
-constexpr auto CollectNote = [](const zx::resource& root_resource, const auto& handle,
-                                auto& note) -> fit::result<Error> {
+constexpr auto CollectNote = [](auto& handle, auto& note) -> fit::result<Error> {
   if (note.empty()) {
-    return note.Collect(root_resource, handle);
+    return note.Collect(handle);
   }
   return fit::ok();
 };
 
-// This doesn't need to be templated as specifically as InfoNote itself.  The
-// GetInfo work is the same for all get_info topics whose data have the same
-// size and alignment, so it's factored out that way here.
-
-template <size_t Size, size_t Align>
-using AlignedStorageVector = std::vector<std::aligned_storage_t<Size, Align>>;
-
-template <typename T>
-using InfoVector = AlignedStorageVector<sizeof(T), alignof(T)>;
-
-template <size_t Align, size_t Size>
-fit::result<Error, AlignedStorageVector<Size, Align>> GetInfo(
-    const zx::handle& task, zx_object_info_topic_t topic, AlignedStorageVector<Size, Align> data) {
-  // Start with a buffer of at least one but reuse any larger old buffer.
-  if (data.empty()) {
-    data.resize(1);
-  }
-  while (true) {
-    // Use as much space as is handy.
-    data.resize(data.capacity());
-
-    // See how much there is available and how much fits in the buffer.
-    size_t actual, avail;
-    zx_status_t status = task.get_info(topic, data.data(), data.size() * Size, &actual, &avail);
-    if (status != ZX_OK) {
-      return fit::error(Error{"zx_object_get_info", status});
-    }
-
-    if (actual == avail) {
-      // This is all the data.
-      data.resize(actual);
-      data.shrink_to_fit();
-      return fit::ok(std::move(data));
-    }
-
-    // There is more data.  Make the buffer at least as big as is needed.
-    if (data.size() < avail) {
-      data.resize(avail);
-    }
-  }
-}
-
 // Notes based on zx_object_get_info calls use this.
-// For some types, the size is variable.
-// We treat them all as variable.
-template <typename Class, zx_object_info_topic_t Topic, typename T>
+template <typename Class, zx_object_info_topic_t Topic>
 class InfoNote : public NoteBase<Class, Topic> {
  public:
-  template <typename Handle>
-  fit::result<Error> Collect(const zx::resource& root_resource, const Handle& task) {
-    auto choose_handle = [&]() {
-      if constexpr (std::is_same_v<typename Class::Handle, zx::resource>) {
-        return std::cref(root_resource);
-      } else {
-        return std::cref(task);
-      }
-    };
-    if (zx::unowned_handle handle{choose_handle().get().get()}; *handle) {
-      auto result = GetInfo<alignof(T), sizeof(T)>(*handle, Topic, std::move(data_));
+  fit::result<Error> Collect(Object& object) {
+    Object& handle =
+        std::is_same_v<typename Class::Handle, Resource> ? object.root_resource() : object;
+
+    if constexpr (kIsSpan<T>) {
+      // Cache the data for iteration.  This tells zxdump::Object to refresh
+      // live data when this is used for the thread list so it will catch up
+      // with racing new threads.
+      auto result = handle.get_info<Topic>(Topic == ZX_INFO_PROCESS_THREADS);
       if (result.is_error()) {
         return result.take_error();
       }
-      data_ = std::move(result).value();
-      this->Emplace({
-          reinterpret_cast<const std::byte*>(data_.data()),
-          data_.size() * sizeof(data_[0]),
-      });
+      info_ = result.value();
     }
+
+    // This gets the same data just cached, but in generic ByteView form.
+    auto result = handle.get_info(Topic);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    this->Emplace(result.value());
     return fit::ok();
   }
 
-  cpp20::span<const T> info() const {
-    static_assert(sizeof(T) == sizeof(data_.data()[0]));
-    return {reinterpret_cast<const T*>(data_.data()), data_.size()};
-  }
+  auto info() const { return info_; }
 
  private:
-  InfoVector<T> data_;
+  using T = typename InfoTraits<Topic>::type;
+  struct Unused {};
+  std::conditional_t<kIsSpan<T>, T, Unused> info_;
 };
 
-// Notes based on the fixed-sized property/state calls use this.
-template <typename Class, uint32_t Prop, typename T>
-class PropertyNote : public NoteBase<Class, Prop> {
+// Notes based on the fixed-sized property calls use this.
+template <typename Class, uint32_t Property>
+class PropertyNote : public NoteBase<Class, Property> {
  public:
-  fit::result<Error> Collect(const zx::resource& root_resource,
-                             const typename Class::Handle& handle) {
-    if (handle) {
-      zx_status_t status = (handle.*Class::kSyscall)(Prop, &data_, sizeof(T));
-      if (status != ZX_OK) {
-        return fit::error(Error{Class::kCall_, status});
-      }
-      this->Emplace({reinterpret_cast<std::byte*>(&data_), sizeof(data_)});
+  fit::result<Error> Collect(typename Class::Handle& handle) {
+    auto result = handle.template get_property<Property>();
+    if (result.is_error()) {
+      return result.take_error();
     }
+    data_ = result.value();
+    ByteView bytes{reinterpret_cast<std::byte*>(&data_), sizeof(data_)};
+    if constexpr (Property == ZX_PROP_NAME) {
+      bytes = {reinterpret_cast<std::byte*>(data_.data()), data_.size()};
+    }
+    this->Emplace(bytes);
     return fit::ok();
   }
 
  private:
-  T data_;
+  typename PropertyTraits<Property>::type data_;
 };
 
-// Classes using zx_object_get_property use this.
-struct PropertyBaseClass {
-  static constexpr std::string_view kCall_{"zx_object_get_property"};
-  static constexpr auto kSyscall = &zx::object_base::get_property;
+// Notes based on the fixed-sized read_state calls use this.
+template <typename Class, uint32_t Kind>
+class ThreadStateNote : public NoteBase<Class, Kind> {
+ public:
+  fit::result<Error> Collect(Thread& thread) {
+    auto result = thread.read_state(Kind);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    this->Emplace(result.value());
+    return fit::ok();
+  }
 };
 
 template <typename Class>
@@ -499,8 +466,9 @@ class JsonNote : public NoteBase<Class, 0> {
   }
 
   // CollectNoteData will call this, but it has nothing to do.
-  static constexpr auto Collect =
-      [](const auto& root_resource, const auto& handle) -> fit::result<Error> { return fit::ok(); };
+  static constexpr auto Collect = [](const auto& handle) -> fit::result<Error> {
+    return fit::ok();
+  };
 
  private:
   rapidjson::StringBuffer data_;
@@ -510,15 +478,14 @@ class JsonNote : public NoteBase<Class, 0> {
 
 constexpr auto CollectNoteData =
     // For each note that hasn't already been fetched, try to fetch it now.
-    [](const zx::resource& root_resource, const auto& handle,
-       auto&... note) -> fit::result<Error, size_t> {
+    [](auto& handle, auto&... note) -> fit::result<Error, size_t> {
   // This value is always replaced (or ignored), but the type is not
   // default-constructible.
   fit::result<Error> result = fit::ok();
 
   size_t total = 0;
-  auto collect = [&root_resource, &handle, &result, &total](auto& note) -> bool {
-    result = CollectNote(root_resource, handle, note);
+  auto collect = [&handle, &result, &total](auto& note) -> bool {
+    result = CollectNote(handle, note);
     if (result.is_ok()) {
       ZX_DEBUG_ASSERT(note.size_bytes() % 2 == 0);
       total += note.size_bytes();
@@ -589,15 +556,14 @@ template <typename Class, typename... Notes>
 using KernelNotes = std::tuple<  // The whole tuple of all note types:
     Notes...,                    // First the process or job notes.
     // Now the kernel note types.
-    InfoNote<Class, ZX_INFO_HANDLE_BASIC, zx_info_handle_basic_t>,
-    InfoNote<Class, ZX_INFO_CPU_STATS, zx_info_cpu_stats_t>,
-    InfoNote<Class, ZX_INFO_KMEM_STATS, zx_info_kmem_stats_t>,
-    InfoNote<Class, ZX_INFO_GUEST_STATS, zx_info_guest_stats_t>>;
+    InfoNote<Class, ZX_INFO_HANDLE_BASIC>,  // Identifies root resource KOID.
+    InfoNote<Class, ZX_INFO_CPU_STATS>,     //
+    InfoNote<Class, ZX_INFO_KMEM_STATS>,    //
+    InfoNote<Class, ZX_INFO_GUEST_STATS>>;
 
-constexpr auto CollectKernelNoteData = [](auto&& resource, auto&& task,
-                                          auto& notes) -> fit::result<Error> {
+constexpr auto CollectKernelNoteData = [](auto&& handle, auto& notes) -> fit::result<Error> {
   auto collect = [&](auto&... note) -> fit::result<Error, size_t> {
-    return CollectNoteData(resource, task, note...);
+    return CollectNoteData(handle, note...);
   };
   if (auto result = std::apply(collect, notes); result.is_error()) {
     return result.take_error();
@@ -689,23 +655,29 @@ class CollectorBase {
 // The public class is just a container for a std::unique_ptr to this private
 // class, so no implementation details of the object need to be visible in the
 // public header.
-class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
+class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
  public:
   // Only constructed by Emplace.
   Collector() = delete;
 
-  // Only Emplace and clear call this.  The process is mandatory; the suspend
-  // token handle is optional and can be null; and all other members are safely
-  // default-initialized.  Note memory_ can't be initialized in its declaration
-  // since that uses process_ before it's been set here.
-  explicit Collector(zx::unowned_process process, zx::suspend_token suspended = {})
-      : process_(std::move(process)), process_suspended_(std::move(suspended)), memory_(*process_) {
-    ZX_ASSERT(process_->is_valid());
-  }
+  // Only Emplace and clear call this.  The process is mandatory and all other
+  // members are safely default-initialized.  The suspend token handle is held
+  // solely to be held, i.e. to be released on destruction of the collector.
+  // It's expected to stay std::nullopt until SuspendAndCollectThreads is
+  // called, and then not to be std::nullopt any more when CollectThreads
+  // runs, indicating that the process is suspended.  We use std::optional
+  // rather than just an invalid handle so that the asserts can distinguish
+  // the "not suspended" state in our logic from the non-Fuchsia case's fake
+  // handles that are all always invalid.  (When dumping a postmortem process,
+  // the logic goes through all the paces of suspension but everything reports
+  // as already ready already by dint of being dead and there are no real
+  // suspend tokens.)
+  Collector(Process& process, std::optional<LiveHandle> suspended)
+      : process_(process), process_suspended_(std::move(suspended)) {}
 
   // Reset to initial state, except that if the process is already suspended,
   // it stays that way.
-  void clear() { *this = Collector{std::move(process_), std::move(process_suspended_)}; }
+  void clear() { *this = Collector{process_, std::move(process_suspended_)}; }
 
   // This can be called at most once and must be called first if at all.  If
   // this is not called, then threads may be allowed to run while the dump
@@ -716,16 +688,21 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   fit::result<Error> SuspendAndCollectThreads() {
     ZX_ASSERT(!process_suspended_);
     ZX_DEBUG_ASSERT(notes_size_bytes_ == 0);
-    zx_status_t status = process_->suspend(&process_suspended_);
-    if (status == ZX_OK) {
-      return CollectThreads();
+    auto result = process_.get().suspend();
+    if (result.is_ok()) {
+      process_suspended_ = std::move(result).value();
+    } else if (result.error_value().status_ == ZX_ERR_NOT_SUPPORTED) {
+      // Suspending yourself isn't supported, but that's OK.
+      ZX_DEBUG_ASSERT(ProcessIsSelf());
+    } else {
+      return result.take_error();
     }
-    return fit::error(Error{"zx_task_suspend", status});
+    return CollectThreads();
   }
 
   fit::result<Error> CollectSystem() { return CollectSystemNote(std::get<SystemNote>(notes_)); }
 
-  fit::result<Error> CollectKernel(zx::unowned_resource resource);
+  fit::result<Error> CollectKernel();
 
   // This collects information about memory and other process-wide state.  The
   // return value gives the total size of the ET_CORE file to be written.
@@ -734,7 +711,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   fit::result<Error, size_t> CollectProcess(SegmentCallback prune, size_t limit) {
     // Collect the process-wide note data.
     auto collect = [this](auto&... note) -> fit::result<Error, size_t> {
-      return CollectNoteData({}, *process_, note...);
+      return CollectNoteData(process_, note...);
     };
     if (auto result = std::apply(collect, notes_); result.is_error()) {
       return result.take_error();
@@ -765,7 +742,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
   // Accumulate header and note data to be written out, by calling
   // `dump(offset, ByreView{...})` repeatedly.
-  // The views point to storage in this->notes and Thread::notes_.
+  // The views point to storage in this->notes and ThreadCollector::notes_.
   fit::result<Error, size_t> DumpHeaders(DumpCallback dump, size_t limit) {
     // Layout has already been done.
     ZX_ASSERT(ehdr_.type == elfldltl::ElfType::kCore);
@@ -806,8 +783,8 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
     }
 
     // Generate the note data for each thread.
-    for (const auto& thread : threads_) {
-      if (append_notes(thread->notes())) {
+    for (const auto& [koid, thread] : threads_) {
+      if (append_notes(thread.notes())) {
         return fit::ok(offset);
       }
     }
@@ -846,17 +823,18 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
         size_t left = size;
         offset = segment.offset;
         do {
-          ByteView chunk;
-
-          // This yields some nonempty subset of the requested range.
-          if (auto read = memory_.ReadBytes(vaddr, 1, left); read.is_error()) {
+          // This yields some nonempty subset of the requested range, and
+          // possibly more than requested.
+          auto read =
+              process_.get().read_memory<std::byte, ByteView>(vaddr, size, ReadMemorySize::kLess);
+          if (read.is_error()) {
             return read.take_error();
-          } else {
-            chunk = read.value();
-            ZX_DEBUG_ASSERT(chunk.size() <= left);
-            ZX_DEBUG_ASSERT(!chunk.empty());
-            ZX_DEBUG_ASSERT(chunk.data());
           }
+
+          // Note the buffer is still owned by read.value().
+          ByteView chunk = read.value()->subspan(0, std::min(size, read.value()->size()));
+          // TODO(mcgrathr): subset dump must be detected in layout phase
+          ZX_DEBUG_ASSERT(!chunk.empty());
 
           // Send it to the callback to write it out.
           if (dump(offset, chunk)) {
@@ -878,52 +856,50 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
  private:
   struct ProcessInfoClass {
-    using Handle = zx::process;
+    using Handle = Process;
     static constexpr auto MakeHeader = kMakeNote<kProcessInfoNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
 
-  template <zx_object_info_topic_t Topic, typename T>
-  using ProcessInfo = InfoNote<ProcessInfoClass, Topic, T>;
+  template <zx_object_info_topic_t Topic>
+  using ProcessInfo = InfoNote<ProcessInfoClass, Topic>;
 
-  struct ProcessPropertyClass : public PropertyBaseClass {
-    using Handle = zx::process;
+  struct ProcessPropertyClass {
+    using Handle = Process;
     static constexpr auto MakeHeader = kMakeNote<kProcessPropertyNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
 
-  template <uint32_t Prop, typename T>
-  using ProcessProperty = PropertyNote<ProcessPropertyClass, Prop, T>;
+  template <uint32_t Prop>
+  using ProcessProperty = PropertyNote<ProcessPropertyClass, Prop>;
 
   struct ThreadInfoClass {
-    using Handle = zx::thread;
+    using Handle = Thread;
     static constexpr auto MakeHeader = kMakeNote<kThreadInfoNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
 
-  template <zx_object_info_topic_t Topic, typename T>
-  using ThreadInfo = InfoNote<ThreadInfoClass, Topic, T>;
+  template <zx_object_info_topic_t Topic>
+  using ThreadInfo = InfoNote<ThreadInfoClass, Topic>;
 
-  struct ThreadPropertyClass : public PropertyBaseClass {
-    using Handle = zx::thread;
+  struct ThreadPropertyClass {
+    using Handle = Thread;
     static constexpr auto MakeHeader = kMakeNote<kThreadPropertyNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
 
-  template <uint32_t Prop, typename T>
-  using ThreadProperty = PropertyNote<ThreadPropertyClass, Prop, T>;
+  template <uint32_t Prop>
+  using ThreadProperty = PropertyNote<ThreadPropertyClass, Prop>;
 
   // Classes using zx_thread_read_state use this.
   struct ThreadStateClass {
-    using Handle = zx::thread;
-    static constexpr std::string_view kCall_{"zx_thread_read_state"};
-    static constexpr auto kSyscall = &zx::thread::read_state;
+    using Handle = Thread;
     static constexpr auto MakeHeader = kMakeNote<kThreadStateNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
 
-  template <zx_thread_state_topic_t Topic, typename T>
-  using ThreadState = PropertyNote<ThreadStateClass, Topic, T>;
+  template <zx_thread_state_topic_t Topic>
+  using ThreadState = ThreadStateNote<ThreadStateClass, Topic>;
 
   struct SystemClass {
     static constexpr auto MakeHeader = kMakeNote<kSystemNoteName>;
@@ -939,9 +915,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
   class DateNote : public NoteBase<DateClass, 0> {
    public:
-    fit::result<Error> Collect(const zx::resource& root_resource, const zx::process& process) {
-      return fit::ok();
-    }
+    fit::result<Error> Collect(Process& process) { return fit::ok(); }
 
     void Set(time_t date) {
       date_ = date;
@@ -953,7 +927,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   };
 
   struct KernelInfoClass {
-    using Handle = zx::resource;
+    using Handle = Resource;
     static constexpr auto MakeHeader = kMakeNote<kKernelInfoNoteName>;
     static constexpr auto Pad = PadForElfNote;
   };
@@ -963,79 +937,72 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
   using ThreadNotes = std::tuple<
       // This lists all the notes that can be extracted from a thread.
+      ThreadInfo<ZX_INFO_HANDLE_BASIC>, ThreadProperty<ZX_PROP_NAME>,
       // Ordering of the notes after the first two is not specified and can
       // change.  Nothing separates the notes for one thread from the notes for
       // the next thread, but consumers recognize the zx_info_handle_basic_t
       // note as the key for a new thread's notes.  Whatever subset of these
       // notes that is available for the given thread is present in the dump.
-      ThreadInfo<ZX_INFO_HANDLE_BASIC, zx_info_handle_basic_t>,
-      ThreadProperty<ZX_PROP_NAME, char[ZX_MAX_NAME_LEN]>,
-      ThreadInfo<ZX_INFO_THREAD, zx_info_thread_t>,
-      ThreadInfo<ZX_INFO_THREAD_EXCEPTION_REPORT, zx_exception_report_t>,
-      ThreadInfo<ZX_INFO_THREAD_STATS, zx_info_thread_stats_t>,
-      ThreadInfo<ZX_INFO_TASK_RUNTIME, zx_info_task_runtime_t>,
-      ThreadState<ZX_THREAD_STATE_GENERAL_REGS, zx_thread_state_general_regs_t>,
-      ThreadState<ZX_THREAD_STATE_FP_REGS, zx_thread_state_fp_regs_t>,
-      ThreadState<ZX_THREAD_STATE_VECTOR_REGS, zx_thread_state_vector_regs_t>,
-      ThreadState<ZX_THREAD_STATE_DEBUG_REGS, zx_thread_state_debug_regs_t>,
-      ThreadState<ZX_THREAD_STATE_SINGLE_STEP, zx_thread_state_single_step_t>>;
+      ThreadInfo<ZX_INFO_THREAD>,                   //
+      ThreadInfo<ZX_INFO_THREAD_EXCEPTION_REPORT>,  //
+      ThreadInfo<ZX_INFO_THREAD_STATS>,             //
+      ThreadInfo<ZX_INFO_TASK_RUNTIME>,             //
+      ThreadState<ZX_THREAD_STATE_GENERAL_REGS>,    //
+      ThreadState<ZX_THREAD_STATE_FP_REGS>,         //
+      ThreadState<ZX_THREAD_STATE_VECTOR_REGS>,     //
+      ThreadState<ZX_THREAD_STATE_DEBUG_REGS>,      //
+      ThreadState<ZX_THREAD_STATE_SINGLE_STEP>>;
 
   using ProcessNotes = WithKernelNotes<
-      // This lists all the notes for process-wide state.  Ordering of the
-      // notes after the first two is not specified and can change.
-      ProcessInfo<ZX_INFO_HANDLE_BASIC, zx_info_handle_basic_t>,
-      ProcessProperty<ZX_PROP_NAME, char[ZX_MAX_NAME_LEN]>,
-      DateNote,    // Self-elides when not set.
-      SystemNote,  // Optionally included in any given process.
-      ProcessInfo<ZX_INFO_PROCESS, zx_info_process_t>,
-      ProcessInfo<ZX_INFO_PROCESS_THREADS, zx_koid_t>,
-      ProcessInfo<ZX_INFO_TASK_STATS, zx_info_task_stats_t>,
-      ProcessInfo<ZX_INFO_TASK_RUNTIME, zx_info_task_runtime_t>,
-      ProcessInfo<ZX_INFO_PROCESS_MAPS, zx_info_maps_t>,
-      ProcessInfo<ZX_INFO_PROCESS_VMOS, zx_info_vmo_t>,
-      ProcessInfo<ZX_INFO_PROCESS_HANDLE_STATS, zx_info_process_handle_stats_t>,
-      ProcessInfo<ZX_INFO_HANDLE_TABLE, zx_info_handle_extended_t>,
-      ProcessProperty<ZX_PROP_PROCESS_DEBUG_ADDR, uintptr_t>,
-      ProcessProperty<ZX_PROP_PROCESS_BREAK_ON_LOAD, uintptr_t>,
-      ProcessProperty<ZX_PROP_PROCESS_VDSO_BASE_ADDRESS, uintptr_t>,
-      ProcessProperty<ZX_PROP_PROCESS_HW_TRACE_CONTEXT_ID, uintptr_t>>;
+      // This lists all the notes for process-wide state.
+      ProcessInfo<ZX_INFO_HANDLE_BASIC>, ProcessProperty<ZX_PROP_NAME>,
+      // Ordering of the notes after the first two is not specified and can
+      // change.
+      DateNote,                                            // Self-elides.
+      SystemNote,                                          // Optional.
+      ProcessInfo<ZX_INFO_PROCESS>,                        //
+      ProcessInfo<ZX_INFO_PROCESS_THREADS>,                //
+      ProcessInfo<ZX_INFO_TASK_STATS>,                     //
+      ProcessInfo<ZX_INFO_TASK_RUNTIME>,                   //
+      ProcessInfo<ZX_INFO_PROCESS_MAPS>,                   //
+      ProcessInfo<ZX_INFO_PROCESS_VMOS>,                   //
+      ProcessInfo<ZX_INFO_PROCESS_HANDLE_STATS>,           //
+      ProcessInfo<ZX_INFO_HANDLE_TABLE>,                   //
+      ProcessProperty<ZX_PROP_PROCESS_DEBUG_ADDR>,         //
+      ProcessProperty<ZX_PROP_PROCESS_BREAK_ON_LOAD>,      //
+      ProcessProperty<ZX_PROP_PROCESS_VDSO_BASE_ADDRESS>,  //
+      ProcessProperty<ZX_PROP_PROCESS_HW_TRACE_CONTEXT_ID>>;
 
-  class Thread {
+  class ThreadCollector {
    public:
-    Thread() = delete;
-    Thread(const Thread&) = delete;
-    Thread(Thread&&) = default;
-    Thread& operator=(Thread&&) noexcept = default;
+    ThreadCollector() = delete;
+    ThreadCollector(ThreadCollector&&) = default;
 
-    explicit Thread(zx_koid_t koid) : koid_(koid) {}
+    explicit ThreadCollector(zx_koid_t koid) : koid_(koid) {}
 
     // Acquire the thread handle if possible.
-    fit::result<Error> Acquire(const zx::process& process) {
+    fit::result<Error> Acquire(Process& process) {
       if (!handle_) {
-        zx::handle child;
-        zx_status_t status = process.get_child(koid_, kThreadRights, &child);
-        switch (status) {
-          case ZX_OK:
-            handle_.emplace(std::move(child));
-            break;
-
-          case ZX_ERR_NOT_FOUND:
-            // It's not an error if the thread has simply died already so the
-            // KOID is no longer valid.
-            handle_.emplace();
-            break;
-
-          default:
-            return fit::error(Error{"zx_object_get_child", status});
+        auto result = process.get_child(koid_);
+        if (result.is_error()) {
+          // It's not an error if the thread has simply died already so the
+          // KOID is no longer valid.
+          if (result.error_value().status_ != ZX_ERR_NOT_FOUND) {
+            return result.take_error();
+          }
+          handle_ = nullptr;
+        } else {
+          zxdump::Object& child = result.value();
+          handle_ = static_cast<zxdump::Thread*>(&child);
         }
       }
       return fit::ok();
     }
 
     // Return the item to wait for this thread if it needs to be waited for.
-    [[nodiscard]] std::optional<zx_wait_item_t> wait() const {
-      if (handle_ && handle_->is_valid()) {
-        return zx_wait_item_t{.handle = handle_->get(), .waitfor = kWaitFor_};
+    [[nodiscard]] std::optional<Object::WaitItem> wait() const {
+      if (handle_ && *handle_) {
+        return Object::WaitItem{.handle = **handle_, .waitfor = kWaitFor_};
       }
       return std::nullopt;
     }
@@ -1045,15 +1012,15 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
     // The next call to wait() will show whether collection is finished.
     fit::result<Error, size_t> Collect(zx_signals_t pending) {
       ZX_DEBUG_ASSERT(handle_);
-      ZX_DEBUG_ASSERT(handle_->is_valid());
+      ZX_DEBUG_ASSERT(*handle_);
 
       if (pending & kWaitFor_) {
         // Now that this thread is quiescent, collect its data.
         // Reset *handle_ so wait() will say no next time.
         // It's only needed for the collection being done right now.
-        auto collect = [thread = std::exchange(*handle_, {})](auto&... note) {
-          return CollectNoteData({}, thread, note...);
-        };
+        Thread& thread = **handle_;
+        handle_ = nullptr;
+        auto collect = [&thread](auto&... note) { return CollectNoteData(thread, note...); };
         return std::apply(collect, notes_);
       }
 
@@ -1064,7 +1031,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
     // Returns a vector of views into the storage held in this->notes_.
     NoteData::Vector notes() const {
       ZX_DEBUG_ASSERT(handle_);
-      ZX_DEBUG_ASSERT(!handle_->is_valid());
+      ZX_DEBUG_ASSERT(!*handle_);
       return std::apply(DumpNoteData, notes_);
     }
 
@@ -1076,8 +1043,8 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
     // This is std::nullopt before the thread has been acquired.  Once the
     // thread has been acquired, this holds its thread handle until it's been
-    // collected.  Once it's been collected, this holds the invalid handle.
-    std::optional<zx::thread> handle_;
+    // collected.  Once it's been collected, this holds nullptr.
+    std::optional<Thread*> handle_;
 
     ThreadNotes notes_;
   };
@@ -1087,40 +1054,16 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
   // Some of the process-wide state is needed in Suspend anyway, so pre-collect
   // it directly in the notes.
+  auto& process_threads() { return std::get<ProcessInfo<ZX_INFO_PROCESS_THREADS>>(notes_); }
 
-  auto& process_threads() {
-    return std::get<ProcessInfo<ZX_INFO_PROCESS_THREADS, zx_koid_t>>(notes_);
-  }
+  auto& process_maps() { return std::get<ProcessInfo<ZX_INFO_PROCESS_MAPS>>(notes_); }
 
-  auto& process_maps() {
-    return std::get<ProcessInfo<ZX_INFO_PROCESS_MAPS, zx_info_maps_t>>(notes_);
-  }
-
-  auto& process_vmos() {
-    return std::get<ProcessInfo<ZX_INFO_PROCESS_VMOS, zx_info_vmo_t>>(notes_);
-  }
-
-  // Each thread not seen before is added to the end of the list.  These are
-  // always processed in the order ZX_INFO_PROCESS_THREADS gives them, which is
-  // chronological order of creation, with old dead threads maybe pruned out.
-  // If a KOID seen before is not in the current list, it's an old dead thread.
-  // That's fine.  Thread::Acquire will fail to find it and that threads_ slot
-  // will be ignored.  If a new KOID is seen, it goes on the end of threads_
-  // regardless of its position in the current list, so it will always be after
-  // older threads already in the list.
-  Thread& AddThread(zx_koid_t koid) {
-    auto [it, is_new] = thread_koid_to_index_.insert({koid, threads_.size()});
-    if (is_new) {
-      threads_.push_back(std::make_unique<Thread>(koid));
-      return *threads_.back();
-    }
-    return *threads_[it->second];
-  }
+  auto& process_vmos() { return std::get<ProcessInfo<ZX_INFO_PROCESS_VMOS>>(notes_); }
 
   // Acquire all the threads.  Then collect all their data as soon as they are
   // done suspending, waiting as necessary.
   fit::result<Error> CollectThreads() {
-    ZX_DEBUG_ASSERT(process_suspended_);
+    ZX_DEBUG_ASSERT(process_suspended_ || ProcessIsSelf());
     threads_.clear();
     while (true) {
       // We need fresh data each time through to see if there are new threads.
@@ -1135,50 +1078,44 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
       // or about the racing new threads, because they won't have any user
       // state that's interesting to dump yet.  So if we overlook those threads
       // the dump will just appear to be from before they existed.
-
-      if (auto get = process_threads().Collect({}, *process_); get.is_error()) {
-        return get.take_error();
+      if (auto get = process_threads().Collect(process_); get.is_error()) {
+        return get;
       }
 
-      zx_wait_item_t wait_for[ZX_WAIT_MANY_MAX_ITEMS];
-      Thread* wait_for_thread[std::size(wait_for)];
-      uint32_t wait_for_count = 0;
+      std::vector<zxdump::Object::WaitItem> wait_for;
+      std::vector<ThreadCollector*> wait_for_threads;
 
       // Look for new threads or unfinished threads.
       for (zx_koid_t koid : process_threads().info()) {
-        Thread& thread = AddThread(koid);
+        auto& thread = threads_.try_emplace(threads_.end(), koid, koid)->second;
 
         // Make sure we have the thread handle if possible.
         // If this is not a new thread, this is a no-op.
-        if (auto acquire = thread.Acquire(*process_); acquire.is_error()) {
-          return acquire;
+        if (auto result = thread.Acquire(process_); result.is_error()) {
+          return result.take_error();
         }
 
         if (auto wait = thread.wait()) {
           // This thread hasn't been collected yet.  Wait for it to finish
-          // suspension (or die).  If the wait_for list is full, that's OK.
-          // We'll block until some other thread finishes, and then come back.
-          // This one might be quiescent already by the time there's room.
-          if (wait_for_count < std::size(wait_for)) {
-            wait_for[wait_for_count] = *wait;
-            wait_for_thread[wait_for_count] = &thread;
-            ++wait_for_count;
-          }
+          // suspension (or die).
+          wait_for.push_back(*wait);
+          wait_for_threads.push_back(&thread);
         }
       }
 
       // If there are no unfinished threads, collection is all done.
-      if (wait_for_count == 0) {
+      if (wait_for.empty()) {
         return fit::ok();
       }
 
       // Wait for a thread to finish its suspension (or death).
-      zx_status_t status = zx::thread::wait_many(wait_for, wait_for_count, zx::time::infinite());
-      if (status != ZX_OK) {
-        return fit::error(Error{"zx_object_wait_many", status});
+      if (auto result = Object::wait_many(wait_for); result.is_error()) {
+        return result.take_error();
       }
-      for (uint32_t i = 0; i < wait_for_count; ++i) {
-        auto result = wait_for_thread[i]->Collect(wait_for[i].pending);
+
+      ZX_DEBUG_ASSERT(wait_for.size() == wait_for_threads.size());
+      for (size_t i = 0; i < wait_for.size(); ++i) {
+        auto result = wait_for_threads[i]->Collect(wait_for[i].pending);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -1194,14 +1131,14 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   // Populate phdrs_.  The p_offset fields are filled in later by Layout.
   fit::result<Error> FindMemory(SegmentCallback prune_segment) {
     // Make sure we have the relevant information to scan.
-    if (auto result = CollectNote({}, *process_, process_maps()); result.is_error()) {
+    if (auto result = CollectNote(process_, process_maps()); result.is_error()) {
       if (result.error_value().status_ == ZX_ERR_NOT_SUPPORTED) {
         // This just means there is no information in the dump.
         return fit::ok();
       }
       return result;
     }
-    if (auto result = CollectNote({}, *process_, process_vmos()); result.is_error()) {
+    if (auto result = CollectNote(process_, process_vmos()); result.is_error()) {
       if (result.error_value().status_ == ZX_ERR_NOT_SUPPORTED) {
         // This just means there is no information in the dump.
         return fit::ok();
@@ -1333,140 +1270,6 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
     return offset;
   }
 
-  class ProcessMemoryReader {
-   public:
-    // Move-only, not default constructible.
-    ProcessMemoryReader() = delete;
-    ProcessMemoryReader(const ProcessMemoryReader&) = delete;
-    ProcessMemoryReader(ProcessMemoryReader&&) = default;
-    ProcessMemoryReader& operator=(const ProcessMemoryReader&) = delete;
-    ProcessMemoryReader& operator=(ProcessMemoryReader&&) = default;
-
-    explicit ProcessMemoryReader(const zx::process& proc) : process_(proc) {
-      ZX_ASSERT(process_->is_valid());
-    }
-
-    // Reset cached state so no old cached data is reused.
-    void clear() { *this = ProcessMemoryReader{*process_}; }
-
-    // Read some data from the process's memory at the given address.  The
-    // returned view starts at that address and has at least min_bytes data
-    // available.  If more data than that is readily available, it will be
-    // returned, but no more than max_bytes.  The returned view is valid only
-    // until the next use of this ProcessMemoryReader object.
-    auto ReadBytes(uintptr_t vaddr, size_t min_bytes, size_t max_bytes = kWindowSize_)
-        -> fit::result<Error, ByteView> {
-      ZX_ASSERT(min_bytes > 0);
-      ZX_ASSERT(max_bytes >= min_bytes);
-      ZX_ASSERT(min_bytes <= kWindowSize_);
-      if (vaddr >= buffer_vaddr_ && vaddr - buffer_vaddr_ < valid_size_) {
-        ZX_DEBUG_ASSERT(buffer_data().data());
-        // There is some cached data already covering the address.
-        ByteView data = buffer_data().subspan(vaddr - buffer_vaddr_, max_bytes);
-        if (data.size() >= min_bytes) {
-          ZX_DEBUG_ASSERT(data.data());
-          return fit::ok(data);
-        }
-      }
-
-      // Read some new data into the buffer.
-      if (!buffer_) {
-        buffer_ = std::make_unique<Buffer>();
-      }
-      ZX_DEBUG_ASSERT(buffer_->data());
-      valid_size_ = 0;
-      buffer_vaddr_ = vaddr;
-      max_bytes = std::min(max_bytes, kWindowSize_);
-
-      auto try_read = [&]() {
-        ZX_DEBUG_ASSERT(buffer_);
-        ZX_DEBUG_ASSERT(buffer_->data());
-        return process_->read_memory(buffer_vaddr_, buffer_->data(), max_bytes, &valid_size_);
-      };
-
-      // Try to read the chosen maximum.  The call can fail with
-      // ZX_ERR_NOT_FOUND in some cases where not all pages are readable
-      // addresses, so retry with one page fewer until reading succeeds.
-      zx_status_t status = try_read();
-      while (status == ZX_ERR_NOT_FOUND && max_bytes >= min_bytes) {
-        uintptr_t end_vaddr = buffer_vaddr_ + max_bytes;
-        if (end_vaddr % ZX_PAGE_SIZE != 0) {
-          // Try again without the partial page.
-          end_vaddr &= -uintptr_t{ZX_PAGE_SIZE};
-          max_bytes = end_vaddr - buffer_vaddr_;
-          status = try_read();
-        } else {
-          // Try one page fewer.
-          end_vaddr -= ZX_PAGE_SIZE;
-          max_bytes = end_vaddr - buffer_vaddr_;
-          if (end_vaddr > buffer_vaddr_) {
-            status = try_read();
-          } else {
-            break;
-          }
-        }
-      }
-
-      if (status != ZX_OK) {
-        return fit::error(Error{"zx_process_read_memory", status});
-      }
-
-      if (valid_size_ < min_bytes) {
-        return fit::error(Error{"short memory read", ZX_ERR_NO_MEMORY});
-      }
-
-      ZX_DEBUG_ASSERT(valid_size_ > 0);
-      ZX_DEBUG_ASSERT(buffer_);
-      ZX_DEBUG_ASSERT(buffer_->data());
-      ZX_DEBUG_ASSERT(buffer_data().data());
-      ByteView data = buffer_data().subspan(0, max_bytes);
-      ZX_DEBUG_ASSERT(data.data());
-      return fit::ok(data);
-    }
-
-    // Read an array from the given address.
-    template <typename T>
-    fit::result<Error, const T*> ReadArray(uintptr_t vaddr, size_t nelem) {
-      size_t byte_size = sizeof(T) * nelem;
-      if (byte_size > kWindowSize_) {
-        return fit::error(Error{"array too large", ZX_ERR_NO_MEMORY});
-      }
-
-      auto result = ReadBytes(vaddr, byte_size);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-
-      if ((vaddr - buffer_vaddr_) % alignof(T) != 0) {
-        return fit::error(Error{"misaligned data", ZX_ERR_NO_MEMORY});
-      }
-
-      return fit::ok(reinterpret_cast<const T*>(result.value().data()));
-    }
-
-    // Read a datum from the given address.
-    template <typename T>
-    fit::result<Error, std::reference_wrapper<const T>> Read(uintptr_t vaddr) {
-      auto result = ReadArray<T>(vaddr, 1);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      const T* datum_ptr = result.value();
-      return fit::ok(std::cref(*datum_ptr));
-    }
-
-   private:
-    static constexpr size_t kWindowSize_ = 1024;
-    using Buffer = std::array<std::byte, kWindowSize_>;
-
-    ByteView buffer_data() const { return {buffer_->data(), valid_size_}; }
-
-    std::unique_ptr<Buffer> buffer_;
-    uintptr_t buffer_vaddr_ = 0;
-    size_t valid_size_ = 0;
-    zx::unowned_process process_;
-  };
-
   size_t headers_size_bytes() const {
     return sizeof(ehdr_) + (sizeof(phdrs_[0]) * phdrs_.size()) +
            (ehdr_.phnum == Elf::Ehdr::kPnXnum ? sizeof(shdr_) : 0);
@@ -1474,13 +1277,22 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
   size_t notes_size_bytes() const { return notes_size_bytes_; }
 
-  zx::unowned_process process_;
-  zx::suspend_token process_suspended_;
-  ProcessMemoryReader memory_;
+  bool ProcessIsSelf() {
+#ifdef __Fuchsia__
+    zx_info_handle_basic_t info;
+    zx_status_t status =
+        zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+    ZX_ASSERT_MSG(status == ZX_OK, "ZX_INFO_HANDLE_BASIC on self: %d", status);
+    return info.koid == process_.get().koid();
+#endif
+    return false;
+  }
+
+  std::reference_wrapper<Process> process_;
+  std::optional<zxdump::LiveHandle> process_suspended_;
   ProcessNotes notes_;
 
-  std::vector<std::unique_ptr<Thread>> threads_;
-  std::map<zx_koid_t, size_t> thread_koid_to_index_;
+  std::map<zx_koid_t, ThreadCollector> threads_;
 
   std::vector<Elf::Phdr> phdrs_;
   Elf::Ehdr ehdr_ = {};
@@ -1490,78 +1302,60 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   size_t notes_size_bytes_ = 0;
 };
 
-ProcessDumpBase::ProcessDumpBase(ProcessDumpBase&&) noexcept = default;
-ProcessDumpBase& ProcessDumpBase::operator=(ProcessDumpBase&&) noexcept = default;
-ProcessDumpBase::~ProcessDumpBase() = default;
+ProcessDump::ProcessDump(ProcessDump&&) noexcept = default;
+ProcessDump& ProcessDump::operator=(ProcessDump&&) noexcept = default;
+ProcessDump::~ProcessDump() = default;
 
-void ProcessDumpBase::clear() { collector_->clear(); }
+void ProcessDump::clear() { collector_->clear(); }
 
-fit::result<Error, size_t> ProcessDumpBase::CollectProcess(SegmentCallback prune, size_t limit) {
-  return collector_->CollectProcess(std::move(prune), limit);
-}
-
-fit::result<Error> ProcessDumpBase::SuspendAndCollectThreads() {
+fit::result<Error> ProcessDump::SuspendAndCollectThreads() {
   return collector_->SuspendAndCollectThreads();
 }
 
-fit::result<Error> ProcessDumpBase::CollectSystem() { return collector_->CollectSystem(); }
-
-fit::result<Error> ProcessDumpBase::CollectKernel(zx::unowned_resource resource) {
-  return collector_->CollectKernel(resource->borrow());
+fit::result<Error, size_t> ProcessDump::CollectProcess(SegmentCallback prune, size_t limit) {
+  return collector_->CollectProcess(std::move(prune), limit);
 }
 
-fit::result<Error, size_t> ProcessDumpBase::DumpHeadersImpl(DumpCallback dump, size_t limit) {
+fit::result<Error> ProcessDump::CollectKernel() { return collector_->CollectKernel(); }
+
+fit::result<Error> ProcessDump::CollectSystem() { return collector_->CollectSystem(); }
+
+fit::result<Error, size_t> ProcessDump::DumpHeadersImpl(DumpCallback dump, size_t limit) {
   return collector_->DumpHeaders(std::move(dump), limit);
 }
 
-fit::result<Error, size_t> ProcessDumpBase::DumpMemoryImpl(DumpCallback callback, size_t limit) {
+fit::result<Error, size_t> ProcessDump::DumpMemoryImpl(DumpCallback callback, size_t limit) {
   return collector_->DumpMemory(std::move(callback), limit);
 }
 
-void ProcessDumpBase::set_date(time_t date) { collector_->set_date(date); }
+void ProcessDump::set_date(time_t date) { collector_->set_date(date); }
 
-fit::result<Error> ProcessDumpBase::Remarks(std::string_view name, ByteView data) {
+fit::result<Error> ProcessDump::Remarks(std::string_view name, ByteView data) {
   collector_->AddRemarks(name, data);
   return fit::ok();
 }
 
-// The Collector borrows the process handle.  A single Collector cannot be
-// used for a different process later.  It can be clear()'d to reset all
-// state other than the process handle.
-void ProcessDumpBase::Emplace(zx::unowned_process process) {
-  collector_ = std::make_unique<Collector>(std::move(process));
-}
+// A single Collector cannot be used for a different process later.  It can be
+// clear()'d to reset all state other than the process handle and the process
+// being suspended.
+ProcessDump::ProcessDump(Process& process) noexcept : collector_{new Collector{process, {}}} {}
 
-template <>
-ProcessDump<zx::process>::ProcessDump(zx::process process) noexcept : process_{std::move(process)} {
-  Emplace(zx::unowned_process{process_});
-}
-
-template class ProcessDump<zx::unowned_process>;
-
-template <>
-ProcessDump<zx::unowned_process>::ProcessDump(zx::unowned_process process) noexcept
-    : process_{std::move(process)} {
-  Emplace(zx::unowned_process{process_});
-}
-
-class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
+class JobDump::Collector : public CollectorBase<JobRemarkClass> {
  public:
-  // Only constructed by Emplace.
   Collector() = delete;
 
   // Only Emplace and clear call this.  The job is mandatory and all other
   // members are safely default-initialized.
-  explicit Collector(zx::unowned_job job) : job_(std::move(job)) { ZX_ASSERT(job_->is_valid()); }
+  explicit Collector(Job& job) : job_(job) {}
 
   // Reset to initial state.
-  void clear() { *this = Collector{std::move(job_)}; }
+  void clear() { *this = Collector{job_}; }
 
   // This collects information about job-wide state.
   fit::result<Error, size_t> CollectJob() {
     // Collect the job-wide note data.
     auto collect = [this](auto&... note) -> fit::result<Error, size_t> {
-      return CollectNoteData({}, *job_, note...);
+      return CollectNoteData(job_, note...);
     };
     auto result = std::apply(collect, notes_);
     if (result.is_error()) {
@@ -1589,59 +1383,13 @@ class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
                    result.value());              // note members & headers.
   }
 
-  fit::result<Error, JobVector> CollectChildren() {
-    auto result = GetChildren();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    JobVector jobs;
-    for (zx_koid_t koid : result.value().get().info()) {
-      zx::job child;
-      zx_status_t status = job_->get_child(koid, kChildRights, &child);
-      switch (status) {
-        case ZX_OK:
-          jobs.push_back({std::move(child), koid});
-          break;
+  auto CollectChildren() { return job_.get().children(); }
 
-        case ZX_ERR_NOT_FOUND:
-          // It died in a race.
-          continue;
-
-        default:
-          return fit::error{Error{"zx_object_get_child", status}};
-      }
-    }
-    return fit::ok(std::move(jobs));
-  }
-
-  fit::result<Error, ProcessVector> CollectProcesses() {
-    auto result = GetProcesses();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    ProcessVector processes;
-    for (zx_koid_t koid : result.value().get().info()) {
-      zx::process process;
-      zx_status_t status = job_->get_child(koid, kChildRights, &process);
-      switch (status) {
-        case ZX_OK:
-          processes.push_back({std::move(process), koid});
-          break;
-
-        case ZX_ERR_NOT_FOUND:
-          // It died in a race.
-          continue;
-
-        default:
-          return fit::error{Error{"zx_object_get_child", status}};
-      }
-    }
-    return fit::ok(std::move(processes));
-  }
+  auto CollectProcesses() { return job_.get().processes(); }
 
   fit::result<Error> CollectSystem() { return CollectSystemNote(std::get<SystemNote>(notes_)); }
 
-  fit::result<Error> CollectKernel(zx::unowned_resource resource);
+  fit::result<Error> CollectKernel();
 
   fit::result<Error, size_t> DumpHeaders(DumpCallback dump, time_t mtime) {
     size_t offset = 0;
@@ -1715,22 +1463,22 @@ class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
 
  private:
   struct JobInfoClass {
-    using Handle = zx::job;
+    using Handle = Job;
     static constexpr auto MakeHeader = kMakeMember<kJobInfoName>;
     static constexpr auto Pad = PadForArchive;
   };
 
-  template <zx_object_info_topic_t Topic, typename T>
-  using JobInfo = InfoNote<JobInfoClass, Topic, T>;
+  template <zx_object_info_topic_t Topic>
+  using JobInfo = InfoNote<JobInfoClass, Topic>;
 
-  struct JobPropertyClass : public PropertyBaseClass {
-    using Handle = zx::job;
+  struct JobPropertyClass {
+    using Handle = Job;
     static constexpr auto MakeHeader = kMakeMember<kJobPropertyName>;
     static constexpr auto Pad = PadForArchive;
   };
 
-  template <uint32_t Prop, typename T>
-  using JobProperty = PropertyNote<JobPropertyClass, Prop, T>;
+  template <uint32_t Prop>
+  using JobProperty = PropertyNote<JobPropertyClass, Prop>;
 
   struct SystemClass {
     static constexpr auto MakeHeader = kMakeMember<kSystemNoteName, true>;
@@ -1740,7 +1488,7 @@ class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
   using SystemNote = JsonNote<SystemClass>;
 
   struct KernelInfoClass {
-    using Handle = zx::resource;
+    using Handle = Resource;
     static constexpr auto MakeHeader = kMakeMember<kKernelInfoNoteName>;
     static constexpr auto Pad = PadForArchive;
   };
@@ -1749,111 +1497,76 @@ class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
   using WithKernelNotes = KernelNotes<KernelInfoClass, Notes...>;
 
   // These are named for use by CollectChildren and CollectProcesses.
-  using Children = JobInfo<ZX_INFO_JOB_CHILDREN, zx_koid_t>;
-  using Processes = JobInfo<ZX_INFO_JOB_PROCESSES, zx_koid_t>;
+  using Children = JobInfo<ZX_INFO_JOB_CHILDREN>;
+  using Processes = JobInfo<ZX_INFO_JOB_PROCESSES>;
 
   using JobNotes = WithKernelNotes<
       // This lists all the notes for job-wide state.
-      JobInfo<ZX_INFO_HANDLE_BASIC, zx_info_handle_basic_t>,
-      JobProperty<ZX_PROP_NAME, char[ZX_MAX_NAME_LEN]>,
+      JobInfo<ZX_INFO_HANDLE_BASIC>, JobProperty<ZX_PROP_NAME>,
       // Ordering of the other notes is not specified and can change.
-      SystemNote,  // Optionally included in any given job.
-      JobInfo<ZX_INFO_JOB, zx_info_job_t>, Children, Processes,
-      JobInfo<ZX_INFO_TASK_RUNTIME, zx_info_task_runtime_t>>;
+      SystemNote,                      // Optionally included in any given job.
+      JobInfo<ZX_INFO_JOB>,            //
+      JobInfo<ZX_INFO_JOB_CHILDREN>,   //
+      JobInfo<ZX_INFO_JOB_PROCESSES>,  //
+      JobInfo<ZX_INFO_TASK_RUNTIME>>;
 
   // Returns a vector of views into the storage held in this->notes_.
   NoteData::Vector notes() const { return std::apply(DumpNoteData, notes_); }
 
-  // Some of the job-wide state is needed in CollectChildren and
-  // CollectProcesses anyway, so pre-collect it directly in the notes.
-
-  fit::result<Error, std::reference_wrapper<const Children>> GetChildren() {
-    Children& children = std::get<Children>(notes_);
-    auto result = CollectNote({}, *job_, children);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    return fit::ok(std::cref(children));
-  }
-
-  fit::result<Error, std::reference_wrapper<const Processes>> GetProcesses() {
-    Processes& processes = std::get<Processes>(notes_);
-    auto result = CollectNote({}, *job_, processes);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    return fit::ok(std::cref(processes));
-  }
-
-  zx::unowned_job job_;
+  std::reference_wrapper<Job> job_;
   ArchiveMemberHeader name_table_;
   JobNotes notes_;
 };
 
-JobDumpBase::JobDumpBase(JobDumpBase&&) noexcept = default;
-JobDumpBase& JobDumpBase::operator=(JobDumpBase&&) noexcept = default;
-JobDumpBase::~JobDumpBase() = default;
+JobDump::JobDump(JobDump&&) noexcept = default;
+JobDump& JobDump::operator=(JobDump&&) noexcept = default;
+JobDump::~JobDump() = default;
 
-fit::result<Error> JobDumpBase::CollectSystem() { return collector_->CollectSystem(); }
+fit::result<Error> JobDump::CollectKernel() { return collector_->CollectKernel(); }
 
-fit::result<Error> JobDumpBase::CollectKernel(zx::unowned_resource resource) {
-  return collector_->CollectKernel(resource->borrow());
-}
+fit::result<Error> JobDump::CollectSystem() { return collector_->CollectSystem(); }
 
-fit::result<Error, size_t> JobDumpBase::CollectJob() { return collector_->CollectJob(); }
+fit::result<Error, size_t> JobDump::CollectJob() { return collector_->CollectJob(); }
 
-fit::result<Error, std::vector<std::pair<zx::job, zx_koid_t>>> JobDumpBase::CollectChildren() {
+fit::result<Error, std::reference_wrapper<Job::JobMap>> JobDump::CollectChildren() {
   return collector_->CollectChildren();
 }
 
-fit::result<Error, std::vector<std::pair<zx::process, zx_koid_t>>> JobDumpBase::CollectProcesses() {
+fit::result<Error, std::reference_wrapper<Job::ProcessMap>> JobDump::CollectProcesses() {
   return collector_->CollectProcesses();
 }
 
-fit::result<Error, size_t> JobDumpBase::DumpHeadersImpl(DumpCallback dump, time_t mtime) {
-  return collector_->DumpHeaders(std::move(dump), mtime);
+fit::result<Error, size_t> JobDump::DumpHeadersImpl(DumpCallback callback, time_t mtime) {
+  return collector_->DumpHeaders(std::move(callback), mtime);
 }
 
-fit::result<Error, size_t> JobDumpBase::DumpMemberHeaderImpl(DumpCallback dump, size_t offset,
-                                                             std::string_view name, size_t size,
-                                                             time_t mtime) {
+fit::result<Error, size_t> JobDump::DumpMemberHeaderImpl(DumpCallback callback, size_t offset,
+                                                         std::string_view name, size_t size,
+                                                         time_t mtime) {
   ArchiveMemberHeader header{name};
   header.set_size(size);
   header.set_date(mtime);
-  dump(offset, header.bytes());
+  callback(offset, header.bytes());
   return fit::ok(offset + header.bytes().size());
 }
 
-size_t JobDumpBase::MemberHeaderSize() { return sizeof(ar_hdr); }
+size_t JobDump::MemberHeaderSize() { return sizeof(ar_hdr); }
 
-fit::result<Error> ProcessDumpBase::Collector::CollectKernel(zx::unowned_resource resource) {
-  return CollectKernelNoteData(*resource, zx::process{}, notes_);
+fit::result<Error> ProcessDump::Collector::CollectKernel() {
+  return CollectKernelNoteData(process_, notes_);
 }
 
-fit::result<Error> JobDumpBase::Collector::CollectKernel(zx::unowned_resource resource) {
-  return CollectKernelNoteData(*resource, zx::job{}, notes_);
+fit::result<Error> JobDump::Collector::CollectKernel() {
+  return CollectKernelNoteData(job_, notes_);
 }
 
-fit::result<Error> JobDumpBase::Remarks(std::string_view name, ByteView data) {
+fit::result<Error> JobDump::Remarks(std::string_view name, ByteView data) {
   collector_->AddRemarks(name, data);
   return fit::ok();
 }
 
-// The Collector borrows the job handle.  A single Collector cannot be used for
-// a different job later.  It can be clear()'d to reset all state other than
-// the job handle.
-void JobDumpBase::Emplace(zx::unowned_job job) {
-  collector_ = std::make_unique<Collector>(std::move(job));
-}
-
-template <>
-JobDump<zx::job>::JobDump(zx::job job) noexcept : job_{std::move(job)} {
-  Emplace(zx::unowned_job{job_});
-}
-
-template <>
-JobDump<zx::unowned_job>::JobDump(zx::unowned_job job) noexcept : job_{std::move(job)} {
-  Emplace(zx::unowned_job{job_});
-}
+// A single Collector cannot be used for a different job later.  It can be
+// clear()'d to reset all state other than the job handle.
+JobDump::JobDump(Job& job) noexcept : collector_{new Collector{job}} {}
 
 }  // namespace zxdump
