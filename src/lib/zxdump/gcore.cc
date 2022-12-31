@@ -10,7 +10,6 @@
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -57,7 +56,7 @@ struct Flags {
     return filename;
   }
 
-  time_t Date() const { return record_date ? time(nullptr) : 0; }
+  time_t Date(zxdump::Task& task) const { return record_date ? task.date() : 0; }
 
   std::vector<Remarks> remarks;
   std::string_view output_prefix = kOutputPrefix;
@@ -198,10 +197,11 @@ class DumperBase {
 };
 
 // This does the Collect* calls that are common to ProcessDumper and JobDumper.
-constexpr auto CollectCommon = [](const Flags& flags, bool top,
-                                  auto& dumper) -> fit::result<zxdump::Error> {
+constexpr auto CollectCommon =  //
+    [](const Flags& flags, bool top, auto& dumper,
+       const zxdump::TaskHolder& holder) -> fit::result<zxdump::Error> {
   if (flags.collect_system && (top || flags.repeat_system)) {
-    auto result = dumper.CollectSystem();
+    auto result = dumper.CollectSystem(holder);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -236,7 +236,7 @@ class ProcessDumper : public DumperBase {
   }
 
   time_t ClockIn(const Flags& flags) {
-    time_t dump_date = flags.Date();
+    time_t dump_date = flags.Date(dumper_.process());
     if (dump_date != 0) {
       dumper_.set_date(dump_date);
     }
@@ -244,7 +244,7 @@ class ProcessDumper : public DumperBase {
   }
 
   // Phase 1: Collect underpants!
-  std::optional<size_t> Collect(const Flags& flags, bool top) {
+  std::optional<size_t> Collect(const Flags& flags, bool top, const zxdump::TaskHolder& holder) {
     zxdump::SegmentCallback prune = PruneAll;
     if (flags.dump_memory) {
       // TODO(mcgrathr): more filtering switches
@@ -259,7 +259,7 @@ class ProcessDumper : public DumperBase {
       }
     }
 
-    if (auto result = CollectCommon(flags, top, dumper_); result.is_error()) {
+    if (auto result = CollectCommon(flags, top, dumper_, holder); result.is_error()) {
       Error(result.error_value());
       return std::nullopt;
     }
@@ -274,7 +274,7 @@ class ProcessDumper : public DumperBase {
   }
 
   // Phase 2: ???
-  bool Dump(Writer& writer, const Flags& flags) {
+  bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
     // File offset calculations start fresh in each ET_CORE file.
     writer.ResetOffset();
 
@@ -330,10 +330,14 @@ class JobDumper : public DumperBase {
 
   auto* operator->() { return &dumper_; }
 
+  time_t ClockIn(const Flags& flags) {
+    date_ = flags.Date(dumper_.job());
+    return date_;
+  }
+
   // Collect the job-wide data and reify the lists of children and processes.
-  std::optional<size_t> Collect(const Flags& flags, bool top) {
-    date_ = flags.Date();
-    if (auto result = CollectCommon(flags, top, dumper_); result.is_error()) {
+  std::optional<size_t> Collect(const Flags& flags, bool top, const zxdump::TaskHolder& holder) {
+    if (auto result = CollectCommon(flags, top, dumper_, holder); result.is_error()) {
       Error(result.error_value());
       return std::nullopt;
     }
@@ -365,7 +369,7 @@ class JobDumper : public DumperBase {
 
   // Dump the job archive: first dump the stub archive, and then collect and
   // dump each process and each child.
-  bool Dump(Writer& writer, const Flags& flags);
+  bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder);
 
  private:
   class CollectedJob;
@@ -432,21 +436,21 @@ class JobDumper::CollectedJob {
 
   // Returns true if the job itself was collected.
   // Later ok() indicates if any process or child collection failed.
-  bool DeepCollect(const Flags& flags) {
+  bool DeepCollect(const Flags& flags, const zxdump::TaskHolder& holder) {
     // Collect the job itself.
     dumper_.ClockIn(flags);
-    if (auto collected_size = dumper_.Collect(flags, false)) {
+    if (auto collected_size = dumper_.Collect(flags, false, holder)) {
       content_size_ += *collected_size;
 
       // Collect all its processes and children.
       if (dumper_.processes_) {
         for (auto& [pid, process] : *dumper_.processes_) {
-          CollectProcess(process, flags);
+          CollectProcess(process, flags, holder);
         }
       }
       if (dumper_.children_) {
         for (auto& [koid, job] : *dumper_.children_) {
-          CollectJob(job, flags);
+          CollectJob(job, flags, holder);
         }
       }
       return true;
@@ -455,7 +459,7 @@ class JobDumper::CollectedJob {
     return false;
   }
 
-  bool Dump(Writer& writer, const Flags& flags) {
+  bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
     // First dump the member header for this archive as a member of its parent.
     // Then dump the "stub archive" describing the job itself.
     if (!DumpMemberHeader(writer, dumper_.OutputFile(flags, false), content_size_, date()) ||
@@ -464,11 +468,11 @@ class JobDumper::CollectedJob {
     } else {
       for (auto& process : processes_) {
         // Each CollectedProcess dumps its own member header and ET_CORE file.
-        ok_ = process.Dump(writer, flags) && ok_;
+        ok_ = process.Dump(writer, flags, holder) && ok_;
       }
       for (auto& job : children_) {
         // Recurse on each child to dump its own member header and job archive.
-        ok_ = job.Dump(writer, flags) && ok_;
+        ok_ = job.Dump(writer, flags, holder) && ok_;
       }
     }
     return ok_;
@@ -492,9 +496,9 @@ class JobDumper::CollectedJob {
     time_t date() const { return date_; }
 
     // Dump the member header and then the ET_CORE file contents.
-    bool Dump(Writer& writer, const Flags& flags) {
+    bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
       return DumpMemberHeader(writer, dumper_.OutputFile(flags, false), content_size_, date()) &&
-             dumper_.Dump(writer, flags);
+             dumper_.Dump(writer, flags, holder);
     }
 
    private:
@@ -503,10 +507,11 @@ class JobDumper::CollectedJob {
     time_t date_ = 0;
   };
 
-  void CollectProcess(zxdump::Process& process, const Flags& flags) {
+  void CollectProcess(zxdump::Process& process, const Flags& flags,
+                      const zxdump::TaskHolder& holder) {
     ProcessDumper dump{process};
     time_t dump_date = dump.ClockIn(flags);
-    if (auto collected_size = dump.Collect(flags, false)) {
+    if (auto collected_size = dump.Collect(flags, false, holder)) {
       CollectedProcess core_file{std::move(dump), *collected_size, dump_date};
       content_size_ += core_file.size_bytes();
       processes_.push_back(std::move(core_file));
@@ -515,9 +520,9 @@ class JobDumper::CollectedJob {
     }
   }
 
-  void CollectJob(zxdump::Job& job, const Flags& flags) {
+  void CollectJob(zxdump::Job& job, const Flags& flags, const zxdump::TaskHolder& holder) {
     CollectedJob archive{JobDumper{job}};
-    if (archive.DeepCollect(flags)) {
+    if (archive.DeepCollect(flags, holder)) {
       content_size_ += archive.size_bytes();
       children_.push_back(std::move(archive));
     }
@@ -532,7 +537,7 @@ class JobDumper::CollectedJob {
   bool ok_ = true;
 };
 
-bool JobDumper::Dump(Writer& writer, const Flags& flags) {
+bool JobDumper::Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
   if (!DumpHeaders(writer, flags)) {
     return false;
   }
@@ -543,7 +548,7 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags) {
       // Collect the process and thus discover the ET_CORE file size.
       ProcessDumper process_dump{process};
       time_t process_dump_date = process_dump.ClockIn(flags);
-      if (auto collected_size = process_dump.Collect(flags, false)) {
+      if (auto collected_size = process_dump.Collect(flags, false, holder)) {
         // Dump the member header, now complete with size.
         if (!DumpMemberHeader(writer, process_dump.OutputFile(flags, false),  //
                               *collected_size, process_dump_date)) {
@@ -551,7 +556,7 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags) {
           return false;
         }
         // Now dump the member contents, the ET_CORE file for the process.
-        ok = process_dump.Dump(writer, flags) && ok;
+        ok = process_dump.Dump(writer, flags, holder) && ok;
       }
     }
   }
@@ -561,7 +566,7 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags) {
       if (flags.flatten_jobs) {
         // Collect just this job first.
         JobDumper child{job};
-        auto collected_job_size = child.Collect(flags, false);
+        auto collected_job_size = child.Collect(flags, false, holder);
         ok = collected_job_size &&
              // Stream out the member header for just the stub archive alone.
              DumpMemberHeader(writer, child.OutputFile(flags, false),  //
@@ -572,12 +577,12 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags) {
              // (flat) archive rather than members of the inner job archive.
              // Another inner recursion will do the same thing, so all the
              // recursions stream out a single flat archive.
-             child.Dump(writer, flags) && ok;
+             child.Dump(writer, flags, holder) && ok;
       } else {
         // Pre-collect the whole job tree and thus discover the archive size.
         // The pre-collected archive dumps its own member header first.
         CollectedJob archive{JobDumper{job}};
-        ok = archive.DeepCollect(flags) && archive.Dump(writer, flags) && ok;
+        ok = archive.DeepCollect(flags, holder) && archive.Dump(writer, flags, holder) && ok;
       }
     }
   }
@@ -595,7 +600,7 @@ fbl::unique_fd CreateOutputFile(const std::string& outfile) {
 
 // Phase 3: Profit!
 template <typename Dumper>
-bool WriteDump(Dumper dumper, const Flags& flags) {
+bool WriteDump(Dumper dumper, const Flags& flags, const zxdump::TaskHolder& holder) {
   std::string outfile = dumper.OutputFile(flags);
   fbl::unique_fd fd = CreateOutputFile(outfile);
   if (!fd) {
@@ -603,12 +608,12 @@ bool WriteDump(Dumper dumper, const Flags& flags) {
   }
   Writer writer{std::move(fd), std::move(outfile), flags.zstd};
   dumper.ClockIn(flags);
-  return writer.Ok(dumper.Collect(flags, true) && dumper.Dump(writer, flags));
+  return writer.Ok(dumper.Collect(flags, true, holder) && dumper.Dump(writer, flags, holder));
 }
 
 // "Dump" a job tree by actually just making separate dumps of each process.
 // We only use the JobDumper to find the processes and/or children.
-bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
+bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags, const zxdump::TaskHolder& holder) {
   bool ok = true;
 
   if (flags.collect_job_processes) {
@@ -617,7 +622,7 @@ bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
       ok = false;
     } else {
       for (auto& [pid, process] : result.value().get()) {
-        ok = WriteDump(ProcessDumper{process}, flags) && ok;
+        ok = WriteDump(ProcessDumper{process}, flags, holder) && ok;
       }
     }
   }
@@ -628,7 +633,7 @@ bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
       ok = false;
     } else {
       for (auto& [koid, job] : result.value().get()) {
-        ok = WriteManyCoreFiles(JobDumper{job}, flags) && ok;
+        ok = WriteManyCoreFiles(JobDumper{job}, flags, holder) && ok;
       }
     }
   }
@@ -992,7 +997,14 @@ essential services.  PID arguments are not allowed with --root-job unless
     }
   }
 
-  if (dump_root_job && !handle_job(JobDumper{holder.root_job()}, flags)) {
+  if (flags.collect_system) {
+    auto result = holder.InsertSystem();
+    if (result.is_error()) {
+      std::cerr << "cannot get live system data: " << result.error_value() << std::endl;
+    }
+  }
+
+  if (dump_root_job && !handle_job(JobDumper{holder.root_job()}, flags, holder)) {
     exit_status = EXIT_FAILURE;
   }
 
@@ -1014,14 +1026,14 @@ essential services.  PID arguments are not allowed with --root-job unless
     zxdump::Task& task = result.value();
     switch (task.type()) {
       case ZX_OBJ_TYPE_PROCESS:
-        if (!WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags)) {
+        if (!WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags, holder)) {
           exit_status = EXIT_FAILURE;
         }
         break;
 
       case ZX_OBJ_TYPE_JOB:
         if (allow_jobs) {
-          if (!handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags)) {
+          if (!handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags, holder)) {
             exit_status = EXIT_FAILURE;
           }
           break;

@@ -6,7 +6,6 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
-#include <lib/zx/process.h>
 #include <lib/zxdump/dump.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls/debug.h>
@@ -16,7 +15,7 @@
 #include <array>
 #include <cassert>
 #include <charconv>
-#include <cstdint>
+#include <cinttypes>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -27,6 +26,10 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+
+#ifdef __Fuchsia__
+#include <lib/zx/process.h>
+#endif
 
 #include "core.h"
 #include "job-archive.h"
@@ -534,20 +537,44 @@ void CollectJson(rapidjson::Document& dom, const char (&name)[N], std::string_vi
   dom.AddMember(name, json_value, dom.GetAllocator());
 }
 
-rapidjson::Document CollectSystemJson() {
+fit::result<Error, rapidjson::Document> CollectSystemJson(const TaskHolder& holder) {
+  std::string_view version = holder.system_get_version_string();
+  if (version.empty()) {
+    return fit::error{Error{"no system data available", ZX_ERR_NOT_SUPPORTED}};
+  }
+
   rapidjson::Document dom;
   dom.SetObject();
-  std::string_view version = zx_system_get_version_string();
-  CollectJson(dom, "version_string", version);
-  CollectJson(dom, "dcache_line_size", zx_system_get_dcache_line_size());
-  CollectJson(dom, "num_cpus", zx_system_get_num_cpus());
-  CollectJson(dom, "page_size", zx_system_get_page_size());
-  CollectJson(dom, "physmem", zx_system_get_physmem());
-  return dom;
+  {
+    rapidjson::Value value(version.data(), static_cast<rapidjson::SizeType>(version.size()));
+    dom.AddMember("version_string", value, dom.GetAllocator());
+  }
+  {
+    rapidjson::Value value{holder.system_get_dcache_line_size()};
+    dom.AddMember("dcache_line_size", value, dom.GetAllocator());
+  }
+  {
+    rapidjson::Value value{holder.system_get_num_cpus()};
+    dom.AddMember("num_cpus", value, dom.GetAllocator());
+  }
+  {
+    rapidjson::Value value{holder.system_get_page_size()};
+    dom.AddMember("page_size", value, dom.GetAllocator());
+  }
+  {
+    rapidjson::Value value{holder.system_get_physmem()};
+    dom.AddMember("physmem", value, dom.GetAllocator());
+  }
+
+  return fit::ok(std::move(dom));
 }
 
-constexpr auto CollectSystemNote = [](auto& note) -> fit::result<Error> {
-  bool ok = note.Set(CollectSystemJson());
+constexpr auto CollectSystemNote = [](const TaskHolder& holder, auto& note) -> fit::result<Error> {
+  auto result = CollectSystemJson(holder);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  bool ok = note.Set(std::move(result).value());
   ZX_ASSERT(ok);
   return fit::ok();
 };
@@ -675,6 +702,8 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
   Collector(Process& process, std::optional<LiveHandle> suspended)
       : process_(process), process_suspended_(std::move(suspended)) {}
 
+  Process& process() const { return process_; }
+
   // Reset to initial state, except that if the process is already suspended,
   // it stays that way.
   void clear() { *this = Collector{process_, std::move(process_suspended_)}; }
@@ -700,7 +729,9 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
     return CollectThreads();
   }
 
-  fit::result<Error> CollectSystem() { return CollectSystemNote(std::get<SystemNote>(notes_)); }
+  fit::result<Error> CollectSystem(const TaskHolder& holder) {
+    return CollectSystemNote(holder, std::get<SystemNote>(notes_));
+  }
 
   fit::result<Error> CollectKernel();
 
@@ -845,7 +876,7 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
           offset += chunk.size();
           left -= chunk.size();
         } while (left > 0);
-        ZX_DEBUG_ASSERT_MSG(offset == segment.offset + size, "%#zx != %#zx + %#zx", offset,
+        ZX_DEBUG_ASSERT_MSG(offset == segment.offset + size, "%#zx != %#" PRIx64 " + %#zx", offset,
                             segment.offset(), size);
       }
     }
@@ -1304,6 +1335,8 @@ ProcessDump::ProcessDump(ProcessDump&&) noexcept = default;
 ProcessDump& ProcessDump::operator=(ProcessDump&&) noexcept = default;
 ProcessDump::~ProcessDump() = default;
 
+Process& ProcessDump::process() const { return collector_->process(); }
+
 void ProcessDump::clear() { collector_->clear(); }
 
 fit::result<Error> ProcessDump::SuspendAndCollectThreads() {
@@ -1316,7 +1349,9 @@ fit::result<Error, size_t> ProcessDump::CollectProcess(SegmentCallback prune, si
 
 fit::result<Error> ProcessDump::CollectKernel() { return collector_->CollectKernel(); }
 
-fit::result<Error> ProcessDump::CollectSystem() { return collector_->CollectSystem(); }
+fit::result<Error> ProcessDump::CollectSystem(const TaskHolder& holder) {
+  return collector_->CollectSystem(holder);
+}
 
 fit::result<Error, size_t> ProcessDump::DumpHeadersImpl(DumpCallback dump, size_t limit) {
   return collector_->DumpHeaders(std::move(dump), limit);
@@ -1345,6 +1380,8 @@ class JobDump::Collector : public CollectorBase<JobRemarkClass> {
   // Only Emplace and clear call this.  The job is mandatory and all other
   // members are safely default-initialized.
   explicit Collector(Job& job) : job_(job) {}
+
+  Job& job() const { return job_; }
 
   // Reset to initial state.
   void clear() { *this = Collector{job_}; }
@@ -1385,7 +1422,9 @@ class JobDump::Collector : public CollectorBase<JobRemarkClass> {
 
   auto CollectProcesses() { return job_.get().processes(); }
 
-  fit::result<Error> CollectSystem() { return CollectSystemNote(std::get<SystemNote>(notes_)); }
+  fit::result<Error> CollectSystem(const TaskHolder& holder) {
+    return CollectSystemNote(holder, std::get<SystemNote>(notes_));
+  }
 
   fit::result<Error> CollectKernel();
 
@@ -1520,9 +1559,13 @@ JobDump::JobDump(JobDump&&) noexcept = default;
 JobDump& JobDump::operator=(JobDump&&) noexcept = default;
 JobDump::~JobDump() = default;
 
+Job& JobDump::job() const { return collector_->job(); }
+
 fit::result<Error> JobDump::CollectKernel() { return collector_->CollectKernel(); }
 
-fit::result<Error> JobDump::CollectSystem() { return collector_->CollectSystem(); }
+fit::result<Error> JobDump::CollectSystem(const TaskHolder& holder) {
+  return collector_->CollectSystem(holder);
+}
 
 fit::result<Error, size_t> JobDump::CollectJob() { return collector_->CollectJob(); }
 

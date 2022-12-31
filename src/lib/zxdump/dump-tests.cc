@@ -135,6 +135,14 @@ void TestProcessForSystemInfo::StartChild() {
       .name = {kChildName},
   });
   ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild());
+
+  auto result = live_holder_.InsertSystem();
+  EXPECT_TRUE(result.is_ok()) << result.error_value();
+}
+
+void TestProcessForSystemInfo::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
+  auto result = dump.CollectSystem(live_holder_);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
 }
 
 void TestProcessForSystemInfo::CheckDump(zxdump::TaskHolder& holder) {

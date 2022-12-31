@@ -174,6 +174,10 @@ class TaskHolder {
   // inserted alone, only their containing process.
   fit::result<Error, std::reference_wrapper<Object>> Insert(LiveHandle task);
 
+  // Insert system data (returned by system_get_*, below) taken from the
+  // currently running system.
+  fit::result<Error> InsertSystem();
+
   // Yields the current root job.  If all tasks in the eye of the TaskHolder
   // form a unified tree, this returns the actual root job in that tree.
   // Otherwise, this is the fake "root job" that reads as KOID 0 with no data

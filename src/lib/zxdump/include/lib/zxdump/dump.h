@@ -127,6 +127,8 @@ class ProcessDump : protected DumpBase {
 
   ~ProcessDump() noexcept;
 
+  Process& process() const;
+
   // Reset to initial state, except that if the process is already suspended,
   // it stays that way.
   void clear();
@@ -145,7 +147,7 @@ class ProcessDump : protected DumpBase {
   // Collect system-wide information.  This is always optional, but it must
   // always be called before CollectProcess, if called at all.  The system
   // information is included in the total size returned by CollectProcess.
-  fit::result<Error> CollectSystem();
+  fit::result<Error> CollectSystem(const TaskHolder& holder);
 
   // Collect privileged system-wide information from the kernel.  This is
   // always optional, but it must always be called before CollectProcess, if
@@ -269,10 +271,7 @@ class JobDump : protected DumpBase {
 
   ~JobDump() noexcept;
 
-  // Collect system-wide information.  This is always optional, but it must
-  // always be called first, before CollectJob, if called at all.  The system
-  // information is included in the total size returned by CollectJob.
-  fit::result<Error> CollectSystem();
+  Job& job() const;
 
   // Collect privileged system-wide information from the kernel.  This is
   // always optional, but it must always be called before CollectJob, if it's
@@ -281,6 +280,11 @@ class JobDump : protected DumpBase {
   // from which the zxdump::Job being dumped was loaded has had the root
   // resource inserted (either the real live object or from a dump).
   fit::result<Error> CollectKernel();
+
+  // Collect system-wide information.  This is always optional, but it must
+  // always be called first, before CollectJob, if called at all.  The system
+  // information is included in the total size returned by CollectJob.
+  fit::result<Error> CollectSystem(const TaskHolder& holder);
 
   // Add dump remarks.  This can be called any number of times, but must be
   // called before CollectJob if it's called at all.

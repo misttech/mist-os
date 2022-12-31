@@ -168,7 +168,8 @@ class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
   // Do the basic dump using the dumper API.
   template <typename Writer>
   void Dump(Writer& writer) {
-    TestProcessForPropertiesAndInfo::Dump(writer, Precollect);
+    auto precollect = [this](auto& holder, auto& dump) { Precollect(holder, dump); };
+    TestProcessForPropertiesAndInfo::Dump(writer, precollect);
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -177,10 +178,9 @@ class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
  private:
   static constexpr const char* kChildName = "zxdump-system-test-child";
 
-  static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
-    auto result = dump.CollectSystem();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
-  }
+  void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
+
+  zxdump::TaskHolder live_holder_;
 };
 
 class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {

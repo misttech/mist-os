@@ -17,17 +17,17 @@
 
 #include <rapidjson/document.h>
 
-#include "core.h"
-#include "dump-file.h"
-#include "job-archive.h"
-#include "live-memory-cache.h"
-#include "rights.h"
-
 #ifdef __Fuchsia__
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <zircon/status.h>
 #endif
+
+#include "core.h"
+#include "dump-file.h"
+#include "job-archive.h"
+#include "live-memory-cache.h"
+#include "rights.h"
 
 namespace zxdump {
 
@@ -303,6 +303,20 @@ class TaskHolder::JobTree {
   T GetSystemData(const char* key) const;
 
   uint64_t system_get_page_size() const;
+
+#ifdef __Fuchsia__
+  fit::result<Error> InsertSystem() {
+    std::string_view version = zx_system_get_version_string();
+    auto version_string = rapidjson::StringRef(version.data(), version.size());
+    system_.SetObject()
+        .AddMember("version_string", version_string, system_.GetAllocator())
+        .AddMember("dcache_line_size", zx_system_get_dcache_line_size(), system_.GetAllocator())
+        .AddMember("num_cpus", zx_system_get_num_cpus(), system_.GetAllocator())
+        .AddMember("page_size", zx_system_get_page_size(), system_.GetAllocator())
+        .AddMember("physmem", zx_system_get_physmem(), system_.GetAllocator());
+    return fit::ok();
+  }
+#endif
 
  private:
   // This is the actual reader, implemented below.
@@ -1388,6 +1402,10 @@ uint64_t TaskHolder::system_get_page_size() const { return tree_->system_get_pag
 uint64_t TaskHolder::system_get_physmem() const {
   return tree_->GetSystemData<uint64_t>("physmem");
 }
+
+#ifdef __Fuchsia__
+fit::result<Error> TaskHolder::InsertSystem() { return tree_->InsertSystem(); }
+#endif
 
 fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size,
                                                      ReadMemorySize size_mode) {

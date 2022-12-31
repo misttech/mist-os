@@ -5,17 +5,27 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/string_view.h>
+#include <zircon/types.h>
 
 #include <cstdlib>
 #include <ctime>
+#include <string>
+#include <vector>
 
-#include "dump-tests.h"
 #include "job-archive.h"
 #include "test-tool-process.h"
+
+#ifdef __Fuchsia__
+#include "dump-tests.h"
+#endif
+
+#include <gtest/gtest.h>
 
 namespace {
 
 using namespace std::literals;
+
+#ifdef __Fuchsia__  // TODO(mcgrathr): See below
 
 constexpr const char* kOutputSwitch = "-o";
 constexpr const char* kExcludeMemorySwitch = "--exclude-memory";
@@ -55,6 +65,8 @@ OutputFile GetOutputFile(zxdump::testing::TestToolProcess& child, std::string_vi
   return {file, prefix, pid_string};
 }
 
+#endif  // __Fuchsia__
+
 void UsageTest(int expected_status, const std::vector<std::string>& args = {}) {
   zxdump::testing::TestToolProcess child;
   ASSERT_NO_FATAL_FAILURE(child.Init());
@@ -66,13 +78,18 @@ void UsageTest(int expected_status, const std::vector<std::string>& args = {}) {
   EXPECT_EQ(status, expected_status);
   EXPECT_EQ(child.collected_stdout(), "");
   std::string text = child.collected_stderr();
-  EXPECT_TRUE(cpp20::starts_with(std::string_view(text), "Usage: "));
-  EXPECT_TRUE(cpp20::ends_with(std::string_view(text), '\n'));
+  EXPECT_TRUE(cpp20::starts_with(std::string_view(text), "Usage: ")) << text;
+  EXPECT_TRUE(cpp20::ends_with(std::string_view(text), '\n')) << text;
 }
 
 TEST(ZxdumpTests, GcoreHelp) { UsageTest(EXIT_SUCCESS, {"--help"}); }
 
 TEST(ZxdumpTests, GcoreUsage) { UsageTest(EXIT_FAILURE); }
+
+// TODO(mcgrathr): Process-launching tests are only possible on Fuchsia.
+// Each of these could have a variant that dumps via reading from a golden
+// job archive in testdata.
+#ifdef __Fuchsia__
 
 TEST(ZxdumpTests, GcoreProcessDumpIsElfCore) {
   zxdump::testing::TestProcess process;
@@ -656,5 +673,7 @@ TEST(ZxdumpTests, GcoreProcessDumpMemory) {
   ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
   ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
 }
+
+#endif  // __Fuchsia__
 
 }  // namespace
