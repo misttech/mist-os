@@ -47,7 +47,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1762
+From //build/config/BUILDCONFIG.gn:1765
 
 ### allow_legacy_data_partition_names
 Set to true to enable legacy data partition names.
@@ -2795,7 +2795,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1509
+From //build/config/BUILDCONFIG.gn:1512
 
 ### extra_vbmeta_descriptors
 Additional VBMeta Descriptors to add to the vbmeta image during assembly.
@@ -3998,10 +3998,10 @@ Each element of the list is one variant, which is a scope defining:
   tags = ["instrumented", "coverage", "llvm-profdata"]
 }, {
   configs = ["//build/config/sanitizers:tsan"]
-  tags = ["instrumentation-runtime", "instrumented", "kernel-excluded", "tsan"]
+  tags = ["tsan", "instrumentation-runtime", "instrumented", "uses-shadow", "kernel-excluded"]
 }, {
   configs = ["//build/config/sanitizers:hwasan"]
-  tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "fuchsia-only"]
+  tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only"]
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
@@ -4016,7 +4016,7 @@ Each element of the list is one variant, which is a scope defining:
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-excluded"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/sanitizers:ubsan"]
@@ -4024,7 +4024,7 @@ Each element of the list is one variant, which is a scope defining:
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers", "//build/config:no_rtti"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-excluded", "ubsan"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "ubsan"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/sanitizers:sancov"]
@@ -4032,7 +4032,7 @@ Each element of the list is one variant, which is a scope defining:
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-excluded", "sancov"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "sancov"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/zircon:no_safestack"]
@@ -4041,7 +4041,7 @@ Each element of the list is one variant, which is a scope defining:
 }
   name = "kasan"
   remove_common_configs = []
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-only"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-only"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/zircon:no_safestack", "//build/config/sanitizers:sancov"]
@@ -4050,7 +4050,7 @@ Each element of the list is one variant, which is a scope defining:
 }
   name = "kasan-sancov"
   remove_common_configs = []
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-only", "sancov"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-only", "sancov"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/fuzzer", "//build/config/sanitizers:rust-asan", "//build/config:icf"]
@@ -4060,7 +4060,7 @@ Each element of the list is one variant, which is a scope defining:
   name = "asan-fuzzer"
   remove_common_configs = ["//build/config:default_frame_pointers", "//build/config:icf"]
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "kernel-excluded", "fuzzer"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "fuzzer"]
   toolchain_args = {
   asan_default_options = "alloc_dealloc_mismatch=0:check_malloc_usable_size=0:detect_odr_violation=0:max_uar_stack_size_log=16:print_scariness=1:allocator_may_return_null=1:detect_leaks=0:detect_stack_use_after_return=1:malloc_context_size=128:print_summary=1:print_suppressions=0:strict_memcmp=0:symbolize=0"
 }
@@ -4076,7 +4076,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1329
+From //build/config/BUILDCONFIG.gn:1330
 
 ### legacy_base_driver_package_labels
 
@@ -6812,7 +6812,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1752
+From //build/config/BUILDCONFIG.gn:1755
 
 ### select_variant_canonical
 *This should never be set as a build argument.*
@@ -6821,7 +6821,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1757
+From //build/config/BUILDCONFIG.gn:1760
 
 ### select_variant_shortcuts
 List of short names for commonly-used variant selectors.  Normally this
@@ -6871,7 +6871,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1555
+From //build/config/BUILDCONFIG.gn:1558
 
 ### size_checker_input
 The input to the size checker.
@@ -7278,7 +7278,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1539
+From //build/config/BUILDCONFIG.gn:1542
 
 ### universe_package_labels
 If you add package labels to this variable, the packages will be included
