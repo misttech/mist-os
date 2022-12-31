@@ -18,7 +18,6 @@
 #include <type_traits>
 
 #include <fbl/unique_fd.h>
-
 #include <gmock/gmock.h>
 
 #include "test-data-holder.h"
@@ -284,6 +283,8 @@ void TestProcessForMemory::StartChild() {
       IntsString(cpp20::span(kMemoryInts)).c_str(),
       "-w",
       kMemoryText.data(),
+      "-p",
+      std::to_string(2 * zx_system_get_page_size()).c_str(),
   }));
 
   // The test-child wrote the pointers where the -m text and -M int array
@@ -295,8 +296,8 @@ void TestProcessForMemory::StartChild() {
   auto close_pipef = fit::defer([pipef]() { fclose(pipef); });
   std::ignore = read_pipe.release();
 
-  ASSERT_EQ(
-      3, fscanf(pipef, "%" SCNx64 "\n%" SCNx64 "\n%" SCNx64, &text_ptr_, &ints_ptr_, &wtext_ptr_));
+  ASSERT_EQ(4, fscanf(pipef, "%" SCNx64 "\n%" SCNx64 "\n%" SCNx64 "\n%" SCNx64, &text_ptr_,
+                      &ints_ptr_, &wtext_ptr_, &pages_ptr_));
 }
 
 void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_elided) {
@@ -323,8 +324,12 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
       EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
     } else {
       std::string_view text{(memory_result->data()), memory_result->size()};
-      ASSERT_EQ(text.size(), kMemoryText.size());
-      EXPECT_EQ(text, kMemoryText) << " reading 0x" << std::hex << text_ptr_;
+      ASSERT_EQ(text.size(), kMemoryText.size())
+          << " reading 0x" << std::hex << text_ptr_ << " copied at "
+          << static_cast<const void*>(text.data());
+      EXPECT_EQ(text, kMemoryText)  //
+          << " reading 0x" << std::hex << text_ptr_ << " copied at "
+          << static_cast<const void*>(text.data());
     }
   }
 
@@ -359,6 +364,26 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
       // know is more than the minimum requested) will be available.
       ASSERT_GE(text.size(), kMemoryText.size());
       EXPECT_TRUE(cpp20::starts_with(text, kMemoryText));
+    }
+  }
+
+  // Test a read crossing a page boundary.
+  {
+    constexpr size_t kSampleSize = 20;
+    ASSERT_TRUE(pages_ptr_ % zx_system_get_page_size() == 0) << std::hex << pages_ptr_;
+    const uint64_t ptr = pages_ptr_ + zx_system_get_page_size() - (kSampleSize / 2);
+    auto memory_result = read_process.read_memory<uint8_t>(ptr, kSampleSize);
+    ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+    if (memory_elided) {
+      EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
+    } else {
+      ASSERT_GE(memory_result->size(), kSampleSize);
+      EXPECT_EQ(memory_result->size(), kSampleSize);
+      for (size_t i = 0; i < kSampleSize; ++i) {
+        const unsigned int actual = (**memory_result)[i];
+        const unsigned int expected = static_cast<uint8_t>(ptr + i);
+        EXPECT_EQ(actual, expected) << i << " of " << kSampleSize << " at " << std::hex << ptr + i;
+      }
     }
   }
 }

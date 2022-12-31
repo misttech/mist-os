@@ -260,12 +260,15 @@ class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
 
   uint64_t wtext_ptr() const { return wtext_ptr_; }
 
+  uint64_t pages_ptr() const { return pages_ptr_; }
+
  private:
   static constexpr const char* kChildName = "zxdump-memory-test-child";
 
   uint64_t text_ptr_ = 0;
   uint64_t ints_ptr_ = 0;
   uint64_t wtext_ptr_ = 0;
+  uint64_t pages_ptr_ = 0;
 };
 
 }  // namespace zxdump::testing

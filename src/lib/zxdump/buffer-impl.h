@@ -21,7 +21,7 @@ class BufferImplVector final : public BufferImpl, public ByteVector {
 
   BufferImplVector(BufferImplVector&&) noexcept = default;
 
-  BufferImplVector(ByteVector&& other) : ByteVector(std::move(other)) {}
+  explicit BufferImplVector(ByteVector&& other) : ByteVector(std::move(other)) {}
 
   using ByteVector::operator=;
 

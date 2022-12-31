@@ -56,6 +56,7 @@ zx_library("zxdump") {
     "error.cc",
     "fd-writer.cc",
     "job-archive.h",
+    "live-memory-cache.h",
     "read-memory-string.cc",
     "read-memory.cc",
     "read.cc",
@@ -73,11 +74,13 @@ zx_library("zxdump") {
     "//src/lib/elfldltl",
     "//third_party/rapidjson",
     "//third_party/zstd",
+    "//zircon/system/ulib/fbl",
   ]
 
   if (is_fuchsia) {
     sources += [
       "dump.cc",
+      "live-memory-cache.cc",
       "root.cc",
     ]
     deps += [

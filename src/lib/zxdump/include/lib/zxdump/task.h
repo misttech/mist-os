@@ -179,6 +179,11 @@ class TaskHolder {
   uint64_t system_get_physmem() const;
   std::string_view system_get_version_string() const;
 
+  // Get and set the limit (in bytes) of unreferenced Process::read_memory
+  // pages from live processes that may be cached for reuse.
+  size_t memory_cache_limit() const;
+  void set_memory_cache_limit(size_t limit);
+
  private:
   friend Object;
   friend Task;
@@ -187,6 +192,7 @@ class TaskHolder {
   friend Thread;
   friend Resource;
   class JobTree;
+  class LiveMemoryCache;
 
   std::unique_ptr<JobTree> tree_;
 };
@@ -466,7 +472,8 @@ class Process : public Task {
   }
 
  private:
-  friend TaskHolder::JobTree;
+  friend TaskHolder;
+  class LiveMemory;
 
   struct Segment {
     uint64_t offset, filesz, memsz;
@@ -475,6 +482,7 @@ class Process : public Task {
   using Task::Task;
 
   fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead);
+  fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size, bool readahead);
 
   template <typename CharT = char>
   fit::result<Error, std::basic_string<CharT>> read_memory_basic_string(
@@ -483,6 +491,7 @@ class Process : public Task {
   std::map<zx_koid_t, Thread> threads_;
   std::map<uint64_t, Segment> memory_;
   internal::DumpFile* dump_ = nullptr;
+  std::unique_ptr<LiveMemory> live_memory_;
 };
 
 // Only these instantiations are actually defined in the library.

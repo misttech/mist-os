@@ -17,10 +17,10 @@
 
 #include <rapidjson/document.h>
 
-#include "buffer-impl.h"
 #include "core.h"
 #include "dump-file.h"
 #include "job-archive.h"
+#include "live-memory-cache.h"
 #include "rights.h"
 
 #ifdef __Fuchsia__
@@ -185,6 +185,12 @@ class TaskHolder::JobTree {
   Job& root_job() const { return root_job_; }
 
   Resource& root_resource() { return root_resource_; }
+
+  size_t memory_cache_limit() const { return live_memory_cache_.cache_limit(); }
+
+  void set_memory_cache_limit(size_t limit) { live_memory_cache_.set_cache_limit(limit); }
+
+  LiveMemoryCache& live_memory_cache() { return live_memory_cache_; }
 
   // Insert any number of dumps by reading a core file or an archive.
   fit::result<Error> Insert(fbl::unique_fd fd, bool read_memory) {
@@ -471,6 +477,9 @@ class TaskHolder::JobTree {
 
   // The only resource we hold is the root resource.
   Resource root_resource_{*this};
+
+  // Shared cache of pages read from process memory (see live-memory-cache.h).
+  LiveMemoryCache live_memory_cache_;
 };
 
 // JobTree is an incomplete type outside this translation unit.  Some methods
@@ -1408,6 +1417,13 @@ uint64_t TaskHolder::system_get_page_size() const {
 
 uint64_t TaskHolder::system_get_physmem() const {
   return tree_->GetSystemData<uint64_t>("physmem");
+}
+
+fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size, bool readahead) {
+  if (!live_memory_) {
+    live_memory_ = std::make_unique<LiveMemory>(tree().live_memory_cache());
+  }
+  return live_memory_->ReadLiveMemory(vaddr, size, readahead, live(), tree().live_memory_cache());
 }
 
 }  // namespace zxdump

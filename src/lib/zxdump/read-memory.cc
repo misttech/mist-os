@@ -15,10 +15,7 @@ namespace zxdump {
 
 fit::result<Error, Buffer<>> Process::ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead) {
   if (live()) {
-    return fit::error(Error{
-        "TODO(mcgrathr): live zx::Process::read_memory not implemented yet",
-        ZX_ERR_NOT_SUPPORTED,
-    });
+    return ReadLiveMemory(vaddr, size, readahead);
   }
 
   auto possible = [vaddr](const auto& elt) -> bool {

@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <lib/stdcompat/span.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 
@@ -26,13 +27,14 @@ namespace {
 
 constexpr std::string_view kStdinoutFilename = "-";
 
-constexpr char kOptString[] = "c:e:m:M:o:t:w:x:";
+constexpr char kOptString[] = "c:e:m:M:o:p:t:w:x:";
 constexpr option kLongOpts[] = {
     {"cat-from", required_argument, nullptr, 'c'},      //
     {"cat-to", required_argument, nullptr, 'o'},        //
     {"echo", required_argument, nullptr, 'e'},          //
     {"memory", required_argument, nullptr, 'm'},        //
     {"memory-ints", required_argument, nullptr, 'M'},   //
+    {"memory-pages", required_argument, nullptr, 'p'},  //
     {"threads", required_argument, nullptr, 't'},       //
     {"memory-wchar", required_argument, nullptr, 'w'},  //
     {"exit", required_argument, nullptr, 'x'},          //
@@ -131,6 +133,19 @@ int main(int argc, char** argv) {
           ints.push_back(atoi(p));
         }
         printf("%p\n", ints.data());
+        continue;
+      }
+
+      case 'p': {
+        size_t size = static_cast<size_t>(strtoul(optarg, nullptr, 0));
+        ZX_ASSERT(size > 0);
+        void* mapped = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        ZX_ASSERT_MSG(mapped != MAP_FAILED, "mmap: %s", strerror(errno));
+        cpp20::span<uint8_t> contents(static_cast<uint8_t*>(mapped), size);
+        for (size_t i = 0; i < size; ++i) {
+          contents[i] = static_cast<uint8_t>(i);
+        }
+        printf("%p\n", mapped);
         continue;
       }
 
