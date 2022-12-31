@@ -74,6 +74,10 @@ all_variant_tags = [
   # The `lto` tag is used for LTO and ThinLTO.
   "lto",
 
+  # The `uses-shadow` tag is used for sanitizers that occupy a large region of
+  # the address space with a sparse mapping for "shadow memory".
+  "uses-shadow",
+
   # The 'kernel-excluded' and 'kernel-only' tags are used to indicate
   # that a given variant should never be applied to the kernel toolchains,
   # or should only be applied to them respectively. Note that these are

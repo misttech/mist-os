@@ -44,6 +44,9 @@ class DumpFile::Mmap : public DumpFile {
   // EOF should never be attempted.
   fit::result<Error, ByteView> ReadProbe(FileRange where) override;
 
+  // The returned Buffer object is valid for the lifetime of the Mmap.
+  fit::result<Error, Buffer<>> ReadMemory(FileRange where) override;
+
   // All the data that will be read has been read.
   void shrink_to_fit() override;
 

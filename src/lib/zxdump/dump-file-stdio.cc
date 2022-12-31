@@ -4,6 +4,8 @@
 
 #include "dump-file-stdio.h"
 
+#include "buffer-impl.h"
+
 namespace zxdump::internal {
 
 DumpFile::Stdio::~Stdio() = default;
@@ -47,7 +49,19 @@ fit::result<Error, ByteView> DumpFile::Stdio::ReadEphemeral(FileRange where) {
   return result;
 }
 
-fit::result<Error, DumpFile::Buffer> DumpFile::Stdio::Read(FileRange where) {
+fit::result<Error, Buffer<>> DumpFile::Stdio::ReadMemory(FileRange where) {
+  auto result = Read(where);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  Buffer<> buffer;
+  auto copy = std::make_unique<BufferImplVector>(*std::move(result));
+  buffer.data_ = cpp20::span<std::byte>(*copy);
+  buffer.impl_ = std::move(copy);
+  return fit::ok(std::move(buffer));
+}
+
+fit::result<Error, DumpFile::ByteVector> DumpFile::Stdio::Read(FileRange where) {
   if (!stream_) {
     return fit::error(Error{"read_memory disabled", ZX_ERR_NOT_SUPPORTED});
   }
@@ -69,7 +83,7 @@ fit::result<Error, DumpFile::Buffer> DumpFile::Stdio::Read(FileRange where) {
   // needed might overlap with the end of the probe that was more than it
   // turned out was actually needed for the header.  So in that case we can
   // steal the data from the ephemeral_buffer_ already on hand.
-  Buffer buffer(where.size);
+  ByteVector buffer(where.size);
   std::byte* data = buffer.data();
   while (where.offset < pos_) {
     ByteView old_data{ephemeral_buffer_.data(), ephemeral_buffer_range_.size};

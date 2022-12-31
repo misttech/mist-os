@@ -1213,6 +1213,7 @@ _asan_variant = {
     "instrumented",
     "lsan",
     "replaces-allocator",
+    "uses-shadow",
     "kernel-excluded",
   ]
 }
@@ -1381,10 +1382,11 @@ declare_args() {
     {
       configs = [ "//build/config/sanitizers:tsan" ]
       tags = [
+        "tsan",
         "instrumentation-runtime",
         "instrumented",
+        "uses-shadow",
         "kernel-excluded",
-        "tsan",
       ]
     },
     {
@@ -1395,6 +1397,7 @@ declare_args() {
         "instrumented",
         "kernel-excluded",
         "replaces-allocator",
+        "uses-shadow",
         "fuchsia-only",
       ]
     },

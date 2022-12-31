@@ -11,13 +11,13 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/syscalls/resource.h>
 
-#include <algorithm>
 #include <charconv>
 #include <forward_list>
 #include <variant>
 
 #include <rapidjson/document.h>
 
+#include "buffer-impl.h"
 #include "core.h"
 #include "dump-file.h"
 #include "job-archive.h"
@@ -869,6 +869,10 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
   // Process-wide notes will accumulate in the Process.
   Process process(*this);
+  if (read_memory) {
+    // The back-pointer is needed by Process::ReadMemoryImpl.
+    process.dump_ = &file;
+  }
 
   // Per-thread notes will accumulate in the thread until a new thread's first
   // note is seen.

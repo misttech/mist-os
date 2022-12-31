@@ -9,6 +9,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -23,17 +24,22 @@ namespace {
 
 constexpr std::string_view kStdinoutFilename = "-";
 
-constexpr char kOptString[] = "c:e:o:t:x:";
+constexpr char kOptString[] = "c:e:m:M:o:t:x:";
 constexpr option kLongOpts[] = {
-    {"cat-from", required_argument, nullptr, 'c'},  //
-    {"cat-to", required_argument, nullptr, 'o'},    //
-    {"echo", required_argument, nullptr, 'e'},      //
-    {"threads", required_argument, nullptr, 't'},   //
-    {"exit", required_argument, nullptr, 'x'},      //
+    {"cat-from", required_argument, nullptr, 'c'},     //
+    {"cat-to", required_argument, nullptr, 'o'},       //
+    {"echo", required_argument, nullptr, 'e'},         //
+    {"memory", required_argument, nullptr, 'm'},       //
+    {"memory-ints", required_argument, nullptr, 'M'},  //
+    {"threads", required_argument, nullptr, 't'},      //
+    {"exit", required_argument, nullptr, 'x'},         //
 };
 
 int Usage() {
-  fprintf(stderr, "Usage: test-child [--echo=STRING] [--cat=FILE] [--threads=N]\n");
+  fprintf(stderr,
+          "Usage: test-child [--echo=STRING] [--memory=STRING] [--memory-ints=INT,...] "
+          "[--cat-from=FILE] [--cat-to=FILE] "
+          "[--threads=N]\n");
   return 1;
 }
 
@@ -89,6 +95,7 @@ void CatTo(const char* filename) {
 
 int main(int argc, char** argv) {
   size_t thread_count = 0;
+  std::vector<int> ints;
 
   while (true) {
     switch (getopt_long(argc, argv, kOptString, kLongOpts, nullptr)) {
@@ -107,6 +114,21 @@ int main(int argc, char** argv) {
       case 'e':
         puts(optarg);
         continue;
+
+      case 'm':
+        printf("%p\n", optarg);
+        continue;
+
+      case 'M': {
+        std::string optstring = optarg;
+        char* rest = optstring.data();
+        char* p;
+        while ((p = strsep(&rest, ",")) != nullptr) {
+          ints.push_back(atoi(p));
+        }
+        printf("%p\n", ints.data());
+        continue;
+      }
 
       case 't':
         thread_count = atoi(optarg);
@@ -131,6 +153,8 @@ int main(int argc, char** argv) {
   if (thread_count > 0) {
     printf("started %zu additional threads\n", thread_count);
   }
+
+  fflush(stdout);
 
   Hang();
 

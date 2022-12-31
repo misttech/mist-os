@@ -9,6 +9,7 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("zxdump") {
   sdk = "source"
   sdk_headers = [
+    "lib/zxdump/buffer.h",
     "lib/zxdump/dump.h",
     "lib/zxdump/fd-writer.h",
     "lib/zxdump/task.h",
@@ -41,6 +42,8 @@ zx_library("zxdump") {
   }
 
   sources = [
+    "buffer-impl.cc",
+    "buffer-impl.h",
     "core.h",
     "dump-file-mmap.cc",
     "dump-file-mmap.h",
@@ -53,6 +56,7 @@ zx_library("zxdump") {
     "error.cc",
     "fd-writer.cc",
     "job-archive.h",
+    "read-memory.cc",
     "read.cc",
     "rights.h",
     "task.cc",
@@ -233,6 +237,10 @@ test("zxdump-unittests") {
 
 executable("zxdump-test-child") {
   testonly = true
+
+  # Don't sanitize the test program in ways that give it too much accessible
+  # memory to fit into a reasonably-sized dump file.
+  exclude_toolchain_tags = [ "uses-shadow" ]
 
   sources = [ "test-child.cc" ]
   deps = [

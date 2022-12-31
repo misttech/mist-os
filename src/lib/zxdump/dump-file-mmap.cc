@@ -36,6 +36,17 @@ fit::result<Error, ByteView> DumpFile::Mmap::ReadProbe(FileRange where) {
   return ReadEphemeral(where);
 }
 
+fit::result<Error, Buffer<>> DumpFile::Mmap::ReadMemory(FileRange where) {
+  auto result = ReadPermanent(where);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  Buffer<> buffer;
+  buffer.data_ = result.value();
+  // There is nothing to own, so this doesn't set the impl_ pointer at all.
+  return fit::ok(std::move(buffer));
+}
+
 // All the data that will be read has been read.
 void DumpFile::Mmap::shrink_to_fit() {
   const size_t page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));

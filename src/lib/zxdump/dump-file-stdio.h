@@ -47,6 +47,9 @@ class DumpFile::Stdio : public DumpFile {
   // until the next call to this method.  The data must be present.
   fit::result<Error, ByteView> ReadEphemeral(FileRange where) override;
 
+  // Use the Buffer object to own the data returned.
+  fit::result<Error, Buffer<>> ReadMemory(FileRange where) override;
+
   void shrink_to_fit() override { stream_.reset(); }
 
  private:
@@ -54,11 +57,11 @@ class DumpFile::Stdio : public DumpFile {
     void operator()(FILE* stream) const { fclose(stream); }
   };
 
-  fit::result<Error, Buffer> Read(FileRange where);
+  fit::result<Error, ByteVector> Read(FileRange where);
 
   std::unique_ptr<FILE, StdioCloser> stream_;
-  std::forward_list<Buffer> keepalive_;
-  Buffer ephemeral_buffer_;
+  std::forward_list<ByteVector> keepalive_;
+  ByteVector ephemeral_buffer_;
   FileRange ephemeral_buffer_range_{};
   size_t size_ = 0;
   size_t pos_ = 0;

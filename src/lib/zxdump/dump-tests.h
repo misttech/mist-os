@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstdio>
+#include <string_view>
 #include <vector>
 
 #include <fbl/unique_fd.h>
@@ -98,6 +99,11 @@ class TestProcess {
   static fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneAllMemory(
       zxdump::SegmentDisposition segment, const zx_info_maps_t& maps, const zx_info_vmo_t& vmo) {
     segment.filesz = 0;
+    return fit::ok(segment);
+  }
+
+  static fit::result<zxdump::Error, zxdump::SegmentDisposition> DumpAllMemory(
+      zxdump::SegmentDisposition segment, const zx_info_maps_t& maps, const zx_info_vmo_t& vmo) {
     return fit::ok(segment);
   }
 
@@ -231,6 +237,23 @@ class TestProcessForRemarks : public TestProcessForPropertiesAndInfo {
   static constexpr const char* kChildName = "zxdump-remarks-test-child";
 
   static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
+};
+
+class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
+ public:
+  // Start a child for basic memory dump testing.
+  void StartChild();
+
+  // Verify a dump file for that child was inserted and looks right.
+  void CheckDump(zxdump::TaskHolder& holder, bool memory_elided = false);
+
+ private:
+  static constexpr const char* kChildName = "zxdump-memory-test-child";
+  static constexpr std::string_view kMemoryText = "in the course of human events";
+  static constexpr std::array kMemoryInts = {17, 23, 42, 55, 66};
+
+  uint64_t text_ptr_ = 0;
+  uint64_t ints_ptr_ = 0;
 };
 
 }  // namespace zxdump::testing

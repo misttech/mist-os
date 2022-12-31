@@ -21,6 +21,7 @@
 #include <lib/zx/handle.h>
 #endif
 
+#include "buffer.h"
 #include "types.h"
 
 namespace zxdump {
@@ -69,6 +70,11 @@ class Task;
 class Job;
 class Process;
 class Thread;
+
+// This is an opaque type used internally.
+namespace internal {
+class DumpFile;
+}  // namespace internal
 
 // This is the API for reading in dumps, both `ET_CORE` files and job archives.
 //
@@ -365,6 +371,48 @@ class Process : public Task {
   // Find a task by KOID: this process or one of its threads.
   fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
 
+  // Read process memory at the given vaddr.  This tries to read at least count
+  // contiguous elements of type T, and succeeds if that was valid memory of
+  // type T in the process.  If readahead is true, it might return more than
+  // count elements if more were cheaply available to be read.  In any event,
+  // it will never return fewer than count elements--except that it can return
+  // an empty buffer if the memory was elided from the dump.  The success
+  // return value is a move-only type; see <zxdump/buffer.h> for full details.
+  template <typename T = std::byte, class View = cpp20::span<const T>>
+  fit::result<Error, Buffer<T, View>> read_memory(uint64_t vaddr, size_t count,
+                                                  bool readahead = false) {
+    static_assert(!std::is_reference_v<T>,
+                  "cannot instantiate zxdump::Process::read_memory with a reference type");
+    static_assert(
+        std::is_same_v<const T*, decltype(std::data(View{}))>,
+        "must instantiate zxdump::Process::read_memory with corresponding T and View types");
+    static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+                  "alignment too large; must read as bytes and copy data");
+    auto result = ReadMemoryImpl(vaddr, count * sizeof(T), readahead);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return fit::ok(static_cast<Buffer<T, View>>(*std::move(result)));
+  }
+
+  // This just reads a single datum of type T from dumped process memory at
+  // vaddr, and simply returns it by value.
+  template <typename T>
+  fit::result<Error, T> read_memory(uint64_t vaddr) {
+    using namespace std::literals;
+    auto result = read_memory<T>(vaddr, 1);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    if (result->empty()) {
+      return fit::error{Error{
+          .op_ = "memory elided from dump"sv,
+          .status_ = ZX_ERR_NO_MEMORY,
+      }};
+    }
+    return fit::ok(result->front());
+  }
+
  private:
   friend TaskHolder::JobTree;
 
@@ -374,8 +422,11 @@ class Process : public Task {
 
   using Task::Task;
 
+  fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead);
+
   std::map<zx_koid_t, Thread> threads_;
   std::map<uint64_t, Segment> memory_;
+  internal::DumpFile* dump_ = nullptr;
 };
 
 // A Job is a Task and also has child jobs and processes.

@@ -4,10 +4,20 @@
 
 #include "dump-tests.h"
 
+#include <lib/fit/defer.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/fd-writer.h>
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
+#include <unistd.h>
+
+#include <array>
+#include <cinttypes>
+#include <cstdio>
+#include <type_traits>
+
+#include <fbl/unique_fd.h>
 
 #include <gmock/gmock.h>
 
@@ -235,6 +245,117 @@ void TestProcessForRemarks::CheckDump(zxdump::TaskHolder& holder) {
       default:
         FAIL() << "too many remarks";
         break;
+    }
+  }
+}
+
+std::string IntsString(cpp20::span<const int> ints) {
+  std::string str;
+  for (int i : ints) {
+    if (!str.empty()) {
+      str += ',';
+    }
+    str += std::to_string(i);
+  }
+  return str;
+}
+
+void TestProcessForMemory::StartChild() {
+  SpawnAction({
+      .action = FDIO_SPAWN_ACTION_SET_NAME,
+      .name = {kChildName},
+  });
+
+  fbl::unique_fd read_pipe;
+  {
+    int pipe_fd[2];
+    ASSERT_EQ(0, pipe(pipe_fd)) << strerror(errno);
+    read_pipe.reset(pipe_fd[STDIN_FILENO]);
+    SpawnAction({
+        .action = FDIO_SPAWN_ACTION_TRANSFER_FD,
+        .fd = {.local_fd = pipe_fd[STDOUT_FILENO], .target_fd = STDOUT_FILENO},
+    });
+  }
+
+  ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild({
+      "-m",
+      kMemoryText.data(),
+      "-M",
+      IntsString(cpp20::span(kMemoryInts)).c_str(),
+  }));
+
+  // The test-child wrote the pointers where the -m text and -M int array
+  // appear in its memory.  Reading these immediately synchronizes with the
+  // child having started up and progressed far enough to have this memory in
+  // place before the process gets dumped.
+  FILE* pipef = fdopen(read_pipe.get(), "r");
+  ASSERT_TRUE(pipef) << "fdopen: " << read_pipe.get() << strerror(errno);
+  auto close_pipef = fit::defer([pipef]() { fclose(pipef); });
+  std::ignore = read_pipe.release();
+
+  ASSERT_EQ(2, fscanf(pipef, "%" SCNx64 "\n%" SCNx64, &text_ptr_, &ints_ptr_));
+}
+
+void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_elided) {
+  auto find_result = holder.root_job().find(koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  {
+    auto name_result = read_process.get_property<ZX_PROP_NAME>();
+    ASSERT_TRUE(name_result.is_ok()) << name_result.error_value();
+    std::string_view name(name_result->data(), name_result->size());
+    name = name.substr(0, name.find_first_of('\0'));
+    EXPECT_EQ(name, std::string_view(kChildName));
+  }
+
+  // Basic test.
+  {
+    auto memory_result = read_process.read_memory<char>(text_ptr_, kMemoryText.size());
+    ASSERT_TRUE(memory_result.is_ok())
+        << memory_result.error_value() << " reading 0x" << std::hex << text_ptr_;
+    if (memory_elided) {
+      EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
+    } else {
+      std::string_view text{(memory_result->data()), memory_result->size()};
+      ASSERT_EQ(text.size(), kMemoryText.size());
+      EXPECT_EQ(text, kMemoryText) << " reading 0x" << std::hex << text_ptr_;
+    }
+  }
+
+  // Test with a non-byte-sized type.
+  {
+    auto memory_result = read_process.read_memory<int>(ints_ptr_, kMemoryInts.size());
+    ASSERT_TRUE(memory_result.is_ok())
+        << memory_result.error_value() << " reading 0x" << std::hex << ints_ptr_;
+    cpp20::span ints = **memory_result;
+    if (memory_elided) {
+      EXPECT_TRUE(ints.empty()) << " read " << ints.size_bytes();
+    } else {
+      static_assert(std::is_same_v<const int, decltype(ints)::element_type>);
+      ASSERT_EQ(ints.size(), kMemoryInts.size());
+      for (size_t i = 0; i < kMemoryInts.size(); ++i) {
+        EXPECT_EQ(ints[i], kMemoryInts[i]);
+      }
+    }
+  }
+
+  // Readahead test.
+  {
+    // Only ask to read half the string's actual size, so there will definitely
+    // be more than that available in the dump.
+    auto memory_result = read_process.read_memory<char>(text_ptr_, kMemoryText.size() / 2, true);
+    ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+    if (memory_elided) {
+      EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
+    } else {
+      std::string_view text{(memory_result->data()), memory_result->size()};
+      // Even if the whole string ended on a page boundary, that much (which we
+      // know is more than the minimum requested) will be available.
+      ASSERT_GE(text.size(), kMemoryText.size());
+      EXPECT_TRUE(cpp20::starts_with(text, kMemoryText));
     }
   }
 }
@@ -503,6 +624,38 @@ TEST(ZxdumpTests, ProcessDumpRemarks) {
 }
 
 // TODO(mcgrathr): test job archives with remarks, nested repeats
+
+TEST(ZxdumpTests, ProcessDumpMemory) {
+  TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  TestProcessForMemory process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
+
+  auto collect_result = dump.CollectProcess(TestProcess::DumpAllMemory);
+  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
+
+  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
+  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
+
+  auto write_result = writer.WriteFragments();
+  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
+  const size_t bytes_written = write_result.value();
+
+  auto memory_result = dump.DumpMemory(writer.WriteCallback());
+  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+  const size_t total_with_memory = memory_result.value();
+
+  // Dumping the memory should have added a bunch to the dump.
+  EXPECT_LT(bytes_written, total_with_memory);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
 
 }  // namespace
 }  // namespace zxdump::testing

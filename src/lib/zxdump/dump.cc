@@ -860,14 +860,15 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
           // Send it to the callback to write it out.
           if (dump(offset, chunk)) {
-            break;
+            return fit::ok(offset);
           }
 
           vaddr += chunk.size();
           offset += chunk.size();
           left -= chunk.size();
         } while (left > 0);
-        ZX_DEBUG_ASSERT(offset == segment.offset + size);
+        ZX_DEBUG_ASSERT_MSG(offset == segment.offset + size, "%#zx != %#zx + %#zx", offset,
+                            segment.offset(), size);
       }
     }
     return fit::ok(offset);

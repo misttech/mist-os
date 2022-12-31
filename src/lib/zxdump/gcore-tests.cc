@@ -624,4 +624,37 @@ TEST(ZxdumpTests, GcoreProcessDumpRemarksBadJson) {
   EXPECT_NE(child.collected_stderr(), "");
 }
 
+TEST(ZxdumpTests, GcoreProcessDumpMemory) {
+  zxdump::testing::TestProcessForMemory process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  const auto& [dump_file, prefix, pid_string] =
+      GetOutputFile(child, "process-dump-memory-no-threads", process.koid());
+  std::vector<std::string> args({
+      // Don't include threads.
+      kNoThreadsSwitch,
+      kOutputSwitch,
+      prefix,
+      pid_string,
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_SUCCESS);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_EQ(child.collected_stderr(), "");
+
+  fbl::unique_fd fd = dump_file.OpenOutput();
+  ASSERT_TRUE(fd) << dump_file.name() << ": " << strerror(errno);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(fd));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
 }  // namespace

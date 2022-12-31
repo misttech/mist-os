@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "dump-tests.h"
+#include "test-file.h"
 #include "test-tool-process.h"
 
 // Much reader functionality is tested in dump-tests.cc in tandem with testing
@@ -52,6 +53,38 @@ TEST(ZxdumpTests, ReadZstdProcessDump) {
 
   // The zstd tool shouldn't complain.
   EXPECT_EQ(zstd.collected_stderr(), "");
+}
+
+TEST(ZxdumpTests, ReadMemoryElided) {
+  zxdump::testing::TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  zxdump::testing::TestProcessForMemory process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
+
+  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::PruneAllMemory);
+  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
+
+  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
+  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
+
+  auto write_result = writer.WriteFragments();
+  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
+  const size_t bytes_written = write_result.value();
+
+  auto memory_result = dump.DumpMemory(writer.WriteCallback());
+  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+  const size_t total_with_memory = memory_result.value();
+
+  // No memory should have been written to increase the size of the dump.
+  EXPECT_EQ(bytes_written, total_with_memory);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, true));
 }
 
 }  // namespace

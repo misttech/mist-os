@@ -4,6 +4,8 @@
 
 #include "dump-file-zstd.h"
 
+#include "buffer-impl.h"
+
 namespace zxdump::internal {
 
 bool DumpFile::IsCompressed(ByteView header) { return ZSTD_isFrame(header.data(), header.size()); }
@@ -44,7 +46,7 @@ void DumpFile::Zstd::shrink_to_fit() {
 // Put some data through the decompressor.
 fit::result<Error, bool> DumpFile::Zstd::Pump(ByteView compressed, size_t skip) {
   if (buffer_.empty()) {
-    buffer_ = Buffer{ZSTD_DStreamOutSize()};
+    buffer_ = ByteVector{ZSTD_DStreamOutSize()};
   }
   ZSTD_inBuffer in = {compressed.data(), compressed.size(), 0};
   ZSTD_outBuffer out = {buffer_.data(), buffer_.size(), skip};
@@ -69,6 +71,22 @@ fit::result<Error, bool> DumpFile::Zstd::Pump(ByteView compressed, size_t skip) 
   // This is zero when the stream is complete.
   file_pos_.size = result;
   return fit::ok(in.pos > 0);
+}
+
+fit::result<Error, Buffer<>> DumpFile::Zstd::ReadMemory(FileRange where) {
+  // Read into a fresh buffer, which will be saved on keepalive_.
+  auto result = ReadPermanent(where);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  // Pop the buffer off keepalive_ to transfer its ownership.
+  ZX_ASSERT(keepalive_.front().data() == result->data());
+  Buffer<> buffer;
+  auto copy = std::make_unique<BufferImplVector>(std::move(keepalive_.front()));
+  keepalive_.pop_front();
+  buffer.data_ = cpp20::span<std::byte>(*copy);
+  buffer.impl_ = std::move(copy);
+  return fit::ok(std::move(buffer));
 }
 
 fit::result<Error, ByteView> DumpFile::Zstd::Read(FileRange where, bool permanent, bool probe) {
@@ -98,8 +116,8 @@ fit::result<Error, ByteView> DumpFile::Zstd::Read(FileRange where, bool permanen
 
     // Ordinarily we only need to keep the buffer alive long enough
     // to copy old data out of it.
-    Buffer keepalive;
-    if (buffer_.size() != 0) {
+    ByteVector keepalive;
+    if (!buffer_.empty()) {
       std::swap(buffer_, keepalive);
 
       if (save_old_buffer) {
@@ -114,7 +132,7 @@ fit::result<Error, ByteView> DumpFile::Zstd::Read(FileRange where, bool permanen
     }
 
     if (buffer_.size() < new_size) {
-      buffer_ = Buffer{new_size};
+      buffer_ = ByteVector{new_size};
       if (!buffered.empty()) {
         size_t count = std::min(buffered.size(), buffer_.size());
         std::copy(buffered.begin(), buffered.begin() + count, buffer_.data());
@@ -135,13 +153,13 @@ fit::result<Error, ByteView> DumpFile::Zstd::Read(FileRange where, bool permanen
       return TruncatedDump();
     }
     if (permanent) {
-      Buffer saved;
+      ByteVector saved;
       if (buffered.data() == buffer_.data() && buffer_.size() == where.size) {
         // The whole buffer is just right, so steal it to be permanent.
         std::swap(saved, buffer_);
       } else {
         // Copy into a new permanent buffer.
-        saved = Buffer{where.size};
+        saved = ByteVector{where.size};
         size_t count = std::min(buffered.size(), saved.size());
         std::copy(buffered.begin(), buffered.begin() + count, saved.data());
         buffered = {saved.data(), count};

@@ -34,6 +34,8 @@ class DumpFile::Zstd : public DumpFile {
 
   fit::result<Error, ByteView> ReadPermanent(FileRange where) override;
 
+  fit::result<Error, Buffer<>> ReadMemory(FileRange where) override;
+
   void shrink_to_fit() override;
 
   // Put some data through the decompressor.
@@ -57,15 +59,15 @@ class DumpFile::Zstd : public DumpFile {
 
   // Decompression writes into this buffer, corresponding to a range of the
   // uncompressed file image.  This acts as the ephemeral buffer too.
-  Buffer buffer_;
+  ByteVector buffer_;
   FileRange buffer_range_{};
 
   // ReadPermanent results are kept here.
-  std::forward_list<Buffer> keepalive_;
+  std::forward_list<ByteVector> keepalive_;
 
   // Occasionally a dangling ephemeral buffer has to be kept alive
   // temporarily when a new buffer is allocated.
-  std::forward_list<Buffer> ephemeral_;
+  std::forward_list<ByteVector> ephemeral_;
 };
 
 }  // namespace zxdump::internal

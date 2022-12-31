@@ -6,6 +6,7 @@
 #define SRC_LIB_ZXDUMP_DUMP_FILE_H_
 
 #include <lib/fit/result.h>
+#include <lib/zxdump/buffer.h>
 #include <lib/zxdump/types.h>
 #include <zircon/assert.h>
 
@@ -109,9 +110,16 @@ class DumpFile {
   // return a shorter range rather than the "truncated dump" error.
   virtual fit::result<Error, ByteView> ReadProbe(FileRange fr) = 0;
 
+  // Read a range of the file, yielding a Buffer object whose lifetime is tied
+  // to the lifetime of this DumpFile object.  The given range is the minimum
+  // range that must be read.  If less is available, failure is returned
+  // (possibly using the "truncated dump" error).  More may be returned if it
+  // is conveniently at hand.
+  virtual fit::result<Error, Buffer<>> ReadMemory(FileRange fr) = 0;
+
  private:
   // This is used by both Stdio and Zstd.
-  using Buffer = std::vector<std::byte>;
+  using ByteVector = std::vector<std::byte>;
 
   // These are the different implementation subclasses.
   class Stdio;
