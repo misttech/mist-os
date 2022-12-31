@@ -241,19 +241,31 @@ class TestProcessForRemarks : public TestProcessForPropertiesAndInfo {
 
 class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
  public:
+  // This is the test data made present in the child's memory by StartChild.
+  static constexpr std::string_view kMemoryText = "in the course of human events";
+  static constexpr std::wstring_view kMemoryWideText = L"in the course of human events";
+  static constexpr std::array kMemoryInts = {17, 23, 42, 55, 66};
+
   // Start a child for basic memory dump testing.
   void StartChild();
 
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder, bool memory_elided = false);
 
+  // These give the addresses where the test data is found in the child.
+
+  uint64_t text_ptr() const { return text_ptr_; }
+
+  uint64_t ints_ptr() const { return ints_ptr_; }
+
+  uint64_t wtext_ptr() const { return wtext_ptr_; }
+
  private:
   static constexpr const char* kChildName = "zxdump-memory-test-child";
-  static constexpr std::string_view kMemoryText = "in the course of human events";
-  static constexpr std::array kMemoryInts = {17, 23, 42, 55, 66};
 
   uint64_t text_ptr_ = 0;
   uint64_t ints_ptr_ = 0;
+  uint64_t wtext_ptr_ = 0;
 };
 
 }  // namespace zxdump::testing

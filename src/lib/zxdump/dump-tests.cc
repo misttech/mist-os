@@ -282,6 +282,8 @@ void TestProcessForMemory::StartChild() {
       kMemoryText.data(),
       "-M",
       IntsString(cpp20::span(kMemoryInts)).c_str(),
+      "-w",
+      kMemoryText.data(),
   }));
 
   // The test-child wrote the pointers where the -m text and -M int array
@@ -293,7 +295,8 @@ void TestProcessForMemory::StartChild() {
   auto close_pipef = fit::defer([pipef]() { fclose(pipef); });
   std::ignore = read_pipe.release();
 
-  ASSERT_EQ(2, fscanf(pipef, "%" SCNx64 "\n%" SCNx64, &text_ptr_, &ints_ptr_));
+  ASSERT_EQ(
+      3, fscanf(pipef, "%" SCNx64 "\n%" SCNx64 "\n%" SCNx64, &text_ptr_, &ints_ptr_, &wtext_ptr_));
 }
 
 void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_elided) {

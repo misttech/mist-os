@@ -56,6 +56,7 @@ zx_library("zxdump") {
     "error.cc",
     "fd-writer.cc",
     "job-archive.h",
+    "read-memory-string.cc",
     "read-memory.cc",
     "read.cc",
     "rights.h",

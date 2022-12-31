@@ -87,4 +87,116 @@ TEST(ZxdumpTests, ReadMemoryElided) {
   ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, true));
 }
 
+TEST(ZxdumpTests, ReadMemoryString) {
+  zxdump::testing::TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  zxdump::testing::TestProcessForMemory process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
+
+  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::DumpAllMemory);
+  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
+
+  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
+  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
+
+  auto write_result = writer.WriteFragments();
+  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
+  const size_t bytes_written = write_result.value();
+
+  auto memory_result = dump.DumpMemory(writer.WriteCallback());
+  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+  const size_t total_with_memory = memory_result.value();
+
+  // Dumping the memory should have added a bunch to the dump.
+  EXPECT_LT(bytes_written, total_with_memory);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+
+  auto find_result = holder.root_job().find(process.koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  // Simple string test.
+  {
+    auto result = read_process.read_memory_string(process.text_ptr());
+    ASSERT_TRUE(result.is_ok()) << result.error_value() << " reading 0x" << std::hex
+                                << process.text_ptr();
+    EXPECT_EQ(zxdump::testing::TestProcessForMemory::kMemoryText, *result);
+  }
+
+  // Wide-character string test.
+  {
+    auto result = read_process.read_memory_wstring(process.wtext_ptr());
+    ASSERT_TRUE(result.is_ok()) << result.error_value() << " reading 0x" << std::hex
+                                << process.wtext_ptr();
+    EXPECT_EQ(zxdump::testing::TestProcessForMemory::kMemoryWideText, *result);
+  }
+
+  // Unterminated (limited) string test.
+  {
+    auto result = read_process.read_memory_string(
+        process.text_ptr(), zxdump::testing::TestProcessForMemory::kMemoryText.size() / 2);
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().status_, ZX_ERR_OUT_OF_RANGE);
+  }
+}
+
+TEST(ZxdumpTests, ReadMemoryStringElided) {
+  zxdump::testing::TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  zxdump::testing::TestProcessForMemory process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::ProcessDump<zx::unowned_process> dump(process.borrow());
+
+  auto collect_result = dump.CollectProcess(zxdump::testing::TestProcess::PruneAllMemory);
+  ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
+
+  auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
+  ASSERT_TRUE(dump_result.is_ok()) << dump_result.error_value();
+
+  auto write_result = writer.WriteFragments();
+  ASSERT_TRUE(write_result.is_ok()) << write_result.error_value();
+  const size_t bytes_written = write_result.value();
+
+  auto memory_result = dump.DumpMemory(writer.WriteCallback());
+  ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+  const size_t total_with_memory = memory_result.value();
+
+  // No memory should have been written to increase the size of the dump.
+  EXPECT_EQ(bytes_written, total_with_memory);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+
+  auto find_result = holder.root_job().find(process.koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  // Simple string test.
+  {
+    auto result = read_process.read_memory_string(process.text_ptr());
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().status_, ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Wide-character string test.
+  {
+    auto result = read_process.read_memory_wstring(process.wtext_ptr());
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().status_, ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
 }  // namespace

@@ -6,10 +6,12 @@
 #include <getopt.h>
 #include <lib/stdcompat/span.h>
 #include <unistd.h>
+#include <zircon/assert.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <locale>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -24,15 +26,16 @@ namespace {
 
 constexpr std::string_view kStdinoutFilename = "-";
 
-constexpr char kOptString[] = "c:e:m:M:o:t:x:";
+constexpr char kOptString[] = "c:e:m:M:o:t:w:x:";
 constexpr option kLongOpts[] = {
-    {"cat-from", required_argument, nullptr, 'c'},     //
-    {"cat-to", required_argument, nullptr, 'o'},       //
-    {"echo", required_argument, nullptr, 'e'},         //
-    {"memory", required_argument, nullptr, 'm'},       //
-    {"memory-ints", required_argument, nullptr, 'M'},  //
-    {"threads", required_argument, nullptr, 't'},      //
-    {"exit", required_argument, nullptr, 'x'},         //
+    {"cat-from", required_argument, nullptr, 'c'},      //
+    {"cat-to", required_argument, nullptr, 'o'},        //
+    {"echo", required_argument, nullptr, 'e'},          //
+    {"memory", required_argument, nullptr, 'm'},        //
+    {"memory-ints", required_argument, nullptr, 'M'},   //
+    {"threads", required_argument, nullptr, 't'},       //
+    {"memory-wchar", required_argument, nullptr, 'w'},  //
+    {"exit", required_argument, nullptr, 'x'},          //
 };
 
 int Usage() {
@@ -96,6 +99,7 @@ void CatTo(const char* filename) {
 int main(int argc, char** argv) {
   size_t thread_count = 0;
   std::vector<int> ints;
+  std::wstring wstr;
 
   while (true) {
     switch (getopt_long(argc, argv, kOptString, kLongOpts, nullptr)) {
@@ -133,6 +137,15 @@ int main(int argc, char** argv) {
       case 't':
         thread_count = atoi(optarg);
         continue;
+
+      case 'w': {
+        std::string_view byte_string = optarg;
+        wstr.resize(byte_string.size());
+        wstr.resize(mbstowcs(wstr.data(), byte_string.data(), wstr.size()));
+        ZX_ASSERT(wstr.size() == byte_string.size());
+        printf("%p\n", wstr.data());
+        continue;
+      }
 
       case 'x':
         return atoi(optarg);

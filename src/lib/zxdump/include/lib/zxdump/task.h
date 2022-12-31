@@ -6,9 +6,11 @@
 #define SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_TASK_H_
 
 #include <lib/fit/result.h>
+#include <lib/stdcompat/version.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/debug.h>
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -25,6 +27,8 @@
 #include "types.h"
 
 namespace zxdump {
+
+constexpr size_t kReadMemoryStringLimit = 1024;
 
 // On Fuchsia, live task handles can be used via the lib/zx API.  On other
 // systems, the API parts for live tasks are still available but they use a
@@ -388,6 +392,12 @@ class Process : public Task {
         "must instantiate zxdump::Process::read_memory with corresponding T and View types");
     static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
                   "alignment too large; must read as bytes and copy data");
+    if (vaddr % alignof(T) != 0) {
+      return fit::error{Error{
+          .op_ = "vaddr misaligned for type",
+          .status_ = ZX_ERR_INVALID_ARGS,
+      }};
+    }
     auto result = ReadMemoryImpl(vaddr, count * sizeof(T), readahead);
     if (result.is_error()) {
       return result.take_error();
@@ -413,6 +423,48 @@ class Process : public Task {
     return fit::ok(result->front());
   }
 
+  // Convenience function to read a C-style NUL-terminated string, while
+  // reading no more than limit chars total.  No string is returned if no NUL
+  // terminator is found, but the std::string returned does not include the NUL
+  // terminator in its size() value (though of course its c_str() value is
+  // NUL-terminated).  If the memory is accessible but no NUL terminator is
+  // found before the size limit is reached, the error result will use
+  // ZX_ERR_OUT_OF_RANGE.  If the necessary memory was simply elided from the
+  // dump, the error result will use ZX_ERR_NOT_SUPPORTED.
+  fit::result<Error, std::string> read_memory_string(uint64_t vaddr,
+                                                     size_t limit = kReadMemoryStringLimit) {
+    return read_memory_basic_string<char>(vaddr, limit);
+  }
+
+  // The same thing is provided in u8string, u16string, u32string, and wstring
+  // variants.
+
+#if __cpp_lib_char8_t
+  fit::result<Error, std::u8string> read_memory_u8string(uint64_t vaddr,
+                                                         size_t limit = kReadMemoryStringLimit /
+                                                                        sizeof(char8_t)) {
+    return read_memory_basic_string<char8_t>(vaddr, limit);
+  }
+#endif
+
+  fit::result<Error, std::u16string> read_memory_u16string(uint64_t vaddr,
+                                                           size_t limit = kReadMemoryStringLimit /
+                                                                          sizeof(char16_t)) {
+    return read_memory_basic_string<char16_t>(vaddr, limit);
+  }
+
+  fit::result<Error, std::u32string> read_memory_u32string(uint64_t vaddr,
+                                                           size_t limit = kReadMemoryStringLimit /
+                                                                          sizeof(char32_t)) {
+    return read_memory_basic_string<char32_t>(vaddr, limit);
+  }
+
+  fit::result<Error, std::wstring> read_memory_wstring(uint64_t vaddr,
+                                                       size_t limit = kReadMemoryStringLimit /
+                                                                      sizeof(wchar_t)) {
+    return read_memory_basic_string<wchar_t>(vaddr, limit);
+  }
+
  private:
   friend TaskHolder::JobTree;
 
@@ -424,10 +476,28 @@ class Process : public Task {
 
   fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead);
 
+  template <typename CharT = char>
+  fit::result<Error, std::basic_string<CharT>> read_memory_basic_string(
+      uint64_t vaddr, size_t limit = kReadMemoryStringLimit / sizeof(CharT));
+
   std::map<zx_koid_t, Thread> threads_;
   std::map<uint64_t, Segment> memory_;
   internal::DumpFile* dump_ = nullptr;
 };
+
+// Only these instantiations are actually defined in the library.
+extern template fit::result<Error, std::basic_string<char>> Process::read_memory_basic_string<char>(
+    uint64_t vaddr, size_t limit);
+#if __cpp_lib_char8_t
+extern template fit::result<Error, std::basic_string<char8_t>>
+Process::read_memory_basic_string<char8_t>(uint64_t vaddr, size_t limit);
+#endif
+extern template fit::result<Error, std::basic_string<char16_t>>
+Process::read_memory_basic_string<char16_t>(uint64_t vaddr, size_t limit);
+extern template fit::result<Error, std::basic_string<char32_t>>
+Process::read_memory_basic_string<char32_t>(uint64_t vaddr, size_t limit);
+extern template fit::result<Error, std::basic_string<wchar_t>>
+Process::read_memory_basic_string<wchar_t>(uint64_t vaddr, size_t limit);
 
 // A Job is a Task and also has child jobs and processes.
 class Job : public Task {
