@@ -26,6 +26,7 @@
 #ifdef __Fuchsia__
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <zircon/status.h>
 #endif
 
 namespace zxdump {
@@ -33,8 +34,6 @@ namespace zxdump {
 using namespace internal;
 
 namespace {
-
-using namespace std::literals;
 
 // The result of parsing an archive member header.  The name view may point
 // into the original header buffer, so this must live no longer than that.
@@ -164,8 +163,6 @@ class StringViewStream {
  private:
   std::string_view data_;
 };
-
-constexpr Error kTaskNotFound{"task KOID not found", ZX_ERR_NOT_FOUND};
 
 #ifdef __Fuchsia__
 using LiveJob = zx::job;
@@ -638,105 +635,6 @@ fit::result<Error, std::reference_wrapper<zxdump::Process::ThreadMap>> Process::
   return fit::ok(std::ref(threads_));
 }
 
-fit::result<Error, std::reference_wrapper<Object>> Object::find(zx_koid_t match) {
-  if (koid() == match) {
-    return fit::ok(std::ref(*this));
-  }
-  switch (this->type()) {
-    case ZX_OBJ_TYPE_JOB:
-      return static_cast<Job*>(this)->find(match);
-    case ZX_OBJ_TYPE_PROCESS:
-      return static_cast<Process*>(this)->find(match);
-  }
-  return fit::error{kTaskNotFound};
-}
-
-fit::result<Error, std::reference_wrapper<Task>> Job::find(zx_koid_t match) {
-  if (koid() == match) {
-    return fit::ok(std::ref(*this));
-  }
-
-  // First check our immediate child tasks.
-  if (auto it = children_.find(match); it != children_.end()) {
-    return fit::ok(std::ref(it->second));
-  }
-  if (auto it = processes_.find(match); it != processes_.end()) {
-    return fit::ok(std::ref(it->second));
-  }
-
-  if (live()) {
-    // Those maps aren't populated eagerly for live tasks.
-    // Instead, just query the kernel for this one KOID first.
-    LiveHandle live_child;
-
-    // zx::handle doesn't permit get_child, so momentarily move the live()
-    // handle to a zx::job.  On non-Fuchsia, it's all still no-ops.
-    LiveJob job{std::move(live())};
-    zx_status_t status = job.get_child(match, kChildRights, &live_child);
-    live() = std::move(job);
-
-    if (status == ZX_OK) {
-      // This is a child of ours, just not inserted yet.
-      InsertChild child;
-      auto result = tree().Insert(std::move(live_child), &child);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-
-      if (auto job = std::get_if<Job>(&child)) {
-        ZX_ASSERT(job->koid() == match);
-        auto [it, unique] = children_.emplace(match, std::move(*job));
-        ZX_DEBUG_ASSERT(unique);
-        return fit::ok(std::ref(it->second));
-      }
-
-      auto& process = std::get<Process>(child);
-      ZX_ASSERT(process.koid() == match);
-      auto [it, unique] = processes_.emplace(match, std::move(process));
-      ZX_DEBUG_ASSERT(unique);
-      return fit::ok(std::ref(it->second));
-    }
-  }
-
-  // For a live job, children() actively fills the children_ list.
-  if (auto result = children(); result.is_error()) {
-    return result.take_error();
-  }
-
-  // Recurse on the child jobs.
-  for (auto& [koid, job] : children_) {
-    auto result = job.find(match);
-    if (result.is_ok()) {
-      return result;
-    }
-  }
-
-  // For a live job, processes() actively fills the processes_ list.
-  if (auto result = processes(); result.is_error()) {
-    return result.take_error();
-  }
-
-  // Recurse on the child processes.
-  for (auto& [koid, process] : processes_) {
-    auto result = process.find(match);
-    if (result.is_ok()) {
-      return result;
-    }
-  }
-
-  return fit::error{kTaskNotFound};
-}
-
-fit::result<Error, std::reference_wrapper<Task>> Process::find(zx_koid_t match) {
-  if (koid() == match) {
-    return fit::ok(std::ref(*this));
-  }
-  if (auto it = threads_.find(match); it != threads_.end()) {
-    return fit::ok(std::ref(it->second));
-  }
-  return fit::error{kTaskNotFound};
-}
-
 std::byte* Object::GetBuffer(size_t size) { return tree().GetBuffer(size); }
 
 void Object::TakeBuffer(std::unique_ptr<std::byte[]> buffer) {
@@ -744,6 +642,11 @@ void Object::TakeBuffer(std::unique_ptr<std::byte[]> buffer) {
 }
 
 fit::result<Error, ByteView> Object::GetSuperrootInfo(zx_object_info_topic_t topic) {
+  if (this == &(tree().root_resource())) {
+    return fit::error{
+        Error{"no kernel information recorded", ZX_ERR_NOT_SUPPORTED},
+    };
+  }
   tree_.get().AssertIsSuperroot(*this);
   return tree_.get().GetSuperrootInfo(topic);
 }
@@ -1084,7 +987,8 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
   };
 
   // Validate a memory segment and add it to the memory map.
-  auto add_segment = [&process](uint64_t vaddr, Process::Segment segment)  //
+  auto add_segment = [where, &process](uint64_t vaddr,
+                                       Process::Segment segment)  //
       -> fit::result<Error> {
     ZX_DEBUG_ASSERT(segment.memsz > 0);
     if (!process.memory_.empty()) {
@@ -1103,6 +1007,22 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
         });
       }
     }
+
+    // Adjust the offset to place it within the archive, if any.
+    if (where.size < segment.offset) {
+      return fit::error(Error{
+          "ELF core file PT_LOAD p_offset past end of file",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      });
+    }
+    if (where.size - segment.offset < segment.filesz) {
+      return fit::error(Error{
+          "ELF core file PT_LOAD p_filesz past end of file",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      });
+    }
+    segment.offset += where.offset;
+
     process.memory_.emplace_hint(process.memory_.end(), vaddr, segment);
     return fit::ok();
   };
@@ -1425,6 +1345,72 @@ fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size
     live_memory_ = std::make_unique<LiveMemory>(tree().live_memory_cache());
   }
   return live_memory_->ReadLiveMemory(vaddr, size, size_mode, live(), tree().live_memory_cache());
+}
+
+fit::result<Error, std::reference_wrapper<Object>> Job::get_child(zx_koid_t koid) {
+  if (auto found = children_.find(koid); found != children_.end()) {
+    return fit::ok(std::ref(found->second));
+  }
+  if (auto found = processes_.find(koid); found != processes_.end()) {
+    return fit::ok(std::ref(found->second));
+  }
+  if (live()) {
+    // Those maps aren't populated eagerly for live tasks.
+    // Instead, just query the kernel for this one KOID.
+    LiveHandle live_child;
+
+    // zx::handle doesn't permit get_child, so momentarily move the live()
+    // handle to a zx::job.  On non-Fuchsia, it's all still no-ops.
+    LiveJob job{std::move(live())};
+    zx_status_t status = job.get_child(koid, kChildRights, &live_child);
+    live() = std::move(job);
+
+    if (status == ZX_OK) {
+      // This is a child of ours, just not inserted yet.
+      InsertChild child;
+      auto result = tree().Insert(std::move(live_child), &child);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      if (auto job = std::get_if<Job>(&child)) {
+        ZX_ASSERT(job->koid() == koid);
+        auto [it, unique] = children_.emplace(koid, std::move(*job));
+        ZX_DEBUG_ASSERT(unique);
+        return fit::ok(std::ref(it->second));
+      }
+
+      auto& process = std::get<Process>(child);
+      ZX_ASSERT(process.koid() == koid);
+      auto [it, unique] = processes_.emplace(koid, std::move(process));
+      ZX_DEBUG_ASSERT(unique);
+      return fit::ok(std::ref(it->second));
+    }
+  }
+  return fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
+}
+
+fit::result<Error, std::reference_wrapper<Object>> Process::get_child(zx_koid_t koid) {
+  if (auto found = threads_.find(koid); found != threads_.end()) {
+    return fit::ok(std::ref(found->second));
+  }
+  if (live()) {
+    LiveHandle live_child;
+    LiveProcess process{std::move(live())};
+    zx_status_t status = process.get_child(koid, kThreadRights, &live_child);
+    live() = std::move(process);
+    if (status != ZX_OK) {
+      return fit::error{Error{"zx_object_get_child", status}};
+    }
+    InsertChild child;
+    if (auto result = tree().Insert(std::move(live_child), &child); result.is_error()) {
+      return result.take_error();
+    }
+    Thread& thread = std::get<Thread>(child);
+    auto it = threads_.try_emplace(threads_.end(), koid, std::move(thread));
+    return fit::ok(std::ref(it->second));
+  }
+  return fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
 }
 
 }  // namespace zxdump

@@ -5,32 +5,53 @@
 #include <lib/zxdump/task.h>
 #include <zircon/assert.h>
 
+#ifdef __Fuchsia__
+#include <lib/zx/job.h>
+#include <lib/zx/process.h>
+#include <lib/zx/thread.h>
+#endif
+
+#include "rights.h"
+
 namespace zxdump {
+namespace {
+
+#ifdef __Fuchsia__
+using LiveJob = zx::job;
+using LiveProcess = zx::process;
+#else
+using LiveJob = LiveHandle;
+using LiveProcess = LiveHandle;
+#endif
 
 constexpr size_t kMaxPropertySize = ZX_MAX_NAME_LEN;
 
-zx_koid_t Object::koid() const {
-  if (auto found = info_.find(ZX_INFO_HANDLE_BASIC); found != info_.end()) {
+constexpr Error kTaskNotFound = {
+    .op_ = "task KOID not found",
+    .status_ = ZX_ERR_NOT_FOUND,
+};
+
+template <typename T, T zx_info_handle_basic_t::*Member>
+T GetHandleBasicInfo(const std::map<zx_object_info_topic_t, ByteView>& info) {
+  if (auto found = info.find(ZX_INFO_HANDLE_BASIC); found != info.end()) {
     auto [topic, data] = *found;
     zx_info_handle_basic_t info;
     ZX_ASSERT(data.size() >= sizeof(info));
     memcpy(&info, data.data(), sizeof(info));
-    return info.koid;
+    return info.*Member;
   }
   // Only the superroot has no cached basic info.  It's a special case.
-  return 0;
+  return T{};
+}
+
+}  // namespace
+
+zx_koid_t Object::koid() const {
+  return GetHandleBasicInfo<zx_koid_t, &zx_info_handle_basic_t::koid>(info_);
 }
 
 zx_obj_type_t Object::type() const {
-  if (auto found = info_.find(ZX_INFO_HANDLE_BASIC); found != info_.end()) {
-    auto [topic, data] = *found;
-    zx_info_handle_basic_t info;
-    ZX_ASSERT(data.size() >= sizeof(info));
-    memcpy(&info, data.data(), sizeof(info));
-    return info.type;
-  }
-  // Only the superroot has no cached basic info.  It's a special case.
-  return 0;
+  return GetHandleBasicInfo<zx_obj_type_t, &zx_info_handle_basic_t::type>(info_);
 }
 
 fit::result<Error, ByteView> Object::get_info(zx_object_info_topic_t topic, size_t record_size) {
@@ -68,9 +89,14 @@ fit::result<Error, ByteView> Object::get_info(zx_object_info_topic_t topic, size
       return fit::error(Error{"zx_object_get_info", status});
     }
 
-    auto [it, unique] = info_.emplace(topic, ByteView{buffer.get(), size});
-    ZX_DEBUG_ASSERT(unique);
-    found = it;
+    ByteView data{buffer.get(), size};
+    if (found == info_.end()) {
+      auto [it, unique] = info_.emplace(topic, data);
+      ZX_DEBUG_ASSERT(unique);
+      found = it;
+    } else {
+      found->second = data;
+    }
 
     TakeBuffer(std::move(buffer));
   }
@@ -102,6 +128,89 @@ fit::result<Error, ByteView> Thread::read_state(zx_thread_state_topic_t topic) {
     return fit::error(Error{"zx_thread_read_state", ZX_ERR_NOT_SUPPORTED});
   }
   return fit::ok(found->second);
+}
+
+fit::result<Error, std::reference_wrapper<Object>> Object::get_child(zx_koid_t koid) {
+  switch (type()) {
+    case ZX_OBJ_TYPE_JOB:
+      return static_cast<Job*>(this)->get_child(koid);
+    case ZX_OBJ_TYPE_PROCESS:
+      return static_cast<Process*>(this)->get_child(koid);
+    default:
+      return fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
+  }
+}
+
+fit::result<Error, std::reference_wrapper<Object>> Object::find(zx_koid_t match) {
+  if (koid() == match) {
+    return fit::ok(std::ref(*this));
+  }
+  switch (this->type()) {
+    case ZX_OBJ_TYPE_JOB:
+      return static_cast<Job*>(this)->find(match);
+    case ZX_OBJ_TYPE_PROCESS:
+      return static_cast<Process*>(this)->find(match);
+  }
+  return fit::error{kTaskNotFound};
+}
+
+fit::result<Error, std::reference_wrapper<Task>> Job::find(zx_koid_t match) {
+  if (koid() == match) {
+    return fit::ok(std::ref(*this));
+  }
+
+  // First check our immediate child tasks.
+  if (auto result = get_child(match); result.is_ok()) {
+    Object& child = result.value();
+    return fit::ok(std::ref(static_cast<Task&>(child)));
+  } else if (result.error_value().status_ != ZX_ERR_NOT_FOUND) {
+    return result.take_error();
+  }
+
+  // For a live job, processes() actively fills the processes_ list.
+  if (auto result = processes(); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Recurse on the child processes.
+  for (auto& [koid, process] : processes_) {
+    ZX_DEBUG_ASSERT(koid != match || live());
+    auto result = process.find(match);
+    if (result.is_ok()) {
+      return result;
+    }
+  }
+
+  // For a live job, children() actively fills the children_ list.
+  if (auto result = children(); result.is_error()) {
+    return result.take_error();
+  }
+
+  // Recurse on the child jobs.
+  for (auto& [koid, job] : children_) {
+    ZX_DEBUG_ASSERT(koid != match || live());
+    auto result = job.find(match);
+    if (result.is_ok()) {
+      return result;
+    }
+  }
+
+  return fit::error{kTaskNotFound};
+}
+
+fit::result<Error, std::reference_wrapper<Task>> Process::find(zx_koid_t match) {
+  if (koid() == match) {
+    return fit::ok(std::ref(*this));
+  }
+
+  auto result = get_child(match);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  Object& thread = result.value();
+  ZX_ASSERT(thread.type() == ZX_OBJ_TYPE_THREAD);
+  return fit::ok(std::ref(static_cast<Thread&>(thread)));
 }
 
 }  // namespace zxdump

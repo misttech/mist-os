@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <fbl/unique_fd.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace zxdump::testing {
@@ -269,6 +270,31 @@ class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
   uint64_t ints_ptr_ = 0;
   uint64_t wtext_ptr_ = 0;
   uint64_t pages_ptr_ = 0;
+};
+
+class TestProcessForThreads : public TestProcessForPropertiesAndInfo {
+ public:
+  static constexpr size_t kThreadCount = 5;
+
+  // Start a child for thread dump testing.
+  void StartChild();
+
+  // Do the basic dump using the dumper API.
+  template <typename Writer>
+  void Dump(Writer& writer) {
+    TestProcessForPropertiesAndInfo::Dump(writer, Precollect);
+  }
+
+  // Verify a dump file for that child was inserted and looks right.
+  void CheckDump(zxdump::TaskHolder& holder);
+
+  cpp20::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
+
+ private:
+  static constexpr const char* kChildName = "zxdump-thread-test-child";
+  std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
+
+  static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
 };
 
 }  // namespace zxdump::testing

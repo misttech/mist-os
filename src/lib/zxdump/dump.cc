@@ -807,7 +807,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
 
     // Generate the note data for each thread.
     for (const auto& thread : threads_) {
-      if (append_notes(thread.notes())) {
+      if (append_notes(thread->notes())) {
         return fit::ok(offset);
       }
     }
@@ -1111,10 +1111,10 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   Thread& AddThread(zx_koid_t koid) {
     auto [it, is_new] = thread_koid_to_index_.insert({koid, threads_.size()});
     if (is_new) {
-      threads_.emplace_back(koid);
-      return threads_.back();
+      threads_.push_back(std::make_unique<Thread>(koid));
+      return *threads_.back();
     }
-    return threads_[it->second];
+    return *threads_[it->second];
   }
 
   // Acquire all the threads.  Then collect all their data as soon as they are
@@ -1479,7 +1479,7 @@ class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
   ProcessMemoryReader memory_;
   ProcessNotes notes_;
 
-  std::vector<Thread> threads_;
+  std::vector<std::unique_ptr<Thread>> threads_;
   std::map<zx_koid_t, size_t> thread_koid_to_index_;
 
   std::vector<Elf::Phdr> phdrs_;

@@ -246,7 +246,18 @@ class Object {
 
   // This is provided for parity with zx::object::get_child, but just using
   // Process::threads, Job::children, or Job::processes is much more convenient
-  // for iterating through the lists reported by get_info.
+  // for iterating through the lists reported by get_info.  However, on live
+  // tasks either get_child or find to reach specific known KOIDs can be much
+  // more efficient than accessing the one of the child-list methods, which
+  // will acquire all the child handles implicitly, not just the matching one.
+  //
+  // **Notes for live objects:** Unlike zx::object::get_child, this does not
+  // take a zx_rights_t parameter even when referring to a live object.
+  // Instead, it always requests the full suite of rights that are necessary to
+  // do get_info, get_property, read_memory, read_state, etc.--everything the
+  // dumper usually needs.  There is only ever a single Object for each KOID,
+  // so returning live object handle with lesser rights once would mean later
+  // calls couldn't use greater rights on the same KOID later.
   fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
 
   // Find a task by KOID: this task or a descendent task.
@@ -263,7 +274,7 @@ class Object {
   // containing TaskHolder.  See <lib/zxdump/types.h> for topic->type mappings.
   template <zx_object_info_topic_t Topic>
   fit::result<Error, InfoTraitsType<Topic>> get_info() {
-    using Info = InfoTraitsType<Topic>;
+    using Info = typename InfoTraits<Topic>::type;
     if constexpr (kIsSpan<Info>) {
       using Element = typename RemoveSpan<Info>::type;
       auto result = get_info_aligned(Topic, sizeof(Element), alignof(Element));
@@ -377,6 +388,7 @@ class Thread : public Task {
   fit::result<Error, ByteView> read_state(zx_thread_state_topic_t topic);
 
  private:
+  friend Process;
   friend TaskHolder::JobTree;
 
   using Task::Task;
@@ -402,6 +414,9 @@ class Process : public Task {
 
   // Find a task by KOID: this process or one of its threads.
   fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
+
+  // zxdump::Object::get_child actually just dispatches to this method.
+  fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
 
   // Read process memory at the given vaddr.  This tries to read at least count
   // contiguous elements of type T, and succeeds if that was valid memory of
@@ -558,6 +573,9 @@ class Job : public Task {
   // Find a task by KOID: this task or a descendent task.
   fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
 
+  // zxdump::Object::get_child actually just dispatches to this method.
+  fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
+
  private:
   friend TaskHolder::JobTree;
 
@@ -565,8 +583,8 @@ class Job : public Task {
 
   fit::result<Error, ByteView> GetSuperrootInfo(zx_object_info_topic_t topic);
 
-  std::map<zx_koid_t, Job> children_;
-  std::map<zx_koid_t, Process> processes_;
+  JobMap children_;
+  ProcessMap processes_;
 };
 
 // Resource objects just hold access to information, but are a distinct type.

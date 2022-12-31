@@ -20,6 +20,7 @@
 #include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 
+#include "rights.h"
 #include "test-data-holder.h"
 #include "test-file.h"
 #include "test-tool-process.h"
@@ -35,6 +36,10 @@
 namespace zxdump::testing {
 
 using namespace std::literals;
+
+using ::testing::Contains;
+using ::testing::FieldsAre;
+using ::testing::UnorderedElementsAreArray;
 
 void TestProcessForPropertiesAndInfo::StartChild() {
   SpawnAction({
@@ -420,6 +425,98 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
   }
 }
 
+void TestProcessForThreads::StartChild() {
+  SpawnAction({
+      .action = FDIO_SPAWN_ACTION_SET_NAME,
+      .name = {kChildName},
+  });
+
+  fbl::unique_fd read_pipe;
+  {
+    int pipe_fd[2];
+    ASSERT_EQ(0, pipe(pipe_fd)) << strerror(errno);
+    read_pipe.reset(pipe_fd[STDIN_FILENO]);
+    SpawnAction({
+        .action = FDIO_SPAWN_ACTION_TRANSFER_FD,
+        .fd = {.local_fd = pipe_fd[STDOUT_FILENO], .target_fd = STDOUT_FILENO},
+    });
+  }
+
+  ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild({
+      "-t",
+      std::to_string(kThreadCount - 1).c_str(),
+  }));
+
+  // The test-child wrote the KOID for each thread.  Reading these immediately
+  //  synchronizes with the child having started up and progressed far enough
+  //  to have all the threads launched up place before the process gets dumped.
+  FILE* pipef = fdopen(read_pipe.get(), "r");
+  ASSERT_TRUE(pipef) << "fdopen: " << read_pipe.get() << strerror(errno);
+  auto close_pipef = fit::defer([pipef]() { fclose(pipef); });
+  std::ignore = read_pipe.release();
+
+  for (zx_koid_t& koid : thread_koids_) {
+    // scanf needs readahead and the child will hang after writing so don't
+    // match the trailing \n explicitly; once it terminates each line it will
+    // be implicitly skipped before the next as the leading space matches all
+    // whitespace.  But the final \n will be just seen in the readahead and not
+    // cause scanf to try to read any more from the pipe, which won't have any.
+    ASSERT_EQ(1, fscanf(pipef, " %" SCNu64, &koid));
+  }
+}
+
+void TestProcessForThreads::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
+  auto result = dump.SuspendAndCollectThreads();
+  EXPECT_TRUE(result.is_ok()) << result.error_value();
+}
+
+void TestProcessForThreads::CheckDump(zxdump::TaskHolder& holder) {
+  auto find_result = holder.root_job().find(koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  auto list_result = read_process.get_info<ZX_INFO_PROCESS_THREADS>();
+  ASSERT_TRUE(list_result.is_ok()) << list_result.error_value();
+  EXPECT_THAT(*list_result, UnorderedElementsAreArray(thread_koids()));
+
+  // Test get_child.
+  std::map<zx_koid_t, zxdump::Object*> objects;
+  std::map<zx_koid_t, zxdump::Thread*> threads;
+  for (zx_koid_t koid : thread_koids()) {
+    auto child_result = read_process.get_child(koid);
+    ASSERT_TRUE(child_result.is_ok())
+        << read_process.koid() << ".get_child(" << koid << ") -> " << child_result.error_value();
+    zxdump::Object& child = *child_result;
+    objects.emplace(koid, &child);
+    ASSERT_EQ(child.type(), ZX_OBJ_TYPE_THREAD);
+    zxdump::Thread& thread = static_cast<zxdump::Thread&>(child);
+    threads.emplace(koid, &thread);
+    EXPECT_EQ(thread.koid(), koid);
+  }
+  ASSERT_EQ(objects.size(), kThreadCount);
+  ASSERT_EQ(threads.size(), kThreadCount);
+
+  // Test find.
+  for (auto [koid, object] : objects) {
+    auto find_result = read_process.find(koid);
+    ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+    zxdump::Object& child = *find_result;
+    EXPECT_EQ(object, &child);
+    EXPECT_EQ(child.type(), ZX_OBJ_TYPE_THREAD);
+    EXPECT_EQ(child.koid(), koid);
+  }
+
+  // Test threads().
+  auto threads_result = read_process.threads();
+  ASSERT_TRUE(threads_result.is_ok()) << threads_result.error_value();
+  EXPECT_EQ(threads_result->get().size(), threads.size());
+  for (auto& [koid, thread] : threads_result->get()) {
+    EXPECT_THAT(threads, Contains(FieldsAre(koid, &thread)));
+  }
+}
+
 namespace {
 
 TEST(ZxdumpTests, ProcessDumpBasic) {
@@ -710,6 +807,20 @@ TEST(ZxdumpTests, ProcessDumpMemory) {
 
   // Dumping the memory should have added a bunch to the dump.
   EXPECT_LT(bytes_written, total_with_memory);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+TEST(ZxdumpTests, ProcessDumpThreads) {
+  TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  TestProcessForThreads process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());

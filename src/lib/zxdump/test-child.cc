@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 
+#include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,7 +21,10 @@
 #include <fbl/unique_fd.h>
 
 #ifdef __Fuchsia__
+#include <lib/zx/thread.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/threads.h>
 #endif
 
 namespace {
@@ -47,6 +51,20 @@ int Usage() {
           "[--threads=N]\n");
   return 1;
 }
+
+#ifdef __Fuchsia__
+void PrintKoid(thrd_t thread) {
+  zx::unowned_thread handle(thrd_get_zx_handle(thread));
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      handle->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    fprintf(stderr, "ZX_INFO_HANDLE_BASIC (%#x) %s\n", handle->get(), zx_status_get_string(status));
+    exit(1);
+  }
+  printf("%" PRIu64 "\n", info.koid);
+}
+#endif
 
 [[noreturn]] void Hang() {
   while (true) {
@@ -179,7 +197,12 @@ int main(int argc, char** argv) {
     thread = std::thread(Hang);
   }
   if (thread_count > 0) {
-    printf("started %zu additional threads\n", thread_count);
+#ifdef __Fuchsia__
+    PrintKoid(thrd_current());
+    for (std::thread& thread : threads) {
+      PrintKoid(thread.native_handle());
+    }
+#endif
   }
 
   fflush(stdout);

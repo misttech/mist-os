@@ -85,4 +85,15 @@ TEST(ZxdumpTests, ReadMemoryFromLiveProcess) {
   ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
 }
 
+TEST(ZxdumpTests, TaskProcessThreads) {
+  zxdump::testing::TestProcessForThreads process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::TaskHolder holder;
+  auto insert_result = holder.Insert(process.handle());
+  ASSERT_TRUE(insert_result.is_ok()) << insert_result.error_value();
+
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
 }  // namespace
