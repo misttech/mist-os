@@ -226,6 +226,7 @@ class TaskHolder::JobTree {
       auto buffer = GetBuffer(sizeof(info));
       memcpy(buffer, &info, sizeof(info));
       task.info_.emplace(ZX_INFO_HANDLE_BASIC, ByteView{buffer, sizeof(info)});
+      ReifyLive(task);
       if (parent) {
         *parent = std::move(task);
         return fit::ok(std::ref(std::get<decltype(task)>(*parent)));
@@ -301,6 +302,8 @@ class TaskHolder::JobTree {
   template <typename T>
   T GetSystemData(const char* key) const;
 
+  uint64_t system_get_page_size() const;
+
  private:
   // This is the actual reader, implemented below.
   fit::result<Error> Read(DumpFile& file, bool read_memory, FileRange where, time_t date = 0);
@@ -311,6 +314,24 @@ class TaskHolder::JobTree {
 
   fit::result<Error> ReadSystemNote(ByteView data);
   const rapidjson::Value* GetSystemJsonData(const char* key) const;
+
+  // Prepare a freshly-inserted live object to be ingested.  Only processes
+  // have something to do.  (This code is unreachable on non-Fuchsia but needs
+  // to exist statically before it's compiled away.)
+  void ReifyLive(Object& object) {}
+  void ReifyLive(Process& process) {
+#ifdef __Fuchsia__
+    // Fix the proper page size even before any memory is actually read.
+    // The dumper relies on this to do layout alignment.  When reading
+    // from a previous dump to dump again, it's always set by observed
+    // PT_LOAD p_align fields or by a system note--and in a dump where
+    // neither system notes nor any PT_LOAD segments are present (i.e. a
+    // process with no memory at all, since they are present for all
+    // mappings whether or not that memory is in the dump) nobody cares
+    // what the value is since there is no memory to contemplate anyway.
+    process.dump_page_size_ = zx_system_get_page_size();
+#endif
+  }
 
   // Snap the root job pointer to the sole job or back to the superroot.
   // Also clear the cached get_info lists so they'll be regenerated on demand.
@@ -1042,16 +1063,41 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
       if (result.is_error()) {
         return result.take_error();
       }
-    } else if (read_memory && phdr.type == elfldltl::ElfPhdrType::kLoad && phdr.memsz > 0) {
-      auto result = add_segment(phdr.vaddr, {phdr.offset, phdr.filesz, phdr.memsz});
-      if (result.is_error()) {
-        return result.take_error();
+    } else if (phdr.type == elfldltl::ElfPhdrType::kLoad && phdr.memsz > 0) {
+      uint64_t page_size = std::max<uint64_t>(process.dump_page_size_, phdr.align);
+      if (!cpp20::has_single_bit(process.dump_page_size_)) {
+        return fit::error(Error{
+            "ELF core file PT_LOAD p_align not a power of two",
+            ZX_ERR_IO_DATA_INTEGRITY,
+        });
+      }
+      process.dump_page_size_ = page_size;
+      if (read_memory) {
+        const Process::Segment segment{phdr.offset, phdr.filesz, phdr.memsz};
+        auto result = add_segment(phdr.vaddr, segment);
+        if (result.is_error()) {
+          return result.take_error();
+        }
       }
     }
   }
 
   if (process.koid() == 0) {  // There was no ZX_INFO_HANDLE_BASIC note.
     return CorruptedDump();
+  }
+
+  // In case there was system info in this or another process or job dump but
+  // no PT_LOADs, use that to set the page size.
+  if (process.dump_page_size_ == 1) {
+    if (uint64_t page_size = system_get_page_size()) {
+      if (!cpp20::has_single_bit(page_size)) {
+        return fit::error(Error{
+            "system page size not a power of two",
+            ZX_ERR_IO_DATA_INTEGRITY,
+        });
+      }
+      process.dump_page_size_ = std::max(process.dump_page_size_, page_size);
+    }
   }
 
   // Looks like a valid dump.  Finish out the last pending thread.
@@ -1333,9 +1379,11 @@ uint32_t TaskHolder::system_get_num_cpus() const {
   return tree_->GetSystemData<uint32_t>("num_cpus");
 }
 
-uint64_t TaskHolder::system_get_page_size() const {
-  return tree_->GetSystemData<uint64_t>("page_size");
+uint64_t TaskHolder::JobTree::system_get_page_size() const {
+  return GetSystemData<uint64_t>("page_size");
 }
+
+uint64_t TaskHolder::system_get_page_size() const { return tree_->system_get_page_size(); }
 
 uint64_t TaskHolder::system_get_physmem() const {
   return tree_->GetSystemData<uint64_t>("physmem");

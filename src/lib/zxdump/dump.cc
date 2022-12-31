@@ -1163,8 +1163,6 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
     uintptr_t address_limit = 0;
     for (const zx_info_maps_t& info : process_maps().info()) {
       if (info.type == ZX_INFO_MAPS_TYPE_MAPPING) {
-        ZX_ASSERT(info.base % ZX_PAGE_SIZE == 0);
-        ZX_ASSERT(info.size % ZX_PAGE_SIZE == 0);
         ZX_ASSERT(info.base >= address_limit);
         address_limit = info.base + info.size;
         ZX_ASSERT(info.base < address_limit);
@@ -1178,7 +1176,7 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
               .vaddr = info.base,
               .filesz = info.size,
               .memsz = info.size,
-              .align = zx_system_get_page_size(),
+              .align = process_.get().dump_page_size(),
           };
           phdrs_.push_back(new_phdr);
         }

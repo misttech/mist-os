@@ -434,6 +434,14 @@ class Process : public Task {
 
   ~Process();
 
+  // Return the size of memory pages in this process, always a power of two.
+  // For a live process, this returns zx_system_get_page_size().  In a dump,
+  // it's determined from the PT_LOAD segments found (even if the dump elides
+  // the actual memory).  If the dump had no memory segments and no system
+  // information to indicate the page size post mortem, this is 1 to maintain
+  // the power-of-two invariant.
+  uint64_t dump_page_size() const { return dump_page_size_; }
+
   // This is the same as what you'd get from get_info<ZX_INFO_PROCESS_THREADS>
   // and then get_child on each KOID, but pre-cached.  Note the returned map is
   // not const so the Thread references can be non-const, but the caller must
@@ -557,6 +565,7 @@ class Process : public Task {
 
   std::map<zx_koid_t, Thread> threads_;
   std::map<uint64_t, Segment> memory_;
+  uint64_t dump_page_size_ = 1;
   internal::DumpFile* dump_ = nullptr;
   std::unique_ptr<LiveMemory> live_memory_;
 };
