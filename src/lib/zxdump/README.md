@@ -345,6 +345,26 @@ This is represented by the ELF note with name `ZirconDumpDate` and `n_type` of
 zero.  It contains a 64-bit POSIX `time_t` "seconds since Epoch" value.  This
 note does not appear at all if the dump-writer chose to elide the timestamp.
 
+## Dump remarks
+
+A dump can include arbitrary additional data provided to the dump-writer.
+These are called "dump remarks".  This is additional information whose format
+and meaning is not specified by the overall dump format, nor necessarily known
+to the dump-writer.  Dump remarks can be included in a job archive, or in an
+`ET_CORE` file, or both.  When a job archive includes dump remarks, those may
+be meant to apply to all dumps in the archive, or only to the specific job.
+
+In a job archive, any member file whose name begins with `ZirconDump.` holds
+dump remarks.  In an `ET_CORE` file, dump remarks are found in ELF notes with
+names that begin with `ZirconDump.` and `n_type` of zero.  The exact name must
+have some suffix after `ZirconDump.`.  The exact format and meaning of dump
+remarks is set only by convention based on that full name.  By convention,
+remarks with names ending in `.json` are encoded as UTF-8 JSON text and remarks
+with names ending in `.txt` are UTF-8 plain text.  It's recommended that other
+dump remarks use names that similarly end in something that looks like a
+filename extension appropriate for their format (e.g. a custom non-text format
+without a canonical filename extension might use `ZirconDump.something.bin`).
+
 ## Reader API
 
 The `zxdump` C++ library provides an API for reading dumps as well as one for

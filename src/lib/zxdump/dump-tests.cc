@@ -9,6 +9,8 @@
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
 
+#include <gmock/gmock.h>
+
 #include "test-data-holder.h"
 #include "test-file.h"
 #include "test-tool-process.h"
@@ -165,6 +167,76 @@ void TestProcessForKernelInfo::CheckDump(zxdump::TaskHolder& holder) {
   // Check that the dump data makes sense as data collected before the live
   // data just collected (after the dump was made).
   dump_data.Check(live_data);
+}
+
+void TestProcessForRemarks::StartChild() {
+  SpawnAction({
+      .action = FDIO_SPAWN_ACTION_SET_NAME,
+      .name = {kChildName},
+  });
+  ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild());
+}
+
+void TestProcessForRemarks::Precollect(zxdump::ProcessDump<zx::unowned_process>& dump) {
+  {
+    auto result = dump.Remarks(kDefaultRemarksName, kTextRemarksData);
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+  {
+    auto result = dump.Remarks(kTextRemarksName, kTextRemarksData);
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+  {
+    auto result = dump.Remarks(kBinaryRemarksName, kBinaryRemarksData);
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+  {
+    auto result = dump.Remarks(kDefaultJsonRemarksName, kNormalizedJsonRemarksData);
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+  {
+    auto result = dump.Remarks(kJsonRemarksName, kNormalizedJsonRemarksData);
+    EXPECT_TRUE(result.is_ok()) << result.error_value();
+  }
+}
+
+void TestProcessForRemarks::CheckDump(zxdump::TaskHolder& holder) {
+  auto find_result = holder.root_job().find(koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  const auto& remarks = read_process.remarks();
+  EXPECT_EQ(remarks.size(), 5u);
+  size_t n = 0;
+  for (const auto& [name, remark] : remarks) {
+    switch (n++) {
+      case 0:
+        EXPECT_EQ(name, kDefaultRemarksName);
+        EXPECT_EQ(AsString(remark), kTextRemarksData);
+        break;
+      case 1:
+        EXPECT_EQ(name, kTextRemarksName);
+        EXPECT_EQ(AsString(remark), kTextRemarksData);
+        break;
+      case 2:
+        EXPECT_EQ(name, kBinaryRemarksName);
+        EXPECT_THAT(remark, ::testing::ElementsAreArray(kBinaryRemarksData));
+        break;
+      case 3:
+        EXPECT_EQ(name, kDefaultJsonRemarksName);
+        EXPECT_EQ(AsString(remark), kNormalizedJsonRemarksData);
+        break;
+      case 4:
+        EXPECT_EQ(name, kJsonRemarksName);
+        EXPECT_EQ(AsString(remark), kNormalizedJsonRemarksData);
+        break;
+      default:
+        FAIL() << "too many remarks";
+        break;
+    }
+  }
 }
 
 namespace {
@@ -415,6 +487,22 @@ TEST(ZxdumpTests, ProcessDumpDate) {
 }
 
 // TODO(mcgrathr): test job archives w/&w/o dates
+
+TEST(ZxdumpTests, ProcessDumpRemarks) {
+  TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  TestProcessForRemarks process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+// TODO(mcgrathr): test job archives with remarks, nested repeats
 
 }  // namespace
 }  // namespace zxdump::testing

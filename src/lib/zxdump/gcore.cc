@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <getopt.h>
+#include <lib/fit/defer.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/fd-writer.h>
 #include <lib/zxdump/task.h>
@@ -21,6 +22,12 @@
 #include <variant>
 
 #include <fbl/unique_fd.h>
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/reader.h>
+#include <rapidjson/stream.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 namespace {
 
@@ -29,6 +36,13 @@ using namespace std::literals;
 constexpr std::string_view kOutputPrefix = "core."sv;
 constexpr std::string_view kArchiveSuffix = ".a"sv;
 constexpr std::string_view kZstdSuffix = ".zst"sv;
+
+constexpr std::string_view kDefaultRemarksName = "remarks"sv;
+
+struct Remarks {
+  std::string name;
+  std::unique_ptr<rapidjson::StringBuffer> data{new rapidjson::StringBuffer};
+};
 
 // Command-line flags controlling the dump are parsed into this object, which
 // is passed around to the methods affected by policy choices.
@@ -45,6 +59,7 @@ struct Flags {
 
   time_t Date() const { return record_date ? time(nullptr) : 0; }
 
+  std::vector<Remarks> remarks;
   std::string_view output_prefix = kOutputPrefix;
   size_t limit = zxdump::DefaultLimit();
   bool dump_memory = true;
@@ -57,6 +72,7 @@ struct Flags {
   bool collect_job_processes = true;
   bool flatten_jobs = false;
   bool record_date = true;
+  bool repeat_remarks = false;
   bool zstd = false;
 };
 
@@ -200,6 +216,16 @@ constexpr auto CollectCommon = [](const Flags& flags, bool top,
     auto result = dumper.CollectKernel(zx::unowned_resource{resource->get()});
     if (result.is_error()) {
       return result.take_error();
+    }
+  }
+
+  if (top || flags.repeat_remarks) {
+    for (const auto& [name, data] : flags.remarks) {
+      std::string_view contents{data->GetString(), data->GetSize()};
+      auto result = dumper.Remarks(name, contents);
+      if (result.is_error()) {
+        return result.take_error();
+      }
     }
   }
 
@@ -608,7 +634,101 @@ bool WriteManyCoreFiles(JobDumper dumper, const Flags& flags) {
   return ok;
 }
 
-constexpr const char kOptString[] = "hlo:zamtcpJjfDUsSkK";
+enum class RemarksType { kText, kJson, kBinary };
+
+std::optional<Remarks> ParseRemarks(const char* arg, RemarksType type) {
+  Remarks result;
+
+  if (const char* eq = strchr(arg, '=')) {
+    result.name = {arg, static_cast<size_t>(eq - arg)};
+    arg = eq + 1;
+  } else {
+    if (type == RemarksType::kBinary) {
+      std::cerr << "--remarks-raw requires NAME= prefix" << std::endl;
+      return std::nullopt;
+    }
+    result.name = kDefaultRemarksName;
+  }
+
+  switch (type) {
+    case RemarksType::kText:
+      result.name += ".txt"sv;
+      break;
+    case RemarksType::kJson:
+      result.name += ".json"sv;
+      break;
+    case RemarksType::kBinary:
+      break;
+  }
+
+  constexpr auto error = [](const char* filename) -> std::ostream& {
+    if (filename) {
+      std::cerr << filename << ": "sv;
+    }
+    return std::cerr;
+  };
+
+  auto empty_remarks = [error](const char* filename = nullptr) {
+    error(filename) << "empty remarks not allowed"sv << std::endl;
+    return std::nullopt;
+  };
+
+  auto parse_json = [error, &result](auto&& stream, const char* filename = nullptr) {
+    rapidjson::Reader reader;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(*result.data);
+    if (!reader.Parse(stream, writer)) {
+      error(filename) << "cannot parse JSON at offset " << reader.GetErrorOffset() << ": "
+                      << GetParseError_En(reader.GetParseErrorCode()) << std::endl;
+      return false;
+    }
+    return true;
+  };
+
+  if (arg[0] == '@') {
+    // Read the response file.
+    const char* filename = &arg[1];
+    FILE* f = fopen(filename, "r");
+    if (!f) {
+      perror(filename);
+      return std::nullopt;
+    }
+    auto close_f = fit::defer([f]() { fclose(f); });
+
+    if (type == RemarksType::kJson) {
+      char buffer[BUFSIZ];
+      rapidjson::FileReadStream stream(f, buffer, sizeof(buffer));
+      if (!parse_json(stream, filename)) {
+        return std::nullopt;
+      }
+    } else {
+      int c;
+      while ((c = getc(f)) != EOF) {
+        result.data->Put(static_cast<char>(c));
+      }
+      if (ferror(f)) {
+        perror(filename);
+        return std::nullopt;
+      }
+      if (result.data->GetSize() == 0) {
+        return empty_remarks(filename);
+      }
+    }
+  } else if (type == RemarksType::kJson) {
+    if (!parse_json(rapidjson::StringStream(arg))) {
+      return std::nullopt;
+    }
+  } else {
+    std::string_view data{arg};
+    if (data.empty()) {
+      return empty_remarks();
+    }
+    data.copy(result.data->Push(data.size()), data.size());
+  }
+
+  return result;
+}
+
+constexpr const char kOptString[] = "hlo:zamtcpJjfDUsSkKr:q:B:R";
 constexpr const option kLongOpts[] = {
     {"help", no_argument, nullptr, 'h'},                 //
     {"limit", required_argument, nullptr, 'l'},          //
@@ -627,6 +747,10 @@ constexpr const option kLongOpts[] = {
     {"system-recursive", no_argument, nullptr, 'S'},     //
     {"kernel", no_argument, nullptr, 'k'},               //
     {"kernel-recursive", no_argument, nullptr, 'K'},     //
+    {"remarks", required_argument, nullptr, 'r'},        //
+    {"remarks-json", required_argument, nullptr, 'q'},   //
+    {"remarks-raw", required_argument, nullptr, 'B'},    //
+    {"remarks-recursive", no_argument, nullptr, 'R'},    //
     {"root-job", no_argument, nullptr, 'a'},             //
     {nullptr, no_argument, nullptr, 0},                  //
 };
@@ -659,6 +783,10 @@ int main(int argc, char** argv) {
     --system-recursive, -S             ... repeated in each child dump
     --kernel, -k                       include privileged kernel information
     --kernel-recursive, -K             ... repeated in each child dump
+    --remarks=REMARKS, -r REMARKS      add dump remarks (UTF-8 text)
+    --remarks-json=REMARKS, -q REMARKS add dump remarks (JSON)
+    --remarks-raw=REMARKS, -B REMARKS  add dump remarks (raw binary)
+    --remarks-recursive, -R            repeat dump remarks in each child dump
     --root-job, -a                     dump the root job
 
 By default, each PID must be the KOID of a process.
@@ -676,6 +804,18 @@ With --no-process, don't dump processes within a job, only its child jobs.
 Using --no-process with --jobs rather than --job-archive means no dumps are
 produced from job KOIDs at all, but valid job KOIDs are ignored rather than
 causing errors.
+
+REMARKS can be `NAME=@FILE` to read the remarks from the file, or `NAME=TEXT`
+to use the literal text in the argument; just `@FILE` or just `TEXT` is like
+`remarks=@FILE` or `remarks=TEXT`.  All text is expected to be in UTF-8.
+Text for --remarks-json must parse as valid JSON but no particular schema is
+expected; it is dumped as compact canonical UTF-8 JSON text.
+
+With `--raw-remarks` (-B), REMARKS is still `NAME=CONTENTS` or `NAME=@FILE`,
+but the contents are uninterpreted binary and `NAME` is expected to have its
+own suffix rather than having `.txt` or `.json` appended.  Note that since
+CONTENTS cannot have embedded NUL characters, using `@FILE` for binary data is
+always recommended.
 
 Each argument is dumped synchronously before processing the next argument.
 Errors dumping each process are reported and cause a failing exit status at
@@ -774,6 +914,31 @@ essential services.  PID arguments are not allowed with --root-job unless
       case 'k':
         flags.collect_kernel = true;
         continue;
+
+      case 'r':
+        if (auto note = ParseRemarks(optarg, RemarksType::kText)) {
+          flags.remarks.push_back(std::move(*note));
+          continue;
+        }
+        return usage();
+
+      case 'R':
+        flags.repeat_remarks = true;
+        continue;
+
+      case 'q':
+        if (auto note = ParseRemarks(optarg, RemarksType::kJson)) {
+          flags.remarks.push_back(std::move(*note));
+          continue;
+        }
+        return usage();
+
+      case 'B':
+        if (auto note = ParseRemarks(optarg, RemarksType::kBinary)) {
+          flags.remarks.push_back(std::move(*note));
+          continue;
+        }
+        return usage();
 
       case 'a':
         dump_root_job = true;

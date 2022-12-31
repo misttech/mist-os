@@ -49,6 +49,9 @@ class TestToolProcess {
     // This is used before Start, with name() used to compose the arguments.
     fbl::unique_fd CreateInput();
 
+    // Same, but fills the file with the given contents.
+    void CreateInput(std::string_view text);
+
     // Read the file after it's been written by the tool.
     // This is used  after Finish.
     fbl::unique_fd OpenOutput();

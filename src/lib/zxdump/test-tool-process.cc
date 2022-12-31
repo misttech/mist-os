@@ -240,6 +240,15 @@ fbl::unique_fd TestToolProcess::File::CreateInput() {
   return fd;
 }
 
+void TestToolProcess::File::CreateInput(std::string_view text) {
+  fbl::unique_fd fd = CreateInput();
+  while (!text.empty()) {
+    ssize_t n = write(fd.get(), text.data(), text.size());
+    ASSERT_GT(n, 0) << owner_->FilePathForRunner(*this) << ": " << strerror(errno);
+    text.remove_prefix(static_cast<size_t>(n));
+  }
+}
+
 fbl::unique_fd TestToolProcess::File::OpenOutput() {
   fbl::unique_fd fd{open(owner_->FilePathForRunner(*this).c_str(), O_RDONLY)};
   if (fd) {

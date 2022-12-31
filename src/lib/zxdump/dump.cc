@@ -102,6 +102,57 @@ constexpr ByteView PadForElfNote(ByteView data) {
   return {kZeroBytes, NoteAlign(data.size()) - data.size()};
 }
 
+class FlexNoteHeader {
+ public:
+  FlexNoteHeader() = default;
+
+  FlexNoteHeader(const FlexNoteHeader&) = delete;
+
+  FlexNoteHeader(FlexNoteHeader&& other) { std::swap(data_, other.data_); }
+
+  FlexNoteHeader& operator=(FlexNoteHeader&& other) {
+    std::swap(data_, other.data_);
+    return *this;
+  }
+
+  ByteView bytes() const {
+    if (!data_) {
+      return {};
+    }
+    return {
+        reinterpret_cast<const std::byte*>(data_),
+        sizeof(data_->nhdr_) + NoteAlign(data_->nhdr_.namesz),
+    };
+  }
+
+  void InitAccumulate(std::string_view name) {
+    ZX_DEBUG_ASSERT(!data_);         // Not already called.
+    ZX_DEBUG_ASSERT(!name.empty());  // Name must be nonempty.
+    const size_t namesz = name.size() + 1;
+    auto buf = new std::byte[sizeof(data_->nhdr_) + NoteAlign(namesz)]();
+    static_assert(alignof(Data) <= alignof(std::max_align_t));
+    data_ = reinterpret_cast<Data*>(buf);
+    data_->nhdr_.namesz = static_cast<uint32_t>(namesz);
+    name.copy(data_->name_, name.size());
+  }
+
+  void set_size(uint32_t descsz) { data_->nhdr_.descsz = descsz; }
+
+  ~FlexNoteHeader() {
+    if (data_) {
+      delete[] reinterpret_cast<std::byte*>(data_);
+    }
+  }
+
+ private:
+  struct Data {
+    Elf::Nhdr nhdr_;
+    char name_[];
+  };
+
+  Data* data_ = nullptr;
+};
+
 // This represents one archive member header.
 //
 // The name field in the traditional header is only 16 characters.  So the
@@ -554,12 +605,91 @@ constexpr auto CollectKernelNoteData = [](auto&& resource, auto&& task,
   return fit::ok();
 };
 
+template <typename Class>
+class Remark : public NoteBase<Class, 0> {
+ public:
+  using Base = NoteBase<Class, 0>;
+
+  Remark() = default;
+
+  Remark(Remark&& other) { *this = std::move(other); }
+
+  Remark& operator=(Remark&& other) {
+    Base::operator=(static_cast<Base&&>(other));
+    data_ = std::move(other.data_);
+    this->Emplace(data_);
+    return *this;
+  }
+
+  Remark(std::string_view name, ByteView data) : data_(data.begin(), data.end()) {
+    ZX_ASSERT(!name.empty());
+    ZX_ASSERT(!data.empty());
+    std::string remark_name{kRemarkNotePrefix};
+    remark_name += name;
+    this->header().InitAccumulate(std::move(remark_name));
+    this->Emplace(data_);
+  }
+
+ private:
+  std::vector<std::byte> data_;
+};
+
+struct JobRemarkClass {
+  static ArchiveMemberHeader MakeHeader(uint32_t type) { return {}; }
+  static constexpr auto Pad = PadForArchive;
+};
+
+struct ProcessRemarkClass {
+  static FlexNoteHeader MakeHeader(uint32_t type) { return {}; }
+  static constexpr auto Pad = PadForElfNote;
+};
+
+template <class RemarkClass>
+class CollectorBase {
+ public:
+  static_assert(std::is_move_constructible_v<Remark<RemarkClass>>);
+  static_assert(std::is_move_assignable_v<Remark<RemarkClass>>);
+
+  void AddRemarks(std::string_view name, ByteView data) { remarks_.emplace_back(name, data); }
+
+  // Returns a vector of views into the storage held in this->remarks_.
+  NoteData::Vector GetRemarks() const {
+    NoteData data;
+    for (const auto& note : remarks_) {
+      note.AddToNoteData(data);
+    }
+    ZX_DEBUG_ASSERT(data.size_bytes() == remarks_size_bytes());
+    return std::move(data).take();
+  }
+
+  template <typename T>
+  bool OnRemarkHeaders(T&& call) {
+    for (auto& note : remarks_) {
+      if (!call(note.header())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  size_t remarks_size_bytes() const {
+    size_t total = 0;
+    for (const auto& remark : remarks_) {
+      total += remark.size_bytes();
+    }
+    return total;
+  }
+
+ private:
+  std::vector<Remark<RemarkClass>> remarks_;
+};
+
 }  // namespace
 
 // The public class is just a container for a std::unique_ptr to this private
 // class, so no implementation details of the object need to be visible in the
 // public header.
-class ProcessDumpBase::Collector {
+class ProcessDumpBase::Collector : public CollectorBase<ProcessRemarkClass> {
  public:
   // Only constructed by Emplace.
   Collector() = delete;
@@ -619,7 +749,7 @@ class ProcessDumpBase::Collector {
     const Elf::Phdr note_phdr = {
         .type = elfldltl::ElfPhdrType::kNote,
         .flags = Elf::Phdr::kRead,
-        .filesz = notes_size_bytes_,
+        .filesz = notes_size_bytes_ + remarks_size_bytes(),
         .align = NoteAlign(),
     };
     phdrs_.push_back(note_phdr);
@@ -684,6 +814,11 @@ class ProcessDumpBase::Collector {
 
     ZX_DEBUG_ASSERT(offset % NoteAlign() == 0);
     ZX_DEBUG_ASSERT(offset == headers_size_bytes() + notes_size_bytes());
+
+    append_notes(GetRemarks());
+
+    ZX_DEBUG_ASSERT(offset % NoteAlign() == 0);
+    ZX_DEBUG_ASSERT(offset == headers_size_bytes() + notes_size_bytes() + remarks_size_bytes());
     return fit::ok(offset);
   }
 
@@ -697,7 +832,7 @@ class ProcessDumpBase::Collector {
   // until all the data has been dumped, and the final `dump` callback's return
   // value will be the "success" return value.
   fit::result<Error, size_t> DumpMemory(DumpCallback dump, size_t limit) {
-    size_t offset = headers_size_bytes() + notes_size_bytes();
+    size_t offset = headers_size_bytes() + notes_size_bytes() + remarks_size_bytes();
     for (const auto& segment : phdrs_) {
       if (segment.type == elfldltl::ElfPhdrType::kLoad) {
         uintptr_t vaddr = segment.vaddr;
@@ -1384,6 +1519,11 @@ fit::result<Error, size_t> ProcessDumpBase::DumpMemoryImpl(DumpCallback callback
 
 void ProcessDumpBase::set_date(time_t date) { collector_->set_date(date); }
 
+fit::result<Error> ProcessDumpBase::Remarks(std::string_view name, ByteView data) {
+  collector_->AddRemarks(name, data);
+  return fit::ok();
+}
+
 // The Collector borrows the process handle.  A single Collector cannot be
 // used for a different process later.  It can be clear()'d to reset all
 // state other than the process handle.
@@ -1404,7 +1544,7 @@ ProcessDump<zx::unowned_process>::ProcessDump(zx::unowned_process process) noexc
   Emplace(zx::unowned_process{process_});
 }
 
-class JobDumpBase::Collector {
+class JobDumpBase::Collector : public CollectorBase<JobRemarkClass> {
  public:
   // Only constructed by Emplace.
   Collector() = delete;
@@ -1433,6 +1573,10 @@ class JobDumpBase::Collector {
       return (note.header().name_bytes().size() + ...);
     };
     size_t name_table_size = std::apply(count_job_note_names, notes_);
+    OnRemarkHeaders([&name_table_size](const ArchiveMemberHeader& header) {
+      name_table_size += header.name_bytes().size();
+      return true;
+    });
     name_table_.InitNameTable(name_table_size);
 
     // The name table member will be padded on the way out.
@@ -1526,14 +1670,19 @@ class JobDumpBase::Collector {
     // members streamed out later can only use the truncated name field in
     // the member header.
     size_t name_table_pos = 0;
-    auto finish_note = [&](auto& note) -> bool {
-      note.header().set_date(mtime);
-      note.header().set_name_offset(name_table_pos);
-      ByteView name = note.header().name_bytes();
+    auto finish_note_header = [&](ArchiveMemberHeader& header) -> bool {
+      header.set_date(mtime);
+      header.set_name_offset(name_table_pos);
+      ByteView name = header.name_bytes();
       name_table_pos += name.size();
       return append(name);
     };
-    auto finalize = [&](auto&... note) { return (finish_note(note) || ...); };
+
+    if (!OnRemarkHeaders(finish_note_header)) {
+      return fit::ok(offset);
+    }
+
+    auto finalize = [&](auto&... note) { return (finish_note_header(note.header()) || ...); };
     if (std::apply(finalize, notes_)) {
       return fit::ok(offset);
     }
@@ -1546,6 +1695,14 @@ class JobDumpBase::Collector {
 
     // Generate the job-wide note data.
     for (ByteView data : notes()) {
+      if (append(data)) {
+        return fit::ok(offset);
+      }
+    }
+    ZX_DEBUG_ASSERT(offset % 2 == 0);
+
+    // Generate the remarks note data.
+    for (ByteView data : GetRemarks()) {
       if (append(data)) {
         return fit::ok(offset);
       }
@@ -1674,6 +1831,11 @@ fit::result<Error> ProcessDumpBase::Collector::CollectKernel(zx::unowned_resourc
 
 fit::result<Error> JobDumpBase::Collector::CollectKernel(zx::unowned_resource resource) {
   return CollectKernelNoteData(*resource, zx::job{}, notes_);
+}
+
+fit::result<Error> JobDumpBase::Remarks(std::string_view name, ByteView data) {
+  collector_->AddRemarks(name, data);
+  return fit::ok();
 }
 
 // The Collector borrows the job handle.  A single Collector cannot be used for

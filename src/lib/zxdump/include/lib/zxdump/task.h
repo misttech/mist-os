@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <fbl/unique_fd.h>
 
@@ -277,6 +278,10 @@ class Object {
   // get_info or get_property calls.
   LiveHandle Reap() { return std::exchange(live_, {}); }
 
+  // A job or process can have dump remarks, stored as a vector of {name, data}
+  // pairs.
+  const auto& remarks() const { return remarks_; }
+
  protected:
   // The class is abstract.  Only the subclasses can be created and destroyed.
   Object() = delete;
@@ -304,6 +309,7 @@ class Object {
   std::reference_wrapper<TaskHolder::JobTree> tree_;
   std::map<zx_object_info_topic_t, ByteView> info_;
   std::map<uint32_t, ByteView> properties_;
+  std::vector<std::pair<std::string_view, ByteView>> remarks_;
   time_t date_ = 0;
   LiveHandle live_;
 };

@@ -906,7 +906,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
         break;
       }
       bytes = bytes.subspan(NoteAlign(nhdr.namesz));
-      if (bytes.size() < NoteAlign(nhdr.namesz)) {
+      if (bytes.size() < NoteAlign(nhdr.descsz)) {
         break;
       }
       auto desc = bytes.subspan(0, nhdr.descsz);
@@ -950,6 +950,12 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
           return CorruptedDump();
         }
         memcpy(&process.date_, desc.data(), sizeof(process.date_));
+        continue;
+      }
+
+      // Check for dump remarks.
+      if (cpp20::starts_with(name, kRemarkNotePrefix)) {
+        process.remarks_.emplace_back(name.substr(kRemarkNotePrefix.size()), desc);
         continue;
       }
 
@@ -1272,6 +1278,16 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
       return ReadKernelNote(*kernel.value(), result.value());
     }
 
+    // Check for dump remarks.
+    if (cpp20::starts_with(member.name, kRemarkNotePrefix)) {
+      auto result = file.ReadPermanent(contents);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      job.remarks_.emplace_back(member.name.substr(kRemarkNotePrefix.size()), result.value());
+      return fit::ok();
+    }
+
     // This member file is not a job note.  It's an embedded dump file.
     return Read(file, read_memory, contents, member.date);
   };
@@ -1310,6 +1326,9 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
 
   if (job.info_.empty() && job.properties_.empty()) {
     // This was just a plain archive, not actually a job archive at all.
+    // If there were any dump remarks, attach them to the superroot.
+    std::move(job.remarks_.begin(), job.remarks_.end(),
+              std::back_inserter(root_job_.get().remarks_));
     return fit::ok();
   }
 

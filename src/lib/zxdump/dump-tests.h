@@ -16,6 +16,7 @@
 #include <lib/zxdump/zstd-writer.h>
 #include <unistd.h>
 
+#include <array>
 #include <cstdio>
 #include <vector>
 
@@ -187,6 +188,49 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
 
   LiveHandle root_resource_;
+};
+
+class TestProcessForRemarks : public TestProcessForPropertiesAndInfo {
+ public:
+  static constexpr std::string_view kTestRemarksNameNoSuffix = "teststuff";
+  static constexpr std::string_view kTextRemarksName = "teststuff.txt";
+  static constexpr std::string_view kDefaultRemarksName = "remarks.txt";
+  static constexpr std::string_view kTextRemarksData = "insert remark here";
+  static constexpr std::string_view kBinaryRemarksName = "teststuff.bin";
+  static constexpr std::array kBinaryTestData = {
+      std::byte{1},
+      std::byte{2},
+      std::byte{3},
+  };
+  static constexpr ByteView kBinaryRemarksData{
+      kBinaryTestData.data(),
+      kBinaryTestData.size(),
+  };
+  static constexpr std::string_view kJsonRemarksName = "teststuff.json";
+  static constexpr std::string_view kDefaultJsonRemarksName = "remarks.json";
+  static constexpr std::string_view kRawJsonRemarksData = R"""({ "foo": [ 1, 3 ] })""";
+  static constexpr std::string_view kNormalizedJsonRemarksData = R"""({"foo":[1,3]})""";
+
+  // Start a child for dump remarks testing.
+  void StartChild();
+
+  // Do the basic dump using the dumper API.
+  template <typename Writer>
+  void Dump(Writer& writer) {
+    TestProcessForPropertiesAndInfo::Dump(writer, Precollect);
+  }
+
+  // Verify a dump file for that child was inserted and looks right.
+  void CheckDump(zxdump::TaskHolder& holder);
+
+  static std::string_view AsString(ByteView bytes) {
+    return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
+  }
+
+ private:
+  static constexpr const char* kChildName = "zxdump-remarks-test-child";
+
+  static void Precollect(zxdump::ProcessDump<zx::unowned_process>& dump);
 };
 
 }  // namespace zxdump::testing

@@ -61,6 +61,11 @@ inline constexpr std::string_view kSystemNoteName{"ZirconSystem.json"};
 // In job archives, this prefix is followed by "." and the topic in decimal.
 inline constexpr std::string_view kKernelInfoNoteName{"ZirconKernelInfo"};
 
+// The suffix is something arbitrary but nonempty that indicates the format and
+// meaning of the contents.  By convention, it ends in ".json" or ".txt" if the
+// contents are UTF-8 JSON text or arbitrary UTF-8 text, respectively.
+inline constexpr std::string_view kRemarkNotePrefix{"ZirconDump."};
+
 }  // namespace zxdump
 
 #endif  // SRC_LIB_ZXDUMP_CORE_H_

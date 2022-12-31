@@ -11,7 +11,6 @@
 
 #include "dump-tests.h"
 #include "job-archive.h"
-#include "test-pipe-reader.h"
 #include "test-tool-process.h"
 
 namespace {
@@ -29,6 +28,9 @@ constexpr const char* kZstdSwitch = "--zstd";
 constexpr const char* kSystemSwitch = "--system";
 constexpr const char* kKernelSwitch = "--kernel";
 constexpr const char* kNoDateSwitch = "--no-date";
+constexpr const char* kRemarksSwitch = "--remarks=";
+constexpr const char* kRawRemarksSwitch = "--remarks-raw=";
+constexpr const char* kJsonRemarksSwitch = "--remarks-json=";
 
 constexpr std::string_view kArchiveSuffix = ".a";
 
@@ -496,6 +498,130 @@ TEST(ZxdumpTests, GcoreProcessDumpDate) {
   zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
 
   EXPECT_GE(read_process.date(), before_dump);
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpRemarks) {
+  using Process = zxdump::testing::TestProcessForRemarks;
+  Process process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  const auto& [dump_file, prefix, pid_string] =
+      GetOutputFile(child, "process-dump-remarks", process.koid());
+  std::vector<std::string> args({
+      std::string(kRemarksSwitch) + std::string(Process::kTextRemarksData),
+      std::string(kRemarksSwitch) + std::string(Process::kTestRemarksNameNoSuffix) + '=' +
+          std::string(Process::kTextRemarksData),
+      std::string(kRawRemarksSwitch) + std::string(Process::kBinaryRemarksName) + '=' +
+          std::string(Process::AsString(Process::kBinaryRemarksData)),
+      std::string(kJsonRemarksSwitch) + std::string(Process::kRawJsonRemarksData),
+      std::string(kJsonRemarksSwitch) + std::string(Process::kTestRemarksNameNoSuffix) + '=' +
+          std::string(Process::kRawJsonRemarksData),
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      kOutputSwitch,
+      prefix,
+      pid_string,
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_SUCCESS);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_EQ(child.collected_stderr(), "");
+
+  fbl::unique_fd fd = dump_file.OpenOutput();
+  ASSERT_TRUE(fd) << dump_file.name() << ": " << strerror(errno);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(fd));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpRemarksFromFile) {
+  using Process = zxdump::testing::TestProcessForRemarks;
+  Process process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  const auto& [dump_file, prefix, pid_string] =
+      GetOutputFile(child, "process-dump-remarks-from-file", process.koid());
+  auto& input_text_file = child.MakeFile("text-remarks.txt");
+  input_text_file.CreateInput(Process::kTextRemarksData);
+  auto& input_binary_file = child.MakeFile("binary-remarks.bin");
+  input_binary_file.CreateInput(Process::AsString(Process::kBinaryRemarksData));
+  auto& input_json_file = child.MakeFile("json-remarks.json");
+  input_json_file.CreateInput(Process::kRawJsonRemarksData);
+  std::vector<std::string> args({
+      std::string(kRemarksSwitch) + '@' + input_text_file.name(),
+      std::string(kRemarksSwitch) + std::string(Process::kTestRemarksNameNoSuffix) + "=@" +
+          input_text_file.name(),
+      std::string(kRawRemarksSwitch) + std::string(Process::kBinaryRemarksName) + "=@" +
+          input_binary_file.name(),
+      std::string(kJsonRemarksSwitch) + '@' + input_json_file.name(),
+      std::string(kJsonRemarksSwitch) + std::string(Process::kTestRemarksNameNoSuffix) + "=@" +
+          input_json_file.name(),
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      kOutputSwitch,
+      prefix,
+      pid_string,
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_SUCCESS);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_EQ(child.collected_stderr(), "");
+
+  fbl::unique_fd fd = dump_file.OpenOutput();
+  ASSERT_TRUE(fd) << dump_file.name() << ": " << strerror(errno);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(fd));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpRemarksBadJson) {
+  using Process = zxdump::testing::TestProcessForRemarks;
+  Process process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  const auto& [dump_file, prefix, pid_string] =
+      GetOutputFile(child, "process-dump-remarks-bad-json", process.koid());
+  std::vector<std::string> args({
+      std::string(kJsonRemarksSwitch) + "not valid json syntax",
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      kOutputSwitch,
+      prefix,
+      pid_string,
+  });
+  dump_file.NoFile();  // Won't actually get written.
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_FAILURE);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_NE(child.collected_stderr(), "");
 }
 
 }  // namespace

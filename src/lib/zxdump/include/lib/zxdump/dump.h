@@ -152,6 +152,17 @@ class ProcessDumpBase : protected DumpBase {
   // returned by CollectProcess.
   fit::result<Error> CollectKernel(zx::unowned_resource root_resource);
 
+  // Add dump remarks.  This can be called any number of times, but must be
+  // called before CollectProcess if it's called at all.
+  fit::result<Error> Remarks(std::string_view name, ByteView data);
+  fit::result<Error> Remarks(std::string_view name, std::string_view string) {
+    ByteView data{
+        reinterpret_cast<const std::byte*>(string.data()),
+        string.size(),
+    };
+    return Remarks(name, data);
+  }
+
   // This can be called first or after SuspendAndCollectThreads.
   //
   // This collects information about memory and other process-wide state.  The
@@ -289,6 +300,17 @@ class JobDumpBase : protected DumpBase {
   // called at all.  The kernel information is included in the total size
   // returned by CollectJob.
   fit::result<Error> CollectKernel(zx::unowned_resource root_resource);
+
+  // Add dump remarks.  This can be called any number of times, but must be
+  // called before CollectJob if it's called at all.
+  fit::result<Error> Remarks(std::string_view name, ByteView data);
+  fit::result<Error> Remarks(std::string_view name, std::string_view string) {
+    ByteView data{
+        reinterpret_cast<const std::byte*>(string.data()),
+        string.size(),
+    };
+    return Remarks(name, data);
+  }
 
   // Collect information about the job itself.  The result contains the size of
   // the job archive to dump just that information.  Note that this collection
