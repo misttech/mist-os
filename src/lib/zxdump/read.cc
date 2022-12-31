@@ -1419,11 +1419,12 @@ uint64_t TaskHolder::system_get_physmem() const {
   return tree_->GetSystemData<uint64_t>("physmem");
 }
 
-fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size, bool readahead) {
+fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size,
+                                                     ReadMemorySize size_mode) {
   if (!live_memory_) {
     live_memory_ = std::make_unique<LiveMemory>(tree().live_memory_cache());
   }
-  return live_memory_->ReadLiveMemory(vaddr, size, readahead, live(), tree().live_memory_cache());
+  return live_memory_->ReadLiveMemory(vaddr, size, size_mode, live(), tree().live_memory_cache());
 }
 
 }  // namespace zxdump

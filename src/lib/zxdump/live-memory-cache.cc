@@ -99,7 +99,7 @@ void TaskHolder::LiveMemoryCache::PruneCache() {
 }
 
 fit::result<Error, Buffer<>> Process::LiveMemory::ReadLiveMemory(
-    uint64_t vaddr, size_t size, bool readahead, const LiveHandle& handle,
+    uint64_t vaddr, size_t size, ReadMemorySize size_mode, const LiveHandle& handle,
     TaskHolder::LiveMemoryCache& shared_cache) {
   zx::unowned_process process(handle.get());
   ZX_DEBUG_ASSERT(process->is_valid());
@@ -135,14 +135,14 @@ fit::result<Error, Buffer<>> Process::LiveMemory::ReadLiveMemory(
   uint64_t last_page = (vaddr + size - 1) & -kPagesize;
 
   // Most reads will fit inside a single page.
-  if (first_page == last_page) {
+  if (first_page == last_page || size_mode == ReadMemorySize::kLess) {
     auto result = read_one_page(vaddr & -kPagesize);
     if (result.is_error()) {
       return result.take_error();
     }
     Buffer<> buffer;
     buffer.data_ = (**result)->contents().subspan(vaddr & (kPagesize - 1));
-    if (!readahead && buffer.data_.size_bytes() > size) {
+    if (size_mode == ReadMemorySize::kExact && buffer.data_.size_bytes() > size) {
       buffer.data_ = buffer.data_.subspan(0, size);
     }
     buffer.impl_ = *std::move(result);

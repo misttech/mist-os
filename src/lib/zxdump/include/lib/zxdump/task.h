@@ -30,6 +30,28 @@ namespace zxdump {
 
 constexpr size_t kReadMemoryStringLimit = 1024;
 
+// This is the type of the optional argument to Process::read_memory, below.
+enum class ReadMemorySize {
+  // Return exactly the amount requested, never more or less--except that an
+  // emtpy buffer may be returned for memory elided from the dump.
+  kExact,
+
+  // Return at least the amount requested, and possibly more if convenient.
+  // (Still return an empty buffer for elided memory.)
+  kMore,
+
+  // Return any amount conveniently available.  An empty buffer still means the
+  // requested memory was elided entirely.  But for any nonempty buffer less
+  // than what was requested, the caller should make an additional read_memory
+  // call at a higher address to get the remainder piecemeal; a later call will
+  // fail outright if that higher address is not valid in the process.
+  //
+  // This mode is recommended for large reads that don't need to be contiguous
+  // in a single buffer, or that will be copied elsewhere anyway.  It allows
+  // Process::read_memory to minimize data copying.
+  kLess,
+};
+
 // On Fuchsia, live task handles can be used via the lib/zx API.  On other
 // systems, the API parts for live tasks are still available but they use a
 // stub handle type that is always invalid.
@@ -383,14 +405,14 @@ class Process : public Task {
 
   // Read process memory at the given vaddr.  This tries to read at least count
   // contiguous elements of type T, and succeeds if that was valid memory of
-  // type T in the process.  If readahead is true, it might return more than
-  // count elements if more were cheaply available to be read.  In any event,
-  // it will never return fewer than count elements--except that it can return
-  // an empty buffer if the memory was elided from the dump.  The success
-  // return value is a move-only type; see <zxdump/buffer.h> for full details.
+  // type T in the process.  The optional size_mode argument can permit it to
+  // return a buffer with more or less data than the exact size requested; see
+  // the enum definition above for details.  In all modes it can return an
+  // empty buffer if the memory was elided from the dump.  The success return
+  // value is a move-only type; see <zxdump/buffer.h> for full details.
   template <typename T = std::byte, class View = cpp20::span<const T>>
-  fit::result<Error, Buffer<T, View>> read_memory(uint64_t vaddr, size_t count,
-                                                  bool readahead = false) {
+  fit::result<Error, Buffer<T, View>> read_memory(
+      uint64_t vaddr, size_t count, ReadMemorySize size_mode = ReadMemorySize::kExact) {
     static_assert(!std::is_reference_v<T>,
                   "cannot instantiate zxdump::Process::read_memory with a reference type");
     static_assert(
@@ -404,7 +426,7 @@ class Process : public Task {
           .status_ = ZX_ERR_INVALID_ARGS,
       }};
     }
-    auto result = ReadMemoryImpl(vaddr, count * sizeof(T), readahead);
+    auto result = ReadMemoryImpl(vaddr, count * sizeof(T), size_mode);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -481,8 +503,10 @@ class Process : public Task {
 
   using Task::Task;
 
-  fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead);
-  fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size, bool readahead);
+  fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size,
+                                              ReadMemorySize size_mode);
+  fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size,
+                                              ReadMemorySize size_mode);
 
   template <typename CharT = char>
   fit::result<Error, std::basic_string<CharT>> read_memory_basic_string(

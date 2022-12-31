@@ -13,9 +13,10 @@
 
 namespace zxdump {
 
-fit::result<Error, Buffer<>> Process::ReadMemoryImpl(uint64_t vaddr, size_t size, bool readahead) {
+fit::result<Error, Buffer<>> Process::ReadMemoryImpl(uint64_t vaddr, size_t size,
+                                                     ReadMemorySize size_mode) {
   if (live()) {
-    return ReadLiveMemory(vaddr, size, readahead);
+    return ReadLiveMemory(vaddr, size, size_mode);
   }
 
   auto possible = [vaddr](const auto& elt) -> bool {
@@ -51,7 +52,7 @@ fit::result<Error, Buffer<>> Process::ReadMemoryImpl(uint64_t vaddr, size_t size
       }
       Buffer<> buffer = *std::move(result);
       ZX_ASSERT(buffer->size_bytes() >= size);
-      if (!readahead) {
+      if (size_mode == ReadMemorySize::kExact) {
         buffer.data_ = buffer.data_.subspan(0, size);
       }
       return fit::ok(std::move(buffer));

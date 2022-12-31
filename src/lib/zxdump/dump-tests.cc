@@ -354,7 +354,8 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
   {
     // Only ask to read half the string's actual size, so there will definitely
     // be more than that available in the dump.
-    auto memory_result = read_process.read_memory<char>(text_ptr_, kMemoryText.size() / 2, true);
+    auto memory_result =
+        read_process.read_memory<char>(text_ptr_, kMemoryText.size() / 2, ReadMemorySize::kMore);
     ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
     if (memory_elided) {
       EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
@@ -368,21 +369,52 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
   }
 
   // Test a read crossing a page boundary.
+  auto test_memory_pages = [memory_elided](uint64_t ptr, size_t sample_size,
+                                           cpp20::span<const uint8_t> contents) {
+    if (memory_elided) {
+      EXPECT_TRUE(contents.empty()) << " read " << contents.size_bytes();
+    } else {
+      ASSERT_GE(contents.size(), sample_size);
+      for (size_t i = 0; i < sample_size; ++i) {
+        const unsigned int actual = contents[i];
+        const unsigned int expected = static_cast<uint8_t>(ptr + i);
+        EXPECT_EQ(actual, expected) << i << " of " << sample_size << " at " << std::hex << ptr + i;
+      }
+    }
+  };
+
   {
     constexpr size_t kSampleSize = 20;
     ASSERT_TRUE(pages_ptr_ % zx_system_get_page_size() == 0) << std::hex << pages_ptr_;
     const uint64_t ptr = pages_ptr_ + zx_system_get_page_size() - (kSampleSize / 2);
     auto memory_result = read_process.read_memory<uint8_t>(ptr, kSampleSize);
     ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
-    if (memory_elided) {
-      EXPECT_TRUE(memory_result->empty()) << " read " << memory_result->size_bytes();
-    } else {
-      ASSERT_GE(memory_result->size(), kSampleSize);
+    ASSERT_NO_FATAL_FAILURE(test_memory_pages(ptr, kSampleSize, **memory_result));
+    if (!memory_elided) {
       EXPECT_EQ(memory_result->size(), kSampleSize);
-      for (size_t i = 0; i < kSampleSize; ++i) {
-        const unsigned int actual = (**memory_result)[i];
-        const unsigned int expected = static_cast<uint8_t>(ptr + i);
-        EXPECT_EQ(actual, expected) << i << " of " << kSampleSize << " at " << std::hex << ptr + i;
+    }
+  }
+
+  // Test a read that can return less than requested.
+  //
+  // Note that this makes read_process unusable for live access in later tests,
+  // so this should be its last use in the test function.
+  {
+    constexpr size_t kSampleSize = 20;
+    const uint64_t ptr = pages_ptr_ + zx_system_get_page_size() - (kSampleSize / 2);
+    auto memory_result = read_process.read_memory<uint8_t>(ptr, kSampleSize, ReadMemorySize::kLess);
+    ASSERT_TRUE(memory_result.is_ok()) << memory_result.error_value();
+    const size_t sample_size = std::min(kSampleSize, memory_result->size());
+    ASSERT_NO_FATAL_FAILURE(test_memory_pages(ptr, sample_size, **memory_result));
+    if (!memory_elided) {
+      if (auto live_process = read_process.Reap()) {
+        // A live read should have been truncated to keep it in the one page.
+        EXPECT_EQ(sample_size, kSampleSize / 2);
+      } else {
+        // Reading a dump always has all the data if it wasn't elided: if it's
+        // an mmap'd file, it's all on hand; if it's another kind of dump, the
+        // data is being copied anyway so there's no benefit to returning less.
+        EXPECT_EQ(sample_size, kSampleSize);
       }
     }
   }

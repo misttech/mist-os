@@ -21,7 +21,7 @@ fit::result<Error, std::basic_string<CharT>> Process::read_memory_basic_string(u
 
   String str;
   while (str.size() < limit) {
-    auto result = read_memory<CharT>(vaddr, 1, true);
+    auto result = read_memory<CharT>(vaddr, 1, ReadMemorySize::kMore);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -34,6 +34,9 @@ fit::result<Error, std::basic_string<CharT>> Process::read_memory_basic_string(u
     }
 
     StringView chars{result->data(), result->size()};
+    if (chars.size() > limit - str.size()) {
+      chars = chars.substr(0, limit - str.size());
+    }
     size_t pos = chars.find_first_of('\0');
     if (pos != StringView::npos) {
       chars = chars.substr(0, pos);

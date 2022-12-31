@@ -142,7 +142,7 @@ class Process::LiveMemory {
 
   explicit LiveMemory(TaskHolder::LiveMemoryCache& shared_cache) : shared_cache_(shared_cache) {}
 
-  fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size, bool readahead,
+  fit::result<Error, Buffer<>> ReadLiveMemory(uint64_t vaddr, size_t size, ReadMemorySize size_mode,
                                               const LiveHandle& handle,
                                               TaskHolder::LiveMemoryCache& shared_cache);
 
