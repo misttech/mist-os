@@ -6,11 +6,14 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl-async/cpp/bind.h>
+#include <lib/fit/defer.h>
 #include <lib/zxio/ops.h>
+#include <lib/zxio/types.h>
 #include <string.h>
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <memory>
 
 #include <zxtest/zxtest.h>
@@ -24,9 +27,7 @@ namespace fio = fuchsia_io;
 
 class TestServer final : public zxio_tests::TestDirectoryServerBase {
  public:
-  TestServer() = default;
-
-  constexpr static int kEntryCount = 1000;
+  constexpr static size_t kEntryCount = 1000;
 
   // Exercised by |zxio_close|.
   void Close(CloseCompleter::Sync& completer) final {
@@ -35,12 +36,11 @@ class TestServer final : public zxio_tests::TestDirectoryServerBase {
   }
 
   void ReadDirents(ReadDirentsRequestView request, ReadDirentsCompleter::Sync& completer) override {
-    auto buffer_start = reinterpret_cast<uint8_t*>(buffer_);
     size_t actual = 0;
 
-    for (; index_ < kEntryCount; index_++) {
-      const size_t name_length = std::min(static_cast<size_t>(index_) + 1, fio::wire::kMaxFilename);
-      uint8_t* buffer_position = buffer_start + actual;
+    for (; index_ < kEntryCount; ++index_) {
+      char name[ZXIO_MAX_FILENAME + 1];
+      const int name_length = snprintf(name, sizeof(name), "%zu", index_);
 
       struct dirent {
         uint64_t inode;
@@ -49,29 +49,26 @@ class TestServer final : public zxio_tests::TestDirectoryServerBase {
         char name[0];
       } __PACKED;
 
-      auto entry = reinterpret_cast<dirent*>(buffer_position);
-      size_t entry_size = sizeof(dirent) + name_length;
-
+      auto& entry = *reinterpret_cast<dirent*>(buffer_ + actual);
+      const size_t entry_size = sizeof(dirent) + name_length;
       if (actual + entry_size > request->max_bytes) {
-        completer.Reply(ZX_OK, fidl::VectorView<uint8_t>::FromExternal(buffer_start, actual));
-        return;
+        break;
       }
 
-      auto name = new char[name_length + 1];
-      snprintf(name, name_length + 1, "%0*d", static_cast<int>(name_length), index_);
+      ASSERT_GE(name_length, 0);
       // No null termination
-      memcpy(entry->name, name, name_length);
-      delete[] name;
+      memcpy(entry.name, name, name_length);
 
-      if (name_length > UINT8_MAX) {
+      if (name_length > std::numeric_limits<uint8_t>::max()) {
         return completer.Close(ZX_ERR_BAD_STATE);
       }
-      entry->size = static_cast<uint8_t>(name_length);
-      entry->inode = index_;
+      entry.size = static_cast<uint8_t>(name_length);
+      entry.inode = index_;
 
       actual += entry_size;
     }
-    completer.Reply(ZX_OK, fidl::VectorView<uint8_t>::FromExternal(buffer_start, actual));
+    completer.Reply(ZX_OK, fidl::VectorView<uint8_t>::FromExternal(
+                               reinterpret_cast<uint8_t*>(buffer_), actual));
   }
 
   void Rewind(RewindCompleter::Sync& completer) final {
@@ -85,11 +82,11 @@ class TestServer final : public zxio_tests::TestDirectoryServerBase {
  private:
   std::atomic<uint32_t> num_close_ = 0;
   char buffer_[fio::wire::kMaxBuf] = {};
-  int index_ = 0;
+  size_t index_ = 0;
 };
 
 class DirentTest : public zxtest::Test {
- public:
+ protected:
   void SetUp() final {
     zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_OK(endpoints.status_value());
@@ -108,29 +105,33 @@ class DirentTest : public zxtest::Test {
     ASSERT_EQ(1, server_->num_close());
   }
 
- protected:
+  auto InitIteratorDeferCleanup(zxio_dirent_iterator_t& iterator) {
+    return zx::make_result(zxio_dirent_iterator_init(&iterator, &dir_.io),
+                           fit::defer([&]() { zxio_dirent_iterator_destroy(&iterator); }));
+  }
+
+ private:
   zxio_storage_t dir_;
-  zx::channel control_client_end_;
-  zx::channel control_server_end_;
   std::unique_ptr<TestServer> server_;
   std::unique_ptr<async::Loop> loop_;
 };
 
 TEST_F(DirentTest, StandardBufferSize) {
   zxio_dirent_iterator_t iterator;
-  ASSERT_OK(zxio_dirent_iterator_init(&iterator, &dir_.io));
+  zx::result cleanup = InitIteratorDeferCleanup(iterator);
+  ASSERT_OK(cleanup);
 
-  for (int count = 0; count < TestServer::kEntryCount; count++) {
+  for (size_t count = 0; count < TestServer::kEntryCount; ++count) {
     char name_buffer[ZXIO_MAX_FILENAME + 1];
     zxio_dirent_t entry = {.name = name_buffer};
-    EXPECT_OK(zxio_dirent_iterator_next(&iterator, &entry));
+    ASSERT_OK(zxio_dirent_iterator_next(&iterator, &entry));
     EXPECT_TRUE(entry.has.id);
     EXPECT_EQ(entry.id, count);
-    const size_t name_length = std::min(static_cast<size_t>(count) + 1, fio::wire::kMaxFilename);
+    char name[ZXIO_MAX_FILENAME + 1];
+    const int name_length = snprintf(name, sizeof(name), "%zu", count);
     EXPECT_EQ(entry.name_length, name_length);
+    EXPECT_EQ(std::string_view(name, name_length), std::string_view(entry.name, entry.name_length));
   }
-
-  zxio_dirent_iterator_destroy(&iterator);
 }
 
 }  // namespace
