@@ -377,13 +377,14 @@ pub mod processed {
                             // If we reach this branch, it means that the report
                             // mentions a process that holds a handle to a VMO,
                             // and that either this VMO or one of its ascendants
-                            // is absent from the VMO list. This might be a bug.
+                            // is absent from the VMO list.
+                            // This can happen because the report producer
+                            // (memory_monitor) does not generate the report
+                            // using an atomic view of the system, so some
+                            // inconsistencies like this are expected.
                             eprintln!(
-                                "Process {:?} refers (directly or indirectly) to unknown VMO {}",
-                                process, vmo_koid
-                            );
-                            eprintln!(
-                                "Please consider reporting this issue to the plugin's authors."
+                              "[stderr] Process {:?} refers (directly or indirectly) to unknown VMO {}",
+                              process, vmo_koid
                             );
                             break;
                         }
