@@ -2131,12 +2131,18 @@ impl BinderDriver {
                         address: UserAddress::from(input.read_buffer),
                         length: input.read_size as usize,
                     };
-                    input.read_consumed = self.handle_thread_read(
+                    let read_result = match self.handle_thread_read(
                         current_task,
                         binder_proc,
                         binder_thread,
                         &read_buffer,
-                    )? as u64;
+                    ) {
+                        // If the wait was interrupted and some command has been consumed, return a
+                        // success.
+                        Err(err) if err == EINTR && input.write_consumed > 0 => Ok(0),
+                        r => r,
+                    };
+                    input.read_consumed = read_result? as u64;
                 }
 
                 // Write back to the calling thread how much data was read/written.
