@@ -289,6 +289,7 @@ vsscanf
 
 # STDLIB
 alarm
+aligned_alloc
 atof
 atoi
 bsearch

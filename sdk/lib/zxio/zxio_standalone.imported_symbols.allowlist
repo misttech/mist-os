@@ -5,6 +5,7 @@ __cxa_atexit
 __errno_location
 __stack_chk_fail
 abort
+aligned_alloc
 btowc
 fclose
 fflush
