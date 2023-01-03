@@ -61,10 +61,7 @@ use notify::RecommendedWatcher;
 // so it may be worth revisiting this in the future in order to make the code
 // in this file a little cleaner and easier to read.
 #[cfg(target_os = "macos")]
-use {
-    notify::PollWatcher as RecommendedWatcher,
-    std::sync::{Arc, Mutex},
-};
+use notify::PollWatcher as RecommendedWatcher;
 
 // Daemon
 
@@ -477,12 +474,12 @@ impl Daemon {
         };
 
         #[cfg(target_os = "macos")]
-        let res = RecommendedWatcher::with_delay(
-            Arc::new(Mutex::new(event_handler)),
-            Duration::from_millis(500),
+        let res = RecommendedWatcher::new(
+            event_handler,
+            notify::Config::default().with_poll_interval(Duration::from_millis(500)),
         );
         #[cfg(not(target_os = "macos"))]
-        let res = RecommendedWatcher::new_immediate(event_handler);
+        let res = RecommendedWatcher::new(event_handler, notify::Config::default());
 
         let mut watcher = res.context("Creating watcher")?;
 

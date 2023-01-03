@@ -7,7 +7,7 @@ use {
     camino::Utf8PathBuf,
     fuchsia_pkg::PackageManifestList,
     futures::{executor::block_on, stream::BoxStream, SinkExt, StreamExt as _},
-    notify::{immediate_watcher, EventKind, RecursiveMode, Watcher as _},
+    notify::{recommended_watcher, EventKind, RecursiveMode, Watcher as _},
     std::{
         collections::{HashMap, HashSet},
         fs::File,
@@ -44,7 +44,8 @@ impl PackageManifestWatcher {
         let (sender, receiver) =
             futures::channel::mpsc::channel::<notify::Event>(NOTIFY_CHANNEL_BUFFER_SIZE);
         let sender = Mutex::new(sender);
-        let mut watcher = immediate_watcher(move |event: notify::Result<notify::Event>| {
+
+        let watcher = recommended_watcher(move |event: notify::Result<notify::Event>| {
             let event = match event {
                 Ok(event) => event,
                 Err(err) => {
@@ -56,7 +57,7 @@ impl PackageManifestWatcher {
                 warn!("Error sending event: {:?}", e);
             }
         })?;
-        watcher.configure(notify::Config::PreciseEvents(true))?;
+
         let manifest_list_watcher =
             Arc::new(Mutex::new(PackageManifestWatcher::new(builder, watcher)?));
 
@@ -271,7 +272,7 @@ impl ManifestFileWatcher {
         if files_hash.is_empty() {
             // Watch the parent path instead of directly watching the file to avoid
             // https://github.com/notify-rs/notify/issues/165.
-            self.watcher.watch(parent, RecursiveMode::NonRecursive)?;
+            self.watcher.watch(parent.as_std_path(), RecursiveMode::NonRecursive)?;
         }
         files_hash.insert(path);
         Ok(())
@@ -283,7 +284,7 @@ impl ManifestFileWatcher {
         if let Some(ref mut files_hash) = self.watched_files.get_mut(parent) {
             files_hash.remove(path);
             if files_hash.is_empty() {
-                self.watcher.unwatch(parent)?;
+                self.watcher.unwatch(parent.as_std_path())?;
             }
         } else {
             warn!("trying to unwatch a file that wastn't watched");

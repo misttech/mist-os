@@ -3,4 +3,3 @@
 # DOCS: https://fuchsia.dev/fuchsia-src/development/languages/rust/third_party#owners_files
 
 include /third_party/rust_crates/vendor/crossbeam-0.8.0/OWNERS
-include /third_party/rust_crates/vendor/notify-5.0.0-pre.10/OWNERS

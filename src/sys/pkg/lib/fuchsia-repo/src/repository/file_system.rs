@@ -17,11 +17,10 @@ use {
         future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead, AsyncSeekExt as _,
         FutureExt as _, Stream, StreamExt as _,
     },
-    notify::{immediate_watcher, RecursiveMode, Watcher as _},
+    notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
         ffi::OsStr,
         pin::Pin,
-        sync::Mutex,
         task::{Context, Poll},
         time::SystemTime,
     },
@@ -225,19 +224,9 @@ impl RepoProvider for FileSystemRepository {
     fn watch(&self) -> Result<BoxStream<'static, ()>> {
         // Since all we are doing is signaling that the timestamp file is changed, it's it's fine
         // if the channel is full, since that just means we haven't consumed our notice yet.
-        let (sender, receiver) = futures::channel::mpsc::channel(1);
+        let (mut sender, receiver) = futures::channel::mpsc::channel(1);
 
-        // FIXME(https://github.com/notify-rs/notify/pull/333): `immediate_watcher` takes an `Fn`
-        // closure, which means it could theoretically call it concurrently (although the current
-        // implementation does not do this). `sender` requires mutability, so we need to use
-        // interior mutability. Notify may change to use `FnMut` in #333, which would remove our
-        // need for interior mutability.
-        //
-        // We use a Mutex over a RefCell in case notify starts using the closure concurrently down
-        // the road without us noticing.
-        let sender = Mutex::new(sender);
-
-        let mut watcher = immediate_watcher(move |event: notify::Result<notify::Event>| {
+        let mut watcher = recommended_watcher(move |event: notify::Result<notify::Event>| {
             let event = match event {
                 Ok(event) => event,
                 Err(err) => {
@@ -249,7 +238,7 @@ impl RepoProvider for FileSystemRepository {
             // Send an event if any applied to timestamp.json.
             let timestamp_name = OsStr::new("timestamp.json");
             if event.paths.iter().any(|p| p.file_name() == Some(timestamp_name)) {
-                if let Err(e) = sender.lock().unwrap().try_send(()) {
+                if let Err(e) = sender.try_send(()) {
                     if e.is_full() {
                         // It's okay to ignore a full channel, since that just means that the other
                         // side of the channel still has an outstanding notice, which should be the
@@ -263,7 +252,7 @@ impl RepoProvider for FileSystemRepository {
 
         // Watch the repo path instead of directly watching timestamp.json to avoid
         // https://github.com/notify-rs/notify/issues/165.
-        watcher.watch(&self.metadata_repo_path, RecursiveMode::NonRecursive)?;
+        watcher.watch(self.metadata_repo_path.as_std_path(), RecursiveMode::NonRecursive)?;
 
         Ok(WatchStream { _watcher: watcher, receiver }.boxed())
     }

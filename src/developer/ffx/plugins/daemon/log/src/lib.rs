@@ -173,16 +173,16 @@ impl LogWatcher {
             }
         };
 
-        match notify::immediate_watcher(make_event_fn()) {
+        match notify::recommended_watcher(make_event_fn()) {
             Ok(mut watcher) => {
                 watcher.watch(path, notify::RecursiveMode::NonRecursive)?;
                 Ok((LogWatcher::Recommended(watcher), rx))
             }
             Err(_) => {
                 // Fall back to a polling watcher.
-                let mut watcher = notify::PollWatcher::with_delay(
-                    Arc::new(Mutex::new(make_event_fn())),
-                    Duration::from_secs(1),
+                let mut watcher = notify::PollWatcher::new(
+                    make_event_fn(),
+                    notify::Config::default().with_poll_interval(Duration::from_secs(1)),
                 )?;
                 watcher.watch(path, notify::RecursiveMode::NonRecursive)?;
                 Ok((LogWatcher::Poll(watcher), rx))

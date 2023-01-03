@@ -294,7 +294,7 @@ indoc = "1.0.3"
 # TODO(fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
 mio = { version = "0.8.2", features = ["net", "os-ext", "os-poll"] }
-notify = "5.0.0-pre.10"
+notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 parking = "2"
 petgraph = "0.6.2"
 proc-macro2 = { version = "1.0.39", features = ["span-locations"] }
@@ -364,6 +364,7 @@ windows_x86_64_msvc = { path = "empty/windows_x86_64_msvc" }
 fatfs = { path = "forks/fatfs" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 pulldown-cmark = { path = "forks/pulldown-cmark" }

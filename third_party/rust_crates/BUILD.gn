@@ -523,7 +523,7 @@ group("nonzero_ext") {
 
 if (!(current_os == "fuchsia")) {
   group("notify") {
-    public_deps = [ ":notify-v5_0_0-pre_10" ]
+    public_deps = [ ":notify-v5_0_0" ]
   }
 }
 
@@ -2802,7 +2802,6 @@ rust_library("crossbeam-channel-v0_5_1") {
     "-Cmetadata=4f2cca7fb0f4b481",
     "-Cextra-filename=-4f2cca7fb0f4b481",
     "--cfg=feature=\"crossbeam-utils\"",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
@@ -5609,6 +5608,50 @@ rust_library("jsonway-v2_0_0") {
   visibility = [ ":*" ]
 }
 
+rust_library("kqueue-v1_0_7") {
+  crate_name = "kqueue"
+  crate_root = "//third_party/rust_crates/vendor/kqueue-1.0.7/src/lib.rs"
+  output_name = "kqueue-8ba64de94884151f"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":kqueue-sys-v1_0_3" ]
+  deps += [ ":libc-v0_2_116" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=8ba64de94884151f",
+    "-Cextra-filename=-8ba64de94884151f",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("kqueue-sys-v1_0_3") {
+  crate_name = "kqueue_sys"
+  crate_root = "//third_party/rust_crates/vendor/kqueue-sys-1.0.3/src/lib.rs"
+  output_name = "kqueue_sys-369df57c1b7accc0"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":bitflags-v1_3_2" ]
+  deps += [ ":libc-v0_2_116" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=369df57c1b7accc0",
+    "-Cextra-filename=-369df57c1b7accc0",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("lazy_static-v1_4_0") {
   crate_name = "lazy_static"
   crate_root = "//third_party/rust_crates/vendor/lazy_static-1.4.0/src/lib.rs"
@@ -6318,21 +6361,24 @@ rust_library("normalize-line-endings-v0_3_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("notify-v5_0_0-pre_10") {
+rust_library("notify-v5_0_0") {
   crate_name = "notify"
-  crate_root = "//third_party/rust_crates/vendor/notify-5.0.0-pre.10/src/lib.rs"
-  output_name = "notify-c3db97053c7ffc03"
+  crate_root = "//third_party/rust_crates/forks/notify/src/lib.rs"
+  output_name = "notify-e7989c525a45b70f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":bitflags-v1_3_2" ]
-  deps += [ ":crossbeam-channel-v0_5_1" ]
   deps += [ ":filetime-v0_2_14" ]
   deps += [ ":libc-v0_2_116" ]
   deps += [ ":walkdir-v2_3_1" ]
+  if (false || false || false || false) {
+    deps += [ ":kqueue-v1_0_7" ]
+    deps += [ ":mio-v0_8_2" ]
+  }
   if (current_os == "linux") {
     deps += [ ":inotify-v0_9_3" ]
-    deps += [ ":mio-v0_7_11" ]
+    deps += [ ":mio-v0_8_2" ]
   }
   if (current_os == "mac") {
     deps += [ ":fsevent-sys-v4_0_0" ]
@@ -6345,9 +6391,11 @@ rust_library("notify-v5_0_0-pre_10") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c3db97053c7ffc03",
-    "-Cextra-filename=-c3db97053c7ffc03",
+    "--edition=2021",
+    "-Cmetadata=e7989c525a45b70f",
+    "-Cextra-filename=-e7989c525a45b70f",
+    "--cfg=feature=\"fsevent-sys\"",
+    "--cfg=feature=\"macos_fsevent\"",
   ]
 
   visibility = [ ":*" ]
