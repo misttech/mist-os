@@ -42,6 +42,16 @@ pub struct CreateCommand {
     #[argh(option)]
     pub update_package_epoch: Option<u64>,
 
+    /// path to a Virtual Device Specification file to include in the product bundle. May be
+    /// repeated to include multiple Virtual Devices.
+    #[argh(option)]
+    pub virtual_device: Vec<Utf8PathBuf>,
+
+    /// name of a Virtual Device Specification file to mark as the "recommended" device
+    /// for emulation.
+    #[argh(option)]
+    pub recommended_device: Option<String>,
+
     /// directory to write the product bundle.
     #[argh(option)]
     pub out_dir: Utf8PathBuf,

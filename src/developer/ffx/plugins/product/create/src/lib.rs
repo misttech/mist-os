@@ -19,7 +19,9 @@ use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::{
     repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::FileSystemRepository,
 };
-use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
+use sdk_metadata::{
+    ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
+};
 use std::fs::File;
 use tempfile::TempDir;
 
@@ -125,7 +127,44 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
         vec![]
     };
 
-    let virtual_devices_path = None;
+    let mut virtual_devices_path = None;
+    if !cmd.virtual_device.is_empty() {
+        let vd_path = cmd.out_dir.join("virtual_devices");
+        std::fs::create_dir_all(&vd_path).context("Creating the virtual_devices directory.")?;
+        let mut manifest = VirtualDeviceManifest::default();
+        for path in cmd.virtual_device {
+            let device = VirtualDeviceManifest::parse_virtual_device_file(&path)
+                .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
+            match device {
+                VirtualDevice::V1(ref device) => {
+                    let template_path = path
+                        .parent()
+                        .expect(&format!("Given path has no parent: '{}'", path))
+                        .join(&device.start_up_args_template);
+                    copy_file(&template_path, &vd_path).with_context(|| {
+                        format!("Copying template file to target directory: '{}'", template_path)
+                    })?;
+                }
+            }
+            let vd_file = File::create(
+                vd_path
+                    .join(path.file_name().expect(&format!("Path has no file name: '{}'", path))),
+            )?;
+            let name = path
+                .file_stem()
+                .expect(&format!("Couldn't determine virtual device name from path: '{}'", path));
+            serde_json::to_writer(vd_file, &device)
+                .context("Couldn't serialize virtual device to disk.")?;
+            manifest.device_paths.insert(name.to_string(), path);
+        }
+        manifest.recommended = cmd.recommended_device;
+        let manifest_path = vd_path.join("manifest.json");
+        let manifest_file = File::create(&manifest_path)
+            .with_context(|| format!("Couldn't create manifest file '{}'", manifest_path))?;
+        serde_json::to_writer(manifest_file, &manifest)
+            .context("Couldn't serialize manifest to disk.")?;
+        virtual_devices_path = Some(manifest_path);
+    }
 
     let product_bundle = ProductBundleV2 {
         partitions,
@@ -235,7 +274,8 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
     // Attempt to hardlink, if that fails, fall back to copying.
     if let Err(_) = std::fs::hard_link(source, &destination) {
         // falling back to copying.
-        std::fs::copy(source, &destination).context("copying file")?;
+        std::fs::copy(source, &destination)
+            .with_context(|| format!("copying file '{}'", source))?;
     }
     Ok(destination)
 }
@@ -243,12 +283,17 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
 #[cfg(test)]
 mod test {
     use super::*;
+    use anyhow::bail;
     use assembly_manifest::AssemblyManifest;
     use assembly_partitions_config::PartitionsConfig;
     use assembly_tool::testing::FakeToolProvider;
     use fuchsia_repo::test_utils;
+    use sdk_metadata::{VirtualDevice, VirtualDeviceV1};
     use std::io::Write;
     use tempfile::TempDir;
+
+    const VIRTUAL_DEVICE_VALID: &str =
+        include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
 
     #[test]
     fn test_copy_file() {
@@ -330,6 +375,8 @@ mod test {
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
+                virtual_device: vec![],
+                recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
             Box::new(tools),
@@ -376,6 +423,8 @@ mod test {
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
+                virtual_device: vec![],
+                recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
             Box::new(tools),
@@ -425,6 +474,8 @@ mod test {
                 tuf_keys: Some(tuf_keys),
                 update_package_version_file: None,
                 update_package_epoch: None,
+                virtual_device: vec![],
+                recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
             Box::new(tools),
@@ -478,6 +529,8 @@ mod test {
                 tuf_keys: Some(tuf_keys),
                 update_package_version_file: Some(version_path),
                 update_package_epoch: Some(1),
+                virtual_device: vec![],
+                recommended_device: None,
                 out_dir: pb_dir.clone(),
             },
             Box::new(tools),
@@ -505,5 +558,84 @@ mod test {
                 blobs_path: pb_dir.join("blobs"),
             }]
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_pb_create_with_virtual_devices() -> Result<()> {
+        let temp = TempDir::new().unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let pb_dir = tempdir.join("pb");
+
+        let partitions_path = tempdir.join("partitions.json");
+        let partitions_file = File::create(&partitions_path)?;
+        serde_json::to_writer(&partitions_file, &PartitionsConfig::default())?;
+
+        let vd_path1 = tempdir.join("device_1.json");
+        let vd_path2 = tempdir.join("device_2.json");
+        let template_path = tempdir.join("device_1.json.template");
+        let mut vd_file1 = File::create(&vd_path1)?;
+        let mut vd_file2 = File::create(&vd_path2)?;
+        File::create(&template_path)?;
+        vd_file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        vd_file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+
+        let tools = FakeToolProvider::default();
+        pb_create_with_tools(
+            CreateCommand {
+                partitions: partitions_path,
+                system_a: None,
+                system_b: None,
+                system_r: None,
+                tuf_keys: None,
+                update_package_version_file: None,
+                update_package_epoch: None,
+                virtual_device: vec![vd_path1, vd_path2],
+                recommended_device: Some("device_2".to_string()),
+                out_dir: pb_dir.clone(),
+            },
+            Box::new(tools),
+        )
+        .await
+        .unwrap();
+
+        let pb = ProductBundle::try_load_from(&pb_dir).unwrap();
+        assert_eq!(
+            pb,
+            ProductBundle::V2(ProductBundleV2 {
+                partitions: PartitionsConfig::default(),
+                system_a: None,
+                system_b: None,
+                system_r: None,
+                repositories: vec![],
+                update_package_hash: None,
+                virtual_devices_path: Some(pb_dir.join("virtual_devices/manifest.json")),
+            })
+        );
+
+        let internal_pb = match pb {
+            ProductBundle::V2(pb) => pb,
+            _ => bail!("We defined it as PBv2 above, so this can't happen."),
+        };
+
+        let path = internal_pb.get_virtual_devices_path();
+        let manifest =
+            VirtualDeviceManifest::from_path(&path).context("Manifest file from_path")?;
+        let default = manifest.default_device();
+        assert!(matches!(default, Ok(Some(VirtualDevice::V1(_)))), "{:?}", default);
+
+        let devices = manifest.device_names();
+        assert_eq!(devices.len(), 2);
+        assert!(devices.contains(&"device_1".to_string()));
+        assert!(devices.contains(&"device_2".to_string()));
+
+        let device1 = manifest.device("device_1");
+        assert!(device1.is_ok(), "{:?}", device1.unwrap_err());
+        assert!(matches!(device1, Ok(VirtualDevice::V1(VirtualDeviceV1 { .. }))));
+
+        let device2 = manifest.device("device_2");
+        assert!(device2.is_ok(), "{:?}", device2.unwrap_err());
+        assert!(matches!(device2, Ok(VirtualDevice::V1(VirtualDeviceV1 { .. }))));
+
+        Ok(())
     }
 }

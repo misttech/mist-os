@@ -66,7 +66,7 @@ impl VirtualDeviceManifest {
     }
 
     /// Given a path to a file, attempt to deserialize its contents as a VirtualDevice.
-    fn parse_virtual_device_file(path: &Utf8PathBuf) -> Result<VirtualDevice> {
+    pub fn parse_virtual_device_file(path: &Utf8PathBuf) -> Result<VirtualDevice> {
         let name = match path.file_stem() {
             None => bail!("Can't determine device name based on provided path: '{}'", path),
             Some(n) => n,
