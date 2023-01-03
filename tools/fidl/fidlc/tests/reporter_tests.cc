@@ -22,11 +22,6 @@ using fidl::SourceSpan;
 using fidl::VirtualSourceFile;
 using fidl::WarningDef;
 
-// TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-using fidl::UndocumentedErrorDef;
-const fidl::ErrorId kTestUndocumentedErrorId = 9995;
-const std::string kTestUndocumentedErrorIdStr = "fi-9995";
-
 const fidl::ErrorId kTestErrorId = 9998;
 const std::string kTestErrorIdStr = "fi-9998";
 const fidl::ErrorId kTestWarningId = 9999;
@@ -39,10 +34,6 @@ const std::string kTestFixableWarningIdStr = "fi-9996";
 const std::string kFakeBinaryLocation = "fake/bin/path";
 const std::string kFixMeTagOpen = "[[[ FIXME ]]]";
 const std::string kFixMeTagClose = "[[[ /FIXME ]]]";
-
-// TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-constexpr UndocumentedErrorDef<kTestUndocumentedErrorId, std::string_view, std::string_view>
-    UndocumentedErrTest("This undocumented test error has one string param '{}' and another '{}'.");
 
 constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ErrTest(
     "This test error has one string param '{}' and another '{}'.");
@@ -82,44 +73,6 @@ std::vector<fidl::SourceManager> FakeSources(uint8_t deps, uint8_t files_per_lib
   }
   out.push_back(FakeSourceManager("lib_", files_per_lib));
   return out;
-}
-
-// TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-TEST(ReporterTests, ReportUndocumentedErrorFormatParams) {
-  Reporter reporter;
-  VirtualSourceFile file("fake");
-  SourceSpan span("span text", file);
-  reporter.Fail(UndocumentedErrTest, span, "param1", "param2");
-
-  const auto& errors = reporter.errors();
-  ASSERT_EQ(errors.size(), 1);
-  ASSERT_EQ(errors[0]->span, span);
-  EXPECT_EQ(errors[0]->PrintId(), kTestUndocumentedErrorIdStr);
-  EXPECT_NOT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(),
-                    kTestUndocumentedErrorIdStr);
-  EXPECT_NOT_SUBSTR(errors[0]->msg.c_str(), kTestUndocumentedErrorIdStr);
-  EXPECT_SUBSTR(errors[0]->msg.c_str(),
-                "This undocumented test error has one string param 'param1' and another 'param2'.");
-}
-
-// TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-TEST(ReporterTests, MakeUndocumentedErrorThenReportIt) {
-  Reporter reporter;
-  VirtualSourceFile file("fake");
-  SourceSpan span("span text", file);
-  std::unique_ptr<Diagnostic> diag =
-      Diagnostic::MakeError(UndocumentedErrTest, span, "param1", "param2");
-  reporter.Report(std::move(diag));
-
-  const auto& errors = reporter.errors();
-  ASSERT_EQ(errors.size(), 1);
-  ASSERT_EQ(errors[0]->span, span);
-  EXPECT_EQ(errors[0]->PrintId(), kTestUndocumentedErrorIdStr);
-  EXPECT_NOT_SUBSTR(errors[0]->Print(reporter.program_invocation()).c_str(),
-                    kTestUndocumentedErrorIdStr);
-  EXPECT_NOT_SUBSTR(errors[0]->msg.c_str(), kTestUndocumentedErrorIdStr);
-  ASSERT_SUBSTR(errors[0]->msg.c_str(),
-                "This undocumented test error has one string param 'param1' and another 'param2'.");
 }
 
 TEST(ReporterTests, ReportErrorFormatParams) {

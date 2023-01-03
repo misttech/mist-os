@@ -158,17 +158,6 @@ struct ErrorDef final : DiagnosticDef {
   }
 };
 
-// TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-// Identical to an Error, except it does not print the permalink.
-template <ErrorId Id, typename... Args>
-struct UndocumentedErrorDef final : DiagnosticDef {
-  constexpr explicit UndocumentedErrorDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kError, DiagnosticDocumented::kNotDocumented,
-                      std::nullopt, msg) {
-    internal::CheckFormatArgs<Args...>(msg);
-  }
-};
-
 // The definition of a warning. All instances of WarningDef are in
 // diagnostics.h. Template args define format parameters in the warning message.
 template <ErrorId Id, typename... Args>
@@ -260,14 +249,6 @@ struct Diagnostic {
 
   template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
   static std::unique_ptr<Diagnostic> MakeError(const FixableErrorDef<Id, FixableKind, Args...>& def,
-
-                                               SourceSpan span, const identity_t<Args>&... args) {
-    return std::make_unique<Diagnostic>(def, span, args...);
-  }
-
-  // TODO(fxbug.dev/108248): Remove once all outstanding errors are documented.
-  template <ErrorId Id, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeError(const UndocumentedErrorDef<Id, Args...>& def,
 
                                                SourceSpan span, const identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);

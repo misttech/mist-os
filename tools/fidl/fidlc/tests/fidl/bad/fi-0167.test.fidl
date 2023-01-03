@@ -10,8 +10,8 @@ alias ServerEnd = server_end:MyProtocol;
 
 protocol MyProtocol {
     MyMethod(resource struct {
-        c ClientEnd:MyOtherProtocol;
+        my_client ClientEnd:MyOtherProtocol;
     }) -> (resource struct {
-        s ServerEnd:MyOtherProtocol;
+        my_server ServerEnd:MyOtherProtocol;
     });
 };

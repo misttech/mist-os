@@ -5,8 +5,8 @@ library test.good.fi0167;
 
 protocol MyProtocol {
     MyMethod(resource struct {
-        c client_end:MyProtocol;
+        my_client client_end:MyProtocol;
     }) -> (resource struct {
-        s server_end:MyProtocol;
+        my_server server_end:MyProtocol;
     });
 };
