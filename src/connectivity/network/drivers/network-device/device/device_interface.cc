@@ -528,7 +528,7 @@ void DeviceInterface::GetPortWatcher(GetPortWatcherRequestView request,
 
   zx_status_t status = watcher->Bind(dispatcher_, cpp20::span(port_ids.begin(), port_id_count),
                                      std::move(request->watcher), [this](PortWatcher& watcher) {
-                                       fbl::AutoLock lock(&control_lock_);
+                                       control_lock_.Acquire();
                                        port_watchers_.erase(watcher);
                                        ContinueTeardown(TeardownState::PORT_WATCHERS);
                                      });
