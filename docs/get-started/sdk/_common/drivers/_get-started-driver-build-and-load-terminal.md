@@ -1,13 +1,13 @@
 The Fuchsia emulator (launched in the [Start the emulator](#start-the-emulator)
 section above) is configured to create a virtual device named
-[`edu`][edu-device], which  is an educational device for writing drivers.
-In the previous section, when the emulator started, Fuchsia’s driver framework
-detected this `edu` device in the system, but it wasn’t able to find a driver
-that could serve the `edu` device. So the `edu` device was left unmatched.
+[`edu`][edu-device]{:.external}, which  is an educational device for writing
+drivers. In the previous section, when the emulator started, Fuchsia’s driver
+framework detected this `edu` device in the system, but it wasn’t able to find
+a driver that could serve the `edu` device. So the `edu` device was left unmatched.
 
-In this section, we'll build and publish the [`qemu_edu`][qemu-edu] sample driver
-(which is a Fuchsia component). Upon detecting a new driver, the driver
-framework will discover that this new `qemu_edu` driver is a match for
+In this section, we'll build and publish the [`qemu_edu`][qemu-edu]{:.external}
+sample driver (which is a Fuchsia component). Upon detecting a new driver, the
+driver framework will discover that this new `qemu_edu` driver is a match for
 the `edu` device. Once matched, the `qemu_edu` driver starts providing the `edu`
 device’s services (capabilities) to other components in the system – one of the
 services provided by the `edu` device is that it computes a factorial given
@@ -164,3 +164,8 @@ Do the following:
    [184.040][universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:65] edu device version major=1 minor=0
    [184.073][universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:117] Exported devfs_path=sys/platform/pt/PCI0/bus/00:06.0_/qemu-edu service_path=examples.qemuedu.Service/default/device
    ```
+
+<!-- Reference links -->
+
+[edu-device]: https://fuchsia.googlesource.com/third_party/qemu/+/refs/heads/main/docs/specs/edu.txt
+[qemu-edu]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu/

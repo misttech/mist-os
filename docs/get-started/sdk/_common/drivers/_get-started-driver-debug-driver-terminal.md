@@ -212,3 +212,7 @@ Do the following:
 
    Note: For more information on usages and best practices on `zxdb`, see the
    [zxdb user guide][zxdb-user-guide].
+
+<!-- Reference links -->
+
+[zxdb-user-guide]: /docs/development/debugger/README.md

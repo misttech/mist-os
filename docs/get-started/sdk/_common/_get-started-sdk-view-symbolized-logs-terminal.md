@@ -88,3 +88,8 @@ Do the following:
    caused the component to crash.
 
    Press `CTRL+C` to exit.
+
+<!-- Reference links -->
+
+[symbolize-logs]: /docs/development/sdk/ffx/symbolize-logs.md
+[ticket-94614]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=94614

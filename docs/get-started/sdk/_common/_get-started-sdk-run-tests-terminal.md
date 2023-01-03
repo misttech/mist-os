@@ -133,3 +133,9 @@ Do the following:
 
    INFO: Build completed, 1 test FAILED, 16 total actions
    ```
+
+<!-- Reference links -->
+
+[google-test]: https://google.github.io/googletest/
+[hello-world-test-package]: https://fuchsia.googlesource.com/sdk-samples/getting-started/+/refs/heads/main/src/hello_world/BUILD.bazel#68
+[sdk-samples-repo]: https://fuchsia.googlesource.com/sdk-samples/getting-started

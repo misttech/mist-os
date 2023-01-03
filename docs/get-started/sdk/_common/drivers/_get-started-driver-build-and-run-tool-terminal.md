@@ -78,3 +78,7 @@ Do the following:
    ```
 
    Notice that more messages are now logged from the `qemu-edu` driver.
+
+<!-- Reference links -->
+
+[eductl_tools]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu/tools

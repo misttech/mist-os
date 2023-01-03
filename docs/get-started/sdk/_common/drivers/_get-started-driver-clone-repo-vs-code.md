@@ -83,4 +83,7 @@ In VS Code, do the following:
 
 <!-- Reference links -->
 
+[clang]: https://clang.llvm.org/
 [remote-vs-code-setup]: /docs/reference/tools/editors/vscode/remote-workspaces.md
+[sdk-driver-sample-repo]: https://fuchsia.googlesource.com/sdk-samples/drivers
+[fuchsia-idk]: /docs/development/idk/README.md

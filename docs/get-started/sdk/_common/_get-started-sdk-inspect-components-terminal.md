@@ -113,3 +113,7 @@ Do the following:
 
    This data records all the events triggered by components on the device so
    far.
+
+<!-- Reference links -->
+
+[inspect-overview]: /docs/development/diagnostics/inspect/README.md

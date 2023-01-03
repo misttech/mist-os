@@ -112,3 +112,8 @@ In VS Code, do the following:
    ```
 
    This command exits silently without output.
+
+<!-- Reference links -->
+
+[driver-framework]: /docs/concepts/drivers/driver_framework.md
+[femu]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md

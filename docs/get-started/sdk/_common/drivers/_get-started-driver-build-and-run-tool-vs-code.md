@@ -70,3 +70,7 @@ In VS Code, do the following:
    ![More logs](/docs/get-started/sdk/images/get-started-vscode-qemu-edu-more-device-logs.png "More messages in the Fuchsia logs panel of VS Code"){: .screenshot}
 
    Notice that more messages are now logged from the `qemu_edu` driver.
+
+<!-- Reference links -->
+
+[eductl_tools]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu/tools

@@ -50,3 +50,7 @@ In VS Code, do the following:
 1. In the debug toolbar at the top of VS Code, click the **Stop** icon.
 
    This causes the component to finish the execution of the rest of the code.
+
+<!-- Reference links -->
+
+[fuchsia-debugger]: /docs/development/debugger/README.md

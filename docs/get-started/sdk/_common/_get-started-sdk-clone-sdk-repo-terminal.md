@@ -77,3 +77,10 @@ Do the following:
 
    Note: The output above shows the version `10.20221130.0.1`, which
    indicates that this SDK was built and published on November 30, 2022.
+
+<!-- Reference links -->
+
+[clang]: https://clang.llvm.org
+[ffx]: https://fuchsia.dev/reference/tools/sdk/ffx
+[fuchsia-idk]: /docs/development/idk/README.md
+[sdk-samples-repo]: https://fuchsia.googlesource.com/sdk-samples/getting-started

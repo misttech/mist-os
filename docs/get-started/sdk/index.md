@@ -389,26 +389,9 @@ enable KVM hardware virtualization:
 
 <!-- Reference links -->
 
-[clang]: https://clang.llvm.org/
-[femu]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
-[ffx]: https://fuchsia.dev/reference/tools/sdk/ffx
-[fuchsia-component]: /docs/concepts/components/v2/README.md
-[fuchsia-debugger]: /docs/development/sdk/ffx/start-the-fuchsia-debugger.md
-[fuchsia-idk]: /docs/development/idk/README.md
-[fuchsia-package-server]: /docs/development/sdk/ffx/create-a-package-repository.md
 [fundamentals]: /docs/get-started/sdk/learn/README.md
 [git-install]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
-[google-test]: https://google.github.io/googletest/
-[hello-world-component]: https://fuchsia.googlesource.com/sdk-samples/getting-started/+/refs/heads/main/src/hello_world/
-[hello-world-test-package]: https://fuchsia.googlesource.com/sdk-samples/getting-started/+/refs/heads/main/src/hello_world/BUILD.bazel#68
-[inspect-overview]: /docs/development/diagnostics/inspect/README.md
-[kvm]: https://www.linux-kvm.org/page/Main_Page
 [qemu]: https://www.qemu.org/
 [sdk-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Bazel
-[sdk-samples-repo]: https://fuchsia.googlesource.com/sdk-samples/getting-started
-[symbolize-logs]: /docs/development/sdk/ffx/symbolize-logs.md
-[ticket-01]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=97909
-[ticket-94614]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=94614
 [using-the-sdk]: /docs/development/sdk/index.md
-[zxdb-user-guide]: /docs/development/debugger/README.md
 [vscode-install]: https://code.visualstudio.com/Download

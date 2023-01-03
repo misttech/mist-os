@@ -119,3 +119,8 @@ Do the following:
    [280.088][pkg-resolver][pkg-resolver][I] resolved fuchsia-pkg://bazel.pkg.component.runnable/hello_world as fuchsia-pkg://bazel.pkg.component.runnable/hello_world to 03405c9f712b2db800194d496ce90372845a8f4bbcb1df4a9abfe9c5bdfc40fb with TUF
    {{ '<strong>' }}[280.113][ffx-laboratory:hello_world.cm][I] Hello again, World!{{ '</strong>' }}
    ```
+
+<!-- Reference links -->
+
+[fuchsia-component]: /docs/concepts/components/v2/README.md
+[hello-world-component]: https://fuchsia.googlesource.com/sdk-samples/getting-started/+/refs/heads/main/src/hello_world/

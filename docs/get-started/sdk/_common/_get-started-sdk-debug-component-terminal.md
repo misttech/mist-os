@@ -146,3 +146,8 @@ Do the following:
 
    Note: For more information on usages and best practices on `zxdb`, see the
    [zxdb user guide][zxdb-user-guide].
+
+<!-- Reference links -->
+
+[fuchsia-debugger]: /docs/development/debugger/README.md
+[zxdb-user-guide]: /docs/development/debugger/README.md

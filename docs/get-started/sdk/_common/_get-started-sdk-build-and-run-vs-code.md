@@ -165,3 +165,5 @@ In VS Code, do the following:
 <!-- Reference links -->
 
 [filter-vscode-logs]: /docs/reference/tools/editors/vscode/fuchsia-ext-using.md#filter_fuchsia_logs
+[fuchsia-component]: /docs/concepts/components/v2/README.md
+[hello-world-component]: https://fuchsia.googlesource.com/sdk-samples/getting-started/+/refs/heads/main/src/hello_world/

@@ -1,13 +1,13 @@
 The Fuchsia emulator (launched in the [Start the emulator](#start-the-emulator)
 section above) is configured to create a virtual device named
-[`edu`][edu-device], which  is an educational device for writing drivers.
-In the previous section, when the emulator started, Fuchsia’s driver framework
-detected this `edu` device in the system, but it wasn’t able to find a driver
-that could serve the `edu` device. So the `edu` device was left unmatched.
+[`edu`][edu-device]{:.external}, which  is an educational device for writing
+drivers. In the previous section, when the emulator started, Fuchsia’s driver
+framework detected this `edu` device in the system, but it wasn’t able to find
+a driver that could serve the `edu` device. So the `edu` device was left unmatched.
 
-In this section, we'll build and publish the [`qemu_edu`][qemu-edu] sample driver
-(which is a Fuchsia component). Upon detecting a new driver, the driver
-framework will discover that this new `qemu_edu` driver is a match for
+In this section, we'll build and publish the [`qemu_edu`][qemu-edu]{:.external}
+sample driver (which is a Fuchsia component). Upon detecting a new driver, the
+driver framework will discover that this new `qemu_edu` driver is a match for
 the `edu` device. Once matched, the `qemu_edu` driver starts providing the `edu`
 device’s services (capabilities) to other components in the system – one of the
 services provided by the `edu` device is that it computes a factorial given
@@ -172,4 +172,6 @@ In VS Code, do the following:
 
 <!-- Reference links -->
 
+[edu-device]: https://fuchsia.googlesource.com/third_party/qemu/+/refs/heads/main/docs/specs/edu.txt
 [filter-vscode-logs]: /docs/reference/tools/editors/vscode/fuchsia-ext-using.md#filter_fuchsia_logs
+[qemu-edu]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu

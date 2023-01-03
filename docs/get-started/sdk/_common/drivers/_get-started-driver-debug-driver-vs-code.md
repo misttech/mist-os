@@ -171,3 +171,6 @@ In VS Code, do the following:
 
    ![Debug stop](/docs/get-started/sdk/images/get-started-vscode-debug-stop-icon.png "The Stop icon in VS Code"){: .screenshot width="250"}
 
+<!-- Reference links -->
+
+[zxdb-user-guide]: /docs/development/debugger/README.md
