@@ -26,7 +26,7 @@ use netstack3_core::{
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
-    transport::{tcp::socket::SetDeviceError, udp::UdpSendToError},
+    transport::{tcp, udp},
     Ctx,
 };
 
@@ -468,7 +468,7 @@ impl IntoErrno for netstack3_core::ip::icmp::IcmpSockCreationError {
     }
 }
 
-impl IntoErrno for UdpSendToError {
+impl IntoErrno for udp::SendToError {
     fn into_errno(self) -> Errno {
         match self {
             Self::CreateSock(err) => err.into_errno(),
@@ -520,7 +520,7 @@ impl IntoErrno for ZonedAddressError {
     }
 }
 
-impl IntoErrno for SetDeviceError {
+impl IntoErrno for tcp::socket::SetDeviceError {
     fn into_errno(self) -> Errno {
         match self {
             Self::Conflict => Errno::Eaddrinuse,

@@ -509,7 +509,7 @@ pub(crate) struct MaybeListenerId<I: Ip>(usize, IpVersionMarker<I>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp)]
 /// Possible socket IDs for TCP.
-pub enum TcpSocketId<I: Ip> {
+pub enum SocketId<I: Ip> {
     /// Unbound socket.
     Unbound(UnboundId<I>),
     /// Bound socket.
@@ -520,25 +520,25 @@ pub enum TcpSocketId<I: Ip> {
     Connection(ConnectionId<I>),
 }
 
-impl<I: Ip> From<ConnectionId<I>> for TcpSocketId<I> {
+impl<I: Ip> From<ConnectionId<I>> for SocketId<I> {
     fn from(connection: ConnectionId<I>) -> Self {
         Self::Connection(connection)
     }
 }
 
-impl<I: Ip> From<ListenerId<I>> for TcpSocketId<I> {
+impl<I: Ip> From<ListenerId<I>> for SocketId<I> {
     fn from(listener: ListenerId<I>) -> Self {
         Self::Listener(listener)
     }
 }
 
-impl<I: Ip> From<UnboundId<I>> for TcpSocketId<I> {
+impl<I: Ip> From<UnboundId<I>> for SocketId<I> {
     fn from(unbound: UnboundId<I>) -> Self {
         Self::Unbound(unbound)
     }
 }
 
-impl<I: Ip> From<BoundId<I>> for TcpSocketId<I> {
+impl<I: Ip> From<BoundId<I>> for SocketId<I> {
     fn from(bound: BoundId<I>) -> Self {
         Self::Bound(bound)
     }
@@ -663,19 +663,19 @@ pub(crate) trait TcpSocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I
         id: ConnectionId<I>,
         device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError>;
-    fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R, Id: Into<TcpSocketId<I>>>(
+    fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R, Id: Into<SocketId<I>>>(
         &mut self,
         ctx: &mut C,
         id: Id,
         f: F,
     ) -> R;
-    fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R, Id: Into<TcpSocketId<I>>>(
+    fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R, Id: Into<SocketId<I>>>(
         &self,
         id: Id,
         f: F,
     ) -> R;
 
-    fn set_send_buffer_size<Id: Into<TcpSocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
+    fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
 }
 
 impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, C> for SC {
@@ -1131,7 +1131,7 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
         })
     }
 
-    fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R, Id: Into<TcpSocketId<I>>>(
+    fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R, Id: Into<SocketId<I>>>(
         &mut self,
         ctx: &mut C,
         id: Id,
@@ -1139,16 +1139,16 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
     ) -> R {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             let maybe_listener_id: MaybeListenerId<I> = match id.into() {
-                TcpSocketId::Unbound(unbound_id) => {
+                SocketId::Unbound(unbound_id) => {
                     return f(&mut sockets
                         .inactive
                         .get_mut(unbound_id.into())
                         .expect("invalid unbound ID")
                         .keep_alive);
                 }
-                TcpSocketId::Bound(bound_id) => bound_id.into(),
-                TcpSocketId::Listener(listener_id) => listener_id.into(),
-                TcpSocketId::Connection(conn_id) => {
+                SocketId::Bound(bound_id) => bound_id.into(),
+                SocketId::Listener(listener_id) => listener_id.into(),
+                SocketId::Connection(conn_id) => {
                     let (conn, (), addr) = conn_id.get_from_socketmap_mut(&mut sockets.socketmap);
                     let old = conn.keep_alive;
                     let result = f(&mut conn.keep_alive);
@@ -1170,23 +1170,23 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
         })
     }
 
-    fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R, Id: Into<TcpSocketId<I>>>(
+    fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R, Id: Into<SocketId<I>>>(
         &self,
         id: Id,
         f: F,
     ) -> R {
         self.with_tcp_sockets(|sockets| {
             let maybe_listener_id: MaybeListenerId<I> = match id.into() {
-                TcpSocketId::Unbound(unbound_id) => {
+                SocketId::Unbound(unbound_id) => {
                     return f(&sockets
                         .inactive
                         .get(unbound_id.into())
                         .expect("invalid unbound ID")
                         .keep_alive);
                 }
-                TcpSocketId::Bound(bound_id) => bound_id.into(),
-                TcpSocketId::Listener(listener_id) => listener_id.into(),
-                TcpSocketId::Connection(conn_id) => {
+                SocketId::Bound(bound_id) => bound_id.into(),
+                SocketId::Listener(listener_id) => listener_id.into(),
+                SocketId::Connection(conn_id) => {
                     let (conn, (), _addr) = conn_id.get_from_socketmap(&sockets.socketmap);
                     return f(&conn.keep_alive);
                 }
@@ -1200,30 +1200,25 @@ impl<I: IpExt, C: NonSyncContext, SC: TcpSyncContext<I, C>> TcpSocketHandler<I, 
         })
     }
 
-    fn set_send_buffer_size<Id: Into<TcpSocketId<I>>>(
-        &mut self,
-        _ctx: &mut C,
-        id: Id,
-        size: usize,
-    ) {
+    fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, _ctx: &mut C, id: Id, size: usize) {
         self.with_tcp_sockets_mut(|sockets| {
             let TcpSockets { port_alloc: _, inactive, socketmap } = sockets;
             let get_listener = match id.into() {
-                TcpSocketId::Unbound(id) => {
+                SocketId::Unbound(id) => {
                     let Unbound { bound_device: _, buffer_sizes, keep_alive: _ } =
                         inactive.get_mut(id.into()).expect("invalid unbound ID");
                     let BufferSizes { send } = buffer_sizes;
                     return *send = size;
                 }
-                TcpSocketId::Connection(id) => {
+                SocketId::Connection(id) => {
                     let (conn, _, _): (_, &(), &ConnAddr<_, _, _, _>) =
                         socketmap.conns_mut().get_by_id_mut(&id.into()).expect("invalid ID");
                     let Connection { acceptor: _, state, ip_sock: _, defunct: _, keep_alive: _ } =
                         conn;
                     return state.set_send_buffer_size(size);
                 }
-                TcpSocketId::Bound(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
-                TcpSocketId::Listener(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
+                SocketId::Bound(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
+                SocketId::Listener(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
             };
 
             let (state, _, _): (_, &(), &ListenerAddr<_, _, _>) =
@@ -1800,7 +1795,7 @@ pub fn with_keep_alive_mut<
     C: crate::NonSyncContext,
     R,
     F: FnOnce(&mut KeepAlive) -> R,
-    Id: Into<TcpSocketId<I>>,
+    Id: Into<SocketId<I>>,
 >(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
@@ -1825,7 +1820,7 @@ pub fn with_keep_alive<
     C: crate::NonSyncContext,
     R,
     F: FnOnce(&KeepAlive) -> R,
-    Id: Into<TcpSocketId<I>>,
+    Id: Into<SocketId<I>>,
 >(
     sync_ctx: &SyncCtx<C>,
     id: Id,
@@ -1844,7 +1839,7 @@ pub fn with_keep_alive<
 }
 
 /// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<TcpSocketId<I>>>(
+pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
@@ -3188,7 +3183,7 @@ mod tests {
             .expect("connect should succeed")
         });
         let mut step_and_increment_send_sizes_until_idle =
-            |net: &mut TcpTestNetwork<I>, local: TcpSocketId<_>, remote: TcpSocketId<_>| loop {
+            |net: &mut TcpTestNetwork<I>, local: SocketId<_>, remote: SocketId<_>| loop {
                 local_send_size += 1;
                 remote_send_size += 1;
                 net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {

@@ -409,7 +409,7 @@ impl<I: Ip> From<BoundSocketId<I, Udp>> for udp::BoundId<I> {
     }
 }
 
-impl<I: Ip> From<SocketId<I, Udp>> for udp::UdpSocketId<I> {
+impl<I: Ip> From<SocketId<I, Udp>> for udp::SocketId<I> {
     fn from(id: SocketId<I, Udp>) -> Self {
         match id {
             SocketId::Unbound(id) => Self::Unbound(id),
@@ -496,7 +496,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         ZonedAddr<I::Addr, DeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     ) {
-        let udp::UdpConnInfo { local_ip, local_port, remote_ip, remote_port } =
+        let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
             udp::get_udp_conn_info(sync_ctx, ctx, id);
         (local_ip, local_port, remote_ip, remote_port)
     }
@@ -506,7 +506,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: Self::ListenerId,
     ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier) {
-        let udp::UdpListenerInfo { local_ip, local_port } =
+        let udp::ListenerInfo { local_ip, local_port } =
             udp::get_udp_listener_info(sync_ctx, ctx, id);
         (local_ip, local_port)
     }
@@ -521,7 +521,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         ZonedAddr<I::Addr, DeviceId<C::Instant>>,
         Self::RemoteIdentifier,
     ) {
-        let udp::UdpConnInfo { local_ip, local_port, remote_ip, remote_port } =
+        let udp::ConnInfo { local_ip, local_port, remote_ip, remote_port } =
             udp::remove_udp_conn(sync_ctx, ctx, id);
         (local_ip, local_port, remote_ip, remote_port)
     }
@@ -531,7 +531,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         ctx: &mut C,
         id: Self::ListenerId,
     ) -> (Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>, Self::LocalIdentifier) {
-        let udp::UdpListenerInfo { local_ip, local_port } =
+        let udp::ListenerInfo { local_ip, local_port } =
             udp::remove_udp_listener(sync_ctx, ctx, id);
         (local_ip, local_port)
     }
@@ -641,8 +641,8 @@ impl<I: IpExt> TransportState<I> for Udp {
 
 impl<I: IpExt, B: BufferMut> BufferTransportState<I, B> for Udp {
     type SendConnError = IpSockSendError;
-    type SendConnToError = udp::UdpSendToError;
-    type SendListenerError = udp::UdpSendToError;
+    type SendConnToError = udp::SendToError;
+    type SendListenerError = udp::SendToError;
 
     fn send_conn<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
