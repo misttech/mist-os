@@ -157,6 +157,12 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
 }
 
 int SynAudioInDevice::Thread() {
+  // The deadline scheduler profile must account for the time it takes to decode 16KiB PDM into 6KiB
+  // of PCM (3 microphone channels). Since the input data is the DMA happening, the period of this
+  // profile must match the period of the DMA, i.e. period = 10.67 msecs.
+  // The output needs to be reported via FifoDepth, and we report kNumberOfTransfersForFifoDepth = 2
+  // which means we expected for the driver to decode one DMA transfer within the time it takes
+  // to receive the next. Hence deadline = one period = 10.67 msecs.
   const char* role_name = "fuchsia.devices.audio.as370.pdm";
   const size_t role_name_size = strlen(role_name);
   const zx_status_t status =
