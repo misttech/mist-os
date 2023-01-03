@@ -282,8 +282,16 @@ protocol VirtioWaylandImporter {
 protocol VirtioWayland {
     compose VirtioDevice;
 
-    /// Start the wayland device.
+    /// Start the wayland device using the built-in wayland server.
     Start(resource struct {
+        start_info StartInfo;
+        vmar zx.handle:VMAR;
+        sysmem_allocator client_end:fuchsia.sysmem.Allocator;
+        scenic_allocator client_end:fuchsia.ui.composition.Allocator;
+    }) -> ();
+
+    /// Start the wayland device using the provided wayland server.
+    StartWithWaylandServer(resource struct {
         start_info StartInfo;
         vmar zx.handle:VMAR;
         wayland_server client_end:<fuchsia.wayland.Server, optional>;

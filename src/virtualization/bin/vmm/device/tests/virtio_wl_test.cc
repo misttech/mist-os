@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <iterator>
+#include <unordered_set>
 
 #include <fbl/algorithm.h>
 #include <virtio/wl.h>
@@ -156,6 +157,17 @@ class TestAllocator : public fuchsia::ui::composition::testing::Allocator_TestBa
   fidl::Binding<fuchsia::ui::composition::Allocator> binding_{this};
 };
 
+enum VirtioWlBackend {
+  // A remote backend test will forward the server-end of the client channels back to the test. This
+  // allows for lower level tests of the virtio-wayland transport
+  kRemote,
+
+  // Using the local backend will service the wayland requests with a wayland server included in the
+  // virtio_wl device itself.
+  kLocal,
+};
+
+template <VirtioWlBackend Backend>
 class VirtioWlTest : public TestWithDevice {
  public:
   VirtioWlTest()
@@ -210,9 +222,16 @@ class VirtioWlTest : public TestWithDevice {
     ASSERT_EQ(sysmem_loop_.StartThread(), ZX_OK);
     ASSERT_EQ(scenic_loop_.StartThread(), ZX_OK);
 
-    status = wl_->Start(std::move(start_info), std::move(vmar), wl_dispatcher_.Bind(),
-                        sysmem_allocator_.Bind(sysmem_loop_.dispatcher()),
-                        scenic_allocator_.Bind(scenic_loop_.dispatcher()));
+    if constexpr (Backend == VirtioWlBackend::kRemote) {
+      status =
+          wl_->StartWithWaylandServer(std::move(start_info), std::move(vmar), wl_dispatcher_.Bind(),
+                                      sysmem_allocator_.Bind(sysmem_loop_.dispatcher()),
+                                      scenic_allocator_.Bind(scenic_loop_.dispatcher()));
+    } else {
+      status = wl_->Start(std::move(start_info), std::move(vmar),
+                          sysmem_allocator_.Bind(sysmem_loop_.dispatcher()),
+                          scenic_allocator_.Bind(scenic_loop_.dispatcher()));
+    }
     ASSERT_EQ(ZX_OK, status);
 
     // Configure device queues.
@@ -343,7 +362,10 @@ class VirtioWlTest : public TestWithDevice {
   std::unique_ptr<component_testing::RealmRoot> realm_;
 };
 
-TEST_F(VirtioWlTest, HandleNew) {
+using VirtioWlRemoteBackendTest = VirtioWlTest<VirtioWlBackend::kRemote>;
+using VirtioWlLocalBackendTest = VirtioWlTest<VirtioWlBackend::kLocal>;
+
+TEST_F(VirtioWlRemoteBackendTest, HandleNew) {
   virtio_wl_ctrl_vfd_new_t request = {};
   request.hdr.type = VIRTIO_WL_CMD_VFD_NEW;
   request.vfd_id = 1u;
@@ -371,7 +393,7 @@ TEST_F(VirtioWlTest, HandleNew) {
   memset(reinterpret_cast<void*>(response->pfn * PAGE_SIZE), 0xff, 4000u);
 }
 
-TEST_F(VirtioWlTest, HandleClose) {
+TEST_F(VirtioWlRemoteBackendTest, HandleClose) {
   ASSERT_EQ(CreateNew(1u, 0xff), ZX_OK);
 
   virtio_wl_ctrl_vfd_t request = {};
@@ -393,7 +415,7 @@ TEST_F(VirtioWlTest, HandleClose) {
   EXPECT_EQ(response->type, VIRTIO_WL_RESP_OK);
 }
 
-TEST_F(VirtioWlTest, HandleNewCtx) {
+TEST_F(VirtioWlRemoteBackendTest, HandleNewCtx) {
   virtio_wl_ctrl_vfd_new_t request = {};
   request.hdr.type = VIRTIO_WL_CMD_VFD_NEW_CTX;
   request.vfd_id = 1u;
@@ -420,7 +442,7 @@ TEST_F(VirtioWlTest, HandleNewCtx) {
   channels_.clear();
 }
 
-TEST_F(VirtioWlTest, HandleNewPipe) {
+TEST_F(VirtioWlRemoteBackendTest, HandleNewPipe) {
   virtio_wl_ctrl_vfd_new_t request = {};
   request.hdr.type = VIRTIO_WL_CMD_VFD_NEW_PIPE;
   request.vfd_id = 1u;
@@ -444,7 +466,7 @@ TEST_F(VirtioWlTest, HandleNewPipe) {
   EXPECT_EQ(response->flags, static_cast<uint32_t>(VIRTIO_WL_VFD_READ));
 }
 
-TEST_F(VirtioWlTest, HandleDmabuf) {
+TEST_F(VirtioWlRemoteBackendTest, HandleDmabuf) {
   virtio_wl_ctrl_vfd_new_t request = {};
   request.hdr.type = VIRTIO_WL_CMD_VFD_NEW_DMABUF;
   request.vfd_id = 1u;
@@ -489,7 +511,7 @@ TEST_F(VirtioWlTest, HandleDmabuf) {
   EXPECT_EQ(sync_response->type, VIRTIO_WL_RESP_OK);
 }
 
-TEST_F(VirtioWlTest, HandleSend) {
+TEST_F(VirtioWlRemoteBackendTest, HandleSend) {
   ASSERT_EQ(CreateNew(1u, 0xaa), ZX_OK);
   ASSERT_EQ(CreatePipe(2u), ZX_OK);
   ASSERT_EQ(CreateConnection(3u), ZX_OK);
@@ -570,7 +592,7 @@ TEST_F(VirtioWlTest, HandleSend) {
   channels_.clear();
 }
 
-TEST_F(VirtioWlTest, Recv) {
+TEST_F(VirtioWlRemoteBackendTest, Recv) {
   ASSERT_EQ(CreateConnection(1u), ZX_OK);
   RunLoopUntilIdle();
   ASSERT_EQ(channels_.size(), 1u);
@@ -718,7 +740,7 @@ TEST_F(VirtioWlTest, Recv) {
   channels_.clear();
 }
 
-TEST_F(VirtioWlTest, Hup) {
+TEST_F(VirtioWlRemoteBackendTest, Hup) {
   ASSERT_EQ(CreateConnection(1u), ZX_OK);
   RunLoopUntilIdle();
   ASSERT_EQ(channels_.size(), 1u);
@@ -744,7 +766,7 @@ TEST_F(VirtioWlTest, Hup) {
   EXPECT_EQ(header->vfd_id, 1u);
 }
 
-TEST_F(VirtioWlTest, ImportExportImage) {
+TEST_F(VirtioWlRemoteBackendTest, ImportExportImage) {
   ASSERT_EQ(CreateConnection(1u), ZX_OK);
   RunLoopUntilIdle();
   ASSERT_EQ(channels_.size(), 1u);
@@ -783,7 +805,7 @@ TEST_F(VirtioWlTest, ImportExportImage) {
   }
 }
 
-TEST_F(VirtioWlTest, ImportExportImageWithToken) {
+TEST_F(VirtioWlRemoteBackendTest, ImportExportImageWithToken) {
   ASSERT_EQ(CreateConnection(1u), ZX_OK);
   RunLoopUntilIdle();
   ASSERT_EQ(channels_.size(), 1u);
@@ -824,6 +846,121 @@ TEST_F(VirtioWlTest, ImportExportImageWithToken) {
     ASSERT_EQ(image->token.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr),
               ZX_OK);
     EXPECT_EQ(info.type, ZX_OBJ_TYPE_EVENTPAIR);
+  }
+}
+
+struct wl_message_header_t {
+  uint32_t sender;
+  uint16_t opcode;
+  uint16_t size;
+};
+
+TEST_F(VirtioWlLocalBackendTest, BindRegistry) {
+  ASSERT_EQ(CreateConnection(1u), ZX_OK);
+  RunLoopUntilIdle();
+
+  constexpr uint32_t kWlDisplayObjectId = 1;
+  constexpr uint32_t kWlRegistryObjectId = 2;
+  constexpr uint16_t kWlDisplayGetRegistryOpcode = 1;
+  constexpr uint16_t kWlRegistryGlobalEventOpcode = 0;
+
+  {
+    // Send wl_display::get_registry. This will result in the server sending back a
+    // wl_registry::global event for each registered global.
+    uint8_t request[sizeof(virtio_wl_ctrl_vfd_send_t) + sizeof(uint32_t) * 3];
+    virtio_wl_ctrl_vfd_send_t* virtio_header =
+        reinterpret_cast<virtio_wl_ctrl_vfd_send_t*>(request);
+    virtio_header->hdr.type = VIRTIO_WL_CMD_VFD_SEND;
+    virtio_header->vfd_id = 1u;
+    virtio_header->vfd_count = 0;
+    auto* wl_header = reinterpret_cast<wl_message_header_t*>(virtio_header + 1);
+    wl_header->sender = kWlDisplayObjectId;
+    wl_header->size = 12;
+    wl_header->opcode = kWlDisplayGetRegistryOpcode;
+    uint32_t* wl_payload = reinterpret_cast<uint32_t*>(wl_header + 1);
+    // new_id for bound registry
+    *wl_payload = kWlRegistryObjectId;
+
+    virtio_wl_ctrl_hdr_t* response;
+    uint16_t descriptor_id;
+    ASSERT_EQ(DescriptorChainBuilder(out_queue_)
+                  .AppendReadableDescriptor(&request, sizeof(request))
+                  .AppendWritableDescriptor(&response, sizeof(*response))
+                  .Build(&descriptor_id),
+              ZX_OK);
+
+    ASSERT_EQ(wl_->NotifyQueue(VIRTWL_VQ_OUT), ZX_OK);
+    auto used_elem = NextUsed(&out_queue_);
+    EXPECT_TRUE(used_elem);
+    EXPECT_EQ(used_elem->id, descriptor_id);
+    EXPECT_EQ(used_elem->len, sizeof(*response));
+    EXPECT_EQ(response->type, VIRTIO_WL_RESP_OK);
+  }
+
+  {
+    // Do a partial (non-exhaustive) query of the wl_registry. This is just a smoke test to verify
+    // the wayland server is able to send us messages over the virtio transport.
+    //
+    // Here we just assume that the server will send _at_least_ |kNumGlobal| globals back.
+    constexpr size_t kNumGlobals = 5;
+    size_t buffer_size = 64;
+    uint8_t* buffers[kNumGlobals];
+    uint16_t descriptor_ids[kNumGlobals];
+    for (size_t i = 0; i < kNumGlobals; ++i) {
+      ASSERT_EQ(DescriptorChainBuilder(in_queue_)
+                    .AppendWritableDescriptor(&buffers[i], static_cast<uint32_t>(buffer_size))
+                    .Build(&descriptor_ids[i]),
+                ZX_OK);
+    }
+
+    ASSERT_EQ(wl_->NotifyQueue(VIRTWL_VQ_IN), ZX_OK);
+
+    const std::unordered_set<std::string> kExpectedGlobals({
+        "wl_compositor",
+        "wl_subcompositor",
+        "wl_output",
+        "wl_seat",
+        "wl_shm",
+        "wl_data_device_manager",
+        "xdg_wm_base",
+        "zwp_linux_dmabuf_v1",
+        "zcr_alpha_compositing_v1",
+        "zcr_secure_output_v1",
+        "wp_viewporter",
+        "zaura_shell",
+    });
+    for (size_t i = 0; i < kNumGlobals; ++i) {
+      auto used_elem = NextUsed(&in_queue_);
+      EXPECT_TRUE(used_elem);
+      EXPECT_EQ(used_elem->id, descriptor_ids[i]);
+
+      virtio_wl_ctrl_vfd_recv_t* virtio_header =
+          reinterpret_cast<virtio_wl_ctrl_vfd_recv_t*>(buffers[i]);
+      EXPECT_EQ(virtio_header->hdr.type, VIRTIO_WL_CMD_VFD_RECV);
+      EXPECT_EQ(virtio_header->hdr.flags, 0u);
+      EXPECT_EQ(virtio_header->vfd_id, 1u);
+      EXPECT_EQ(virtio_header->vfd_count, 0u);
+
+      // The wl_registry::global message has the following layout:
+      //
+      //  * uint id
+      //  * string interface
+      //  * uint version
+      //
+      // The uint values are simply 32-bit integers. The interface string is encoded as a 32-bit
+      // length, followed by |length| characters, then a null byte, and then padded to the next 4
+      // byte boundary.
+      //
+      // For this test we just verify the interface names look to be reasonable.
+      auto* wl_header = reinterpret_cast<wl_message_header_t*>(virtio_header + 1);
+      EXPECT_EQ(wl_header->sender, kWlRegistryObjectId);
+      EXPECT_EQ(wl_header->opcode, kWlRegistryGlobalEventOpcode);
+
+      auto* wl_payload = reinterpret_cast<uint32_t*>(wl_header + 1);
+      const char* interface = reinterpret_cast<const char*>(wl_payload + 2);
+      FX_LOGS(INFO) << "found interface " << interface;
+      EXPECT_EQ(kExpectedGlobals.count(interface), 1u);
+    }
   }
 }
 

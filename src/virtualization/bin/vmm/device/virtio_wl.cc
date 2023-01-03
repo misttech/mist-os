@@ -22,12 +22,6 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/virtualization/bin/vmm/bits.h"
 
-#ifdef USE_VIRTIO_WL_LOCAL_WAYLAND_SERVER
-constexpr bool kUseLocalWaylandServer = true;
-#else
-constexpr bool kUseLocalWaylandServer = false;
-#endif
-
 fuchsia::sysmem::PixelFormatType DrmFormatToSysmemFormat(uint32_t drm_format) {
   switch (drm_format) {
     case DRM_FORMAT_ARGB8888:
@@ -290,26 +284,40 @@ class Pipe : public VirtioWl::Vfd {
   async::Wait tx_wait_;
 };
 
-VirtioWl::VirtioWl(sys::ComponentContext* context) : DeviceBase(context) {
-  if (kUseLocalWaylandServer) {
-    auto result = WaylandServer::Create();
-    FX_CHECK(result.is_ok()) << "Failed to create wayland server";
-    local_wayland_server_ = std::move(result.value());
-  }
-}
+VirtioWl::VirtioWl(sys::ComponentContext* context) : DeviceBase(context) {}
 
 void VirtioWl::Start(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-                     fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
                      fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
                      fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
                      StartCallback callback) {
-  auto deferred = fit::defer(std::move(callback));
+  auto result = WaylandServer::Create();
+  FX_CHECK(result.is_ok()) << "Failed to create wayland server";
+  local_wayland_server_ = std::move(result.value());
+
+  StartDevice(std::move(start_info), std::move(vmar), std::move(sysmem_allocator),
+              std::move(scenic_allocator));
+  callback();
+}
+
+void VirtioWl::StartWithWaylandServer(
+    fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
+    fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
+    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
+    StartWithWaylandServerCallback callback) {
+  remote_wayland_server_ = wayland_server.Bind();
+  StartDevice(std::move(start_info), std::move(vmar), std::move(sysmem_allocator),
+              std::move(scenic_allocator));
+  callback();
+}
+
+void VirtioWl::StartDevice(
+    fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
+    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator) {
   PrepStart(std::move(start_info));
   vmar_ = std::move(vmar);
 
-  if (!kUseLocalWaylandServer) {
-    remote_wayland_server_ = wayland_server.Bind();
-  }
   sysmem_allocator_ = sysmem_allocator.BindSync();
   sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
   scenic_allocator_ = scenic_allocator.Bind();
@@ -687,10 +695,12 @@ void VirtioWl::HandleNewCtx(const virtio_wl_ctrl_vfd_new_t* request,
     return;
   }
 
-  if (kUseLocalWaylandServer) {
+  if (local_wayland_server_) {
     local_wayland_server_->PushClient(std::move(remote_channel));
-  } else {
+  } else if (remote_wayland_server_) {
     remote_wayland_server_->Connect(std::move(remote_channel));
+  } else {
+    FX_CHECK(false) << "Received NewCtx without a wayland server configured";
   }
 
   response->hdr.type = VIRTIO_WL_RESP_VFD_NEW;

@@ -105,10 +105,15 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
 
   // |fuchsia::virtualization::hardware::VirtioWayland|
   void Start(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-             fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
              fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
              fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
              StartCallback callback) override;
+  void StartWithWaylandServer(
+      fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
+      fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
+      fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+      fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
+      StartCallback callback) override;
   void GetImporter(fidl::InterfaceRequest<fuchsia::virtualization::hardware::VirtioWaylandImporter>
                        request) override;
 
@@ -136,6 +141,10 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
   void DispatchPendingEvents();
   bool AcquireWritableDescriptor(VirtioQueue* queue, VirtioChain* chain, VirtioDescriptor* desc);
   bool CreatePendingVfds();
+
+  void StartDevice(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
+                   fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+                   fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator);
 
   std::array<VirtioQueue, VIRTWL_QUEUE_COUNT> queues_;
   zx::vmar vmar_;
@@ -175,8 +184,8 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
 
   fidl::BindingSet<fuchsia::virtualization::hardware::VirtioWaylandImporter> importer_bindings_;
 
-  fuchsia::wayland::ServerPtr remote_wayland_server_;
   std::unique_ptr<WaylandServer> local_wayland_server_;
+  fuchsia::wayland::ServerPtr remote_wayland_server_;
 };
 
 #endif  // SRC_VIRTUALIZATION_BIN_VMM_DEVICE_VIRTIO_WL_H_

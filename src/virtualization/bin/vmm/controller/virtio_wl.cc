@@ -13,6 +13,11 @@ namespace {
 constexpr auto kComponentName = "virtio_wl";
 constexpr auto kComponentCollectionName = "virtio_wl_devices";
 constexpr auto kComponentUrl = "#meta/virtio_wl.cm";
+#ifdef USE_VIRTIO_WL_LOCAL_WAYLAND_SERVER
+constexpr bool kUseLocalWaylandServer = true;
+#else
+constexpr bool kUseLocalWaylandServer = false;
+#endif
 
 }  // namespace
 
@@ -40,8 +45,14 @@ zx_status_t VirtioWl::Start(
   if (status != ZX_OK) {
     return status;
   }
-  status = wayland_->Start(std::move(start_info), std::move(vmar), std::move(wayland_server),
-                           std::move(sysmem_allocator), std::move(scenic_allocator));
+  if constexpr (kUseLocalWaylandServer) {
+    status = wayland_->Start(std::move(start_info), std::move(vmar), std::move(sysmem_allocator),
+                             std::move(scenic_allocator));
+  } else {
+    status = wayland_->StartWithWaylandServer(
+        std::move(start_info), std::move(vmar), std::move(wayland_server),
+        std::move(sysmem_allocator), std::move(scenic_allocator));
+  }
   return status;
 }
 
