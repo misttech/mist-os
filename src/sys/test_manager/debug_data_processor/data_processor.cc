@@ -238,6 +238,10 @@ void DataProcessor::WriteSummaryFile(fbl::unique_fd& fd, TestDebugDataMap debug_
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   doc.Accept(writer);
 
-  FX_CHECK(files::WriteFileAt(fd.get(), kSummaryFile, buffer.GetString(), buffer.GetSize()))
-      << strerror(errno);
+  if (!files::WriteFileAt(fd.get(), kSummaryFile, buffer.GetString(), buffer.GetSize())) {
+    // Since the directory is managed by test_manager and not debug_data_processor, it is
+    // possible that the directory is destroyed before this write occurs. This isn't
+    // necessarily an error since test execution could've been cancelled.
+    FX_LOGS(ERROR) << strerror(errno);
+  }
 }
