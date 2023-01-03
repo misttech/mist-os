@@ -2249,6 +2249,8 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+// TODO(https://fxbug.dev/100759): Re-enable after device accesses are fallible.
+#[ignore]
 async fn tcp_connect_bound_to_device(name: &str) {
     // TODO(https://github.com/google/gvisor/issues/8276): Run this against
     // Netstack2 variants once gVisor uses the bound device when connecting TCP
