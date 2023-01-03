@@ -28,87 +28,16 @@ struct IoCommand {
   list_node_t node;
   block_impl_queue_callback completion_cb;
   void* cookie;
-  uint16_t pending_txns;
   uint8_t opcode;
-  uint8_t flags;
-
-  DEF_SUBBIT(flags, 0, command_failed);
-  DEF_SUBBIT(flags, 1, forced_unit_access);
 };
 
 static inline void IoCommandComplete(IoCommand* io_cmd, zx_status_t status) {
   io_cmd->completion_cb(io_cmd->cookie, status, &io_cmd->op);
 }
 
-bool Namespace::SubmitAllTxnsForIoCommand(IoCommand* io_cmd) {
-  while (true) {
-    uint32_t blocks = io_cmd->op.rw.length;
-    if (blocks > max_transfer_blocks_) {
-      blocks = max_transfer_blocks_;
-    }
-
-    // Total transfer size in bytes
-    size_t bytes = blocks * block_info_.block_size;
-
-    NvmIoSubmission submission(io_cmd->opcode == BLOCK_OP_WRITE);
-    submission.namespace_id = namespace_id_;
-    ZX_ASSERT(blocks - 1 <= UINT16_MAX);
-    submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(blocks - 1);
-    if (io_cmd->forced_unit_access()) {
-      submission.set_force_unit_access(true);
-    }
-
-    zx_status_t status = controller_->io_queue()->Submit(
-        submission, zx::unowned_vmo(io_cmd->op.rw.vmo), io_cmd->op.rw.offset_vmo, bytes, io_cmd);
-    if (status != ZX_OK) {
-      if (status == ZX_ERR_SHOULD_WAIT) {
-        // We can't proceed if there is no available space in the submission queue, and we tell the
-        // caller to retain the command (false).
-        return false;
-      } else {
-        zxlogf(ERROR, "Failed to submit transaction (command %p): %s", io_cmd,
-               zx_status_get_string(status));
-        break;
-      }
-    }
-
-    // keep track of where we are
-    io_cmd->op.rw.offset_dev += blocks;
-    io_cmd->op.rw.offset_vmo += bytes;
-    io_cmd->op.rw.length -= blocks;
-    io_cmd->pending_txns++;
-
-    // If there are no more transactions remaining, we're done. We move this command to the active
-    // list and tell the caller not to retain the command (true).
-    if (io_cmd->op.rw.length == 0) {
-      fbl::AutoLock lock(&commands_lock_);
-      list_add_tail(&active_commands_, &io_cmd->node);
-      return true;
-    }
-  }
-
-  {
-    fbl::AutoLock lock(&commands_lock_);
-    io_cmd->set_command_failed(true);
-    if (io_cmd->pending_txns) {
-      // If there are earlier uncompleted transactions, we become active now and will finish
-      // erroring out when they complete.
-      list_add_tail(&active_commands_, &io_cmd->node);
-      io_cmd = nullptr;
-    }
-  }
-
-  if (io_cmd != nullptr) {
-    IoCommandComplete(io_cmd, ZX_ERR_INTERNAL);
-  }
-
-  // Either successful or not, we tell the caller not to retain the command (true).
-  return true;
-}
-
 void Namespace::ProcessIoSubmissions() {
-  IoCommand* io_cmd;
   while (true) {
+    IoCommand* io_cmd;
     {
       fbl::AutoLock lock(&commands_lock_);
       io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node);
@@ -118,11 +47,34 @@ void Namespace::ProcessIoSubmissions() {
       return;
     }
 
-    if (!SubmitAllTxnsForIoCommand(io_cmd)) {
-      // put command back at front of queue for further processing later
-      fbl::AutoLock lock(&commands_lock_);
-      list_add_head(&pending_commands_, &io_cmd->node);
-      return;
+    NvmIoSubmission submission(io_cmd->opcode == BLOCK_OP_WRITE);
+    submission.namespace_id = namespace_id_;
+    submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(io_cmd->op.rw.length - 1);
+    if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
+      submission.set_force_unit_access(true);
+    }
+
+    // Convert op.rw.offset_vmo and op.rw.length to bytes.
+    zx_status_t status =
+        controller_->io_queue()->Submit(submission, zx::unowned_vmo(io_cmd->op.rw.vmo),
+                                        io_cmd->op.rw.offset_vmo * block_info_.block_size,
+                                        io_cmd->op.rw.length * block_info_.block_size, io_cmd);
+    switch (status) {
+      case ZX_OK:
+        break;
+      case ZX_ERR_SHOULD_WAIT:
+        // We can't proceed if there is no available space in the submission queue. Put command back
+        // at front of queue for further processing later.
+        {
+          fbl::AutoLock lock(&commands_lock_);
+          list_add_head(&pending_commands_, &io_cmd->node);
+        }
+        return;
+      default:
+        zxlogf(ERROR, "Failed to submit transaction (command %p): %s", io_cmd,
+               zx_status_get_string(status));
+        IoCommandComplete(io_cmd, ZX_ERR_INTERNAL);
+        break;
     }
   }
 }
@@ -143,25 +95,12 @@ void Namespace::ProcessIoCompletions() {
     if (completion->status_code_type() == StatusCodeType::kGeneric &&
         completion->status_code() == 0) {
       zxlogf(TRACE, "Completed transaction #%u command %p OK.", completion->command_id(), io_cmd);
+      IoCommandComplete(io_cmd, ZX_OK);
     } else {
       zxlogf(ERROR, "Completed transaction #%u command %p ERROR: status type=%01x, status=%02x",
              completion->command_id(), io_cmd, completion->status_code_type(),
              completion->status_code());
-      io_cmd->set_command_failed(true);
-      // Discard any remaining bytes -- no reason to keep creating further txns once one has failed.
-      io_cmd->op.rw.length = 0;
-    }
-
-    io_cmd->pending_txns--;
-    if ((io_cmd->pending_txns == 0) && (io_cmd->op.rw.length == 0)) {
-      // remove from either pending or active list
-      {
-        fbl::AutoLock lock(&commands_lock_);
-        list_delete(&io_cmd->node);
-      }
-      zxlogf(TRACE, "Completed command %p %s", io_cmd,
-             io_cmd->command_failed() ? "FAILED." : "OK.");
-      IoCommandComplete(io_cmd, io_cmd->command_failed() ? ZX_ERR_IO : ZX_OK);
+      IoCommandComplete(io_cmd, ZX_ERR_IO);
     }
   }
 
@@ -225,9 +164,6 @@ void Namespace::DdkRelease() {
   {
     fbl::AutoLock lock(&commands_lock_);
     IoCommand* io_cmd;
-    while ((io_cmd = list_remove_head_type(&active_commands_, IoCommand, node)) != nullptr) {
-      IoCommandComplete(io_cmd, ZX_ERR_PEER_CLOSED);
-    }
     while ((io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node)) != nullptr) {
       IoCommandComplete(io_cmd, ZX_ERR_PEER_CLOSED);
     }
@@ -286,7 +222,6 @@ static void PopulateNamespaceInspect(const IdentifyNvmeNamespace& ns,
 
 zx_status_t Namespace::Init() {
   list_initialize(&pending_commands_);
-  list_initialize(&active_commands_);
 
   zx::vmo admin_data;
   const uint32_t kPageSize = zx_system_get_page_size();
@@ -319,9 +254,6 @@ zx_status_t Namespace::Init() {
   block_info_.block_count = ns->n_sze;
   auto& fmt = ns->lba_formats[ns->lba_format_index()];
   block_info_.block_size = fmt.lba_data_size_bytes();
-  // TODO(fxbug.dev/102133): Explore the option of bounding this and relying on the block driver to
-  // break up large IOs.
-  block_info_.max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED;
 
   if (fmt.metadata_size_bytes()) {
     zxlogf(ERROR, "NVMe drive uses LBA format with metadata (%u bytes), which we do not support.",
@@ -334,7 +266,7 @@ zx_status_t Namespace::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // NVME r/w commands operate in block units, maximum of 64K:
+  // NVME r/w commands operate in block units, maximum of 64K blocks.
   const uint32_t max_bytes_per_cmd = block_info_.block_size * 65536;
   uint32_t max_transfer_bytes = controller_->max_data_transfer_bytes();
   if (max_transfer_bytes == 0) {
@@ -349,6 +281,8 @@ zx_status_t Namespace::Init() {
   if (max_transfer_bytes > prp_restricted_transfer_bytes) {
     max_transfer_bytes = prp_restricted_transfer_bytes;
   }
+
+  block_info_.max_transfer_size = max_transfer_bytes;
 
   // Convert to block units.
   max_transfer_blocks_ = max_transfer_bytes / block_info_.block_size;
@@ -379,10 +313,6 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
   io_cmd->completion_cb = callback;
   io_cmd->cookie = cookie;
   io_cmd->opcode = io_cmd->op.command & BLOCK_OP_MASK;
-  io_cmd->flags = 0;
-  if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
-    io_cmd->set_forced_unit_access(true);
-  }
 
   switch (io_cmd->opcode) {
     case BLOCK_OP_READ:
@@ -401,17 +331,17 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
     IoCommandComplete(io_cmd, ZX_ERR_INVALID_ARGS);
     return;
   }
-  // Transaction must fit within device
+  if (io_cmd->op.rw.length > max_transfer_blocks_) {
+    zxlogf(ERROR, "Request exceeding max transfer size.");
+    IoCommandComplete(io_cmd, ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  // IO address range must fit within device.
   if ((io_cmd->op.rw.offset_dev >= block_info_.block_count) ||
       (block_info_.block_count - io_cmd->op.rw.offset_dev < io_cmd->op.rw.length)) {
     IoCommandComplete(io_cmd, ZX_ERR_OUT_OF_RANGE);
     return;
   }
-
-  // convert vmo offset to a byte offset
-  io_cmd->op.rw.offset_vmo *= block_info_.block_size;
-
-  io_cmd->pending_txns = 0;
 
   zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", io_cmd->opcode == BLOCK_OP_WRITE ? "wr" : "rd",
          io_cmd->op.rw.length, io_cmd->op.rw.offset_dev);

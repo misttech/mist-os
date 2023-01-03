@@ -51,10 +51,6 @@ class Namespace : public NamespaceDeviceType,
   // Main driver initialization.
   zx_status_t Init();
 
-  // Attempt to submit NVMe transactions for an IoCommand. Returns false if this could not be
-  // completed due to temporary lack of resources, or true if either it succeeded or errored out.
-  bool SubmitAllTxnsForIoCommand(IoCommand* io_cmd);
-
   // Process pending IO commands. Called in the IoLoop().
   void ProcessIoSubmissions();
   // Process pending IO completions. Called in the IoLoop().
@@ -65,12 +61,8 @@ class Namespace : public NamespaceDeviceType,
 
   fbl::Mutex commands_lock_;
   // The pending list consists of commands that have been received via BlockImplQueue() and are
-  // waiting for IO to start. The exception is the head of the pending list which may be partially
-  // started, waiting for more txn slots to become available.
-  list_node_t pending_commands_ TA_GUARDED(commands_lock_);  // Inbound commands to process.
-  // The active list consists of commands where all txns have been created and we're waiting for
-  // them to complete or error out.
-  list_node_t active_commands_ TA_GUARDED(commands_lock_);  // Commands in flight.
+  // waiting for IO to start.
+  list_node_t pending_commands_ TA_GUARDED(commands_lock_);
 
   // Notifies IoThread() that it has work to do. Signaled from BlockImplQueue() or the IRQ handler.
   sync_completion_t io_signal_;
