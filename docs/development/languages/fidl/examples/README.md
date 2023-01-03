@@ -37,51 +37,99 @@ section.
 
 <!-- DO_NOT_REMOVE_COMMENT:concepts (Why? See: /tools/fidl/scripts/canonical_example/README.md) -->
 
+### Acknowledgement pattern
+
 <<../widgets/_acknowledgement_pattern.md>>
+
+### Alias
 
 <<../widgets/_alias.md>>
 
+### Anonymous type
+
 <<../widgets/_anonymous_type.md>>
+
+### Bits
 
 <<../widgets/_bits.md>>
 
+### Discoverable
+
 <<../widgets/_discoverable.md>>
+
+### Enum
 
 <<../widgets/_enum.md>>
 
+### Feed forward pattern
+
 <<../widgets/_feed_forward_pattern.md>>
+
+### Generated name
 
 <<../widgets/_generated_name.md>>
 
+### Handle rights
+
 <<../widgets/_handle_rights.md>>
+
+### Infallible two way method
 
 <<../widgets/_infallible_two_way_method.md>>
 
+### Named payload
+
 <<../widgets/_named_payload.md>>
+
+### Optionality
 
 <<../widgets/_optionality.md>>
 
+### Pagination pattern
+
 <<../widgets/_pagination_pattern.md>>
+
+### Persistence
 
 <<../widgets/_persistence.md>>
 
+### Protocol end
+
 <<../widgets/_protocol_end.md>>
+
+### Protocol
 
 <<../widgets/_protocol.md>>
 
+### Recursive type
+
 <<../widgets/_recursive_type.md>>
+
+### Resource type
 
 <<../widgets/_resource_type.md>>
 
+### Scalar type
+
 <<../widgets/_scalar_type.md>>
+
+### Size constraint
 
 <<../widgets/_size_constraint.md>>
 
+### Struct payload
+
 <<../widgets/_struct_payload.md>>
+
+### Table payload
 
 <<../widgets/_table_payload.md>>
 
+### Throttled event pattern
+
 <<../widgets/_throttled_event_pattern.md>>
+
+### Union payload
 
 <<../widgets/_union_payload.md>>
 

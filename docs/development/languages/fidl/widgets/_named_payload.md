@@ -1,7 +1,7 @@
 <div>
   <devsite-expandable>
     <h4 class="showalways">
-      FIDL recipe: Named method payload
+      FIDL recipe: Named payload
     </h4>
 
 <!--

@@ -504,6 +504,8 @@ def document(name, concepts):
                     break
                 line_num = line_num + 1
             lines.insert(line_num, """%s%s.md>>\n\n""" % (prefix, concept))
+            lines.insert(
+                line_num, """### %s\n\n""" % subs['concept_sentence_case'])
             out_contents = "".join(lines)
             f.write(out_contents)
 
