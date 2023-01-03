@@ -4,6 +4,7 @@
 
 //! The show_output module contains print routines for the Show subcommand.
 
+use camino::Utf8PathBuf;
 use ffx_emulator_common::tuntap::TAP_INTERFACE_NAME;
 use ffx_emulator_config::{EmulatorConfiguration, NetworkingMode};
 use sdk_metadata::{
@@ -77,7 +78,8 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) {
             memory: emu_config.device.memory.clone(),
             window_size: emu_config.device.screen.clone(),
         },
-        start_up_args_template: Some(emu_config.runtime.template.to_string_lossy().to_string()),
+        start_up_args_template: Utf8PathBuf::from_path_buf(emu_config.runtime.template.clone())
+            .expect("Converting to utf8"),
         ports: None,
     };
 

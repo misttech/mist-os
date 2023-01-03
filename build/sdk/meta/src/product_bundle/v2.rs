@@ -226,6 +226,11 @@ impl ProductBundleV2 {
 
         Ok(())
     }
+
+    /// Return the path to the Virtual Device Manifest.
+    pub fn get_virtual_devices_path(&self) -> Option<Utf8PathBuf> {
+        self.virtual_devices_path.clone()
+    }
 }
 
 #[cfg(test)]
@@ -342,6 +347,8 @@ mod tests {
     fn test_relativize_with_paths() {
         let tmp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let vd_manifest = tempdir.join("virtual_devices.json");
+        File::create(&vd_manifest).expect("Create vd manifest file");
 
         let mut pb = ProductBundleV2 {
             partitions: PartitionsConfig {
@@ -374,7 +381,7 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
-            virtual_devices_path: Some(tempdir.join("device")),
+            virtual_devices_path: Some(vd_manifest),
         };
         let result = pb.relativize_paths(tempdir);
         assert!(result.is_ok());

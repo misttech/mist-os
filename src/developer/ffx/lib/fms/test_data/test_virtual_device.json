@@ -26,7 +26,8 @@
             }
         },
         "name": "virtual-arm64",
-        "type": "virtual_device"
+        "type": "virtual_device",
+        "start_up_args_template": "path/to/template"
     },
     "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json"
 }

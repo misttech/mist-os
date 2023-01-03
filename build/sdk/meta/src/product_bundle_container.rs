@@ -226,7 +226,8 @@ mod tests {
                                 "quantity": 1,
                                 "units": "gigabytes"
                             }
-                        }
+                        },
+                        "start_up_args_template": "path/to/template"
                     }
                 ]
             }

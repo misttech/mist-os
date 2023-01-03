@@ -17,7 +17,7 @@ use ffx_emulator_config::{
 };
 use ffx_emulator_start_args::StartCommand;
 use pbms::{load_product_bundle, ListingMode};
-use sdk_metadata::ProductBundle;
+use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
 use std::str::FromStr;
 use std::{collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, time::Duration};
 
@@ -30,8 +30,10 @@ pub(crate) async fn list_virtual_devices(
         load_product_bundle(&sdk, &cmd.product_bundle, ListingMode::ReadyBundlesOnly).await?;
     match bundle {
         ProductBundle::V1(product_bundle) => Ok(product_bundle.device_refs.clone()),
-        ProductBundle::V2(_) => {
-            bail!("V2 Product Bundles do not yet contain multiple virtual devices")
+        ProductBundle::V2(product_bundle) => {
+            let path = product_bundle.get_virtual_devices_path();
+            let manifest = VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
+            Ok(manifest.device_names())
         }
     }
 }
