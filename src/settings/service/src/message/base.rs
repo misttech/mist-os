@@ -33,10 +33,10 @@ impl<T: Copy + Debug + Eq + Hash + Send + Sync> Role for T {}
 /// MessageHub participants, which are capable of sending and receiving
 /// messages.
 pub(super) mod messenger {
-    use super::{role, Address, MessengerType, Payload, Role};
+    use super::{Address, MessengerType, Payload, Role};
     use std::collections::HashSet;
 
-    pub type Roles<R> = HashSet<role::Signature<R>>;
+    pub type Roles = HashSet<crate::Role>;
 
     /// `Descriptor` is a blueprint for creating a messenger. It is sent to the
     /// MessageHub by clients, which interprets the information to build the
@@ -51,7 +51,7 @@ pub(super) mod messenger {
         /// The roles to associate with this messenger. When a messenger
         /// is associated with a given [`Role`], any message directed to that
         /// [`Role`] will be delivered to the messenger.
-        pub roles: Roles<R>,
+        pub roles: Roles,
     }
 }
 
@@ -67,20 +67,6 @@ pub enum MessageEvent<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
     /// A status update for the message that spawned the receptor delivering this
     /// update.
     Status(Status),
-}
-
-/// This mod contains common definitions for working with [`Role`]. [`Role`]
-/// defines a group which messengers can belong to and messages can be directed
-/// to.
-pub mod role {
-    use super::Role;
-
-    /// An enumeration of role types used internally in [`Signature`] to
-    /// uniquely identify the role.
-    #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-    pub enum Signature<R: Role + 'static> {
-        Role(R),
-    }
 }
 
 /// This mod contains the default type definitions for the MessageHub's type
@@ -121,20 +107,20 @@ pub enum Status {
 
 /// The intended recipients for a message.
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-pub enum Audience<A: Address + 'static, R: Role + 'static = default::Role> {
+pub enum Audience<A: Address + 'static> {
     // All non-broker messengers outside of the sender.
     Broadcast,
     // An Audience Group.
-    Group(group::Group<A, R>),
+    Group(group::Group<A>),
     // The messenger at the specified address.
     Address(A),
     // The messenger with the specified signature.
     Messenger(Signature<A>),
     // A messenger who belongs to the specified role.
-    Role(role::Signature<R>),
+    Role(crate::Role),
 }
 
-impl<A: Address + 'static, R: Role + 'static> Audience<A, R> {
+impl<A: Address + 'static> Audience<A> {
     /// Indicates whether a message directed towards this `Audience` must match
     /// to a messenger or if it's okay for the message to be delivered to no
     /// one. For example, broadcasts are meant to be delivered to any
@@ -150,11 +136,11 @@ impl<A: Address + 'static, R: Role + 'static> Audience<A, R> {
         }
     }
 
-    pub fn contains(&self, audience: &Audience<A, R>) -> bool {
+    pub fn contains(&self, audience: &Audience<A>) -> bool {
         audience.flatten().is_subset(&self.flatten())
     }
 
-    pub fn flatten(&self) -> HashSet<Audience<A, R>> {
+    pub fn flatten(&self) -> HashSet<Audience<A>> {
         match self {
             Audience::Group(group) => {
                 group.audiences.iter().flat_map(|audience| audience.flatten()).collect()
@@ -165,14 +151,14 @@ impl<A: Address + 'static, R: Role + 'static> Audience<A, R> {
 }
 
 pub mod group {
-    use super::{Address, Audience, Role};
+    use super::{Address, Audience};
     #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-    pub struct Group<A: Address + 'static, R: Role + 'static> {
-        pub audiences: Vec<Audience<A, R>>,
+    pub struct Group<A: Address + 'static> {
+        pub audiences: Vec<Audience<A>>,
     }
 
-    impl<A: Address + 'static, R: Role + 'static> Group<A, R> {
-        pub fn contains(&self, audience: &Audience<A, R>) -> bool {
+    impl<A: Address + 'static> Group<A> {
+        pub fn contains(&self, audience: &Audience<A>) -> bool {
             for target in &self.audiences {
                 if target == audience {
                     return true;
@@ -187,22 +173,22 @@ pub mod group {
     }
 
     #[cfg(test)]
-    pub(crate) struct Builder<A: Address + 'static, R: Role + 'static> {
-        audiences: Vec<Audience<A, R>>,
+    pub(crate) struct Builder<A: Address + 'static> {
+        audiences: Vec<Audience<A>>,
     }
 
     #[cfg(test)]
-    impl<A: Address + 'static, R: Role + 'static> Builder<A, R> {
+    impl<A: Address + 'static> Builder<A> {
         pub(crate) fn new() -> Self {
             Self { audiences: vec![] }
         }
 
-        pub(crate) fn add(mut self, audience: Audience<A, R>) -> Self {
+        pub(crate) fn add(mut self, audience: Audience<A>) -> Self {
             self.audiences.push(audience);
             self
         }
 
-        pub(crate) fn build(self) -> Group<A, R> {
+        pub(crate) fn build(self) -> Group<A> {
             Group { audiences: self.audiences }
         }
     }
@@ -254,7 +240,7 @@ pub mod filter {
     pub enum Condition<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
         /// Matches on the message's intended audience as specified by the
         /// sender.
-        Audience(Audience<A, R>),
+        Audience(Audience<A>),
         /// Matches on the author's signature.
         Author(Signature<A>),
         /// Matches on a custom closure that may evaluate the sent message.
@@ -355,7 +341,7 @@ pub mod filter {
 #[derive(Clone, Debug)]
 pub enum MessageType<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
     /// A completely new message that is intended for the specified audience.
-    Origin(Audience<A, R>),
+    Origin(Audience<A>),
     /// A response to a previously received message. Note that the value must
     /// be boxed to mitigate recursive sizing issues as MessageType is held by
     /// Message.

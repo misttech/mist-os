@@ -27,8 +27,6 @@ use crate::handler::base as handler;
 use crate::handler::setting_handler as controller;
 use crate::job;
 #[cfg(test)]
-use crate::message::base::role;
-#[cfg(test)]
 use crate::message::base::MessengerType;
 use crate::message::MessageHubDefinition;
 use crate::policy::{self, PolicyType};
@@ -210,7 +208,7 @@ macro_rules! payload_convert {
 pub(crate) async fn build_event_listener(delegate: &message::Delegate) -> message::Receptor {
     delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(Role::Event(event::Role::Sink)))
+        .add_role(Role::Event(event::Role::Sink))
         .build()
         .await
         .expect("Should be able to retrieve receptor")

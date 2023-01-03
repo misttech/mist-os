@@ -5,7 +5,7 @@
 use crate::base::SettingType;
 use crate::config;
 use crate::event;
-use crate::message::base::{role, Audience};
+use crate::message::base::Audience;
 use crate::payload_convert;
 use crate::service;
 use crate::service_context::ExternalServiceEvent;
@@ -178,7 +178,7 @@ impl Publisher {
         self.messenger
             .message(
                 Payload::Event(event).into(),
-                Audience::Role(role::Signature::Role(service::Role::Event(event::Role::Sink))),
+                Audience::Role(service::Role::Event(event::Role::Sink)),
             )
             .send()
             .ack();

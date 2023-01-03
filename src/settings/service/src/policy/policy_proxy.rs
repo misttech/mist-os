@@ -7,7 +7,7 @@ use fuchsia_async::Task;
 use futures::StreamExt;
 
 use crate::handler::base::{Error as HandlerError, Payload, Request, Response};
-use crate::message::base::{filter, role, MessageEvent, MessageType, MessengerType};
+use crate::message::base::{filter, MessageEvent, MessageType, MessengerType};
 use crate::policy::policy_handler::{PolicyHandler, RequestTransform, ResponseTransform};
 use crate::policy::{
     self as policy_base, PolicyHandlerFactory, PolicyType, Request as PolicyRequest, Role,
@@ -91,7 +91,7 @@ impl PolicyProxy {
             .messenger_builder(MessengerType::Addressable(service::Address::PolicyHandler(
                 policy_type,
             )))
-            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(service::Role::Policy(Role::PolicyHandler))
             .build()
             .await?;
 

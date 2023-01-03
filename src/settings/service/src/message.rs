@@ -45,7 +45,7 @@ where
     T: MessageHubDefinition,
 {
     type Delegate = delegate::Delegate<T::Payload, T::Address, T::Role>;
-    type Audience = base::Audience<T::Address, T::Role>;
+    type Audience = base::Audience<T::Address>;
     type Messenger = messenger::MessengerClient<T::Payload, T::Address, T::Role>;
     type MessageError = base::MessageError<T::Address>;
     type MessageEvent = base::MessageEvent<T::Payload, T::Address, T::Role>;

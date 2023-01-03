@@ -4,7 +4,7 @@
 
 use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
-    default, messenger, role, ActionSender, Address, Audience, CreateMessengerResult, Fingerprint,
+    default, messenger, ActionSender, Address, Audience, CreateMessengerResult, Fingerprint,
     Message, MessageAction, MessageError, MessageType, MessengerAction, MessengerActionSender,
     MessengerId, MessengerType, Payload, Role, Signature,
 };
@@ -25,7 +25,7 @@ pub struct Builder<P: Payload + 'static, A: Address + 'static, R: Role + 'static
     /// type determines what audiences the messenger is included in.
     messenger_type: MessengerType<P, A, R>,
     /// The roles to associate with this messenger.
-    roles: HashSet<role::Signature<R>>,
+    roles: HashSet<crate::Role>,
 }
 
 impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A, R> {
@@ -40,7 +40,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A
 
     /// Includes the specified role in the list of roles to be associated with
     /// the new messenger.
-    pub(crate) fn add_role(mut self, role: role::Signature<R>) -> Self {
+    pub(crate) fn add_role(mut self, role: crate::Role) -> Self {
         let _ = self.roles.insert(role);
         self
     }
@@ -83,7 +83,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessengerCli
 
     /// Creates a MessageBuilder for a new message with the specified payload
     /// and audience.
-    pub(crate) fn message(&self, payload: P, audience: Audience<A, R>) -> MessageBuilder<P, A, R> {
+    pub(crate) fn message(&self, payload: P, audience: Audience<A>) -> MessageBuilder<P, A, R> {
         MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
     }
 

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::agent::{Context, Payload};
 use crate::blueprint_definition;
 use crate::clock;
-use crate::message::base::{filter, role, MessageEvent, MessengerType};
+use crate::message::base::{filter, MessageEvent, MessengerType};
 use crate::policy::{self as policy_base, Payload as PolicyPayload, Request, Role};
 use crate::service::message::{Audience, MessageClient, Messenger, Signature};
 use crate::{service, trace};
@@ -100,9 +100,7 @@ impl PolicyValuesInspectAgent {
                 .messenger_client
                 .message(
                     PolicyPayload::Request(Request::Get).into(),
-                    Audience::Role(role::Signature::Role(service::Role::Policy(
-                        Role::PolicyHandler,
-                    ))),
+                    Audience::Role(service::Role::Policy(Role::PolicyHandler)),
                 )
                 .send();
 
@@ -267,7 +265,7 @@ mod tests {
     use crate::audio::policy::{PolicyId, StateBuilder, TransformFlags};
     use crate::audio::types::AudioStreamType;
     use crate::clock;
-    use crate::message::base::{role, MessageEvent, MessengerType, Status};
+    use crate::message::base::{MessageEvent, MessengerType, Status};
     use crate::message::MessageHubUtil;
     use crate::policy::{self as policy_base, Payload, PolicyInfo, Role, UnknownInfo};
     use crate::service::message::Audience;
@@ -301,7 +299,7 @@ mod tests {
         let (_, mut policy_receptor) = context
             .delegate
             .messenger_builder(MessengerType::Unbound)
-            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(service::Role::Policy(Role::PolicyHandler))
             .build()
             .await
             .unwrap();
@@ -366,7 +364,7 @@ mod tests {
         let (_, mut policy_receptor) = context
             .delegate
             .messenger_builder(MessengerType::Unbound)
-            .add_role(role::Signature::Role(service::Role::Policy(Role::PolicyHandler)))
+            .add_role(service::Role::Policy(Role::PolicyHandler))
             .build()
             .await
             .unwrap();

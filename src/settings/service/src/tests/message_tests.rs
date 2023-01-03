@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::event;
 use crate::message::action_fuse::ActionFuseBuilder;
 use crate::message::base::{
-    filter, group, role, Address, Audience, MessageEvent, MessengerType, Payload, Role, Status,
+    filter, group, Address, Audience, MessageEvent, MessengerType, Payload, Role, Status,
 };
 use crate::message::receptor::Receptor;
 use crate::message::MessageHubUtil;
+use crate::policy;
 use crate::tests::message_utils::verify_payload;
 use fuchsia_zircon::DurationNum;
 use futures::future::BoxFuture;
@@ -30,12 +32,6 @@ pub(crate) enum TestMessage {
 #[derive(Clone, Eq, PartialEq, Debug, Copy, Hash)]
 pub(crate) enum TestAddress {
     Foo(u64),
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Copy, Hash)]
-pub(crate) enum TestRole {
-    Foo,
-    Bar,
 }
 
 /// Ensures the delivery result matches expected value.
@@ -64,6 +60,9 @@ static MODIFIED_2: TestMessage = TestMessage::Thud;
 static BROADCAST: TestMessage = TestMessage::Baz;
 static REPLY: TestMessage = TestMessage::Bar;
 
+const ROLE_1: crate::Role = crate::Role::Event(event::Role::Sink);
+const ROLE_2: crate::Role = crate::Role::Policy(policy::Role::PolicyHandler);
+
 mod test {
     use super::*;
     use crate::message::MessageHubDefinition;
@@ -72,7 +71,7 @@ mod test {
     impl MessageHubDefinition for MessageHub {
         type Payload = TestMessage;
         type Address = TestAddress;
-        type Role = TestRole;
+        type Role = crate::message::base::default::Role;
     }
 }
 
@@ -463,9 +462,7 @@ async fn test_messenger_behavior() {
     }
 }
 
-async fn verify_messenger_behavior(
-    messenger_type: MessengerType<TestMessage, TestAddress, TestRole>,
-) {
+async fn verify_messenger_behavior(messenger_type: MessengerType<TestMessage, TestAddress>) {
     let delegate = test::MessageHub::create_hub();
 
     // Messenger to receive message.
@@ -1208,13 +1205,13 @@ async fn test_roles_membership() {
     // Create messengers who participate in roles
     let (_, mut foo_role_receptor) = delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(TestRole::Foo))
+        .add_role(ROLE_1)
         .build()
         .await
         .expect("recipient messenger should be created");
     let (_, mut foo_role_receptor_2) = delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(TestRole::Foo))
+        .add_role(ROLE_1)
         .build()
         .await
         .expect("recipient messenger should be created");
@@ -1227,7 +1224,7 @@ async fn test_roles_membership() {
         .expect("sending messenger should be created");
 
     let message = TestMessage::Foo;
-    let audience = Audience::Role(role::Signature::Role(TestRole::Foo));
+    let audience = Audience::Role(ROLE_1);
     sender.message(message, audience).send().ack();
 
     // Verify payload received by role members.
@@ -1244,13 +1241,13 @@ async fn test_roles_exclusivity() {
     // Create messengers who participate in roles
     let (_, mut foo_role_receptor) = delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(TestRole::Foo))
+        .add_role(ROLE_1)
         .build()
         .await
         .expect("recipient messenger should be created");
     let (_, mut bar_role_receptor) = delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(TestRole::Bar))
+        .add_role(ROLE_2)
         .build()
         .await
         .expect("recipient messenger should be created");
@@ -1265,7 +1262,7 @@ async fn test_roles_exclusivity() {
     // Send messages to roles.
     {
         let message = TestMessage::Bar;
-        let audience = Audience::Role(role::Signature::Role(TestRole::Bar));
+        let audience = Audience::Role(ROLE_2);
         sender.message(message, audience).send().ack();
 
         // Verify payload received by role members.
@@ -1273,7 +1270,7 @@ async fn test_roles_exclusivity() {
     }
     {
         let message = TestMessage::Foo;
-        let audience = Audience::Role(role::Signature::Role(TestRole::Foo));
+        let audience = Audience::Role(ROLE_1);
         sender.message(message, audience).send().ack();
 
         // Verify payload received by role members.
@@ -1290,7 +1287,7 @@ async fn test_roles_audience() {
     // Create messenger who participate in a role
     let (_, mut foo_role_receptor) = delegate
         .messenger_builder(MessengerType::Unbound)
-        .add_role(role::Signature::Role(TestRole::Foo))
+        .add_role(ROLE_1)
         .build()
         .await
         .expect("recipient messenger should be created");
@@ -1314,7 +1311,7 @@ async fn test_roles_audience() {
     // Send message to role.
     {
         let message = TestMessage::Foo;
-        let audience = Audience::Role(role::Signature::Role(TestRole::Foo));
+        let audience = Audience::Role(ROLE_1);
         sender.message(message, audience).send().ack();
 
         // Verify payload received by role members.

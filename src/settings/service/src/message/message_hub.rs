@@ -5,9 +5,9 @@
 use crate::message::action_fuse::ActionFuseBuilder;
 use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
-    filter::Filter, messenger, role, ActionSender, Address, Attribution, Audience, Fingerprint,
-    Message, MessageAction, MessageClientId, MessageError, MessageType, MessengerAction,
-    MessengerId, MessengerType, Payload, Role, Signature, Status,
+    filter::Filter, messenger, ActionSender, Address, Attribution, Audience, Fingerprint, Message,
+    MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
+    MessengerType, Payload, Role, Signature, Status,
 };
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::delegate::Delegate;
@@ -69,10 +69,10 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
     addresses: HashMap<A, MessengerId>,
     /// MessengerId mapping to roles. This mapping allows the `MessageHub`
     /// to remove a messenger from role memberships upon removal.
-    messengers: HashMap<MessengerId, messenger::Roles<R>>,
+    messengers: HashMap<MessengerId, messenger::Roles>,
     /// Role mapping for looking up which messengers belong to a particular
     /// role.
-    roles: HashMap<role::Signature<R>, HashSet<MessengerId>>,
+    roles: HashMap<crate::Role, HashSet<MessengerId>>,
     /// Mapping of registered messengers (including brokers) to beacons. Used for
     /// delivering messages from a resolved address or a list of participants.
     beacons: HashMap<MessengerId, Beacon<P, A, R>>,
@@ -390,7 +390,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
     fn resolve_audience(
         &self,
         sender_id: MessengerId,
-        audience: &Audience<A, R>,
+        audience: &Audience<A>,
     ) -> Result<(HashSet<MessengerId>, bool), anyhow::Error> {
         let mut return_set = HashSet::new();
         let mut delivery_required = false;

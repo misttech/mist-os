@@ -73,7 +73,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClien
     /// Returns the audience associated with the underlying [`Message`]. If it
     /// is a new [`Message`] (origin), it will be the target audience.
     /// Otherwise it is the author of the reply.
-    pub(crate) fn get_audience(&self) -> Audience<A, R> {
+    pub(crate) fn get_audience(&self) -> Audience<A> {
         match self.message.get_type() {
             MessageType::Origin(audience) => audience.clone(),
             MessageType::Reply(message) => Audience::Messenger(message.get_author()),
