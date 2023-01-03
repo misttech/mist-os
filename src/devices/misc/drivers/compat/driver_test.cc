@@ -61,41 +61,72 @@ zx::vmo GetVmo(std::string_view path) {
   return std::move(response.value()->vmo);
 }
 
-class TestNode : public std::enable_shared_from_this<TestNode>,
-                 public fidl::WireServer<fuchsia_driver_framework::NodeController>,
+class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                  public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:
-  static std::shared_ptr<TestNode> Create(async_dispatcher_t* dispatcher, std::string name) {
-    return std::shared_ptr<TestNode>(new TestNode(dispatcher, std::move(name)));
-  }
+  using ChildrenMap = std::unordered_map<std::string, TestNode>;
 
-  std::vector<std::shared_ptr<TestNode>>& children() { return children_; }
-
- private:
   TestNode(async_dispatcher_t* dispatcher, std::string name)
       : dispatcher_(dispatcher), name_(std::move(name)) {}
 
-  void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
-    std::shared_ptr node = TestNode::Create(dispatcher_, std::string(request->args.name().get()));
-    node->controller_binding_ =
-        fidl::BindServer<fdf::NodeController, fidl::WireServer<fdf::NodeController>>(
-            dispatcher_, std::move(request->controller), shared_from_this());
-    if (request->node) {
-      node->node_binding_ = fidl::BindServer<fdf::Node, fidl::WireServer<fdf::Node>>(
-          dispatcher_, std::move(request->node), shared_from_this());
+  ChildrenMap& children() { return children_; }
+  const std::string& name() const { return name_; }
+
+  zx::result<fidl::ClientEnd<fdf::Node>> CreateNodeChannel() {
+    if (node_binding_.has_value()) {
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    children_.push_back(std::move(node));
+    zx::result endpoints = fidl::CreateEndpoints<fdf::Node>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    node_binding_.emplace(dispatcher_, std::move(endpoints->server), this,
+                          [this](fidl::UnbindInfo) { Remove(); });
+    return zx::ok(std::move(endpoints->client));
+  }
+
+ private:
+  void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
+    std::string name{request->args.name().get()};
+    auto [it, inserted] = children_.try_emplace(name, dispatcher_, name);
+    if (!inserted) {
+      completer.ReplyError(fdf::NodeError::kNameAlreadyExists);
+      return;
+    }
+    TestNode& node = it->second;
+    node.parent_ = *this;
+    node.controller_binding_.emplace(dispatcher_, std::move(request->controller), &node,
+                                     fidl::kIgnoreBindingClosure);
+    if (request->node) {
+      node.node_binding_.emplace(dispatcher_, std::move(request->node), &node,
+                                 [this](fidl::UnbindInfo) { Remove(); });
+    }
+
     completer.ReplySuccess();
   }
 
-  void Remove(RemoveCompleter::Sync& completer) override {}
+  void Remove(RemoveCompleter::Sync& completer) override { Remove(); }
 
-  std::optional<fidl::ServerBindingRef<fdf::Node>> node_binding_;
-  std::optional<fidl::ServerBindingRef<fdf::NodeController>> controller_binding_;
+  void Remove() {
+    children_.clear();
+    node_binding_.reset();
+    controller_binding_.reset();
+
+    if (!parent_.has_value()) {
+      return;
+    }
+    // After this call we are destructed, so don't access anything else.
+    size_t count = parent_.value().get().children_.erase(name_);
+    ZX_ASSERT_MSG(count == 1, "Should've removed 1 child, removed %ld", count);
+  }
+
+  std::optional<fidl::ServerBinding<fdf::Node>> node_binding_;
+  std::optional<fidl::ServerBinding<fdf::NodeController>> controller_binding_;
 
   async_dispatcher_t* dispatcher_;
   std::string name_;
-  std::vector<std::shared_ptr<TestNode>> children_;
+  std::optional<std::reference_wrapper<TestNode>> parent_;
+  ChildrenMap children_;
 };
 
 class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource> {
@@ -316,7 +347,7 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 class DriverTest : public gtest::DriverTestLoopFixture {
  protected:
-  std::shared_ptr<TestNode>& node() { return node_; }
+  TestNode& node() { return node_.value(); }
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
@@ -329,7 +360,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     arguments["clock.backstop"] = "0";
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
 
-    node_ = TestNode::Create(dispatcher(), "root");
+    node_.emplace(dispatcher(), "root");
   }
 
   void TearDown() override {
@@ -343,8 +374,6 @@ class DriverTest : public gtest::DriverTestLoopFixture {
 
   std::unique_ptr<compat::Driver> StartDriver(std::string_view v1_driver_path,
                                               const zx_protocol_device_t* ops) {
-    auto node_endpoints = fidl::CreateEndpoints<fdf::Node>();
-    EXPECT_TRUE(node_endpoints.is_ok());
     auto outgoing_dir_endpoints = fidl::CreateEndpoints<fio::Directory>();
     EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
     auto pkg_endpoints = fidl::CreateEndpoints<fio::Directory>();
@@ -355,8 +384,8 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     EXPECT_TRUE(compat_service_endpoints.is_ok());
 
     // Setup the node.
-    fidl::BindServer<fdf::Node, fidl::WireServer<fdf::Node>>(
-        dispatcher(), std::move(node_endpoints->server), node_);
+    zx::result node_client = node_->CreateNodeChannel();
+    EXPECT_EQ(ZX_OK, node_client.status_value());
 
     // Setup and bind "/pkg" directory.
     compat_file_.SetVmo(GetVmo("/pkg/driver/compat.so"));
@@ -457,7 +486,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     fdata::Dictionary program({.entries = std::move(program_vec)});
 
     fdf::DriverStartArgs start_args(
-        {.node = std::move(node_endpoints->client),
+        {.node = std::move(node_client.value()),
          .symbols = std::move(symbols),
          .url = std::string("fuchsia-pkg://fuchsia.com/driver#meta/driver.cm"),
          .program = std::move(program),
@@ -481,6 +510,27 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     return compat_driver;
   }
 
+  void UnbindAndFreeDriver(std::unique_ptr<compat::Driver> driver) {
+    libsync::Completion completion;
+    PrepareStopContext stop_context{
+        .driver = &completion,
+        .complete =
+            [](PrepareStopContext* context, zx_status_t status) {
+              reinterpret_cast<libsync::Completion*>(context->driver)->Signal();
+            },
+    };
+    async::PostTask(driver_dispatcher().async_dispatcher(),
+                    [&driver, &stop_context] { driver->PrepareStop(&stop_context); });
+
+    // Keep running the test loop while we're waiting for a signal on the dispatcher thread.
+    // The dispatcher thread needs to interact with our Node servers, which run on the test loop.
+    while (!completion.signaled()) {
+      RunTestLoopUntilIdle();
+    }
+
+    RunOnDispatcher([&] { driver.reset(); });
+  }
+
   void RunUntilDispatchersIdle() {
     bool ran = false;
     do {
@@ -496,10 +546,10 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   }
 
   void WaitForChildDeviceAdded() {
-    while (node()->children().empty()) {
+    while (node().children().empty()) {
       RunUntilDispatchersIdle();
     }
-    EXPECT_FALSE(node()->children().empty());
+    EXPECT_FALSE(node().children().empty());
   }
 
   async_dispatcher_t* dispatcher() { return test_loop_.dispatcher(); }
@@ -507,7 +557,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   TestProfileProvider profile_provider_;
 
  private:
-  std::shared_ptr<TestNode> node_;
+  std::optional<TestNode> node_;
   TestRootResource root_resource_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
@@ -549,7 +599,7 @@ TEST_F(DriverTest, Start) {
   AssertDevfsPaths({"/dev/test/my-device/v1"});
 
   // Verify v1_test.so state after release.
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
@@ -579,7 +629,7 @@ TEST_F(DriverTest, Start_WithCreate) {
   }
 
   // Verify v1_test.so state after release.
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
@@ -594,12 +644,12 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
 
   // Verify that v1_test.so has not added a child device.
   RunUntilDispatchersIdle();
-  EXPECT_TRUE(node()->children().empty());
+  EXPECT_TRUE(node().children().empty());
 
   // Verify that v1_test.so has not set a context.
   EXPECT_EQ(nullptr, driver->Context());
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
 }
 
@@ -610,7 +660,7 @@ TEST_F(DriverTest, Start_DeviceAddNull) {
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
 }
 
@@ -639,7 +689,7 @@ TEST_F(DriverTest, Start_CheckCompatService) {
   expected_metadata = {4, 5, 6};
   ASSERT_EQ(metadata, expected_metadata);
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
 }
 
@@ -673,12 +723,12 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
 
   // Verify that v1_test.so has not added a child device.
   RunUntilDispatchersIdle();
-  EXPECT_TRUE(node()->children().empty());
+  EXPECT_TRUE(node().children().empty());
 
   // Verify that v1_test.so has not set a context.
   EXPECT_EQ(nullptr, driver->Context());
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
 }
 
@@ -699,7 +749,7 @@ TEST_F(DriverTest, Start_BindFailed) {
   }
 
   // Verify that v1_test.so has not added a child device.
-  EXPECT_TRUE(node()->children().empty());
+  EXPECT_TRUE(node().children().empty());
 
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -711,7 +761,7 @@ TEST_F(DriverTest, Start_BindFailed) {
   }
 
   // Verify v1_test.so state after release.
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 
@@ -733,7 +783,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
   ASSERT_NE(nullptr, v1_test.get());
 
   // Verify that v1_test.so has not added a child device.
-  EXPECT_TRUE(node()->children().empty());
+  EXPECT_TRUE(node().children().empty());
 
   bool was_called = false;
 
@@ -756,7 +806,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
   }
   ASSERT_TRUE(was_called);
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
@@ -790,7 +840,7 @@ TEST_F(DriverTest, GetProfile) {
   } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
   thread.join();
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
@@ -829,7 +879,7 @@ TEST_F(DriverTest, GetDeadlineProfile) {
   } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
   thread.join();
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
@@ -873,7 +923,7 @@ TEST_F(DriverTest, GetVariable) {
   } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
   thread.join();
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
@@ -912,7 +962,7 @@ TEST_F(DriverTest, SetProfileByRole) {
   } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
   thread.join();
 
-  RunOnDispatcher([&] { driver.reset(); });
+  UnbindAndFreeDriver(std::move(driver));
   ShutdownDriverDispatcher();
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
