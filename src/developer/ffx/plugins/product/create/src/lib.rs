@@ -125,6 +125,8 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
         vec![]
     };
 
+    let virtual_devices_path = None;
+
     let product_bundle = ProductBundleV2 {
         partitions,
         system_a,
@@ -132,6 +134,7 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
         system_r,
         repositories,
         update_package_hash,
+        virtual_devices_path,
     };
     let product_bundle = ProductBundle::V2(product_bundle);
     product_bundle.write(&cmd.out_dir).context("writing product bundle")?;
@@ -344,6 +347,7 @@ mod test {
                 system_r: None,
                 repositories: vec![],
                 update_package_hash: None,
+                virtual_devices_path: None,
             })
         );
     }
@@ -389,6 +393,7 @@ mod test {
                 system_r: Some(AssemblyManifest::default()),
                 repositories: vec![],
                 update_package_hash: None,
+                virtual_devices_path: None,
             })
         );
     }
@@ -441,6 +446,7 @@ mod test {
                     blobs_path: pb_dir.join("blobs"),
                 }],
                 update_package_hash: None,
+                virtual_devices_path: None,
             })
         );
     }
@@ -492,6 +498,7 @@ mod test {
                 system_r: None,
                 repositories,
                 update_package_hash: Some(_),
+                virtual_devices_path: None,
             }) if partitions == Default::default() && repositories == &[Repository {
                 name: "fuchsia.com".into(),
                 metadata_path: pb_dir.join("repository"),

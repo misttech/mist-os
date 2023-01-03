@@ -56,6 +56,11 @@ pub struct ProductBundleV2 {
     /// The merkle-root of the update package that is added to the repository.
     #[serde(default)]
     pub update_package_hash: Option<Hash>,
+
+    /// The relative path from the product bundle base directory to a file
+    /// containing the Virtual Device manifest.
+    #[serde(default)]
+    pub virtual_devices_path: Option<Utf8PathBuf>,
 }
 
 /// A repository that holds all the packages, blobs, and keys.
@@ -152,6 +157,15 @@ impl ProductBundleV2 {
             repository.blobs_path = canonicalize_dir(&repository.blobs_path)?;
         }
 
+        // Canonicalize the virtual device specifications path.
+        if let Some(path) = &self.virtual_devices_path {
+            if !path.exists() {
+                std::fs::create_dir_all(&path)
+                    .with_context(|| format!("Creating the directory: {}", path))?;
+            }
+            self.virtual_devices_path = Some(product_bundle_dir.join(&path).canonicalize_utf8()?);
+        }
+
         Ok(())
     }
 
@@ -204,6 +218,12 @@ impl ProductBundleV2 {
             repository.blobs_path = relativize_dir(&repository.blobs_path)?;
         }
 
+        // Relativize the virtual device specifications.
+        if let Some(path) = &self.virtual_devices_path {
+            self.virtual_devices_path =
+                Some(diff_utf8_paths(&path, &product_bundle_dir).context("rebasing file path")?);
+        }
+
         Ok(())
     }
 }
@@ -234,9 +254,10 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
+            virtual_devices_path: None,
         };
         let result = pb.canonicalize_paths(&Utf8PathBuf::from("path/to/product_bundle"));
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.unwrap_err());
     }
 
     #[test]
@@ -257,6 +278,7 @@ mod tests {
         create_temp_file("vbmeta");
         create_temp_file("fvm");
         create_temp_file("unlock_credentials");
+        create_temp_file("device");
 
         let mut pb = ProductBundleV2 {
             partitions: PartitionsConfig {
@@ -289,6 +311,7 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
+            virtual_devices_path: Some("device".into()),
         };
         let result = pb.canonicalize_paths(tempdir);
         assert!(result.is_ok());
@@ -309,6 +332,7 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
+            virtual_devices_path: None,
         };
         let result = pb.relativize_paths(&Utf8PathBuf::from("path/to/product_bundle"));
         assert!(result.is_ok());
@@ -350,6 +374,7 @@ mod tests {
             system_r: None,
             repositories: vec![],
             update_package_hash: None,
+            virtual_devices_path: Some(tempdir.join("device")),
         };
         let result = pb.relativize_paths(tempdir);
         assert!(result.is_ok());
@@ -372,6 +397,7 @@ mod tests {
                 blobs_path: dir.join("repository").join("blobs"),
             }],
             update_package_hash: None,
+            virtual_devices_path: None,
         };
 
         let expected = HashSet::from([
@@ -400,6 +426,7 @@ mod tests {
                 blobs_path: "blobs".into(),
             }],
             update_package_hash: None,
+            virtual_devices_path: None,
         };
         assert_eq!("repository/targets.json", pb.repositories[0].targets_path());
     }

@@ -263,6 +263,7 @@ mod tests {
                 blobs_path: pb_path.join("blobs"),
             }],
             update_package_hash: None,
+            virtual_devices_path: None,
         });
         pb.write(&pb_path).unwrap();
 
