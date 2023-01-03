@@ -111,6 +111,11 @@ class GuestManager : public fuchsia::virtualization::GuestManager {
   fuchsia::virtualization::GuestStatus state_ = fuchsia::virtualization::GuestStatus::NOT_STARTED;
   // Inflates / deflates the guest balloon in response to the host memory pressure events
   std::unique_ptr<MemoryPressureHandler> memory_pressure_handler_;
+
+  // Callbacks that should be triggered when the guest enters a STOPPED state. The guest shutting
+  // down is an asynchronous process, so multiple penidng callbacks can be registered while the
+  // guest spins down.
+  std::vector<ForceShutdownCallback> pending_force_shutdowns_;
 };
 
 #endif  // SRC_VIRTUALIZATION_BIN_GUEST_MANAGER_GUEST_MANAGER_H_

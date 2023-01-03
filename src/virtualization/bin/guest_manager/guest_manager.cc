@@ -197,6 +197,12 @@ void GuestManager::HandleGuestStopped(fit::result<GuestError> err) {
   stop_time_ = zx::clock::get_monotonic();
   state_ = GuestStatus::STOPPED;
 
+  for (auto& pending_force_shutdown : pending_force_shutdowns_) {
+    auto callback = std::move(pending_force_shutdown);
+    callback();
+  }
+  pending_force_shutdowns_.clear();
+
   OnGuestStopped();
 }
 
@@ -208,7 +214,8 @@ void GuestManager::ForceShutdown(ForceShutdownCallback callback) {
   }
 
   state_ = GuestStatus::STOPPING;
-  lifecycle_->Stop([callback = std::move(callback)]() { callback(); });
+  pending_force_shutdowns_.push_back(std::move(callback));
+  lifecycle_->Stop([]() {});
 }
 
 GuestNetworkState GuestManager::QueryGuestNetworkState() {

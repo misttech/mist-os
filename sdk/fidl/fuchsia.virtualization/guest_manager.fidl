@@ -108,8 +108,8 @@ protocol GuestManager {
         controller server_end:Guest;
     }) -> () error GuestManagerError;
 
-    /// Forcibly shuts down a running guest. After ForceShutdown returns, Launch can be used to
-    /// launch another guest.
+    /// Forcibly shuts down a running guest. Immediately after ForceShutdown returns, Launch can
+    /// be used to launch another guest.
     ForceShutdown() -> ();
 
     /// Connect to a currently running guest.
