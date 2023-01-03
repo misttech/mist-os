@@ -71,6 +71,7 @@ macro_rules! not_implemented {
     )
 }
 
+#[allow(unused)]
 macro_rules! not_implemented_log_once {
     ($($arg:tt)*) => (
         {
@@ -89,6 +90,7 @@ pub(crate) use log_info;
 pub(crate) use log_trace;
 pub(crate) use log_warn;
 pub(crate) use not_implemented;
+#[allow(unused)]
 pub(crate) use not_implemented_log_once;
 
 // Call this when you get an error that should "never" happen, i.e. if it does that means the

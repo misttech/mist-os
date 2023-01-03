@@ -253,7 +253,7 @@ struct BinderProcessState {
     /// The set of threads that are interacting with the binder driver.
     thread_pool: ThreadPool,
     /// Binder objects hosted by the process shared with other processes.
-    objects: BTreeMap<UserAddress, Weak<BinderObject>>,
+    objects: BTreeMap<UserAddress, Arc<BinderObject>>,
     /// Handle table of remote binder objects.
     handles: HandleTable,
     /// State associated with active transactions, keyed by the userspace addresses of the buffers
@@ -487,9 +487,10 @@ impl BinderProcess {
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<(), Errno> {
-        // Ensure references are clean after the lock is released.
-        let _reference_to_clean =
-            self.lock().handle_refcount_operation(current_task, command, handle)?;
+        let action = self.lock().handle_refcount_operation(current_task, command, handle)?;
+        if let Some(action) = action {
+            action.execute();
+        }
         Ok(())
     }
 
@@ -498,11 +499,14 @@ impl BinderProcess {
     /// `BR_ACQUIRE`/`BR_INCREFS` command.
     fn handle_refcount_operation_done(
         self: &Arc<Self>,
-        current_task: &dyn RunningBinderTask,
         command: binder_driver_command_protocol,
         object: LocalBinderObject,
     ) -> Result<(), Errno> {
-        self.lock().handle_refcount_operation_done(current_task, command, object)
+        let action = self.lock().handle_refcount_operation_done(command, object)?;
+        if let Some(action) = action {
+            action.execute();
+        }
+        Ok(())
     }
 
     /// Subscribe a process to the death of the owner of `handle`.
@@ -623,14 +627,14 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
     /// binder object.
-    /// Returns any `BinderObjectRef` that should be dropped, so it can happen without holding a
-    /// lock on `BinderProcess`.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
     fn handle_refcount_operation(
         &mut self,
         current_task: &dyn RunningBinderTask,
         command: binder_driver_command_protocol,
         handle: Handle,
-    ) -> Result<Option<BinderObjectRef>, Errno> {
+    ) -> Result<Option<RefCountAction>, Errno> {
         let idx = match handle {
             Handle::SpecialServiceManager => {
                 // TODO: Figure out how to acquire/release refs for the context manager
@@ -653,22 +657,24 @@ impl<'a> BinderProcessGuard<'a> {
     /// Handle a binder thread's notification that it successfully incremented a strong/weak
     /// reference to a local (in-process) binder object. This is in response to a
     /// `BR_ACQUIRE`/`BR_INCREFS` command.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
     fn handle_refcount_operation_done(
         &self,
-        current_task: &dyn RunningBinderTask,
         command: binder_driver_command_protocol,
-        object: LocalBinderObject,
-    ) -> Result<(), Errno> {
-        // TODO: When the binder driver keeps track of references internally, this should
-        // reduce the temporary refcount that is held while the binder thread performs the
-        // refcount.
-        let msg = match command {
-            binder_driver_command_protocol_BC_INCREFS_DONE => "BC_INCREFS_DONE",
-            binder_driver_command_protocol_BC_ACQUIRE_DONE => "BC_ACQUIRE_DONE",
+        local: LocalBinderObject,
+    ) -> Result<Option<RefCountAction>, Errno> {
+        let object = self.find_object(&local).ok_or_else(|| errno!(EINVAL))?;
+        match command {
+            binder_driver_command_protocol_BC_INCREFS_DONE => object.ack_incref(),
+            binder_driver_command_protocol_BC_ACQUIRE_DONE => object.ack_acquire(),
             _ => unreachable!(),
-        };
-        not_implemented_log_once!(current_task, "{} {:?}", msg, &object);
-        Ok(())
+        }
+    }
+
+    /// Finds the binder object that corresponds to the process-local addresses `local`.
+    pub fn find_object(&self, local: &LocalBinderObject) -> Option<Arc<BinderObject>> {
+        self.objects.get(&local.weak_ref_addr).map(Arc::clone)
     }
 
     /// Finds the binder object that corresponds to the process-local addresses `local`, or creates
@@ -678,11 +684,12 @@ impl<'a> BinderProcessGuard<'a> {
         binder_thread: &Arc<BinderThread>,
         local: LocalBinderObject,
     ) -> Arc<BinderObject> {
-        if let Some(object) = self.objects.get(&local.weak_ref_addr).and_then(Weak::upgrade) {
+        if let Some(object) = self.find_object(&local) {
             object
         } else {
             let object = BinderObject::new(self.base, local);
-            self.objects.insert(object.local.weak_ref_addr, Arc::downgrade(&object));
+            self.objects.insert(object.local.weak_ref_addr, object.clone());
+
             // Tell the owning process that a remote process now has a strong reference to
             // to this object.
             binder_thread.state.write().enqueue_command(Command::AcquireRef(object.local));
@@ -692,7 +699,7 @@ impl<'a> BinderProcessGuard<'a> {
     }
 
     /// Whether the driver should request that the client starts a new thread.
-    fn should_request_thread(&mut self, thread: &Arc<BinderThread>) -> bool {
+    fn should_request_thread(&self, thread: &Arc<BinderThread>) -> bool {
         !self.thread_requested
             && self.thread_pool.0.len() < self.max_thread_count
             && thread.read().is_registered()
@@ -972,137 +979,130 @@ struct HandleTable {
     table: ObjectTable,
 }
 
-/// A reference to a binder object in another process.
-///
-/// Because it can owns a `BinderObject` that might take a lock on `BinderProcess` when destroyed,
-/// this object must not be deleted while owning a lock on `BinderProcess`.
-#[derive(Debug)]
-enum BinderObjectRef {
-    /// A strong reference that keeps the remote binder object from being destroyed.
-    StrongRef { strong_ref: Arc<BinderObject>, strong_count: usize, weak_count: usize },
-    /// A weak reference that does not keep the remote binder object from being destroyed, but still
-    /// occupies a place in the handle table.
-    WeakRef { weak_ref: Weak<BinderObject>, weak_count: usize },
-}
-
-/// Instructs the [`HandleTable`] on what to do with a handle after the
-/// [`BinderObjectRef::dec_strong`] and [`BinderObjectRef::dec_weak`] operations.
-///
-/// Contains any `BinderObjectRef` that has been released by the operation.
-enum HandleAction {
-    Keep(Option<BinderObjectRef>),
-    Drop(Option<BinderObjectRef>),
-}
-
-impl HandleAction {
-    fn take_releases_reference(self) -> Option<BinderObjectRef> {
-        match self {
-            Self::Keep(mut v) | Self::Drop(mut v) => v.take(),
+/// The HandleTable is dropped at the time the BinderProcess is dropped. At this moment, any
+/// reference to object owned by another BinderProcess need to be clean.
+impl Drop for HandleTable {
+    fn drop(&mut self) {
+        for (_, r) in self.table.iter_mut() {
+            for action in r.clean_refs().expect(
+                "The reference count operation on the underlying binder object \
+                failed when dropping this reference: the reference count is out \
+                of sync which should never happen.",
+            ) {
+                action.execute();
+            }
         }
+    }
+}
+
+/// A reference to a binder object in another process.
+#[derive(Debug)]
+struct BinderObjectRef {
+    /// The associated BinderObject
+    binder_object: Arc<BinderObject>,
+    /// The number of weak references to this `BinderObjectRef`.
+    weak_count: usize,
+    /// The number of strong references to this `BinderObjectRef`.
+    strong_count: usize,
+}
+
+/// Assert that a dropped reference do not have any reference left, as this would keep an object
+/// owned by another process alive.
+#[cfg(any(test, debug_assertions))]
+impl Drop for BinderObjectRef {
+    fn drop(&mut self) {
+        assert!(!self.has_ref());
     }
 }
 
 impl BinderObjectRef {
-    /// Increments the strong reference count of the binder object reference, promoting the
-    /// reference to a strong reference if it was weak, or failing if the object no longer exists.
-    fn inc_strong(&mut self) -> Result<Option<BinderObjectRef>, Errno> {
-        let mut result = None;
-        match self {
-            Self::StrongRef { strong_count, .. } => *strong_count += 1,
-            Self::WeakRef { weak_ref, weak_count } => {
-                let strong_ref = weak_ref.upgrade().ok_or_else(|| errno!(EINVAL))?;
-                // Update `self` value and move the old value into `result`.
-                std::mem::swap(
-                    result.insert(BinderObjectRef::StrongRef {
-                        strong_ref,
-                        strong_count: 1,
-                        weak_count: *weak_count,
-                    }),
-                    self,
-                );
-            }
+    fn new(binder_object: Arc<BinderObject>) -> Self {
+        Self { binder_object, weak_count: 0, strong_count: 0 }
+    }
+
+    /// Returns whether this object has still any strong or weak reference. The object must be kept
+    /// in the handle table until this is false.
+    fn has_ref(&self) -> bool {
+        self.weak_count > 0 || self.strong_count > 0
+    }
+
+    /// Free any reference held on `binder_object` by this reference.
+    /// Returns a list of `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn clean_refs(&mut self) -> Result<Vec<RefCountAction>, Errno> {
+        let mut result = vec![];
+        if self.weak_count > 0 {
+            result.push(self.binder_object.dec_weak()?);
+            self.weak_count = 0;
         }
+        if self.strong_count > 0 {
+            result.push(self.binder_object.dec_strong()?);
+            self.strong_count = 0;
+        }
+        Ok(result.into_iter().flatten().collect())
+    }
+
+    /// Increments the strong reference count of the binder object reference.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_strong(&mut self) -> Result<Option<RefCountAction>, Errno> {
+        let mut result = None;
+        if self.strong_count == 0 {
+            result = self.binder_object.inc_strong()?;
+        }
+        self.strong_count += 1;
         Ok(result)
     }
 
     /// Increments the weak reference count of the binder object reference.
-    fn inc_weak(&mut self) -> Result<Option<BinderObjectRef>, Errno> {
-        match self {
-            Self::StrongRef { weak_count, .. } | Self::WeakRef { weak_count, .. } => {
-                *weak_count += 1
-            }
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_weak(&mut self) -> Result<Option<RefCountAction>, Errno> {
+        let mut result = None;
+        if self.weak_count == 0 {
+            result = self.binder_object.inc_weak()?;
         }
-        Ok(None)
+        self.weak_count += 1;
+        Ok(result)
     }
 
-    /// Decrements the strong reference count of the binder object reference, demoting the reference
-    /// to a weak reference or returning [`HandleAction::Drop`] if the handle should be dropped.
-    fn dec_strong(&mut self) -> Result<HandleAction, Errno> {
-        match self {
-            Self::WeakRef { .. } => error!(EINVAL),
-            Self::StrongRef { strong_ref, strong_count, weak_count } => {
-                let mut result = None;
-                *strong_count -= 1;
-                if *strong_count == 0 {
-                    let weak_count = *weak_count;
-                    // Update `self` value and move the old value into `result`.
-                    std::mem::swap(
-                        result.insert(BinderObjectRef::WeakRef {
-                            weak_ref: Arc::downgrade(strong_ref),
-                            weak_count,
-                        }),
-                        self,
-                    );
-                    if weak_count == 0 {
-                        return Ok(HandleAction::Drop(result));
-                    }
-                }
-                Ok(HandleAction::Keep(result))
-            }
+    /// Decrements the strong reference count of the binder object reference.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_strong(&mut self) -> Result<Option<RefCountAction>, Errno> {
+        if self.strong_count == 0 {
+            return error!(EINVAL);
         }
+        let mut result = None;
+        if self.strong_count == 1 {
+            result = self.binder_object.dec_strong()?;
+        }
+        self.strong_count -= 1;
+        Ok(result)
     }
 
-    /// Decrements the weak reference count of the binder object reference, returning
-    /// [`HandleAction::Drop`] if the strong count and weak count both drop to 0.
-    fn dec_weak(&mut self) -> Result<HandleAction, Errno> {
-        match self {
-            Self::StrongRef { weak_count, .. } => {
-                if *weak_count == 0 {
-                    error!(EINVAL)
-                } else {
-                    *weak_count -= 1;
-                    Ok(HandleAction::Keep(None))
-                }
-            }
-            Self::WeakRef { weak_count, .. } => {
-                *weak_count -= 1;
-                if *weak_count == 0 {
-                    Ok(HandleAction::Drop(None))
-                } else {
-                    Ok(HandleAction::Keep(None))
-                }
-            }
+    /// Decrements the weak reference count of the binder object reference.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_weak(&mut self) -> Result<Option<RefCountAction>, Errno> {
+        if self.weak_count == 0 {
+            return error!(EINVAL);
         }
+        let mut result = None;
+        if self.weak_count == 1 {
+            result = self.binder_object.dec_weak()?;
+        }
+        self.weak_count -= 1;
+        Ok(result)
     }
 
     fn is_ref_to_object(&self, object: &Arc<BinderObject>) -> bool {
-        let ptr = match self {
-            Self::StrongRef { strong_ref, .. } => Arc::as_ptr(strong_ref),
-            Self::WeakRef { weak_ref, .. } => Weak::as_ptr(weak_ref),
-        };
-        if ptr == Arc::as_ptr(object) {
+        if Arc::as_ptr(&self.binder_object) == Arc::as_ptr(object) {
             return true;
         }
 
-        let strong = match self {
-            Self::StrongRef { strong_ref, .. } => Arc::clone(strong_ref),
-            Self::WeakRef { weak_ref, .. } => match weak_ref.upgrade() {
-                Some(strong) => strong,
-                None => return false,
-            },
-        };
-        let deep_equal = strong.local.weak_ref_addr == object.local.weak_ref_addr
-            && Weak::ptr_eq(&strong.owner, &object.owner);
+        let deep_equal = self.binder_object.local.weak_ref_addr == object.local.weak_ref_addr
+            && Weak::ptr_eq(&self.binder_object.owner, &object.owner);
         // This shouldn't be possible. We have it here as a debugging check.
         assert!(
             !deep_equal,
@@ -1113,82 +1113,139 @@ impl BinderObjectRef {
     }
 }
 
+/// Instructs the [`BinderDriver`] on what to do on an object after an ref count
+/// operation.
+#[derive(Debug)]
+#[must_use = "RefCountAction must be handled"]
+enum RefCountAction {
+    /// Send a AcquireRef command to the owning process.
+    Acquire(Arc<BinderObject>),
+    /// Send a ReleaseRef command to the owning process.
+    Release(Arc<BinderObject>),
+    /// Send a IncRef command to the owning process.
+    IncRefs(Arc<BinderObject>),
+    /// Send a DecRef command to the owning process.
+    DecRefs(Arc<BinderObject>),
+}
+
+impl RefCountAction {
+    /// Execute the current action. This must be done without holding any lock to a
+    /// `BinderProcess`.
+    fn execute(self) {
+        match self {
+            Self::Acquire(object) => {
+                if let Some(binder_process) = object.owner.upgrade() {
+                    binder_process.lock().enqueue_command(Command::AcquireRef(object.local));
+                }
+            }
+            Self::Release(object) => {
+                if let Some(binder_process) = object.owner.upgrade() {
+                    let mut process_state = binder_process.lock();
+                    process_state.enqueue_command(Command::ReleaseRef(object.local));
+                    if !object.has_ref() {
+                        process_state.objects.remove(&object.local.weak_ref_addr);
+                    }
+                }
+            }
+            Self::IncRefs(object) => {
+                if let Some(binder_process) = object.owner.upgrade() {
+                    binder_process.lock().enqueue_command(Command::IncRef(object.local));
+                }
+            }
+            Self::DecRefs(object) => {
+                if let Some(binder_process) = object.owner.upgrade() {
+                    let mut process_state = binder_process.lock();
+                    process_state.enqueue_command(Command::DecRef(object.local));
+                    if !object.has_ref() {
+                        process_state.objects.remove(&object.local.weak_ref_addr);
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl HandleTable {
     /// Inserts a reference to a binder object, returning a handle that represents it. The handle
     /// may be an existing handle if the object was already present in the table. If the client does
     /// not acquire a strong reference to this handle before the transaction that inserted it is
     /// complete, the handle will be dropped.
-    fn insert_for_transaction(&mut self, object: Arc<BinderObject>) -> Handle {
-        let existing_idx = self
-            .table
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess` and the handle representing the object.
+    fn insert_for_transaction(
+        &mut self,
+        object: Arc<BinderObject>,
+    ) -> (Option<RefCountAction>, Handle) {
+        let index = {
+            if let Some(existing_idx) = self.get_object_index(&object) {
+                existing_idx
+            } else {
+                self.table.insert(BinderObjectRef::new(object.clone()))
+            }
+        };
+        // Increment the number of strong reference, as the caller expects having a strong
+        // reference to it.
+        // The incrementation cannot fail as the index has just been computed and checked.
+        let action = self.inc_strong(index).expect("inc_strong");
+        (action, Handle::Object { index })
+    }
+
+    fn get_object_index(&mut self, object: &Arc<BinderObject>) -> Option<usize> {
+        self.table
             .iter()
-            .find_map(|(idx, object_ref)| object_ref.is_ref_to_object(&object).then_some(idx));
-
-        if let Some(existing_idx) = existing_idx {
-            // Increment the number of strong reference, as the caller expects having a strong
-            // reference to it.
-            // The incrementation cannot fail as the index has just been computed and checked.
-            self.inc_strong(existing_idx).expect("inc_strong");
-            return Handle::Object { index: existing_idx };
-        }
-
-        let new_idx = self.table.insert(BinderObjectRef::StrongRef {
-            strong_ref: object,
-            strong_count: 1,
-            weak_count: 0,
-        });
-        Handle::Object { index: new_idx }
+            .find_map(|(idx, object_ref)| object_ref.is_ref_to_object(object).then_some(idx))
     }
 
     /// Retrieves a reference to a binder object at index `idx`.
     fn get(&self, idx: usize) -> Option<Arc<BinderObject>> {
         let object_ref = self.table.get(idx)?;
-        match object_ref {
-            BinderObjectRef::WeakRef { weak_ref, .. } => weak_ref.upgrade(),
-            BinderObjectRef::StrongRef { strong_ref, .. } => Some(strong_ref.clone()),
+        if object_ref.binder_object.has_strong() {
+            Some(object_ref.binder_object.clone())
+        } else {
+            None
         }
     }
 
     /// Increments the strong reference count of the binder object reference at index `idx`,
     /// failing if the object no longer exists.
-    /// Returns any reference that has been released by the operation. Client must ensure that the
-    /// returned object is not dropped while holding a lock on a `BinderProcess` object.
-    fn inc_strong(&mut self, idx: usize) -> Result<Option<BinderObjectRef>, Errno> {
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_strong(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
         self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_strong()
     }
 
     /// Increments the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Returns any reference that has been released by the operation. Client must ensure that the
-    /// returned object is not dropped while holding a lock on a `BinderProcess` object.
-    fn inc_weak(&mut self, idx: usize) -> Result<Option<BinderObjectRef>, Errno> {
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_weak(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
         self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_weak()
     }
 
     /// Decrements the strong reference count of the binder object reference at index `idx`, failing
     /// if the object no longer exists.
-    /// Returns any reference that has been released by the operation. Client must ensure that the
-    /// returned object is not dropped while holding a lock on a `BinderProcess` object.
-    fn dec_strong(&mut self, idx: usize) -> Result<Option<BinderObjectRef>, Errno> {
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_strong(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
-        let result = object_ref.dec_strong()?;
-        if let HandleAction::Drop(_) = result {
+        let refcount_action = object_ref.dec_strong()?;
+        if !object_ref.has_ref() {
             self.table.remove(idx);
         }
-        Ok(result.take_releases_reference())
+        Ok(refcount_action)
     }
 
     /// Decrements the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Returns any reference that has been released by the operation. Client must ensure that the
-    /// returned object is not dropped while holding a lock on a `BinderProcess` object.
-    fn dec_weak(&mut self, idx: usize) -> Result<Option<BinderObjectRef>, Errno> {
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_weak(&mut self, idx: usize) -> Result<Option<RefCountAction>, Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
-        let result = object_ref.dec_weak()?;
-        if let HandleAction::Drop(_) = result {
+        let refcount_action = object_ref.dec_weak()?;
+        if !object_ref.has_ref() {
             self.table.remove(idx);
         }
-        Ok(result.take_releases_reference())
+        Ok(refcount_action)
     }
 }
 
@@ -1393,6 +1450,14 @@ enum Command {
     /// references to the specified binder object. The object may still have references within the
     /// owning process.
     ReleaseRef(LocalBinderObject),
+    /// Notifies a binder thread that a remote process acquired a weak reference to the specified
+    /// binder object. The object should not be destroyed until a [`Command::DecRef`] is
+    /// delivered.
+    IncRef(LocalBinderObject),
+    /// Notifies a binder thread that there are no longer any remote processes holding weak
+    /// references to the specified binder object. The object may still have references within the
+    /// owning process.
+    DecRef(LocalBinderObject),
     /// Notifies a binder thread that the last processed command contained an error.
     Error(i32),
     /// Commands a binder thread to start processing an incoming oneway transaction, which requires
@@ -1433,6 +1498,8 @@ impl Command {
         match self {
             Self::AcquireRef(..) => binder_driver_return_protocol_BR_ACQUIRE,
             Self::ReleaseRef(..) => binder_driver_return_protocol_BR_RELEASE,
+            Self::IncRef(..) => binder_driver_return_protocol_BR_INCREFS,
+            Self::DecRef(..) => binder_driver_return_protocol_BR_DECREFS,
             Self::Error(..) => binder_driver_return_protocol_BR_ERROR,
             Self::OnewayTransaction(..) | Self::Transaction { .. } => {
                 binder_driver_return_protocol_BR_TRANSACTION
@@ -1455,7 +1522,10 @@ impl Command {
         buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
         match self {
-            Self::AcquireRef(obj) | Self::ReleaseRef(obj) => {
+            Self::AcquireRef(obj)
+            | Self::ReleaseRef(obj)
+            | Self::IncRef(obj)
+            | Self::DecRef(obj) => {
                 #[repr(C, packed)]
                 #[derive(AsBytes)]
                 struct AcquireRefData {
@@ -1548,9 +1618,19 @@ struct BinderObject {
     state: Mutex<BinderObjectMutableState>,
 }
 
+/// Assert that a dropped object from a live process has no reference.
+#[cfg(any(test, debug_assertions))]
+impl Drop for BinderObject {
+    fn drop(&mut self) {
+        if self.owner.upgrade().is_some() {
+            assert!(!self.has_ref());
+        }
+    }
+}
+
 /// Mutable state of a [`BinderObject`], mainly for handling the ordering guarantees of oneway
 /// transactions.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct BinderObjectMutableState {
     /// Command queue for oneway transactions on this binder object. Oneway transactions are
     /// guaranteed to be dispatched in the order they are submitted to the driver, and one at a
@@ -1560,17 +1640,47 @@ struct BinderObjectMutableState {
     /// when there are no more transactions in the `oneway_transactions` and a binder thread freed
     /// the buffer associated with the last oneway transaction.
     handling_oneway_transaction: bool,
+
+    /// The number of weak references to this `BinderObject`.
+    weak_count: usize,
+
+    /// The number of strong references to this `BinderObject`.
+    strong_count: usize,
+
+    /// Whether a `BR_INCREFS` has been sent to the owner, and the `BC_INCREFS_DONE` has not been
+    /// received yet.
+    /// When this is the case, no `BR_INCREFS` or `BR_DECREFS` are sent to the owner. Instead, a
+    /// BR_DECREFS will be sent to the owner when receiving the `BC_INCREFS_DONE` if the reference
+    /// count dropped to zero while waiting.
+    waiting_weak_ack: bool,
+
+    /// Whether a `BR_ACQUIRE` has been sent to the owner, and the `BC_ACQUIRE_DONE` has not been
+    /// received yet.
+    /// When this is the case, no `BR_ACQUIRE` or `BR_RELEASE` are sent to the owner. Instead, a
+    /// BR_RELEASE will be sent to the owner when receiving the `BC_ACQUIRE_DONE` if the reference
+    /// count dropped to zero while waiting.
+    waiting_strong_ack: bool,
 }
 
 impl BinderObject {
+    /// Creates a new BinderObject. It is the responsibility of the caller to sent a `BR_ACQUIRE`
+    /// to the owning process.
     fn new(owner: &Arc<BinderProcess>, local: LocalBinderObject) -> Arc<Self> {
         Arc::new(Self {
             owner: Arc::downgrade(owner),
             local,
             state: Mutex::new(BinderObjectMutableState {
-                oneway_transactions: VecDeque::new(),
-                handling_oneway_transaction: false,
+                waiting_strong_ack: true,
+                ..Default::default()
             }),
+        })
+    }
+
+    fn new_context_manager_marker(context_manager: &Arc<BinderProcess>) -> Arc<Self> {
+        Arc::new(Self {
+            owner: Arc::downgrade(context_manager),
+            local: Default::default(),
+            state: Default::default(),
         })
     }
 
@@ -1578,14 +1688,112 @@ impl BinderObject {
     fn lock(&self) -> MutexGuard<'_, BinderObjectMutableState> {
         self.state.lock()
     }
-}
 
-impl Drop for BinderObject {
-    fn drop(&mut self) {
-        if let Some(owner) = self.owner.upgrade() {
-            // The owner process is not dead, so tell it that the last remote reference has been
-            // released.
-            owner.lock().enqueue_command(Command::ReleaseRef(self.local));
+    /// Returns whether the object has any strong reference.
+    fn has_strong(&self) -> bool {
+        self.state.lock().strong_count > 0
+    }
+
+    /// Returns whether the object has any reference, or is waiting for an acknowledgement from the
+    /// owning process. The object cannot be removed from the object table has long as this is
+    /// true.
+    fn has_ref(&self) -> bool {
+        let state = self.state.lock();
+        state.weak_count > 0
+            || state.strong_count > 0
+            || state.waiting_weak_ack
+            || state.waiting_strong_ack
+    }
+
+    /// Increments the strong reference count of the binder object.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_strong(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        state.strong_count += 1;
+        if state.strong_count == 1 && !state.waiting_strong_ack {
+            state.waiting_strong_ack = true;
+            Ok(Some(RefCountAction::Acquire(self.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Increments the weak reference count of the binder object.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_weak(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        state.weak_count += 1;
+        if state.weak_count == 1 && !state.waiting_weak_ack {
+            state.waiting_weak_ack = true;
+            Ok(Some(RefCountAction::IncRefs(self.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Decrements the strong reference count of the binder object.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_strong(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        if state.strong_count == 0 {
+            return error!(EINVAL);
+        }
+        state.strong_count -= 1;
+        if state.strong_count == 0 && !state.waiting_strong_ack {
+            Ok(Some(RefCountAction::Release(self.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Decrements the weak reference count of the binder object.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn dec_weak(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        if state.weak_count == 0 {
+            return error!(EINVAL);
+        }
+        state.weak_count -= 1;
+        if state.weak_count == 0 && !state.waiting_weak_ack {
+            Ok(Some(RefCountAction::DecRefs(self.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Acknowledge the BC_ACQUIRE_DONE command received from the object owner.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn ack_acquire(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        if !state.waiting_strong_ack {
+            return error!(EINVAL);
+        }
+        state.waiting_strong_ack = false;
+        if state.strong_count == 0 {
+            Ok(Some(RefCountAction::Release(self.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Acknowledge the BC_INCREFS_DONE command received from the object owner.
+    /// Returns an optional `RefCountAction` that must be `execute`d without holding a lock on
+    /// `BinderProcess`.
+    fn ack_incref(self: &Arc<Self>) -> Result<Option<RefCountAction>, Errno> {
+        let mut state = self.state.lock();
+        if !state.waiting_weak_ack {
+            return error!(EINVAL);
+        }
+        state.waiting_weak_ack = false;
+        if state.weak_count == 0 {
+            Ok(Some(RefCountAction::DecRefs(self.clone())))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -2084,8 +2292,7 @@ impl BinderDriver {
                 // TODO: Read the flat_binder_object when ioctl is uapi::BINDER_SET_CONTEXT_MGR_EXT.
 
                 let mut state = self.context_manager_and_queue.lock();
-                state.context_manager =
-                    Some(BinderObject::new(binder_proc, LocalBinderObject::default()));
+                state.context_manager = Some(BinderObject::new_context_manager_marker(binder_proc));
                 state.wait_queue.notify_all();
                 Ok(SUCCESS)
             }
@@ -2224,7 +2431,7 @@ impl BinderDriver {
                     weak_ref_addr: UserAddress::from(cursor.read_object::<binder_uintptr_t>()?),
                     strong_ref_addr: UserAddress::from(cursor.read_object::<binder_uintptr_t>()?),
                 };
-                binder_proc.handle_refcount_operation_done(current_task, command, object)
+                binder_proc.handle_refcount_operation_done(command, object)
             }
             binder_driver_command_protocol_BC_FREE_BUFFER => {
                 let buffer_ptr = UserAddress::from(cursor.read_object::<binder_uintptr_t>()?);
@@ -2540,6 +2747,8 @@ impl BinderDriver {
                     | Command::OnewayTransactionComplete
                     | Command::AcquireRef(..)
                     | Command::ReleaseRef(..)
+                    | Command::IncRef(..)
+                    | Command::DecRef(..)
                     | Command::Error(..)
                     | Command::FailedReply
                     | Command::DeadReply
@@ -2671,8 +2880,11 @@ impl BinderDriver {
                             } else {
                                 // The binder object does not belong to the receiving process, so
                                 // dup the handle in the receiving process' handle table.
-                                let new_handle =
+                                let (action, new_handle) =
                                     target_proc.lock().handles.insert_for_transaction(proxy);
+                                if let Some(action) = action {
+                                    action.execute();
+                                }
 
                                 // Tie this handle's strong reference to be held as long as this
                                 // buffer.
@@ -2692,7 +2904,11 @@ impl BinderDriver {
 
                     // Create a handle in the receiving process that references the binder object
                     // in the sender's process.
-                    let handle = target_proc.lock().handles.insert_for_transaction(object);
+                    let (action, handle) =
+                        target_proc.lock().handles.insert_for_transaction(object);
+                    if let Some(action) = action {
+                        action.execute();
+                    }
 
                     // Tie this handle's strong reference to be held as long as this buffer.
                     transaction_state.push_handle(handle);
@@ -3187,6 +3403,91 @@ mod tests {
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
 
+    struct TranslateHandlesTestFixture {
+        _kernel: Arc<Kernel>,
+        driver: Arc<BinderDriver>,
+
+        sender_task: CurrentTask,
+        sender_proc: Arc<BinderProcess>,
+        sender_thread: Arc<BinderThread>,
+
+        receiver_task: CurrentTask,
+        receiver_proc: Arc<BinderProcess>,
+    }
+
+    impl TranslateHandlesTestFixture {
+        fn new() -> Self {
+            let (kernel, sender_task) = create_kernel_and_task();
+            let driver = BinderDriver::new();
+            let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
+            let receiver_task = create_task(&kernel, "receiver_task");
+            let receiver_proc = driver.create_process(receiver_task.id);
+
+            mmap_shared_memory(&driver, &sender_task, &sender_proc);
+            mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
+
+            Self {
+                _kernel: kernel,
+                driver,
+                sender_task,
+                sender_proc,
+                sender_thread,
+                receiver_task,
+                receiver_proc,
+            }
+        }
+
+        fn lock_receiver_shared_memory(&self) -> crate::lock::MappedMutexGuard<'_, SharedMemory> {
+            crate::lock::MutexGuard::map(self.receiver_proc.shared_memory.lock(), |value| {
+                value.as_mut().unwrap()
+            })
+        }
+    }
+
+    /// Fills the provided shared memory with n buffers, each spanning 1/n-th of the vmo.
+    fn fill_with_buffers(shared_memory: &mut SharedMemory, n: usize) -> Vec<UserAddress> {
+        let mut addresses = vec![];
+        for _ in 0..n {
+            let address = {
+                let (buffer, _, _) = shared_memory
+                    .allocate_buffers(VMO_LENGTH / n, 0, 0)
+                    .unwrap_or_else(|_| panic!("allocate {n:?}-th buffer"));
+                buffer.memory.user_address + buffer.offset
+            };
+            addresses.push(address);
+        }
+        addresses
+    }
+
+    /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
+    /// `proc`.
+    fn mmap_shared_memory(driver: &BinderDriver, task: &CurrentTask, proc: &Arc<BinderProcess>) {
+        driver
+            .mmap(
+                task,
+                proc,
+                DesiredAddress::Hint(UserAddress::default()),
+                VMO_LENGTH,
+                zx::VmarFlags::PERM_READ,
+                MappingOptions::empty(),
+                NamespaceNode::new_anonymous(DirEntry::new_unrooted(Arc::new(FsNode::new_root(
+                    PanickingFsNode,
+                )))),
+            )
+            .expect("mmap");
+    }
+
+    /// Registers a binder object to `owner`.
+    fn register_binder_object(
+        owner: &Arc<BinderProcess>,
+        weak_ref_addr: UserAddress,
+        strong_ref_addr: UserAddress,
+    ) -> Arc<BinderObject> {
+        let object = BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr });
+        owner.lock().objects.insert(weak_ref_addr, object.clone());
+        object
+    }
+
     #[fuchsia::test]
     fn handle_tests() {
         assert_matches!(Handle::from(0), Handle::SpecialServiceManager);
@@ -3200,20 +3501,13 @@ mod tests {
         let driver = BinderDriver::new();
         let (_kernel, current_task) = create_kernel_and_task();
         let context_manager_proc = driver.create_process(1);
-        let context_manager = BinderObject::new(
-            &context_manager_proc,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0xDEADBEEF),
-                strong_ref_addr: UserAddress::from(0xDEADDEAD),
-            },
-        );
-        driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
+        let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
+        driver.context_manager_and_queue.lock().context_manager = Some(context_manager.clone());
         let (object, owner) = driver
             .get_context_manager(&CurrentBinderTask { task: &current_task })
             .expect("failed to find handle 0");
         assert!(Arc::ptr_eq(&context_manager_proc, &owner));
-        assert_eq!(object.local.weak_ref_addr, UserAddress::from(0xDEADBEEF));
-        assert_eq!(object.local.strong_ref_addr, UserAddress::from(0xDEADDEAD));
+        assert!(Arc::ptr_eq(&context_manager, &object));
     }
 
     #[fuchsia::test]
@@ -3241,7 +3535,7 @@ mod tests {
         let _ = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
 
         // Insert the same object.
-        let handle = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
+        let (_, handle) = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
 
         // The object should be present in the handle table until a strong decrement.
         assert!(Arc::ptr_eq(
@@ -3272,9 +3566,12 @@ mod tests {
                 strong_ref_addr: UserAddress::from(0x1111111111111111),
             },
         );
+        scopeguard::defer! {
+             transaction_ref.ack_acquire().expect("ack_acquire");
+        }
 
         // Transactions always take a strong reference to binder objects.
-        let handle = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
+        let (_, handle) = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
 
         // The object should be present in the handle table until a strong decrement.
         assert!(Arc::ptr_eq(
@@ -3303,8 +3600,19 @@ mod tests {
             },
         );
 
+        // Simulate another process keeping a strong reference.
+        transaction_ref.inc_strong().expect("inc_strong");
+        scopeguard::defer! {
+            // Other process releases the object.
+            transaction_ref.dec_strong().expect("dec_strong");
+            // Ack the initial acquire.
+            transaction_ref.ack_acquire().expect("ack_acquire");
+            // Ack the subsequent incref from the test.
+            transaction_ref.ack_incref().expect("ack_acquire");
+        }
+
         // The handle starts with a strong ref.
-        let handle = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
+        let (_, handle) = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone());
 
         // Acquire a weak reference.
         proc_2.lock().handles.inc_weak(handle.object_index()).expect("inc_weak");
@@ -3472,21 +3780,6 @@ mod tests {
         shared_memory.allocate_buffers(1, 0, 0).expect_err("out-of-bounds allocation");
     }
 
-    /// Fills the provided shared memory with n buffers, each spanning 1/n-th of the vmo.
-    fn fill_with_buffers(shared_memory: &mut SharedMemory, n: usize) -> Vec<UserAddress> {
-        let mut addresses = vec![];
-        for _ in 0..n {
-            let address = {
-                let (buffer, _, _) = shared_memory
-                    .allocate_buffers(VMO_LENGTH / n, 0, 0)
-                    .unwrap_or_else(|_| panic!("allocate {n:?}-th buffer"));
-                buffer.memory.user_address + buffer.offset
-            };
-            addresses.push(address);
-        }
-        addresses
-    }
-
     #[fuchsia::test]
     fn shared_memory_allocation_wraps_in_order() {
         let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
@@ -3613,7 +3906,8 @@ mod tests {
 
         let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT);
 
-        drop(object);
+        let command = object.ack_acquire().expect("ack_acquire").expect("has command");
+        command.execute();
 
         assert_matches!(
             proc.command_queue.lock().commands.front(),
@@ -3633,11 +3927,13 @@ mod tests {
                 strong_ref_addr: UserAddress::from(0x0000000000000100),
             },
         );
+        // Simulate another process keeping a strong reference.
+        object.inc_strong().expect("inc_strong");
 
         let mut handle_table = HandleTable::default();
 
         // Starts with one strong reference.
-        let handle = handle_table.insert_for_transaction(object.clone());
+        let (_, handle) = handle_table.insert_for_transaction(object.clone());
 
         handle_table.inc_strong(handle.object_index()).expect("inc_strong 1");
         handle_table.inc_strong(handle.object_index()).expect("inc_strong 2");
@@ -3652,10 +3948,15 @@ mod tests {
         handle_table.dec_strong(handle.object_index()).expect_err("dec_strong -1");
 
         // The object should still take up an entry in the handle table, as there is 1 weak
-        // reference.
+        // reference and it is maintained alive by anotger process.
         handle_table.get(handle.object_index()).expect("object still exists");
 
-        drop(object);
+        // Simulate another process droppping its reference.
+        object.dec_strong().expect("dec_strong");
+        // Ack the initial acquire.
+        object.ack_acquire().expect("ack_acquire");
+        // Ack the subsequent incref from the test.
+        object.ack_incref().expect("ack_acquire");
 
         // Our weak reference won't keep the object alive.
         assert!(handle_table.get(handle.object_index()).is_none(), "object should be dead");
@@ -3916,47 +4217,6 @@ mod tests {
         SerializedBinderObject::from_bytes(&unaligned_input[1..]).expect("read unaligned object");
     }
 
-    struct TranslateHandlesTestFixture {
-        _kernel: Arc<Kernel>,
-        driver: Arc<BinderDriver>,
-
-        sender_task: CurrentTask,
-        sender_proc: Arc<BinderProcess>,
-        sender_thread: Arc<BinderThread>,
-
-        receiver_task: CurrentTask,
-        receiver_proc: Arc<BinderProcess>,
-    }
-
-    impl TranslateHandlesTestFixture {
-        fn new() -> Self {
-            let (kernel, sender_task) = create_kernel_and_task();
-            let driver = BinderDriver::new();
-            let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
-            let receiver_task = create_task(&kernel, "receiver_task");
-            let receiver_proc = driver.create_process(receiver_task.id);
-
-            mmap_shared_memory(&driver, &sender_task, &sender_proc);
-            mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
-
-            Self {
-                _kernel: kernel,
-                driver,
-                sender_task,
-                sender_proc,
-                sender_thread,
-                receiver_task,
-                receiver_proc,
-            }
-        }
-
-        fn lock_receiver_shared_memory(&self) -> crate::lock::MappedMutexGuard<'_, SharedMemory> {
-            crate::lock::MutexGuard::map(self.receiver_proc.shared_memory.lock(), |value| {
-                value.as_mut().unwrap()
-            })
-        }
-    }
-
     #[fuchsia::test]
     fn copy_transaction_data_between_processes() {
         let test = TranslateHandlesTestFixture::new();
@@ -4130,17 +4390,22 @@ mod tests {
         let (_, _, mut sg_buffer) =
             receiver_shared_memory.allocate_buffers(0, 0, 0).expect("allocate buffers");
 
-        let binder_object = LocalBinderObject {
+        let local_binder_object = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
             strong_ref_addr: UserAddress::from(0x0000000000000100),
         };
+        let binder_object = BinderObject::new(&test.receiver_proc, local_binder_object);
+        scopeguard::defer! {
+            binder_object.ack_acquire().expect("ack_acquire");
+        }
 
         // Pretend the binder object was given to the sender earlier, so it can be sent back.
-        let handle = test
-            .sender_proc
-            .lock()
-            .handles
-            .insert_for_transaction(BinderObject::new(&test.receiver_proc, binder_object));
+        let (_, handle) =
+            test.sender_proc.lock().handles.insert_for_transaction(binder_object.clone());
+        // Clear the strong reference.
+        scopeguard::defer! {
+            test.sender_proc.lock().handles.dec_strong(handle.object_index()).expect("dec_strong");
+        }
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
@@ -4173,8 +4438,8 @@ mod tests {
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_BINDER,
             flags: 0,
-            cookie: binder_object.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: binder_object.weak_ref_addr.ptr() as u64,
+            cookie: local_binder_object.strong_ref_addr.ptr() as u64,
+            __bindgen_anon_1.binder: local_binder_object.weak_ref_addr.ptr() as u64,
         }));
         assert_eq!(&expected_transaction_data, &transaction_data);
     }
@@ -4196,7 +4461,7 @@ mod tests {
         const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
 
         // Pretend the binder object was given to the sender earlier.
-        let handle = test
+        let (_, handle) = test
             .sender_proc
             .lock()
             .handles
@@ -4285,11 +4550,11 @@ mod tests {
         let sender_object = BinderObject::new(&test.sender_proc, binder_object_addr);
         let other_object = BinderObject::new(&other_proc, binder_object_addr);
         assert_eq!(
-            test.sender_proc.lock().handles.insert_for_transaction(sender_object),
+            test.sender_proc.lock().handles.insert_for_transaction(sender_object).1,
             SENDING_HANDLE_SENDER
         );
         assert_eq!(
-            test.sender_proc.lock().handles.insert_for_transaction(other_object),
+            test.sender_proc.lock().handles.insert_for_transaction(other_object).1,
             SENDING_HANDLE_OTHER
         );
 
@@ -4971,7 +5236,7 @@ mod tests {
         let weak_object = Arc::downgrade(&object);
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = client_proc.lock().handles.insert_for_transaction(object);
 
         // Grab a weak reference.
         client_proc.lock().handles.inc_weak(handle.object_index()).expect("inc_weak");
@@ -5028,7 +5293,7 @@ mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = client_proc.lock().handles.insert_for_transaction(object);
 
         const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
 
@@ -5079,7 +5344,7 @@ mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = client_proc.lock().handles.insert_for_transaction(object);
 
         // Now the owner process dies.
         driver.procs.write().remove(&owner_proc.identifier);
@@ -5124,7 +5389,7 @@ mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = client_proc.lock().handles.insert_for_transaction(object);
 
         let death_notification_cookie = 0xDEADBEEF;
 
@@ -5325,7 +5590,7 @@ mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender_proc.lock().handles.insert_for_transaction(object.clone());
+        let (_, handle) = sender_proc.lock().handles.insert_for_transaction(object.clone());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -5452,7 +5717,7 @@ mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender_proc.lock().handles.insert_for_transaction(object.clone());
+        let (_, handle) = sender_proc.lock().handles.insert_for_transaction(object.clone());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const ONEWAY_TRANSACTION_CODE: u32 = 42;
@@ -5544,7 +5809,7 @@ mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -5592,7 +5857,7 @@ mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -5652,7 +5917,7 @@ mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object);
+        let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -5746,13 +6011,7 @@ mod tests {
             // Set the context manager, as external ioctl will wait for it to be set before
             // executing.
             let context_manager_proc = driver.create_process(1);
-            let context_manager = BinderObject::new(
-                &context_manager_proc,
-                LocalBinderObject {
-                    weak_ref_addr: UserAddress::from(0xDEADBEEF),
-                    strong_ref_addr: UserAddress::from(0xDEADDEAD),
-                },
-            );
+            let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
             driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
 
             let process = fuchsia_runtime::process_self()
@@ -5811,35 +6070,6 @@ mod tests {
         assert_eq!(vector[1], 1);
         assert_eq!(vector, other_vector);
     }
-
-    // Simulates an mmap call on the binder driver, setting up shared memory between the driver and
-    // `proc`.
-    fn mmap_shared_memory(driver: &BinderDriver, task: &CurrentTask, proc: &Arc<BinderProcess>) {
-        driver
-            .mmap(
-                task,
-                proc,
-                DesiredAddress::Hint(UserAddress::default()),
-                VMO_LENGTH,
-                zx::VmarFlags::PERM_READ,
-                MappingOptions::empty(),
-                NamespaceNode::new_anonymous(DirEntry::new_unrooted(Arc::new(FsNode::new_root(
-                    PanickingFsNode,
-                )))),
-            )
-            .expect("mmap");
-    }
-
-    /// Registers a binder object to `owner`.
-    fn register_binder_object(
-        owner: &Arc<BinderProcess>,
-        weak_ref_addr: UserAddress,
-        strong_ref_addr: UserAddress,
-    ) -> Arc<BinderObject> {
-        let object = BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr });
-        owner.lock().objects.insert(weak_ref_addr, Arc::downgrade(&object));
-        object
-    }
 }
 
 #[cfg(not(any(test, debug_assertions)))]
@@ -5860,6 +6090,18 @@ mod object_table {
 
     impl<'a, A> Iterator for Iter<'a, A> {
         type Item = (usize, &'a A);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.map_iter.next().map(|(i, v)| (*i, v))
+        }
+    }
+
+    pub struct IterMut<'a, A> {
+        map_iter: std::collections::btree_map::IterMut<'a, usize, A>,
+    }
+
+    impl<'a, A> Iterator for IterMut<'a, A> {
+        type Item = (usize, &'a mut A);
 
         fn next(&mut self) -> Option<Self::Item> {
             self.map_iter.next().map(|(i, v)| (*i, v))
@@ -5893,6 +6135,10 @@ mod object_table {
 
         pub fn iter(&self) -> Iter<'_, A> {
             Iter { map_iter: self.objects.iter() }
+        }
+
+        pub fn iter_mut(&mut self) -> IterMut<'_, A> {
+            IterMut { map_iter: self.objects.iter_mut() }
         }
     }
 
