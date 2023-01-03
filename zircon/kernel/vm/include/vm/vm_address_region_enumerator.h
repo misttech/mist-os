@@ -126,13 +126,6 @@ class VmAddressRegionEnumerator {
     ASSERT(!state_.paused_);
     // Save information of the next iteration we should return.
     if (itr_.IsValid()) {
-      // Per comment on |itr_|, we could be at a VmAddressRegion or a VmMapping. However, a
-      // VmAddressRegion (or a VmMapping with a base below min_addr_) is only possible if we have
-      // just constructed the enumerator, or just called |resume| (without calling |next|). We do
-      // not track specifically if we have called |next| or not, but we do know that if depth_ is
-      // not kStartDepth, then |next| must have been called. Using the depth_ heuristic we have at
-      // least a chance of detecting incorrect enumerations with the following assert.
-      DEBUG_ASSERT((itr_->is_mapping() && itr_->base() >= min_addr_) || depth_ == kStartDepth);
       // Is possible that the object extends only partially into our enumeration range. As such we
       // cannot just record its base() as the point to resume iteration, but need to clip it with
       // |min_addr_| to ensure we do not iterate backwards or outside of our requested range.

@@ -2380,6 +2380,45 @@ TEST(Vmar, ConcurrentUnmapReadMemory) {
   t.join();
 }
 
+// Test for bug fxbug.dev/118226.
+// Issuing a vmar operation on a range that is next to a vmar should not crash.
+TEST(Vmar, OpOnRangeWithChildVmarNextToIt) {
+  auto root_vmar = zx::vmar::root_self();
+
+  const size_t kVmoSize = zx_system_get_page_size();
+  // VMAR topology:
+  // [   PARENT VMAR     ]
+  // [[    VMAR_A       ]]
+  // [[ VMO_A [ VMAR_B ]]]
+
+  zx::vmo vmo_a;
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo_a));
+
+  zx::vmar vmar_parent;
+  uintptr_t vmar_parent_base;
+  ASSERT_OK(root_vmar->allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
+                                0, kVmoSize * 2, &vmar_parent, &vmar_parent_base));
+
+  zx::vmar vmar_a;
+  uintptr_t vmar_a_base;
+  ASSERT_OK(vmar_parent.allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
+                                 0, kVmoSize * 2, &vmar_a, &vmar_a_base));
+
+  zx::vmar vmar_b;
+  uintptr_t vmar_b_base;
+  ASSERT_OK(vmar_a.allocate(
+      ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0x1000,
+      kVmoSize, &vmar_b, &vmar_b_base));
+
+  uintptr_t vmo_a_addr;
+  ASSERT_OK(vmar_a.map(ZX_VM_SPECIFIC | ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo_a, 0, kVmoSize,
+                       &vmo_a_addr));
+
+  // Doing an operation on a vmar on a range that has a child vmar next to it
+  // should work.
+  EXPECT_OK(vmar_parent.op_range(ZX_VMAR_OP_MAP_RANGE, vmo_a_addr, kVmoSize, nullptr, 0));
+}
+
 // Test DECOMMIT on a vmar with two non-contiguous mappings (fxbug.dev/68272)
 TEST(Vmar, RangeOpCommitVmoPages2) {
   auto root_vmar = zx::vmar::root_self();
