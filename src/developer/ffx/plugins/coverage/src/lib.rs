@@ -64,11 +64,20 @@ pub async fn coverage(cmd: CoverageCommand) -> Result<()> {
     };
 
     match (cmd.export_html, cmd.export_lcov) {
-        (Some(ref html_export_dir), _) => export_html(&params, html_export_dir)
-            .context(format!("failed to export HTML coverage report to {:?}", html_export_dir))?,
-        (_, Some(ref lcov_export_path)) => export_lcov(&params, lcov_export_path)
-            .context(format!("failed to export LCOV to {:?}", lcov_export_path))?,
         (None, None) => show_coverage(&params).context("failed to show coverage")?,
+        (html, lcov) => {
+            if let Some(ref html_export_dir) = html {
+                export_html(&params, html_export_dir).context(format!(
+                    "failed to export HTML coverage report to {:?}",
+                    html_export_dir
+                ))?
+            }
+
+            if let Some(ref lcov_export_path) = lcov {
+                export_lcov(&params, lcov_export_path)
+                    .context(format!("failed to export lcov to {:?}", lcov_export_path))?
+            }
+        }
     }
 
     Ok(())
