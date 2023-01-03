@@ -138,29 +138,16 @@ group("core") {
   testonly = true
 
   # Assign should contain all deps of //src/buildbot/core.
-  # TODO(fxbug.dev/108563): Add //src to deps when all tests in //src pass with
-  # DFv2 enabled.
+  # TODO(fxbug.dev/108563): Add //src:e2e_tests to this add-assign when all
+  # tests in //src:e2e_tests pass with DFv2 enabled.
   deps = [
     "//bundles/buildbot/core:no_e2e",
     "//bundles/fidl:tests",
     "//sdk:tests",
-    "//tools",
   ]
 
   # Ensure paths to known e2e test libs are always up-to-date.
   deps += e2e_test_libs
-
-  # Add-assign should contain all deps of //src.
-  # TODO(fxbug.dev/108563): Remove the following add-assign when all tests in
-  # //src pass with DFv2 enabled.
-  # TODO(fxbug.dev/108563): Add //src:e2e_tests to this add-assign when all
-  # tests in //src:e2e_tests pass with DFv2 enabled.
-  # TODO(fxbug.dev/108563): Add //src/connectivity to this add-assign when all
-  # tests in //src/connectivity pass with DFv2 enabled.
-  deps += [
-    "//src:src_no_e2e",
-    "//src/recovery",
-  ]
 
   # Add-assign should contain all deps of //src:e2e_tests.
   # TODO(fxbug.dev/108563): Remove this add-assign when all tests in
