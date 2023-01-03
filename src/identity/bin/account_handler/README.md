@@ -2,59 +2,106 @@
 
 ## Overview
 
-Account Handler manages the state of a single Fuchsia account (and its personae)
-on a Fuchsia device. It also provides access to authentication tokens for the
-Service Provider accounts associated with the Fuchsia account.
+The Account Handler component exists to manage the state of individual accounts
+(and their personae) in the Fuchsia account system. Account Manager creates a
+new Account Handler component instance when a client attempts to interact with
+an account for the first time. Each Account Handler component instance is
+responsible for a single account and cannot access data for other accounts in
+the system.
 
-Account Handler component instances come in two variants, one for persistent,
-and one for ephemeral accounts. Both are launched by Account Manager and
-implement the fuchsia.identity.internal.AccountHandlerControl FIDL protocols
-so they may be controlled by Account Manager. Each Account Handler component
-instance is responsible for handling a single Fuchsia account. A persistent
-account handler only accesses the persistent storage for that one account.
-An ephemeral account handler has no persistent storage priveleges at all.
+Account Handler orchestrates the provisioning and authentication of an account
+and is responsible for mounting storage volumes protected by these
+authentication factors (aka account-encrypted storage).
 
-Account Handler also implements the fuchsia.identity.account.Account and
-fuchsia.identity.account.Persona FIDL protocols. These protocols are not
-discoverable; Account channels may only be obtained through Account Manager and
-Persona channels may only be obtained from an Account channel.
+Account Handler does not have access to device-encrypted storage or network
+(this reduces the risk of mass exfiltration from account-encrypted storage if
+the system were to be compromised). Instead, Account Manager persists the
+"pre-authentication state" (information about an account that must be available
+before authentication is complete) and passes it to Account Handler over FIDL.
+Account Handler stores the "post-authentication state" (information about an
+account that is only available after authentication has been completed) as a
+file in account-encrypted storage.
+
+Two variants of the Account Handler component are defined, one for persistent
+accounts and and one for ephemeral accounts. The ephemeral variant does not
+persist account encryption keys and therefore the account-encrypted storage for
+an ephemeral account cannot be read once the Account Handler component instance
+has been terminated. Currently persistent accounts require a single
+authentication mechanisms enrollment while ephemeral accounts do not have any
+authentication mechanisms enrolled.
+
+The Account Handler component serves the
+`fuchsia.identity.internal.AccountHandlerControl` for communication with
+Account Manager. In addition, Account Handler acts as a FIDL server for
+`fuchsia.identity.mechanisms.Interaction`, `fuchsia.identity.account.Account`
+and `fuchsia.identity.account.Persona`.
 
 
 ## Key Dependencies
 
-* */identity/lib/account_common* - Account Handler uses error and identifier
-  definitions from this crate
-* */identity/lib/identity_common* - Account Handler uses the TaskGroup type from
-  this crate
+- **/identity/lib/account_common** - Account Handler uses error and identifier
+  definitions from this crate.
+- **/identity/lib/identity_common** - Account Handler uses the TaskGroup type
+  from this crate.
+- **/identity/lib/storage_manager** - Account Handler uses the file system
+  integrations provided by this crate.
 
 
 ## Design
 
-`AccountHandler` implements the fuchsia.identity.internal.AccountHandlerControl
-FIDL protocol. The crate's main function creates a single instance of
-`AccountHandler` and uses it to handle all incoming requests. The
-`LocalAccountId` is also supplied to the Account Handler at launch time, but is
-passed through a flag instead, and parsed by in the main program entry point.
+The Account Handler component is composed of several different rust modules
+whose responsibilities and key interactions are summarized below:
 
-The AccountHandlerControl protocol drives a state machine in the Account
-Handler, starting in an `Uninitialized` state. Once an account is unlocked or
-created, the `AccountHandler` is considered `Initialized`. When initialized, the
-`Account` serves subsequent `AccountHandlerControl.GetAccount` calls. Notably,
-the `AccountHandler` can also be in the `Locked` state, where the `Account`
-is not available. Unlocking may involve an authentication attempt if the
-account was enrolled with an authentication mechanism upon creation.
-
-`Account` implements the fuchsia.identity.account.Account FIDL protocol and
-stores an instance of the `Persona` struct representing the default Persona.
-When a persistent `Account` is constructed, it manages a database file using a
-`StoredAccount`. The `Account` also stores an instance of `TokenManager`,
-supplied with a path to the token database upon creation (if the account is
-persistent).
-
-`Persona` implements the fuchsia.identity.account.Persona FIDL protocol.
-
-`StoredAccount` implements JSON serialization and deserialization of account
-metadata.
+- **`main`** - This module reads configuration and selects an appropriate
+  storage manager implementation before handling control to the
+  `account_handler` module. `main` is not unit tested so its scope should remain
+  minimal.
+- **`account_handler`** - This large module is currently a menagerie of
+  everything that did not fit cleanly into some other module. Over time we
+  expect to refactor this into more modules with better cohesion, but the scope
+  of `account_manager` currently contains:
+  - Defining the top level component state
+  - Defining the top-level "lifecycle" state machine for the component
+  - Defining an sub-state machine for the component once it has been initialized
+  - Connecting to the correct authentication protocol based on configuration
+  - Implementing a `fuchsia.identity.internal.AccountHandlerControl` server
+  - Invoking the storage manager library.
+- **`account`** - This module defines the state of an unlocked account, uses the
+  `stored_account` module to load and save post-authentication state for the
+  account, and implements a `fuchsia.identity.account.Account` server to expose
+  information about the account to other components. The `account` module also
+  uses the `persona` module to serve requests for personae. No other modules
+  should understand the details of an unlocked account.
+- **`persona`** - This module defines the state of an account persona and
+  implements a `fuchsia.identity.account.Persona` server to expose information
+  about the persona to other components. No other modules should understand
+  personae.
+- **`interaction`** - This module implements a FIDL server for the
+  `fuchsia.identity.mechanisms.Interaction` protocol, delegating authentication
+  and enrollment requests to an authentication mechanism supplied at
+  construction. No other modules should understand the details of the
+  interaction protocol
+- **`pre_auth`** - This module defines the pre-authentication state of an
+  account and the methods to serialize into and deserialize from the byte string
+  sent over FIDL. Pre-authentication state include the AccountID and the
+  information needed to perform authentication. `pre_auth` depends on the
+  `wrapped_key` module to define the wrapped volume keys. No other modules
+  should understand the serialized form of pre-authentication state.
+- **`stored_account`** - This module defines the post-authentication state of an
+  account and the methods to to save to and load from storage. No other modules
+  should understand how post-authentication state is stored.
+- **`wrapped_key`** - This module defines a data structure used inside
+  pre-authentication state to store volume encryption keys and provides
+  cryptographic operations to wrap and unwrap these keys.
+- **`lock_request`** - This module defines a simple wrapper used to communicate
+  account lock events received on any `Account` channel to the `account_handler`
+  module.
+- **`inspect`** - This module defines the data that the component publishes to
+  the Inspect diagnostics system.
+- **`common`** - This module defines data types that are used widely across
+  several other modules.
+- **`test_util`** - The module contains helper data types and constants that are
+  used widely in the unit test for other modules
 
 
 ## Future Work
