@@ -179,6 +179,23 @@ fx test epoll_test --output -- --gunit_filter="*"
 
 Specifying `*` as the filter turns on all tests in the binary.
 
+### Making changes to Starnix when using ffx
+
+The Starnix instances that `ffx` connects are static in the component hieararchy. This means that
+they need to be stopped explicitly in order to be updated when changes have been made to the Starnix
+runner code.
+
+```sh
+ffx component stop starnix_runner
+```
+
+If more than one Starnix instance is running, the above command will list the running Starnix instances and you can stop them individually.
+
+Alternatively, use the following command to stop all the instances at once:
+
+```sh
+fx shell killall starnix_runner.cm
+```
 
 ## Testing
 
@@ -216,21 +233,6 @@ You can then build and run your test as usual:
 ```sh
 fx build
 fx test syscalls_test
-```
-
-### Updating Starnix when running prebuilt tests
-
-When working on the Starnix runner to make behavioral changes that affect
-prebuilt tests such as the GVisor tests, re-running the test does not implicitly
-fetch and start a new runner. In these cases it is necessary to explicitly stop
-the runner so that it is updated on next component launch.
-
-The following snippet performs those stops:
-
-```sh
-for moniker in /core/{starnix_runner,starnix_manager,test_manager/{starnix_test_runner,starnix_unit_test_runner}}; do
-  ffx component stop -r $moniker
-done
 ```
 
 ### Viewing Inspect for debugging
