@@ -19,6 +19,10 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#ifdef __Fuchsia__
+#include <lib/zx/vmo.h>
+#endif
+
 // Get the full path to an arbitrary test data file.
 std::filesystem::path GetTestDataPath(std::string_view filename);
 
@@ -26,6 +30,11 @@ std::filesystem::path GetTestDataPath(std::string_view filename);
 fbl::unique_fd GetTestLib(std::string_view libname);
 
 using AllFormatsTypedTest = elfldltl::AllFormats<::testing::Types>;
+
+#ifdef __Fuchsia__
+// Get the vmo backing an arbitrary test data file.
+zx::vmo GetTestLibVmo(std::string_view libname);
+#endif
 
 template <class ElfLayout>
 struct FormatTypedTest : public testing::Test {

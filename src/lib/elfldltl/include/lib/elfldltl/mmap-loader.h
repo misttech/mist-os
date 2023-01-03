@@ -30,10 +30,15 @@ class MmapLoader {
 
   [[gnu::const]] static size_t page_size() { return sysconf(_SC_PAGESIZE); }
 
-  // This takes a LoadInfo object describing segments to be mapped in and an opened file descriptor
+  // This takes a LoadInfo object describing segments to be mapped in and an opened fd
   // from which the file contents should be mapped. It returns true on success and false otherwise,
-  // in which case a diagnostic will be emitted to diag. In either case mappings may be present
-  // until destruction of the MmapLoader object. Use Commit() to keep loaded pages mapped.
+  // in which case a diagnostic will be emitted to diag.
+  //
+  // When Load() is called, one should assume that the address space of the caller has a new mapping
+  // whether the call succeeded or failed. The mapping is tied to the lifetime of the MmapLoader
+  // until Commit() is called. Without committing, the destructor of the MmapLoader will destroy the
+  // mapping.
+  //
   // Logically, Commit() isn't sensible after Load has failed.
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, int fd) {
@@ -55,30 +60,26 @@ class MmapLoader {
              (s.executable() ? PROT_EXEC : 0);
     };
 
-    // Load segments are divided into 3 regions
+    // Load segments are divided into 2 or 3 regions depending on segment.
     // [file pages]*[intersecting page]?[anon pages]*
     //
-    // "file pages" are present when filesz > 0, "anon pages" will exist when memsz > filesz.
-    // The "intersecting page" will exist when both the above are true and the filesz is not
-    // a multiple of pagesize. Note, for the intersecting page we choose to map this as an
-    // anonymous page then read in any remaining file data into it. The alternative would be
-    // to map filesz page rounded up into memory and then zero out the zero fill portion of
-    // the intersecting page. This isn't preferable because we would immeditely cause a page
-    // fault and spend time zero'ing a page when the OS may already have a zero'd page for us.
+    // * "file pages" are present when filesz > 0
+    // * "anon pages" are present when memsz > filesz.
+    // * "intersecting page" exists when both file pages and anon pages exist,
+    //   and file pages are not an exact multiple of pagesize. At most a **single**
+    //   intersecting page exists.
     //
-    // To map a segment we have 3 steps to map in each of the 3 different regions.
+    // **Note:**: The MmapLoader performs only two mappings.
+    //    * Mapping file pages up to the last full page of file data.
+    //    * Mapping anonymous pages, including the intersecting page, to the end of the segment.
     //
-    // 1. Map "file pages".
-    //    If memsz > filesz, we round this size down to the nearest page, and will map in the
-    //    remaining filesz as part of the intersecting page later. Otherwise, we can map in the
-    //    entire filesz. We'll call the amount to map `map_size`.
+    // After the second mapping, the MmapLoader then reads in the partial file data into the
+    // intersecting page.
     //
-    // 2. Map "anon pages"
-    //    Here we need to map memsz - `map_size` bytes, which will include the full intersectng
-    //    page.
-    //
-    // 3. Fill in "intersecting page"
-    //    pread in filesz - `map_size` into this page allocated in step 2.
+    // The alternative would be to map filesz page rounded up into memory and then zero out the
+    // zero fill portion of the intersecting page. This isn't preferable because we would
+    // immediately cause a page fault and spend time zero'ing a page when the OS may already have
+    // copied this page for us.
     auto mapper = [base = reinterpret_cast<std::byte*>(map), vaddr_start = load_info.vaddr_start(),
                    prot, fd, &diag](const auto& segment) {
       std::byte* addr = base + (segment.vaddr() - vaddr_start);

@@ -16,10 +16,9 @@
 
 // The fdio open doesn't support getting an fd that will allow PROT_EXEC mmap
 // usage, i.e. yield a VMO with ZX_RIGHT_EXECUTE.  Instead, use the loader
-// service to look up the file in /pkg/lib and use fdio's API to construct an
-// fd from that executable VMO handle.  Note this uses gtest assertions for all
+// service to look up the file in /pkg/lib. Note this uses gtest assertions for all
 // failures and so must be used inside a gtest TEST(...) function.
-fbl::unique_fd GetTestLib(std::string_view libname) {
+zx::vmo GetTestLibVmo(std::string_view libname) {
   constexpr auto init_ldsvc = []() {
     // The dl_set_loader_service API replaces the handle used by `dlopen` et al
     // and returns the old one, so initialize by borrowing that handle while
@@ -43,9 +42,15 @@ fbl::unique_fd GetTestLib(std::string_view libname) {
   if (result->rv != ZX_OK) {
     return {};
   }
+  return std::move(result->object);
+}
 
+// Fuchsia-specific implementation of GetTestLib; a custom implementation is needed
+// because fdio open does not support returning an executable fd.
+fbl::unique_fd GetTestLib(std::string_view libname) {
+  zx::vmo lib_vmo = GetTestLibVmo(libname);
   int fd;
-  zx_status_t status = fdio_fd_create(result->object.release(), &fd);
+  zx_status_t status = fdio_fd_create(lib_vmo.release(), &fd);
   EXPECT_EQ(status, ZX_OK) << libname << ": fdio_fd_create: " << zx_status_get_string(status);
 
   return fbl::unique_fd{fd};

@@ -34,6 +34,7 @@ zx_library("elfldltl") {
     "lib/elfldltl/mapped-vmo-file.h",
     "lib/elfldltl/memory.h",
     "lib/elfldltl/mmap-loader.h",
+    "lib/elfldltl/vmar-loader.h",
     "lib/elfldltl/note.h",
     "lib/elfldltl/phdr.h",
     "lib/elfldltl/posix.h",
@@ -89,7 +90,10 @@ zx_library("elfldltl") {
       "//zircon/system/ulib/fbl",
     ]
     if (is_fuchsia) {
-      sources += [ "mapped-vmo-file.cc" ]
+      sources += [
+        "mapped-vmo-file.cc",
+        "vmar-loader.cc",
+      ]
       deps += [ "//zircon/system/ulib/zx" ]
     }
   }
