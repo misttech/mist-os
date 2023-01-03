@@ -69,9 +69,9 @@ async fn get_devices<DeviceType: New + New<Output = DeviceType>>(
         {
             continue;
         }
-        let device = fuchsia_fs::open_node(
+        let device = fuchsia_fs::directory::open_node_no_describe(
             dir,
-            &msg.filename,
+            &msg.filename.to_str().unwrap(),
             fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_SERVICE,
         )?;

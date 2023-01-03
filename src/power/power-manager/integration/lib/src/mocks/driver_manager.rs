@@ -148,8 +148,9 @@ impl MockDriverManager {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::Proxy,
-        fidl_fuchsia_hardware_thermal as fhardwarethermal, futures::StreamExt, std::path::PathBuf,
+        super::*, assert_matches::assert_matches,
+        fidl_fuchsia_hardware_thermal as fhardwarethermal,
+        fuchsia_component::client::connect_to_named_protocol_at_dir_root, futures::StreamExt,
     };
 
     /// Tests that the mock tries to register with Power Manager when it first starts up.
@@ -229,20 +230,9 @@ mod tests {
         let devfs = dir.into_proxy().unwrap();
 
         // Try to connect to the mock temperature device using the received devfs handle
-        let driver_proxy = fidl::endpoints::ClientEnd::<fhardwarethermal::DeviceMarker>::new(
-            fuchsia_fs::open_node(
-                &devfs,
-                &PathBuf::from("mock"),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_SERVICE,
-            )
-            .unwrap()
-            .into_channel()
-            .unwrap()
-            .into_zx_channel(),
-        )
-        .into_proxy()
-        .unwrap();
+        let driver_proxy =
+            connect_to_named_protocol_at_dir_root::<fhardwarethermal::DeviceMarker>(&devfs, "mock")
+                .expect("Failed to connect to the mock temperature device");
 
         // Default temperature is initially 0
         assert_eq!(driver_proxy.get_temperature_celsius().await.unwrap(), (0, 0.0));

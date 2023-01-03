@@ -35,9 +35,10 @@ use {
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
-    futures::{channel::oneshot, prelude::*, TryStreamExt},
+    futures::{channel::oneshot, prelude::*},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     std::{
         collections::{HashMap, HashSet},
@@ -1012,8 +1013,10 @@ impl Drop for ScopedNamespaceDir<'_> {
 /// Contains functions to use capabilities in routing tests.
 pub mod capability_util {
     use {
-        super::*, assert_matches::assert_matches, cm_rust::NativeIntoFidl,
-        fidl::endpoints::ProtocolMarker,
+        super::*,
+        assert_matches::assert_matches,
+        cm_rust::NativeIntoFidl,
+        fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker},
     };
 
     /// Looks up `resolved_url` in the namespace, and attempts to read ${path}/hippo. The file
@@ -1214,16 +1217,10 @@ pub mod capability_util {
         path: &CapabilityPath,
     ) -> T::Proxy {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let node_proxy = fuchsia_fs::open_node(
-            &dir_proxy,
-            &Path::new(&path.basename),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open echo service");
+        let proxy = connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, &path.basename)
+            .expect("failed to open service");
         add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-        let client_end = ClientEnd::<T>::new(node_proxy.into_channel().unwrap().into_zx_channel());
-        client_end.into_proxy().unwrap()
+        proxy
     }
 
     pub async fn connect_to_instance_svc_in_namespace<T: ProtocolMarker>(
@@ -1233,31 +1230,25 @@ pub mod capability_util {
         member: &str,
     ) -> T::Proxy {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
+        // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             &path.basename,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
         )
         .await
         .expect("failed to open service dir");
+        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
         let instance_dir = fuchsia_fs::directory::open_directory(
             &service_dir,
             instance,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
         )
         .await
         .expect("failed to open instance dir");
-        let member_proxy = fuchsia_fs::directory::open_node_no_describe(
-            &instance_dir,
-            member,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open member node");
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-        let client_end =
-            ClientEnd::<T>::new(member_proxy.into_channel().unwrap().into_zx_channel());
-        client_end.into_proxy().unwrap()
+        connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
+            .expect("failed to open service")
     }
 
     pub async fn subscribe_to_event_stream_v2(
@@ -1350,32 +1341,13 @@ pub mod capability_util {
     /// an OnOpen event when opened with OPEN_FLAG_DESCRIBE.
     pub async fn call_file_svc_from_namespace(namespace: &ManagedNamespace, path: CapabilityPath) {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let node_proxy = fuchsia_fs::open_node(
+        let _file_proxy = fuchsia_fs::directory::open_file(
             &dir_proxy,
-            &Path::new(&path.basename),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-            // This should be MODE_TYPE_SERVICE, but we implement the underlying
-            // service as a file for convenience in testing.
-            fio::MODE_TYPE_FILE,
+            &path.basename,
+            fio::OpenFlags::RIGHT_READABLE,
         )
-        .expect("failed to open file service");
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-
-        let file_proxy = fio::FileProxy::new(node_proxy.into_channel().unwrap());
-        let mut event_stream = file_proxy.take_event_stream();
-        let event = event_stream.try_next().await.unwrap();
-        match event.expect("failed to received file event") {
-            fio::FileEvent::OnOpen_ { s, info } => {
-                assert_eq!(s, zx::sys::ZX_OK);
-                assert!(matches!(
-                    *info.expect("failed to receive node info"),
-                    fio::NodeInfoDeprecated::File(fio::FileObject { .. })
-                ));
-            }
-            fio::FileEvent::OnRepresentation { payload } => {
-                assert!(matches!(payload, fio::Representation::File(fio::FileInfo { .. })));
-            }
-        }
+        .await
+        .expect("failed to open file");
     }
 
     /// Attempts to read ${path}/hippo in `abs_moniker`'s exposed directory. The file should
@@ -1453,22 +1425,19 @@ pub mod capability_util {
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         open_exposed_dir(&path, abs_moniker, model, fio::MODE_TYPE_SERVICE, server_end).await;
+        // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
         let instance_dir = fuchsia_fs::directory::open_directory(
             &service_dir,
             &instance,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .await
         .expect("failed to open instance");
-        let member_node = fuchsia_fs::directory::open_node_no_describe(
-            &instance_dir,
-            &member,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open member node");
-        let echo_proxy = echo::EchoProxy::new(member_node.into_channel().unwrap());
+        let echo_proxy =
+            connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&instance_dir, &member)
+                .expect("failed to connect to Echo service");
         call_echo_and_validate_result(echo_proxy, expected_res).await;
     }
 
@@ -1481,14 +1450,11 @@ pub mod capability_util {
         bind_calls: Arc<Mutex<Vec<String>>>,
     ) {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let node_proxy = fuchsia_fs::open_node(
+        let realm_proxy = connect_to_named_protocol_at_dir_root::<fcomponent::RealmMarker>(
             &dir_proxy,
-            &Path::new(&path.basename),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
+            &path.basename,
         )
         .expect("failed to open realm service");
-        let realm_proxy = fcomponent::RealmProxy::new(node_proxy.into_channel().unwrap());
         let mut child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
         let (_, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let res = realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
@@ -1507,18 +1473,13 @@ pub mod capability_util {
         child_decl: ChildDecl,
         args: fcomponent::CreateChildArgs,
     ) {
-        let path: CapabilityPath =
-            "/svc/fuchsia.component.Realm".try_into().expect("no realm service");
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let node_proxy = fuchsia_fs::open_node(
-            &dir_proxy,
-            &Path::new(&path.basename),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open realm service");
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-        let realm_proxy = fcomponent::RealmProxy::new(node_proxy.into_channel().unwrap());
+        let path = CapabilityPath::try_from(&format!(
+            "/svc/{}",
+            fcomponent::RealmMarker::PROTOCOL_NAME
+        ) as &str)
+        .expect("no realm service");
+        let realm_proxy =
+            connect_to_svc_in_namespace::<fcomponent::RealmMarker>(namespace, &path).await;
         let mut collection_ref = fdecl::CollectionRef { name: collection.to_string() };
         let child_decl = child_decl.native_into_fidl();
         let res = realm_proxy.create_child(&mut collection_ref, child_decl, args).await;
@@ -1532,18 +1493,13 @@ pub mod capability_util {
         collection: &'a str,
         name: &'a str,
     ) {
-        let path: CapabilityPath =
-            "/svc/fuchsia.component.Realm".try_into().expect("no realm service");
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let node_proxy = fuchsia_fs::open_node(
-            &dir_proxy,
-            &Path::new(&path.basename),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open realm service");
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-        let realm_proxy = fcomponent::RealmProxy::new(node_proxy.into_channel().unwrap());
+        let path = CapabilityPath::try_from(&format!(
+            "/svc/{}",
+            fcomponent::RealmMarker::PROTOCOL_NAME
+        ) as &str)
+        .expect("no realm service");
+        let realm_proxy =
+            connect_to_svc_in_namespace::<fcomponent::RealmMarker>(namespace, &path).await;
         let mut child_ref =
             fdecl::ChildRef { collection: Some(collection.to_string()), name: name.to_string() };
         let res = realm_proxy.destroy_child(&mut child_ref).await;

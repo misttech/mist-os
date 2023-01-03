@@ -64,7 +64,8 @@ impl MockTemperatureDriver {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl::endpoints::Proxy, fidl_fuchsia_io as fio, std::path::PathBuf,
+        super::*, fidl::endpoints::Proxy, fidl_fuchsia_io as fio,
+        fuchsia_component::client::connect_to_named_protocol_at_dir_root,
         vfs::directory::entry::DirectoryEntry, vfs::pseudo_directory,
     };
 
@@ -84,20 +85,12 @@ mod tests {
             vfs::path::Path::dot(),
             dir_server,
         );
-        let driver_proxy = fidl::endpoints::ClientEnd::<fhardwarethermal::DeviceMarker>::new(
-            fuchsia_fs::open_node(
-                &fio::DirectoryProxy::from_channel(dir.into_channel().unwrap()),
-                &PathBuf::from("mock"),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_SERVICE,
-            )
-            .unwrap()
-            .into_channel()
-            .unwrap()
-            .into_zx_channel(),
+
+        let driver_proxy = connect_to_named_protocol_at_dir_root::<fhardwarethermal::DeviceMarker>(
+            &fio::DirectoryProxy::from_channel(dir.into_channel().unwrap()),
+            "mock",
         )
-        .into_proxy()
-        .unwrap();
+        .expect("Failed to connect to the mock temperature device");
 
         // Default temperature is initially 0
         assert_eq!(driver_proxy.get_temperature_celsius().await.unwrap(), (0, 0.0));

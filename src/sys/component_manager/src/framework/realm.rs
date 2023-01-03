@@ -433,17 +433,15 @@ mod tests {
             ExposeSource, ExposeTarget,
         },
         cm_rust_testing::*,
-        fidl::endpoints::{self, Proxy},
+        fidl::endpoints,
         fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client,
-        fuchsia_fs::OpenFlags,
         futures::lock::Mutex,
         moniker::AbsoluteMoniker,
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
         std::convert::TryFrom,
-        std::path::PathBuf,
     };
 
     struct RealmCapabilityTest {
@@ -1269,16 +1267,11 @@ mod tests {
 
         // Now that it was asserted that "system:0" has yet to start,
         // assert that it starts after making connection below.
-        let node_proxy = fuchsia_fs::open_node(
-            &dir_proxy,
-            &PathBuf::from("hippo"),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open hippo service");
+        let echo_proxy =
+            client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
+                .expect("failed to open hippo service");
         let event = event_stream.wait_until(EventType::Started, vec!["system"].into()).await;
         assert!(event.is_some());
-        let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 
@@ -1349,16 +1342,11 @@ mod tests {
 
         // Now that it was asserted that "system" has yet to start,
         // assert that it starts after making connection below.
-        let node_proxy = fuchsia_fs::open_node(
-            &dir_proxy,
-            &PathBuf::from("hippo"),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )
-        .expect("failed to open hippo service");
+        let echo_proxy =
+            client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
+                .expect("failed to open hippo service");
         let event = event_stream.wait_until(EventType::Started, vec!["coll:system"].into()).await;
         assert!(event.is_some());
-        let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 
@@ -1423,14 +1411,10 @@ mod tests {
                 endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let res = test.realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
             res.expect("fidl call failed").expect("open_exposed_dir() failed");
-            let node_proxy = fuchsia_fs::open_node(
-                &dir_proxy,
-                &PathBuf::from("hippo"),
-                OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_SERVICE,
+            let echo_proxy = client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(
+                &dir_proxy, "hippo",
             )
             .expect("failed to open hippo service");
-            let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
             let res = echo_proxy.echo_string(Some("hippos")).await;
             assert!(res.is_err());
         }

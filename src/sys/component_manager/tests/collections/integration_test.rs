@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::{self, Proxy},
+    anyhow::Error,
+    fidl::endpoints,
     fidl::{AsHandleRef, HandleBased},
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
     fuchsia_async as fasync,
     fuchsia_component::client,
-    fuchsia_fs::{self, OpenFlags},
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
     std::ffi::CString,
-    std::path::PathBuf,
 };
 
 #[fasync::run_singlethreaded(test)]
@@ -51,7 +49,9 @@ async fn collections() {
             .await
             .expect(&format!("open_exposed_dir {} failed", name))
             .expect(&format!("failed to open exposed dir of child {}", name));
-        let trigger = open_trigger_svc(&dir).expect("failed to open trigger service");
+        let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&dir)
+            .expect("failed to open trigger service");
+
         let out = trigger.run().await.expect(&format!("trigger {} failed", name));
         assert_eq!(out, format!("Triggered {}", name));
     }
@@ -105,7 +105,8 @@ async fn collections() {
             .await
             .expect("open_exposed_dir a failed")
             .expect("failed to open exposed dir of child a");
-        let trigger = open_trigger_svc(&dir).expect("failed to open trigger service");
+        let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&dir)
+            .expect("failed to open trigger service");
         let out = trigger.run().await.expect("second trigger a failed");
         assert_eq!(&out, "Triggered a");
     }
@@ -255,15 +256,4 @@ async fn list_children(realm: &fcomponent::RealmProxy) -> Result<String, Error> 
         .map(|c| format!("{}:{}", c.collection.as_ref().expect("no collection"), &c.name))
         .collect();
     Ok(children.join(","))
-}
-
-fn open_trigger_svc(dir: &fio::DirectoryProxy) -> Result<ftest::TriggerProxy, Error> {
-    let node_proxy = fuchsia_fs::open_node(
-        dir,
-        &PathBuf::from("fidl.test.components.Trigger"),
-        OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_SERVICE,
-    )
-    .context("failed to open trigger service")?;
-    Ok(ftest::TriggerProxy::new(node_proxy.into_channel().unwrap()))
 }

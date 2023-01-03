@@ -123,12 +123,13 @@ async fn recursive_wait_and_open_node_with_flags(
                 return Err(format_err!("path contains non-normal component {:?}", component))
             }
         };
-        let () = wait_for_file(&dir, file.to_str().unwrap()).await?;
-        let file = std::path::Path::new(file);
+        let file = file.to_str().unwrap();
+        let () = wait_for_file(&dir, file).await?;
         if components.peek().is_some() {
-            dir = fuchsia_fs::open_directory(&dir, file, flags)?;
+            dir = fuchsia_fs::open_directory(&dir, std::path::Path::new(file), flags)?;
         } else {
-            break fuchsia_fs::open_node(&dir, file, flags, mode);
+            break fuchsia_fs::directory::open_node_no_describe(&dir, file, flags, mode)
+                .map_err(Into::into);
         }
     }
 }

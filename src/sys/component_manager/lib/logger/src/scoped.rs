@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error, diagnostics_log::Publisher, fidl::endpoints::Proxy, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkProxy, fuchsia_async::Task, std::path::Path,
+    anyhow::Error, diagnostics_log::Publisher, fidl_fuchsia_io as fio,
+    fidl_fuchsia_logger::LogSinkMarker, fuchsia_async::Task,
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
 };
 
 pub struct ScopedLogger {
@@ -14,13 +15,7 @@ pub struct ScopedLogger {
 
 impl ScopedLogger {
     pub fn from_directory(dir: &fio::DirectoryProxy, path: &str) -> Result<Self, Error> {
-        let log_sink_node = fuchsia_fs::open_node(
-            dir,
-            &Path::new(path.trim_start_matches("/")),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_SERVICE,
-        )?;
-        let sink = LogSinkProxy::from_channel(log_sink_node.into_channel().unwrap());
+        let sink = connect_to_named_protocol_at_dir_root::<LogSinkMarker>(dir, path)?;
         let publish_opts = Default::default();
         let (publisher, interest_listener) = Publisher::new_with_proxy(sink, publish_opts)?;
         Ok(Self { publisher, _interest_listener: Task::spawn(interest_listener) })

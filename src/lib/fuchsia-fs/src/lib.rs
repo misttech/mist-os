@@ -28,20 +28,6 @@ pub mod node;
 // Reexported from fidl_fuchsia_io for convenience
 pub use fio::OpenFlags;
 
-/// open_node will return a NodeProxy opened to the node at the given path relative to the
-/// given directory, or return an error if no such node exists (or some other FIDL error was
-/// encountered). This function will not block.
-pub fn open_node<'a>(
-    dir: &'a fio::DirectoryProxy,
-    path: &'a Path,
-    flags: fio::OpenFlags,
-    mode: u32,
-) -> Result<fio::NodeProxy, Error> {
-    let path = check_path(path)?;
-    let node = directory::open_node_no_describe(dir, path, flags, mode)?;
-    Ok(node)
-}
-
 /// open_directory will open a NodeProxy at the given path relative to the given directory, and
 /// convert it into a DirectoryProxy. This function will not block.
 pub fn open_directory<'a>(
