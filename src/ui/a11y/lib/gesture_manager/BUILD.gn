@@ -23,6 +23,7 @@ source_set("gesture_manager") {
     "//src/ui/a11y/lib/gesture_manager/arena",
     "//src/ui/a11y/lib/gesture_manager/arena_v2",
     "//src/ui/a11y/lib/gesture_manager/recognizers",
+    "//src/ui/a11y/lib/gesture_manager/recognizers_v2",
   ]
 
   deps = [
