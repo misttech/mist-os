@@ -277,12 +277,12 @@ class TestConnection {
   void Buffer() {
     ASSERT_TRUE(connection_);
 
-    uint64_t size = page_size();
-    uint64_t actual_size;
+    uint64_t size = page_size() + 16;
+    uint64_t actual_size = 0;
     magma_buffer_t buffer = 0;
 
     ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer));
-    EXPECT_GE(size, actual_size);
+    EXPECT_GE(actual_size, size);
     EXPECT_NE(buffer, 0u);
 
     magma_release_buffer(connection_, buffer);
@@ -617,10 +617,10 @@ class TestConnection {
 
     for (uint32_t i = 0; i < items.size(); i++) {
       if (i < items.size() - 1) {
-        EXPECT_EQ(items[i].result, items[i].condition);
+        EXPECT_EQ(items[i].result, items[i].condition) << "item index " << i;
       } else {
         // Notification channel
-        EXPECT_EQ(items[i].result, 0u);
+        EXPECT_EQ(items[i].result, 0u) << "item index " << i;
       }
     }
 
