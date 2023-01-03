@@ -78,13 +78,13 @@ pub async fn install_update(
 
 #[derive(Debug, thiserror::Error)]
 enum InstallUpdateError {
-    #[error("expected exactly one UpdateCheckResult from Omaha, got {0}")]
-    TooManyUpdateCheckResults(usize),
-    #[error("expected exactly one app_response from Omaha, got {0}")]
-    TooManyAppResponses(usize),
+    #[error("expected exactly one UpdateCheckResult from Omaha, got {0:?}")]
+    WrongNumberOfUpdateCheckResults(Vec<Result<update_check::Response, UpdateCheckError>>),
+    #[error("expected exactly one app_response from Omaha, got {0:?}")]
+    WrongNumberOfAppResponses(Vec<omaha_client::state_machine::update_check::AppResponse>),
     #[error("update check failed: {0}")]
     UpdateCheckFailed(UpdateCheckError),
-    #[error("update check did not produce an update, took action {0}")]
+    #[error("update check did not produce an update, took action {0:?}")]
     DidNotUpdate(update_check::Action),
 }
 
@@ -125,23 +125,14 @@ where
         })
         .collect();
 
-    let filtered_events_len = filtered_events.len();
-
     // Ensure we only got one update check result
-    let mut filtered_events = filtered_events.into_iter();
-    let response = match (filtered_events.next(), filtered_events.next()) {
-        (Some(Ok(r)), None) => r,
-        (Some(Err(e)), None) => return Err(InstallUpdateError::UpdateCheckFailed(e)),
-        _ => return Err(InstallUpdateError::TooManyUpdateCheckResults(filtered_events_len)),
-    };
+    let [response]: [_; 1] =
+        filtered_events.try_into().map_err(InstallUpdateError::WrongNumberOfUpdateCheckResults)?;
+    let response = response.map_err(InstallUpdateError::UpdateCheckFailed)?;
 
     // Ensure that update check only contained one app response
-    let app_responses_len = response.app_responses.len();
-    let mut app_responses = response.app_responses.into_iter();
-    let app_response = match (app_responses.next(), app_responses.next()) {
-        (Some(ar), None) => ar,
-        _ => return Err(InstallUpdateError::TooManyAppResponses(app_responses_len)),
-    };
+    let [app_response]: [_; 1] =
+        response.app_responses.try_into().map_err(InstallUpdateError::WrongNumberOfAppResponses)?;
 
     // Return the result of that single update check
     match app_response.result {
