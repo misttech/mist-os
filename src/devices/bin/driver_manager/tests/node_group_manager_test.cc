@@ -84,11 +84,11 @@ TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(1))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(1))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
   auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
@@ -99,20 +99,20 @@ TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
       .values = prop_vals_2,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_2(allocator, 1);
-  bind_props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(10))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
+  props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(10))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 2);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
   nodes[1] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name = "test_name";
@@ -180,11 +180,11 @@ TEST_F(NodeGroupManagerTest, TestBindSameNodeTwice) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(1))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(1))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
   auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
@@ -195,20 +195,20 @@ TEST_F(NodeGroupManagerTest, TestBindSameNodeTwice) {
       .values = prop_vals_2,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_2(allocator, 1);
-  bind_props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(20))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(100))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
+  props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(20))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(100))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 2);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
   nodes[1] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name = "test_name";
@@ -266,11 +266,11 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(30))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(30))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
   auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
@@ -281,20 +281,20 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
       .values = prop_vals_2,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_2(allocator, 1);
-  bind_props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(20))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(10))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
+  props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(20))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(10))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes_1(allocator, 2);
   nodes_1[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
   nodes_1[1] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name_1 = "test_name";
@@ -317,7 +317,7 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes_2(allocator, 1);
   nodes_2[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name_2 = "test_name2";
@@ -379,11 +379,11 @@ TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(1))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(1))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
   auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
@@ -394,20 +394,20 @@ TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
       .values = prop_vals_2,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_2(allocator, 1);
-  bind_props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(10))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
+  props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(10))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 2);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
   nodes[1] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name = "test_name";
@@ -471,22 +471,22 @@ TEST_F(NodeGroupManagerTest, TestAddDuplicate) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(1))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(1))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 1);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes_2(allocator, 1);
   nodes_2[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
 
   auto node_group_name = "test_name";
@@ -522,11 +522,11 @@ TEST_F(NodeGroupManagerTest, TestRebindCompositeMatch) {
       .values = prop_vals_1,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_1(allocator, 1);
-  bind_props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(1))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(1))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_1(allocator, 1);
+  props_1[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(1))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(1))
+                   .Build();
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_2(allocator, 2);
   auto prop_vals_2 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 2);
@@ -537,20 +537,20 @@ TEST_F(NodeGroupManagerTest, TestRebindCompositeMatch) {
       .values = prop_vals_2,
   };
 
-  fidl::VectorView<fdf::wire::NodeProperty> bind_props_2(allocator, 1);
-  bind_props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
-                        .key(fdf::wire::NodePropertyKey::WithIntValue(100))
-                        .value(fdf::wire::NodePropertyValue::WithIntValue(10))
-                        .Build();
+  fidl::VectorView<fdf::wire::NodeProperty> props_2(allocator, 1);
+  props_2[0] = fdf::wire::NodeProperty::Builder(allocator)
+                   .key(fdf::wire::NodePropertyKey::WithIntValue(100))
+                   .value(fdf::wire::NodePropertyValue::WithIntValue(10))
+                   .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 2);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_1,
-      .bind_properties = bind_props_1,
+      .properties = props_1,
   };
   nodes[1] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules_2,
-      .bind_properties = bind_props_2,
+      .properties = props_2,
   };
 
   auto node_group_name = "test_name";

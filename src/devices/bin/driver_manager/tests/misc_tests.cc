@@ -470,16 +470,16 @@ TEST(MiscTestCase, AddNodeGroup) {
       .values = prop_vals_2,
   };
 
-  auto bind_properties = fidl::VectorView<fdf::wire::NodeProperty>(allocator, 1);
-  bind_properties[0] = fdf::wire::NodeProperty::Builder(allocator)
-                           .key(fdf::wire::NodePropertyKey::WithIntValue(10))
-                           .value(fdf::wire::NodePropertyValue::WithIntValue(500))
-                           .Build();
+  auto properties = fidl::VectorView<fdf::wire::NodeProperty>(allocator, 1);
+  properties[0] = fdf::wire::NodeProperty::Builder(allocator)
+                      .key(fdf::wire::NodePropertyKey::WithIntValue(10))
+                      .value(fdf::wire::NodePropertyValue::WithIntValue(500))
+                      .Build();
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 1);
   nodes[0] = fdf::wire::NodeRepresentation{
       .bind_rules = bind_rules,
-      .bind_properties = bind_properties,
+      .properties = properties,
   };
 
   fidl::VectorView<fuchsia_device_manager::wire::DeviceMetadata> metadata(allocator, 0);

@@ -31,7 +31,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
       ddk::MakeRejectBindRule("sandpiper", true),
   };
 
-  const device_bind_prop_t node_1_bind_properties[] = {
+  const device_bind_prop_t node_1_properties[] = {
       ddk::MakeProperty(BIND_PROTOCOL, 100),
       ddk::MakeProperty(BIND_USB_VID, 20),
   };
@@ -42,13 +42,13 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
       ddk::MakeRejectBindRule(20, 10),
   };
 
-  const device_bind_prop_t node_2_bind_properties[] = {
+  const device_bind_prop_t node_2_properties[] = {
       ddk::MakeProperty(BIND_PROTOCOL, 20),
   };
 
   status = root_dev->DdkAddNodeGroup(
-      "node_group", ddk::NodeGroupDesc(node_1_bind_rules, node_1_bind_properties)
-                        .AddNodeRepresentation(node_2_bind_rules, node_2_bind_properties));
+      "node_group", ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
+                        .AddNodeRepresentation(node_2_bind_rules, node_2_properties));
   if (status != ZX_OK) {
     return status;
   }

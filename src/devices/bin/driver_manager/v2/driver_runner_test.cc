@@ -1745,11 +1745,11 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
        .nodes = std::vector<fuchsia_driver_framework::NodeRepresentation>{
            fuchsia_driver_framework::NodeRepresentation({
                .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
-               .bind_properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
+               .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            }),
            fuchsia_driver_framework::NodeRepresentation({
                .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
-               .bind_properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
+               .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            })}});
 
   auto node_group = std::make_unique<NodeGroupV2>(

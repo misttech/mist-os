@@ -32,7 +32,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       ddk::MakeRejectBindRule(bind_test::FLAG, true),
   };
 
-  const device_bind_prop_t node_1_bind_properties[] = {
+  const device_bind_prop_t node_1_properties[] = {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_test::BIND_PROTOCOL_VALUE_1),
       ddk::MakeProperty(bind_fuchsia::USB_VID, bind_test::BIND_USB_VID_VALUE),
   };
@@ -44,7 +44,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       ddk::MakeRejectBindRule(20, 10),
   };
 
-  const device_bind_prop_t node_2_bind_properties[] = {
+  const device_bind_prop_t node_2_properties[] = {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_test::BIND_PROTOCOL_VALUE_2),
   };
 
@@ -55,7 +55,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       ddk::MakeRejectBindRule(20, 10),
   };
 
-  const device_bind_prop_t node_3_bind_properties[] = {
+  const device_bind_prop_t node_3_properties[] = {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_test::BIND_PROTOCOL_VALUE_3),
   };
 
@@ -67,21 +67,21 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       },
   };
 
-  status = dev->DdkAddNodeGroup(
-      "node_group", ddk::NodeGroupDesc(node_1_bind_rules, node_1_bind_properties)
-                        .AddNodeRepresentation(node_2_bind_rules, node_2_bind_properties)
-                        .set_metadata(metadata)
-                        .set_spawn_colocated(true));
+  status = dev->DdkAddNodeGroup("node_group",
+                                ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
+                                    .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
+                                    .set_metadata(metadata)
+                                    .set_spawn_colocated(true));
   if (status != ZX_OK) {
     return status;
   }
 
-  status = dev->DdkAddNodeGroup(
-      "node_group_2", ddk::NodeGroupDesc(node_1_bind_rules, node_1_bind_properties)
-                          .AddNodeRepresentation(node_2_bind_rules, node_2_bind_properties)
-                          .AddNodeRepresentation(node_3_bind_rules, node_3_bind_properties)
-                          .set_metadata(metadata)
-                          .set_spawn_colocated(true));
+  status = dev->DdkAddNodeGroup("node_group_2",
+                                ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
+                                    .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
+                                    .AddNodeRepresentation(node_3_bind_rules, node_3_properties)
+                                    .set_metadata(metadata)
+                                    .set_spawn_colocated(true));
   if (status != ZX_OK) {
     return status;
   }

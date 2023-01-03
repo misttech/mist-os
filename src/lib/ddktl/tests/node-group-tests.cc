@@ -406,9 +406,9 @@ TEST_F(NodeGroupTest, CreateNodeGroupDescValues) {
 
   // Verify the bind properties in the first node.
   auto node_1 = desc.nodes[0];
-  ASSERT_EQ(1, node_1.bind_property_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_1.bind_properties[0].key);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_1.bind_properties[0].value);
+  ASSERT_EQ(1, node_1.property_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), node_1.properties[0].key);
+  VerifyPropertyValue(device_bind_prop_int_val(10), node_1.properties[0].value);
 
   // Verify the bind rules in the first node.
   ASSERT_EQ(1, node_1.bind_rule_count);
@@ -419,11 +419,11 @@ TEST_F(NodeGroupTest, CreateNodeGroupDescValues) {
 
   // Verify the bind properties in the second node.
   auto node_2 = desc.nodes[1];
-  ASSERT_EQ(2, node_2.bind_property_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.bind_properties[0].key);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_2.bind_properties[0].value);
-  VerifyPropertyKey(device_bind_prop_str_key("swallow"), node_2.bind_properties[1].key);
-  VerifyPropertyValue(device_bind_prop_bool_val(true), node_2.bind_properties[1].value);
+  ASSERT_EQ(2, node_2.property_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.properties[0].key);
+  VerifyPropertyValue(device_bind_prop_int_val(10), node_2.properties[0].value);
+  VerifyPropertyKey(device_bind_prop_str_key("swallow"), node_2.properties[1].key);
+  VerifyPropertyValue(device_bind_prop_bool_val(true), node_2.properties[1].value);
 
   // Verify the bind rules in the second node.
   ASSERT_EQ(3, node_2.bind_rule_count);

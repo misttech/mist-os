@@ -29,9 +29,9 @@ type NodeRepresentation = struct {
     /// Node's bind rules. Property keys must be unique. Must not be empty.
     bind_rules vector<BindRule>:MAX_PROPERTY_COUNT;
 
-    /// Bind properties for matching against a composite driver's bind rules.
+    /// Properties for matching against a composite driver's bind rules.
     /// Keys must be unique.
-    bind_properties vector<NodeProperty>:MAX_PROPERTY_COUNT;
+    properties vector<NodeProperty>:MAX_PROPERTY_COUNT;
 };
 
 /// Struct that represents a node group.

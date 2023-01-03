@@ -284,7 +284,7 @@ class NodeGroupDesc {
     nodes_.clear();
     bind_rules_data_.clear();
     bind_rules_values_data_.clear();
-    bind_properties_data_.clear();
+    properties_data_.clear();
     for (size_t i = 0; i < other.nodes_.size(); ++i) {
       AddNodeRepresentation(other.nodes_[i]);
     }
@@ -308,21 +308,21 @@ class NodeGroupDesc {
       bind_rules_values_data_.push_back(std::move(bind_rule_values));
     }
 
-    auto bind_property_count = properties.size();
-    auto bind_properties = std::vector<device_bind_prop_t>();
-    for (size_t i = 0; i < bind_property_count; i++) {
-      bind_properties.push_back(properties[i]);
+    auto prop_count = properties.size();
+    auto props = std::vector<device_bind_prop_t>();
+    for (size_t i = 0; i < prop_count; i++) {
+      props.push_back(properties[i]);
     }
 
     nodes_.push_back(node_representation_t{
         .bind_rules = bind_rules.data(),
         .bind_rule_count = bind_rule_count,
-        .bind_properties = bind_properties.data(),
-        .bind_property_count = bind_property_count,
+        .properties = props.data(),
+        .property_count = prop_count,
     });
 
     bind_rules_data_.push_back(std::move(bind_rules));
-    bind_properties_data_.push_back(std::move(bind_properties));
+    properties_data_.push_back(std::move(props));
 
     desc_.nodes = nodes_.data();
     desc_.nodes_count = std::size(nodes_);
@@ -360,23 +360,23 @@ class NodeGroupDesc {
       bind_rules_values_data_.push_back(std::move(bind_rule_values));
     }
 
-    auto bind_property_count = node.bind_property_count;
-    auto bind_properties = std::vector<device_bind_prop_t>();
-    for (size_t i = 0; i < bind_property_count; i++) {
-      bind_properties.push_back(node.bind_properties[i]);
+    auto property_count = node.property_count;
+    auto properties = std::vector<device_bind_prop_t>();
+    for (size_t i = 0; i < property_count; i++) {
+      properties.push_back(node.properties[i]);
     }
 
     nodes_.push_back(node_representation_t{
         .bind_rules = bind_rules.data(),
         .bind_rule_count = bind_rule_count,
-        .bind_properties = bind_properties.data(),
-        .bind_property_count = bind_property_count,
+        .properties = properties.data(),
+        .property_count = property_count,
     });
     desc_.nodes = nodes_.data();
     desc_.nodes_count = std::size(nodes_);
 
     bind_rules_data_.push_back(std::move(bind_rules));
-    bind_properties_data_.push_back(std::move(bind_properties));
+    properties_data_.push_back(std::move(properties));
   }
 
   std::vector<node_representation_t> nodes_;
@@ -387,8 +387,8 @@ class NodeGroupDesc {
   // Store all bind rule values data in |nodes_|.
   std::vector<std::vector<device_bind_prop_value_t>> bind_rules_values_data_;
 
-  // Stores all bind_properties data in |nodes_|.
-  std::vector<std::vector<device_bind_prop_t>> bind_properties_data_;
+  // Stores all properties data in |nodes_|.
+  std::vector<std::vector<device_bind_prop_t>> properties_data_;
 
   node_group_desc_t desc_ = {};
 };

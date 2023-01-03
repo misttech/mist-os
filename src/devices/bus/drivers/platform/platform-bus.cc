@@ -667,7 +667,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
       return;
     }
 
-    if (node.bind_properties().empty()) {
+    if (node.properties().empty()) {
       zxlogf(ERROR, "Node representation properties cannot be empty");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
@@ -680,8 +680,8 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
     }
 
     std::vector<device_bind_prop_t> properties;
-    properties.reserve(node.bind_properties().size());
-    for (auto property : node.bind_properties()) {
+    properties.reserve(node.properties().size());
+    for (auto property : node.properties()) {
       if (!property.key() || !property.value()) {
         zxlogf(ERROR, "Node representation properties must contain a key and value");
         completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);

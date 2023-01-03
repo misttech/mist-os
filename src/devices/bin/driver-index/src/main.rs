@@ -2523,7 +2523,7 @@ mod tests {
                 },
             ];
 
-            let bind_properties = vec![fdf::NodeProperty {
+            let properties = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2536,7 +2536,7 @@ mod tests {
                         name: Some("test_group".to_string()),
                         nodes: Some(vec![fdf::NodeRepresentation {
                             bind_rules: bind_rules,
-                            bind_properties: bind_properties,
+                            properties: properties,
                         }]),
                         ..fdf::NodeGroup::EMPTY
                     })
@@ -2654,7 +2654,7 @@ mod tests {
                 },
             ];
 
-            let bind_properties = vec![fdf::NodeProperty {
+            let properties = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2667,7 +2667,7 @@ mod tests {
                         name: Some("test_group".to_string()),
                         nodes: Some(vec![fdf::NodeRepresentation {
                             bind_rules: bind_rules,
-                            bind_properties: bind_properties,
+                            properties: properties,
                         }]),
                         ..fdf::NodeGroup::EMPTY
                     })
@@ -2847,7 +2847,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2859,7 +2859,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -2878,11 +2878,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: node_1_bind_rules.clone(),
-                            bind_properties: node_1_bind_props_match.clone(),
+                            properties: node_1_props_match.clone(),
                         },
                         fdf::NodeRepresentation {
                             bind_rules: node_2_bind_rules.clone(),
-                            bind_properties: node_2_bind_props_match.clone(),
+                            properties: node_2_props_match.clone(),
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -2892,7 +2892,7 @@ mod tests {
                 .unwrap();
             assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
 
-            let node_1_bind_props_nonmatch = vec![fdf::NodeProperty {
+            let node_1_props_nonmatch = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2906,11 +2906,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_nonmatch,
+                                properties: node_1_props_nonmatch,
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_match,
+                                properties: node_2_props_match,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -2919,7 +2919,7 @@ mod tests {
                     .unwrap()
             );
 
-            let node_2_bind_props_nonmatch = vec![fdf::NodeProperty {
+            let node_2_props_nonmatch = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(1)),
                 value: Some(fdf::NodePropertyValue::IntValue(10)),
                 ..fdf::NodeProperty::EMPTY
@@ -2933,11 +2933,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_match,
+                                properties: node_1_props_match,
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_nonmatch,
+                                properties: node_2_props_nonmatch,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3053,7 +3053,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3065,7 +3065,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -3084,11 +3084,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: node_1_bind_rules.clone(),
-                            bind_properties: node_1_bind_props_match.clone(),
+                            properties: node_1_props_match.clone(),
                         },
                         fdf::NodeRepresentation {
                             bind_rules: node_2_bind_rules.clone(),
-                            bind_properties: node_2_bind_props_match.clone(),
+                            properties: node_2_props_match.clone(),
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -3098,7 +3098,7 @@ mod tests {
                 .unwrap();
             assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
 
-            let node_1_bind_props_nonmatch = vec![fdf::NodeProperty {
+            let node_1_props_nonmatch = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3112,11 +3112,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_nonmatch,
+                                properties: node_1_props_nonmatch,
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_match,
+                                properties: node_2_props_match,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3125,7 +3125,7 @@ mod tests {
                     .unwrap()
             );
 
-            let node_2_bind_props_nonmatch = vec![fdf::NodeProperty {
+            let node_2_props_nonmatch = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(1)),
                 value: Some(fdf::NodePropertyValue::IntValue(10)),
                 ..fdf::NodeProperty::EMPTY
@@ -3139,11 +3139,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_match,
+                                properties: node_1_props_match,
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_nonmatch,
+                                properties: node_2_props_nonmatch,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3259,7 +3259,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3271,7 +3271,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let optional_1_bind_props_match = vec![fdf::NodeProperty {
+            let optional_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("trembler".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3283,7 +3283,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -3302,15 +3302,15 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: node_1_bind_rules.clone(),
-                            bind_properties: node_1_bind_props_match.clone(),
+                            properties: node_1_props_match.clone(),
                         },
                         fdf::NodeRepresentation {
                             bind_rules: optional_1_bind_rules.clone(),
-                            bind_properties: optional_1_bind_props_match.clone(),
+                            properties: optional_1_props_match.clone(),
                         },
                         fdf::NodeRepresentation {
                             bind_rules: node_2_bind_rules.clone(),
-                            bind_properties: node_2_bind_props_match.clone(),
+                            properties: node_2_props_match.clone(),
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -3406,7 +3406,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3418,7 +3418,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -3440,11 +3440,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_match.clone(),
+                                properties: node_1_props_match.clone(),
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_match,
+                                properties: node_2_props_match,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3608,7 +3608,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3620,7 +3620,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -3642,11 +3642,11 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_match.clone(),
+                                properties: node_1_props_match.clone(),
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_match,
+                                properties: node_2_props_match,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3810,7 +3810,7 @@ mod tests {
                 },
             ];
 
-            let node_1_bind_props_match = vec![fdf::NodeProperty {
+            let node_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3822,7 +3822,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let node_2_bind_props_match = vec![
+            let node_2_props_match = vec![
                 fdf::NodeProperty {
                     key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
                     value: Some(fdf::NodePropertyValue::IntValue(1)),
@@ -3841,7 +3841,7 @@ mod tests {
                 values: vec![fdf::NodePropertyValue::IntValue(10)],
             }];
 
-            let optional_1_bind_props_match = vec![fdf::NodeProperty {
+            let optional_1_props_match = vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("trembler".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -3856,15 +3856,15 @@ mod tests {
                         nodes: Some(vec![
                             fdf::NodeRepresentation {
                                 bind_rules: node_1_bind_rules.clone(),
-                                bind_properties: node_1_bind_props_match.clone(),
+                                properties: node_1_props_match.clone(),
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: node_2_bind_rules.clone(),
-                                bind_properties: node_2_bind_props_match,
+                                properties: node_2_props_match,
                             },
                             fdf::NodeRepresentation {
                                 bind_rules: optional_1_bind_rules.clone(),
-                                bind_properties: optional_1_bind_props_match,
+                                properties: optional_1_props_match,
                             },
                         ]),
                         ..fdf::NodeGroup::EMPTY
@@ -3990,7 +3990,7 @@ mod tests {
                         name: Some("test_group".to_string()),
                         nodes: Some(vec![fdf::NodeRepresentation {
                             bind_rules: bind_rules,
-                            bind_properties: vec![fdf::NodeProperty {
+                            properties: vec![fdf::NodeProperty {
                                 key: Some(fdf::NodePropertyKey::StringValue(
                                     "trembler".to_string()
                                 )),
@@ -4023,7 +4023,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: duplicate_bind_rules,
-                        bind_properties: node_transform,
+                        properties: node_transform,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 })
@@ -4101,7 +4101,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules,
-                        bind_properties: node_transform,
+                        properties: node_transform,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 })

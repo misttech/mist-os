@@ -44,7 +44,7 @@ zx_status_t TestBoard::NodeGroupInit() {
   auto nodes = std::vector{
       fuchsia_driver_framework::NodeRepresentation{{
           .bind_rules = bind_rules,
-          .bind_properties = properties,
+          .properties = properties,
       }},
   };
 

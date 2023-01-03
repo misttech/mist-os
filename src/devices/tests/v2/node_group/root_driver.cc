@@ -30,7 +30,7 @@ fdf::NodeGroup NodeGroupOne() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_LEFT),
   };
 
-  auto bind_properties_left = std::vector{
+  auto properties_left = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
@@ -38,18 +38,18 @@ fdf::NodeGroup NodeGroupOne() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_RIGHT),
   };
 
-  auto bind_properties_right = std::vector{
+  auto properties_right = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_left,
-          .bind_properties = bind_properties_left,
+          .properties = properties_left,
       }},
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_right,
-          .bind_properties = bind_properties_right,
+          .properties = properties_right,
       }},
   };
 
@@ -62,7 +62,7 @@ fdf::NodeGroup NodeGroupTwo() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_LEFT),
   };
 
-  auto bind_properties_left = std::vector{
+  auto properties_left = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
@@ -70,18 +70,18 @@ fdf::NodeGroup NodeGroupTwo() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_RIGHT),
   };
 
-  auto bind_properties_right = std::vector{
+  auto properties_right = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_left,
-          .bind_properties = bind_properties_left,
+          .properties = properties_left,
       }},
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_right,
-          .bind_properties = bind_properties_right,
+          .properties = properties_right,
       }},
   };
 
@@ -94,7 +94,7 @@ fdf::NodeGroup NodeGroupThree() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_THREE_LEFT),
   };
 
-  auto bind_properties_left = std::vector{
+  auto properties_left = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
@@ -102,18 +102,18 @@ fdf::NodeGroup NodeGroupThree() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_THREE_RIGHT),
   };
 
-  auto bind_properties_right = std::vector{
+  auto properties_right = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
   auto nodes = std::vector{
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_left,
-          .bind_properties = bind_properties_left,
+          .properties = properties_left,
       }},
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_right,
-          .bind_properties = bind_properties_right,
+          .properties = properties_right,
       }},
   };
 
@@ -126,7 +126,7 @@ fdf::NodeGroup NodeGroupFour() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_FOUR_LEFT),
   };
 
-  auto bind_properties_left = std::vector{
+  auto properties_left = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_LEFT),
   };
 
@@ -134,7 +134,7 @@ fdf::NodeGroup NodeGroupFour() {
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_FOUR_RIGHT),
   };
 
-  auto bind_properties_right = std::vector{
+  auto properties_right = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
@@ -143,22 +143,22 @@ fdf::NodeGroup NodeGroupFour() {
                               bindlib::TEST_BIND_PROPERTY_FOUR_OPTIONAL),
   };
 
-  auto bind_properties_optional = std::vector{
+  auto properties_optional = std::vector{
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_OPTIONAL),
   };
 
   auto nodes = std::vector{
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_left,
-          .bind_properties = bind_properties_left,
+          .properties = properties_left,
       }},
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_right,
-          .bind_properties = bind_properties_right,
+          .properties = properties_right,
       }},
       fdf::NodeRepresentation{{
           .bind_rules = bind_rules_optional,
-          .bind_properties = bind_properties_optional,
+          .properties = properties_optional,
       }},
   };
 

@@ -401,12 +401,12 @@ TEST_F(CoreTest, AddNodeGroup) {
         ASSERT_EQ(1, node_1_bind_rule_2_result.values.count());
         EXPECT_EQ(3, node_1_bind_rule_2_result.values.at(0).int_value());
 
-        auto node_1_bind_props_result = node_result_1.bind_properties;
-        EXPECT_EQ(2, node_1_bind_props_result.count());
-        ASSERT_EQ(100, node_1_bind_props_result.at(0).key().int_value());
-        ASSERT_FALSE(node_1_bind_props_result.at(0).value().bool_value());
-        ASSERT_STREQ("kinglet", node_1_bind_props_result.at(1).key().string_value());
-        ASSERT_EQ(20, node_1_bind_props_result.at(1).value().int_value());
+        auto node_1_props_result = node_result_1.properties;
+        EXPECT_EQ(2, node_1_props_result.count());
+        ASSERT_EQ(100, node_1_props_result.at(0).key().int_value());
+        ASSERT_FALSE(node_1_props_result.at(0).value().bool_value());
+        ASSERT_STREQ("kinglet", node_1_props_result.at(1).key().string_value());
+        ASSERT_EQ(20, node_1_props_result.at(1).value().int_value());
 
         // Check the second node.
         auto node_result_2 = node_group.nodes.at(1);
@@ -425,10 +425,10 @@ TEST_F(CoreTest, AddNodeGroup) {
         EXPECT_STREQ("willet", node_2_bind_rule_2.values.at(0).string_value().get());
         EXPECT_STREQ("sanderling", node_2_bind_rule_2.values.at(1).string_value().get());
 
-        auto node_2_bind_prop_result = node_result_2.bind_properties;
-        EXPECT_EQ(1, node_2_bind_prop_result.count());
-        ASSERT_EQ(100, node_2_bind_prop_result.at(0).key().int_value());
-        ASSERT_TRUE(node_2_bind_prop_result.at(0).value().bool_value());
+        auto node_2_prop_result = node_result_2.properties;
+        EXPECT_EQ(1, node_2_prop_result.count());
+        ASSERT_EQ(100, node_2_prop_result.at(0).key().int_value());
+        ASSERT_TRUE(node_2_prop_result.at(0).value().bool_value());
       };
 
   coordinator_.set_node_group_callback(std::move(test_callback));
@@ -457,22 +457,21 @@ TEST_F(CoreTest, AddNodeGroup) {
       },
   };
 
-  const device_bind_prop_t node_1_bind_properties[] = {
-      {
-          .key = device_bind_prop_int_key(100),
-          .value = device_bind_prop_bool_val(false),
-      },
+  const device_bind_prop_t node_1_properties[] = {{
+                                                      .key = device_bind_prop_int_key(100),
+                                                      .value = device_bind_prop_bool_val(false),
+                                                  },
 
-      {
-          .key = device_bind_prop_str_key("kinglet"),
-          .value = device_bind_prop_int_val(20),
-      }};
+                                                  {
+                                                      .key = device_bind_prop_str_key("kinglet"),
+                                                      .value = device_bind_prop_int_val(20),
+                                                  }};
 
   const node_representation_t node_1{
       .bind_rules = node_1_bind_rules,
       .bind_rule_count = std::size(node_1_bind_rules),
-      .bind_properties = node_1_bind_properties,
-      .bind_property_count = std::size(node_1_bind_properties),
+      .properties = node_1_properties,
+      .property_count = std::size(node_1_properties),
   };
 
   const device_bind_prop_value_t node_2_props_values_1[] = {
@@ -499,7 +498,7 @@ TEST_F(CoreTest, AddNodeGroup) {
       },
   };
 
-  const device_bind_prop_t node_2_bind_properties[] = {{
+  const device_bind_prop_t node_2_properties[] = {{
       .key = device_bind_prop_int_key(100),
       .value = device_bind_prop_bool_val(true),
   }};
@@ -507,8 +506,8 @@ TEST_F(CoreTest, AddNodeGroup) {
   const node_representation_t node_2{
       .bind_rules = node_2_props,
       .bind_rule_count = std::size(node_2_props),
-      .bind_properties = node_2_bind_properties,
-      .bind_property_count = std::size(node_2_bind_properties),
+      .properties = node_2_properties,
+      .property_count = std::size(node_2_properties),
   };
 
   const node_representation_t nodes[] = {

@@ -606,8 +606,8 @@ typedef struct node_representation {
   const node_group_bind_rule_t* bind_rules;
   size_t bind_rule_count;
 
-  const device_bind_prop_t* bind_properties;
-  size_t bind_property_count;
+  const device_bind_prop_t* properties;
+  size_t property_count;
 
 } node_representation_t;
 

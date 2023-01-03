@@ -78,17 +78,17 @@ pub async fn list_node_groups(
                     )?;
                 }
 
-                let bind_props_len = node.bind_properties.len();
-                writeln!(writer, "  {0} {1}", bind_props_len, "Properties")?;
+                let props_len = node.properties.len();
+                writeln!(writer, "  {0} {1}", props_len, "Properties")?;
 
-                for (j, bind_property) in node.bind_properties.into_iter().enumerate() {
-                    let key = node_property_key_to_string(&bind_property.key.unwrap());
-                    let value = node_property_value_to_string(&bind_property.value.unwrap());
+                for (j, property) in node.properties.into_iter().enumerate() {
+                    let key = node_property_key_to_string(&property.key.unwrap());
+                    let value = node_property_value_to_string(&property.value.unwrap());
                     writeln!(
                         writer,
                         "  [{0:>2}/{1:>2}] : Key {2:30} Value {3}",
                         j + 1,
-                        bind_props_len,
+                        props_len,
                         key,
                         value,
                     )?;
@@ -199,7 +199,7 @@ mod tests {
                                             "rule_val".to_string(),
                                         )],
                                     }],
-                                    bind_properties: vec![fdf::NodeProperty {
+                                    properties: vec![fdf::NodeProperty {
                                         key: Some(fdf::NodePropertyKey::StringValue(
                                             "prop_key".to_string(),
                                         )),
@@ -235,7 +235,7 @@ mod tests {
                                                 ),
                                             ],
                                         }],
-                                        bind_properties: vec![fdf::NodeProperty {
+                                        properties: vec![fdf::NodeProperty {
                                             key: Some(fdf::NodePropertyKey::StringValue(
                                                 "prop_key_0".to_string(),
                                             )),
@@ -264,7 +264,7 @@ mod tests {
                                                 )],
                                             },
                                         ],
-                                        bind_properties: vec![
+                                        properties: vec![
                                             fdf::NodeProperty {
                                                 key: Some(fdf::NodePropertyKey::StringValue(
                                                     "prop_key_1".to_string(),

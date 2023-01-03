@@ -148,20 +148,20 @@ zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepres
     bind_rules[i] = std::move(bind_rule_result.value());
   }
 
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> bind_props(
-      allocator, node.bind_property_count);
-  for (size_t i = 0; i < node.bind_property_count; i++) {
-    auto bind_prop_result = ConvertBindPropToFidl(allocator, node.bind_properties[i]);
-    if (!bind_prop_result.is_ok()) {
-      return bind_prop_result.take_error();
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> props(allocator,
+                                                                       node.property_count);
+  for (size_t i = 0; i < node.property_count; i++) {
+    auto prop_result = ConvertBindPropToFidl(allocator, node.properties[i]);
+    if (!prop_result.is_ok()) {
+      return prop_result.take_error();
     }
 
-    bind_props[i] = std::move(bind_prop_result.value());
+    props[i] = std::move(prop_result.value());
   }
 
   return zx::ok(fuchsia_driver_framework::wire::NodeRepresentation{
       .bind_rules = bind_rules,
-      .bind_properties = bind_props,
+      .properties = props,
   });
 }
 

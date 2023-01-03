@@ -85,7 +85,7 @@ impl NodeGroupManager {
 
         // Collect node group nodes in a separate vector before adding them to the node group
         // manager. This is to ensure that we add the nodes after they're all verified to be valid.
-        // TODO(fxb/105562): Update tests so that we can verify that bind_properties exists in
+        // TODO(fxb/105562): Update tests so that we can verify that properties exists in
         // each node.
         let mut node_representations: Vec<(
             NodeRepresentationBindRules,
@@ -112,7 +112,7 @@ impl NodeGroupManager {
         }
 
         for composite_driver in composite_drivers {
-            let matched_composite = match_composite_bind_properties(composite_driver, &nodes)?;
+            let matched_composite = match_composite_properties(composite_driver, &nodes)?;
             if let Some(matched_composite) = matched_composite {
                 // Found a match so we can set this in our map.
                 self.node_group_list.insert(
@@ -176,7 +176,7 @@ impl NodeGroupManager {
                 continue;
             }
             let matched_composite_result =
-                match_composite_bind_properties(&resolved_driver, &dev_group.nodes);
+                match_composite_properties(&resolved_driver, &dev_group.nodes);
             if let Ok(Some(matched_composite)) = matched_composite_result {
                 dev_group.matched = Some(matched_composite);
             }
@@ -343,7 +343,7 @@ fn node_property_to_symbol(value: &fdf::NodePropertyValue) -> Symbol {
     }
 }
 
-fn match_composite_bind_properties<'a>(
+fn match_composite_properties<'a>(
     composite_driver: &'a ResolvedDriver,
     nodes: &'a Vec<fdf::NodeRepresentation>,
 ) -> Result<Option<MatchedComposite>, i32> {
@@ -380,11 +380,11 @@ fn match_composite_bind_properties<'a>(
         return Ok(None);
     }
 
-    // The remaining nodes in the bind_properties can match the
+    // The remaining nodes in the properties can match the
     // additional nodes in the bind rules in any order.
     //
     // This logic has one issue that we are accepting as a tradeoff for simplicity:
-    // If a bind_properties node can match to multiple bind rule
+    // If a properties node can match to multiple bind rule
     // additional nodes, it is going to take the first one, even if there is a less strict
     // node that it can take. This can lead to false negative matches.
     //
@@ -485,7 +485,7 @@ fn node_matches_composite_driver(
     bind_rules_node: &Vec<u8>,
     symbol_table: &HashMap<u32, String>,
 ) -> bool {
-    match node_to_device_property(&node.bind_properties) {
+    match node_to_device_property(&node.properties) {
         Err(_) => false,
         Ok(props) => {
             let match_bind_data = MatchBindData { symbol_table, instructions: bind_rules_node };
@@ -571,7 +571,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(2)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -595,21 +595,15 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
         }];
 
         let nodes = Some(vec![
-            fdf::NodeRepresentation {
-                bind_rules: bind_rules_1,
-                bind_properties: bind_properties_1,
-            },
-            fdf::NodeRepresentation {
-                bind_rules: bind_rules_2,
-                bind_properties: bind_properties_2,
-            },
+            fdf::NodeRepresentation { bind_rules: bind_rules_1, properties: properties_1 },
+            fdf::NodeRepresentation { bind_rules: bind_rules_2, properties: properties_2 },
         ]);
 
         let mut node_group_manager = NodeGroupManager::new();
@@ -708,7 +702,7 @@ mod tests {
             },
         ];
 
-        let bind_properties = vec![fdf::NodeProperty {
+        let properties = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -722,7 +716,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules,
-                        bind_properties: bind_properties,
+                        properties: properties,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -764,7 +758,7 @@ mod tests {
             },
         ];
 
-        let bind_properties = vec![fdf::NodeProperty {
+        let properties = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(0x01)),
             value: Some(fdf::NodePropertyValue::IntValue(50)),
             ..fdf::NodeProperty::EMPTY
@@ -778,7 +772,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules,
-                        bind_properties: bind_properties,
+                        properties: properties,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -832,7 +826,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(2)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -874,7 +868,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -886,7 +880,7 @@ mod tests {
             values: vec![fdf::NodePropertyValue::BoolValue(true)],
         }];
 
-        let bind_properties_3 = vec![fdf::NodeProperty {
+        let properties_3 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::StringValue("anhinga".to_string())),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -901,11 +895,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
-                            bind_properties: bind_properties_2.clone(),
+                            properties: properties_2.clone(),
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -922,11 +916,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2_rearranged,
-                            bind_properties: bind_properties_2,
+                            properties: properties_2,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_3,
-                            bind_properties: bind_properties_3,
+                            properties: properties_3,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -989,7 +983,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(2)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -1013,7 +1007,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1038,7 +1032,7 @@ mod tests {
             values: vec![fdf::NodePropertyValue::BoolValue(true)],
         }];
 
-        let bind_properties_3 = vec![fdf::NodeProperty {
+        let properties_3 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -1053,7 +1047,7 @@ mod tests {
             ],
         }];
 
-        let bind_properties_4 = vec![fdf::NodeProperty {
+        let properties_4 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(2)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1068,11 +1062,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1,
-                            bind_properties: bind_properties_1.clone(),
+                            properties: properties_1.clone(),
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
-                            bind_properties: bind_properties_2,
+                            properties: properties_2,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -1089,11 +1083,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_3,
-                            bind_properties: bind_properties_3,
+                            properties: properties_3,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1_rearranged,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -1109,7 +1103,7 @@ mod tests {
                     name: Some("test_group3".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules_4,
-                        bind_properties: bind_properties_4,
+                        properties: properties_4,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1178,7 +1172,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(2)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -1197,7 +1191,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1212,11 +1206,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
-                            bind_properties: bind_properties_2,
+                            properties: properties_2,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -1262,7 +1256,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(1)),
             value: Some(fdf::NodePropertyValue::IntValue(100)),
             ..fdf::NodeProperty::EMPTY
@@ -1284,7 +1278,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1299,11 +1293,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
-                            bind_properties: bind_properties_2,
+                            properties: properties_2,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -1376,7 +1370,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(1)),
             value: Some(fdf::NodePropertyValue::IntValue(100)),
             ..fdf::NodeProperty::EMPTY
@@ -1398,7 +1392,7 @@ mod tests {
             },
         ];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1413,11 +1407,11 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_1,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
-                            bind_properties: bind_properties_2,
+                            properties: properties_2,
                         },
                     ]),
                     ..fdf::NodeGroup::EMPTY
@@ -1454,7 +1448,7 @@ mod tests {
             ],
         }];
 
-        let bind_properties = vec![fdf::NodeProperty {
+        let properties = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(1)),
             value: Some(fdf::NodePropertyValue::IntValue(100)),
             ..fdf::NodeProperty::EMPTY
@@ -1468,7 +1462,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules,
-                        bind_properties: bind_properties,
+                        properties: properties,
                     }]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1495,7 +1489,7 @@ mod tests {
             },
         ];
 
-        let bind_properties = vec![fdf::NodeProperty {
+        let properties = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
@@ -1509,7 +1503,7 @@ mod tests {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![fdf::NodeRepresentation {
                         bind_rules: bind_rules,
-                        bind_properties: bind_properties,
+                        properties: properties,
                     },]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1536,13 +1530,13 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
         }];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(10)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -1557,12 +1551,9 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
-                        fdf::NodeRepresentation {
-                            bind_rules: vec![],
-                            bind_properties: bind_properties_2
-                        },
+                        fdf::NodeRepresentation { bind_rules: vec![], properties: properties_2 },
                     ]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1589,13 +1580,13 @@ mod tests {
             },
         ];
 
-        let bind_properties_1 = vec![fdf::NodeProperty {
+        let properties_1 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(3)),
             value: Some(fdf::NodePropertyValue::BoolValue(true)),
             ..fdf::NodeProperty::EMPTY
         }];
 
-        let bind_properties_2 = vec![fdf::NodeProperty {
+        let properties_2 = vec![fdf::NodeProperty {
             key: Some(fdf::NodePropertyKey::IntValue(1)),
             value: Some(fdf::NodePropertyValue::BoolValue(false)),
             ..fdf::NodeProperty::EMPTY
@@ -1610,12 +1601,9 @@ mod tests {
                     nodes: Some(vec![
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules,
-                            bind_properties: bind_properties_1,
+                            properties: properties_1,
                         },
-                        fdf::NodeRepresentation {
-                            bind_rules: vec![],
-                            bind_properties: bind_properties_2,
-                        },
+                        fdf::NodeRepresentation { bind_rules: vec![], properties: properties_2 },
                     ]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1677,7 +1665,7 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -1694,7 +1682,7 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -1720,7 +1708,7 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -1867,7 +1855,7 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -1884,7 +1872,7 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -1910,7 +1898,7 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2061,7 +2049,7 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2078,7 +2066,7 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2104,7 +2092,7 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2256,7 +2244,7 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2273,7 +2261,7 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2299,7 +2287,7 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2316,7 +2304,7 @@ mod tests {
 
         let optional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: optional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(optional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(optional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2494,7 +2482,7 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2521,7 +2509,7 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2538,7 +2526,7 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
                 value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
                 ..fdf::NodeProperty::EMPTY
@@ -2583,7 +2571,7 @@ mod tests {
                 condition: fdf::Condition::Accept,
                 values: vec![fdf::NodePropertyValue::IntValue(200)],
             }],
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("dotteral".to_string())),
                 value: Some(fdf::NodePropertyValue::StringValue("wrybill".to_string())),
                 ..fdf::NodeProperty::EMPTY
@@ -2623,7 +2611,7 @@ mod tests {
                 condition: fdf::Condition::Accept,
                 values: vec![fdf::NodePropertyValue::IntValue(200)],
             }],
-            bind_properties: vec![fdf::NodeProperty {
+            properties: vec![fdf::NodeProperty {
                 key: Some(fdf::NodePropertyKey::StringValue("dotteral".to_string())),
                 value: Some(fdf::NodePropertyValue::IntValue(100)),
                 ..fdf::NodeProperty::EMPTY
