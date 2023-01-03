@@ -280,6 +280,16 @@ async fn assemble_puppet_realm() -> RealmInstance {
         .await
         .expect("Failed to route capabilities.");
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::storage("tmp"))
+                .from(Ref::parent())
+                .to(Ref::child(TEST_UI_STACK)),
+        )
+        .await
+        .expect("Failed to route capabilities.");
+
     // Create the test realm.
     builder.build().await.expect("Failed to create test realm.")
 }

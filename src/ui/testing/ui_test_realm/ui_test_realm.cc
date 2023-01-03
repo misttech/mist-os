@@ -51,6 +51,7 @@ using component_testing::Protocol;
 using component_testing::RealmBuilder;
 using component_testing::Ref;
 using component_testing::Route;
+using component_testing::Storage;
 
 // TODO(fxbug.dev/114001): Remove hard-coded values.
 // Fake display dimensions.
@@ -513,6 +514,9 @@ void UITestRealm::Build() {
   // Override component config for input owner to specify how long the idle
   // threshold timeout should be.
   ConfigureActivityService();
+
+  realm_builder_.AddRoute(Route{
+      .capabilities = {Storage{"tmp"}}, .source = ParentRef(), .targets = {ChildRef{kScenicName}}});
 
   realm_root_ = std::make_unique<component_testing::RealmRoot>(realm_builder_.Build());
 }

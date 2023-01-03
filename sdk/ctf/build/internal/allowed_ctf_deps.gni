@@ -54,6 +54,10 @@ ALLOWED_CTS_DEPS = [
   "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
   "//sdk/lib/component/incoming/cpp:cpp",
   "//sdk/lib/syslog/cpp:cpp-macros",
+
+  # Needed by //sdk/ctf/tests/fidl/fuchsia.ui.composition.flatland
+  "//sdk/ctf/test_realm:fuchsia.ui.composition.flatland_test_realm",
+  "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context",
 ]
 
 # All targets in these directories and their subdirectories are approved for use in CTF.

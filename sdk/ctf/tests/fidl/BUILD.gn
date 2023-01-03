@@ -11,6 +11,7 @@ group("tests") {
     "fuchsia.hwinfo:tests",
     "fuchsia.intl:tests",
     "fuchsia.settings:tests",
+    "fuchsia.ui.composition:tests",
   ]
   testonly = true
 }
