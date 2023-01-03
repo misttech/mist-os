@@ -80,7 +80,7 @@ zx_status_t I2cChild::CreateAndAddDevice(
 
   result = dev->outgoing_dir_.Serve(std::move(endpoints->server));
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to service the outoing directory: %s", result.status_string());
+    zxlogf(ERROR, "Failed to service the outgoing directory: %s", result.status_string());
     return result.error_value();
   }
 

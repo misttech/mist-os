@@ -74,7 +74,7 @@ zx_device_prop_t pci_device_props[] = {
 
   zx_status_t status = fidl_dev->outgoing_dir().Serve(std::move(endpoints->server));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to service the outoing directory");
+    zxlogf(ERROR, "Failed to service the outgoing directory");
     return zx::error(status);
   }
 

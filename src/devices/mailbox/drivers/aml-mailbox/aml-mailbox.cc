@@ -453,7 +453,7 @@ zx_status_t AmlMailbox::Create(void* ctx, zx_device_t* parent) {
 
   status = dev->outgoing_->Serve(std::move(endpoints->server));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to service the outoing directory %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to service the outgoing directory %s", zx_status_get_string(status));
     return status;
   }
 

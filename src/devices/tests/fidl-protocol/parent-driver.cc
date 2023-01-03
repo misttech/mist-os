@@ -48,7 +48,7 @@ class Device : public DeviceParent, public fidl::WireServer<fidl_examples_echo::
 
     auto status = device->outgoing_dir_.Serve(std::move(endpoints->server));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to service the outoing directory");
+      zxlogf(ERROR, "Failed to service the outgoing directory");
       return status;
     }
 
