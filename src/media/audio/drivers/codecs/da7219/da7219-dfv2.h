@@ -62,7 +62,7 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
 
 class Driver : public fdf::DriverBase {
  public:
-  Driver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("da7219", std::move(start_args), std::move(driver_dispatcher)) {}
 
   ~Driver() override = default;

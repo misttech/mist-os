@@ -29,7 +29,7 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 // classes which inherit from |DriverBase| must implement a constructor with the following
 // signature and forward said parameters to the |DriverBase| base class:
 //
-//   T(DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher);
+//   T(DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 //
 // Otherwise a custom factory must be created and used to call constructors of any other shape.
 //
@@ -38,7 +38,7 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 // ```
 // class MyDriver : public fdf::DriverBase {
 //  public:
-//   MyDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+//   MyDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 //       : fdf::DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
 //
 //   zx::result<> Start() override {
@@ -70,7 +70,7 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 class DriverBase {
  public:
   DriverBase(std::string_view name, DriverStartArgs start_args,
-             fdf::UnownedDispatcher driver_dispatcher)
+             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : name_(name),
         start_args_(std::move(start_args)),
         driver_dispatcher_(std::move(driver_dispatcher)),
@@ -136,8 +136,8 @@ class DriverBase {
   DriverContext& context() { return driver_context_; }
   const DriverContext& context() const { return driver_context_; }
 
-  fdf::UnownedDispatcher& driver_dispatcher() { return driver_dispatcher_; }
-  const fdf::UnownedDispatcher& driver_dispatcher() const { return driver_dispatcher_; }
+  fdf::UnownedSynchronizedDispatcher& driver_dispatcher() { return driver_dispatcher_; }
+  const fdf::UnownedSynchronizedDispatcher& driver_dispatcher() const { return driver_dispatcher_; }
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   const async_dispatcher_t* dispatcher() const { return dispatcher_; }
@@ -162,7 +162,7 @@ class DriverBase {
  private:
   std::string name_;
   DriverStartArgs start_args_;
-  fdf::UnownedDispatcher driver_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_dispatcher_t* dispatcher_;
   DriverContext driver_context_;
 };
@@ -171,17 +171,18 @@ class DriverBase {
 // |DriverBase| class. |Driver| must implement a constructor with the following
 // signature and forward said parameters to the |DriverBase| base class:
 //
-//   T(DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher);
+//   T(DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 template <typename Driver>
 class BasicFactory {
   static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
-  static_assert(std::is_constructible_v<Driver, DriverStartArgs, fdf::UnownedDispatcher>,
-                "Driver must contain a constructor with the signature '(fdf::DriverStartArgs, "
-                "fdf::UnownedDispatcher)' in order to be used with the BasicFactory.");
+  static_assert(
+      std::is_constructible_v<Driver, DriverStartArgs, fdf::UnownedSynchronizedDispatcher>,
+      "Driver must contain a constructor with the signature '(fdf::DriverStartArgs, "
+      "fdf::UnownedDispatcher)' in order to be used with the BasicFactory.");
 
  public:
   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-      DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher) {
+      DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
     std::unique_ptr<DriverBase> driver =
         std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher));
     auto result = driver->Start();
@@ -203,7 +204,7 @@ class BasicFactory {
 // public |CreateDriver| function with the following signature:
 // ```
 // static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-//     DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+//     DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 // ```
 //
 // This illustrates how to use a |Record| with the default |BasicFactory|:
@@ -216,7 +217,7 @@ class BasicFactory {
 // class CustomFactory {
 //  public:
 //   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-//       DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+//       DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 //   ...construct and start driver...
 // };
 // // We must define the record before passing into the macro, otherwise the macro expansion
@@ -231,13 +232,13 @@ class Record {
   DECLARE_HAS_MEMBER_FN(has_create_driver, CreateDriver);
   static_assert(has_create_driver_v<Factory>,
                 "Factory must implement a public static CreateDriver function.");
-  static_assert(
-      std::is_same_v<decltype(&Factory::CreateDriver),
-                     zx::result<std::unique_ptr<DriverBase>> (*)(
-                         DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)>,
-      "CreateDriver must be a public static function with signature "
-      "'zx::result<std::unique_ptr<fdf::DriverBase>> (fdf::DriverStartArgs start_args, "
-      "fdf::UnownedDispatcher driver_dispatcher)'.");
+  static_assert(std::is_same_v<decltype(&Factory::CreateDriver),
+                               zx::result<std::unique_ptr<DriverBase>> (*)(
+                                   DriverStartArgs start_args,
+                                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)>,
+                "CreateDriver must be a public static function with signature "
+                "'zx::result<std::unique_ptr<fdf::DriverBase>> (fdf::DriverStartArgs start_args, "
+                "fdf::UnownedSynchronizedDispatcher driver_dispatcher)'.");
 
  public:
   static zx_status_t Start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
@@ -253,8 +254,8 @@ class Record {
       return start_args.error_value().status();
     }
 
-    zx::result<std::unique_ptr<DriverBase>> created_driver =
-        Factory::CreateDriver(std::move(*start_args), fdf::UnownedDispatcher(dispatcher));
+    zx::result<std::unique_ptr<DriverBase>> created_driver = Factory::CreateDriver(
+        std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher));
 
     if (created_driver.is_error()) {
       return created_driver.status_value();

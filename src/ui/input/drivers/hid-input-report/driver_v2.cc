@@ -26,7 +26,7 @@ const std::string kDeviceName = "InputReport";
 
 class InputReportDriver : public fdf::DriverBase {
  public:
-  InputReportDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher dispatcher)
+  InputReportDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : DriverBase(kDeviceName, std::move(start_args), std::move(dispatcher)) {}
 
   zx::result<> Start() override {

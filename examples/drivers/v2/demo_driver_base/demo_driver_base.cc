@@ -11,7 +11,7 @@ using fdf::Record;
 // ----------------------------------Default BasicFactory------------------------------------------
 class MyDriver : public DriverBase {
  public:
-  MyDriver(DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  MyDriver(DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
@@ -52,7 +52,7 @@ class AnotherDriver : public DriverBase {
 class CustomFactory {
  public:
   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-      DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher) {
+      DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
     // The logic here right now is similar to the one in |BasicFactory| but it does not have to be.
     // The driver author can run any custom constructor/initialization here.
     std::unique_ptr<DriverBase> driver = std::make_unique<AnotherDriver>(

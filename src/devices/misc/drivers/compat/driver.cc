@@ -123,8 +123,9 @@ void DriverList::Log(FuchsiaLogSeverity severity, const char* tag, const char* f
   (*drivers_.begin())->Log(severity, tag, file, line, msg, args);
 }
 
-Driver::Driver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher,
-               device_t device, const zx_protocol_device_t* ops, std::string_view driver_path)
+Driver::Driver(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher, device_t device,
+               const zx_protocol_device_t* ops, std::string_view driver_path)
     : fdf::DriverBase("compat", std::move(start_args), std::move(driver_dispatcher)),
       executor_(dispatcher()),
       driver_path_(driver_path),
@@ -749,7 +750,7 @@ zx::result<fit::deferred_callback> Driver::ExportToDevfsSync(
 }
 
 zx::result<std::unique_ptr<fdf::DriverBase>> DriverFactory::CreateDriver(
-    fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher) {
+    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
   auto compat_device =
       fdf::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol, &kDefaultDevice);
   const zx_protocol_device_t* ops =

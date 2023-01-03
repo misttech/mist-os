@@ -27,7 +27,8 @@ namespace {
 
 class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
  public:
-  LifecycleDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  LifecycleDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("lifeycle-driver", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {

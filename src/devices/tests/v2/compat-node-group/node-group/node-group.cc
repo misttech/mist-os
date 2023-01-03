@@ -12,7 +12,8 @@ namespace {
 
 class NodeGroupDriver : public fdf::DriverBase {
  public:
-  NodeGroupDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  NodeGroupDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("node_group", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {

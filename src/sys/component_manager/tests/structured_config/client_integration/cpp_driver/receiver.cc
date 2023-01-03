@@ -15,7 +15,8 @@ namespace {
 
 class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::ConfigReceiverPuppet> {
  public:
-  ReceiverDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  ReceiverDriver(fdf::DriverStartArgs start_args,
+                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("receiver", std::move(start_args), std::move(driver_dispatcher)),
         config_(take_config<receiver_config::Config>()) {}
 

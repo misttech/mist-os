@@ -70,7 +70,7 @@ class DemoNumberConnection : public fidl::Server<fuchsia_hardware_demo::Demo> {
 // This class represents the driver instance.
 class DemoNumber : public fdf::DriverBase {
  public:
-  DemoNumber(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  DemoNumber(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         devfs_connector_(fit::bind_member<&DemoNumber::Connect>(this)) {}
 

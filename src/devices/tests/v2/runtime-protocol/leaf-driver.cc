@@ -32,7 +32,7 @@ namespace {
 
 class LeafDriver : public fdf::DriverBase {
  public:
-  LeafDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  LeafDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)),
         executor_(dispatcher()),
         node_(fidl::WireSharedClient(std::move(node()), dispatcher())) {}

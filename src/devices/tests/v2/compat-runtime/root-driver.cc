@@ -22,7 +22,7 @@ namespace {
 
 class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
  public:
-  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("root", std::move(start_args), std::move(driver_dispatcher)),
         node_(fidl::WireClient(std::move(node()), dispatcher())) {}
 

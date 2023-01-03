@@ -22,7 +22,7 @@ class TestProtocolServer : public fidl::WireServer<fuchsia_gizmo_protocol::Testi
 class ChildDriverTransportDriver : public fdf::DriverBase {
  public:
   ChildDriverTransportDriver(fdf::DriverStartArgs start_args,
-                             fdf::UnownedDispatcher driver_dispatcher)
+                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("transport-child", std::move(start_args), std::move(driver_dispatcher)),
         arena_(fdf::Arena('EXAM')) {}
 

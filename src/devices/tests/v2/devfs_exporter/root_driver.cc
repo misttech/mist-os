@@ -18,7 +18,7 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
   static constexpr std::string_view name = "root";
 
  public:
-  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher)
+  RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase(name, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {

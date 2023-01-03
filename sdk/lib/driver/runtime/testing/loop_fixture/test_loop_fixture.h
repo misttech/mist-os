@@ -43,8 +43,8 @@ class DriverTestLoopFixture : public ::testing::Test {
     // runtime library doesn't complain.
     fdf_testing_push_driver(this);
 
-    auto dispatcher = fdf::Dispatcher::Create(
-        FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "driver-test-loop",
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop",
         [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
     EXPECT_EQ(ZX_OK, dispatcher.status_value());
     dispatcher_ = std::move(dispatcher.value());
@@ -75,10 +75,10 @@ class DriverTestLoopFixture : public ::testing::Test {
     task_completion.Wait();
   }
 
-  const fdf::Dispatcher& driver_dispatcher() { return dispatcher_; }
+  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
 
  private:
-  fdf::Dispatcher dispatcher_;
+  fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
 };
 

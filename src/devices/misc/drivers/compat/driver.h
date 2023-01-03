@@ -26,8 +26,8 @@ namespace compat {
 // Driver is the compatibility driver that loads DFv1 drivers.
 class Driver : public fdf::DriverBase {
  public:
-  Driver(fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher, device_t device,
-         const zx_protocol_device_t* ops, std::string_view driver_path);
+  Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+         device_t device, const zx_protocol_device_t* ops, std::string_view driver_path);
   ~Driver() override;
 
   zx::result<> Start() override;
@@ -152,7 +152,7 @@ class Driver : public fdf::DriverBase {
 class DriverFactory {
  public:
   static zx::result<std::unique_ptr<fdf::DriverBase>> CreateDriver(
-      fdf::DriverStartArgs start_args, fdf::UnownedDispatcher driver_dispatcher);
+      fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 };
 
 class DriverList {
