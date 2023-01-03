@@ -9,9 +9,10 @@ use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{self as inspect, component};
-use fuchsia_syslog::{self as syslog, fx_log_info};
+use fuchsia_syslog::{self as syslog, fx_log_info, fx_log_warn};
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use settings::agent::BlueprintHandle as AgentBlueprintHandle;
@@ -99,6 +100,13 @@ fn main() -> Result<(), Error> {
     // EnvironmentBuilder::spawn returns a future that can be awaited for the
     // result of the startup. Since main is a synchronous function, we cannot
     // block here and therefore continue without waiting for the result.
+
+    // Initialize inspect.
+    let mut fs = ServiceFs::new();
+    if let Err(e) = inspect_runtime::serve(component::inspector(), &mut fs) {
+        fx_log_warn!("Unable to serve inspect runtime: {:?}", e);
+    }
+
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
         .agent_mapping(<AgentBlueprintHandle as From<AgentType>>::from)
@@ -111,6 +119,6 @@ fn main() -> Result<(), Error> {
         .metric_event_logger_factory_proxy(
             connect_to_protocol::<MetricEventLoggerFactoryMarker>().ok(),
         )
-        .spawn(executor)
+        .spawn(executor, fs)
         .context("Failed to spawn environment for setui")
 }

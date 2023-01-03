@@ -439,20 +439,13 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// components are spawned and ready to handle events and FIDL requests.
     async fn prepare_env(
         mut self,
+        mut fs: ServiceFs<ServiceObj<'_, ()>>,
         runtime: Runtime,
-    ) -> Result<(ServiceFs<ServiceObj<'static, ()>>, Delegate, Seeder, HashSet<Entity>), Error>
-    {
-        let mut fs = ServiceFs::new();
-
-        let service_dir = if runtime == Runtime::Service {
-            // Initialize inspect.
-            if let Err(e) = inspect_runtime::serve(component::inspector(), &mut fs) {
-                fx_log_warn!("Unable to serve inspect runtime: {:?}", e);
-            }
-
-            fs.dir("svc")
-        } else {
-            fs.root_dir()
+    ) -> Result<(ServiceFs<ServiceObj<'_, ()>>, Delegate, Seeder, HashSet<Entity>), Error> {
+        let service_dir = match runtime {
+            Runtime::Service => fs.dir("svc"),
+            #[cfg(test)]
+            Runtime::Nested(_) => fs.root_dir(),
         };
 
         // Define top level MessageHub for service communication.
@@ -614,9 +607,13 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
 
     /// Spawn an [Environment] on the supplied [fasync::LocalExecutor] so that it may process
     /// incoming FIDL requests.
-    pub fn spawn(self, mut executor: fasync::LocalExecutor) -> Result<(), Error> {
+    pub fn spawn(
+        self,
+        mut executor: fasync::LocalExecutor,
+        fs: ServiceFs<ServiceObj<'_, ()>>,
+    ) -> Result<(), Error> {
         let (mut fs, ..) = executor
-            .run_singlethreaded(self.prepare_env(Runtime::Service))
+            .run_singlethreaded(self.prepare_env(fs, Runtime::Service))
             .context("Failed to prepare env")?;
         let _ = fs.take_and_serve_directory_handle().expect("could not service directory handle");
         executor.run_singlethreaded(fs.collect::<()>());
@@ -626,8 +623,10 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// Spawn a nested [Environment] so that it can be used for tests.
     #[cfg(test)]
     pub async fn spawn_nested(self, env_name: &'static str) -> Result<Environment, Error> {
-        let (mut fs, delegate, job_seeder, entities) =
-            self.prepare_env(Runtime::Nested(env_name)).await.context("Failed to prepare env")?;
+        let (mut fs, delegate, job_seeder, entities) = self
+            .prepare_env(ServiceFs::new(), Runtime::Nested(env_name))
+            .await
+            .context("Failed to prepare env")?;
         let connector = Some(fs.create_protocol_connector()?);
         fasync::Task::spawn(fs.collect()).detach();
 
