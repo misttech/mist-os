@@ -176,7 +176,7 @@ pte_t mmu_flags_to_s1_pte_attr(uint flags, bool hypervisor = false) {
       attr |= MMU_PTE_ATTR_DEVICE;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("unexpected flags value 0x%x", flags);
   }
 
   switch (flags & (ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_WRITE)) {
@@ -238,7 +238,7 @@ uint s1_pte_attr_to_mmu_flags(pte_t pte, bool hypervisor = false) {
       mmu_flags |= ARCH_MMU_FLAG_CACHED;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("unexpected pte value %" PRIx64, pte);
   }
 
   mmu_flags |= ARCH_MMU_FLAG_PERM_READ;
@@ -302,7 +302,7 @@ pte_t mmu_flags_to_s2_pte_attr(uint flags) {
       attr |= MMU_S2_PTE_ATTR_DEVICE;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("unexpected flags value 0x%x", flags);
   }
 
   if (flags & ARCH_MMU_FLAG_PERM_WRITE) {
@@ -334,7 +334,7 @@ uint s2_pte_attr_to_mmu_flags(pte_t pte) {
       mmu_flags |= ARCH_MMU_FLAG_CACHED;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("unexpected pte value %" PRIx64, pte);
   }
 
   mmu_flags |= ARCH_MMU_FLAG_PERM_READ;
@@ -345,7 +345,7 @@ uint s2_pte_attr_to_mmu_flags(pte_t pte) {
       mmu_flags |= ARCH_MMU_FLAG_PERM_WRITE;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("unexpected pte value %" PRIx64, pte);
   }
 
   if (!(pte & MMU_S2_PTE_ATTR_XN)) {
@@ -588,9 +588,9 @@ zx_status_t ArmArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mm
       return ZX_OK;
     }
 
-    if (index_shift <= page_size_shift_ || descriptor_type != MMU_PTE_L012_DESCRIPTOR_TABLE) {
-      PANIC_UNIMPLEMENTED;
-    }
+    ASSERT_MSG(index_shift > page_size_shift_ && descriptor_type == MMU_PTE_L012_DESCRIPTOR_TABLE,
+               "index_shift %u, page_size_shift %u, descriptor_type %#x", index_shift,
+               page_size_shift_, descriptor_type);
 
     page_table = static_cast<const volatile pte_t*>(paddr_to_physmap(pte_addr));
     index_shift -= page_size_shift_ - 3;
@@ -923,7 +923,7 @@ ssize_t ArmArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, pa
           return ZX_ERR_ALREADY_EXISTS;
 
         default:
-          PANIC_UNIMPLEMENTED;
+          panic("unexpected pte value %" PRIx64, pte);
       }
       DEBUG_ASSERT(next_page_table);
 
