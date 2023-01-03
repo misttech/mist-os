@@ -68,17 +68,7 @@ zx_status_t I2cChild::CreateAndAddDevice(
     return endpoints.status_value();
   }
 
-  auto result = dev->outgoing_dir_.AddUnmanagedProtocol<fidl_i2c::Device>(
-      [dev = dev.get()](fidl::ServerEnd<fidl_i2c::Device> request) mutable {
-        dev->Bind(std::move(request));
-      });
-
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to AddProtocol: %s", result.status_string());
-    return result.error_value();
-  }
-
-  result = dev->outgoing_dir_.AddService<fidl_i2c::Service>(fidl_i2c::Service::InstanceHandler(
+  auto result = dev->outgoing_dir_.AddService<fidl_i2c::Service>(fidl_i2c::Service::InstanceHandler(
       {.device = [dev = dev.get()](fidl::ServerEnd<fidl_i2c::Device> request) mutable {
         dev->Bind(std::move(request));
       }}));
@@ -94,7 +84,6 @@ zx_status_t I2cChild::CreateAndAddDevice(
     return result.error_value();
   }
 
-  std::array offers = {fidl::DiscoverableProtocolName<fidl_i2c::Device>};
   std::array service_offers = {
       fidl_i2c::Service::Name,
   };
@@ -106,7 +95,6 @@ zx_status_t I2cChild::CreateAndAddDevice(
                                 .set_proto_id(ZX_PROTOCOL_I2C)
                                 .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                 .set_props(props)
-                                .set_fidl_protocol_offers(offers)
                                 .set_fidl_service_offers(service_offers)
                                 .set_outgoing_dir(endpoints->client.TakeChannel()));
 
