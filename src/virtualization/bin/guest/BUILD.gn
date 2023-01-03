@@ -45,7 +45,6 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   sources = [
-    "src/arguments.rs",
     "src/main.rs",
     "src/services.rs",
     "src/vsh.rs",

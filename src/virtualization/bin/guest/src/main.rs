@@ -1,14 +1,14 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {crate::arguments::*, anyhow::Error};
 
-mod arguments;
+use {guest_cli::platform::PlatformServices, guest_cli_args::*};
+
 mod services;
 mod vsh;
 
 #[fuchsia::main(logging_tags = ["guest"])]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), anyhow::Error> {
     let options: GuestOptions = argh::from_env();
     let services = guest_cli::platform::FuchsiaPlatformServices::new();
 
@@ -62,7 +62,7 @@ async fn main() -> Result<(), Error> {
             let mut stdout = unsafe { services::get_evented_stdio(services::Stdio::Stdout) };
             let mut stderr = unsafe { services::get_evented_stdio(services::Stdio::Stderr) };
 
-            let termina_manager = services::connect_to_manager(arguments::GuestType::Termina)?;
+            let termina_manager = services.connect_to_manager(GuestType::Termina).await?;
 
             vsh::handle_vsh(
                 &mut stdin,

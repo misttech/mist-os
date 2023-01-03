@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_virtualization::{GuestManagerMarker, GuestManagerProxy},
     fuchsia_async::{self as fasync},
-    fuchsia_component::client::connect_to_protocol_at_path,
     std::os::unix::{io::AsRawFd, io::FromRawFd, prelude::RawFd},
 };
 
@@ -50,14 +47,4 @@ pub unsafe fn get_evented_stdio(stdio: Stdio) -> fasync::net::EventedFd<std::fs:
     // is dropped. This behaviour could be avoided by using a std::io::Stdin (etc.) directly, but
     // they are buffered which may be undesirable.
     fasync::net::EventedFd::new(std::fs::File::from_raw_fd(stdio.as_raw_fd())).unwrap()
-}
-
-pub fn connect_to_manager(
-    guest_type: crate::arguments::GuestType,
-) -> Result<GuestManagerProxy, Error> {
-    let manager = connect_to_protocol_at_path::<GuestManagerMarker>(
-        format!("/svc/{}", guest_type.guest_manager_interface()).as_str(),
-    )
-    .context("Failed to connect to manager service")?;
-    Ok(manager)
 }
