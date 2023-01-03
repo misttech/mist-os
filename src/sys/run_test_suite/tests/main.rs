@@ -36,8 +36,7 @@ macro_rules! assert_output {
             .filter(|x| {
                 let is_stdout = x.starts_with("[stdout - ");
                 let is_stderr = x.starts_with("[stderr - ");
-                let is_debug_data_warn = is_debug_data_warning(x);
-                !(is_stdout || is_stderr || is_debug_data_warn)
+                !(is_stdout || is_stderr)
             })
             .map(sanitize_log_for_comparison)
             .collect::<Vec<_>>();
@@ -47,12 +46,6 @@ macro_rules! assert_output {
 
         assert_eq!(output, expected_output);
     };
-}
-
-// TODO(fxbug.dev/61180): once debug data routing is fixed, this log should be gone and this
-// function can be deleted.
-fn is_debug_data_warning(log: impl AsRef<str>) -> bool {
-    log.as_ref().contains("No capability available at path /svc/fuchsia.debugdata.Publisher")
 }
 
 fn sanitize_log_for_comparison(log: impl AsRef<str>) -> String {
