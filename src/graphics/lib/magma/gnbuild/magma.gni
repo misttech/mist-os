@@ -77,6 +77,8 @@ template("magma_vulkan_icd") {
   if (is_fuchsia) {
     assert(defined(invoker.imported_symbols_allowlist),
            "imported_symbols_allowlist must be provided")
+  } else {
+    testonly = true
   }
 
   has_allowlist = defined(invoker.imported_symbols_allowlist)
@@ -94,21 +96,23 @@ template("magma_vulkan_icd") {
       configs += invoker.configs
     }
     if (!is_debug) {
-      version_script = "//src/graphics/lib/magma/scripts/libvulkan.version"
-      if (!defined(invoker.inputs)) {
-        inputs = []
+      if (is_fuchsia) {
+        # This linker script has Fuchsia specific symbols
+        version_script = "//src/graphics/lib/magma/scripts/libvulkan.version"
+      } else {
+        version_script = ""
       }
-      inputs += [ version_script ]
-      if (!defined(invoker.ldflags)) {
-        ldflags = []
+      if (version_script != "") {
+        if (!defined(invoker.inputs)) {
+          inputs = []
+        }
+        inputs += [ version_script ]
+        if (!defined(invoker.ldflags)) {
+          ldflags = []
+        }
+        ldflags += [ "-Wl,--version-script=" +
+                     rebase_path(version_script, root_build_dir) ]
       }
-      ldflags += [
-        "-Wl,--version-script=" + rebase_path(version_script, root_build_dir),
-
-        # TODO(fxbug.dev/117101): Mitigate linker errors on libvulkan_intel.so
-        # after "--no-undefined-version" was enabled by default.
-        "-Wl,--undefined-version",
-      ]
     }
 
     # Do not build ICDs with instrumented build variants, otherwise
