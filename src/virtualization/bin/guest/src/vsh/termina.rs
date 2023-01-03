@@ -5,10 +5,9 @@
 use {
     anyhow::{anyhow, Context, Result},
     fidl_fuchsia_virtualization::{
-        ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerMarker,
+        ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
     },
     fuchsia_async::{Duration, Interval},
-    fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     futures::{future::ready, select, stream, StreamExt},
     std::io::Write,
@@ -107,11 +106,8 @@ fn print_after_stage(
 
 /// Launches a Termina VM. An ascii progress bar and the current status info are rendered to `w`
 /// until the launch sequence terminates.
-pub async fn launch(w: &mut impl Write) -> Result<()> {
+pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Result<()> {
     const TERMINA_ENVIRONMENT_NAME: &str = "termina";
-
-    let linux_manager =
-        connect_to_protocol::<LinuxManagerMarker>().context("Failed to connect to LinuxManager")?;
 
     let linux_guest_info = linux_manager
         .start_and_get_linux_guest_info(TERMINA_ENVIRONMENT_NAME)

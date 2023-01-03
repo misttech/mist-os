@@ -58,6 +58,12 @@ impl UnbufferedStdio {
     }
 }
 
+impl AsRawFd for UnbufferedStdio {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0.as_ref().unwrap().as_raw_fd()
+    }
+}
+
 impl Drop for UnbufferedStdio {
     fn drop(&mut self) {
         // Prevent the file from closing the fd (which it doesn't own).

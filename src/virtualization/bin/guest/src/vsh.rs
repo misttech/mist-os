@@ -8,11 +8,15 @@ mod util;
 
 use {
     anyhow::{anyhow, Context, Result},
+    blocking::Unblock,
     fidl_fuchsia_hardware_pty as fpty,
-    fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, HostVsockEndpointMarker},
+    fidl_fuchsia_virtualization::{GuestMarker, HostVsockEndpointMarker},
     fuchsia_async::{self as fasync, Duration, Timer},
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{future::Fuse, pin_mut, select, AsyncReadExt, AsyncWriteExt, FutureExt},
+    guest_cli::platform::PlatformServices,
+    guest_cli::platform::{GuestConsole, UnbufferedStdio},
+    guest_cli_args::GuestType,
     tracing,
     vsh_rust_proto::vm_tools::vsh,
 };
@@ -100,8 +104,8 @@ async fn init_shell(socket: &mut fasync::Socket, args: Vec<String>) -> Result<Op
 
 // Receive messages from the guest vshd, and output to stdout
 async fn console_out(
-    stdout: &mut fasync::net::EventedFd<std::fs::File>,
-    stderr: &mut fasync::net::EventedFd<std::fs::File>,
+    stdout: &mut Unblock<UnbufferedStdio>,
+    stderr: &mut Unblock<UnbufferedStdio>,
     mut socket: fasync::Socket,
 ) -> Result<i32> {
     loop {
@@ -132,12 +136,12 @@ async fn console_out(
 
 // Receive input from stdin, and forward them as messages to guest vshd
 async fn console_in(
-    stdin: &mut fasync::net::EventedFd<std::fs::File>,
+    stdin: &mut Unblock<UnbufferedStdio>,
     mut socket: fasync::Socket,
 ) -> Result<()> {
     // Try to get a handle to the pty::Device and signaling eventpair. If this is None then stdin
     // isn't a pty and we don't need to handle resize events.
-    let pty_and_eventpair = pty::get_pty(stdin).await?;
+    let pty_and_eventpair = pty::get_pty(stdin.get_mut().await).await?;
 
     // When a new event can be read using ReadEvent, SIGNAL_EVENT is signaled on the eventpair.
     // Convert SIGNAL_EVENT from a DeviceSignal bitflag to a zx::Signal.
@@ -213,20 +217,24 @@ async fn console_in(
 /// not already started we will try to start it.
 ///
 /// Returns the exit code of the remote process, or an error indicating the failure reason.
-pub async fn handle_vsh(
-    stdin: &mut fasync::net::EventedFd<std::fs::File>,
-    stdout: &mut fasync::net::EventedFd<std::fs::File>,
-    stderr: &mut fasync::net::EventedFd<std::fs::File>,
-    termina_manager: GuestManagerProxy,
+pub async fn handle_vsh<P: PlatformServices>(
+    services: &P,
     port: Option<u32>,
     is_container: bool,
     mut args: Vec<String>,
 ) -> Result<i32> {
+    let mut stdin = GuestConsole::get_unblocked_stdio(guest_cli::platform::Stdio::Stdin);
+    let mut stdout = GuestConsole::get_unblocked_stdio(guest_cli::platform::Stdio::Stdout);
+    let mut stderr = GuestConsole::get_unblocked_stdio(guest_cli::platform::Stdio::Stderr);
+
+    let termina_manager = services.connect_to_manager(GuestType::Termina).await?;
+    let linux_manager = services.connect_to_linux_manager().await?;
+
     let port = port.unwrap_or(util::VSH_PORT);
 
     'outer: loop {
         // Attempts to launch Termina VM and container if necessary
-        if let Err(e) = termina::launch(stdout.as_mut()).await {
+        if let Err(e) = termina::launch(&linux_manager, stdout.get_mut().await).await {
             println!("Starting the Linux container has failed because of: {:?}", e);
             'inner: loop {
                 println!("Retry? (y/n)");
@@ -301,8 +309,8 @@ pub async fn handle_vsh(
         }
     }
 
-    let stdin_handler = console_in(stdin, socket_in).fuse();
-    let stdout_handler = console_out(stdout, stderr, socket_out).fuse();
+    let stdin_handler = console_in(&mut stdin, socket_in).fuse();
+    let stdout_handler = console_out(&mut stdout, &mut stderr, socket_out).fuse();
     pin_mut!(stdin_handler, stdout_handler);
     loop {
         select! {

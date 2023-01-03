@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {guest_cli::platform::PlatformServices, guest_cli_args::*};
+use guest_cli_args::*;
 
-mod services;
 mod vsh;
 
 #[fuchsia::main(logging_tags = ["guest"])]
@@ -54,27 +53,9 @@ async fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
         SubCommands::Vsh(vsh_args) => {
-            // SAFETY: These unsafe helpers should only be called once as they take ownership of the
-            // Stdin and Stdout file descriptors (and also assume that these FDs exceed the lifetime
-            // of the returned object). An additional consequence is that those FDs will be closed
-            // on drop, so we call this as early as possible.
-            let mut stdin = unsafe { services::get_evented_stdio(services::Stdio::Stdin) };
-            let mut stdout = unsafe { services::get_evented_stdio(services::Stdio::Stdout) };
-            let mut stderr = unsafe { services::get_evented_stdio(services::Stdio::Stderr) };
-
-            let termina_manager = services.connect_to_manager(GuestType::Termina).await?;
-
-            vsh::handle_vsh(
-                &mut stdin,
-                &mut stdout,
-                &mut stderr,
-                termina_manager,
-                vsh_args.port,
-                vsh_args.container,
-                vsh_args.args,
-            )
-            .await
-            .map(|exit_code| std::process::exit(exit_code))
+            vsh::handle_vsh(&services, vsh_args.port, vsh_args.container, vsh_args.args)
+                .await
+                .map(|exit_code| std::process::exit(exit_code))
         }
         SubCommands::Mem(mem_args) => {
             let output = guest_cli::mem::handle_mem(&services, mem_args).await?;
