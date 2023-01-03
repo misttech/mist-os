@@ -4,7 +4,6 @@
 use {crate::arguments::*, anyhow::Error};
 
 mod arguments;
-mod balloon;
 mod services;
 mod socat;
 mod vsh;
@@ -31,17 +30,7 @@ async fn main() -> Result<(), Error> {
             Ok(())
         }
         SubCommands::Balloon(balloon_args) => {
-            let balloon_controller =
-                balloon::connect_to_balloon_controller(balloon_args.guest_type).await?;
-            let output =
-                balloon::handle_balloon(balloon_controller, balloon_args.num_pages).await?;
-            println!("{}", output);
-            Ok(())
-        }
-        SubCommands::BalloonStats(balloon_stat_args) => {
-            let balloon_controller =
-                balloon::connect_to_balloon_controller(balloon_stat_args.guest_type).await?;
-            let output = balloon::handle_balloon_stats(balloon_controller).await?;
+            let output = guest_cli::balloon::handle_balloon(&services, &balloon_args).await;
             println!("{}", output);
             Ok(())
         }

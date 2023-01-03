@@ -101,8 +101,7 @@ pub enum SubCommands {
     Attach(crate::attach_args::AttachArgs),
     Launch(crate::launch_args::LaunchArgs),
     Stop(crate::stop_args::StopArgs),
-    Balloon(BalloonArgs),
-    BalloonStats(BalloonStatsArgs),
+    Balloon(crate::balloon_args::BalloonArgs),
     List(crate::list_args::ListArgs),
     Socat(SocatArgs),
     SocatListen(SocatListenArgs),
@@ -150,25 +149,44 @@ pub mod mem_args {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Modify the size of a memory balloon. Usage: guest balloon guest-type num-pages
-#[argh(subcommand, name = "balloon")]
-pub struct BalloonArgs {
-    #[argh(positional)]
-    /// type of the guest
-    pub guest_type: GuestType,
-    #[argh(positional)]
-    /// number of pages guest balloon will have after use.
-    pub num_pages: u32,
-}
+pub mod balloon_args {
+    use super::*;
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Interact with the guest memory balloon. Usage: guest balloon sub-command guest-type ...
+    #[argh(subcommand, name = "balloon")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct BalloonArgs {
+        #[argh(subcommand)]
+        pub balloon_cmd: BalloonCommands,
+    }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// See the stats of a guest's memory balloon. Usage: guest balloon-stats guest-type
-#[argh(subcommand, name = "balloon-stats")]
-pub struct BalloonStatsArgs {
-    #[argh(positional)]
-    /// type of the guest
-    pub guest_type: GuestType,
+    #[derive(FromArgs, PartialEq, Debug)]
+    #[argh(subcommand)]
+    pub enum BalloonCommands {
+        Set(BalloonSet),
+        Stats(BalloonStats),
+    }
+
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Modify the size of a memory balloon. Usage: guest balloon set guest-type num-pages
+    #[argh(subcommand, name = "set")]
+    pub struct BalloonSet {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+        #[argh(positional)]
+        /// number of pages guest balloon will have after use.
+        pub num_pages: u32,
+    }
+
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// See the stats of a guest's memory balloon. Usage: guest balloon stats guest-type
+    #[argh(subcommand, name = "stats")]
+    pub struct BalloonStats {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+    }
 }
 
 pub mod list_args {

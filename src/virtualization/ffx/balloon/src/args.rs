@@ -2,12 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod attach;
-pub mod balloon;
-pub mod launch;
-pub mod list;
-pub mod mem;
-pub mod platform;
-pub mod stop;
-pub mod vsockperf;
-pub mod wipe;
+use {argh as _, ffx_core as _};
+
+pub use guest_cli_args::balloon_args::{BalloonArgs, FfxPluginCommand};

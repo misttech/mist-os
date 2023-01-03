@@ -10,6 +10,7 @@ ffx_plugin("ffx_guest") {
 
   plugin_deps = [
     "attach:ffx_guest_attach",
+    "balloon:ffx_guest_balloon",
     "launch:ffx_guest_launch",
     "list:ffx_guest_list",
     "mem:ffx_guest_mem",
