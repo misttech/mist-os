@@ -13,6 +13,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
@@ -32,7 +33,6 @@ constexpr uint32_t kDspDefaultLoadAddress = 0xfffa0000; /* DSP default load addr
 constexpr DspStartMode kStartMode =
     DspStartMode::kSmcStartMode;  /* 0: scpi start mode, 1: smc start mode */
 constexpr bool kPmSupport = true; /* Support power management */
-constexpr uint32_t kHifiBase = 0xf7030000;
 constexpr uint8_t kPmDspa = 10;
 constexpr uint8_t kPwrOn = 1;
 constexpr uint8_t kPwrOff = 0;
@@ -42,7 +42,7 @@ constexpr uint8_t kScpiCmdHifiresume = 0x4f;
 constexpr uint8_t kDspSourceSelect800M = 1; /* DSP clock source selection: 1 800M */
 constexpr uint8_t kDspSourceSelect24M = 0;  /* DSP clock source selection: 0 24M */
 constexpr uint32_t kStartHifi = 0x82000090;
-constexpr uint32_t kDspSecPowerSrt = 0x82000092;
+constexpr uint32_t kDspSecPowerSrt = 0x82000093;
 constexpr uint8_t kDefaultTemp = 1;
 constexpr uint8_t kVectorOffset = 1;
 constexpr uint8_t kStrobeOffset = 2;
@@ -80,6 +80,22 @@ zx_status_t AmlDsp::Init() {
 
   if ((status = pdev.GetSmc(0, &smc_resource_)) != ZX_OK) {
     zxlogf(ERROR, "pdev.GetSmc failed %s", zx_status_get_string(status));
+    return status;
+  }
+
+  zx::bti bti;
+  status = pdev.GetBti(0, &bti);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "could not obtain bti %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Get the address where the DSP firmware is loaded.
+  zx::pmt pmt;
+  status = bti.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, *zx::unowned_vmo(dsp_sram_addr_.get_vmo()),
+                   0, ZX_PAGE_SIZE, &hifi_base_, 1, &pmt);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "unable to pin memory: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -243,7 +259,7 @@ zx_status_t AmlDsp::DspStart() {
   dsp_clk_sel_.SetInput(kDspSourceSelect800M);
   dsp_clk_gate_.Enable();
 
-  uint32_t StatVectorSel = (kHifiBase != kDspDefaultLoadAddress);
+  uint32_t StatVectorSel = (hifi_base_ != kDspDefaultLoadAddress);
   uint32_t tmp = kDefaultTemp | StatVectorSel << kVectorOffset | kStrobe << kStrobeOffset;
 
   switch (kStartMode) {
@@ -252,7 +268,7 @@ zx_status_t AmlDsp::DspStart() {
       return ZX_ERR_INVALID_ARGS;
 
     case DspStartMode::kSmcStartMode:
-      status = DspSmcCall(kStartHifi, kNone, kHifiBase, tmp);
+      status = DspSmcCall(kStartHifi, kNone, static_cast<uint32_t>(hifi_base_), tmp);
       if (status != ZX_OK) {
         return status;
       }

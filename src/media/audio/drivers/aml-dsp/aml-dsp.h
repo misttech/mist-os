@@ -78,6 +78,7 @@ class AmlDsp : public DeviceType {
   ddk::MmioBuffer dsp_sram_addr_;
   bool dsp_start_ = false;
   bool firmware_loaded_ = false;
+  zx_paddr_t hifi_base_;
   zx::resource smc_resource_;
   const ddk::ClockProtocolClient dsp_clk_sel_;
   const ddk::ClockProtocolClient dsp_clk_gate_;

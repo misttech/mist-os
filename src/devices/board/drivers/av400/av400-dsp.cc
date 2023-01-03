@@ -31,6 +31,13 @@ static const std::vector<fpbus::Mmio> dsp_mmios{
     }},
 };
 
+static const std::vector<fpbus::Bti> dsp_btis{
+    {{
+        .iommu_index = 0,
+        .bti_id = BTI_DSP,
+    }},
+};
+
 static const std::vector<fpbus::Smc> dsp_smcs{
     {{
         .service_call_num_base = ARM_SMC_SERVICE_CALL_NUM_SIP_SERVICE_BASE,
@@ -46,6 +53,7 @@ static const fpbus::Node dsp_dev = []() {
   dev.pid() = PDEV_PID_AMLOGIC_A5;
   dev.did() = PDEV_DID_AMLOGIC_DSP;
   dev.mmio() = dsp_mmios;
+  dev.bti() = dsp_btis;
   dev.smc() = dsp_smcs;
   return dev;
 }();
