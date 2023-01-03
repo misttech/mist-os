@@ -9,9 +9,7 @@ use crate::message::delegate::Delegate;
 use crate::message::messenger::MessengerClient;
 use crate::message::receptor::Receptor;
 use crate::message::MessageHubUtil;
-use crate::service::{
-    Address as ServiceAddress, MessageHub, Payload as ServicePayload, Role as ServiceRole,
-};
+use crate::service::{Address as ServiceAddress, MessageHub, Payload as ServicePayload};
 
 use fuchsia_async::TestExecutor;
 use futures::pin_mut;
@@ -45,7 +43,7 @@ pub fn move_executor_forward_and_get<T>(
 
 // Create a messenger hub, returning an unbound messenger and publisher.
 pub async fn create_messenger_and_publisher(
-) -> (MessengerClient<ServicePayload, ServiceAddress, ServiceRole>, Publisher) {
+) -> (MessengerClient<ServicePayload, ServiceAddress>, Publisher) {
     let message_hub = MessageHub::create_hub();
     let publisher = Publisher::create(&message_hub, MessengerType::Unbound).await;
 
@@ -57,8 +55,8 @@ pub async fn create_messenger_and_publisher(
 
 // Create and return an unbound messenger and publisher from a given `message_hub`.
 pub async fn create_messenger_and_publisher_from_hub(
-    message_hub: &Delegate<ServicePayload, ServiceAddress, ServiceRole>,
-) -> (MessengerClient<ServicePayload, ServiceAddress, ServiceRole>, Publisher) {
+    message_hub: &Delegate<ServicePayload, ServiceAddress>,
+) -> (MessengerClient<ServicePayload, ServiceAddress>, Publisher) {
     let publisher = Publisher::create(message_hub, MessengerType::Unbound).await;
     let messenger =
         message_hub.create(MessengerType::Unbound).await.expect("Unable to create messenger").0;
@@ -69,9 +67,9 @@ pub async fn create_messenger_and_publisher_from_hub(
 // Given a `setting_type` and `message_hub`, creates a receptor from the message hub with the address
 // of the setting type.
 pub async fn create_receptor_for_setting_type(
-    message_hub: &Delegate<ServicePayload, ServiceAddress, ServiceRole>,
+    message_hub: &Delegate<ServicePayload, ServiceAddress>,
     setting_type: SettingType,
-) -> Receptor<ServicePayload, ServiceAddress, ServiceRole> {
+) -> Receptor<ServicePayload, ServiceAddress> {
     message_hub
         .create(MessengerType::Addressable(ServiceAddress::Handler(setting_type)))
         .await

@@ -289,8 +289,7 @@ impl SettingProxyInspectAgent {
     fn process_message_event(
         &mut self,
         event: service::message::MessageEvent,
-    ) -> Option<(SettingType, u64, Receptor<service::Payload, service::Address, service::Role>)>
-    {
+    ) -> Option<(SettingType, u64, Receptor<service::Payload, service::Address>)> {
         if let Ok((HandlerPayload::Request(request), mut client)) =
             HandlerPayload::try_from_with_client(event)
         {

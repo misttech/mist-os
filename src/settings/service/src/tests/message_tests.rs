@@ -5,7 +5,7 @@
 use crate::event;
 use crate::message::action_fuse::ActionFuseBuilder;
 use crate::message::base::{
-    filter, group, Address, Audience, MessageEvent, MessengerType, Payload, Role, Status,
+    filter, group, Address, Audience, MessageEvent, MessengerType, Payload, Status,
 };
 use crate::message::receptor::Receptor;
 use crate::message::MessageHubUtil;
@@ -35,13 +35,9 @@ pub(crate) enum TestAddress {
 }
 
 /// Ensures the delivery result matches expected value.
-async fn verify_result<
-    P: Payload + PartialEq + 'static,
-    A: Address + PartialEq + 'static,
-    R: Role + PartialEq + 'static,
->(
+async fn verify_result<P: Payload + PartialEq + 'static, A: Address + PartialEq + 'static>(
     expected: Status,
-    receptor: &mut Receptor<P, A, R>,
+    receptor: &mut Receptor<P, A>,
 ) {
     while let Some(message_event) = receptor.next().await {
         if let MessageEvent::Status(status) = message_event {
@@ -71,7 +67,6 @@ mod test {
     impl MessageHubDefinition for MessageHub {
         type Payload = TestMessage;
         type Address = TestAddress;
-        type Role = crate::message::base::default::Role;
     }
 }
 
@@ -82,7 +77,6 @@ mod num_test {
     impl MessageHubDefinition for MessageHub {
         type Payload = u64;
         type Address = u64;
-        type Role = crate::message::base::default::Role;
     }
 }
 

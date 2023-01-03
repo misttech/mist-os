@@ -7,7 +7,7 @@ use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
     filter::Filter, messenger, ActionSender, Address, Attribution, Audience, Fingerprint, Message,
     MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
-    MessengerType, Payload, Role, Signature, Status,
+    MessengerType, Payload, Signature, Status,
 };
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::delegate::Delegate;
@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 /// Type definition for a handle to the MessageHub. There is a single instance
 /// of a hub per communication ecosystem and therefore held behind an Arc mutex.
-pub type MessageHubHandle<P, A, R> = Arc<Mutex<MessageHub<P, A, R>>>;
+pub type MessageHubHandle<P, A> = Arc<Mutex<MessageHub<P, A>>>;
 
 /// Type definition for exit message sender.
 type ExitSender = futures::channel::mpsc::UnboundedSender<()>;
@@ -41,16 +41,16 @@ pub enum Error {
 
 /// `Broker` captures the information necessary to process messages to a broker.
 #[derive(Clone)]
-struct Broker<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
+struct Broker<P: Payload + 'static, A: Address + 'static> {
     /// The `MessengerId` associated with the broker so that it can be distinguished from other
     /// messengers.
     messenger_id: MessengerId,
     /// A condition that is applied to a message to determine whether it should be directed to the
     /// broker.
-    filter: Option<Filter<P, A, R>>,
+    filter: Option<Filter<P, A>>,
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> PartialEq for Broker<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> PartialEq for Broker<P, A> {
     fn eq(&self, other: &Self) -> bool {
         // Since each broker has a unique [`MessengerId`], it is implied that any brokers that share
         // the same [`MessengerId`] are the same, having matching filters as well.
@@ -61,9 +61,9 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> PartialEq fo
 /// The MessageHub controls the message flow for a set of messengers. It
 /// processes actions upon messages, incorporates brokers, and signals receipt
 /// of messages.
-pub struct MessageHub<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
+pub struct MessageHub<P: Payload + 'static, A: Address + 'static> {
     /// A sender given to messengers to signal actions upon the MessageHub.
-    action_tx: ActionSender<P, A, R>,
+    action_tx: ActionSender<P, A>,
     /// Address mapping for looking up messengers. Used for sending messages
     /// to an addressable recipient.
     addresses: HashMap<A, MessengerId>,
@@ -75,9 +75,9 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
     roles: HashMap<crate::Role, HashSet<MessengerId>>,
     /// Mapping of registered messengers (including brokers) to beacons. Used for
     /// delivering messages from a resolved address or a list of participants.
-    beacons: HashMap<MessengerId, Beacon<P, A, R>>,
+    beacons: HashMap<MessengerId, Beacon<P, A>>,
     /// An ordered set of messengers who will be forwarded messages.
-    brokers: Vec<Broker<P, A, R>>,
+    brokers: Vec<Broker<P, A>>,
     /// The next id to be given to a messenger.
     next_id: MessengerId,
     /// The next id to be given to a `MessageClient`.
@@ -88,16 +88,16 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static, R: Role + 'sta
     exit_tx: ExitSender,
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     /// Returns a new MessageHub for the given types.
-    pub(crate) fn create(fuse: Option<ActionFuseHandle>) -> Delegate<P, A, R> {
+    pub(crate) fn create(fuse: Option<ActionFuseHandle>) -> Delegate<P, A> {
         let (action_tx, mut action_rx) = futures::channel::mpsc::unbounded::<(
             Fingerprint<A>,
-            MessageAction<P, A, R>,
-            Option<Beacon<P, A, R>>,
+            MessageAction<P, A>,
+            Option<Beacon<P, A>>,
         )>();
         let (messenger_tx, mut messenger_rx) =
-            futures::channel::mpsc::unbounded::<MessengerAction<P, A, R>>();
+            futures::channel::mpsc::unbounded::<MessengerAction<P, A>>();
 
         let (exit_tx, mut exit_rx) = futures::channel::mpsc::unbounded::<()>();
 
@@ -192,7 +192,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         &mut self,
         id: ftrace::Id,
         sender_id: MessengerId,
-        message: Message<P, A, R>,
+        message: Message<P, A>,
     ) {
         trace!(id, "send_to_next");
         let mut recipients = vec![];
@@ -229,7 +229,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
                 .map(|broker| broker.messenger_id)
                 .collect();
 
-            let mut return_path: Vec<Beacon<P, A, R>> = broker_ids
+            let mut return_path: Vec<Beacon<P, A>> = broker_ids
                 .iter()
                 .map(|broker_id| {
                     self.beacons.get(broker_id).expect("beacon should resolve").clone()
@@ -444,11 +444,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         Ok((return_set, delivery_required))
     }
 
-    async fn process_messenger_request(
-        &mut self,
-        id: ftrace::Id,
-        action: MessengerAction<P, A, R>,
-    ) {
+    async fn process_messenger_request(&mut self, id: ftrace::Id, action: MessengerAction<P, A>) {
         match action {
             MessengerAction::Create(messenger_descriptor, responder, messenger_tx) => {
                 trace!(
@@ -582,8 +578,8 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageHub<P
         &mut self,
         id: ftrace::Id,
         fingerprint: Fingerprint<A>,
-        action: MessageAction<P, A, R>,
-        beacon: Option<Beacon<P, A, R>>,
+        action: MessageAction<P, A>,
+        beacon: Option<Beacon<P, A>>,
     ) {
         let (mut outgoing_message, _guard) = match action {
             MessageAction::Send(payload, message_type) => {

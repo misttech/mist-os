@@ -36,7 +36,6 @@ pub struct MessageHub;
 impl MessageHubDefinition for MessageHub {
     type Payload = Payload;
     type Address = Address;
-    type Role = Role;
 }
 
 pub(crate) mod message {

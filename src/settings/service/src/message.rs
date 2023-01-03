@@ -22,7 +22,6 @@ pub type Timestamp = zx::Time;
 pub trait MessageHubDefinition {
     type Payload: base::Payload + 'static;
     type Address: base::Address + 'static;
-    type Role: base::Role + 'static;
 }
 
 pub trait MessageHubUtil {
@@ -44,18 +43,18 @@ impl<T> MessageHubUtil for T
 where
     T: MessageHubDefinition,
 {
-    type Delegate = delegate::Delegate<T::Payload, T::Address, T::Role>;
+    type Delegate = delegate::Delegate<T::Payload, T::Address>;
     type Audience = base::Audience<T::Address>;
-    type Messenger = messenger::MessengerClient<T::Payload, T::Address, T::Role>;
+    type Messenger = messenger::MessengerClient<T::Payload, T::Address>;
     type MessageError = base::MessageError<T::Address>;
-    type MessageEvent = base::MessageEvent<T::Payload, T::Address, T::Role>;
-    type MessageClient = message_client::MessageClient<T::Payload, T::Address, T::Role>;
-    type MessengerType = base::MessengerType<T::Payload, T::Address, T::Role>;
-    type MessageType = base::MessageType<T::Payload, T::Address, T::Role>;
-    type Receptor = receptor::Receptor<T::Payload, T::Address, T::Role>;
+    type MessageEvent = base::MessageEvent<T::Payload, T::Address>;
+    type MessageClient = message_client::MessageClient<T::Payload, T::Address>;
+    type MessengerType = base::MessengerType<T::Payload, T::Address>;
+    type MessageType = base::MessageType<T::Payload, T::Address>;
+    type Receptor = receptor::Receptor<T::Payload, T::Address>;
     type Signature = base::Signature<T::Address>;
 
     fn create_hub() -> Self::Delegate {
-        message_hub::MessageHub::<T::Payload, T::Address, T::Role>::create(None)
+        message_hub::MessageHub::<T::Payload, T::Address>::create(None)
     }
 }

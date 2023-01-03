@@ -39,7 +39,6 @@ use crate::privacy::types::PrivacyInfo;
 use crate::service::{self, Address};
 use crate::setup::types::SetupInfo;
 use crate::storage::{Error, Payload, StorageInfo, StorageRequest, StorageResponse, StorageType};
-use crate::Role;
 use crate::{trace, trace_guard};
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageConvertible};
 use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
@@ -124,9 +123,7 @@ where
     async fn handle_messages(
         &mut self,
         id: ftrace::Id,
-        mut unordered: FuturesUnordered<
-            StreamFuture<Receptor<service::Payload, service::Address, Role>>,
-        >,
+        mut unordered: FuturesUnordered<StreamFuture<Receptor<service::Payload, service::Address>>>,
     ) {
         let storage_management = StorageManagement {
             device_storage_factory: Arc::clone(&self.device_storage_factory),

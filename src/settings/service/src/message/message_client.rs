@@ -4,7 +4,7 @@
 
 use crate::message::action_fuse::{ActionFuse, ActionFuseBuilder, ActionFuseHandle};
 use crate::message::base::{
-    Address, Audience, Message, MessageClientId, MessageType, Payload, Role, Signature, Status,
+    Address, Audience, Message, MessageClientId, MessageType, Payload, Signature, Status,
 };
 use crate::message::beacon::BeaconBuilder;
 use crate::message::message_builder::MessageBuilder;
@@ -16,34 +16,32 @@ use crate::message::receptor::Receptor;
 /// desired. Once all MessageClient instances go out of scope, the original
 /// message is forwarded to the next Messenger if no interaction preceded it.
 #[derive(Clone, Debug)]
-pub struct MessageClient<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
+pub struct MessageClient<P: Payload + 'static, A: Address + 'static> {
     // A unique identifier that identifies this client within the parent message
     // hub.
     id: MessageClientId,
     // The "source" message for the client. Any replies or action are done in the
     // context of this message.
-    message: Message<P, A, R>,
+    message: Message<P, A>,
     // The messenger to receive any actions.
-    messenger: Messenger<P, A, R>,
+    messenger: Messenger<P, A>,
     // Auto-trigger for automatically forwarding the message to the next
     // recipient.
     forwarder: ActionFuseHandle,
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> PartialEq
-    for MessageClient<P, A, R>
-{
-    fn eq(&self, other: &MessageClient<P, A, R>) -> bool {
+impl<P: Payload + 'static, A: Address + 'static> PartialEq for MessageClient<P, A> {
+    fn eq(&self, other: &MessageClient<P, A>) -> bool {
         other.id == self.id
     }
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClient<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> MessageClient<P, A> {
     pub(super) fn new(
         id: MessageClientId,
-        message: Message<P, A, R>,
-        messenger: Messenger<P, A, R>,
-    ) -> MessageClient<P, A, R> {
+        message: Message<P, A>,
+        messenger: Messenger<P, A>,
+    ) -> MessageClient<P, A> {
         let fuse_messenger_clone = messenger.clone();
         let fuse_message_clone = message.clone();
         MessageClient {
@@ -81,7 +79,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClien
     }
 
     /// Creates a dedicated receptor for receiving future communication on this message thread.
-    pub(crate) fn spawn_observer(&mut self) -> Receptor<P, A, R> {
+    pub(crate) fn spawn_observer(&mut self) -> Receptor<P, A> {
         let (beacon, receptor) = BeaconBuilder::new(self.messenger.clone()).build();
         self.messenger.forward(self.message.clone(), Some(beacon));
         ActionFuse::defuse(self.forwarder.clone());
@@ -90,7 +88,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClien
     }
 
     /// Creates a MessageBuilder for the reply to this message.
-    pub(crate) fn reply(&self, payload: P) -> MessageBuilder<P, A, R> {
+    pub(crate) fn reply(&self, payload: P) -> MessageBuilder<P, A> {
         // Return a MessageBuilder for a reply. Note that the auto-forwarder is
         // handed off so the automatic forwarding behavior follows the
         // MessageBuilder rather than this MessageClient.
@@ -103,7 +101,7 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessageClien
     }
 
     /// Propagates a derived message on the path of the original message.
-    pub(crate) fn propagate(&self, payload: P) -> MessageBuilder<P, A, R> {
+    pub(crate) fn propagate(&self, payload: P) -> MessageBuilder<P, A> {
         MessageBuilder::derive(payload, self.message.clone(), self.messenger.clone())
             .auto_forwarder(self.forwarder.clone())
     }

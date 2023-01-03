@@ -4,9 +4,9 @@
 
 use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
-    default, messenger, ActionSender, Address, Audience, CreateMessengerResult, Fingerprint,
-    Message, MessageAction, MessageError, MessageType, MessengerAction, MessengerActionSender,
-    MessengerId, MessengerType, Payload, Role, Signature,
+    messenger, ActionSender, Address, Audience, CreateMessengerResult, Fingerprint, Message,
+    MessageAction, MessageError, MessageType, MessengerAction, MessengerActionSender, MessengerId,
+    MessengerType, Payload, Signature,
 };
 use crate::message::beacon::Beacon;
 use crate::message::message_builder::MessageBuilder;
@@ -18,22 +18,22 @@ use std::convert::identity;
 /// `Builder` is the default way for creating a new messenger. Beyond the base
 /// messenger type, this helper allows for roles to be associated as well
 /// during construction.
-pub struct Builder<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
+pub struct Builder<P: Payload + 'static, A: Address + 'static> {
     /// The sender for sending messenger creation requests to the MessageHub.
-    messenger_action_tx: MessengerActionSender<P, A, R>,
+    messenger_action_tx: MessengerActionSender<P, A>,
     /// The type of messenger to be created. Along with roles, the messenger
     /// type determines what audiences the messenger is included in.
-    messenger_type: MessengerType<P, A, R>,
+    messenger_type: MessengerType<P, A>,
     /// The roles to associate with this messenger.
     roles: HashSet<crate::Role>,
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> Builder<P, A> {
     /// Creates a new builder for constructing a messenger of the given
     /// type.
     pub(super) fn new(
-        messenger_action_tx: MessengerActionSender<P, A, R>,
-        messenger_type: MessengerType<P, A, R>,
+        messenger_action_tx: MessengerActionSender<P, A>,
+        messenger_type: MessengerType<P, A>,
     ) -> Self {
         Self { messenger_action_tx, messenger_type, roles: HashSet::new() }
     }
@@ -46,8 +46,8 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A
     }
 
     /// Constructs a messenger based on specifications supplied.
-    pub(crate) async fn build(self) -> CreateMessengerResult<P, A, R> {
-        let (tx, rx) = futures::channel::oneshot::channel::<CreateMessengerResult<P, A, R>>();
+    pub(crate) async fn build(self) -> CreateMessengerResult<P, A> {
+        let (tx, rx) = futures::channel::oneshot::channel::<CreateMessengerResult<P, A>>();
 
         // Panic if send failed since a messenger cannot be created.
         self.messenger_action_tx
@@ -64,26 +64,19 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Builder<P, A
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]
-pub struct MessengerClient<
-    P: Payload + 'static,
-    A: Address + 'static,
-    R: Role + 'static = default::Role,
-> {
-    messenger: Messenger<P, A, R>,
+pub struct MessengerClient<P: Payload + 'static, A: Address + 'static> {
+    messenger: Messenger<P, A>,
     _fuse: ActionFuseHandle, // Handle that maintains scoped messenger cleanup
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessengerClient<P, A, R> {
-    pub(super) fn new(
-        messenger: Messenger<P, A, R>,
-        fuse: ActionFuseHandle,
-    ) -> MessengerClient<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> MessengerClient<P, A> {
+    pub(super) fn new(messenger: Messenger<P, A>, fuse: ActionFuseHandle) -> MessengerClient<P, A> {
         MessengerClient { messenger, _fuse: fuse }
     }
 
     /// Creates a MessageBuilder for a new message with the specified payload
     /// and audience.
-    pub(crate) fn message(&self, payload: P, audience: Audience<A>) -> MessageBuilder<P, A, R> {
+    pub(crate) fn message(&self, payload: P, audience: Audience<A>) -> MessageBuilder<P, A> {
         MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
     }
 
@@ -96,16 +89,16 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> MessengerCli
 /// Messengers provide clients the ability to send messages to other registered
 /// clients. They can only be created through a MessageHub.
 #[derive(Clone, Debug)]
-pub struct Messenger<P: Payload + 'static, A: Address + 'static, R: Role + 'static> {
+pub struct Messenger<P: Payload + 'static, A: Address + 'static> {
     fingerprint: Fingerprint<A>,
-    action_tx: ActionSender<P, A, R>,
+    action_tx: ActionSender<P, A>,
 }
 
-impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Messenger<P, A, R> {
+impl<P: Payload + 'static, A: Address + 'static> Messenger<P, A> {
     pub(super) fn new(
         fingerprint: Fingerprint<A>,
-        action_tx: ActionSender<P, A, R>,
-    ) -> Messenger<P, A, R> {
+        action_tx: ActionSender<P, A>,
+    ) -> Messenger<P, A> {
         Messenger { fingerprint, action_tx }
     }
 
@@ -116,14 +109,14 @@ impl<P: Payload + 'static, A: Address + 'static, R: Role + 'static> Messenger<P,
 
     /// Forwards the message to the next Messenger. Note that this method is
     /// private and only called through the MessageClient.
-    pub(super) fn forward(&self, message: Message<P, A, R>, beacon: Option<Beacon<P, A, R>>) {
+    pub(super) fn forward(&self, message: Message<P, A>, beacon: Option<Beacon<P, A>>) {
         self.transmit(MessageAction::Forward(message), beacon);
     }
 
     /// Tranmits a given action to the message hub. This is a common utility
     /// method to be used for immediate actions (forwarding, observing) and
     /// deferred actions as well (sending, replying).
-    pub(super) fn transmit(&self, action: MessageAction<P, A, R>, beacon: Option<Beacon<P, A, R>>) {
+    pub(super) fn transmit(&self, action: MessageAction<P, A>, beacon: Option<Beacon<P, A>>) {
         // Do not transmit if the message hub has exited.
         if self.action_tx.is_closed() {
             return;

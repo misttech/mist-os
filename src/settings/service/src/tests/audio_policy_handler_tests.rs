@@ -47,7 +47,6 @@ struct MessageHub;
 impl MessageHubDefinition for MessageHub {
     type Payload = TestEnvironmentPayload;
     type Address = crate::message::base::default::Address;
-    type Role = crate::message::base::default::Role;
 }
 
 struct TestEnvironment {
