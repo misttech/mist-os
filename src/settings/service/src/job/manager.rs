@@ -32,8 +32,6 @@ type JobStreamItem = (source::Id, Option<Result<Job, Error>>);
 
 /// [Manager] processes incoming streams for new [Job]s. [Job]s are handled and executed by the
 /// [Manager] based on the [Job] definitions.
-// TODO(fxbug.dev/70534): Use Manager to handle FIDL requests.
-#[allow(dead_code)]
 pub(crate) struct Manager {
     /// A mapping from [source id](source::Id) to [handler](source::Handler). This mapping is used
     /// to retrieve the [handler](source::Handler) for job updates (inserting, retrieving,
