@@ -5,7 +5,6 @@
     include: [
         "//src/connectivity/network/tun/network-tun/meta/network-tun-test.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
-        "driver_test_realm/meta/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
