@@ -70,7 +70,7 @@ class CobaltApp {
   // |max_bytes_per_observation_store| The maximum number of bytes to store for each of the
   //                                   observation_stores.
   //
-  // |storage_quotas| The storage quotas used by Cobalt 1.1 local aggregation.
+  // |storage_quotas| The storage quotas used by Cobalt's local aggregation.
   //
   // |product_name| A product name included in the SystemProfile that is implicitly part of every
   //                Cobalt metric.

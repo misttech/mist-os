@@ -22,9 +22,9 @@
 namespace cobalt {
 namespace testapp {
 
-// Tests of Cobalt 1.1 metrics, all of which use local aggregation.
+// Tests of Cobalt metrics, all of which use local aggregation.
 //
-// Each of these tests assumes that the local_aggregation_1.1 has been updated with
+// Each of these tests assumes that the local_aggregation has been updated with
 // the ProjectContext of |logger|, but that the LocalAggregation's LocalAggregateStorage
 // contains no aggregates. One way to ensure this is to reconnect to the Cobalt
 // app immediately before running each of these tests.

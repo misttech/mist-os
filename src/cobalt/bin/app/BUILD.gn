@@ -167,28 +167,28 @@ resource("cobalt_devel_environment") {
 }
 
 resource("analyzer_devel_public") {
-  # Cobalt 1.0 analyzer public key for devel environment.
+  # Cobalt analyzer public key for devel environment.
   sources =
       [ rebase_path("//third_party/cobalt/keys/analyzer_public.cobalt_key") ]
   outputs = [ "data/keys/analyzer_devel_public" ]
 }
 
 resource("shuffler_devel_public") {
-  # Cobalt 1.0 shuffler public key for devel environment.
+  # Cobalt shuffler public key for devel environment.
   sources =
       [ rebase_path("//third_party/cobalt/keys/shuffler_public.cobalt_key") ]
   outputs = [ "data/keys/shuffler_devel_public" ]
 }
 
 resource("analyzer_prod_public") {
-  # Cobalt 1.0 analyzer public key for prod environment.
+  # Cobalt analyzer public key for prod environment.
   sources = [ rebase_path(
           "//third_party/cobalt/keys/analyzer_prod_public.cobalt_key") ]
   outputs = [ "data/keys/analyzer_prod_public" ]
 }
 
 resource("shuffler_prod_public") {
-  # Cobalt 1.0 shuffler public key for prod environment.
+  # Cobalt shuffler public key for prod environment.
   sources = [ rebase_path(
           "//third_party/cobalt/keys/shuffler_prod_public.cobalt_key") ]
   outputs = [ "data/keys/shuffler_prod_public" ]
