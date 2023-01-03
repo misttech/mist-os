@@ -427,16 +427,15 @@ impl controller::Handle for InputController {
                     Ok(state) => state,
                     Err(e) => return Some(Err(e)),
                 };
-                if old_state.has_state(DeviceState::MUTED) != is_muted {
-                    return Some(
-                        self.inner
-                            .lock()
-                            .await
-                            .set_sw_camera_mute(is_muted, DEFAULT_CAMERA_NAME.to_string())
-                            .await,
-                    );
-                }
-                None
+                Some(if old_state.has_state(DeviceState::MUTED) != is_muted {
+                    self.inner
+                        .lock()
+                        .await
+                        .set_sw_camera_mute(is_muted, DEFAULT_CAMERA_NAME.to_string())
+                        .await
+                } else {
+                    Ok(None)
+                })
             }
             Request::OnButton(mut buttons) => {
                 if buttons.mic_mute.is_some()
