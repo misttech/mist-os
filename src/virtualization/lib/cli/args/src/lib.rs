@@ -103,8 +103,7 @@ pub enum SubCommands {
     Stop(crate::stop_args::StopArgs),
     Balloon(crate::balloon_args::BalloonArgs),
     List(crate::list_args::ListArgs),
-    Socat(SocatArgs),
-    SocatListen(SocatListenArgs),
+    Socat(crate::socat_args::SocatArgs),
     Vsh(VshArgs),
     VsockPerf(crate::vsockperf_args::VsockPerfArgs),
     Wipe(crate::wipe_args::WipeArgs),
@@ -202,28 +201,47 @@ pub mod list_args {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Create a socat connection on the specified port. Usage: guest socat guest-type port
-#[argh(subcommand, name = "socat")]
-pub struct SocatArgs {
-    #[argh(option)]
-    /// type of the guest
-    pub guest_type: GuestType,
-    #[argh(option)]
-    /// port for listeners to connect on.
-    pub port: u32,
-}
+pub mod socat_args {
+    use super::*;
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Interact with the guest via socat. See the sub-command help for details.
+    #[argh(subcommand, name = "socat")]
+    #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
+    pub struct SocatArgs {
+        #[argh(subcommand)]
+        pub socat_cmd: SocatCommands,
+    }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Listen through socat on the specified port. Usage: guest socat-listen guest-type host-port
-#[argh(subcommand, name = "socat-listen")]
-pub struct SocatListenArgs {
-    #[argh(option)]
-    /// type of the guest
-    pub guest_type: GuestType,
-    #[argh(option)]
-    /// port number of host (see `guest socat`)
-    pub host_port: u32,
+    #[derive(FromArgs, PartialEq, Debug)]
+    #[argh(subcommand)]
+    pub enum SocatCommands {
+        Listen(SocatListen),
+        Connect(SocatConnect),
+    }
+
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Create a socat connection on the specified port. Usage: guest socat connect guest-type port
+    #[argh(subcommand, name = "connect")]
+    pub struct SocatConnect {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+        #[argh(positional)]
+        /// guest port number to attempt to connect to
+        pub guest_port: u32,
+    }
+
+    #[derive(FromArgs, PartialEq, Debug)]
+    /// Listen through socat on the specified port. Usage: guest socat listen guest-type host-port
+    #[argh(subcommand, name = "listen")]
+    pub struct SocatListen {
+        #[argh(positional)]
+        /// type of the guest
+        pub guest_type: GuestType,
+        #[argh(positional)]
+        /// host port number to accept incoming guest connections on
+        pub host_port: u32,
+    }
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

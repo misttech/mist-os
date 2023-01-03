@@ -5,7 +5,6 @@ use {crate::arguments::*, anyhow::Error};
 
 mod arguments;
 mod services;
-mod socat;
 mod vsh;
 
 #[fuchsia::main(logging_tags = ["guest"])]
@@ -50,13 +49,9 @@ async fn main() -> Result<(), Error> {
             Ok(())
         }
         SubCommands::Socat(socat_args) => {
-            let vsock_endpoint = socat::connect_to_vsock_endpoint(socat_args.guest_type).await?;
-            socat::handle_socat(vsock_endpoint, socat_args.port).await
-        }
-        SubCommands::SocatListen(socat_listen_args) => {
-            let vsock_endpoint =
-                socat::connect_to_vsock_endpoint(socat_listen_args.guest_type).await?;
-            socat::handle_socat_listen(vsock_endpoint, socat_listen_args.host_port).await
+            let output = guest_cli::socat::handle_socat(&services, &socat_args).await;
+            println!("{}", output);
+            Ok(())
         }
         SubCommands::Vsh(vsh_args) => {
             // SAFETY: These unsafe helpers should only be called once as they take ownership of the

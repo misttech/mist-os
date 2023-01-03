@@ -55,6 +55,7 @@ rustc_library("guest_cli") {
     "src/platform/fuchsia.rs",
     "src/platform/host.rs",
     "src/platform/mod.rs",
+    "src/socat.rs",
     "src/stop.rs",
     "src/vsockperf.rs",
     "src/wipe.rs",
