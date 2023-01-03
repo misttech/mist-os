@@ -24,7 +24,6 @@ use zx::Duration;
 
 /// Minimum amount of time between flushing to disk, in milliseconds. The flush call triggers
 /// file I/O which is slow.
-// TODO(fxbug.dev/95380) Investigate if this value should be updated for fidl-based storage.
 const MIN_FLUSH_INTERVAL_MS: i64 = 500;
 const MAX_FLUSH_INTERVAL_MS: i64 = 1_800_000; // 30 minutes
 const MIN_FLUSH_DURATION: Duration = Duration::from_millis(MIN_FLUSH_INTERVAL_MS);
