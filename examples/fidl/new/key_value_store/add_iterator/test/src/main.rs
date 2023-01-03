@@ -4,7 +4,6 @@
 
 use {
     anyhow::Error,
-    diagnostics_data::{Data, Logs},
     example_tester::{assert_logs_eq_to_golden, run_test, Client, Server, TestKind},
     fidl::prelude::*,
     fidl_examples_keyvaluestore_additerator::StoreMarker,
@@ -31,9 +30,13 @@ async fn test_iteration(test_name: &str, iterate_from: &str) -> Result<(), Error
             builder.set_config_value_string(&client, "iterate_from", iterate_from).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            assert_logs_eq_to_golden(&raw_logs, &client);
-            assert_logs_eq_to_golden(&raw_logs, &server);
+        |log_reader| {
+            let client_clone = client.clone();
+            let server_clone = server.clone();
+            async move {
+                assert_logs_eq_to_golden(&log_reader, &client_clone).await;
+                assert_logs_eq_to_golden(&log_reader, &server_clone).await;
+            }
         },
     )
     .await

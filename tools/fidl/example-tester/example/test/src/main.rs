@@ -29,12 +29,16 @@ async fn test_one_component_log_by_log() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", 3).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            let all_logs = logs_to_str(&raw_logs, None);
-            assert_eq!(all_logs.filter(|log| *log == "Started").count(), 1);
+        |log_reader| {
+            let client_clone = client.clone();
+            async move {
+                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let all_logs = logs_to_str(&raw_logs, None);
+                assert_eq!(all_logs.filter(|log| *log == "Started").count(), 1);
 
-            let client_logs = logs_to_str(&raw_logs, Some(vec![&client]));
-            assert_eq!(client_logs.last().expect("no response"), format!("Response: {}", 4));
+                let client_logs = logs_to_str(&raw_logs, Some(vec![&client_clone]));
+                assert_eq!(client_logs.last().expect("no response"), format!("Response: {}", 4));
+            }
         },
     )
     .await
@@ -64,8 +68,11 @@ async fn test_one_component() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", 30).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            assert_filtered_logs_eq_to_golden(&raw_logs, &client, filter);
+        |log_reader| {
+            let client_clone = client.clone();
+            async move {
+                assert_filtered_logs_eq_to_golden(&log_reader, &client_clone, filter).await;
+            }
         },
     )
     .await
@@ -91,23 +98,28 @@ async fn test_two_component_log_by_log() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", addend).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            let all_logs = logs_to_str(&raw_logs, None);
-            assert_eq!(all_logs.filter(|log| *log == "Started").count(), 2);
+        |log_reader| {
+            let server_clone = server.clone();
+            let client_clone = client.clone();
+            async move {
+                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let all_logs = logs_to_str(&raw_logs, None);
+                assert_eq!(all_logs.filter(|log| *log == "Started").count(), 2);
 
-            let non_client_logs = logs_to_str(&raw_logs, Some(vec![&server]));
-            assert_eq!(
-                non_client_logs
-                    .filter(|log| *log == "Request received" || *log == "Response sent")
-                    .count(),
-                2
-            );
+                let non_client_logs = logs_to_str(&raw_logs, Some(vec![&server_clone]));
+                assert_eq!(
+                    non_client_logs
+                        .filter(|log| *log == "Request received" || *log == "Response sent")
+                        .count(),
+                    2
+                );
 
-            let client_logs = logs_to_str(&raw_logs, Some(vec![&client]));
-            assert_eq!(
-                client_logs.last().expect("no response"),
-                format!("Response: {}", want_response)
-            );
+                let client_logs = logs_to_str(&raw_logs, Some(vec![&client_clone]));
+                assert_eq!(
+                    client_logs.last().expect("no response"),
+                    format!("Response: {}", want_response)
+                );
+            }
         },
     )
     .await
@@ -139,9 +151,13 @@ async fn test_two_component() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", 20).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            assert_filtered_logs_eq_to_golden(&raw_logs, &client, filter);
-            assert_filtered_logs_eq_to_golden(&raw_logs, &server, filter);
+        |log_reader| {
+            let client_clone = client.clone();
+            let server_clone = server.clone();
+            async move {
+                assert_filtered_logs_eq_to_golden(&log_reader, &client_clone, filter).await;
+                assert_filtered_logs_eq_to_golden(&log_reader, &server_clone, filter).await;
+            }
         },
     )
     .await
@@ -168,23 +184,29 @@ async fn test_three_component_log_by_log() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", addend).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            let all_logs = logs_to_str(&raw_logs, None);
-            assert_eq!(all_logs.filter(|log| *log == "Started").count(), 3);
+        |log_reader| {
+            let proxy_fut = proxy.clone();
+            let client_clone = client.clone();
+            let server_clone = server.clone();
+            async move {
+                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let all_logs = logs_to_str(&raw_logs, None);
+                assert_eq!(all_logs.filter(|log| *log == "Started").count(), 3);
 
-            let non_client_logs = logs_to_str(&raw_logs, Some(vec![&proxy, &server]));
-            assert_eq!(
-                non_client_logs
-                    .filter(|log| *log == "Request received" || *log == "Response sent")
-                    .count(),
-                4
-            );
+                let non_client_logs = logs_to_str(&raw_logs, Some(vec![&proxy_fut, &server_clone]));
+                assert_eq!(
+                    non_client_logs
+                        .filter(|log| *log == "Request received" || *log == "Response sent")
+                        .count(),
+                    4
+                );
 
-            let client_logs = logs_to_str(&raw_logs, Some(vec![&client]));
-            assert_eq!(
-                client_logs.last().expect("no response"),
-                format!("Response: {}", want_response)
-            );
+                let client_logs = logs_to_str(&raw_logs, Some(vec![&client_clone]));
+                assert_eq!(
+                    client_logs.last().expect("no response"),
+                    format!("Response: {}", want_response)
+                );
+            }
         },
     )
     .await
@@ -217,10 +239,15 @@ async fn test_three_component() -> Result<(), Error> {
             builder.set_config_value_uint8(&client, "addend", 50).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            assert_filtered_logs_eq_to_golden(&raw_logs, &client, filter);
-            assert_filtered_logs_eq_to_golden(&raw_logs, &proxy, filter);
-            assert_filtered_logs_eq_to_golden(&raw_logs, &server, filter);
+        |log_reader| {
+            let client_clone = client.clone();
+            let server_clone = server.clone();
+            let proxy_fut = proxy.clone();
+            async move {
+                assert_filtered_logs_eq_to_golden(&log_reader, &client_clone, filter).await;
+                assert_filtered_logs_eq_to_golden(&log_reader, &proxy_fut, filter).await;
+                assert_filtered_logs_eq_to_golden(&log_reader, &server_clone, filter).await;
+            }
         },
     )
     .await

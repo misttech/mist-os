@@ -43,9 +43,13 @@ async fn test_draw_success() -> Result<(), Error> {
                 .await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
-        |raw_logs: Vec<Data<Logs>>| {
-            assert_filtered_logs_eq_to_golden(&raw_logs, &client, filter);
-            assert_filtered_logs_eq_to_golden(&raw_logs, &server, filter);
+        |log_reader| {
+            let client_clone = client.clone();
+            let server_clone = server.clone();
+            async move {
+                assert_filtered_logs_eq_to_golden(&log_reader, &client_clone, filter).await;
+                assert_filtered_logs_eq_to_golden(&log_reader, &server_clone, filter).await;
+            }
         },
     )
     .await

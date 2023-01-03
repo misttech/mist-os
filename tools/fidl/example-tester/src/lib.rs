@@ -7,10 +7,11 @@ use {
     component_events::{events::*, matcher::*, sequence::*},
     diagnostics_data::{Data, Logs},
     diagnostics_reader::ArchiveReader,
+    fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route},
+    fuchsia_zircon::DurationNum,
     regex::Regex,
     std::future::Future,
-    std::{thread, time},
 };
 
 /// Represents a component under test. The `name` is the test-local name assigned to the component,
@@ -23,6 +24,7 @@ pub trait Component {
 }
 
 /// Represents the client component under test.
+#[derive(Clone)]
 pub struct Client<'a> {
     name: String,
     path: &'a str,
@@ -60,6 +62,7 @@ impl<'a> Component for Client<'a> {
 }
 
 /// Represents a proxy component under test.
+#[derive(Clone)]
 pub struct Proxy<'a> {
     name: String,
     path: &'a str,
@@ -97,6 +100,7 @@ impl<'a> Component for Proxy<'a> {
 }
 
 /// Represents a server component under test.
+#[derive(Clone)]
 pub struct Server<'a> {
     name: String,
     path: &'a str,
@@ -150,14 +154,15 @@ pub enum TestKind<'a> {
 /// logged values. Note that these are raw logs - most users will want to process the logs into
 /// string form, which can be accomplished by passing the raw log vector to the `logs_to_str` helper
 /// function.
-pub async fn run_test<Fut>(
+pub async fn run_test<'a, Fut, FutLogsReader>(
     protocol_name: &str,
-    test_kind: TestKind<'_>,
+    test_kind: TestKind<'a>,
     input_setter: impl FnOnce(RealmBuilder, ChildRef) -> Fut,
-    logs_reader: impl Fn(Vec<Data<Logs>>),
+    logs_reader: impl Fn(ArchiveReader) -> FutLogsReader,
 ) -> Result<(), Error>
 where
-    Fut: Future<Output = Result<(RealmBuilder, ChildRef), Error>>,
+    Fut: Future<Output = Result<(RealmBuilder, ChildRef), Error>> + 'a,
+    FutLogsReader: Future<Output = ()> + 'a,
 {
     // Subscribe to started events for child components.
     let event_stream = EventStream::open().await.unwrap();
@@ -290,15 +295,11 @@ where
         archivist_reader.select_all_for_moniker(moniker.as_str());
     });
 
-    // TODO(fxbug.dev/76579): We need to sleep here to make sure all child component logs get
-    // drained. Once the referenced bug has been resolved, we can remove the sleep.
-    thread::sleep(time::Duration::from_secs(2));
-
     // Clean up the realm instance, and close all open processes.
     realm_instance.destroy().await?;
 
     // Read all of the logs out to the test, and exit.
-    logs_reader(archivist_reader.snapshot::<Logs>().await?);
+    logs_reader(archivist_reader);
     Ok(())
 }
 
@@ -353,17 +354,17 @@ pub fn logs_to_str_filtered<'a>(
 ///   /pkg/data/goldens/test_foo_bar_proxy.log.golden
 ///   /pkg/data/goldens/test_foo_bar_server.log.golden
 ///
-pub fn assert_logs_eq_to_golden<'a>(raw_logs: &'a Vec<Data<Logs>>, comp: &'a dyn Component) {
-    assert_filtered_logs_eq_to_golden(raw_logs, comp, |_raw_log| true)
+pub async fn assert_logs_eq_to_golden<'a>(log_reader: &'a ArchiveReader, comp: &'a dyn Component) {
+    assert_filtered_logs_eq_to_golden(&log_reader, comp, |_raw_log| true).await;
 }
 
 /// Same as |assert_logs_eq_to_golden|, except an additional filtering function may be used to trim
 /// arbitrary logs. This is particularly useful if one or more languages produces logs that we don't
 /// want to include in the final, common output to be compared across language implementations.
-pub fn assert_filtered_logs_eq_to_golden<'a>(
-    raw_logs: &'a Vec<Data<Logs>>,
+pub async fn assert_filtered_logs_eq_to_golden<'a>(
+    log_reader: &'a ArchiveReader,
     comp: &'a dyn Component,
-    filter_by_log: impl FnMut(&&Data<Logs>) -> bool + 'a,
+    filter_by_log: impl FnMut(&&Data<Logs>) -> bool + 'a + Copy,
 ) {
     // Extract the golden log data.
     let golden_path = format!("/pkg/data/goldens/{}.log.golden", comp.get_name());
@@ -372,13 +373,21 @@ pub fn assert_filtered_logs_eq_to_golden<'a>(
         .unwrap();
     let golden_logs = golden_file.as_str().trim();
 
-    // Compare it to the actual components actual logs, asserting if there is a mismatch.
-    let logs = logs_to_str_filtered(&raw_logs, Some(vec![comp]), filter_by_log)
-        .collect::<Vec<&str>>()
-        .join("\n");
-    if logs != golden_logs.trim() {
-        print!(
-            "
+    const MAX_ATTEMPTS: usize = 10;
+    let mut attempts = 0;
+    while attempts < MAX_ATTEMPTS {
+        attempts += 1;
+        let raw_logs = log_reader.snapshot::<Logs>().await.expect("can read from the accessor");
+
+        // Compare it to the actual components actual logs, asserting if there is a mismatch.
+        let logs = logs_to_str_filtered(&raw_logs, Some(vec![comp]), filter_by_log)
+            .collect::<Vec<&str>>()
+            .join("\n");
+        if logs == golden_logs.trim() {
+            break;
+        } else if attempts == MAX_ATTEMPTS {
+            print!(
+                "
 
 Logs golden mismatch in '{}' ({})
 Please copy the output between the '===' bounds into the golden file at {} in the fuchsia.git tree
@@ -388,11 +397,13 @@ Please copy the output between the '===' bounds into the golden file at {} in th
 
 
 ",
-            comp.get_name(),
-            comp.get_path(),
-            golden_path,
-            logs
-        );
+                comp.get_name(),
+                comp.get_path(),
+                golden_path,
+                logs
+            );
+            assert_eq!(logs, golden_logs)
+        }
+        fasync::Timer::new(fasync::Time::after(500.millis())).await;
     }
-    assert_eq!(logs, golden_logs)
 }

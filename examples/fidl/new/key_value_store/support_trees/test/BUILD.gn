@@ -12,7 +12,6 @@ rustc_test("runner_bin") {
   source_root = "src/main.rs"
   deps = [
     "//examples/fidl/new/key_value_store/support_trees/fidl:examples.keyvaluestore.supporttrees_rust",
-    "//src/lib/diagnostics/data/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
