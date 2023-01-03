@@ -12,6 +12,8 @@
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
+// LINT.IfChange
+
 namespace fidl {
 
 constexpr RetiredDef<0> ErrAlwaysRetired("error id fi-0000 was always retired");
@@ -451,5 +453,7 @@ constexpr FixableErrorDef<192, Fixable::Kind::kProtocolModifier, std::string_vie
         "from closed to open, and explicit modifiers are mandatory during the migration.)");
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
 }  // namespace fidl
+
+// LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_H_

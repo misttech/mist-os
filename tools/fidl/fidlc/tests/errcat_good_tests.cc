@@ -12,9 +12,9 @@
 // in this suite - their purpose is not to serve as tests for the features at hand, but rather to
 // provide well-vetted and tested examples of the "correct" way to fix FIDL errors.
 
-namespace {
-
 // LINT.IfChange
+
+namespace {
 
 TEST(ConstsTests, Good0003) {
   TestLibrary library;
