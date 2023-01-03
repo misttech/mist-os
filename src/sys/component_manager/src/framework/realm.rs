@@ -114,18 +114,21 @@ impl RealmCapabilityHost {
     pub async fn serve(
         &self,
         component: WeakComponentInstance,
-        stream: fcomponent::RealmRequestStream,
+        mut stream: fcomponent::RealmRequestStream,
     ) -> Result<(), fidl::Error> {
-        stream
-            .try_for_each(|request| async {
-                let method_name = request.method_name();
-                let res = self.handle_request(request, &component).await;
-                if let Err(error) = &res {
+        while let Some(request) = stream.try_next().await? {
+            let method_name = request.method_name();
+            let result = self.handle_request(request, &component).await;
+            match result {
+                // If the error was PEER_CLOSED then we don't need to log it as a client can
+                // disconnect while we are processing its request.
+                Err(error) if !error.is_closed() => {
                     warn!(%method_name, %error, "Couldn't send Realm response");
                 }
-                res
-            })
-            .await
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     async fn handle_request(
