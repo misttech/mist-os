@@ -38,14 +38,6 @@ pub const LINEAR_HISTOGRAM_EXTRA_SLOTS: usize = 4;
 /// step and step multiplier) and 2 overflow slots.
 pub const EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS: usize = 5;
 
-// TODO(fxbug.dev/43873): move LinkNodeDisposition and ArrayFormat to fuchsia-inspect-format
-/// Disposition of a Link value.
-#[derive(Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-pub enum LinkNodeDisposition {
-    Child = 0,
-    Inline = 1,
-}
-
 /// Format in which the array will be read.
 #[derive(Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 pub enum ArrayFormat {
@@ -376,19 +368,6 @@ impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key> {
             return Some((self.current_key.clone(), Some(property)));
         }
     }
-}
-
-/// A lazy node in a hierarchy.
-#[derive(Debug, PartialEq, Clone)]
-pub struct LinkValue {
-    /// The name of the link.
-    pub name: String,
-
-    /// The content of the link.
-    pub content: String,
-
-    /// The disposition of the link in the hierarchy when evaluated.
-    pub disposition: LinkNodeDisposition,
 }
 
 /// A named property. Each of the fields consists of (name, value).

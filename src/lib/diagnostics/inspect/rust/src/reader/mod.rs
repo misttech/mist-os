@@ -49,10 +49,8 @@ pub use {
         tree_reader::read,
         tree_reader::read_with_timeout,
     },
-    diagnostics_hierarchy::{
-        ArrayContent, ArrayFormat, Bucket, DiagnosticsHierarchy, LinkNodeDisposition, LinkValue,
-        Property,
-    },
+    diagnostics_hierarchy::{ArrayContent, ArrayFormat, Bucket, DiagnosticsHierarchy, Property},
+    inspect_format::LinkNodeDisposition,
 };
 
 mod error;
@@ -77,6 +75,19 @@ pub struct PartialNodeHierarchy {
 
     /// Links this node hierarchy haven't expanded yet.
     pub(crate) links: Vec<LinkValue>,
+}
+
+/// A lazy node in a hierarchy.
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct LinkValue {
+    /// The name of the link.
+    pub name: String,
+
+    /// The content of the link.
+    pub content: String,
+
+    /// The disposition of the link in the hierarchy when evaluated.
+    pub disposition: LinkNodeDisposition,
 }
 
 impl PartialNodeHierarchy {

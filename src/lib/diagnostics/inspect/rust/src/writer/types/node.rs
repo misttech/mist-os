@@ -10,11 +10,9 @@ use crate::writer::{
     StringArrayProperty, StringProperty, StringReference, UintArrayProperty,
     UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty, ValueList,
 };
-use diagnostics_hierarchy::{
-    ArrayFormat, ExponentialHistogramParams, LinearHistogramParams, LinkNodeDisposition,
-};
+use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
-use inspect_format::{constants, PropertyFormat};
+use inspect_format::{constants, LinkNodeDisposition, PropertyFormat};
 
 #[cfg(test)]
 use inspect_format::{Block, Container};

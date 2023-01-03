@@ -10,11 +10,9 @@ use {
     },
     anyhow::{bail, format_err, Error},
     base64,
-    diagnostics_hierarchy::{
-        ArrayContent, DiagnosticsHierarchy, LinkNodeDisposition, Property as iProperty,
-    },
+    diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property as iProperty},
     difference,
-    inspect_format::ArrayFormat,
+    inspect_format::{ArrayFormat, LinkNodeDisposition},
     num_derive::{FromPrimitive, ToPrimitive},
     std::{
         self,

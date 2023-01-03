@@ -6,12 +6,11 @@ use {
     super::{validate::ROOT_ID, Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME},
     crate::metrics::{BlockMetrics, BlockStatus},
     anyhow::{bail, format_err, Error},
-    diagnostics_hierarchy::LinkNodeDisposition,
     fuchsia_inspect::{reader as ireader, reader::snapshot::ScannedBlock},
     fuchsia_zircon::Vmo,
     inspect_format::{
         constants::EMPTY_STRING_SLOT_INDEX, constants::MIN_ORDER_SIZE, ArrayFormat, BlockType,
-        PropertyFormat,
+        LinkNodeDisposition, PropertyFormat,
     },
     std::{
         self,

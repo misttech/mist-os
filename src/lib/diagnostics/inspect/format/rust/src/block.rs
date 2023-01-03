@@ -21,7 +21,14 @@ use std::{
     sync::atomic::{fence, Ordering},
 };
 
-pub use diagnostics_hierarchy::{ArrayFormat, LinkNodeDisposition};
+pub use diagnostics_hierarchy::ArrayFormat;
+
+/// Disposition of a Link value.
+#[derive(Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+pub enum LinkNodeDisposition {
+    Child = 0,
+    Inline = 1,
+}
 
 /// Format in which the property will be read.
 #[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
