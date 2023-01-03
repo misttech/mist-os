@@ -310,7 +310,7 @@ impl DocYamlCheck for YamlChecker {
                             if markdown_file_set.take(&file_path).is_none()
                                 && !visited.contains(&file_path)
                             {
-                                errors.push(DocCheckError::new(
+                                errors.push(DocCheckError::new_error(
                                     0,
                                     yaml_doc.clone(),
                                     &format!("Reference to missing file: {}", p),
@@ -329,7 +329,7 @@ impl DocYamlCheck for YamlChecker {
                         .map(|p| self.root_dir.join(p.strip_prefix('/').unwrap_or(p.as_str())))
                         .filter(|p| {
                             if p == &current_yaml {
-                                errors.push(DocCheckError::new(
+                                errors.push(DocCheckError::new_error(
                                     0,
                                     current_yaml.clone(),
                                     &format!(
@@ -345,7 +345,7 @@ impl DocYamlCheck for YamlChecker {
                     toc_stack.extend(additional_paths);
                 }
             } else if !visited.contains(&current_yaml) {
-                return Ok(Some(vec![DocCheckError::new(
+                return Ok(Some(vec![DocCheckError::new_error(
                     0,
                     current_yaml.clone(),
                     &format!("Cannot find {:?} at {:?}", &current_yaml, &yaml_file_set),
@@ -369,7 +369,7 @@ impl DocYamlCheck for YamlChecker {
             .filter(|p| !p.ends_with("gen/build_arguments.md"))
             .copied()
             .for_each(|f| {
-                errors.push(DocCheckError::new(
+                errors.push(DocCheckError::new_error(
                     0,
                     f.clone(),
                     "File not referenced in any _toc.yaml files.",
@@ -377,7 +377,7 @@ impl DocYamlCheck for YamlChecker {
             });
 
         yaml_file_set.iter().filter(|f| f.ends_with("_toc.yaml")).for_each(|&f| {
-            errors.push(DocCheckError::new(
+            errors.push(DocCheckError::new_error(
                 0,
                 f.clone(),
                 "File not reachable via _toc include references.",
@@ -420,7 +420,11 @@ fn check_path(
     match do_check_link(doc_line, path, project) {
         Ok(Some(doc_error)) => return Some(doc_error),
         Err(e) => {
-            return Some(DocCheckError { doc_line: doc_line.clone(), message: format!("{}", e) })
+            return Some(DocCheckError::new_error(
+                doc_line.line_num,
+                doc_line.file_name.clone(),
+                &e.to_string(),
+            ))
         }
         Ok(None) => {}
     };
@@ -430,10 +434,11 @@ fn check_path(
     if ["/CONTRIBUTING.md", "/CODE_OF_CONDUCT.md"].contains(&path) {
         let filepath = root_path.join(path.strip_prefix('/').unwrap_or(path));
         if !path_helper::exists(&filepath) {
-            return Some(DocCheckError {
-                doc_line: doc_line.clone(),
-                message: format!("File: {:?} not found.", filepath),
-            });
+            return Some(DocCheckError::new_error(
+                doc_line.line_num,
+                doc_line.file_name.clone(),
+                &format!("File: {:?} not found.", filepath),
+            ));
         }
         return None;
     }
@@ -447,13 +452,14 @@ fn check_path(
                 if in_tree_path.starts_with("/reference") {
                     None
                 } else {
-                    Some(DocCheckError {
-                        doc_line: doc_line.clone(),
-                        message: format!(
-                            "invalid path {}. Path must be in /docs (checked: {:?}",
+                    Some(DocCheckError::new_error(
+                        doc_line.line_num,
+                        doc_line.file_name.clone(),
+                        &format!(
+                            "Invalid path {}. Path must be in /docs (checked: {:?}",
                             path, in_tree_path
                         ),
-                    })
+                    ))
                 }
             } else {
                 do_in_tree_check(doc_line, root_path, docs_folder, path, &in_tree_path)
@@ -461,14 +467,16 @@ fn check_path(
         }
         // Accept external links.
         Ok(None) if is_external_path(path) => None,
-        Ok(None) => Some(DocCheckError {
-            doc_line: doc_line.clone(),
-            message: format!("invalid path {}", path),
-        }),
-        Err(e) => Some(DocCheckError {
-            doc_line: doc_line.clone(),
-            message: format!("Error checking path {}: {}", path, e),
-        }),
+        Ok(None) => Some(DocCheckError::new_error(
+            doc_line.line_num,
+            doc_line.file_name.clone(),
+            &format!("invalid path {}", path),
+        )),
+        Err(e) => Some(DocCheckError::new_error(
+            doc_line.line_num,
+            doc_line.file_name.clone(),
+            &format!("Error checking path {}: {}", path, e),
+        )),
     }
 }
 
@@ -490,7 +498,7 @@ fn check_deprecated_docs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocC
     //TODO(fxbug.dev/113636): Add a check that the to: doc exists.
     match result {
         Ok(_) => None,
-        Err(e) => Some(vec![DocCheckError::new(
+        Err(e) => Some(vec![DocCheckError::new_error(
             1,
             filename.to_path_buf(),
             &format!("invalid structure {}", e),
@@ -503,10 +511,11 @@ fn check_drivers_areas(filename: &Path, yaml_value: &Value) -> Option<Vec<DocChe
     //TODO(fxbug.dev/113634): Align on common _areas.yaml structure
     match result {
         Ok(_redirects) => None,
-        Err(e) => Some(vec![DocCheckError {
-            doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-            message: format!("invalid structure for _drivers_areas {}. Data: {:?}", e, yaml_value),
-        }]),
+        Err(e) => Some(vec![DocCheckError::new_error(
+            1,
+            filename.into(),
+            &format!("invalid structure for _drivers_areas {}. Data: {:?}", e, yaml_value),
+        )]),
     }
 }
 
@@ -520,7 +529,7 @@ fn check_eng_council(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheck
     let result = serde_yaml::from_value::<EngCouncil>(yaml_value.clone());
     match result {
         Ok(_redirects) => None,
-        Err(e) => Some(vec![DocCheckError::new(
+        Err(e) => Some(vec![DocCheckError::new_error(
             1,
             filename.to_path_buf(),
             &format!("invalid structure for EngCouncil {}. Found {:?}", e, yaml_value),
@@ -539,7 +548,7 @@ fn check_metadata(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckErr
     //TODO(fxbug.dev/113640): Add checks for metadata.
     match result {
         Ok(_redirects) => None,
-        Err(e) => Some(vec![DocCheckError::new(
+        Err(e) => Some(vec![DocCheckError::new_error(
             1,
             filename.to_path_buf(),
             &format!("invalid structure for _metadata {}. Data: {:?}", e, yaml_value),
@@ -558,7 +567,7 @@ fn check_redirects(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckEr
     //TODO(fxbug.dev/113642): add valication to redirects.
     match result {
         Ok(_) => None,
-        Err(e) => Some(vec![DocCheckError::new(
+        Err(e) => Some(vec![DocCheckError::new_error(
             1,
             filename.to_path_buf(),
             &format!("invalid structure {}", e),
@@ -586,7 +595,7 @@ fn check_supported_cpu_architecture(
     //TODO(fxbug.dev/113645): Add validation
     match result {
         Ok(_redirects) => None,
-        Err(e) => Some(vec![DocCheckError::new(
+        Err(e) => Some(vec![DocCheckError::new_error(
             1,
             filename.to_path_buf(),
             &format!(
@@ -619,7 +628,7 @@ fn parse_entries<T: DeserializeOwned>(
         if item_list.is_empty() {
             (
                 None,
-                Some(vec![DocCheckError::new(
+                Some(vec![DocCheckError::new_error(
                     1,
                     filename.to_path_buf(),
                     &format!("unexpected empty list for {:?} file, got {:?}", filename, yaml_value),
@@ -634,7 +643,7 @@ fn parse_entries<T: DeserializeOwned>(
                 match result {
                     Ok(element) => items.push(element),
                     Err(e) => {
-                        errors.push(DocCheckError::new(
+                        errors.push(DocCheckError::new_error(
                             1,
                             filename.to_path_buf(),
                             &format!(
@@ -652,7 +661,7 @@ fn parse_entries<T: DeserializeOwned>(
     } else {
         (
             None,
-            Some(vec![DocCheckError::new(
+            Some(vec![DocCheckError::new_error(
                 1,
                 filename.to_path_buf(),
                 &format!(
@@ -693,10 +702,10 @@ mod test {
             ("/CODE_OF_CONDUCT.md", None),
             (
                 "/README.md",
-                Some(DocCheckError::new(
+                Some(DocCheckError::new_error(
                     1,
                     PathBuf::from("test-check-path"),
-                    "invalid path /README.md. Path must be in /docs (checked: \"/README.md\"",
+                    "Invalid path /README.md. Path must be in /docs (checked: \"/README.md\"",
                 )),
             ),
             ("https://fuchsia.dev/reference/to/something-else.md", None),
@@ -704,10 +713,10 @@ mod test {
             ("https://somewhere.com/is-ok", None),
             (
                 "/src/main.cc",
-                Some(DocCheckError::new(
+                Some(DocCheckError::new_error(
                     1,
                     PathBuf::from("test-check-path"),
-                    "invalid path /src/main.cc. Path must be in /docs (checked: \"/src/main.cc\"",
+                    "Invalid path /src/main.cc. Path must be in /docs (checked: \"/src/main.cc\"",
                 )),
             ),
         ];

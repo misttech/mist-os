@@ -11,21 +11,113 @@ use {
     async_trait::async_trait,
     serde_yaml::Value,
     std::{
-        fmt::{Debug, Display},
+        fmt::{self, Debug, Display},
         path::{Path, PathBuf},
     },
 };
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ErrorLevel {
+    Info,
+    Warning,
+    Error,
+}
+impl fmt::Display for ErrorLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ErrorLevel::Info => write!(f, "Info"),
+            ErrorLevel::Warning => write!(f, "Warning"),
+            ErrorLevel::Error => write!(f, "Error"),
+        }
+    }
+}
 
 /// An error reported by a [`DocCheck`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocCheckError {
     pub doc_line: DocLine,
     pub message: String,
+    pub help_suggestion: Option<String>,
+    pub level: ErrorLevel,
 }
 
 impl DocCheckError {
-    pub fn new(line_num: usize, file_name: PathBuf, message: &str) -> Self {
-        DocCheckError { doc_line: DocLine { line_num, file_name }, message: message.to_string() }
+    pub fn new_error(line_num: usize, file_name: PathBuf, message: &str) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: None,
+            level: ErrorLevel::Error,
+        }
+    }
+    pub fn new_error_helpful(
+        line_num: usize,
+        file_name: PathBuf,
+        message: &str,
+        help: &str,
+    ) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: Some(help.to_string()),
+            level: ErrorLevel::Error,
+        }
+    }
+    pub fn new_warning(line_num: usize, file_name: PathBuf, message: &str) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: None,
+            level: ErrorLevel::Warning,
+        }
+    }
+    pub fn new_warning_helpful(
+        line_num: usize,
+        file_name: PathBuf,
+        message: &str,
+        help: &str,
+    ) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: Some(help.to_string()),
+            level: ErrorLevel::Warning,
+        }
+    }
+    pub fn new_info(line_num: usize, file_name: PathBuf, message: &str) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: None,
+            level: ErrorLevel::Info,
+        }
+    }
+    pub fn new_info_helpful(
+        line_num: usize,
+        file_name: PathBuf,
+        message: &str,
+        help: &str,
+    ) -> Self {
+        DocCheckError {
+            doc_line: DocLine { line_num, file_name },
+            message: message.to_string(),
+            help_suggestion: Some(help.to_string()),
+            level: ErrorLevel::Info,
+        }
+    }
+}
+
+impl fmt::Display for DocCheckError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.help_suggestion {
+            Some(help) => f.write_fmt(format_args!(
+                "{} {}: {}. Consider using {}.",
+                self.doc_line, self.level, self.message, help
+            )),
+            None => {
+                f.write_fmt(format_args!("{} {}: {}.", self.doc_line, self.level, self.message))
+            }
+        }
     }
 }
 

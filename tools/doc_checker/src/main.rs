@@ -5,6 +5,8 @@
 //! doc_checker is a CLI tool to check markdown files for correctness in
 //! the Fuchsia project.
 
+pub(crate) use crate::checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck, ErrorLevel};
+pub(crate) use crate::md_element::DocContext;
 use {
     anyhow::{bail, Context, Result},
     argh::FromArgs,
@@ -16,9 +18,6 @@ use {
         path::PathBuf,
     },
 };
-
-pub(crate) use crate::checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck};
-pub(crate) use crate::md_element::DocContext;
 mod checker;
 mod include_checker;
 mod link_checker;
@@ -115,10 +114,28 @@ async fn main() -> Result<()> {
 
     if let Some(errors) = do_main(opt).await? {
         // Output the result
+        let mut error_count = 0;
+        let mut warning_count = 0;
+        let mut info_count = 0;
         for e in &errors {
-            println!("{}: {}", e.doc_line, e.message);
+            match e.level {
+                ErrorLevel::Info => info_count += 1,
+                ErrorLevel::Warning => warning_count += 1,
+                ErrorLevel::Error => error_count += 1,
+            }
+            println!("{}", e);
         }
-        bail!("{} errors found", errors.len())
+        // Only bail if there are errors, warnings should return OK.
+        if error_count > 0 {
+            bail!("Found {} errors, {} warnings, {} info.", error_count, warning_count, info_count)
+        } else {
+            println!(
+                "Found {} errors, {} warnings, {} info.",
+                error_count, warning_count, info_count
+            )
+        }
+    } else {
+        println!("No errors found");
     }
     Ok(())
 }
@@ -200,20 +217,22 @@ async fn do_main(opt: DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
         match c.post_check(&markdown_files, &yaml_files).await {
             Ok(Some(check_errors)) => errors.extend(check_errors),
             Ok(None) => {}
-            Err(e) => errors.push(DocCheckError {
-                doc_line: DocLine { line_num: 0, file_name: PathBuf::from("") },
-                message: format!("Error {} running check: {} ", e, c.name()),
-            }),
+            Err(e) => errors.push(DocCheckError::new_error(
+                0,
+                "".into(),
+                &format!("Error {} running check: {} ", e, c.name()),
+            )),
         }
     }
     for c in markdown_checks {
         match c.post_check().await {
             Ok(Some(check_errors)) => errors.extend(check_errors),
             Ok(None) => {}
-            Err(e) => errors.push(DocCheckError {
-                doc_line: DocLine { line_num: 0, file_name: PathBuf::from("") },
-                message: format!("Error {} running check: {} ", e, c.name()),
-            }),
+            Err(e) => errors.push(DocCheckError::new_error(
+                0,
+                "".into(),
+                &format!("Error {} running check: {} ", e, c.name()),
+            )),
         }
     }
 
@@ -237,10 +256,11 @@ pub fn check_markdown<'a>(
                 match c.check(&element) {
                     Ok(Some(check_errors)) => errors.extend(check_errors),
                     Ok(None) => {}
-                    Err(e) => errors.push(DocCheckError {
-                        doc_line: element.doc_line(),
-                        message: format!("Error {} running check: {:?} ", e, c.name()),
-                    }),
+                    Err(e) => errors.push(DocCheckError::new_error(
+                        0,
+                        "".into(),
+                        &format!("Error {} running check: {} ", e, c.name()),
+                    )),
                 }
             }
         }
@@ -264,10 +284,11 @@ fn check_yaml<'a>(
             match c.check(yaml_file, &val) {
                 Ok(Some(check_errors)) => errors.extend(check_errors),
                 Ok(None) => {}
-                Err(e) => errors.push(DocCheckError {
-                    doc_line: DocLine { line_num: 1, file_name: yaml_file.to_path_buf() },
-                    message: format!("Error {} running check: {} ", e, c.name()),
-                }),
+                Err(e) => errors.push(DocCheckError::new_error(
+                    0,
+                    "".into(),
+                    &format!("Error {} running check: {} ", e, c.name()),
+                )),
             }
         }
     }
@@ -294,35 +315,35 @@ mod test {
         env::set_current_dir(env::current_exe()?.parent().unwrap_or(&PathBuf::from(".")))?;
 
         let expected: Vec<DocCheckError> = vec![
-            DocCheckError::new(8, PathBuf::from("doc_checker_test_data/docs/README.md"),
+            DocCheckError::new_error(8, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "in-tree link to /docs/missing.md could not be found at \"doc_checker_test_data/docs/missing.md\""),
-            DocCheckError::new(11, PathBuf::from("doc_checker_test_data/docs/README.md"),
+            DocCheckError::new_error(11, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Should not link to https://fuchsia.dev/fuchsia-src/path.md via https, use relative filepath"),
-            DocCheckError::new(19, PathBuf::from("doc_checker_test_data/docs/README.md"),
+            DocCheckError::new_error(19, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/refs/heads/main/README.md"),
-            DocCheckError::new(21,PathBuf::from("doc_checker_test_data/docs/README.md"),
+            DocCheckError::new_error(21,PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Cannot normalize /docs/../../README.md, references parent beyond root."),
-            DocCheckError::new(5, PathBuf::from("doc_checker_test_data/docs/_common/_included.md"),
+            DocCheckError::new_error(5, PathBuf::from("doc_checker_test_data/docs/_common/_included.md"),
                 "in-tree link to /docs/missing.md could not be found at \"doc_checker_test_data/docs/missing.md\""),
-            DocCheckError::new(7, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
+            DocCheckError::new_error(7, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
                 "Included markdown file \"doc_checker_test_data/docs/_common/missing.md\" not found."),
-            DocCheckError::new(11, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
+            DocCheckError::new_error(11, PathBuf::from("doc_checker_test_data/docs/include_here.md"),
                "Included markdown file \"/docs/_common/_included.md\" must be a relative path."),
-            DocCheckError::new(2,  PathBuf::from("doc_checker_test_data/docs/no_readme/details.md"),
+            DocCheckError::new_error(2,  PathBuf::from("doc_checker_test_data/docs/no_readme/details.md"),
                 "in-tree link to /docs/no_readme could not be found at \"doc_checker_test_data/docs/no_readme\" or  \"doc_checker_test_data/docs/no_readme/README.md\""),
-            DocCheckError::new(4,PathBuf::from("doc_checker_test_data/docs/path.md"),
+            DocCheckError::new_error(4,PathBuf::from("doc_checker_test_data/docs/path.md"),
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
-            DocCheckError::new(4, PathBuf::from("doc_checker_test_data/docs/second.md"),
+            DocCheckError::new_error(4, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
-            DocCheckError::new(18, PathBuf::from("doc_checker_test_data/docs/second.md"),
+            DocCheckError::new_error(18, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Cannot normalize /docs/../../missing.md, references parent beyond root."),
-            DocCheckError::new(1, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
+            DocCheckError::new_error(1, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
                 "in-tree link to /docs/unused could not be found at \"doc_checker_test_data/docs/unused\" or  \"doc_checker_test_data/docs/unused/README.md\""),
-            DocCheckError::new(0, PathBuf::from("doc_checker_test_data/docs/cycle/_toc.yaml"),
+            DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/cycle/_toc.yaml"),
                 "YAML files cannot include themselves \"doc_checker_test_data/docs/cycle/_toc.yaml\""),
-            DocCheckError::new(0, PathBuf::from("doc_checker_test_data/docs/unreachable.md"),
+            DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/unreachable.md"),
                 "File not referenced in any _toc.yaml files."),
-            DocCheckError::new(0, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
+            DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
                 "File not reachable via _toc include references."),
         ];
 

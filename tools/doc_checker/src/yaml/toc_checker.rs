@@ -133,10 +133,11 @@ pub(crate) fn check_toc(
     match result {
         Ok(toc) => {
             if toc.toc.is_empty() {
-                errors.push(DocCheckError {
-                    doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-                    message: format!("toc cannot be empty. {:?}.", &yaml_value),
-                });
+                errors.push(DocCheckError::new_error(
+                    1,
+                    filename.to_path_buf(),
+                    &format!("The toc element cannot be empty: {:?}", &yaml_value),
+                ));
             }
             for toc_entry in toc.toc {
                 if let Some(path) = toc_entry.path.as_ref() {
@@ -154,72 +155,63 @@ pub(crate) fn check_toc(
                 }
                 if let Some(status) = toc_entry.status.as_ref() {
                     if !KNOWN_STATUS.contains(&status.as_str()) {
-                        errors.push(DocCheckError {
-                            doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-                            message: format!(
-                                "invalid status {}. Valid statuses are {:?}.",
+                        errors.push(DocCheckError::new_error(
+                            1,
+                            filename.to_path_buf(),
+                            &format!(
+                                "Invalid status {}. Valid statuses are {:?}",
                                 &status, KNOWN_STATUS
                             ),
-                        })
+                        ))
                     }
                 }
                 if toc_entry.step_group.is_some() {
                     // Cannot have Section, and needs Path
                     if toc_entry.section.is_some() {
-                        errors.push(DocCheckError {
-                            doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-                            message: format!(
-                                "invalid toc_entry {:?}. Cannot specify step_group and section.",
+                        errors.push(DocCheckError::new_error(
+                            1,
+                            filename.to_path_buf(),
+                            &format!(
+                                "Invalid toc_entry {:?}. Cannot specify step_group and section",
                                 &toc_entry
                             ),
-                        })
+                        ))
                     }
                     if toc_entry.path.is_none() {
-                        errors.push(DocCheckError {
-                            doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-                            message: format!(
-                                "invalid toc_entry {:?}. Cannot specify step_group and not path.",
+                        errors.push(DocCheckError::new_error(
+                            1,
+                            filename.to_path_buf(),
+                            &format!(
+                                "Invalid toc_entry {:?}. Cannot specify step_group and not path",
                                 &toc_entry
                             ),
-                        })
+                        ))
                     }
                 }
                 if let Some(style) = toc_entry.style.as_ref() {
                     if !["divider", "accordion"].contains(&style.as_str()) {
-                        errors.push(DocCheckError {
-                        doc_line: DocLine {
-                            line_num: 1,
-                            file_name: filename.to_path_buf(),
-                        },
-                        message: format!("invalid toc_entry {:?}. style must be  one of [\"divider\", \"accordion\"].", &toc_entry),
-                    })
+                        errors.push(DocCheckError::new_error(
+                            1,filename.to_path_buf(),
+                        &format!(
+                            "Invalid toc_entry {:?}. style must be  one of [\"divider\", \"accordion\"]", &toc_entry)))
                     }
                     if toc_entry.vertical_break.is_some() {
-                        errors.push(DocCheckError {
-                        doc_line: DocLine {
-                            line_num: 1,
-                            file_name: filename.to_path_buf(),
-                        },
-                        message: format!("invalid toc_entry {:?}. Cannot use break, include, style are mutually exclusive", &toc_entry),
-                    })
+                        errors.push(DocCheckError::new_error(
+                            1,filename.to_path_buf(),
+                            &format!(
+                                "Invalid toc_entry {:?}. Cannot use break, include, style are mutually exclusive", &toc_entry)))
                     }
                     if toc_entry.include.is_some() {
-                        errors.push(DocCheckError {
-                        doc_line: DocLine {
-                            line_num: 1,
-                            file_name: filename.to_path_buf(),
-                        },
-                        message: format!("invalid toc_entry {:?}. Cannot use break, include, style are mutually exclusive", &toc_entry),
-                    })
+                        errors.push(DocCheckError::new_error(
+                            1,filename.to_path_buf(),
+                            &format!(
+                                "Invalid toc_entry {:?}. Cannot use break, include, style are mutually exclusive", &toc_entry)))
                     }
                     if toc_entry.heading.is_none() && toc_entry.section.is_none() {
-                        errors.push(DocCheckError {
-                        doc_line: DocLine {
-                            line_num: 1,
-                            file_name: filename.to_path_buf(),
-                        },
-                        message: format!("invalid toc_entry {:?}. Use of style requires \"heading\" or \"section\".", &toc_entry),
-                    })
+                        errors.push(DocCheckError::new_error(
+                            1,filename.to_path_buf(),
+                            &format!(
+                                "Invalid toc_entry {:?}. Use of style requires \"heading\" or \"section\"", &toc_entry)))
                     }
                 }
             }
@@ -229,10 +221,11 @@ pub(crate) fn check_toc(
                 None
             }
         }
-        Err(e) => Some(vec![DocCheckError {
-            doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-            message: format!("invalid structure {}", e),
-        }]),
+        Err(e) => Some(vec![DocCheckError::new_error(
+            1,
+            filename.to_path_buf(),
+            &format!("Invalid structure {}", e),
+        )]),
     }
 }
 
@@ -252,10 +245,11 @@ mod test {
         if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
             assert_eq!(result.len(), 1);
             if let Some(err) = result.get(0) {
-                let expected = DocCheckError {
-                    doc_line: DocLine { line_num: 1, file_name: filename.to_path_buf() },
-                    message: format!("toc cannot be empty. {:?}.", yaml_value),
-                };
+                let expected = DocCheckError::new_error(
+                    1,
+                    filename.to_path_buf(),
+                    &format!("The toc element cannot be empty: {:?}", yaml_value),
+                );
                 assert_eq!(err, &expected);
             } else {
                 panic!("Expected error, but did not get one");
@@ -326,8 +320,9 @@ mod test {
         if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
             assert_eq!(result.len(), 1);
             if let Some(err) = result.get(0) {
-                let expected = DocCheckError { doc_line: DocLine { line_num: 1, file_name: PathBuf::from("_toc.yaml") },
-                message: "in-tree link to /docs/title1.md could not be found at \"/some/root/dir/docs/title1.md\"".to_string() };
+                let expected = DocCheckError::new_error(
+                    1, PathBuf::from("_toc.yaml"),
+                "in-tree link to /docs/title1.md could not be found at \"/some/root/dir/docs/title1.md\"");
                 assert_eq!(err, &expected);
             } else {
                 panic!("Expected error, but did not get one");
@@ -560,11 +555,16 @@ mod test {
         };
         let yaml_value = serde_yaml::to_value(&toc)?;
         if let Some(result) = check_toc(&root_dir, &docs_folder, project, &filename, &yaml_value) {
-            let expected_result =[ DocCheckError { doc_line: DocLine { line_num: 1, file_name: PathBuf::from("_toc.yaml") },
-            message: "invalid path /src/main.cc. Path must be in /docs (checked: \"/src/main.cc\"".to_string() },
-            DocCheckError { doc_line: DocLine { line_num: 1, file_name: PathBuf::from("_toc.yaml") },
-             message: "Error checking path /docs/../../invalid_path.md: Cannot normalize /docs/../../invalid_path.md, references parent beyond root.".to_string()},
-             DocCheckError { doc_line: DocLine { line_num: 1, file_name: PathBuf::from("_toc.yaml") }, message: "Invalid link http://{}.com/markdown : invalid uri character".to_string() }
+            let expected_result =[
+                 DocCheckError::new_error(
+                    1,PathBuf::from("_toc.yaml"),
+                     "Invalid path /src/main.cc. Path must be in /docs (checked: \"/src/main.cc\""),
+                DocCheckError::new_error(
+                    1, PathBuf::from("_toc.yaml"),
+                    "Error checking path /docs/../../invalid_path.md: Cannot normalize /docs/../../invalid_path.md, references parent beyond root."),
+                DocCheckError::new_error(
+                    1, PathBuf::from("_toc.yaml"),
+                     "Invalid link http://{}.com/markdown : invalid uri character")
             ];
 
             let mut expected_iter = expected_result.iter();

@@ -52,23 +52,22 @@ impl IncludeChecker {
                 for cap in INCLUDE_REGEX.captures_iter(trimmed) {
                     let file_path = PathBuf::from(&cap[1]);
                     if file_path.is_absolute() {
-                        return Ok(Some(vec![DocCheckError {
-                            doc_line: element.doc_line(),
-                            message: format!(
+                        return Ok(Some(vec![DocCheckError::new_error(
+                            element.doc_line().line_num,
+                            element.doc_line().file_name,
+                            &format!(
                                 "Included markdown file {:?} must be a relative path.",
                                 file_path
                             ),
-                        }]));
+                        )]));
                     } else {
                         let included = current_file_dir.join(file_path);
                         if !path_helper::exists(&included) {
-                            return Ok(Some(vec![DocCheckError {
-                                doc_line: element.doc_line(),
-                                message: format!(
-                                    "Included markdown file {:?} not found.",
-                                    included
-                                ),
-                            }]));
+                            return Ok(Some(vec![DocCheckError::new_error(
+                                element.doc_line().line_num,
+                                element.doc_line().file_name,
+                                &format!("Included markdown file {:?} not found.", included),
+                            )]));
                         }
                     }
                 }
@@ -170,7 +169,7 @@ mod tests {
         let data = [
             (
                 DocContext::new(PathBuf::from("/docs/README.md"), "does not exist <<missing.md>>"),
-                vec![DocCheckError::new(
+                vec![DocCheckError::new_error(
                     1,
                     PathBuf::from("/docs/README.md"),
                     "Included markdown file \"/docs/missing.md\" not found.",
@@ -181,7 +180,7 @@ mod tests {
                     PathBuf::from("/docs/README.md"),
                     " no absolute\" <</docs/README.md>>",
                 ),
-                vec![DocCheckError::new(
+                vec![DocCheckError::new_error(
                     1,
                     PathBuf::from("/docs/README.md"),
                     "Included markdown file \"/docs/README.md\" must be a relative path.",

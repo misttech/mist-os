@@ -193,13 +193,14 @@ impl DocCheck for LinkChecker {
                         // Check for alt text
                         let alt = ele.get_contents().trim().to_string();
                         if DISALLOWED_ALT_IMAGE_TEXT.contains(&alt.as_str()) {
-                            errors.push(DocCheckError {
-                                doc_line: ele.doc_line(),
-                                message: format!(
+                            errors.push(DocCheckError::new_error(
+                                ele.doc_line().line_num,
+                                ele.doc_line().file_name,
+                                &format!(
                                     "Invalid image alt text: {:?}, cannot  be one of {:?}",
                                     alt, DISALLOWED_ALT_IMAGE_TEXT
                                 ),
-                            })
+                            ))
                         }
                         link_url
                     }
@@ -235,10 +236,11 @@ impl DocCheck for LinkChecker {
                             });
                         }
                     }
-                    Err(e) => errors.push(DocCheckError {
-                        doc_line: element.doc_line(),
-                        message: format!("{}", e),
-                    }),
+                    Err(e) => errors.push(DocCheckError::new_error(
+                        element.doc_line().line_num,
+                        element.doc_line().file_name,
+                        &e.to_string(),
+                    )),
                 };
             }
         }
@@ -277,31 +279,31 @@ pub(crate) fn do_in_tree_check(
     let filepath = root_dir.join(in_tree_path.strip_prefix("/").unwrap_or(in_tree_path));
 
     if !path_helper::exists(&filepath) {
-        return Some(DocCheckError {
-            doc_line: doc_line.clone(),
-            message: format!(
-                "in-tree link to {} could not be found at {:?}",
-                link_to_check, filepath
-            ),
-        });
+        return Some(DocCheckError::new_error(
+            doc_line.line_num,
+            doc_line.file_name.clone(),
+            &format!("in-tree link to {} could not be found at {:?}", link_to_check, filepath),
+        ));
     } else if filepath.components().any(|c| c == path::Component::ParentDir) {
         let cannonical_path = match filepath.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                return Some(DocCheckError {
-                    doc_line: doc_line.clone(),
-                    message: format!("Error canonicalizing path: {:?}: {}", filepath, e),
-                })
+                return Some(DocCheckError::new_error(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!("Error canonicalizing path: {:?}: {}", filepath, e),
+                ))
             }
         };
         if !cannonical_path.starts_with(root_dir) {
-            return Some(DocCheckError {
-                doc_line: doc_line.clone(),
-                message: format!(
+            return Some(DocCheckError::new_error(
+                doc_line.line_num,
+                doc_line.file_name.clone(),
+                &format!(
                     "relative path {:?} points outside root directory {:?}",
                     in_tree_path, root_dir
                 ),
-            });
+            ));
         }
     } else if path_helper::is_dir(&filepath) {
         // If it is a directory to the /docs directory, that directory needs
@@ -313,13 +315,14 @@ pub(crate) fn do_in_tree_check(
         {
             let readme_path = filepath.join("README.md");
             if !path_helper::exists(&readme_path) {
-                return Some(DocCheckError {
-                    doc_line: doc_line.clone(),
-                    message: format!(
+                return Some(DocCheckError::new_error(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!(
                         "in-tree link to {} could not be found at {:?} or  {:?}",
                         link_to_check, filepath, readme_path
                     ),
-                });
+                ));
             }
         }
         // Non-docs paths are OK.
@@ -355,18 +358,20 @@ pub(crate) fn do_check_link(
                 .unwrap_or(false)
                 && uri.query().map(|query| query.contains("hl=")).unwrap_or(false)
             {
-                return Ok(Some(DocCheckError {
-                    doc_line: doc_line.clone(),
-                    message: format!("Do not add host language parameter `hl` {}", link),
-                }));
+                return Ok(Some(DocCheckError::new_error(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!("Do not add host language parameter `hl` {}", link),
+                )));
             }
 
             Ok(None)
         }
-        Err(e) => Ok(Some(DocCheckError {
-            doc_line: doc_line.clone(),
-            message: format!("Invalid link {} : {}", link, e),
-        })),
+        Err(e) => Ok(Some(DocCheckError::new_error(
+            doc_line.line_num,
+            doc_line.file_name.clone(),
+            &format!("Invalid link {} : {}", link, e),
+        ))),
     }
 }
 
@@ -441,26 +446,31 @@ fn check_link_authority(
      */
     if link_to_fuchsia_gerrit_host {
         if !VALID_PROJECTS.contains(&project) {
-            return Some(DocCheckError {
-                doc_line: doc_line.clone(),
-                message: format!("Obsolete or invalid project {}: {}", project, uri),
-            });
+            return Some(DocCheckError::new_error(
+                doc_line.line_num,
+                doc_line.file_name.clone(),
+                &format!("Obsolete or invalid project {}: {}", project, uri),
+            ));
         }
         if !on_gerrit_master(uri) && project == project_being_checked {
             let branch_index = parts.iter().position(|x| *x == "+").unwrap();
-            let branch_spec = parts[branch_index..branch_index + 2].join("/");
+            let file_path =
+                if parts[branch_index + 1] == "refs" && parts[branch_index + 2] == "heads" {
+                    parts[branch_index + 4..].join("/")
+                } else {
+                    parts[branch_index + 2..].join("/")
+                };
 
-            let recommended = uri.to_string().replace(&branch_spec, "+/HEAD");
             //Possible point of discussion: Non-HEAD links are open discussion for non- //docs links.
 
+            // Allow files that are not markdown, such as OWNERS to be links.
             if parts.contains(&"docs") && uri.path().ends_with(".md") {
-                return Some(DocCheckError {
-                    doc_line: doc_line.clone(),
-                    message: format!(
-                        "Invalid link to non-master branch: {} consider using {}",
-                        uri, recommended
-                    ),
-                });
+                return Some(DocCheckError::new_error_helpful(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!("Invalid link to non-main branch: {}", uri),
+                    &format!("filepath: /{}", file_path),
+                ));
             }
         }
     }
@@ -485,14 +495,15 @@ fn check_link_authority(
             // If the link is to the published docs directory (fuchsia-src), then
             // a path should be used instead.
             if parts.contains(&"fuchsia-src") {
-                return Some(DocCheckError {
-                    doc_line: doc_line.clone(),
-                    message: format!(
+                return Some(DocCheckError::new_error(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!(
                         "Should not link to {} via {}, use relative filepath",
                         uri,
                         uri.scheme_str().unwrap_or_default()
                     ),
-                });
+                ));
             }
         }
     }
@@ -579,16 +590,18 @@ pub async fn check_external_links(links: &Vec<LinkReference>) -> Option<Vec<DocC
                     let set = domain_sorted_links.entry(key).or_default();
                     set.insert(link);
                 } else {
-                    errors.push(DocCheckError {
-                        doc_line: link.location.clone(),
-                        message: format!("Error parsing {}: no authority found", link.link),
-                    });
+                    errors.push(DocCheckError::new_error(
+                        link.location.line_num,
+                        link.location.file_name.clone(),
+                        &format!("Error parsing {}: no authority found", link.link),
+                    ));
                 }
             }
-            Err(e) => errors.push(DocCheckError {
-                doc_line: link.location.clone(),
-                message: format!("Error parsing {}: {}", link.link, e),
-            }),
+            Err(e) => errors.push(DocCheckError::new_error(
+                link.location.line_num,
+                link.location.file_name.clone(),
+                &format!("Error parsing {}: {}", link.link, e),
+            )),
         };
     }
 
@@ -616,25 +629,28 @@ async fn check_url_link(client: HttpsClient, link: &LinkReference) -> Option<Doc
     let request = match Request::get(&link.link).body(Body::from("")) {
         Ok(request) => request,
         Err(e) => {
-            return Some(DocCheckError {
-                doc_line: link.location.clone(),
-                message: format!("Error {} requesting {}", e, link.link),
-            })
+            return Some(DocCheckError::new_error(
+                link.location.line_num,
+                link.location.file_name.clone(),
+                &format!("Error {} requesting {}", e, link.link),
+            ))
         }
     };
 
     match client.request(request).await {
         Ok(response) => match response.status() {
             StatusCode::OK | StatusCode::FOUND | StatusCode::MOVED_PERMANENTLY => None,
-            _ => Some(DocCheckError {
-                doc_line: link.location.clone(),
-                message: format!("Error response {} reading {}", response.status(), &link.link),
-            }),
+            _ => Some(DocCheckError::new_error(
+                link.location.line_num,
+                link.location.file_name.clone(),
+                &format!("Error response {} reading {}", response.status(), &link.link),
+            )),
         },
-        Err(e) => Some(DocCheckError {
-            doc_line: link.location.clone(),
-            message: format!("Error {} reading {}", e, link.link),
-        }),
+        Err(e) => Some(DocCheckError::new_error(
+            link.location.line_num,
+            link.location.file_name.clone(),
+            &format!("Error {} reading {}", e, link.link),
+        )),
     }
 }
 
@@ -800,9 +816,9 @@ mod tests {
                 "invalid image text ![](/docs/something.png)",
             ),
             Some(
-                [DocCheckError::new(1, PathBuf::from("/docs/README.md"),
+                [DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
                     "Invalid image alt text: \"\", cannot  be one of [\"\"]"),
-                 DocCheckError::new(1,PathBuf::from("/docs/README.md"),
+                 DocCheckError::new_error(1,PathBuf::from("/docs/README.md"),
                    "in-tree link to /docs/something.png could not be found at \"/path/to/fuchsia/docs/something.png\"")].to_vec()),
         ),
         (
@@ -810,7 +826,7 @@ mod tests {
                 PathBuf::from("/docs/README.md"),
                 "invalid url [oops](https:///nowhere/something.md?xx)",
             ),
-            Some([DocCheckError::new(1, PathBuf::from("/docs/README.md"),
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
              "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
         ),
         (
@@ -818,7 +834,7 @@ mod tests {
                 PathBuf::from("/docs/README.md"),
                 "relative path outside root  [oops](/docs/../../illegal.md)",
             ),
-            Some([DocCheckError::new(1,PathBuf::from("/docs/README.md"),
+            Some([DocCheckError::new_error(1,PathBuf::from("/docs/README.md"),
              "Cannot normalize /docs/../../illegal.md, references parent beyond root.")].to_vec())
         ),
         (
@@ -833,7 +849,7 @@ mod tests {
                 PathBuf::from("/docs/README.md"),
                 "invalid project link [garnet](https://fuchsia.googlesource.com/garnet/+/HEAD/src/file.cc)",
             ),
-            Some([DocCheckError::new(1, PathBuf::from("/docs/README.md"),
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
              "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/HEAD/src/file.cc")].to_vec())
         ),
         (
@@ -842,7 +858,7 @@ mod tests {
                 "A reference link to [`topaz`][flutter-gni]\n\n\
                 [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\""
             ),
-            Some([DocCheckError::new(1, PathBuf::from("/docs/README.md"),
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
             "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
         ),
         (
@@ -850,8 +866,8 @@ mod tests {
                 PathBuf::from("/docs/README.md"),
                 "non-master branch link to docs [old doc](https://fuchsia.googlesource.com/fuchsia/+/some-branch/docs/file.md)",
             ),
-            Some([DocCheckError::new(1,PathBuf::from("/docs/README.md"),
-              "Invalid link to non-master branch: https://fuchsia.googlesource.com/fuchsia/+/some-branch/docs/file.md consider using https://fuchsia.googlesource.com/fuchsia/+/HEAD/docs/file.md")].to_vec())
+            Some([DocCheckError::new_error_helpful(1,PathBuf::from("/docs/README.md"),
+              "Invalid link to non-main branch: https://fuchsia.googlesource.com/fuchsia/+/some-branch/docs/file.md","filepath: /docs/file.md")].to_vec())
         ),
         (
             DocContext::new(
@@ -906,7 +922,7 @@ mod tests {
 
         let test_data = [
                    ("/docs/exists/something.md", "/docs/exists/something.md", None),
-               ("/docs/no_readme", "/docs/no_readme", Some(DocCheckError::new(
+               ("/docs/no_readme", "/docs/no_readme", Some(DocCheckError::new_error(
                  1, PathBuf::from("some/file.md"),
                   "in-tree link to /docs/no_readme could not be found at \"/path/to/fuchsia/docs/no_readme\" or  \"/path/to/fuchsia/docs/no_readme/README.md\"")))];
 
