@@ -66,13 +66,6 @@ protocol NetworkManager {
     });
 };
 
-/// Backing of an emulated endpoint.
-type EndpointBacking = strict enum {
-    /// Endpoint backed by a network-tun device.
-    /// The created `fuchsia.hardware.network.Device` always acts as a virtual ethernet device.
-    NETWORK_DEVICE = 1;
-};
-
 /// Configuration used to create an endpoint.
 type EndpointConfig = struct {
     /// Fake ethernet mtu.
@@ -80,8 +73,6 @@ type EndpointConfig = struct {
     /// Fake ethernet mac address, if not provided will be set to randomized local mac,
     /// using endpoint name as seed.
     mac box<fuchsia.net.MacAddress>;
-    /// Backing type of emulated endpoint.
-    backing EndpointBacking;
 };
 
 /// Manages virtual endpoints.
@@ -166,19 +157,11 @@ protocol Network {
 /// Simple interface to serve devices over fidl.
 protocol DeviceProxy {
     /// Fulfills the device request.
-    /// The fulfilled requests's protocol is defined by the `Endpoint`'s `EndpointBacking`.
+    ///
+    /// This interface provides erased types to match devfs behavior.
     ServeDevice(resource struct {
         req zx.handle:CHANNEL;
     });
-};
-
-/// A connection to an endpoint's underlying protocol.
-type DeviceConnection = strict resource union {
-    /// Set if the endpoint's backing is `NETWORK_DEVICE`.
-    // NOTE(brunodalbo) the DeviceInstance protocol is a transient protocol that is exposed by devfs.
-    // As documented in its definition, users should avoid passing this forward, but connect to its
-    // internal protocols instead.
-    1: network_device client_end:fuchsia.hardware.network.DeviceInstance;
 };
 
 /// Virtual ethernet endpoint.
@@ -195,10 +178,9 @@ protocol Endpoint {
     SetLinkUp(struct {
         up bool;
     }) -> ();
-    /// Opens a channel with the underlying device protocol.
-    /// The resulting `DeviceConnection` variant is defined by this `Endpoint`'s `EndpointBacking`.
-    GetDevice() -> (resource struct {
-        device DeviceConnection;
+    /// Connects to the underlying device port.
+    GetPort(resource struct {
+        port server_end:fuchsia.hardware.network.Port;
     });
     /// Gets a proxy to open requests with zircon ethernet device.
     GetProxy(resource struct {
@@ -221,7 +203,7 @@ type EndpointSetup = struct {
     /// Endpoint name, must be unique in network context.
     name string:MAX_NAME_LENGTH;
     /// Optional endpoint config, if not provided defaults will be used. Default
-    /// values are: mtu = 1500, backing = NETWORK_DEVICE, mac = randomized.
+    /// values are: mtu = 1500,  mac = randomized.
     config box<EndpointConfig>;
     /// Start endpoint with link status up.
     link_up bool;

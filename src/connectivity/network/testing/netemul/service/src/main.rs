@@ -1372,31 +1372,21 @@ mod tests {
         let endpoints = endpoint_mgr.list_endpoints().await.expect("calling list endpoints");
         assert_eq!(endpoints, Vec::<String>::new());
 
-        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
-        for (i, backing) in backings.iter().enumerate() {
-            let name = format!("ep{}", i);
-            let (status, endpoint) = endpoint_mgr
-                .create_endpoint(
-                    &name,
-                    &mut fnetemul_network::EndpointConfig {
-                        mtu: 1500,
-                        mac: None,
-                        backing: *backing,
-                    },
-                )
-                .await
-                .expect("calling create endpoint");
-            let () = zx::Status::ok(status).expect("endpoint creation");
-            let endpoint = endpoint
-                .expect("endpoint creation")
-                .into_proxy()
-                .expect("failed to create endpoint proxy");
-            assert_eq!(endpoint.get_name().await.expect("calling get name"), name);
-            assert_eq!(
-                endpoint.get_config().await.expect("calling get config"),
-                fnetemul_network::EndpointConfig { mtu: 1500, mac: None, backing: *backing }
-            );
-        }
+        let name = "ep";
+        let (status, endpoint) = endpoint_mgr
+            .create_endpoint(&name, &mut fnetemul_network::EndpointConfig { mtu: 1500, mac: None })
+            .await
+            .expect("calling create endpoint");
+        let () = zx::Status::ok(status).expect("endpoint creation");
+        let endpoint = endpoint
+            .expect("endpoint creation")
+            .into_proxy()
+            .expect("failed to create endpoint proxy");
+        assert_eq!(endpoint.get_name().await.expect("calling get name"), name);
+        assert_eq!(
+            endpoint.get_config().await.expect("calling get config"),
+            fnetemul_network::EndpointConfig { mtu: 1500, mac: None }
+        );
     }
 
     fn get_network_manager(
@@ -1938,77 +1928,72 @@ mod tests {
         let mut watcher = get_devfs_watcher(&realm).await;
 
         const TEST_DEVICE_NAME: &str = "test";
-        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
-        for (i, backing) in backings.iter().enumerate() {
-            let name = format!("{}{}", TEST_DEVICE_NAME, i);
-            let endpoint = create_endpoint(
-                &sandbox,
-                &name,
-                fnetemul_network::EndpointConfig { mtu: 1500, mac: None, backing: *backing },
-            )
-            .await;
+        let endpoint = create_endpoint(
+            &sandbox,
+            TEST_DEVICE_NAME,
+            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+        )
+        .await;
 
-            let () = realm
-                .add_device(&name, get_device_proxy(&endpoint))
+        let () = realm
+            .add_device(TEST_DEVICE_NAME, get_device_proxy(&endpoint))
+            .await
+            .expect("calling add device")
+            .map_err(zx::Status::from_raw)
+            .expect("error adding device");
+        let () = wait_for_event_on_path(
+            &mut watcher,
+            fvfs_watcher::WatchEvent::ADD_FILE,
+            &std::path::Path::new(TEST_DEVICE_NAME),
+        )
+        .await;
+        assert_eq!(
+            realm
+                .add_device(TEST_DEVICE_NAME, get_device_proxy(&endpoint))
                 .await
                 .expect("calling add device")
                 .map_err(zx::Status::from_raw)
-                .expect("error adding device");
-            let () = wait_for_event_on_path(
-                &mut watcher,
-                fvfs_watcher::WatchEvent::ADD_FILE,
-                &std::path::Path::new(&name),
-            )
-            .await;
-            assert_eq!(
-                realm
-                    .add_device(&name, get_device_proxy(&endpoint))
-                    .await
-                    .expect("calling add device")
-                    .map_err(zx::Status::from_raw)
-                    .expect_err("adding a duplicate device should fail"),
-                zx::Status::ALREADY_EXISTS,
-            );
+                .expect_err("adding a duplicate device should fail"),
+            zx::Status::ALREADY_EXISTS,
+        );
 
-            // Expect the device to implement `fuchsia.device/Controller.GetTopologicalPath`.
-            let (controller, server_end) =
-                fidl::endpoints::create_proxy::<fdevice::ControllerMarker>()
-                    .expect("failed to create proxy");
-            let () = get_device_proxy(&endpoint)
-                .into_proxy()
-                .expect("failed to create device proxy from client end")
-                .serve_device(server_end.into_channel())
-                .expect("failed to serve device");
-            let path = controller
-                .get_topological_path()
-                .await
-                .expect("calling get topological path")
-                .map_err(zx::Status::from_raw)
-                .expect("failed to get topological path");
-            assert!(path.contains(&name));
+        // Expect the device to implement `fuchsia.device/Controller.GetTopologicalPath`.
+        let (controller, server_end) = fidl::endpoints::create_proxy::<fdevice::ControllerMarker>()
+            .expect("failed to create proxy");
+        let () = get_device_proxy(&endpoint)
+            .into_proxy()
+            .expect("failed to create device proxy from client end")
+            .serve_device(server_end.into_channel())
+            .expect("failed to serve device");
+        let path = controller
+            .get_topological_path()
+            .await
+            .expect("calling get topological path")
+            .map_err(zx::Status::from_raw)
+            .expect("failed to get topological path");
+        assert!(path.contains(TEST_DEVICE_NAME));
 
-            let () = realm
-                .remove_device(&name)
+        let () = realm
+            .remove_device(TEST_DEVICE_NAME)
+            .await
+            .expect("calling remove device")
+            .map_err(zx::Status::from_raw)
+            .expect("error removing device");
+        let () = wait_for_event_on_path(
+            &mut watcher,
+            fvfs_watcher::WatchEvent::REMOVE_FILE,
+            &std::path::Path::new(TEST_DEVICE_NAME),
+        )
+        .await;
+        assert_eq!(
+            realm
+                .remove_device(TEST_DEVICE_NAME)
                 .await
                 .expect("calling remove device")
                 .map_err(zx::Status::from_raw)
-                .expect("error removing device");
-            let () = wait_for_event_on_path(
-                &mut watcher,
-                fvfs_watcher::WatchEvent::REMOVE_FILE,
-                &std::path::Path::new(&name),
-            )
-            .await;
-            assert_eq!(
-                realm
-                    .remove_device(&name)
-                    .await
-                    .expect("calling remove device")
-                    .map_err(zx::Status::from_raw)
-                    .expect_err("removing a nonexistent device should fail"),
-                zx::Status::NOT_FOUND,
-            );
-        }
+                .expect_err("removing a nonexistent device should fail"),
+            zx::Status::NOT_FOUND,
+        );
     }
 
     #[fixture(with_sandbox)]
@@ -2018,11 +2003,7 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig {
-                mtu: 1500,
-                mac: None,
-                backing: fnetemul_network::EndpointBacking::NetworkDevice,
-            },
+            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
         )
         .await;
         let (TestRealm { realm: realm_a }, TestRealm { realm: realm_b }) = (
@@ -2107,45 +2088,38 @@ mod tests {
         );
         let counter = realm.connect_to_protocol::<CounterMarker>();
 
-        let backings = [fnetemul_network::EndpointBacking::NetworkDevice];
-        for (i, backing) in backings.iter().enumerate() {
-            let class = match backing {
-                fnetemul_network::EndpointBacking::NetworkDevice => "network",
-            };
-            let name = format!("{}_test_{}", class, i);
-            let endpoint = create_endpoint(
-                &sandbox,
-                &name,
-                fnetemul_network::EndpointConfig { mtu: 1500, mac: None, backing: *backing },
-            )
-            .await;
-            let () = realm
-                .realm
-                .add_device(&name, get_device_proxy(&endpoint))
-                .await
-                .expect("FIDL error")
-                .map_err(zx::Status::from_raw)
-                .expect("error adding device");
+        const TEST_DEVICE_NAME: &str = "test";
+        let endpoint = create_endpoint(
+            &sandbox,
+            TEST_DEVICE_NAME,
+            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
+        )
+        .await;
+        let () = realm
+            .realm
+            .add_device(TEST_DEVICE_NAME, get_device_proxy(&endpoint))
+            .await
+            .expect("FIDL error")
+            .map_err(zx::Status::from_raw)
+            .expect("error adding device");
 
-            // Expect the device to implement `fuchsia.device/Controller.GetTopologicalPath`.
-            let (controller, server_end) =
-                fidl::endpoints::create_proxy::<fdevice::ControllerMarker>()
-                    .expect("failed to create proxy");
-            let () = counter
-                .open_in_namespace(
-                    &format!("{}/{}", DEVFS_PATH, name),
-                    fio::OpenFlags::RIGHT_READABLE,
-                    server_end.into_channel(),
-                )
-                .expect("failed to connect to device through counter");
-            let path = controller
-                .get_topological_path()
-                .await
-                .expect("FIDL error")
-                .map_err(zx::Status::from_raw)
-                .expect("failed to get topological path");
-            assert!(path.contains(&name));
-        }
+        // Expect the device to implement `fuchsia.device/Controller.GetTopologicalPath`.
+        let (controller, server_end) = fidl::endpoints::create_proxy::<fdevice::ControllerMarker>()
+            .expect("failed to create proxy");
+        let () = counter
+            .open_in_namespace(
+                &format!("{}/{}", DEVFS_PATH, TEST_DEVICE_NAME),
+                fio::OpenFlags::RIGHT_READABLE,
+                server_end.into_channel(),
+            )
+            .expect("failed to connect to device through counter");
+        let path = controller
+            .get_topological_path()
+            .await
+            .expect("FIDL error")
+            .map_err(zx::Status::from_raw)
+            .expect("failed to get topological path");
+        assert!(path.contains(TEST_DEVICE_NAME));
     }
 
     #[fixture(with_sandbox)]
@@ -2294,11 +2268,7 @@ mod tests {
         let endpoint = create_endpoint(
             &sandbox,
             TEST_DEVICE_NAME,
-            fnetemul_network::EndpointConfig {
-                mtu: 1500,
-                mac: None,
-                backing: fnetemul_network::EndpointBacking::NetworkDevice,
-            },
+            fnetemul_network::EndpointConfig { mtu: 1500, mac: None },
         )
         .await;
 

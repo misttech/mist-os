@@ -32,7 +32,6 @@ class Endpoint : public fuchsia::netemul::network::Endpoint,
   using FProxy = fuchsia::netemul::network::DeviceProxy;
   using Config = fuchsia::netemul::network::EndpointConfig;
   using EndpointClosedCallback = fit::function<void(const Endpoint&)>;
-  using Backing = fuchsia::netemul::network::EndpointBacking;
 
   Endpoint(NetworkContext* context, std::string name, Config config);
 
@@ -47,7 +46,7 @@ class Endpoint : public fuchsia::netemul::network::Endpoint,
   void GetConfig(GetConfigCallback callback) override;
   void GetName(GetNameCallback callback) override;
   void SetLinkUp(bool up, SetLinkUpCallback callback) override;
-  void GetDevice(GetDeviceCallback callback) override;
+  void GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) override;
   void GetProxy(fidl::InterfaceRequest<FProxy> proxy) override;
 
   void ServeDevice(zx::channel channel) override;

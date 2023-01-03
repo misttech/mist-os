@@ -13,6 +13,7 @@ fidl("fuchsia.netemul") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.component",
+    "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.url",

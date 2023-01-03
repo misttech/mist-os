@@ -17,7 +17,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
-    "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",

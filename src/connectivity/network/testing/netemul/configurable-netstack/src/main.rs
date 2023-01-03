@@ -13,7 +13,6 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_component::{
     client::connect_to_protocol,
     server::{ServiceFs, ServiceFsDir},
@@ -127,83 +126,81 @@ async fn configure_interface(
     }: fnetemul::InterfaceOptions,
 ) -> Result<(), InterfaceConfigError> {
     let name = name.ok_or(InterfaceConfigError::NameNotProvided)?;
-    let device = device.ok_or(InterfaceConfigError::DeviceConnectionNotProvided)?;
+    let device_instance = device.ok_or(InterfaceConfigError::DeviceConnectionNotProvided)?;
 
     info!("installing and configuring interface '{}'", name);
 
     let (control, server_end) =
         fnet_interfaces_ext::admin::Control::create_endpoints().context("create endpoints")?;
-    let nicid = match device {
-        fnetemul_network::DeviceConnection::NetworkDevice(device_instance) => {
-            let device = {
-                let (proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fhardware_network::DeviceMarker>()
-                        .context("create proxy")?;
-                device_instance
-                    .into_proxy()
-                    .context("client end into proxy")?
-                    .get_device(server_end)?;
-                proxy
-            };
-            let mut port_events = {
-                let (proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fhardware_network::PortWatcherMarker>()
-                        .context("create proxy")?;
-                device.get_port_watcher(server_end)?;
-                HangingGetStream::new(proxy, fhardware_network::PortWatcherProxy::watch)
-            };
-            let mut port_id = loop {
-                let port_event = port_events.next().await.context("get port event")??;
-                match port_event {
-                    fhardware_network::DevicePortEvent::Existing(port_id)
-                    | fhardware_network::DevicePortEvent::Added(port_id) => {
-                        break port_id;
-                    }
-                    fhardware_network::DevicePortEvent::Idle(fhardware_network::Empty {}) => {
-                        info!(
-                            "failed to observe port on network device for interface '{}', \
-                            waiting...",
-                            name
-                        );
-                    }
-                    fhardware_network::DevicePortEvent::Removed(port_id) => {
-                        return Err(anyhow!(
-                            "unexpected removal of device port {:?} for interface '{}'",
-                            port_id,
-                            name,
-                        )
-                        .into());
-                    }
+    let nicid = {
+        let device = {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fhardware_network::DeviceMarker>()
+                    .context("create proxy")?;
+            device_instance
+                .into_proxy()
+                .context("client end into proxy")?
+                .get_device(server_end)?;
+            proxy
+        };
+        let mut port_events = {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fhardware_network::PortWatcherMarker>()
+                    .context("create proxy")?;
+            device.get_port_watcher(server_end)?;
+            HangingGetStream::new(proxy, fhardware_network::PortWatcherProxy::watch)
+        };
+        let mut port_id = loop {
+            let port_event = port_events.next().await.context("get port event")??;
+            match port_event {
+                fhardware_network::DevicePortEvent::Existing(port_id)
+                | fhardware_network::DevicePortEvent::Added(port_id) => {
+                    break port_id;
                 }
-            };
-            let device_control = {
-                let (proxy, server_end) =
-                    fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
-                        .context("create proxy")?;
-                let device = fidl::endpoints::ClientEnd::new(
-                    device.into_channel().expect("extract channel from proxy").into_zx_channel(),
-                );
-                let installer = connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
-                    .context("connect to protocol")?;
-                installer.install_device(device, server_end)?;
-                proxy
-            };
-            device_control.create_interface(
-                &mut port_id,
-                server_end,
-                fnet_interfaces_admin::Options {
-                    name: Some(name.clone()),
-                    metric: Some(DEFAULT_METRIC),
-                    ..fnet_interfaces_admin::Options::EMPTY
-                },
-            )?;
+                fhardware_network::DevicePortEvent::Idle(fhardware_network::Empty {}) => {
+                    info!(
+                        "failed to observe port on network device for interface '{}', \
+                            waiting...",
+                        name
+                    );
+                }
+                fhardware_network::DevicePortEvent::Removed(port_id) => {
+                    return Err(anyhow!(
+                        "unexpected removal of device port {:?} for interface '{}'",
+                        port_id,
+                        name,
+                    )
+                    .into());
+                }
+            }
+        };
+        let device_control = {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
+                    .context("create proxy")?;
+            let device = fidl::endpoints::ClientEnd::new(
+                device.into_channel().expect("extract channel from proxy").into_zx_channel(),
+            );
+            let installer = connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+                .context("connect to protocol")?;
+            installer.install_device(device, server_end)?;
+            proxy
+        };
+        device_control.create_interface(
+            &mut port_id,
+            server_end,
+            fnet_interfaces_admin::Options {
+                name: Some(name.clone()),
+                metric: Some(DEFAULT_METRIC),
+                ..fnet_interfaces_admin::Options::EMPTY
+            },
+        )?;
 
-            // Ensure the interface won't be removed when we drop the control handles.
-            device_control.detach()?;
-            control.detach().map_err(NetstackError::InterfaceControl)?;
+        // Ensure the interface won't be removed when we drop the control handles.
+        device_control.detach()?;
+        control.detach().map_err(NetstackError::InterfaceControl)?;
 
-            control.get_id().await.map_err(NetstackError::InterfaceControl)?
-        }
+        control.get_id().await.map_err(NetstackError::InterfaceControl)?
     };
 
     let _enabled: bool = control
@@ -393,15 +390,15 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn broken_device_instance() {
+    async fn broken_port_instance() {
         let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fhardware_network::DeviceInstanceMarker>()
+            fidl::endpoints::create_endpoints::<fhardware_network::PortMarker>()
                 .expect("create endpoints");
         drop(server_end);
 
         let result = configure_interface(fnetemul::InterfaceOptions {
             name: Some("ep".to_string()),
-            device: Some(fnetemul_network::DeviceConnection::NetworkDevice(client_end)),
+            device: Some(client_end),
             ..fnetemul::InterfaceOptions::EMPTY
         })
         .await;

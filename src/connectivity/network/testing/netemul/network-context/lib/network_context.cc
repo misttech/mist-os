@@ -94,7 +94,6 @@ zx_status_t NetworkContext::Setup(std::vector<NetworkSetup> setup,
         endp_setup.config = std::make_unique<Endpoint::Config>();
         endp_setup.config->mtu = kDefaultMtu;
         endp_setup.config->mac = nullptr;
-        endp_setup.config->backing = fuchsia::netemul::network::EndpointBacking::NETWORK_DEVICE;
       }
       status = endpoint_manager_.CreateEndpoint(endp_setup.name, std::move(*endp_setup.config),
                                                 endp_setup.link_up,

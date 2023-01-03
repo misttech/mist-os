@@ -4,7 +4,7 @@
 library fuchsia.netemul;
 
 using fuchsia.net;
-using fuchsia.netemul.network;
+using fuchsia.hardware.network;
 
 /// A test-friendly wrapper around Fuchsia's administrative netstack APIs.
 ///
@@ -27,10 +27,10 @@ protocol ConfigurableNetstack {
         ///
         /// Required.
         1: name string:MAX;
-        /// The device to be installed.
+        /// The device port to be installed.
         ///
         /// Required.
-        2: device fuchsia.netemul.network.DeviceConnection;
+        2: device client_end:fuchsia.hardware.network.Port;
         /// Whether to disable automatic generation and assignment of link-
         /// local IPv6 addresses for the interface.
         ///

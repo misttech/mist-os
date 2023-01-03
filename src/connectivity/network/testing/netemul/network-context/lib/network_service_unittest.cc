@@ -73,11 +73,9 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     netc->GetEndpointManager(std::move(epm));
   }
 
-  static Endpoint::Config GetDefaultEndpointConfig(
-      Endpoint::Backing backing = Endpoint::Backing::NETWORK_DEVICE) {
+  static Endpoint::Config GetDefaultEndpointConfig() {
     Endpoint::Config ret;
     ret.mtu = 1500;
-    ret.backing = backing;
     return ret;
   }
 
@@ -123,9 +121,8 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     *netout = eph.BindSync();
   }
 
-  void CreateEndpoint(const char* name, fidl::SynchronousInterfacePtr<FEndpoint>* netout,
-                      Endpoint::Backing backing = Endpoint::Backing::NETWORK_DEVICE) {
-    CreateEndpoint(name, netout, GetDefaultEndpointConfig(backing));
+  void CreateEndpoint(const char* name, fidl::SynchronousInterfacePtr<FEndpoint>* netout) {
+    CreateEndpoint(name, netout, GetDefaultEndpointConfig());
   }
 
   struct ClientWithAttachedPort {
@@ -142,31 +139,27 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     }
   };
 
-  void StartNetdeviceClient(
-      fidl::InterfaceHandle<fuchsia::hardware::network::DeviceInstance> instance,
-      ClientWithAttachedPort* out_client) {
+  void StartNetdeviceClient(fidl::InterfaceHandle<fuchsia::hardware::network::Port> port_handle,
+                            ClientWithAttachedPort* out_client) {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
     ASSERT_OK(endpoints.status_value());
     auto& [client_end, server_end] = endpoints.value();
-    ASSERT_OK(instance.BindSync()->GetDevice(
+
+    fuchsia::hardware::network::PortSyncPtr port = port_handle.BindSync();
+    ASSERT_OK(port->GetDevice(
         fidl::InterfaceRequest<fuchsia::hardware::network::Device>(server_end.TakeChannel())));
     std::unique_ptr client =
         std::make_unique<network::client::NetworkDeviceClient>(std::move(client_end), dispatcher());
 
-    fuchsia_hardware_network::wire::PortId port_id;
+    zx::result maybe_port_id = GetPortId(port);
+    ASSERT_OK(maybe_port_id.status_value());
+    fuchsia_hardware_network::wire::PortId port_id = maybe_port_id.value();
+
     {
       std::optional<zx_status_t> status;
       client->OpenSession("network-context-test", [&status](zx_status_t s) { status = s; });
-      std::optional<zx::result<std::vector<fuchsia_hardware_network::wire::PortId>>> ports;
-      client->GetPorts([&ports](zx::result<std::vector<fuchsia_hardware_network::wire::PortId>> p) {
-        ports = std::move(p);
-      });
-      ASSERT_TRUE(RunLoopWithTimeoutOrUntil(
-          [&status, &ports]() { return status.has_value() && ports.has_value(); }, kTestTimeout));
-      ASSERT_OK(status.value());
-      ASSERT_OK(ports.value().status_value());
-      ASSERT_EQ(ports.value().value().size(), 1ul);
-      port_id = ports.value().value()[0];
+      ASSERT_TRUE(
+          RunLoopWithTimeoutOrUntil([&status]() { return status.has_value(); }, kTestTimeout));
     }
     {
       std::optional<zx_status_t> status;
@@ -219,37 +212,29 @@ class NetworkServiceTest : public gtest::RealLoopFixture {
     auto ep1 = ep1_handle.BindSync();
     auto ep2 = ep2_handle.BindSync();
     // start ethernet clients on both endpoints:
-    fuchsia::netemul::network::DeviceConnection conn1;
-    fuchsia::netemul::network::DeviceConnection conn2;
-    ASSERT_OK(ep1->GetDevice(&conn1));
-    ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
-    ASSERT_OK(ep2->GetDevice(&conn2));
-    ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+    fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn1;
+    fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn2;
+    ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
+    ASSERT_OK(ep2->GetPort(conn2.NewRequest()));
 
-    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), dev1));
-    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), dev2));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1), dev1));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2), dev2));
   }
 
-  zx::result<fuchsia_hardware_network::wire::PortId> GetSinglePortId(
-      network::client::NetworkDeviceClient& cli) {
-    std::optional<zx::result<fuchsia_hardware_network::wire::PortId>> id;
-    cli.GetPorts([&id](zx::result<std::vector<fuchsia_hardware_network::wire::PortId>> result) {
-      if (result.is_error()) {
-        id = result.take_error();
-        return;
-      }
-      const std::vector<fuchsia_hardware_network::wire::PortId>& port_ids = result.value();
-      if (port_ids.size() != 1) {
-        ADD_FAILURE() << "observed " << port_ids.size() << "ports, expected a single port";
-        id = zx::error(ZX_ERR_INTERNAL);
-        return;
-      }
-      const fuchsia_hardware_network::wire::PortId& port_id = port_ids[0];
-      EXPECT_EQ(port_id.base, Endpoint::kPortId);
-      id = zx::ok(port_id);
+  zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
+      fuchsia::hardware::network::PortSyncPtr& port) {
+    fuchsia::hardware::network::PortInfo info;
+    if (zx_status_t status = port->GetInfo(&info); status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (!info.has_id()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    const fuchsia::hardware::network::PortId& port_id = info.id();
+    return zx::ok(fuchsia_hardware_network::wire::PortId{
+        .base = port_id.base,
+        .salt = port_id.salt,
     });
-    RunLoopUntil([&id]() { return id.has_value(); });
-    return id.value();
   }
 
   void TearDown() override {
@@ -377,13 +362,6 @@ TEST_F(NetworkServiceTest, BadEndpointConfigurations) {
   ASSERT_STATUS(status, ZX_ERR_INVALID_ARGS);
   ASSERT_FALSE(eph.is_valid());
 
-  // can't create endpoint with unexisting backing
-  auto badBacking = GetDefaultEndpointConfig();
-  badBacking.backing = static_cast<fuchsia::netemul::network::EndpointBacking>(-1);
-  ASSERT_STATUS(epm->CreateEndpoint(epname, std::move(badBacking), &status, &eph),
-                ZX_ERR_INVALID_ARGS);
-  ASSERT_FALSE(eph.is_valid());
-
   // Can't create endpoint which violates maximum MTU.
   auto badMtu = GetDefaultEndpointConfig();
   badMtu.mtu = fuchsia::net::tun::MAX_MTU + 1;
@@ -455,17 +433,15 @@ TEST_F(NetworkServiceTest, TransitData) {
   ASSERT_OK(status);
 
   // start ethernet clients on both endpoints:
-  fuchsia::netemul::network::DeviceConnection conn1;
-  fuchsia::netemul::network::DeviceConnection conn2;
-  ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
-  ASSERT_OK(ep2->GetDevice(&conn2));
-  ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn1;
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn2;
+  ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
+  ASSERT_OK(ep2->GetPort(conn2.NewRequest()));
 
   ClientWithAttachedPort dev1;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1), &dev1));
   ClientWithAttachedPort dev2;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2), &dev2));
   // Create both clients.
   bool ok = false;
 
@@ -542,22 +518,19 @@ TEST_F(NetworkServiceTest, Flooding) {
   ASSERT_OK(net->AttachEndpoint(ep3name, &status));
   ASSERT_OK(status);
 
-  fuchsia::netemul::network::DeviceConnection conn1;
-  fuchsia::netemul::network::DeviceConnection conn2;
-  fuchsia::netemul::network::DeviceConnection conn3;
-  ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
-  ASSERT_OK(ep2->GetDevice(&conn2));
-  ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
-  ASSERT_OK(ep3->GetDevice(&conn3));
-  ASSERT_TRUE(conn3.is_network_device() && conn3.network_device().is_valid());
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn1;
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn2;
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn3;
+  ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
+  ASSERT_OK(ep2->GetPort(conn2.NewRequest()));
+  ASSERT_OK(ep3->GetPort(conn3.NewRequest()));
   // Create all clients.
   ClientWithAttachedPort dev1;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1), &dev1));
   ClientWithAttachedPort dev2;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2), &dev2));
   ClientWithAttachedPort dev3;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn3.network_device()), &dev3));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn3), &dev3));
 
   uint8_t test_buff[TEST_BUF_SIZE];
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
@@ -659,12 +632,11 @@ TEST_F(NetworkServiceTest, FakeEndpoints) {
   ASSERT_OK(status);
 
   // start ethernet clients on endpoint:
-  fuchsia::netemul::network::DeviceConnection conn1;
-  ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
+  fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn1;
+  ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
 
   ClientWithAttachedPort dev1;
-  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+  ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1), &dev1));
   bool ok = false;
 
   std::vector<uint8_t> test_buff1(TEST_BUF_SIZE);
@@ -805,17 +777,15 @@ TEST_F(NetworkServiceTest, NetworkContext) {
     auto ep1 = ep1_h.BindSync();
     auto ep2 = ep2_h.BindSync();
     // start ethernet clients on both endpoints:
-    fuchsia::netemul::network::DeviceConnection conn1;
-    fuchsia::netemul::network::DeviceConnection conn2;
-    ASSERT_OK(ep1->GetDevice(&conn1));
-    ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
-    ASSERT_OK(ep2->GetDevice(&conn2));
-    ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+    fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn1;
+    fidl::InterfaceHandle<fuchsia::hardware::network::Port> conn2;
+    ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
+    ASSERT_OK(ep2->GetPort(conn2.NewRequest()));
 
     ClientWithAttachedPort dev1;
-    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1.network_device()), &dev1));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn1), &dev1));
     ClientWithAttachedPort dev2;
-    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2.network_device()), &dev2));
+    ASSERT_NO_FATAL_FAILURE(StartNetdeviceClient(std::move(conn2), &dev2));
 
     bool ok = false;
 
@@ -1070,11 +1040,11 @@ TEST_F(NetworkServiceTest, DualNetworkDevice) {
 
   // Create first endpoint.
   fidl::SynchronousInterfacePtr<FEndpoint> ep1;
-  CreateEndpoint(ep1name, &ep1, Endpoint::Backing::NETWORK_DEVICE);
+  CreateEndpoint(ep1name, &ep1);
 
   // Create second endpoint.
   fidl::SynchronousInterfacePtr<FEndpoint> ep2;
-  CreateEndpoint(ep2name, &ep2, Endpoint::Backing::NETWORK_DEVICE);
+  CreateEndpoint(ep2name, &ep2);
   ASSERT_OK(ep1->SetLinkUp(true));
   ASSERT_OK(ep2->SetLinkUp(true));
 
@@ -1085,19 +1055,17 @@ TEST_F(NetworkServiceTest, DualNetworkDevice) {
   ASSERT_OK(net->AttachEndpoint(ep2name, &status));
   ASSERT_OK(status);
 
-  // Start ethernet clients on both endpoints.
-  fuchsia::netemul::network::DeviceConnection conn1;
-  fuchsia::netemul::network::DeviceConnection conn2;
-  ASSERT_OK(ep1->GetDevice(&conn1));
-  ASSERT_TRUE(conn1.is_network_device() && conn1.network_device().is_valid());
-  ASSERT_OK(ep2->GetDevice(&conn2));
-  ASSERT_TRUE(conn2.is_network_device() && conn2.network_device().is_valid());
+  // Start clients on both endpoints.
+  fidl::SynchronousInterfacePtr<fuchsia::hardware::network::Port> conn1;
+  fidl::SynchronousInterfacePtr<fuchsia::hardware::network::Port> conn2;
+  ASSERT_OK(ep1->GetPort(conn1.NewRequest()));
+  ASSERT_OK(ep2->GetPort(conn2.NewRequest()));
   // Create both clients.
   fidl::InterfaceHandle<fuchsia::hardware::network::Device> device1;
-  conn1.network_device().Bind()->GetDevice(device1.NewRequest());
+  ASSERT_OK(conn1->GetDevice(device1.NewRequest()));
   network::client::NetworkDeviceClient cli1(fidl::HLCPPToNatural(device1));
   fidl::InterfaceHandle<fuchsia::hardware::network::Device> device2;
-  conn2.network_device().Bind()->GetDevice(device2.NewRequest());
+  ASSERT_OK(conn2->GetDevice(device2.NewRequest()));
   network::client::NetworkDeviceClient cli2(fidl::HLCPPToNatural(device2));
   bool ok = false;
 
@@ -1113,7 +1081,7 @@ TEST_F(NetworkServiceTest, DualNetworkDevice) {
   });
   WAIT_FOR_OK_AND_RESET(ok);
 
-  zx::result maybe_port_id = GetSinglePortId(cli1);
+  zx::result maybe_port_id = GetPortId(conn1);
   ASSERT_OK(maybe_port_id.status_value());
   const fuchsia_hardware_network::wire::PortId port_id1 = maybe_port_id.value();
   cli1.AttachPort(port_id1, {kEndpointFrameType}, [&ok](zx_status_t status) {
@@ -1122,7 +1090,7 @@ TEST_F(NetworkServiceTest, DualNetworkDevice) {
   });
   WAIT_FOR_OK_AND_RESET(ok);
 
-  maybe_port_id = GetSinglePortId(cli2);
+  maybe_port_id = GetPortId(conn2);
   ASSERT_OK(maybe_port_id.status_value());
   const fuchsia_hardware_network::wire::PortId port_id2 = maybe_port_id.value();
   cli2.AttachPort(port_id2, {kEndpointFrameType}, [&ok](zx_status_t status) {
@@ -1335,7 +1303,7 @@ TEST_F(NetworkServiceTest, NetworkDeviceAndVirtualization) {
 
   // Create and attach network device endpoint.
   fidl::SynchronousInterfacePtr<FEndpoint> ep;
-  CreateEndpoint(epname, &ep, Endpoint::Backing::NETWORK_DEVICE);
+  CreateEndpoint(epname, &ep);
   ASSERT_OK(ep->SetLinkUp(true));
   {
     zx_status_t status;
@@ -1344,12 +1312,11 @@ TEST_F(NetworkServiceTest, NetworkDeviceAndVirtualization) {
   }
 
   // Start and configure ethernet client.
-  fuchsia::netemul::network::DeviceConnection conn;
-  ASSERT_OK(ep->GetDevice(&conn));
-  ASSERT_TRUE(conn.is_network_device() && conn.network_device().is_valid());
+  fidl::SynchronousInterfacePtr<fuchsia::hardware::network::Port> conn;
+  ASSERT_OK(ep->GetPort(conn.NewRequest()));
   // Create and configure network device client.
   fidl::InterfaceHandle<fuchsia::hardware::network::Device> device;
-  conn.network_device().Bind()->GetDevice(device.NewRequest());
+  ASSERT_OK(conn->GetDevice(device.NewRequest()));
   network::client::NetworkDeviceClient cli(fidl::HLCPPToNatural(device));
   bool ok = false;
   cli.OpenSession("test_session", [&ok](zx_status_t status) {
@@ -1358,7 +1325,7 @@ TEST_F(NetworkServiceTest, NetworkDeviceAndVirtualization) {
   });
   WAIT_FOR_OK_AND_RESET(ok);
 
-  zx::result maybe_port_id = GetSinglePortId(cli);
+  zx::result maybe_port_id = GetPortId(conn);
   ASSERT_OK(maybe_port_id.status_value());
   const fuchsia_hardware_network::wire::PortId port_id = maybe_port_id.value();
 

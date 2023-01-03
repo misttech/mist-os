@@ -278,27 +278,18 @@ impl TestSetup {
             }
         };
 
-        let device_instance = match ep.get_device().await? {
-            fidl_fuchsia_netemul_network::DeviceConnection::NetworkDevice(n) => n,
-        };
-
-        let (device, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
-        device_instance
-            .into_proxy()
-            .expect("create proxy")
-            .get_device(server_end)
-            .context("get_device")?;
-
-        // Find the port id.
-        let (port_watcher, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
-        device.get_port_watcher(server_end).context("get port watcher")?;
-        let port_id = match port_watcher.watch().await.context("failed to watch port")? {
-            fidl_fuchsia_hardware_network::DevicePortEvent::Existing(id) => id,
-            e => panic!("unexpected watcher event {:?}", e),
-        };
-        let (client, server_end) = fidl::endpoints::create_endpoints().context("create proxy")?;
-        device.clone(server_end).context("clone device")?;
-        Ok((client, port_id))
+        let (port, server_end) = fidl::endpoints::create_proxy().context("create proxy")?;
+        ep.get_port(server_end).context("get port")?;
+        let (device, server_end) =
+            fidl::endpoints::create_endpoints().context("create endpoints")?;
+        port.get_device(server_end).context("get device")?;
+        let port_id = port
+            .get_info()
+            .await
+            .context("get port info")?
+            .id
+            .ok_or_else(|| anyhow::anyhow!("missing port id"))?;
+        Ok((device, port_id))
     }
 
     /// Creates a new empty `TestSetup`.

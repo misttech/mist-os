@@ -48,9 +48,9 @@ class EndpointImpl : public data::Consumer {
 
   virtual void SetLinkUp(bool up, fit::callback<void()> done) = 0;
 
-  virtual fuchsia::netemul::network::DeviceConnection GetDevice() = 0;
-
   virtual void ServeDevice(zx::channel req) = 0;
+
+  virtual void GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) = 0;
 
   static fuchsia::net::MacAddress RandomMac(const std::string& str_seed) {
     fuchsia::net::MacAddress ret;
@@ -143,10 +143,8 @@ class NetworkDeviceImpl : public EndpointImpl,
     tun_port_->SetOnline(up, [cb = std::move(done)]() mutable { cb(); });
   }
 
-  fuchsia::netemul::network::DeviceConnection GetDevice() override {
-    fidl::InterfaceHandle<fuchsia::hardware::network::DeviceInstance> dev;
-    ServeDevice(dev.NewRequest().TakeChannel());
-    return fuchsia::netemul::network::DeviceConnection::WithNetworkDevice(std::move(dev));
+  void GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) override {
+    tun_port_->GetPort(std::move(port));
   }
 
   void ServeDevice(zx::channel req) override {
@@ -265,10 +263,7 @@ class NetworkDeviceImpl : public EndpointImpl,
 };
 
 std::unique_ptr<EndpointImpl> MakeImpl(Endpoint::Config config) {
-  switch (config.backing) {
-    case Endpoint::Backing::NETWORK_DEVICE:
-      return std::make_unique<NetworkDeviceImpl>(std::move(config));
-  }
+  return std::make_unique<NetworkDeviceImpl>(std::move(config));
 }
 
 }  // namespace impl
@@ -304,7 +299,9 @@ void Endpoint::SetLinkUp(bool up, Endpoint::SetLinkUpCallback callback) {
   impl_->SetLinkUp(up, std::move(callback));
 }
 
-void Endpoint::GetDevice(Endpoint::GetDeviceCallback callback) { callback(impl_->GetDevice()); }
+void Endpoint::GetPort(fidl::InterfaceRequest<fuchsia::hardware::network::Port> port) {
+  impl_->GetPort(std::move(port));
+}
 
 void Endpoint::GetProxy(fidl::InterfaceRequest<FProxy> proxy) {
   proxy_bindings_.AddBinding(this, std::move(proxy), parent_->dispatcher());

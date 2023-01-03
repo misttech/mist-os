@@ -24,7 +24,6 @@ use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_zircon as zx;
 
 use anyhow::{anyhow, Context as _};
-use fidl::endpoints::Proxy as _;
 use futures::{
     future::{FutureExt as _, TryFutureExt as _},
     SinkExt as _, StreamExt as _, TryStreamExt as _,
@@ -52,11 +51,7 @@ pub fn new_endpoint_config(
     mtu: u16,
     mac: Option<fnet::MacAddress>,
 ) -> fnetemul_network::EndpointConfig {
-    fnetemul_network::EndpointConfig {
-        mtu,
-        mac: mac.map(Box::new),
-        backing: fnetemul_network::EndpointBacking::NetworkDevice,
-    }
+    fnetemul_network::EndpointConfig { mtu, mac: mac.map(Box::new) }
 }
 
 /// A test sandbox backed by a [`fnetemul::SandboxProxy`].
@@ -756,49 +751,20 @@ impl<'a> TestFakeEndpoint<'a> {
     }
 }
 
-/// Returns the [`fnetwork::PortId`] for a device that is expected to have a
-/// single port.
-///
-/// Returns an error if the device has more or less than a single port.
-pub async fn get_single_device_port_id(device: &fnetwork::DeviceProxy) -> Result<fnetwork::PortId> {
-    let (watcher, server) = fidl::endpoints::create_proxy::<fnetwork::PortWatcherMarker>()
-        .context("create endpoints")?;
-    let () = device.get_port_watcher(server).context("get port watcher")?;
-    let stream = futures::stream::try_unfold(watcher, |watcher| async move {
-        let event = watcher.watch().await.context("watch failed")?;
-        match event {
-            fnetwork::DevicePortEvent::Existing(port_id) => Ok(Some((port_id, watcher))),
-            fnetwork::DevicePortEvent::Idle(fnetwork::Empty {}) => Ok(None),
-            e @ fnetwork::DevicePortEvent::Added(_) | e @ fnetwork::DevicePortEvent::Removed(_) => {
-                Err(anyhow::anyhow!("unexpected device port event {:?}", e))
-            }
-        }
-    });
-    futures::pin_mut!(stream);
-    let port_id = stream
-        .try_next()
-        .await
-        .context("fetching first port")?
-        .ok_or_else(|| anyhow::anyhow!("no ports found on device"))?;
-    let rest = stream.try_collect::<Vec<_>>().await.context("observing idle")?;
-    if rest.is_empty() {
-        Ok(port_id)
-    } else {
-        Err(anyhow::anyhow!("found more than one device port: {:?}, {:?}", port_id, rest))
-    }
-}
-
-/// Helper function to retrieve device and port information from a netemul
-/// netdevice instance.
+/// Helper function to retrieve device and port information from a port
+/// instance.
 async fn to_netdevice_inner(
-    netdevice: fidl::endpoints::ClientEnd<fnetwork::DeviceInstanceMarker>,
+    port: fidl::endpoints::ClientEnd<fnetwork::PortMarker>,
 ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
-    let netdevice: fnetwork::DeviceInstanceProxy = netdevice.into_proxy()?;
-    let (device, device_server_end) = fidl::endpoints::create_proxy::<fnetwork::DeviceMarker>()?;
-    let () = netdevice.get_device(device_server_end)?;
-    let port_id = get_single_device_port_id(&device).await?;
-    // No other references exist, we just created this proxy, unwrap is safe.
-    let device = fidl::endpoints::ClientEnd::new(device.into_channel().unwrap().into_zx_channel());
+    let port = port.into_proxy()?;
+    let (device, server_end) = fidl::endpoints::create_endpoints::<fnetwork::DeviceMarker>()?;
+    let () = port.get_device(server_end)?;
+    let port_id = port
+        .get_info()
+        .await
+        .context("get port info")?
+        .id
+        .ok_or_else(|| anyhow::anyhow!("missing port id"))?;
     Ok((device, port_id))
 }
 
@@ -821,13 +787,10 @@ impl<'a> TestEndpoint<'a> {
     pub async fn get_netdevice(
         &self,
     ) -> Result<(fidl::endpoints::ClientEnd<fnetwork::DeviceMarker>, fnetwork::PortId)> {
-        match self
-            .get_device()
-            .await
-            .with_context(|| format!("failed to get device connection for {}", self.name))?
-        {
-            fnetemul_network::DeviceConnection::NetworkDevice(n) => to_netdevice_inner(n).await,
-        }
+        let (port, server_end) = fidl::endpoints::create_endpoints().context("create endpoints")?;
+        self.get_port(server_end)
+            .with_context(|| format!("failed to get device connection for {}", self.name))?;
+        to_netdevice_inner(port).await
     }
 
     /// Adds the [`TestEndpoint`] to the provided `realm` with an optional
@@ -847,38 +810,32 @@ impl<'a> TestEndpoint<'a> {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
                 .to_string()
         });
-        match self.get_device().await.context("get_device failed")? {
-            fnetemul_network::DeviceConnection::NetworkDevice(netdevice) => {
-                let (device, mut port_id) = to_netdevice_inner(netdevice).await?;
-                let installer = realm
-                    .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
-                    .context("connect to protocol")?;
-                let device_control = {
-                    let (control, server_end) = fidl::endpoints::create_proxy::<
-                        fnet_interfaces_admin::DeviceControlMarker,
-                    >()
+        let (device, mut port_id) = self.get_netdevice().await?;
+        let installer = realm
+            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+            .context("connect to protocol")?;
+        let device_control = {
+            let (control, server_end) =
+                fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
                     .context("create proxy")?;
-                    let () =
-                        installer.install_device(device, server_end).context("install device")?;
-                    control
-                };
-                let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
-                    .context("create endpoints")?;
-                let () = device_control
-                    .create_interface(
-                        &mut port_id,
-                        server_end,
-                        fnet_interfaces_admin::Options {
-                            name,
-                            metric,
-                            ..fnet_interfaces_admin::Options::EMPTY
-                        },
-                    )
-                    .context("create interface")?;
-                let id = control.get_id().await.context("get id")?;
-                Ok((id, control, Some(device_control)))
-            }
-        }
+            let () = installer.install_device(device, server_end).context("install device")?;
+            control
+        };
+        let (control, server_end) =
+            fnet_interfaces_ext::admin::Control::create_endpoints().context("create endpoints")?;
+        let () = device_control
+            .create_interface(
+                &mut port_id,
+                server_end,
+                fnet_interfaces_admin::Options {
+                    name,
+                    metric,
+                    ..fnet_interfaces_admin::Options::EMPTY
+                },
+            )
+            .context("create interface")?;
+        let id = control.get_id().await.context("get id")?;
+        Ok((id, control, Some(device_control)))
     }
 
     /// Like `into_interface_realm_with_name` but with default parameters.
@@ -1159,15 +1116,6 @@ impl<'a> TestInterface<'a> {
         // the interface; dropping it triggers interface removal in the
         // Netstack. For Ethernet devices this is a No-Op.
         std::mem::drop(control);
-        // Ethernet devices should be removed with the `fuchsia.net.stack` API.
-        // Note that NetDevice interfaces will be removed by this API in
-        // Netstack2, but will generate errors in Netstack3. Hence preferring
-        // the legacy `fuchsia.net.stack` API for Ethernet devices.
-        // TODO(https://fxbug.dev/102064): Remove this once Ethernet devices are
-        // no longer supported.
-        match endpoint.get_device().await.context("get_device failed")? {
-            fnetemul_network::DeviceConnection::NetworkDevice(_) => {}
-        }
         Ok((endpoint, device_control))
     }
 
