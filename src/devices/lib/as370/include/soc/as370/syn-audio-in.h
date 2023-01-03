@@ -31,7 +31,8 @@ class SynAudioInDevice {
 
   static std::unique_ptr<SynAudioInDevice> Create(ddk::MmioBuffer mmio_avio_global,
                                                   ddk::MmioBuffer mmio_i2s,
-                                                  ddk::SharedDmaProtocolClient dma);
+                                                  ddk::SharedDmaProtocolClient dma,
+                                                  zx_device_t* device);
 
   zx_status_t GetBuffer(size_t size, zx::vmo* buffer);
 
@@ -60,9 +61,10 @@ class SynAudioInDevice {
 
   // TODO(andresoportus): Add more configuration options.
   SynAudioInDevice(ddk::MmioBuffer mmio_avio_global, ddk::MmioBuffer mmio_i2s,
-                   ddk::SharedDmaProtocolClient dma);  // protected for unit testing.
-  std::unique_ptr<CicFilter> cic_filter_;              // protected for unit testing.
-  uint32_t dma_buffer_size_[kNumberOfDmas] = {};       // protected for unit testing.
+                   ddk::SharedDmaProtocolClient dma,
+                   zx_device_t* device);          // protected for unit testing.
+  std::unique_ptr<CicFilter> cic_filter_;         // protected for unit testing.
+  uint32_t dma_buffer_size_[kNumberOfDmas] = {};  // protected for unit testing.
 
  private:
   ddk::MmioBuffer avio_global_;
@@ -83,6 +85,7 @@ class SynAudioInDevice {
   // clang-format on
   uint32_t overflows_ = 0;
   uint32_t size_per_notification_ = 0;
+  zx_device_t* device_;
 
   int Thread();
   uint32_t PcmAmountPerTransfer() const;

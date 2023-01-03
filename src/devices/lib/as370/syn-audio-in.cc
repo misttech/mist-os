@@ -25,10 +25,11 @@ constexpr uint64_t kPortShutdown = 0x01;
 
 std::unique_ptr<SynAudioInDevice> SynAudioInDevice::Create(ddk::MmioBuffer mmio_avio_global,
                                                            ddk::MmioBuffer mmio_i2s,
-                                                           ddk::SharedDmaProtocolClient dma) {
+                                                           ddk::SharedDmaProtocolClient dma,
+                                                           zx_device_t* device) {
   fbl::AllocChecker ac;
   auto dev = std::unique_ptr<SynAudioInDevice>(
-      new (&ac) SynAudioInDevice(std::move(mmio_avio_global), std::move(mmio_i2s), dma));
+      new (&ac) SynAudioInDevice(std::move(mmio_avio_global), std::move(mmio_i2s), dma, device));
   if (!ac.check()) {
     return nullptr;
   }
@@ -42,8 +43,11 @@ std::unique_ptr<SynAudioInDevice> SynAudioInDevice::Create(ddk::MmioBuffer mmio_
 }
 
 SynAudioInDevice::SynAudioInDevice(ddk::MmioBuffer mmio_avio_global, ddk::MmioBuffer mmio_i2s,
-                                   ddk::SharedDmaProtocolClient dma)
-    : avio_global_(std::move(mmio_avio_global)), i2s_(std::move(mmio_i2s)), dma_(dma) {
+                                   ddk::SharedDmaProtocolClient dma, zx_device_t* device)
+    : avio_global_(std::move(mmio_avio_global)),
+      i2s_(std::move(mmio_i2s)),
+      dma_(dma),
+      device_(device) {
   cic_filter_ = std::make_unique<CicFilter>();
 }
 
@@ -153,6 +157,13 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
 }
 
 int SynAudioInDevice::Thread() {
+  const char* role_name = "fuchsia.devices.audio.as370.pdm";
+  const size_t role_name_size = strlen(role_name);
+  const zx_status_t status =
+      device_set_profile_by_role(device_, zx_thread_self(), role_name, role_name_size);
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to apply role \"%s\" to the AS370 audio PDM thread\n", role_name);
+  }
   while (1) {
     zx_port_packet_t packet;
     auto status = port_.wait(zx::time::infinite(), &packet);

@@ -32,7 +32,7 @@ class SynAudioInDeviceTest : public SynAudioInDevice {
  public:
   SynAudioInDeviceTest(ddk::MmioBuffer mmio_avio, ddk::MmioBuffer mmio_i2s,
                        ddk::SharedDmaProtocolClient dma)
-      : SynAudioInDevice(std::move(mmio_avio), std::move(mmio_i2s), std::move(dma)) {
+      : SynAudioInDevice(std::move(mmio_avio), std::move(mmio_i2s), std::move(dma), nullptr) {
     cic_filter_ = std::make_unique<CicFilterTest>();
     dma_buffer_size_[0] = 0x10;
     if (kNumberOfDmas > 1) {

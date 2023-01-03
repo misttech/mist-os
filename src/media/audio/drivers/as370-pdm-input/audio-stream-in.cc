@@ -92,7 +92,7 @@ zx_status_t As370AudioStreamIn::InitPDev() {
     return status;
   }
 
-  lib_ = SynAudioInDevice::Create(*std::move(mmio_avio_global), *std::move(mmio_i2s), dma);
+  lib_ = SynAudioInDevice::Create(*std::move(mmio_avio_global), *std::move(mmio_i2s), dma, zxdev());
   if (lib_ == nullptr) {
     zxlogf(ERROR, "failed to create Syn audio device");
     return ZX_ERR_NO_MEMORY;
