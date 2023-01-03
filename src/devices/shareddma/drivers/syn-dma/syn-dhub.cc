@@ -103,6 +103,26 @@ zx_status_t SynDhub::Bind() {
 }
 
 int SynDhub::Thread() {
+  // The deadline scheduler profile must account for the time it takes to re-arm a dHub DMA
+  // (capacity) and the time it takes one DMA to complete (deadline), this since this driver
+  // supports concurrent DMAs having most of the time 2 DMAs in flight. This process is recurrent
+  // happening every time one DMA completes (period).
+  // The time it takes for a DMA to complete is driven by the slow side of the DMA engine, and the
+  // last MTU copy will start shortly before the last MTU amount is drained in the slow side.
+  // For kDmaIdMa0 with kMtuFactor = 4 and dma_mtus = 64 (see channel_info_ in syn-dhub.h) a DMA
+  // copies 8KiB at the time, with drainage of 8 bytes audio frames at 96kHz this DMA occurs every
+  // 10.67 msecs (8 * 1024 / 8 / 96'000), hence deadline = period = 10.67 msecs.
+  // For kDmaIdPdmW0 with kMtuFactor = 4 and dma_mtus = 128 (see channel_info_ in syn-dhub.h) a DMA
+  // copies 16KiB at the time, with drainage of 16 bytes of PDM data (equivalent to 4 bytes of PCM)
+  // at 96kHz this DMA also occurs every 10.67 msecs (16 * 1024 / 16 / 96'000) and
+  // deadline = period = 10.67 msecs. kDmaIdPdmW1 is the same as kDmaIdPdmW0.
+  const char* role_name = "fuchsia.devices.audio.as370.dma";
+  const size_t role_name_size = strlen(role_name);
+  const zx_status_t status =
+      device_set_profile_by_role(zxdev(), zx_thread_self(), role_name, role_name_size);
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to apply role \"%s\" to the AS370 DMA (dHub) thread\n", role_name);
+  }
   while (1) {
     zx_port_packet_t packet = {};
     auto status = port_.wait(zx::time::infinite(), &packet);
