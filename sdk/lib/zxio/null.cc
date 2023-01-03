@@ -143,6 +143,10 @@ zx_status_t zxio_default_dirent_iterator_next(zxio_t* io, zxio_dirent_iterator_t
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+zx_status_t zxio_default_dirent_iterator_rewind(zxio_t* io, zxio_dirent_iterator_t* iterator) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 void zxio_default_dirent_iterator_destroy(zxio_t* io, zxio_dirent_iterator_t* iterator) {
   iterator->io = nullptr;
 }

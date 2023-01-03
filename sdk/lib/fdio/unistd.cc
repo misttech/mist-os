@@ -1618,8 +1618,7 @@ void rewinddir(DIR* dir) {
   const fbl::AutoLock lock(&dir->lock);
   if (dir->iterator) {
     const fdio_ptr io = fd_to_io(dir->fd);
-    io->dirent_iterator_destroy(dir->iterator.get());
-    dir->iterator.reset();
+    io->dirent_iterator_rewind(dir->iterator.get());
   }
 }
 

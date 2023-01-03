@@ -553,6 +553,9 @@ extern "C" {
     ) -> zx_status_t;
 }
 extern "C" {
+    pub fn zxio_dirent_iterator_rewind(iterator: *mut zxio_dirent_iterator_t) -> zx_status_t;
+}
+extern "C" {
     pub fn zxio_dirent_iterator_destroy(iterator: *mut zxio_dirent_iterator_t);
 }
 extern "C" {

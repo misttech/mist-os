@@ -14,6 +14,7 @@
 		zxio_dirent_iterator_destroy;
 		zxio_dirent_iterator_init;
 		zxio_dirent_iterator_next;
+		zxio_dirent_iterator_rewind;
 		zxio_flags_get;
 		zxio_flags_set;
 		zxio_get_posix_mode;

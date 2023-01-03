@@ -36,8 +36,6 @@ class DirentIteratorImpl {
                   "zxio_dirent_iterator_t requires first field of implementation to be zxio_t");
   }
 
-  ~DirentIteratorImpl() { [[maybe_unused]] const fidl::WireResult result = client()->Rewind(); }
-
   zx_status_t Next(zxio_dirent_t* inout_entry) {
     if (index_ >= count_) {
       const zx_status_t status = RemoteReadDirents();
@@ -94,6 +92,14 @@ class DirentIteratorImpl {
     }
 
     return ZX_OK;
+  }
+
+  zx_status_t Rewind() {
+    const fidl::WireResult result = client()->Rewind();
+    if (!result.ok()) {
+      return result.status();
+    }
+    return result->s;
   }
 
  private:
@@ -425,6 +431,8 @@ class Remote : public HasIo {
   zx_status_t DirentIteratorInit(zxio_dirent_iterator_t* iterator);
 
   zx_status_t DirentIteratorNext(zxio_dirent_iterator_t* iterator, zxio_dirent_t* inout_entry);
+
+  zx_status_t DirentIteratorRewind(zxio_dirent_iterator_t* iterator);
 
   void DirentIteratorDestroy(zxio_dirent_iterator_t* iterator);
 
@@ -993,6 +1001,11 @@ zx_status_t Remote<Protocol>::DirentIteratorNext(zxio_dirent_iterator_t* iterato
 }
 
 template <typename Protocol>
+zx_status_t Remote<Protocol>::DirentIteratorRewind(zxio_dirent_iterator_t* iterator) {
+  return reinterpret_cast<DirentIteratorImpl*>(iterator)->Rewind();
+}
+
+template <typename Protocol>
 void Remote<Protocol>::DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
   reinterpret_cast<DirentIteratorImpl*>(iterator)->~DirentIteratorImpl();
 }
@@ -1215,6 +1228,7 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.link = Adaptor::From<&Directory::Link>;
   ops.dirent_iterator_init = Adaptor::From<&Directory::DirentIteratorInit>;
   ops.dirent_iterator_next = Adaptor::From<&Directory::DirentIteratorNext>;
+  ops.dirent_iterator_rewind = Adaptor::From<&Directory::DirentIteratorRewind>;
   ops.dirent_iterator_destroy = Adaptor::From<&Directory::DirentIteratorDestroy>;
   ops.watch_directory = Adaptor::From<&Directory::WatchDirectory>;
 

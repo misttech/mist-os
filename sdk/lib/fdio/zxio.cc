@@ -136,6 +136,10 @@ zx_status_t zxio::dirent_iterator_next(zxio_dirent_iterator_t* iterator,
   return zxio_dirent_iterator_next(iterator, inout_entry);
 }
 
+zx_status_t zxio::dirent_iterator_rewind(zxio_dirent_iterator_t* iterator) {
+  return zxio_dirent_iterator_rewind(iterator);
+}
+
 void zxio::dirent_iterator_destroy(zxio_dirent_iterator_t* iterator) {
   return zxio_dirent_iterator_destroy(iterator);
 }

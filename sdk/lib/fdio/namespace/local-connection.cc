@@ -106,6 +106,12 @@ struct local_connection : public fdio_t {
     return dir.fs->Readdir(*dir.vn, &dir_iterator->iterator_state, inout_entry);
   }
 
+  zx_status_t dirent_iterator_rewind(zxio_dirent_iterator_t* iterator) override {
+    auto* dir_iterator = reinterpret_cast<local_dir_dirent_iterator*>(iterator);
+    dir_iterator->iterator_state = DirentIteratorState();
+    return ZX_OK;
+  }
+
   void dirent_iterator_destroy(zxio_dirent_iterator_t* iterator) override {
     auto* dir_iterator = reinterpret_cast<local_dir_dirent_iterator*>(iterator);
     free(dir_iterator->buffer);

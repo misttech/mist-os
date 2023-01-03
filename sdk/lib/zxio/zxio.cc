@@ -11,6 +11,7 @@
 #include <lib/zx/eventpair.h>
 #include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/ops.h>
+#include <lib/zxio/types.h>
 #include <lib/zxio/watcher.h>
 #include <lib/zxio/zxio.h>
 #include <string.h>
@@ -415,6 +416,14 @@ zx_status_t zxio_dirent_iterator_next(zxio_dirent_iterator_t* iterator,
   }
   zxio_internal_t* zio = to_internal(iterator->io);
   return zio->ops->dirent_iterator_next(iterator->io, iterator, inout_entry);
+}
+
+zx_status_t zxio_dirent_iterator_rewind(zxio_dirent_iterator_t* iterator) {
+  if (!zxio_is_valid(iterator->io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(iterator->io);
+  return zio->ops->dirent_iterator_rewind(iterator->io, iterator);
 }
 
 void zxio_dirent_iterator_destroy(zxio_dirent_iterator_t* iterator) {

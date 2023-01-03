@@ -479,6 +479,9 @@ ZXIO_EXPORT zx_status_t zxio_dirent_iterator_init(zxio_dirent_iterator_t* iterat
 ZXIO_EXPORT zx_status_t zxio_dirent_iterator_next(zxio_dirent_iterator_t* iterator,
                                                   zxio_dirent_t* inout_entry);
 
+// Rewinds a |zxio_dirent_iterator_t| back to the first entry.
+ZXIO_EXPORT zx_status_t zxio_dirent_iterator_rewind(zxio_dirent_iterator_t* iterator);
+
 // Destroys a |zxio_dirent_iterator_t|, freeing associated resources.
 //
 // After destruction, another |zxio_dirent_iterator_init| call might be made on

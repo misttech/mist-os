@@ -130,7 +130,35 @@ TEST_F(DirentTest, StandardBufferSize) {
     char name[ZXIO_MAX_FILENAME + 1];
     const int name_length = snprintf(name, sizeof(name), "%zu", count);
     EXPECT_EQ(entry.name_length, name_length);
-    EXPECT_EQ(std::string_view(name, name_length), std::string_view(entry.name, entry.name_length));
+    EXPECT_STREQ(std::string_view(name, name_length),
+                 std::string_view(entry.name, entry.name_length));
+  }
+}
+
+TEST_F(DirentTest, Rewind) {
+  zxio_dirent_iterator_t iterator;
+  zx::result cleanup = InitIteratorDeferCleanup(iterator);
+  ASSERT_OK(cleanup);
+
+  char name_buffer[ZXIO_MAX_FILENAME + 1];
+  std::vector<std::string> names;
+  names.reserve(TestServer::kEntryCount);
+
+  for (size_t count = 0; count < TestServer::kEntryCount; ++count) {
+    zxio_dirent_t entry = {.name = name_buffer};
+    ASSERT_OK(zxio_dirent_iterator_next(&iterator, &entry));
+    ASSERT_LE(entry.name_length, ZXIO_MAX_FILENAME);
+
+    names.emplace_back(entry.name, entry.name_length);
+  }
+
+  ASSERT_OK(zxio_dirent_iterator_rewind(&iterator));
+
+  for (size_t count = 0; count < TestServer::kEntryCount; ++count) {
+    zxio_dirent_t entry = {.name = name_buffer};
+    ASSERT_OK(zxio_dirent_iterator_next(&iterator, &entry));
+    ASSERT_LE(entry.name_length, ZXIO_MAX_FILENAME);
+    EXPECT_STREQ(std::string_view(entry.name, entry.name_length), names[count]);
   }
 }
 
