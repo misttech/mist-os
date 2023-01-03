@@ -8,17 +8,17 @@
 
 ## usage: fx pave [--build|--no-build] [-1|--keep-running] [extra bootserver arguments]
 ##
-##   --build | --no-build     build (or not) the images required to pave.
-##   -1 | --keep-running      perform a single pave and exit or keep the bootserver
-##                            running after the first paving
+##   --build | --no-build     build (or not) the images required to pave. defaults to --no-build
+##   --run-once | --keep-running      perform a single pave and exit or keep the bootserver
+##                                    running after the first paving. defaults to --run-once
 ##   extra bootserver args    arguments passed directly to bootserver
 ##
 ## Start a bootserver for paving a device, optionally performing a build of the
 ## system images before.
 ##
 ## Defaults are defined by the "incremental" feature:
-##    'fx --enable=incremental pave'  defaults to "--build" and "-1"
-##    'fx --disable=incremental pave'  defaults to "--no-build" and "--keep-running"
+##    'fx --enable=incremental pave'  defaults to "--build"
+##    'fx --disable=incremental pave'  defaults to "--no-build"
 ##
 ## For bootserver specific arguments, use 'fx pave --help'
 
@@ -28,12 +28,11 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 fx-config-read
 
 function main {
-  local single_run=false
+  local single_run=true
   local build=false
   if is_feature_enabled "incremental"; then
     # In incremental workflows, these defaults have changed.
     # Keep old behavior if incremental is not enabled.
-    single_run=true
     build=true
   fi
   local pave_args=()
@@ -52,7 +51,8 @@ function main {
       --keep-running)
         single_run=false
         ;;
-      -1)
+      # -1 is here for backward compatibility.
+      --run-once | -1)
         single_run=true
         ;;
       *)

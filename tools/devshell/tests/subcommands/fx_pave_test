@@ -38,15 +38,29 @@ TEST_pave_noincr_noargs() {
   BT_ASSERT_FILE_DOES_NOT_EXIST "${build}.mock_state"
   # pave.sh was called
   BT_ASSERT_FILE_EXISTS "${pavesh}.mock_state"
-  # pave.sh was called without option "-1"
-  BT_EXPECT btf::does-mock-args-not-contain "${pavesh}.mock_state" "-1"
+  # pave.sh was called with option "-1". `--run-once` is the default behavior
+  BT_EXPECT btf::does-mock-args-contain "${pavesh}.mock_state" "-1"
 }
 
 TEST_pave_singlerun() {
   local out="${BT_TEMP_DIR}/_fx_pave_output"
+  BT_EXPECT ${fx} pave --run-once > "$out" 2>&1
+  # pave.sh was called with option "-1"
+  BT_EXPECT btf::does-mock-args-contain "${pavesh}.mock_state" "-1"
+}
+
+TEST_pave_singlerun_shortened() {
+  local out="${BT_TEMP_DIR}/_fx_pave_output"
   BT_EXPECT ${fx} pave -1 > "$out" 2>&1
   # pave.sh was called with option "-1"
   BT_EXPECT btf::does-mock-args-contain "${pavesh}.mock_state" "-1"
+}
+
+TEST_pave_keeprunning() {
+  local out="${BT_TEMP_DIR}/_fx_pave_output"
+  BT_EXPECT ${fx} pave --keep-running > "$out" 2>&1
+  # pave.sh was called without option "-1"
+  BT_EXPECT btf::does-mock-args-not-contain "${pavesh}.mock_state" "-1"
 }
 
 TEST_pave_helpoptions() {

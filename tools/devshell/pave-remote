@@ -12,10 +12,12 @@
 ## Connect to HOST, run a build using fx from DIR, fetch the artifacts and
 ## start the paver.
 ##
-##  --no-build           do not build, just pull artifacts already present
-##  --no-pave            do not start the paver, just pull the artifacts
+##  --no-build           do not build, just pull artifacts already present. Defaults to build
+##  --no-pave            do not start the paver, just pull the artifacts. Defaults to pave
 ##  --no-check-ssh-keys  do not verify that the default SSH credentials are the
-##                       same before paving.
+##                       same before paving. Defaults to check ssh keys
+##  --run-once | --keep-running      perform a single pave and exit or keep the bootserver
+##                                   running after the first paving. defaults to --run-once
 ##  --                   pass any arguments after the -- to the fx pave command
 ##
 ##  HOST          the hostname to connect to
@@ -35,9 +37,10 @@ fx-config-read
 build=true
 pave=true
 check_ssh_keys=true
+single_run=true
 host=""
 dir=""
-args=()
+pave_args=()
 while [[ $# -ne 0 ]]; do
   case "$1" in
   --help|-h)
@@ -53,9 +56,16 @@ while [[ $# -ne 0 ]]; do
   --no-check-ssh-keys)
     check_ssh_keys=false
     ;;
+  # -1 is here for backward compatibility.
+  --run-once | -1)
+    single_run=true
+    ;;
+  --keep-running)
+    single_run=false
+    ;;
   --)
     shift
-    args+=("$@")
+    pave_args+=("$@")
     break
     ;;
   -*)
@@ -76,6 +86,10 @@ while [[ $# -ne 0 ]]; do
   esac
   shift
 done
+
+if $single_run; then
+  pave_args+=( "-1" )
+fi
 
 if cached=( $(load_remote_info "$host") ); then
   host="${cached[0]}"
@@ -115,10 +129,10 @@ fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" pave $build
 
 if "${pave}"; then
   if [[ -n "$(get-device-name)" ]]; then
-    args+=(-n $(get-device-name))
+    pave_args+=(-n $(get-device-name))
   fi
 
   fetch_or_build_tool "${host}" "${dir}" "${artifact_dir}" bootserver
   cd "${artifact_dir}"
-  ./pave.sh --authorized-keys "${authkeys_path}" "${args[@]}"
+  ./pave.sh --authorized-keys "${authkeys_path}" "${pave_args[@]}"
 fi
