@@ -29,6 +29,7 @@ ffx_plugin("ffx_trace") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:term_grid",
     "//third_party/rust_crates:termion",
   ]
@@ -38,8 +39,5 @@ ffx_plugin("ffx_trace") {
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_rust",
   ]
 
-  test_deps = [
-    "//third_party/rust_crates:regex",
-    "//third_party/rust_crates:serde_json",
-  ]
+  test_deps = [ "//third_party/rust_crates:regex" ]
 }

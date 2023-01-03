@@ -14,6 +14,7 @@ use {
     lazy_static::lazy_static,
     regex::Regex,
     serde::{Deserialize, Serialize},
+    serde_json::Value,
     std::collections::BTreeSet,
     std::future::Future,
     std::io::{stdin, Stdin},
@@ -125,6 +126,24 @@ fn validate_category_name(category_name: &str) -> Result<()> {
     Ok(())
 }
 
+async fn get_category_group_names() -> Result<Vec<String>> {
+    let all_groups = ffx_config::query(ffx_config::build().select(ffx_config::SelectMode::All))
+        .name(Some("trace.category_groups"))
+        .get::<Value>()
+        .await
+        .context("could not query `trace.category_groups` in config.")?;
+    let mut group_names: Vec<String> = all_groups
+        .as_array()
+        .unwrap()
+        .into_iter()
+        .flat_map(|subgroups| subgroups.as_object().unwrap())
+        .map(|(group_name, _)| group_name)
+        .cloned()
+        .collect();
+    group_names.sort_unstable();
+    Ok(group_names)
+}
+
 async fn get_category_group(category_group_name: &str) -> Result<Vec<String>> {
     let category_group = ffx_config::get::<Vec<String>, _>(&format!(
         "trace.category_groups.{}",
@@ -224,6 +243,13 @@ pub async fn trace(
             } else {
                 writer.line("Trace providers:")?;
                 print_grid(&writer, providers.into_iter().map(|provider| provider.name).collect())?;
+            }
+        }
+        TraceSubCommand::ListCategoryGroups(_) => {
+            let group_names = get_category_group_names().await?;
+            writer.line("Category groups:")?;
+            for group_name in group_names {
+                writer.line(format!("  #{}", group_name))?;
             }
         }
         TraceSubCommand::Start(opts) => {
@@ -979,6 +1005,31 @@ Current tracing status:
             .await
             .unwrap();
         assert_eq!(birds, get_category_group("birds").await.unwrap());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_category_group_names() {
+        let _env = ffx_config::test_init().await.unwrap();
+        let birds = vec!["chickens", "ducks"];
+        let bees = vec!["honey", "bumble"];
+        ffx_config::query("trace.category_groups.birds")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(birds))
+            .await
+            .unwrap();
+        ffx_config::query("trace.category_groups.bees")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(bees))
+            .await
+            .unwrap();
+        ffx_config::query("trace.category_groups.*invalid")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(bees))
+            .await
+            .unwrap();
+        assert!(get_category_group_names().await.unwrap().contains(&"birds".to_owned()));
+        assert!(get_category_group_names().await.unwrap().contains(&"bees".to_owned()));
+        assert!(get_category_group_names().await.unwrap().contains(&"*invalid".to_owned()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

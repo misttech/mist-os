@@ -23,6 +23,7 @@ pub struct TraceCommand {
 pub enum TraceSubCommand {
     ListCategories(ListCategories),
     ListProviders(ListProviders),
+    ListCategoryGroups(ListCategoryGroups),
     Start(Start),
     Stop(Stop),
     Status(Status),
@@ -38,6 +39,11 @@ pub struct ListCategories {}
 /// List the target's trace providers.
 #[argh(subcommand, name = "list-providers")]
 pub struct ListProviders {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// List the builtin and custom category groups.
+#[argh(subcommand, name = "list-category-groups")]
+pub struct ListCategoryGroups {}
 
 // Work around argh's handling of Vec.  Listing categories as a comma
 // separated list of values rather than a repeated keyed option
