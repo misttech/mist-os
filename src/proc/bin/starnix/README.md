@@ -91,7 +91,7 @@ ffx starnix start fuchsia-pkg://fuchsia.com/starnix_android#meta/adbd.cm
 ```
 
 The relay between the host and server is started by running the adb
-starnix plugin in a termainal.
+starnix plugin in a terminal.
 
 ```sh
 ffx starnix adb
@@ -108,7 +108,7 @@ List of devices attached
 emulator-5554          offline transport_id:1
 ```
 
-If there is more than one adb device, run commands with the '-s`
+If there is more than one adb device, run commands with the `-s`
 or `-t` selectors. For example:
 
 ```sh
