@@ -68,6 +68,7 @@ fuchsia_test_package("volume_change_earcons_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 
   # test_media_sounds_system_source is expected to panic and emit Error logs.
   # BluetoothHandler is expected to setup failed.
@@ -122,6 +123,7 @@ fuchsia_test_package("earcons_with_input_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 }
 
 config_data("with_input_tests_config") {
@@ -165,6 +167,7 @@ fuchsia_test_package("bluetooth_earcons_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 }
 
 config_data("bluetooth_tests_config") {

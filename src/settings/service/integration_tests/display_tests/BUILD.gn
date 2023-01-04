@@ -59,6 +59,7 @@ fuchsia_test_package("display_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 }
 
 config_data("tests_config") {
@@ -102,6 +103,7 @@ fuchsia_test_package("internal_display_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 }
 
 config_data("internal_tests_config") {

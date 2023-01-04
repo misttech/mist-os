@@ -50,6 +50,7 @@ fuchsia_test_package("audio_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 
   # invalid_missing_input_tests produces error logs due to purposefully passing
   # invalid input to the settings service.

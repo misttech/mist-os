@@ -42,6 +42,7 @@ fuchsia_test_package("privacy_integration_test_pkg") {
     "//src/settings/service:setui_service_v2",
     "//src/sys/stash:pkg",
   ]
+  subpackages = [ "//src/sys/stash:pkg" ]
 }
 
 config_data("tests_config") {
