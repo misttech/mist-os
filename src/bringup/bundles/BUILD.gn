@@ -6,15 +6,6 @@
 # products.
 group("bootstrap") {
   deps = [
-    ":zedboot",
-    "//src/bringup/bin/watch",
-  ]
-}
-
-# This target contains elements that are present on the boot partition of the
-# zedboot image for all products.
-group("zedboot") {
-  deps = [
     "//src/bringup:bootfs",
     "//src/bringup/bin/console:bootfs",
     "//src/bringup/bin/console-launcher:bootfs",

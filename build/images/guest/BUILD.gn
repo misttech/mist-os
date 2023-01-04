@@ -57,7 +57,6 @@ assembled_system("guest") {
     "//src/bringup/bin/sysinfo",
     "//src/bringup/bin/virtcon:bootfs",
     "//src/bringup/bin/waitfor",
-    "//src/bringup/bin/watch",
     "//src/bringup/bundles:bootstrap",
     "//src/connectivity/ethernet/drivers/ethernet",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
