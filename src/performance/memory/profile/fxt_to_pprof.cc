@@ -279,7 +279,7 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> fx
         "    with `readelf -d <binary>`\n"
         "2 - the component does not register a trace provider. See:\n"
         "    https://fuchsia.dev/fuchsia-src/development/tracing/tutorial/registering-a-trace-provider?hl=en#register-with-the-trace-manager\n"
-        "3 - the component does not have access to the trace FILD service\n"
+        "3 - the component does not have access to the trace FIDL service\n"
         "    `fuchsia.tracing.provider.Registry`\n"
         "    Please verify you manifest.\n"
         "4 - the component is not running");
