@@ -748,26 +748,26 @@ There is a limit to how much of the topology can be statically validated. When
 the exploration reaches a collection, in general it has to stop because the
 contents of a collection are runtime determined.
 
-[docs-concepts]: /docs/concepts/components
-[docs-development]: /docs/development/components
-[docs-eager]: /docs/development/components/connect#eager
-[docs-environments]: /docs/concepts/components/v2/environments
-[docs-eventpair]: /docs/reference/kernel_objects/eventpair
+[docs-concepts]: /docs/concepts/components/v2
+[docs-development]: /docs/development/components/build.md
+[docs-eager]: /docs/development/components/connect.md#eager
+[docs-environments]: /docs/concepts/components/v2/environments.md
+[docs-eventpair]: /docs/reference/kernel_objects/eventpair.md
 [docs-get-started]: /docs/get-started/learn/components
-[docs-hub]: /docs/concepts/components/v2/hub
-[docs-intro-components]: /docs/concepts/components/v2/introduction#components
-[docs-manifests]: /docs/concepts/components/v2/component_manifests
-[docs-monikers]: /docs/concepts/components/v2/monikers
+[docs-hub]: /docs/concepts/components/v2/hub.md
+[docs-intro-components]: /docs/concepts/components/v2/introduction.md#components
+[docs-manifests]: /docs/concepts/components/v2/component_manifests.md
+[docs-monikers]: /docs/concepts/components/v2/identifiers.md#monikers
 [docs-principles-secure]: /docs/concepts/principles/secure.md
-[docs-socket]: /docs/reference/kernel_objects/socket
-[docs-storage-index]: /docs/development/components/component_id_index
-[docs-storage]: /docs/concepts/components/v2/capabilities/storage
-[docs-url]: /docs/concepts/components/component_urls
-[docs-vmo]: /docs/reference/kernel_objects/vm_object
+[docs-socket]: /docs/reference/kernel_objects/socket.md
+[docs-storage-index]: /docs/development/components/component_id_index.md
+[docs-storage]: /docs/concepts/components/v2/capabilities/storage.md
+[docs-url]: /docs/concepts/components/v2/identifiers.md#component-urls
+[docs-vmo]: /docs/reference/kernel_objects/vm_object.md
 [examples]: /examples
 [fidl-realm]: /sdk/fidl/fuchsia.component/realm.fidl
 [rfc-eager-updates]: /docs/contribute/governance/rfcs/0145_eager_package_updates.md
-[rfc-versions]: /docs/contribute/governance/rfcs/0002_platform_versioning
+[rfc-versions]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [src-builtin]: /src/sys/component_manager/configs/bootfs_config.json5
 [src-route-exceptions]: /src/security/policy/build/verify_routes_exceptions_allowlist.json5
 [src-security_policy]: /src/security/policy/component_manager_policy.json5

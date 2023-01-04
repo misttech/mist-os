@@ -23,6 +23,9 @@ toc:
   path: /docs/contribute/contributing-to-api.md
 - title: "Contributing to Zircon"
   path: /docs/contribute/contributing_to_zircon.md
+- title: "Contributing to the Component Framework"
+  section:
+  - include: /docs/contribute/contributing-to-cf/_toc.yaml
 - title: "Contributing to FIDL"
   section:
   - include: /docs/contribute/contributing-to-fidl/_toc.yaml
