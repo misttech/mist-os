@@ -178,13 +178,12 @@ async fn flush_outgoing_messages<Hdl: 'static + for<'a> ProxyableRW<'a>>(
 ) -> Result<Option<StreamRefSender>, Error> {
     let mut message = Default::default();
     let endpoint = stream_reader.conn().endpoint();
-    let mut ctx = Context::from_waker(noop_waker_ref());
     loop {
         let msg = match futures::future::select(
             proxy.read_from_handle(&mut message),
             stream_reader.next(),
         )
-        .poll_unpin(&mut ctx)
+        .poll_unpin(&mut Context::from_waker(noop_waker_ref()))
         {
             Poll::Pending => return Ok(Some(stream_ref_sender)),
             Poll::Ready(Either::Left((x, _))) => {

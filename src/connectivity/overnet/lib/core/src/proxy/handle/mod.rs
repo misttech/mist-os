@@ -211,9 +211,8 @@ impl<Hdl: Proxyable> ProxyableHandle<Hdl> {
         Hdl: for<'a> ProxyableRW<'a>,
     {
         let mut message = Default::default();
-        let mut ctx = Context::from_waker(noop_waker_ref());
         loop {
-            let pr = self.read(&mut message).poll_unpin(&mut ctx);
+            let pr = self.read(&mut message).poll_unpin(&mut Context::from_waker(noop_waker_ref()));
             match pr {
                 Poll::Pending => return Ok(()),
                 Poll::Ready(Err(e)) => return Err(e.into()),
