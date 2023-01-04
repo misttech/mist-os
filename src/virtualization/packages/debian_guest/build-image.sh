@@ -9,7 +9,7 @@
 set -e
 
 usage() {
-  echo "usage: ${0} <output dir> (arm64|x64)"
+  echo "usage: ${0} <output dir> (arm64|x64) [--disable-fakemachine]"
   echo
   echo "Builds a Debian based image, initrd, and kernel suitable for Machina."
   echo
@@ -27,7 +27,7 @@ check_dep() {
 
 main() {
   # Ensure correct number of args given.
-  if [[ $# -ne 2 ]]; then
+  if [[ $# -lt 2 ]]; then
     usage
   fi
 
@@ -35,6 +35,8 @@ main() {
   local output_dir
   output_dir=$(realpath "${1}")
   mkdir -p "${output_dir}" || exit 1
+
+  local disable_fakemachine=false
 
   # Target architecture.
   case "${2}" in
@@ -47,6 +49,17 @@ main() {
     *)
       usage;;
   esac
+
+  for option in "${@:3}"
+  do
+    case "${option}" in
+      --disable-fakemachine)
+        local disable_fakemachine=true
+        ;;
+    *)
+      usage;;
+    esac
+  done
 
   # Ensure dependencies exist.
   check_dep debos
@@ -64,13 +77,22 @@ main() {
   local script_dir
   script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+  # If we disable the fakemachine VM we also need to use sudo for losetup
+  if [ "$disable_fakemachine" == true ]
+  then
+    debos="sudo debos --disable-fakemachine"
+  else
+    debos="debos"
+  fi
+
   # Create the image.
   #
   # We change the working directory to ${working_dir} because debos
   # unhelpfully writes files to its current working directory.
   echo "Starting image creation VM..."
-  (cd $working_dir;
-    debos -v --artifactdir="${working_dir}" -t "arch:${arch}" "${script_dir}/debos/debos.yaml")
+  pushd $working_dir;
+  $debos -v --artifactdir="${working_dir}" -t "arch:${arch}" "${script_dir}/debos/debos.yaml"
+  popd
 
   # Move files to the output directory.
   for file in vmlinuz initrd.img rootfs.qcow2; do
