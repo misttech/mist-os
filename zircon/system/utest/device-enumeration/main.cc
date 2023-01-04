@@ -844,6 +844,13 @@ TEST_F(DeviceEnumerationTest, AtlasTest) {
     return;
   }
 
+  static const char* kDfv1DevicePaths[] = {
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-I2C4/acpi-DLG7/pt/acpi-DLG7-composite/DA7219-output",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-I2C4/acpi-DLG7/pt/acpi-DLG7-composite/DA7219-input",
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
+
   // TODO(fxbug.dev/107847): Move this back to the normal kDevicePaths when wlanphy_dfv2 is
   // re-enabled.
   static const char* kDevicesThatFailInDfv2[] = {

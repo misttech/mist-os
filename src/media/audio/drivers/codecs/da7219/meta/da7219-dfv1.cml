@@ -10,11 +10,11 @@
     program: {
         runner: "driver",
         bind: "meta/bind/da7219.bindbc",
-        colocate: "true",
         compat: "driver/da7219.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
+        { service: "fuchsia.hardware.i2c.Service" },
     ],
 }
