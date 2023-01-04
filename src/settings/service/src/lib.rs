@@ -913,10 +913,18 @@ where
     let mut agent_authority =
         Authority::create(delegate.clone(), components.clone(), policies).await?;
 
-    // TODO(fxbug.dev/96251) Handle registrants with missing dependencies.
     for registrant in registrants {
-        if registrant.get_dependencies().iter().all(|dependency| dependency.is_fulfilled(&entities))
-        {
+        if registrant.get_dependencies().iter().all(|dependency| {
+            let dep_met = dependency.is_fulfilled(&entities);
+            if !dep_met {
+                fx_log_err!(
+                    "Skipping {} registration due to missing dependency {:?}",
+                    registrant.get_interface(),
+                    dependency
+                );
+            }
+            dep_met
+        }) {
             registrant.register(&job_seeder, &mut service_dir);
         }
     }

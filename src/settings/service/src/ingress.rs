@@ -64,16 +64,30 @@ pub(crate) mod registration {
 
     /// [Registrant] brings up an inbound interface in the service.
     pub struct Registrant {
+        /// The name of the interface being registered.
+        interface: String,
+        /// The [Registrar] responsible for bringing up the interface.
+        registrar: Registrar,
         /// A list of [Dependencies](Dependency) the registrant relies on being present in order to
         /// function.
         dependencies: HashSet<Dependency>,
-        /// The [Registrar] responsible for bringing up the interface.
-        registrar: Registrar,
     }
 
     impl Registrant {
+        pub(crate) fn new(
+            interface: String,
+            registrar: Registrar,
+            dependencies: HashSet<Dependency>,
+        ) -> Registrant {
+            Registrant { interface, registrar, dependencies }
+        }
+
         pub(crate) fn get_dependencies(&self) -> &HashSet<Dependency> {
             &self.dependencies
+        }
+
+        pub(crate) fn get_interface(&self) -> &String {
+            &self.interface
         }
 
         pub(crate) fn register(
@@ -84,32 +98,11 @@ pub(crate) mod registration {
             self.registrar.register(job_seeder, service_dir);
         }
     }
-
-    pub struct Builder {
-        registrar: Registrar,
-        dependencies: HashSet<Dependency>,
-    }
-
-    impl Builder {
-        pub(crate) fn new(registrar: Registrar) -> Self {
-            Self { registrar, dependencies: HashSet::new() }
-        }
-
-        pub(crate) fn add_dependency(mut self, dependency: Dependency) -> Self {
-            let _ = self.dependencies.insert(dependency);
-
-            self
-        }
-
-        pub(crate) fn build(self) -> Registrant {
-            Registrant { registrar: self.registrar, dependencies: self.dependencies }
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::registration::{Builder, Registrar};
+    use super::registration::{Registrant, Registrar};
     use crate::base::{Dependency, Entity, SettingType};
     use crate::job::source::Seeder;
     use crate::message::base::MessengerType;
@@ -122,11 +115,13 @@ mod tests {
     async fn test_registration() {
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
         let dependency = Dependency::Entity(Entity::Handler(SettingType::Unknown));
-        let registrant = Builder::new(Registrar::Test(Box::new(move || {
-            assert!(tx.send(()).is_ok());
-        })))
-        .add_dependency(dependency)
-        .build();
+        let registrant = Registrant::new(
+            "Registrar::Test".to_string(),
+            Registrar::Test(Box::new(move || {
+                assert!(tx.send(()).is_ok());
+            })),
+            [dependency].into(),
+        );
 
         let mut fs = ServiceFs::new();
 

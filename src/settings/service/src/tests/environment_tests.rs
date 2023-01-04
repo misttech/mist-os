@@ -153,10 +153,12 @@ async fn test_message_hub() {
 #[fuchsia_async::run_until_stalled(test)]
 async fn test_dependency_generation() {
     let entity = Entity::Handler(SettingType::Unknown);
-    let registrant =
-        registration::Builder::new(registration::Registrar::Test(Box::new(move || {})))
-            .add_dependency(Dependency::Entity(entity))
-            .build();
+
+    let registrant = registration::Registrant::new(
+        "Registrar::Test".to_string(),
+        registration::Registrar::Test(Box::new(move || {})),
+        [Dependency::Entity(entity)].into(),
+    );
 
     let Environment { entities, .. } =
         EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
@@ -197,12 +199,13 @@ async fn test_job_sourcing() {
     .into_stream();
 
     // Build a registrant with the stream.
-    let registrant = registration::Builder::new(registration::Registrar::TestWithSeeder(Box::new(
-        move |seeder| {
+    let registrant = registration::Registrant::new(
+        "Registrar::TestWithSeeder".to_string(),
+        registration::Registrar::TestWithSeeder(Box::new(move |seeder| {
             seeder.seed(job_stream);
-        },
-    )))
-    .build();
+        })),
+        [].into(),
+    );
 
     // Build environment with the registrant.
     let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))

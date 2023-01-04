@@ -4,7 +4,7 @@
 
 use crate::base::{Dependency, Entity, SettingType};
 use crate::handler::base::Error;
-use crate::ingress::registration::{self, Registrant, Registrar};
+use crate::ingress::registration::{Registrant, Registrar};
 use crate::job::source::Seeder;
 use crate::policy::PolicyType;
 use fidl_fuchsia_settings::{
@@ -281,13 +281,11 @@ impl Interface {
     /// specified in a configuration into actionable Registrants that can be used in the setting
     /// service.
     pub(crate) fn registrant(self) -> Registrant {
-        let mut builder = registration::Builder::new(Registrar::Fidl(self.registration_fn()));
-        let dependencies: Vec<Dependency> = self.dependencies();
-        for dependency in dependencies {
-            builder = builder.add_dependency(dependency);
-        }
-
-        builder.build()
+        Registrant::new(
+            format!("{self:?}"),
+            Registrar::Fidl(self.registration_fn()),
+            self.dependencies().into_iter().collect(),
+        )
     }
 }
 
