@@ -350,25 +350,15 @@ impl Timer {
     ///
     /// If the kernel reports no memory available to create a timer or the process' job policy
     /// denies timer creation.
-    #[allow(deprecated)]
     pub fn create() -> Self {
-        Self::try_create()
-            .expect("timer creation always succeeds except with OOM or when job policy denies it")
-    }
-
-    /// Create a timer, an object that can signal when a specified point in time has been reached.
-    /// Wraps the
-    /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
-    /// syscall.
-    #[deprecated = "creation APIs will no longer be fallible in the future. Users should prefer `create`"]
-    pub fn try_create() -> Result<Timer, Status> {
         let mut out = 0;
         let opts = 0;
         let status = unsafe {
             sys::zx_timer_create(opts, 0 /*ZX_CLOCK_MONOTONIC*/, &mut out)
         };
-        ok(status)?;
-        unsafe { Ok(Self::from(Handle::from_raw(out))) }
+        ok(status)
+            .expect("timer creation always succeeds except with OOM or when job policy denies it");
+        unsafe { Self::from(Handle::from_raw(out)) }
     }
 
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the

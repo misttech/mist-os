@@ -45,26 +45,15 @@ impl Channel {
     ///
     /// If the process' job policy denies channel creation or the kernel reports no memory
     /// available to create a new channel.
-    #[allow(deprecated)]
     pub fn create() -> (Self, Self) {
-        Self::try_create()
-            .expect("channel creation always succeeds except with OOM or when job policy denies it")
-    }
-
-    /// Create a channel, resulting in a pair of `Channel` objects representing both
-    /// sides of the channel. Messages written into one may be read from the opposite.
-    ///
-    /// Wraps the
-    /// [zx_channel_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_create.md)
-    /// syscall.
-    #[deprecated = "creation APIs will no longer be fallible in the future. Users should prefer `create`"]
-    pub fn try_create() -> Result<(Channel, Channel), Status> {
         unsafe {
             let mut handle0 = 0;
             let mut handle1 = 0;
             let opts = 0;
-            ok(sys::zx_channel_create(opts, &mut handle0, &mut handle1))?;
-            Ok((Self::from(Handle::from_raw(handle0)), Self::from(Handle::from_raw(handle1))))
+            ok(sys::zx_channel_create(opts, &mut handle0, &mut handle1)).expect(
+                "channel creation always succeeds except with OOM or when job policy denies it",
+            );
+            (Self(Handle::from_raw(handle0)), Self(Handle::from_raw(handle1)))
         }
     }
 

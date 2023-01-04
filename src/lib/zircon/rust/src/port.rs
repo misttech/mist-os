@@ -350,25 +350,15 @@ impl Port {
     ///
     /// If the kernel reports no memory available to create a port or the process' job policy
     /// denies port creation.
-    #[allow(deprecated)]
     pub fn create() -> Self {
-        Self::try_create()
-            .expect("port creation always succeeds except with OOM or when job policy denies it")
-    }
-
-    /// Create an IO port, allowing IO packets to be read and enqueued.
-    ///
-    /// Wraps the
-    /// [zx_port_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_create.md)
-    /// syscall.
-    #[deprecated = "creation APIs will no longer be fallible in the future. Users should prefer `create`"]
-    pub fn try_create() -> Result<Port, Status> {
         unsafe {
             let mut handle = 0;
             let opts = 0;
             let status = sys::zx_port_create(opts, &mut handle);
-            ok(status)?;
-            Ok(Handle::from_raw(handle).into())
+            ok(status).expect(
+                "port creation always succeeds except with OOM or when job policy denies it",
+            );
+            Handle::from_raw(handle).into()
         }
     }
 

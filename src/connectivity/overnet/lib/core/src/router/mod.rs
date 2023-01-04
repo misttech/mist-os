@@ -972,14 +972,13 @@ impl Router {
         conn: PeerConnRef<'_>,
         stats: Arc<MessageStats>,
     ) -> Result<Handle, Error> {
-        #[allow(deprecated)]
         match handle {
             ZirconHandle::Channel(ChannelHandle { stream_ref, rights }) => {
                 self.recv_proxied_handle(
                     conn,
                     stats,
                     stream_ref,
-                    move || Channel::try_create().map_err(Into::into),
+                    move || Ok(Channel::create()),
                     rights,
                 )
                 .await
@@ -1003,7 +1002,7 @@ impl Router {
                     conn,
                     stats,
                     stream_ref,
-                    move || EventPair::try_create().map_err(Into::into),
+                    move || Ok(EventPair::create()),
                     rights,
                 )
                 .await

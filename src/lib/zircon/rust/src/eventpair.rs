@@ -5,7 +5,7 @@
 //! Type-safe bindings for Zircon event pairs.
 
 use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Peered, Status};
+use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Peered};
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon
@@ -27,31 +27,22 @@ impl EventPair {
     ///
     /// If the kernel reports no available memory to create an event pair or the process' job
     /// policy disallows EventPair creation.
-    #[allow(deprecated)]
     pub fn create() -> (Self, Self) {
-        Self::try_create().expect(
-            "eventpair creation always succeeds except with OOM or when job policy denies it",
-        )
-    }
-
-    /// Create an event pair, a pair of objects which can signal each other. Wraps the
-    /// [zx_eventpair_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/eventpair_create.md)
-    /// syscall.
-    #[deprecated = "creation APIs will no longer be fallible in the future. Users should prefer `create`"]
-    pub fn try_create() -> Result<(EventPair, EventPair), Status> {
         let mut out0 = 0;
         let mut out1 = 0;
         let options = 0;
         let status = unsafe { sys::zx_eventpair_create(options, &mut out0, &mut out1) };
-        ok(status)?;
-        unsafe { Ok((Self::from(Handle::from_raw(out0)), Self::from(Handle::from_raw(out1)))) }
+        ok(status).expect(
+            "eventpair creation always succeeds except with OOM or when job policy denies it",
+        );
+        unsafe { (Self::from(Handle::from_raw(out0)), Self::from(Handle::from_raw(out1))) }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, Signals, Time};
+    use crate::{DurationNum, Signals, Status, Time};
 
     #[test]
     fn wait_and_signal_peer() {

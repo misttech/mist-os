@@ -403,12 +403,6 @@ impl Channel {
     /// Create a channel, resulting in a pair of `Channel` objects representing both
     /// sides of the channel. Messages written into one maybe read from the opposite.
     pub fn create() -> (Channel, Channel) {
-        Self::try_create().unwrap()
-    }
-
-    /// Create a channel, resulting in a pair of `Channel` objects representing both
-    /// sides of the channel. Messages written into one maybe read from the opposite.
-    pub fn try_create() -> Result<(Channel, Channel), zx_status::Status> {
         let rights = Rights::CHANNEL_DEFAULT;
         let (shard, slot) = CHANNELS.new_two_sided_slot(rights);
         let left = pack_handle(shard, slot, HdlType::Channel, Side::Left);
@@ -425,7 +419,7 @@ impl Channel {
             .signal(Side::Right, Signals::NONE, Signals::OBJECT_WRITABLE)
             .expect("Handle wasn't open immediately after creation");
 
-        Ok((Channel(left), Channel(right)))
+        (Channel(left), Channel(right))
     }
 
     /// Returns true if the channel is closed (i.e. other side was dropped).
