@@ -32,10 +32,13 @@ impl StoredMessage {
         Ok(StoredMessage { bytes: MessageBytes::Legacy(msg), stats: Some(stats) })
     }
 
-    pub fn structured(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<Self, StreamError> {
-        let (timestamp, severity) = diagnostics_message::parse_basic_structured_info(&buf)?;
+    pub fn structured(buf: &[u8], stats: Arc<LogStreamStats>) -> Result<Self, StreamError> {
+        let (timestamp, severity) = diagnostics_message::parse_basic_structured_info(buf)?;
+        // TODO(fxbug.dev/66656): remove copy. `buf.into()` calls into
+        // https://doc.rust-lang.org/std/boxed/struct.Box.html#method.from-1 which allocates on the
+        // heap and copies.
         Ok(StoredMessage {
-            bytes: MessageBytes::Structured { bytes: buf.into_boxed_slice(), severity, timestamp },
+            bytes: MessageBytes::Structured { bytes: buf.into(), severity, timestamp },
             stats: Some(stats),
         })
     }

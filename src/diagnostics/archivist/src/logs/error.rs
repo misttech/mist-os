@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use crate::events::error::EventError;
-use fuchsia_zircon as zx;
 use thiserror::Error;
 
 use super::listener::ListenerError;
@@ -34,8 +33,13 @@ pub enum LogsError {
 
 #[derive(Debug, Error)]
 pub enum StreamError {
-    #[error("couldn't read from socket. Status: {0}")]
-    Io(#[from] zx::Status),
+    #[error("couldn't read from socket: {source:?}")]
+    Io {
+        #[from]
+        source: std::io::Error,
+    },
+    #[error("socket was closed and no messages remain")]
+    Closed,
     #[error(transparent)]
     Message(#[from] MessageError),
     #[error("couldn't convert debuglog message")]
@@ -47,7 +51,7 @@ impl PartialEq for StreamError {
     fn eq(&self, other: &Self) -> bool {
         use StreamError::*;
         match (self, other) {
-            (Io(s1), Io(s2)) => s1 == s2,
+            (Io { source }, Io { source: s2 }) => source.kind() == s2.kind(),
             (Message(source), Message(s2)) => source == s2,
             _ => false,
         }

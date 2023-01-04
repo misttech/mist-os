@@ -7,6 +7,7 @@ use crate::{
     logs::{
         budget::BudgetHandle,
         buffer::{ArcList, LazyItem},
+        error::StreamError,
         multiplex::PinStream,
         socket::{Encoding, LogMessageSocket},
         stats::LogStreamStats,
@@ -368,14 +369,14 @@ impl LogsArtifactsContainer {
         debug!(%self.identity, "Draining messages from a socket.");
         loop {
             match log_stream.next().await {
-                Some(Ok(message)) => {
+                Ok(message) => {
                     self.ingest_message(message).await;
                 }
-                Some(Err(e)) => {
+                Err(StreamError::Closed) => break,
+                Err(e) => {
                     warn!(source = %self.identity, %e, "closing socket");
                     break;
                 }
-                None => break,
             }
         }
         debug!(%self.identity, "Socket closed.");
