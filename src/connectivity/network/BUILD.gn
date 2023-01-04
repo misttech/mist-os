@@ -12,6 +12,13 @@ declare_args() {
   use_netstack3 = false
 }
 
+# TODO(https://fxbug.dev/85450): Convert this to a platform configuration
+# option in Product Assembly.
+_system_netstack_component = "netstack:component"
+if (use_netstack3) {
+  _system_netstack_component = "netstack3:component-dropin"
+}
+
 fuchsia_component("component") {
   component_name = "network"
   manifest = "meta/network-default.cml"
@@ -24,16 +31,6 @@ fuchsia_component("component") {
 fuchsia_component("component-basic") {
   component_name = "network"
   manifest = "meta/network-basic.cml"
-}
-
-# TODO(https://fxbug.dev/85450): Convert this to a platform configuration
-# option in Product Assembly
-group("network") {
-  if (use_netstack3) {
-    public_deps = [ ":network_netstack3" ]
-  } else {
-    public_deps = [ ":network_netstack2" ]
-  }
 }
 
 # Defines a Fuchsia package with networking components.
@@ -74,24 +71,13 @@ template("network_package") {
   }
 }
 
-network_package("network_netstack2") {
-  netstack_component = "netstack:component"
+network_package("network") {
+  netstack_component = _system_netstack_component
   basic = false
-
-  # Other targets should depend on this via the :network group.
-  visibility = [ ":network" ]
-}
-
-network_package("network_netstack3") {
-  netstack_component = "netstack3:component-dropin"
-  basic = false
-
-  # Other targets should depend on this via the :network group.
-  visibility = [ ":network" ]
 }
 
 network_package("network-basic") {
-  netstack_component = "netstack:component"
+  netstack_component = _system_netstack_component
   basic = true
 }
 
