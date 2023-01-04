@@ -13,15 +13,17 @@ use {
     std::io::Write,
 };
 
+const INDENT_SIZE: usize = 2;
+
 trait DeviceInfoPrinter {
-    fn print(&self, writer: &mut impl Write, tabs: usize) -> Result<()>;
+    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()>;
 
     fn print_graph_node(&self, writer: &mut impl Write) -> Result<()>;
     fn print_graph_edge(&self, writer: &mut impl Write, child: &fdd::DeviceInfo) -> Result<()>;
 }
 
 impl DeviceInfoPrinter for DFv1Device {
-    fn print(&self, writer: &mut impl Write, tabs: usize) -> Result<()> {
+    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
         writeln!(
             writer,
             "{:indent$}[{}] pid={} {}",
@@ -29,7 +31,7 @@ impl DeviceInfoPrinter for DFv1Device {
             self.extract_name()?,
             self.0.driver_host_koid.as_ref().ok_or(format_err!("Missing driver host KOID"))?,
             self.0.bound_driver_libname.as_ref().ok_or(format_err!("Missing driver libname"))?,
-            indent = tabs * 3,
+            indent = indent_level * INDENT_SIZE,
         )?;
         Ok(())
     }
@@ -56,7 +58,7 @@ impl DeviceInfoPrinter for DFv1Device {
 }
 
 impl DeviceInfoPrinter for DFv2Node {
-    fn print(&self, writer: &mut impl Write, tabs: usize) -> Result<()> {
+    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
         writeln!(
             writer,
             "{:indent$}[{}] pid={} {}",
@@ -64,7 +66,7 @@ impl DeviceInfoPrinter for DFv2Node {
             self.extract_name()?,
             self.0.driver_host_koid.as_ref().ok_or(format_err!("Missing driver host KOID"))?,
             self.0.bound_driver_url.as_deref().unwrap_or(""),
-            indent = tabs * 3,
+            indent = indent_level * INDENT_SIZE,
         )?;
         Ok(())
     }
@@ -91,10 +93,10 @@ impl DeviceInfoPrinter for DFv2Node {
 }
 
 impl DeviceInfoPrinter for Device {
-    fn print(&self, writer: &mut impl Write, tabs: usize) -> Result<()> {
+    fn print(&self, writer: &mut impl Write, indent_level: usize) -> Result<()> {
         match self {
-            Device::V1(device) => device.print(writer, tabs),
-            Device::V2(device) => device.print(writer, tabs),
+            Device::V1(device) => device.print(writer, indent_level),
+            Device::V2(device) => device.print(writer, indent_level),
         }
     }
 
@@ -120,12 +122,12 @@ fn print_tree(
 ) -> Result<()> {
     let mut stack = VecDeque::new();
     stack.push_front((root, 0));
-    while let Some((device, tabs)) = stack.pop_front() {
-        device.print(writer, tabs)?;
+    while let Some((device, indent_level)) = stack.pop_front() {
+        device.print(writer, indent_level)?;
         if let Some(child_ids) = &device.get_device_info().child_ids {
             for id in child_ids.iter().rev() {
                 if let Some(child) = device_map.get(id) {
-                    stack.push_front((child, tabs + 1));
+                    stack.push_front((child, indent_level + 1));
                 }
             }
         }
@@ -327,7 +329,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(output, "[foo] pid=0 foo.so\n   [bar] pid=0 bar.so\n");
+        assert_eq!(output, "[foo] pid=0 foo.so\n  [bar] pid=0 bar.so\n");
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -356,10 +358,10 @@ mod tests {
         assert_eq!(
             output,
             r#"[platform] pid=0 root.so
-   [parent] pid=0 parent.so
-      [child] pid=0 child.so
+  [parent] pid=0 parent.so
+    [child] pid=0 child.so
 [parent] pid=0 parent.so
-   [child] pid=0 child.so
+  [child] pid=0 child.so
 "#
         );
     }
@@ -390,7 +392,7 @@ mod tests {
         assert_eq!(
             output,
             r#"[parent] pid=0 parent.so
-   [child] pid=0 child.so
+  [child] pid=0 child.so
 "#
         );
     }
