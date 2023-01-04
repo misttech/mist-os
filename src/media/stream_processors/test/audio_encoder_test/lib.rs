@@ -8,6 +8,7 @@ mod pcm_audio;
 mod test_suite;
 mod timestamp_validator;
 
+use crate::pcm_audio::PcmAudio;
 use crate::test_suite::*;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
@@ -54,20 +55,13 @@ fn sbc_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                output_file: None,
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 94,
-                expected_digests: vec![ExpectedDigest::new(
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                94,
+                vec![ExpectedDigest::new(
                     "Sbc: 44.1kHz/Loudness/Mono/bitpool 56/blocks 8/subbands 4",
                     "5c65a88bda3f132538966d87df34aa8675f85c9892b7f9f5571f76f3c7813562",
                 )],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new().unwrap().run_singlethreaded(sbc_tests.run())
@@ -88,16 +82,9 @@ fn aac_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 5,
-                output_file: None,
-                expected_digests: vec![
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                5,
+                vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
                         "11fe39d40b09c3158172adf86ecb715d98f5e0ca9d5b541629ac80922f79fc1c",
@@ -107,7 +94,7 @@ fn aac_test_suite() -> Result<()> {
                         "5be551b15b856508a186daa008e06b5ea2d7c2b18ae7977c5037ddee92d4ef9b",
                     ),
                 ],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new().unwrap().run_singlethreaded(aac_raw_tests.run())?;
@@ -125,16 +112,9 @@ fn aac_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 5,
-                output_file: None,
-                expected_digests: vec![
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                5,
+                vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
                         "11fe39d40b09c3158172adf86ecb715d98f5e0ca9d5b541629ac80922f79fc1c",
@@ -144,7 +124,7 @@ fn aac_test_suite() -> Result<()> {
                         "5be551b15b856508a186daa008e06b5ea2d7c2b18ae7977c5037ddee92d4ef9b",
                     ),
                 ],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new().unwrap().run_singlethreaded(aac_raw_tests.run())
@@ -165,16 +145,9 @@ fn aac_adts_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 5,
-                output_file: None,
-                expected_digests: vec![
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                5,
+                vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Adts Arm",
                         "c9d1ebb5844b9d90c09b0a26db14ddcf4189e77087efc064061f1c88df51e296",
@@ -184,7 +157,7 @@ fn aac_adts_test_suite() -> Result<()> {
                         "e88afc9130dc3cf429719f4e66fa7c60a17161c5ac30b37c527ab98e83f30750",
                     ),
                 ],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new().unwrap().run_singlethreaded(aac_adts_tests.run())
@@ -205,16 +178,9 @@ fn aac_latm_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 5,
-                output_file: None,
-                expected_digests: vec![
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                5,
+                vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/MuxConfig Arm",
                         "85ce565087981c36e47c873be7df2d57d3c0e8273e6641477e1b6d20c41c29b4",
@@ -224,7 +190,7 @@ fn aac_latm_test_suite() -> Result<()> {
                         "6f2eadfe6dd88b189a38b00b9711160fea4b2d8a6acc24ea9008708d2a355735",
                     ),
                 ],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new()
@@ -242,16 +208,9 @@ fn aac_latm_test_suite() -> Result<()> {
                 })
             }),
             channel_count: 1,
-            hash_tests: vec![AudioEncoderHashTest {
-                input_format: PcmFormat {
-                    pcm_mode: AudioPcmMode::Linear,
-                    bits_per_sample: 16,
-                    frames_per_second: 44100,
-                    channel_map: vec![AudioChannelId::Cf],
-                },
-                output_packet_count: 5,
-                output_file: None,
-                expected_digests: vec![
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                5,
+                vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/NoMuxConfig Arm",
                         "09f7e4a6c55873f21772a8ef6d28d96eab287a93290d6d3cd612a11bc2abe6e3",
@@ -261,11 +220,51 @@ fn aac_latm_test_suite() -> Result<()> {
                         "a139f287f77c06e3f0a318a8712ea2cabf93c94b7b7106825747f3dd752fc7c0",
                     ),
                 ],
-            }],
+            )],
         };
 
         fasync::TestExecutor::new()
             .unwrap()
             .run_singlethreaded(aac_latm_without_mux_config_test.run())
+    })
+}
+
+// NOTE: Since the Bluetooth spec doesn't fully nail down CVSD precisely enough
+// (such as the data types for codec state), this hash test is more of a change
+// detection mechanism than a strict test vector. Passing this test indicates
+// that fuchsia codec appears to be working and/or is matching Chromium at the
+// current time.
+#[test]
+fn cvsd_simple_test_suite() -> Result<()> {
+    with_large_stack(|| {
+        let cvsd_tests = AudioEncoderTestCase {
+            input_framelength: 8,
+            settings: Rc::new(move || -> EncoderSettings {
+                EncoderSettings::Cvsd(CvsdEncoderSettings { ..CvsdEncoderSettings::EMPTY })
+            }),
+            channel_count: 1,
+            hash_tests: vec![AudioEncoderHashTest {
+                output_file: None,
+                input_audio: PcmAudio::create_from_data(
+                    PcmFormat {
+                        pcm_mode: AudioPcmMode::Linear,
+                        bits_per_sample: 16,
+                        frames_per_second: 64000,
+                        channel_map: vec![AudioChannelId::Cf],
+                    },
+                    vec![1, 2, 3, 4, 5, 6, 7, 8],
+                ),
+                // Total number of expected decoded output bytes is 1.
+                // Since the minimum output buffer size is 1 byte, test should
+                // have outputted 1 packet.
+                output_packet_count: 1,
+                expected_digests: vec![ExpectedDigest::new_from_raw(
+                    "Simple test case",
+                    // The encoded result is based off of Chromium codec.
+                    vec![0b01010101],
+                )],
+            }],
+        };
+        fasync::TestExecutor::new().unwrap().run_singlethreaded(cvsd_tests.run())
     })
 }

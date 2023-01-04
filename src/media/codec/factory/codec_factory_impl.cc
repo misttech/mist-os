@@ -32,6 +32,7 @@ namespace {
 
 const std::string kIsolateRelativeUrlSbc = "#meta/codec_runner_sw_sbc.cm";
 const std::string kIsolateRelativeUrlAac = "#meta/codec_runner_sw_aac.cm";
+const std::string kIsolateRelativeUrlCvsd = "#meta/codec_runner_sw_cvsd.cm";
 const std::string kIsolateRelativeUrlFfmpeg = "#meta/codec_runner_sw_ffmpeg.cm";
 
 struct EncoderSupportSpec {
@@ -59,9 +60,17 @@ const EncoderSupportSpec kAacEncoderSupportSpec = {
     .mime_types = {"audio/pcm"},
     .supports_settings =
         [](const fuchsia::media::EncoderSettings& settings) { return settings.is_aac(); },
+};
+
+const EncoderSupportSpec kCvsdEncoderSupportSpec = {
+    .isolate_url = kIsolateRelativeUrlCvsd,
+    .mime_types = {"audio/pcm"},
+    .supports_settings =
+        [](const fuchsia::media::EncoderSettings& settings) { return settings.is_cvsd(); },
 };  // namespace
 
-const EncoderSupportSpec supported_encoders[] = {kSbcEncoderSupportSpec, kAacEncoderSupportSpec};
+const EncoderSupportSpec supported_encoders[] = {kSbcEncoderSupportSpec, kAacEncoderSupportSpec,
+                                                 kCvsdEncoderSupportSpec};
 
 struct DecoderSupportSpec {
   std::string isolate_url;
@@ -81,7 +90,13 @@ const DecoderSupportSpec kSbcDecoderSuportSpec = {
     .mime_types = {"audio/sbc"},
 };
 
-const DecoderSupportSpec supported_decoders[] = {kFfmpegSupportSpec, kSbcDecoderSuportSpec};
+const DecoderSupportSpec kCvsdDecoderSuportSpec = {
+    .isolate_url = kIsolateRelativeUrlCvsd,
+    .mime_types = {"audio/cvsd"},
+};
+
+const DecoderSupportSpec supported_decoders[] = {kFfmpegSupportSpec, kSbcDecoderSuportSpec,
+                                                 kCvsdDecoderSuportSpec};
 
 std::optional<std::string> FindEncoder(const std::string& mime_type,
                                        const fuchsia::media::EncoderSettings& settings) {

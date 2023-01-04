@@ -4,9 +4,11 @@
 
 #![cfg(test)]
 
+mod cvsd;
 mod sbc;
 mod test_suite;
 
+use crate::cvsd::*;
 use crate::sbc::*;
 use crate::test_suite::*;
 use fidl::encoding::Decodable;
@@ -117,4 +119,49 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
     };
 
     fasync::TestExecutor::new().unwrap().run_singlethreaded(sbc_tests.run())
+}
+
+// NOTE: Since the Bluetooth spec doesn't fully nail down CVSD precisely enough
+// (such as the data types for codec state), this hash test is more of a change
+// detection mechanism than a strict test vector. Passing this test indicates
+// that fuchsia codec appears to be working and/or is matching Chromium at the
+// current time.
+#[test]
+fn cvsd_simple_decode() -> Result<()> {
+    let output_format = FormatDetails {
+        format_details_version_ordinal: Some(1),
+        mime_type: Some("audio/pcm".to_string()),
+        domain: Some(DomainFormat::Audio(AudioFormat::Uncompressed(AudioUncompressedFormat::Pcm(
+            PcmFormat {
+                pcm_mode: AudioPcmMode::Linear,
+                bits_per_sample: 16,
+                frames_per_second: 64000,
+                channel_map: vec![AudioChannelId::Lf],
+            },
+        )))),
+        ..<FormatDetails as Decodable>::new_empty()
+    };
+
+    let cvsd_tests = AudioDecoderTestCase {
+        hash_tests: vec![AudioDecoderHashTest {
+            output_file: None,
+            stream: Rc::new(TimestampedStream {
+                source: CvsdStream::from_data(vec![0b01010101], 1),
+                timestamps: 0..,
+            }),
+            // Total number of expected decoded output bytes is 16.
+            // Since the minimum output buffer size is 16 bytes, all the input
+            // should have been decoded in 1 output packet.
+            output_packet_count: 1,
+            expected_digests: vec![ExpectedDigest::new_from_raw(
+                "Simple test case",
+                // Equivalent to eight int16 elements [10, 0, 9, -1, 9, -1, 9, -1].
+                // The decoded result is based off of Chromium codec.
+                vec![10, 0, 0, 0, 9, 0, 255, 255, 9, 0, 255, 255, 9, 0, 255, 255],
+            )],
+            expected_output_format: output_format,
+        }],
+    };
+
+    fasync::TestExecutor::new().unwrap().run_singlethreaded(cvsd_tests.run())
 }

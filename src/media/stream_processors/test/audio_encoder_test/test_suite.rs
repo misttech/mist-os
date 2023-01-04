@@ -30,9 +30,31 @@ pub struct AudioEncoderHashTest {
     /// If provided, the output will also be written to this file. Use this to verify new files
     /// with a decoder before using their digest in tests.
     pub output_file: Option<&'static str>,
-    pub input_format: PcmFormat,
+    pub input_audio: PcmAudio,
     pub output_packet_count: usize,
     pub expected_digests: Vec<ExpectedDigest>,
+}
+
+impl AudioEncoderHashTest {
+    pub fn saw_wave_test(
+        output_packet_count: usize,
+        expected_digests: Vec<ExpectedDigest>,
+    ) -> Self {
+        Self {
+            output_file: None,
+            input_audio: PcmAudio::create_saw_wave(
+                PcmFormat {
+                    pcm_mode: AudioPcmMode::Linear,
+                    bits_per_sample: 16,
+                    frames_per_second: 44100,
+                    channel_map: vec![AudioChannelId::Cf],
+                },
+                TEST_PCM_FRAME_COUNT,
+            ),
+            output_packet_count,
+            expected_digests,
+        }
+    }
 }
 
 impl AudioEncoderTestCase {
@@ -50,14 +72,13 @@ impl AudioEncoderTestCase {
             self.hash_tests.into_iter().zip(OrdinalPattern::Odd.into_iter())
         {
             let settings = self.settings.clone();
-            let pcm_audio = PcmAudio::create_saw_wave(hash_test.input_format, TEST_PCM_FRAME_COUNT);
+            let pcm_audio = hash_test.input_audio;
             let stream = Rc::new(PcmAudioStream {
                 pcm_audio,
                 encoder_settings: move || (settings)(),
                 frames_per_packet: (0..).map(move |_| easy_framelength),
                 timebase: None,
             });
-
             cases.push(TestCase {
                 name: "Audio encoder hash test",
                 stream,

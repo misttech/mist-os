@@ -116,6 +116,7 @@ rustc_test("audio_decoder_test_bin") {
   ]
 
   sources = [
+    "audio_decoder_test/cvsd.rs",
     "audio_decoder_test/lib.rs",
     "audio_decoder_test/sbc.rs",
     "audio_decoder_test/test_suite.rs",
@@ -138,10 +139,8 @@ fuchsia_test_component("audio_decoder_test_comp") {
 
 fuchsia_test_package("audio_decoder_test") {
   test_components = [ ":audio_decoder_test_comp" ]
-  deps = [
-    ":sbc_file",
-    "//src/media/codec:codec_factory",
-  ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
+  deps = [ ":sbc_file" ]
 }
 
 rustc_test("audio_encoder_test_bin") {
@@ -183,7 +182,7 @@ fuchsia_test_component("audio_encoder_test_comp") {
 
 fuchsia_test_package("audio_encoder_test") {
   test_components = [ ":audio_encoder_test_comp" ]
-  deps = [ "//src/media/codec:codec_factory" ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
 }
 
 rustc_library("video_frame_hasher_lib") {
@@ -299,10 +298,8 @@ fuchsia_test_component("h264_decoder_test_comp") {
 
 fuchsia_test_package("h264_decoder_test") {
   test_components = [ ":h264_decoder_test_comp" ]
-  deps = [
-    ":bear_video",
-    "//src/media/codec:codec_factory",
-  ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
+  deps = [ ":bear_video" ]
   test_specs = {
     environments = basic_envs + [
                      astro_env,
@@ -348,7 +345,7 @@ fuchsia_test_component("h264_encoder_test_comp") {
 
 fuchsia_test_package("h264_encoder_test") {
   test_components = [ ":h264_encoder_test_comp" ]
-  deps = [ "//src/media/codec:codec_factory" ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
   test_specs = {
     environments = [
       sherlock_env,

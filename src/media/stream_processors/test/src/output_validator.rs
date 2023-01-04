@@ -240,6 +240,14 @@ impl ExpectedDigest {
             ..Self::new(label, hex)
         }
     }
+
+    pub fn new_from_raw(label: &'static str, raw_data: Vec<u8>) -> Self {
+        Self {
+            label,
+            bytes: <Sha256 as Hasher>::hash(raw_data.as_slice()).bytes(),
+            per_frame_bytes: None,
+        }
+    }
 }
 
 impl fmt::Display for ExpectedDigest {

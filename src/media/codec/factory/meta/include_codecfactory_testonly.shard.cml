@@ -1,13 +1,11 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// TODO(fxb/117319): remove this file once transition to use `include_codecfactory_testonly.shard.cml` is completed.
 {
     children: [
         {
             name: "codec-factory",
-            url: "fuchsia-pkg://fuchsia.com/codec_factory#meta/codec_factory.cm",
+            url: "codec_factory_test#meta/codec_factory.cm",
         },
     ],
     offer: [
@@ -36,7 +34,7 @@
     ],
     facets: {
         "fuchsia.test": {
-            "deprecated-allowed-packages": [ "codec_factory" ],
+            "deprecated-allowed-packages": [ "codec_factory_test" ],
         },
     },
 }

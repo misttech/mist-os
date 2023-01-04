@@ -45,6 +45,13 @@ impl PcmAudio {
         Self { pcm_format, buffer }
     }
 
+    pub fn create_from_data(pcm_format: PcmFormat, raw_data: Vec<i16>) -> Self {
+        Self {
+            pcm_format,
+            buffer: raw_data.iter().flat_map(|pcm_sample| pcm_sample.to_ne_bytes()).collect(),
+        }
+    }
+
     pub fn frame_size(&self) -> usize {
         self.pcm_format.channel_map.len() * PCM_SAMPLE_SIZE
     }
