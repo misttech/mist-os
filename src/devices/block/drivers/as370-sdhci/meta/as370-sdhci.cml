@@ -10,7 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/as370-sdhci.bindbc",
-        compat: "driver/as370-shdci.so",
+        compat: "driver/as370-sdhci.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
