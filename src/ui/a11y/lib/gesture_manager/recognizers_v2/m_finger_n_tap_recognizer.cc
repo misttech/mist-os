@@ -17,7 +17,7 @@
 namespace a11y::recognizers_v2 {
 
 struct MFingerNTapRecognizer::Contest {
-  Contest(std::unique_ptr<ContestMember> contest_member)
+  explicit Contest(std::unique_ptr<ContestMember> contest_member)
       : member(std::move(contest_member)),
         tap_length_timeout(member.get()),
         tap_interval_timeout(member.get()) {}

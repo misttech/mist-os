@@ -17,7 +17,7 @@
 namespace a11y::recognizers_v2 {
 
 struct MFingerNTapDragRecognizer::Contest {
-  Contest(std::unique_ptr<ContestMember> contest_member)
+  explicit Contest(std::unique_ptr<ContestMember> contest_member)
       : member(std::move(contest_member)),
         tap_length_timeout(member.get()),
         tap_interval_timeout(member.get()),
@@ -267,7 +267,7 @@ void MFingerNTapDragRecognizer::HandleEvent(
 
 bool MFingerNTapDragRecognizer::DisplacementExceedsThreshold(::fuchsia::math::PointF start,
                                                              ::fuchsia::math::PointF end,
-                                                             float threshold) {
+                                                             float threshold) const {
   return SquareDistanceBetweenPoints(start, end) >= threshold * threshold;
 }
 

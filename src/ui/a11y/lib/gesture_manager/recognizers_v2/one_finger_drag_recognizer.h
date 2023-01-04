@@ -9,7 +9,6 @@
 #include <lib/zx/time.h>
 
 #include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/gesture_arena.h"
 #include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/timing_constants.h"
@@ -69,7 +68,7 @@ class OneFingerDragRecognizer : public GestureRecognizer {
   // Returns true if distance between current pointer event and event that prompted previous call to
   // update callback exceeds kMinDragDistanceForUpdate.
   bool DragDistanceExceedsUpdateThreshold(
-      const fuchsia::ui::input::accessibility::PointerEvent& pointer_event);
+      const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const;
 
   // Callback invoked once the drag gesture has been recognized.
   DragGestureCallback on_drag_started_;

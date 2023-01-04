@@ -68,7 +68,7 @@ class MFingerNTapDragRecognizer : public GestureRecognizer {
 
   // Returns true if the displacement from |start| to |end| is at least |threshold|.
   bool DisplacementExceedsThreshold(::fuchsia::math::PointF start, ::fuchsia::math::PointF end,
-                                    float threshold);
+                                    float threshold) const;
 
   // Helper method invoked when more than m fingers are in contact with the
   // screen.

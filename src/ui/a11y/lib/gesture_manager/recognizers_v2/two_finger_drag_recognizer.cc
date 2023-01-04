@@ -8,12 +8,10 @@
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-
 namespace a11y::recognizers_v2 {
 
 struct TwoFingerDragRecognizer::Contest {
-  Contest(std::unique_ptr<ContestMember> contest_member)
+  explicit Contest(std::unique_ptr<ContestMember> contest_member)
       : member(std::move(contest_member)),
         claim_win_task(member.get()),
         reject_task(member.get()) {}

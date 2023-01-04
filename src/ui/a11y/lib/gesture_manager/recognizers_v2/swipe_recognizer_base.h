@@ -10,7 +10,6 @@
 #include <unordered_map>
 
 #include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/gesture_arena.h"
 #include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
 
@@ -38,7 +37,7 @@ class SwipeRecognizerBase : public GestureRecognizer {
   // gesture arena. |number_of_fingers| is the number of fingers that will be used to perform the
   // swipe gesture.
   SwipeRecognizerBase(SwipeGestureCallback callback, uint32_t number_of_fingers,
-                      zx::duration swipe_gesture_timeout, const std::string& debug_name);
+                      zx::duration swipe_gesture_timeout, std::string debug_name);
   ~SwipeRecognizerBase() override;
 
   void HandleEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) override;

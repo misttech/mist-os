@@ -13,7 +13,7 @@
 namespace a11y::recognizers_v2 {
 
 struct OneFingerNTapRecognizer::Contest {
-  Contest(std::unique_ptr<ContestMember> contest_member)
+  explicit Contest(std::unique_ptr<ContestMember> contest_member)
       : member(std::move(contest_member)), reject_task(member.get()) {}
 
   std::unique_ptr<ContestMember> member;

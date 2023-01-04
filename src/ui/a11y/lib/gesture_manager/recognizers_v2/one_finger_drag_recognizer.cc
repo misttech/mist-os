@@ -8,12 +8,10 @@
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-
 namespace a11y::recognizers_v2 {
 
 struct OneFingerDragRecognizer::Contest {
-  Contest(std::unique_ptr<ContestMember> contest_member)
+  explicit Contest(std::unique_ptr<ContestMember> contest_member)
       : member(std::move(contest_member)), claim_win_task(member.get()) {}
 
   std::unique_ptr<ContestMember> member;
@@ -150,7 +148,7 @@ void OneFingerDragRecognizer::ResetRecognizer() {
 }
 
 bool OneFingerDragRecognizer::DragDistanceExceedsUpdateThreshold(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {
+    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const {
   // Check if distance between previous update point and current event exceeds specified minimum
   // threshold.
   auto dx = pointer_event.ndc_point().x - previous_update_location_.ndc_point.x;

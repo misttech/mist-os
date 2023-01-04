@@ -26,7 +26,7 @@ using Phase = fuchsia::ui::input::PointerEventPhase;
 
 class TwoFingerDragRecognizerTest : public gtest::TestLoopFixture {
  public:
-  TwoFingerDragRecognizerTest() {}
+  TwoFingerDragRecognizerTest() = default;
 
   void SendPointerEvents(const std::vector<PointerParams>& events) {
     for (const auto& event : events) {

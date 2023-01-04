@@ -10,7 +10,6 @@
 
 #include <utility>
 
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
 
 namespace a11y::recognizers_v2 {
@@ -27,12 +26,11 @@ struct SwipeRecognizerBase::Contest {
 };
 
 SwipeRecognizerBase::SwipeRecognizerBase(SwipeGestureCallback callback, uint32_t number_of_fingers,
-                                         zx::duration swipe_gesture_timeout,
-                                         const std::string& debug_name)
+                                         zx::duration swipe_gesture_timeout, std::string debug_name)
     : swipe_gesture_callback_(std::move(callback)),
       swipe_gesture_timeout_(swipe_gesture_timeout),
       number_of_fingers_(number_of_fingers),
-      debug_name_(debug_name) {}
+      debug_name_(std::move(debug_name)) {}
 
 SwipeRecognizerBase::~SwipeRecognizerBase() = default;
 
