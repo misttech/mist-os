@@ -16,6 +16,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -29,7 +30,8 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
  public:
   LifecycleDriver(fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("lifeycle-driver", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("lifeycle-driver", std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&LifecycleDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
     FDF_LOG(INFO, "Starting lifecycle driver");
@@ -52,10 +54,9 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
     }
 
     // Serve our Service.
-    ft::Service::InstanceHandler handler(
-        {.device = [this](fidl::ServerEnd<ft::Device> request) -> void {
-          fidl::BindServer(dispatcher(), std::move(request), this);
-        }});
+    ft::Service::InstanceHandler handler({
+        .device = fit::bind_member<&LifecycleDriver::Serve>(this),
+    });
 
     auto result = context().outgoing()->AddService<ft::Service>(std::move(handler));
     if (result.is_error()) {
@@ -71,19 +72,42 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
             node().reset();
             return;
           }
-          compat_context_ = std::move(*context);
           const auto kDeviceName = "lifecycle-device";
-          child_ =
-              compat::DeviceServer(kDeviceName, 0, compat_context_->TopologicalPath(kDeviceName));
-          const auto kServicePath =
-              std::string(ft::Service::Name) + "/" + component::kDefaultInstance + "/device";
-          child_->ExportToDevfs(
-              compat_context_->devfs_exporter(), kServicePath, [this](zx_status_t status) {
-                if (status != ZX_OK) {
-                  FDF_LOG(WARNING, "Failed to export to devfs: %s", zx_status_get_string(status));
-                  node().reset();
-                }
-              });
+
+          // Export to devfs.
+          zx::result connection =
+              this->context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+          if (connection.is_error()) {
+            FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
+                     KV("status", connection.status_string()));
+            node().reset();
+            return;
+          }
+          fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
+
+          zx::result connector = devfs_connector_.Bind(dispatcher());
+          if (connector.is_error()) {
+            FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
+                     KV("status", connector.status_string()));
+            node().reset();
+            return;
+          }
+          fidl::WireResult export_result = devfs_exporter->ExportV2(
+              std::move(connector.value()),
+              fidl::StringView::FromExternal(context.value()->TopologicalPath(kDeviceName)),
+              fidl::StringView(), fuchsia_device_fs::ExportOptions());
+          if (!export_result.ok()) {
+            FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+                     KV("status", export_result.status_string()));
+            node().reset();
+            return;
+          }
+          if (export_result.value().is_error()) {
+            FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+                     KV("status", zx_status_get_string(export_result.value().error_value())));
+            node().reset();
+            return;
+          }
         });
     return zx::ok();
   }
@@ -115,8 +139,11 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
   void Stop() override { stop_called_ = true; }
 
  private:
-  std::optional<compat::DeviceServer> child_;
-  std::shared_ptr<compat::Context> compat_context_;
+  void Serve(fidl::ServerEnd<ft::Device> device) {
+    fidl::BindServer(dispatcher(), std::move(device), this);
+  }
+
+  driver_devfs::Connector<ft::Device> devfs_connector_;
 
   std::optional<StopCompleter::Async> stop_completer_;
   bool stop_called_ = false;
