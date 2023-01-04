@@ -24,7 +24,7 @@ protocol Screenshot {
     /// doing pixel equality checks making use of non-fully saturated colors should convert to a
     /// linear color space.
     ///
-    /// TODO(fxbug.dev/114595): Link to fuchsia.dev documentation when it's up.
+    /// See https://fuchsia.dev/fuchsia-src/concepts/ui/scenic/color_spaces for more information.
     ///
     /// Screenshot is taken immediately, populated with the display's content from the most recent
     /// VSYNC.
