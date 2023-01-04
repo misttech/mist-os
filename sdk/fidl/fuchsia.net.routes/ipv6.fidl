@@ -1,0 +1,103 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// The fuchsia.net.routes API is split into two variants, one supporting IPv4
+// routes and the other supporting IPv6 routes. The two halves are a mirror
+// image of one another, and should be kept in sync moving forward. Edits
+// made here should also be applied to "ipv4.fidl".
+// LINT.IfChange
+library fuchsia.net.routes;
+
+using fuchsia.net;
+
+/// A `RouteV6` specifies an IPv6 network route.
+@available(added=HEAD)
+type RouteV6 = struct {
+    /// The destination subnet of the route. When making a routing decision
+    /// for a given packet the route whose destination forms the longest
+    /// matching prefix will be selected, with ties being broken by the route's
+    /// metric.
+    destination fuchsia.net.Ipv6AddressWithPrefix;
+    /// Packets matching this route will have the specified action applied to
+    /// them.
+    action @generated_name("RouteActionV6") flexible union {
+        /// Forward the packet to the specified target.
+        1: forward @generated_name("RouteTargetV6") struct {
+            /// The interface ID of the target's outbound interface.
+            outbound_interface fuchsia.net.InterfaceId;
+            /// The optional next-hop of the target. If provided, the address
+            /// must be a unicast address.
+            next_hop box<fuchsia.net.Ipv6Address>;
+        };
+    };
+    /// The additional properties of the IPv6 route.
+    properties @generated_name("RoutePropertiesV6") table {
+        /// The route's specified properties.
+        1: specified_properties SpecifiedRouteProperties;
+    };
+};
+
+/// An `InstalledRouteV6` specifies an IPv6 network route that is installed in
+/// the system's routing table.
+@available(added=HEAD)
+type InstalledRouteV6 = table {
+    /// The route.
+    1: route RouteV6;
+    /// The route's effective properties.
+    2: effective_properties EffectiveRouteProperties;
+};
+
+/// Provides observability to the system's IPv6 routing state.
+@discoverable
+@available(added=HEAD)
+protocol StateV6 {
+    /// Initialize a watcher for IPv6 routing state.
+    ///
+    /// + request 'watcher' grants access to the `WatcherV6` Protocol.
+    /// + request `watch_options` specifies the behavior of the `WatcherV6`.
+    GetWatcherV6(resource struct {
+        watcher server_end:WatcherV6;
+        options @generated_name("WatcherOptionsV6") table {};
+    });
+};
+
+/// An observer protocol for changes in system's IPv6 routing state.
+@available(added=HEAD)
+protocol WatcherV6 {
+    /// Hanging-Get style API for observing routing changes.
+    ///
+    /// Clients must only have one pending `Watch` call at a time. Calling
+    /// `Watch` while a request is already pending will cause the protocol to
+    /// close.
+    ///
+    /// The first N events will always be `existing` where N is the number of
+    /// IPv6 routes that already existed when the server-end of the protocol was
+    /// initialized. The following event will be `idle` signaling the end of the
+    /// `existing` events. At this point the client has watched all existing
+    /// state and will never again observe an `existing` event.
+    ///
+    /// Events are returned in batches of up to `MAX_EVENTS` events. There is no
+    /// correlation between the batch size/boundary and it's contents: it is
+    /// perfectly valid for the server to split the block of `existing` events,
+    /// across several batches. Clients should view this API as providing a
+    /// stream of events, where batches are used to reduce IPC load on the
+    /// system.
+    ///
+    /// - response `events` A vector of at most `MAX_EVENTS` events.
+    Watch() -> (struct {
+        events vector<@generated_name("EventV6") flexible union {
+            /// A route that already existed when watching started.
+            1: existing InstalledRouteV6;
+            /// Sentinel value indicating no more `existing` events will be
+            /// received.
+            2: idle Empty;
+            /// A route that was added while watching.
+            3: added InstalledRouteV6;
+            /// A route that was removed while watching.
+            4: removed InstalledRouteV6;
+        }>:MAX_EVENTS;
+    });
+};
+
+// LINT.ThenChange(ipv4.fidl)

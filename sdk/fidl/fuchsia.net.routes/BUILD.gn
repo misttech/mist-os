@@ -8,7 +8,11 @@ fidl("fuchsia.net.routes") {
   sdk_category = "partner"
 
   api = "fuchsia.net.routes.api"
-  sources = [ "routes.fidl" ]
+  sources = [
+    "ipv4.fidl",
+    "ipv6.fidl",
+    "routes.fidl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",
     "//zircon/vdso/zx",

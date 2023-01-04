@@ -7,6 +7,7 @@ library fuchsia.net.interfaces.admin;
 using fuchsia.net;
 using fuchsia.hardware.network;
 using fuchsia.net.interfaces;
+using zx;
 
 /// The configuration for an interface.
 type Configuration = table {
@@ -33,6 +34,15 @@ type Configuration = table {
         /// Controls whether or not IPv6 multicast packets may be forwarded.
         2: multicast_forwarding bool;
     };
+};
+
+/// A credential passed into the `fuchsia.net.*` family of APIs to authenticate
+/// access to a particular interface.
+type ProofOfInterfaceAuthorization = resource struct {
+    /// The ID of the interface this credential is authenticating.
+    interface_id fuchsia.net.InterfaceId;
+    /// The EVENTPAIR providing authentication over this interface.
+    token zx.handle:<EVENTPAIR, zx.rights.INSPECT>;
 };
 
 /// Provides control over an interface.
@@ -135,6 +145,26 @@ protocol Control {
     /// interface to be removed.
     Detach();
 
+    /// Get an authentication credential for this interface.
+    ///
+    /// The credential contains a [`zx::handle::EVENTPAIR`], whose entangled
+    /// partner is held by the server. This credential can be converted into a
+    /// [`ProofOfInterfaceAuthorization`] and then passed into `fuchsia.net.*`
+    /// API calls to prove ownership of this interface. The `EVENTPAIR` is
+    /// stable throughout the lifetime of the interface. Clients may duplicate
+    /// this `EVENTPAIR` to make multiple API calls, or transfer the `EVENTPAIR`
+    /// to other clients.
+    ///
+    /// - response `credential` the authorization credential for this interface.
+    GetAuthorizationForInterface() -> (resource struct {
+        credential @generated_name("GrantForInterfaceAuthorization") resource struct {
+            /// The ID of the interface this credential is authenticating.
+            interface_id fuchsia.net.InterfaceId;
+            /// The EVENTPAIR providing authentication over this interface.
+            token zx.handle:<EVENTPAIR, zx.rights.TRANSFER | zx.rights.DUPLICATE | zx.rights.INSPECT>;
+        };
+    });
+
     /// Terminal event. Immediately precedes the closure of the server end of
     /// the protocol.
     ///
@@ -208,9 +238,7 @@ protocol DeviceControl {
             /// The default metric value used for routes through this interface.
             ///
             /// If not set, the server will use a sensible default.
-            // TODO(...) alias this type from fuchsia.net.routes
-            // when it exists or remove if we decide against it?
-            2: metric uint32;
+            2: metric fuchsia.net.RouteMetric;
         };
     });
 

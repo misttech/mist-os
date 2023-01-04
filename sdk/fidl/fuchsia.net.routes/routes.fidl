@@ -7,6 +7,49 @@ library fuchsia.net.routes;
 using fuchsia.net;
 using zx;
 
+/// A placeholder for empty values.
+@available(added=HEAD)
+type Empty = struct {};
+
+/// The properties of the route that were explicitly specified at the time the
+/// route was created.
+@available(added=HEAD)
+type SpecifiedRouteProperties = table {
+    /// The route's effective metric will be determined by whichever value is
+    /// specified below.
+    1: metric @generated_name("SpecifiedMetric") strict union {
+        /// The route's metric will be this explicitly specified value.
+        1: explicit_metric fuchsia.net.RouteMetric;
+        /// The route's metric is inherited from its outbound interface, and
+        /// will track this value as it changes throughout the route's lifetime.
+        /// Clients may prefer this approach if they wish to offload the
+        /// responsibility of "which route is best" to the system.
+        2: inherited_from_interface Empty;
+    };
+};
+
+/// The effective properties of a route installed in the system.
+@available(added=HEAD)
+type EffectiveRouteProperties = table {
+    /// The route's effective metric, dependent on the value of the route's
+    /// [`SpecifiedRouteProperties`]. If the `specified_metric` is
+    /// `explicit_metric`, this value will be identical to the provided value;
+    /// if the `specified_metric` is `inherited_from_interface` this value will
+    /// be the interface's routing metric.
+    1: metric fuchsia.net.RouteMetric;
+};
+
+/// The maximum number of events that can be returned by one call to `Watch()`.
+// Rationale for the current value:
+// Prefer an "as large as possible" value for `MAX_EVENTS`, because FIDL
+// `vectors` are variable length, meaning a `vector` of one event won't waste
+// space on the wire. Both [`InstalledRouteV4`] and [`InstalledRouteV6`] are
+// less than 64 bytes, and the maximum FIDL message size is 64K. While we could
+// probably squeeze in 1024 events, 512 is a nice compromise that allows the
+// the types to grow as more fields are added.
+@available(added=HEAD)
+const MAX_EVENTS uint16 = 512;
+
 /// Collection of addresses and identifiers describing a network destination.
 ///
 /// A `Destination` is the "next-hop" for a routed packet.

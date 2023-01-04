@@ -221,6 +221,13 @@ func (ci *adminControlImpl) Detach(fidl.Context) error {
 	return nil
 }
 
+func (ci *adminControlImpl) GetAuthorizationForInterface(fidl.Context) (admin.GrantForInterfaceAuthorization, error) {
+	// TODO(https://fxbug.dev/117846): Implement GetAuthorizationForInterface.
+	_ = syslog.Errorf("GetAuthorizationForInterface is unimplemented")
+	ci.cancelServe()
+	return admin.GrantForInterfaceAuthorization{}, nil
+}
+
 func propertiesToLifetimes(properties admin.AddressProperties) stack.AddressLifetimes {
 	lifetimes := stack.AddressLifetimes{
 		ValidUntil: tcpip.MonotonicTimeInfinite(),

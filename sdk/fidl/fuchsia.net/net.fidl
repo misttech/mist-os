@@ -80,3 +80,6 @@ type Ipv6AddressWithPrefix = struct {
 type MacAddress = struct {
     octets array<uint8, 6>;
 };
+
+/// The metric of a route. Lower metrics indicate higher priority.
+alias RouteMetric = uint32;

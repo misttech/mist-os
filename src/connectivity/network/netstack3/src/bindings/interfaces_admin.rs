@@ -570,6 +570,9 @@ async fn dispatch_control_request(
             *owns_interface = false;
             Ok(())
         }
+        fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface { responder: _ } => {
+            todo!("https://fxbug.dev/117844 support GetAuthorizationForInterface")
+        }
     }
 }
 

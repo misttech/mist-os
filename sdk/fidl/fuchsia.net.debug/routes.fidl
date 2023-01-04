@@ -1,0 +1,68 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.net.debug;
+
+using fuchsia.net.routes.admin;
+
+/// Debugging functionality for IPv4 network routes.
+///
+/// This protocol is intended for debugging and testing only; it is not intended
+/// for production code.
+@discoverable
+protocol RoutesV4 {
+    /// Returns a `RouteSetV4` containing all IPv4 routes from the global
+    /// routing table. Clients have unilateral access to add or remove routes
+    /// from the set. This includes the ability to remove routes installed by
+    /// the system, or routes installed by other clients of the `RouteSetV4`
+    /// protocol.
+    ///
+    /// Note that the established connection to the `RouteSetV4` protocol will
+    /// have a few notable differences from a `RouteSetV4` obtained by
+    /// [`fuchsia.net.routes.admin/SetProviderV4.NewRouteSet`]:
+    ///   - When removing a route from this route set, the route will be
+    ///     completely removed from the system, including removal from all other
+    ///     route sets to which it belongs.
+    ///   - The protocol does not encode the lifetime of the route set or its
+    ///     routes. Closing the client end will not cause the routes within this
+    ///     route set to be removed from the system. Thus, routes added via this
+    ///     route set will effectively be abandoned/unowned after this
+    ///     client-end closes.
+    ///
+    /// + request `route set` grants access to the `RouteSetV4` protocol.
+    GlobalRouteSet(resource struct {
+        route_set server_end:fuchsia.net.routes.admin.RouteSetV4;
+    });
+};
+
+
+/// Debugging functionality for IPv6 network routes.
+///
+/// This protocol is intended for debugging and testing only; it is not intended
+/// for production code.
+@discoverable
+protocol RoutesV6 {
+    /// Returns a `RouteSetV6` containing all IPv6 routes from the global
+    /// routing table. Clients have unilateral access to add or remove routes
+    /// from the set. This includes the ability to remove routes installed by
+    /// the system, or routes installed by other clients of the `RouteSetV6`
+    /// protocol.
+    ///
+    /// Note that the established connection to the `RouteSetV6` protocol will
+    /// have a few notable differences from a `RouteSetV6` obtained by
+    /// [`fuchsia.net.routes.admin/SetProviderV6.NewRouteSet`]:
+    ///   - When removing a route from this route set, the route will be
+    ///     completely removed from the system, including removal from all other
+    ///     route sets to which it belongs.
+    ///   - The protocol does not encode the lifetime of the route set or its
+    ///     routes. Closing the client end will not cause the routes within this
+    ///     route set to be removed from the system. Thus, routes added via this
+    ///     route set will effectively be abandoned/unowned after this
+    ///     client-end closes.
+    ///
+    /// + request `route set` grants access to the `RouteSetV6` protocol.
+    GlobalRouteSet(resource struct {
+        route_set server_end:fuchsia.net.routes.admin.RouteSetV6;
+    });
+};
