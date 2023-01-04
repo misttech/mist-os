@@ -15,25 +15,21 @@ use {
     account_common::{AccountId, AccountManagerError},
     aes_gcm::aead::generic_array::{typenum::U32, GenericArray},
     anyhow::{anyhow, format_err},
-    fidl::endpoints::{create_endpoints, ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl::prelude::*,
     fidl_fuchsia_identity_account::{AccountMarker, Error as ApiError},
-    fidl_fuchsia_identity_authentication::{
-        Enrollment, InteractionMarker, InteractionProtocolServerEnd, Mechanism,
-        StorageUnlockMechanismMarker, StorageUnlockMechanismProxy,
-    },
+    fidl_fuchsia_identity_authentication::{Enrollment, InteractionMarker, Mechanism},
     fidl_fuchsia_identity_internal::{
         AccountHandlerControlCreateAccountRequest, AccountHandlerControlRequest,
         AccountHandlerControlRequestStream,
     },
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_inspect::{Inspector, Property},
     futures::{channel::oneshot, lock::Mutex, prelude::*},
     identity_common::{EnrollmentData, PrekeyMaterial, TaskGroupError},
     lazy_static::lazy_static,
-    std::{collections::HashMap, convert::TryInto, fmt, sync::Arc},
+    std::{convert::TryInto, fmt, sync::Arc},
     storage_manager::StorageManager,
     tracing::{error, info, warn},
 };
@@ -44,35 +40,6 @@ lazy_static! {
     /// for the developer authenticator implementations
     /// (see src/identity/bin/dev_authenticator) and needs to stay in sync.
     static ref MAGIC_PREKEY: [u8; 32] = [77; 32];
-
-    static ref DEV_AUTHENTICATION_MECHANISM_PATHS: HashMap<&'static str, &'static str> =
-        HashMap::from([
-            (
-                "#meta/dev_authenticator_always_succeed.cm",
-                "/svc/fuchsia.identity.authentication.AlwaysSucceedStorageUnlockMechanism"
-            ),
-            (
-                "#meta/dev_authenticator_always_fail_authentication.cm",
-                "/svc/fuchsia.identity.authentication.AlwaysFailStorageUnlockMechanism"
-            )
-        ]);
-}
-
-/// Connects to a specified authentication mechanism and return a proxy to it.
-async fn get_auth_mechanism_connection(
-    auth_mechanism_id: &str,
-) -> Result<StorageUnlockMechanismProxy, ApiError> {
-    let key = match DEV_AUTHENTICATION_MECHANISM_PATHS.get(auth_mechanism_id) {
-        Some(key) => key,
-        None => {
-            warn!("Invalid auth mechanism id: {}", auth_mechanism_id);
-            return Err(ApiError::InvalidRequest);
-        }
-    };
-    connect_to_protocol_at_path::<StorageUnlockMechanismMarker>(key).map_err(|err| {
-        warn!("Failed to connect to authenticator {:?}", err);
-        ApiError::Resource
-    })
 }
 
 // A static enrollment id which represents the only enrollment.
@@ -160,6 +127,7 @@ where
 
     // TODO(fxb/116213): Remove this once interaction is completely rolled out.
     /// Feature flag to enable/disable interaction protocol.
+    #[allow(dead_code)]
     is_interaction_enabled: bool,
 
     /// The available mechanisms which can be used for Authentication.
@@ -240,12 +208,10 @@ where
 
     /// Creates a new system account and attaches it to this handler.  Moves
     /// the handler from the `Uninitialized` to the `Initialized` state.
-    // TODO(fxb/104199): Remove auth_mechanism once interaction is used for tests.
     async fn create_account(
         &self,
         mut payload: AccountHandlerControlCreateAccountRequest,
     ) -> Result<Vec<u8>, ApiError> {
-        let maybe_auth_mechanism_id = payload.auth_mechanism_id;
         let account_id: AccountId = payload
             .id
             .take()
@@ -262,7 +228,7 @@ where
                 let disk_key: GenericArray<u8, U32> = make_random_256_bit_generic_array();
 
                 let enrollment_state = self
-                    .enroll_auth_mechanism(maybe_auth_mechanism_id, payload.interaction, &disk_key)
+                    .enroll_auth_mechanism(payload.interaction, &disk_key)
                     .await
                     .map_err(|err| {
                         warn!("Enrollment error: {:?}", err);
@@ -377,7 +343,6 @@ where
                 storage_manager,
             } => {
                 let (prekey_material, maybe_updated_enrollment_state) = Self::authenticate(
-                    self.is_interaction_enabled,
                     &pre_auth_state_ref.enrollment_state,
                     interaction,
                     &self.mechanisms,
@@ -561,26 +526,6 @@ where
         }
     }
 
-    /// Enrolls a new authentication mechanism for the account, returning the
-    /// enrollment data and prekey material from the authenticator if successful.
-    async fn enroll_auth_mechanism(
-        &self,
-        maybe_auth_mechanism_id: Option<String>,
-        interaction: Option<ServerEnd<InteractionMarker>>,
-        disk_key: &GenericArray<u8, U32>,
-    ) -> Result<EnrollmentState, AccountManagerError> {
-        let enrollment_state = if !self.is_interaction_enabled {
-            self.enroll_auth_mechanism_without_interaction(maybe_auth_mechanism_id, disk_key)
-                .await?
-        } else {
-            // If interaction mechanisms are enabled, use the interaction
-            // protocol for authenticator challenges.
-            self.enroll_auth_mechanism_with_interaction(interaction, disk_key).await?
-        };
-
-        Ok(enrollment_state)
-    }
-
     fn fetch_key(
         prekey_material: &PrekeyMaterial,
         enrollment_state: &EnrollmentState,
@@ -607,56 +552,9 @@ where
         }
     }
 
-    async fn enroll_auth_mechanism_without_interaction(
-        &self,
-        maybe_auth_mechanism_id: Option<String>,
-        disk_key: &GenericArray<u8, U32>,
-    ) -> Result<EnrollmentState, AccountManagerError> {
-        Ok(match (&self.lifetime, maybe_auth_mechanism_id) {
-            (AccountLifetime::Persistent { .. }, Some(auth_mechanism_id)) => {
-                let (_, test_interaction_server_end) = create_endpoints().unwrap();
-                let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
-                let auth_mechanism_proxy =
-                    get_auth_mechanism_connection(&auth_mechanism_id).await?;
-                let (data, prekey_material) = auth_mechanism_proxy
-                    .enroll(&mut test_ipse)
-                    .await
-                    .map_err(|err| {
-                        AccountManagerError::new(ApiError::Unknown)
-                            .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
-                    })?
-                    .map_err(|authenticator_err| {
-                        AccountManagerError::new(ApiError::Unknown).with_cause(format_err!(
-                            "Error while enrolling account: {:?}",
-                            authenticator_err
-                        ))
-                    })
-                    .map(|(enrollment_data, prekey_material)| {
-                        (EnrollmentData(enrollment_data), PrekeyMaterial(prekey_material))
-                    })?;
-                // TODO(fxb/116213): Remove the clone once we don't need to
-                // return the prekey for checking outside of this block.
-                produce_single_enrollment(
-                    auth_mechanism_id,
-                    Mechanism::Test,
-                    data,
-                    prekey_material,
-                    disk_key,
-                )?
-            }
-            (AccountLifetime::Ephemeral, Some(_)) => {
-                return Err(AccountManagerError::new(ApiError::InvalidRequest).with_cause(
-                    format_err!(
-                        "CreateAccount called with \
-                            auth_mechanism_id set on an ephemeral account"
-                    ),
-                ));
-            }
-            (_, None) => pre_auth::EnrollmentState::NoEnrollments,
-        })
-    }
-
-    async fn enroll_auth_mechanism_with_interaction(
+    /// Enrolls a new authentication mechanism for the account, returning the
+    /// enrollment data and prekey material from the authenticator if successful.
+    async fn enroll_auth_mechanism(
         &self,
         mut interaction: Option<ServerEnd<InteractionMarker>>,
         disk_key: &GenericArray<u8, U32>,
@@ -668,8 +566,7 @@ where
                         .with_cause(format_err!("Interaction ServerEnd missing."))
                 })?;
                 let (data, prekey_material) = Interaction::enroll(server_end, *mechanism).await?;
-                // TODO(fxb/116213): Remove the clone once we don't need to
-                // return the prekey for checking outside of this block.
+
                 produce_single_enrollment(
                     "".to_string(),
                     *mechanism,
@@ -703,7 +600,6 @@ where
     /// optionally a new pre-authentication state, to be written if the
     /// attempt is successful.
     async fn authenticate(
-        is_interaction_enabled: bool,
         enrollment_state: &pre_auth::EnrollmentState,
         mut interaction: Option<ServerEnd<InteractionMarker>>,
         mechanisms: &[Mechanism],
@@ -715,32 +611,20 @@ where
             ref wrapped_key_material,
         } = enrollment_state
         {
-            let mut enrollments = vec![Enrollment { id: ENROLLMENT_ID, data: data.to_vec() }];
-            let auth_attempt = if !is_interaction_enabled {
-                let (_, test_interaction_server_end) = create_endpoints().unwrap();
-                let mut test_ipse = InteractionProtocolServerEnd::Test(test_interaction_server_end);
-                let auth_mechanism_proxy = get_auth_mechanism_connection(auth_mechanism_id).await?;
-                let fut =
-                    auth_mechanism_proxy.authenticate(&mut test_ipse, &mut enrollments.iter_mut());
-                fut.await.map_err(|err| {
-                    AccountManagerError::new(ApiError::Unknown)
-                        .with_cause(format_err!("Error connecting to authenticator: {:?}", err))
-                })??
-            } else {
-                if !mechanisms.contains(mechanism) {
-                    return Err(AccountManagerError::new(ApiError::Internal).with_cause(
-                        format_err!(
-                            "Enrollment mechanism {:?} is not available for authentication.",
-                            mechanism
-                        ),
-                    ));
-                }
-                let server_end = interaction.take().ok_or_else(|| {
-                    AccountManagerError::new(ApiError::InvalidRequest)
-                        .with_cause(format_err!("Interaction ServerEnd missing."))
-                })?;
-                Interaction::authenticate(server_end, *mechanism, enrollments).await?
-            };
+            let enrollments = vec![Enrollment { id: ENROLLMENT_ID, data: data.to_vec() }];
+            if !mechanisms.contains(mechanism) {
+                return Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
+                    "Enrollment mechanism {:?} is not available for authentication.",
+                    mechanism
+                )));
+            }
+            let server_end = interaction.take().ok_or_else(|| {
+                AccountManagerError::new(ApiError::InvalidRequest)
+                    .with_cause(format_err!("Interaction ServerEnd missing."))
+            })?;
+            let auth_attempt =
+                Interaction::authenticate(server_end, *mechanism, enrollments).await?;
+
             match auth_attempt.enrollment_id {
                 None => Err(AccountManagerError::new(ApiError::Internal).with_cause(format_err!(
                     "Authenticator returned an empty enrollment id during authentication."
