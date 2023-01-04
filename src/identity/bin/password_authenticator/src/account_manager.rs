@@ -237,12 +237,6 @@ where
                 let mut resp = Err(faccount::Error::UnsupportedOperation);
                 responder.send(&mut resp).context("sending ProvisionNewAccount response")?;
             }
-            AccountManagerRequest::GetAuthenticationMechanisms { responder } => {
-                let mut resp = Err(faccount::Error::UnsupportedOperation);
-                responder
-                    .send(&mut resp)
-                    .context("sending GetAuthenticationMechanisms response")?;
-            }
         }
         Ok(())
     }

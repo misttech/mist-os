@@ -351,6 +351,7 @@ mod tests {
     use fidl_fuchsia_identity_account::{
         AccountMarker, AccountProxy, AuthChangeGranularity, AuthTargetRegisterAuthListenerRequest,
     };
+    use fidl_fuchsia_identity_authentication::Mechanism;
     use fuchsia_async as fasync;
     use fuchsia_fs::{directory, file};
     use fuchsia_inspect::Inspector;
@@ -358,8 +359,6 @@ mod tests {
     use identity_testutil::{make_formatted_account_partition_any_key, MockDiskManager};
     use storage_manager::{minfs::StorageManager as MinfsStorageManager, Key};
     use typed_builder::TypedBuilder;
-
-    const TEST_AUTH_MECHANISM_ID: &str = "<AUTH MECHANISM ID>";
 
     const TEST_ENROLLMENT_ID: u64 = 1337;
 
@@ -709,7 +708,7 @@ mod tests {
                     Err(ApiError::UnsupportedOperation)
                 );
                 assert_eq!(
-                    proxy.create_auth_mechanism_enrollment(TEST_AUTH_MECHANISM_ID).await?,
+                    proxy.create_auth_mechanism_enrollment(Mechanism::Test).await?,
                     Err(ApiError::UnsupportedOperation)
                 );
                 assert_eq!(

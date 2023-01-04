@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.identity.account;
 
+using fuchsia.identity.authentication;
 using fuchsia.io;
 
 /// A protocol to receive events when the authentication state of an account
@@ -116,12 +117,12 @@ protocol Account {
     /// Create a new enrollment of the provided authentication mechanism,
     /// and add it to the account.
     ///
-    /// `auth_mechanism_id` The identifier of the authentication mechanism to
-    ///                     use for the enrollment.
+    /// `mechanism` The enum specifying the authentication mechanism to be
+    ///             used for the enrollment.
     ///
     /// Returns: The `AuthMechanismEnrollmentId` of the created enrollment.
     CreateAuthMechanismEnrollment(struct {
-        auth_mechanism_id AuthMechanismId;
+        mechanism fuchsia.identity.authentication.Mechanism;
     }) -> (struct {
         enrollment_id AuthMechanismEnrollmentId;
     }) error Error;

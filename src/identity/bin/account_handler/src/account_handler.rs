@@ -560,13 +560,7 @@ where
                 })?;
                 let (data, prekey_material) = Interaction::enroll(server_end, *mechanism).await?;
 
-                produce_single_enrollment(
-                    "".to_string(),
-                    *mechanism,
-                    data,
-                    prekey_material,
-                    disk_key,
-                )?
+                produce_single_enrollment(*mechanism, data, prekey_material, disk_key)?
             }
             (AccountLifetime::Ephemeral, []) => pre_auth::EnrollmentState::NoEnrollments,
             (AccountLifetime::Persistent { .. }, _) => {
@@ -598,7 +592,6 @@ where
         mechanisms: &[Mechanism],
     ) -> Result<(PrekeyMaterial, Option<pre_auth::EnrollmentState>), AccountManagerError> {
         if let pre_auth::EnrollmentState::SingleEnrollment {
-            ref auth_mechanism_id,
             ref mechanism,
             ref data,
             ref wrapped_key_material,
@@ -634,7 +627,6 @@ where
             // Determine whether pre-auth state should be updated
             let updated_pre_auth_state = auth_attempt.updated_enrollment_data.map(|data| {
                 pre_auth::EnrollmentState::SingleEnrollment {
-                    auth_mechanism_id: auth_mechanism_id.to_string(),
                     mechanism: *mechanism,
                     data: EnrollmentData(data),
                     wrapped_key_material: wrapped_key_material.clone(),

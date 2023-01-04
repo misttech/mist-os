@@ -112,11 +112,6 @@ protocol AccountManager {
     /// `metadata` [required] Metadata for the new account
     /// `interaction` An `Interaction` channel enabling the user to select and
     ///               enroll authentication mechanisms for the new account.
-    /// `auth_mechanism_id` An `AuthMechanismId` for a storage
-    ///                     unlock-capable authentication mechanism. If
-    ///                     provided, a single enrollment of that
-    ///                     mechanism will be created for storage
-    ///                     unlock.
     ///
     /// Returns: `account_id` The identifier of the newly added account
     ///
@@ -128,9 +123,6 @@ protocol AccountManager {
         1: lifetime Lifetime;
         2: metadata AccountMetadata;
         3: interaction server_end:fuchsia.identity.authentication.Interaction;
-        // TODO(fxbug.dev/104199): Remove this field once interaction is
-        // used for tests.
-        4: auth_mechanism_id AuthMechanismId;
     }) -> (struct {
         account_id AccountId;
     }) error Error;
@@ -158,13 +150,6 @@ protocol AccountManager {
         metadata AccountMetadata;
         account server_end:Account;
     }) -> () error Error;
-
-    /// Returns all available authentication mechanisms.
-    // TODO(fxbug.dev/104199): Remove this method once interaction is
-    // used for tests.
-    GetAuthenticationMechanisms() -> (struct {
-        auth_mechanisms vector<AuthMechanismProperties>:MAX_AUTH_MECHANISMS;
-    }) error Error;
 };
 
 /// An `AuthState` along with the system account that it applies to.

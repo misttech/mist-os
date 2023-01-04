@@ -78,8 +78,6 @@ pub enum EnrollmentState {
     /// A single enrollment of an authentication mechanism,
     /// containing:
     SingleEnrollment {
-        /// the ID of the authentication mechanism,
-        auth_mechanism_id: String,
         #[serde(
             deserialize_with = "deserialize_mechanism",
             serialize_with = "serialize_mechanism"
@@ -110,18 +108,16 @@ where
 }
 
 /// Produce an EnrollmentState::SingleEnrollment enum variant from {
-/// |auth_mechanism_id|, |mechanism|, |enrollment_data| }. Use |prekey_material|
+/// |mechanism|, |enrollment_data| }. Use |prekey_material|
 /// and |disk_key| to produce a wrapped disk encryption key, and also attach that to
 /// the SingleEnrollment.
 pub fn produce_single_enrollment(
-    auth_mechanism_id: String,
     mechanism: Mechanism,
     enrollment_data: EnrollmentData,
     prekey_material: PrekeyMaterial,
     disk_key: &GenericArray<u8, U32>,
 ) -> Result<EnrollmentState, ApiError> {
     Ok(EnrollmentState::SingleEnrollment {
-        auth_mechanism_id,
         mechanism,
         data: enrollment_data,
         wrapped_key_material: produce_wrapped_keys(prekey_material, disk_key)?,
@@ -137,7 +133,6 @@ mod tests {
 
     lazy_static! {
         static ref TEST_ENROLLMENT_STATE: EnrollmentState = EnrollmentState::SingleEnrollment {
-            auth_mechanism_id: String::from("test_id"),
             mechanism: Mechanism::Test,
             data: EnrollmentData(vec![1, 2, 3]),
             wrapped_key_material: WrappedKeySet {
@@ -155,10 +150,9 @@ mod tests {
         static ref TEST_STATE: State =
             State::new(*TEST_ACCOUNT_ID_1, TEST_ENROLLMENT_STATE.clone(),);
         static ref TEST_STATE_BYTES: Vec<u8> = vec![
-            1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115,
-            116, 95, 105, 100, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0,
-            4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 7, 8, 9, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0
+            1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1,
+            2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0,
+            0, 0, 0, 0, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ];
     }
 

@@ -82,11 +82,6 @@ protocol AccountHandlerControl {
     /// `metadata` [required] Metadata for the new account
     /// `interaction` An `Interaction` channel enabling the user to select and
     ///               enroll authentication mechanisms for the new account.
-    /// `auth_mechanism_id` An `AuthMechanismId` for a storage
-    ///                     unlock-capable authentication mechanism. If
-    ///                     provided, a single enrollment of that
-    ///                     mechanism will be created for storage
-    ///                     unlock.
     ///
     /// Returns an `AccountPreAuthState` that the client should persist for
     /// use in future operations on the account.
@@ -101,9 +96,6 @@ protocol AccountHandlerControl {
         1: id fuchsia.identity.account.AccountId;
         2: metadata fuchsia.identity.account.AccountMetadata;
         3: interaction server_end:fuchsia.identity.authentication.Interaction;
-        // TODO(fxbug.dev/104199): Remove this field once interaction is
-        // used for tests.
-        4: auth_mechanism_id fuchsia.identity.account.AuthMechanismId;
     }) -> (struct {
         pre_auth_state AccountPreAuthState;
     }) error fuchsia.identity.account.Error;

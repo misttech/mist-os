@@ -111,9 +111,6 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             } => {
                 unimplemented!();
             }
-            AccountManagerRequest::GetAuthenticationMechanisms { responder } => {
-                responder.send(&mut Err(ApiError::UnsupportedOperation))?;
-            }
         }
         Ok(())
     }
@@ -229,7 +226,6 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
     async fn create_account_internal(
         &self,
         lifetime: Lifetime,
-        auth_mechanism_id: Option<String>,
         interaction: Option<ServerEnd<InteractionMarker>>,
     ) -> Result<(Arc<AHC>, Vec<u8>), ApiError> {
         let account_handler =
@@ -242,7 +238,6 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             .proxy()
             .create_account(AccountHandlerControlCreateAccountRequest {
                 id: account_id,
-                auth_mechanism_id,
                 interaction,
                 ..AccountHandlerControlCreateAccountRequest::EMPTY
             })
@@ -258,7 +253,6 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
         &self,
         AccountManagerProvisionNewAccountRequest {
             lifetime,
-            auth_mechanism_id,
             mut metadata,
             interaction,
             ..
@@ -272,11 +266,7 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
             })?
             .try_into()?;
         let (account_handler, pre_auth_state) = self
-            .create_account_internal(
-                lifetime.ok_or(ApiError::InvalidRequest)?,
-                auth_mechanism_id,
-                interaction,
-            )
+            .create_account_internal(lifetime.ok_or(ApiError::InvalidRequest)?, interaction)
             .await?;
         let account_id = account_handler.get_account_id();
 

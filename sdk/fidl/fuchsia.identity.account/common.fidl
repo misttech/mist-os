@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.identity.account;
-using fuchsia.sys;
 
 /// The maximum number of system accounts that may be simultaneously
 /// provisioned on a device. This number may be increased in the future.
@@ -96,22 +95,6 @@ type AccountMetadata = table {
     /// and are not guaranteed to be meaningful or unique, even among the
     /// accounts on a single device.
     1: name string:MAX_NAME_SIZE;
-};
-
-/// A Fuchsia component URI pointing to a component containing an authentication
-/// mechanism. It acts as a unique, stable identifier representing an
-/// authentication mechanism.
-// TODO(fxbug.dev/100785): Remove this type and the knowledge of implementation
-// that it infers.
-alias AuthMechanismId = fuchsia.sys.component_url;
-
-/// Properties describing the authentication mechanism.
-type AuthMechanismProperties = table {
-    /// A unique identifier for the authentication mechanism.
-    1: id AuthMechanismId;
-
-    /// If true, the authentication mechanism can be used for storage unlock.
-    2: storage_unlock bool;
 };
 
 /// An identifier for an enrollment of an authentication mechanism. It is

@@ -757,13 +757,14 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
 
     // Fail if there is no metadata
     let account_manager_clone = Arc::clone(&account_manager);
+    let (_, interaction_server_end) = create_proxy().expect("Failed to create interaction proxy");
     let account_without_metadata_task = Task::local(async move {
         account_manager_clone
             .lock()
             .await
             .provision_new_account(AccountManagerProvisionNewAccountRequest {
                 lifetime: Some(Lifetime::Persistent),
-                auth_mechanism_id: None,
+                interaction: Some(interaction_server_end),
                 metadata: None,
                 ..AccountManagerProvisionNewAccountRequest::EMPTY
             })
@@ -773,14 +774,14 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
     assert_eq!(account_without_metadata_task.await, Err(ApiError::InvalidRequest));
 
     // Fail if metadata is invalid
-    // let account_manager_clone = Arc::clone(&account_manager);
+    let (_, interaction_server_end) = create_proxy().expect("Failed to create interaction proxy");
     let account_with_empty_metadata_task = Task::local(async move {
         account_manager
             .lock()
             .await
             .provision_new_account(AccountManagerProvisionNewAccountRequest {
                 lifetime: Some(Lifetime::Persistent),
-                auth_mechanism_id: None,
+                interaction: Some(interaction_server_end),
                 metadata: Some(AccountMetadata::EMPTY),
                 ..AccountManagerProvisionNewAccountRequest::EMPTY
             })
