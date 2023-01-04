@@ -194,10 +194,7 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   }
 
   err = os->GetProcesses(
-      [&state, capture, &os](int depth, zx_handle_t handle, zx_koid_t koid, zx_koid_t parent_koid) {
-        if (koid == state.self_koid) {
-          return ZX_OK;
-        }
+      [capture, &os](int depth, zx_handle_t handle, zx_koid_t koid, zx_koid_t parent_koid) {
         char name[ZX_MAX_NAME_LEN];
         zx_status_t s = os->GetProperty(handle, ZX_PROP_NAME, name, ZX_MAX_NAME_LEN);
         if (s != ZX_OK) {
