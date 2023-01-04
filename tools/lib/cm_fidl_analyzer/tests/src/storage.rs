@@ -14,7 +14,7 @@ mod tests {
         component_id_index::gen_instance_id,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         routing_test_helpers::{
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
             ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
@@ -214,9 +214,9 @@ mod tests {
                 AbsoluteMoniker::parse_str("/consumer").unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(
-                        vec!["consumer:0".into()],
-                    )),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["consumer:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),

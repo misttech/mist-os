@@ -496,7 +496,7 @@ mod tests {
         let b_component =
             test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
-        let relative_moniker = InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into()]);
+        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // Open.
         let dir = open_isolated_storage(
@@ -534,7 +534,7 @@ mod tests {
 
         // Open another component's storage.
         let relative_moniker =
-            InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into(), "e:0".into()]);
+            InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1", "e:0"]).unwrap();
         let dir = open_isolated_storage(
             &StorageCapabilitySource {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -580,7 +580,7 @@ mod tests {
         let b_component =
             test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
-        let relative_moniker = InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into()]);
+        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // open the storage directory using instance ID.
         let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));
@@ -651,7 +651,7 @@ mod tests {
         test.start_instance_and_wait_start(&AbsoluteMoniker::root()).await.unwrap();
 
         // Try to open the storage. We expect an error.
-        let relative_moniker = InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into()]);
+        let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let res = open_isolated_storage(
             &StorageCapabilitySource {
                 storage_provider: Some(Arc::clone(&test.model.root())),
@@ -699,8 +699,8 @@ mod tests {
         let b_component =
             test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
-        let parent_moniker = InstancedRelativeMoniker::new(vec!["c:0".into()]);
-        let child_moniker = InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into()]);
+        let parent_moniker = InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap();
+        let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -824,7 +824,7 @@ mod tests {
         let b_component =
             test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
-        let child_moniker = InstancedRelativeMoniker::new(vec!["c:0".into(), "coll:d:1".into()]);
+        let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));
         // Open and write to the storage for child.
         let dir = open_isolated_storage(

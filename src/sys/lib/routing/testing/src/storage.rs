@@ -13,7 +13,7 @@ use {
     component_id_index::gen_instance_id,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx_status,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
     routing::config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
     std::{collections::HashSet, convert::TryInto, marker::PhantomData, path::PathBuf},
 };
@@ -81,7 +81,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["b:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
+                    ),
                     from_cm_namespace: true,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -144,7 +146,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["b:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -207,7 +211,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["b:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -350,7 +356,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b", "c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -432,7 +440,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b", "c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("subdir_1/subdir_2".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -518,7 +528,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b", "c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("bar".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -596,10 +608,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b", "c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec![
-                        "b:0".into(),
-                        "c:0".into(),
-                    ])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0", "c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -675,7 +686,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -753,7 +766,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("subdir_1/subdir_2".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -887,7 +902,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("data".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -899,7 +916,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c"].into(),
                 CheckUse::Storage {
                     path: "/cache".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -911,10 +930,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c", "d"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec![
-                        "c:0".into(),
-                        "d:0".into(),
-                    ])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0", "d:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("data".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -926,10 +944,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["c", "d"].into(),
                 CheckUse::Storage {
                     path: "/cache".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec![
-                        "c:0".into(),
-                        "d:0".into(),
-                    ])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0", "d:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -1254,7 +1271,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["b:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
+                    ),
                     from_cm_namespace: true,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Err(zx_status::Status::ACCESS_DENIED),
@@ -1352,7 +1371,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 vec!["b"].into(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["b:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
@@ -1362,7 +1383,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.check_test_subdir_contains(".", b_instance_id.as_ref().unwrap().to_string()).await;
 
         // instance `c` uses moniker-based paths.
-        let storage_relation = InstancedRelativeMoniker::new(vec!["b:0".into(), "c:0".into()]);
+        let storage_relation = InstancedRelativeMoniker::try_from(vec!["b:0", "c:0"]).unwrap();
         model
             .check_use(
                 vec!["b", "c"].into(),

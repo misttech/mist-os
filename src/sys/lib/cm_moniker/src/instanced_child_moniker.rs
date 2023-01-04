@@ -108,10 +108,11 @@ impl InstancedChildMoniker {
     }
 }
 
-impl From<&str> for InstancedChildMoniker {
-    fn from(rep: &str) -> Self {
+impl TryFrom<&str> for InstancedChildMoniker {
+    type Error = MonikerError;
+
+    fn try_from(rep: &str) -> Result<Self, MonikerError> {
         InstancedChildMoniker::parse(rep)
-            .expect(&format!("instanced moniker failed to parse: {}", rep))
     }
 }
 
@@ -155,7 +156,7 @@ mod tests {
         assert_eq!(None, m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("test:42", format!("{}", m));
-        assert_eq!(m, InstancedChildMoniker::from("test:42"));
+        assert_eq!(m, InstancedChildMoniker::try_from("test:42").unwrap());
         assert_eq!("test", m.without_instance_id().to_string());
         assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"test".try_into().unwrap(), 42));
 
@@ -164,7 +165,7 @@ mod tests {
         assert_eq!(Some("coll"), m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("coll:test:42", format!("{}", m));
-        assert_eq!(m, InstancedChildMoniker::from("coll:test:42"));
+        assert_eq!(m, InstancedChildMoniker::try_from("coll:test:42").unwrap());
         assert_eq!("coll:test", m.without_instance_id().to_string());
         assert_eq!(
             m,

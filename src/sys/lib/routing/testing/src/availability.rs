@@ -11,7 +11,6 @@ use {
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder, ProtocolDeclBuilder},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx_status,
-    moniker::RelativeMonikerBase,
     std::{
         convert::TryInto,
         marker::PhantomData,
@@ -240,7 +239,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
-                    storage_relation: Some(InstancedRelativeMoniker::new(vec!["c:0".into()])),
+                    storage_relation: Some(
+                        InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
+                    ),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
