@@ -10,6 +10,7 @@
 #include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/devfs/cpp/exporter.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
@@ -27,7 +28,8 @@ const std::string kDeviceName = "InputReport";
 class InputReportDriver : public fdf::DriverBase {
  public:
   InputReportDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : DriverBase(kDeviceName, std::move(start_args), std::move(dispatcher)) {}
+      : DriverBase(kDeviceName, std::move(start_args), std::move(dispatcher)),
+        devfs_connector_(fit::bind_member<&InputReportDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
     auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
@@ -79,16 +81,40 @@ class InputReportDriver : public fdf::DriverBase {
     }
     compat_context_ = std::move(*context);
 
-    // Create our child device and export it to devfs.
-    child_ = compat::DeviceServer(kDeviceName, ZX_PROTOCOL_INPUTREPORT,
-                                  compat_context_->TopologicalPath(kDeviceName));
-    child_->ExportToDevfs(
-        compat_context_->devfs_exporter(), child_->name(), [this](zx_status_t status) {
-          if (status != ZX_OK) {
-            FDF_LOG(WARNING, "Failed to export to devfs: %s", zx_status_get_string(status));
-            ScheduleStop();
-          }
-        });
+    // Export to devfs.
+    zx::result connection = this->context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+    if (connection.is_error()) {
+      FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
+               KV("status", connection.status_string()));
+      return ScheduleStop();
+    }
+
+    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
+
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
+               KV("status", connector.status_string()));
+      return ScheduleStop();
+    }
+    fidl::WireResult export_result = devfs_exporter->ExportV2(
+        std::move(connector.value()),
+        fidl::StringView::FromExternal(compat_context_->TopologicalPath(kDeviceName)),
+        fidl::StringView::FromExternal("input-report"), fuchsia_device_fs::ExportOptions());
+    if (!export_result.ok()) {
+      FDF_SLOG(ERROR, "Failed to export to devfs: %s", KV("status", export_result.status_string()));
+      return ScheduleStop();
+    }
+    if (export_result.value().is_error()) {
+      FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+               KV("status", zx_status_get_string(export_result.value().error_value())));
+      return ScheduleStop();
+    }
+  }
+
+  void Serve(fidl::ServerEnd<fuchsia_input_report::InputDevice> server) {
+    input_report_bindings_.AddBinding(dispatcher(), std::move(server), &input_report_.value(),
+                                      fidl::kIgnoreBindingClosure);
   }
 
   // Calling this function drops our node handle, which tells the DriverFramework to call Stop
@@ -98,8 +124,8 @@ class InputReportDriver : public fdf::DriverBase {
   std::optional<hid_input_report_dev::InputReport> input_report_;
   fidl::ServerBindingGroup<fuchsia_input_report::InputDevice> input_report_bindings_;
   std::optional<inspect::ComponentInspector> exposed_inspector_;
-  std::optional<compat::DeviceServer> child_;
   std::shared_ptr<compat::Context> compat_context_;
+  driver_devfs::Connector<fuchsia_input_report::InputDevice> devfs_connector_;
 };
 
 }  // namespace
