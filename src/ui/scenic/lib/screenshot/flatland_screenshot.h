@@ -5,13 +5,21 @@
 #ifndef SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 #define SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 
+#include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
+
+#include <optional>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
+#include "src/ui/scenic/lib/screenshot/util.h"
 
 namespace screenshot {
+
+namespace test {
+class FlatlandScreenshotTest;
+}  // namespace test
 
 using allocation::Allocator;
 using screen_capture::ScreenCapture;
@@ -26,10 +34,13 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   ~FlatlandScreenshot() override;
 
   // |fuchsia::ui::composition::Screenshot|
-  void Take(fuchsia::ui::composition::ScreenshotTakeRequest format, TakeCallback callback) override;
+  void Take(fuchsia::ui::composition::ScreenshotTakeRequest params, TakeCallback callback) override;
+  void TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
+                TakeFileCallback callback) override;
 
  private:
-  void HandleFrameRender();
+  zx::vmo HandleFrameRender();
+  void GetNextFrame();
 
   std::unique_ptr<screen_capture::ScreenCapture> screen_capturer_;
   fuchsia::sysmem::AllocatorPtr sysmem_allocator_;
@@ -46,9 +57,12 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   // Called when this instance should be destroyed.
   fit::function<void(FlatlandScreenshot*)> destroy_instance_function_;
 
-  // The client-supplied callback to be fired after the screenshot occurrs.
-  TakeCallback callback_ = nullptr;
+  // The client-supplied callback to be fired after the screenshot occurs.
+  TakeCallback take_callback_ = nullptr;
+  TakeFileCallback take_file_callback_ = nullptr;
+
   zx::event render_event_;
+
   std::shared_ptr<async::WaitOnce> render_wait_;
 
   // Used to ensure that the first Take() call happens after the asynchronous sysmem buffer
@@ -56,6 +70,13 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   zx::event init_event_;
   std::shared_ptr<async::WaitOnce> init_wait_;
 
+  size_t served_screenshots_next_id_ = 0;
+  std::unordered_map<size_t,
+                     std::pair<std::unique_ptr<vfs::VmoFile>, std::unique_ptr<async::WaitOnce>>>
+      served_screenshots_;
+
+  size_t NumCurrentServedScreenshots() { return served_screenshots_.size(); }
+  friend class test::FlatlandScreenshotTest;
   // Should be last.
   fxl::WeakPtrFactory<FlatlandScreenshot> weak_factory_;
 };

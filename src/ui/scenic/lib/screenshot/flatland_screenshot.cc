@@ -18,6 +18,9 @@ using fuchsia::ui::composition::FrameInfo;
 using fuchsia::ui::composition::GetNextFrameArgs;
 using fuchsia::ui::composition::ScreenCaptureConfig;
 using fuchsia::ui::composition::ScreenCaptureError;
+using fuchsia::ui::composition::ScreenshotTakeFileResponse;
+using fuchsia::ui::composition::ScreenshotTakeRequest;
+using fuchsia::ui::composition::ScreenshotTakeResponse;
 using screen_capture::ScreenCapture;
 
 namespace {
@@ -143,14 +146,14 @@ FlatlandScreenshot::FlatlandScreenshot(
 
 FlatlandScreenshot::~FlatlandScreenshot() {}
 
-void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest format,
+void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest params,
                               TakeCallback callback) {
   // Check if there is already a Take() call pending. Either the setup is done (|init_wait_| is
   // signaled) or the setup is still in progress.
   //
-  // If the setup is done, then a Take() call would set |callback_|.
+  // If the setup is done, then a Take() call would set |take_callback_|.
   // If the setup is not done, then a Take() call would make |init_wait| pending.
-  if (callback_ != nullptr || init_wait_->is_pending()) {
+  if (take_callback_ != nullptr || init_wait_->is_pending()) {
     FX_LOGS(ERROR) << "Screenshot::Take() already in progress, closing connection. Wait for return "
                       "before calling again.";
     destroy_instance_function_(this);
@@ -162,7 +165,7 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest fo
     // complete.
     zx_status_t status = init_wait_->Begin(
         async_get_default_dispatcher(),
-        [weak_ptr = weak_factory_.GetWeakPtr(), format = std::move(format),
+        [weak_ptr = weak_factory_.GetWeakPtr(), params = std::move(params),
          callback = std::move(callback)](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
                                          const zx_packet_signal_t* signal) mutable {
           if (!weak_ptr) {
@@ -171,36 +174,35 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest fo
           FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
 
           // Retry the Take() call.
-          weak_ptr->Take(std::move(format), std::move(callback));
+          weak_ptr->Take(std::move(params), std::move(callback));
         });
     FX_DCHECK(status == ZX_OK);
     return;
   }
 
-  callback_ = std::move(callback);
+  take_callback_ = std::move(callback);
 
-  FX_DCHECK(!render_event_);
-  zx::event dup;
-  zx_status_t status = zx::event::create(0, &render_event_);
-  FX_DCHECK(status == ZX_OK);
-  render_event_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-
-  GetNextFrameArgs frame_args;
-  frame_args.set_event(std::move(dup));
-
-  screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {});
+  GetNextFrame();
 
   // Wait for the frame to render in an async fashion.
   render_wait_ = std::make_shared<async::WaitOnce>(render_event_.get(), ZX_EVENT_SIGNALED);
-  status = render_wait_->Begin(
-      async_get_default_dispatcher(), [weak_ptr = weak_factory_.GetWeakPtr()](
+  zx_status_t status = render_wait_->Begin(
+      async_get_default_dispatcher(), [this, weak_ptr = weak_factory_.GetWeakPtr()](
                                           async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
                                           const zx_packet_signal_t*) mutable {
         FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
         if (!weak_ptr) {
           return;
         }
-        weak_ptr->HandleFrameRender();
+        FX_DCHECK(take_callback_);
+        zx::vmo response_vmo = weak_ptr->HandleFrameRender();
+        fuchsia::ui::composition::ScreenshotTakeResponse response;
+        response.set_vmo(std::move(response_vmo));
+        response.set_size({display_size_.width, display_size_.height});
+        take_callback_(std::move(response));
+
+        take_callback_ = nullptr;
+        render_event_.reset();
 
         // Release the buffer to allow for subsequent screenshots.
         weak_ptr->screen_capturer_->ReleaseFrame(kBufferIndex, [](auto result) {});
@@ -208,11 +210,7 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest fo
   FX_DCHECK(status == ZX_OK);
 }
 
-void FlatlandScreenshot::HandleFrameRender() {
-  FX_DCHECK(callback_);
-
-  fuchsia::ui::composition::ScreenshotTakeResponse response;
-
+zx::vmo FlatlandScreenshot::HandleFrameRender() {
   // Copy ScreenCapture output for inspection. Note that the stride of the buffer may be different
   // than the width of the image, if the width of the image is not a multiple of 64.
   //
@@ -256,12 +254,100 @@ void FlatlandScreenshot::HandleFrameRender() {
                                      ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
   }
 
-  response.set_vmo(std::move(response_vmo));
-  response.set_size({display_size_.width, display_size_.height});
-  callback_(std::move(response));
+  return response_vmo;
+}
 
-  callback_ = nullptr;
-  render_event_.reset();
+void FlatlandScreenshot::GetNextFrame() {
+  FX_DCHECK(!render_event_);
+  zx::event dup;
+  zx_status_t status = zx::event::create(0, &render_event_);
+  FX_DCHECK(status == ZX_OK);
+  render_event_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+
+  GetNextFrameArgs frame_args;
+  frame_args.set_event(std::move(dup));
+
+  FX_LOGS(INFO) << "Capturing next frame for screenshot.";
+  screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {});
+}
+
+void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
+                                  TakeFileCallback callback) {
+  if (take_file_callback_ != nullptr) {
+    FX_LOGS(ERROR)
+        << "Screenshot::TakeFile() already in progress, closing connection. Wait for return "
+           "before calling again.";
+    destroy_instance_function_(this);
+    return;
+  }
+
+  if (!utils::IsEventSignalled(init_event_, ZX_EVENT_SIGNALED)) {
+    // Begin to asynchronously wait on the event. Retry the Take() call when the initialization is
+    // complete.
+    zx_status_t status = init_wait_->Begin(
+        async_get_default_dispatcher(),
+        [weak_ptr = weak_factory_.GetWeakPtr(), params = std::move(params),
+         callback = std::move(callback)](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                         const zx_packet_signal_t* signal) mutable {
+          if (!weak_ptr) {
+            return;
+          }
+          FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
+
+          // Retry the Take() call.
+          weak_ptr->TakeFile(std::move(params), std::move(callback));
+        });
+    FX_DCHECK(status == ZX_OK);
+    return;
+  }
+
+  take_file_callback_ = std::move(callback);
+
+  GetNextFrame();
+
+  // Wait for the frame to render in an async fashion.
+  render_wait_ = std::make_shared<async::WaitOnce>(render_event_.get(), ZX_EVENT_SIGNALED);
+  zx_status_t status = render_wait_->Begin(
+      async_get_default_dispatcher(), [this, weak_ptr = weak_factory_.GetWeakPtr()](
+                                          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                          const zx_packet_signal_t*) mutable {
+        FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
+        if (!weak_ptr) {
+          return;
+        }
+        FX_DCHECK(take_file_callback_);
+
+        zx::vmo response_vmo = weak_ptr->HandleFrameRender();
+        fuchsia::ui::composition::ScreenshotTakeFileResponse response;
+
+        response.set_size({display_size_.width, display_size_.height});
+
+        fidl::InterfaceHandle<fuchsia::io::File> file_client;
+
+        fidl::InterfaceRequest<fuchsia::io::File> file_server = file_client.NewRequest();
+
+        if (!file_server.is_valid()) {
+          FX_LOGS(ERROR) << "Cannot create file server channel";
+          return;
+        }
+
+        const size_t screenshot_index = served_screenshots_next_id_++;
+        if (!ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
+                             &served_screenshots_)) {
+          return;
+        }
+
+        response.set_file(std::move(file_client));
+
+        take_file_callback_(std::move(response));
+
+        take_file_callback_ = nullptr;
+        render_event_.reset();
+
+        // Release the buffer to allow for subsequent screenshots.
+        weak_ptr->screen_capturer_->ReleaseFrame(kBufferIndex, [](auto result) {});
+      });
+  FX_DCHECK(status == ZX_OK);
 }
 
 }  // namespace screenshot

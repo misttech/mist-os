@@ -10,8 +10,11 @@ source_set("screenshot") {
     "gfx_screenshot.h",
     "screenshot_manager.cc",
     "screenshot_manager.h",
+    "util.cc",
+    "util.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/lib/fsl:fsl",

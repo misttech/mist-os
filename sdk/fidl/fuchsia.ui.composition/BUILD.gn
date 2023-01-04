@@ -16,6 +16,7 @@ fidl("fuchsia.ui.composition") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.scenic.scheduling",
     "//sdk/fidl/fuchsia.sysmem",
