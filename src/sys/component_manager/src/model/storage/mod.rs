@@ -309,25 +309,25 @@ pub async fn delete_isolated_storage(
         let parent_path = storage_path.parent().ok_or_else(|| {
             StorageError::invalid_storage_path(relative_moniker.clone(), Some(instance_id.clone()))
         })?;
-        let dir = if parent_path
+        let parent_path_str = parent_path
             .to_str()
-            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?
-            .is_empty()
-        {
+            .ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?;
+        let dir = if parent_path_str.is_empty() {
             root_dir
         } else {
-            fuchsia_fs::open_directory(&root_dir, parent_path, FLAGS).map_err(|e| {
-                StorageError::open(
-                    storage_source_info
-                        .storage_provider
-                        .as_ref()
-                        .map(|r| r.instanced_moniker().clone()),
-                    storage_source_info.backing_directory_path.clone(),
-                    relative_moniker.clone(),
-                    None,
-                    e,
-                )
-            })?
+            fuchsia_fs::directory::open_directory_no_describe(&root_dir, parent_path_str, FLAGS)
+                .map_err(|e| {
+                    StorageError::open(
+                        storage_source_info
+                            .storage_provider
+                            .as_ref()
+                            .map(|r| r.instanced_moniker().clone()),
+                        storage_source_info.backing_directory_path.clone(),
+                        relative_moniker.clone(),
+                        None,
+                        e,
+                    )
+                })?
         };
         (dir, file_name)
     } else {
@@ -338,20 +338,26 @@ pub async fn delete_isolated_storage(
         };
         // We want to strip off the "data" portion of the path, and then one more level to get to the
         // directory holding the target component's storage.
-        if storage_path.parent().and_then(|p| p.parent()).is_none() {
-            return Err(StorageError::invalid_storage_path(relative_moniker.clone(), None).into());
-        }
-        let dir_path = storage_path.parent().unwrap().parent().unwrap().to_path_buf();
-        let name = storage_path.parent().unwrap().file_name().ok_or_else(|| {
-            ModelError::from(StorageError::invalid_storage_path(relative_moniker.clone(), None))
-        })?;
+        let storage_path_parent = storage_path
+            .parent()
+            .ok_or_else(|| StorageError::invalid_storage_path(relative_moniker.clone(), None))?;
+        let dir_path = storage_path_parent
+            .parent()
+            .ok_or_else(|| StorageError::invalid_storage_path(relative_moniker.clone(), None))?;
+        let name = storage_path_parent
+            .file_name()
+            .ok_or_else(|| StorageError::invalid_storage_path(relative_moniker.clone(), None))?;
         let name =
             name.to_str().ok_or_else(|| ModelError::path_is_not_utf8(storage_path.clone()))?;
-
         let dir = if dir_path.parent().is_none() {
             root_dir
         } else {
-            fuchsia_fs::open_directory(&root_dir, &dir_path, FLAGS).map_err(|e| {
+            fuchsia_fs::directory::open_directory_no_describe(
+                &root_dir,
+                dir_path.to_str().unwrap(),
+                FLAGS,
+            )
+            .map_err(|e| {
                 StorageError::open(
                     storage_source_info
                         .storage_provider

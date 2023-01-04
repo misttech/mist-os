@@ -16,7 +16,6 @@ use {
     fuchsia_zircon_status as zx,
     futures::TryStreamExt,
     std::fmt,
-    std::path::Path,
 };
 
 pub async fn lsblk(_cmd: LsblkCommand, dev: fio::DirectoryProxy) -> Result<()> {
@@ -25,9 +24,11 @@ pub async fn lsblk(_cmd: LsblkCommand, dev: fio::DirectoryProxy) -> Result<()> {
         "ID", "SIZE", "TYPE", "LABEL", "FLAGS", "DEVICE"
     );
 
-    if let Ok(block_dir) =
-        fuchsia_fs::open_directory(&dev, &Path::new("class/block"), fio::OpenFlags::RIGHT_READABLE)
-    {
+    if let Ok(block_dir) = fuchsia_fs::directory::open_directory_no_describe(
+        &dev,
+        "class/block",
+        fio::OpenFlags::RIGHT_READABLE,
+    ) {
         for device in get_devices::<BlockDevice>(&block_dir).await? {
             println!("{}", device);
         }
@@ -35,9 +36,9 @@ pub async fn lsblk(_cmd: LsblkCommand, dev: fio::DirectoryProxy) -> Result<()> {
         println!("Error opening /dev/class/block");
     }
 
-    if let Ok(skip_block_dir) = fuchsia_fs::open_directory(
+    if let Ok(skip_block_dir) = fuchsia_fs::directory::open_directory_no_describe(
         &dev,
-        &Path::new("class/skip-block"),
+        "class/skip-block",
         fio::OpenFlags::RIGHT_READABLE,
     ) {
         for device in get_devices::<SkipBlockDevice>(&skip_block_dir).await? {

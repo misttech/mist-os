@@ -11,7 +11,6 @@ use {
     },
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_fs,
-    std::path::Path,
 };
 
 // macros
@@ -65,8 +64,12 @@ async fn package_resolution() {
         .add(fio::DirentType::Directory, b".")
         .add(fio::DirentType::File, b"hello_world_v1");
     assert_read_dirents!(
-        fuchsia_fs::open_directory(&dir_proxy, Path::new("bin"), fio::OpenFlags::RIGHT_READABLE)
-            .unwrap(),
+        fuchsia_fs::directory::open_directory_no_describe(
+            &dir_proxy,
+            "bin",
+            fio::OpenFlags::RIGHT_READABLE
+        )
+        .unwrap(),
         1000,
         expected_bin.into_vec()
     );
@@ -80,8 +83,12 @@ async fn package_resolution() {
         .add(fio::DirentType::File, b"package");
 
     assert_read_dirents!(
-        fuchsia_fs::open_directory(&dir_proxy, Path::new("meta"), fio::OpenFlags::RIGHT_READABLE)
-            .unwrap(),
+        fuchsia_fs::directory::open_directory_no_describe(
+            &dir_proxy,
+            "meta",
+            fio::OpenFlags::RIGHT_READABLE
+        )
+        .unwrap(),
         1000,
         expected_meta.into_vec()
     );

@@ -37,9 +37,9 @@ async fn get_all_input_device_paths(
     dev: &fio::DirectoryProxy,
 ) -> Result<impl Stream<Item = Result<PathBuf>>> {
     const INPUT_DEVICE_DIR: &str = "class/input-report";
-    let input_device_dir = fuchsia_fs::open_directory(
+    let input_device_dir = fuchsia_fs::directory::open_directory_no_describe(
         &dev,
-        &Path::new(INPUT_DEVICE_DIR),
+        INPUT_DEVICE_DIR,
         fio::OpenFlags::RIGHT_READABLE,
     )
     .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;

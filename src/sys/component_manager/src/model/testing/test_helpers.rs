@@ -204,9 +204,12 @@ pub async fn dir_contains<'a>(
     path: &'a str,
     entry_name: &'a str,
 ) -> bool {
-    let dir =
-        fuchsia_fs::open_directory(&root_proxy, &Path::new(path), fio::OpenFlags::RIGHT_READABLE)
-            .expect("Failed to open directory");
+    let dir = fuchsia_fs::directory::open_directory_no_describe(
+        &root_proxy,
+        path,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("Failed to open directory");
     let entries = fuchsia_fs::directory::readdir(&dir).await.expect("readdir failed");
     let listing = entries.iter().map(|entry| entry.name.clone()).collect::<Vec<String>>();
     listing.contains(&String::from(entry_name))
@@ -220,10 +223,10 @@ pub async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<Stri
 }
 
 pub async fn list_sub_directory(parent: &fio::DirectoryProxy, path: &str) -> Vec<String> {
-    let sub_dir = fuchsia_fs::open_directory(
+    let sub_dir = fuchsia_fs::directory::open_directory_no_describe(
         &parent,
-        &Path::new(path),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        path,
+        fio::OpenFlags::RIGHT_READABLE,
     )
     .expect("Failed to open directory");
     list_directory(&sub_dir).await

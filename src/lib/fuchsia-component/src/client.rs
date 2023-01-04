@@ -27,7 +27,7 @@ use {
         stream::{StreamExt, TryStreamExt},
         Future,
     },
-    std::{borrow::Borrow, fmt, fs::File, marker::PhantomData, path::Path, sync::Arc},
+    std::{borrow::Borrow, fmt, fs::File, marker::PhantomData, sync::Arc},
     thiserror::Error,
 };
 
@@ -269,9 +269,9 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
     instance: &str,
 ) -> Result<S::Proxy, Error> {
-    let service_path = Path::new(S::SERVICE_NAME).join(instance);
+    let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
     let directory_proxy =
-        fuchsia_fs::open_directory(directory, service_path.as_path(), SERVICE_FLAGS)?;
+        fuchsia_fs::directory::open_directory_no_describe(directory, &service_path, SERVICE_FLAGS)?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
@@ -313,7 +313,8 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::open_directory(directory, Path::new(S::SERVICE_NAME), SERVICE_FLAGS)
+    fuchsia_fs::directory::open_directory_no_describe(directory, S::SERVICE_NAME, SERVICE_FLAGS)
+        .map_err(Into::into)
 }
 
 /// Opens the exposed directory from a child. Only works in CFv2, and only works if this component

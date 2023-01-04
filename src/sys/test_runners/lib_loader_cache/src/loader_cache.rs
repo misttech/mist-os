@@ -153,7 +153,7 @@ fn serve_lib_loader(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, assert_matches::assert_matches, std::path::Path};
+    use {super::*, anyhow::Error, assert_matches::assert_matches};
 
     async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
         let entries = fuchsia_fs::directory::readdir(root_proxy).await.expect("readdir failed");
@@ -168,20 +168,12 @@ mod tests {
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let mut pkg_lib = fuchsia_fs::directory::open_in_namespace("/pkg/lib", rights)?;
         let entries = list_directory(&pkg_lib).await;
-        if entries.iter().any(|f| &f as &str == "asan-ubsan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("asan-ubsan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "asan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("asan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "hwasan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("hwasan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage-rust") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage-rust"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage-cts") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage-cts"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "profile") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("profile"), rights)?;
+        if let Some(name) =
+            ["asan-ubsan", "asan", "hwasan", "coverage", "coverage-rust", "coverage-cts", "profile"]
+                .iter()
+                .find(|&&name| entries.iter().any(|f| f == name))
+        {
+            pkg_lib = fuchsia_fs::directory::open_directory_no_describe(&pkg_lib, name, rights)?;
         }
 
         let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;

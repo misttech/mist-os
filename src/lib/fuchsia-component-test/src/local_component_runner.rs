@@ -14,7 +14,7 @@ use {
     fuchsia_fs, fuchsia_zircon as zx,
     futures::{channel::oneshot, future::BoxFuture, lock::Mutex, select, FutureExt, TryStreamExt},
     runner::get_value as get_dictionary_value,
-    std::{collections::HashMap, path::Path, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::*,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
@@ -116,13 +116,14 @@ impl LocalComponentHandles {
     pub fn open_named_service(&self, name: &str) -> Result<fio::DirectoryProxy, Error> {
         let svc_dir_proxy = self
             .namespace
-            .get(&"/svc".to_string())
+            .get("/svc")
             .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
-        fuchsia_fs::open_directory(
+        fuchsia_fs::directory::open_directory_no_describe(
             &svc_dir_proxy,
-            &Path::new(name),
+            name,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
+        .map_err(Into::into)
     }
 
     /// Connect to the "default" instance of a FIDL service in the `/svc` directory of
@@ -150,9 +151,9 @@ impl LocalComponentHandles {
         instance_name: &str,
     ) -> Result<S::Proxy, Error> {
         let service_dir = self.open_named_service(service_name)?;
-        let directory_proxy = fuchsia_fs::open_directory(
+        let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
             &service_dir,
-            &Path::new(instance_name),
+            instance_name,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
         Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
@@ -168,7 +169,8 @@ impl LocalComponentHandles {
     ///
     /// ```
     /// let data_dir = handles.clone_from_namespace("data")?;
-    /// let assets_dir = fuchsia_fs::open_directory(&data_dir, Path::new("assets"), ...)?;
+    /// let assets_dir =
+    ///     fuchsia_fs::directory::open_directory_no_describe(&data_dir, "assets", ...)?;
     /// ```
     pub fn clone_from_namespace(&self, directory_name: &str) -> Result<fio::DirectoryProxy, Error> {
         let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or(format_err!(

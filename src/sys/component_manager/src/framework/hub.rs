@@ -500,7 +500,7 @@ mod tests {
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio,
         moniker::AbsoluteMoniker,
-        std::{convert::TryFrom, path::Path},
+        std::convert::TryFrom,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
             file::vmo::asynchronous::read_only_static, path::Path as pfsPath, pseudo_directory,
@@ -752,9 +752,9 @@ mod tests {
         )
         .await;
 
-        let ns_dir = fuchsia_fs::open_directory(
+        let ns_dir = fuchsia_fs::directory::open_directory_no_describe(
             &hub_proxy,
-            &Path::new("ns"),
+            "ns",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         )
         .expect("Failed to open directory");
@@ -809,9 +809,9 @@ mod tests {
         )
         .await;
 
-        let expose_dir = fuchsia_fs::open_directory(
+        let expose_dir = fuchsia_fs::directory::open_directory_no_describe(
             &hub_proxy,
-            &Path::new("exposed"),
+            "exposed",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         )
         .expect("Failed to open directory");
@@ -844,9 +844,9 @@ mod tests {
         )
         .await;
 
-        let ns_dir = fuchsia_fs::open_directory(
+        let ns_dir = fuchsia_fs::directory::open_directory_no_describe(
             &hub_proxy,
-            &Path::new("ns"),
+            "ns",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         )
         .expect("Failed to open directory");

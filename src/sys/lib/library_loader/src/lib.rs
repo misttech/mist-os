@@ -134,28 +134,20 @@ pub fn parse_config_string(
     if config.contains("/") {
         return Err(format_err!("'/' character found in loader service config string"));
     }
+    let (config, search_root) = match config.strip_suffix('!') {
+        Some(config) => (config, false),
+        None => (config, true),
+    };
     let mut search_dirs = vec![];
-    if Some('!') == config.chars().last() {
-        // Only search the subdirs.
-        for dir_proxy in lib_dirs {
-            let sub_dir_proxy = fuchsia_fs::open_directory(
-                dir_proxy,
-                &Path::new(&config[..config.len() - 1]),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )?;
-            search_dirs.push(Arc::new(sub_dir_proxy));
-        }
-    } else {
-        // Search the subdirs and the root dirs.
-        for dir_proxy in lib_dirs {
-            let sub_dir_proxy = fuchsia_fs::open_directory(
-                dir_proxy,
-                &Path::new(config),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )?;
-            search_dirs.push(Arc::new(sub_dir_proxy));
-        }
-
+    for dir_proxy in lib_dirs {
+        let sub_dir_proxy = fuchsia_fs::directory::open_directory_no_describe(
+            dir_proxy,
+            config,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )?;
+        search_dirs.push(Arc::new(sub_dir_proxy));
+    }
+    if search_root {
         search_dirs.append(&mut lib_dirs.clone());
     }
     Ok(search_dirs)
@@ -178,22 +170,13 @@ mod tests {
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let mut pkg_lib = fuchsia_fs::directory::open_in_namespace("/pkg/lib", rights)?;
         let entries = list_directory(&pkg_lib).await;
-        if entries.iter().any(|f| &f as &str == "asan-ubsan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("asan-ubsan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "asan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("asan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "hwasan") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("hwasan"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage-rust") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage-rust"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "coverage-cts") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("coverage-cts"), rights)?;
-        } else if entries.iter().any(|f| &f as &str == "profile") {
-            pkg_lib = fuchsia_fs::open_directory(&pkg_lib, &Path::new("profile"), rights)?;
+        if let Some(name) =
+            ["asan-ubsan", "asan", "hwasan", "coverage", "coverage-rust", "coverage-cts", "profile"]
+                .iter()
+                .find(|&&name| entries.iter().any(|f| f == name))
+        {
+            pkg_lib = fuchsia_fs::directory::open_directory_no_describe(&pkg_lib, name, rights)?;
         }
-
         let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
         start(pkg_lib.into(), loader_service.into_channel());
 

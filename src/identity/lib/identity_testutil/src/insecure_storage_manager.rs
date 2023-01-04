@@ -180,9 +180,9 @@ impl StorageManager for InsecureKeyDirectoryStorageManager {
     async fn get_root_dir(&self) -> Result<fio::DirectoryProxy, AccountManagerError> {
         let state_lock = self.state.lock().await;
         match *state_lock {
-            StorageManagerState::Available => fuchsia_fs::open_directory(
+            StorageManagerState::Available => fuchsia_fs::directory::open_directory_no_describe(
                 &self.managed_dir,
-                Path::new(CLIENT_ROOT_PATH),
+                CLIENT_ROOT_PATH,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )
             .account_manager_error(ApiError::Resource),

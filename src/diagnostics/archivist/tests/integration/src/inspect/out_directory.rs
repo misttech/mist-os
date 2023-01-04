@@ -9,7 +9,6 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
 use fuchsia_zircon::DurationNum;
-use std::path::Path;
 
 #[fuchsia::test]
 async fn out_can_be_read() {
@@ -53,9 +52,9 @@ async fn verify_out(moniker: &str) -> Result<(), Error> {
         fasync::Timer::new(fasync::Time::after(100.millis())).await;
     };
 
-    let diagnostics_dir = fuchsia_fs::open_directory(
+    let diagnostics_dir = fuchsia_fs::directory::open_directory_no_describe(
         &out_dir,
-        Path::new("diagnostics"),
+        "diagnostics",
         fio::OpenFlags::RIGHT_READABLE,
     )
     .unwrap();

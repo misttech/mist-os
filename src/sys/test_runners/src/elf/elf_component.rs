@@ -338,11 +338,12 @@ fn get_pkg_and_lib_proxy<'a>(
         .find(|(p, _)| p.as_str() == PKG_PATH)
         .ok_or_else(|| ComponentError::MissingPkg(url.clone()))?;
 
-    let lib_proxy = fuchsia_fs::open_directory(
+    let lib_proxy = fuchsia_fs::directory::open_directory_no_describe(
         pkg_proxy,
-        &Path::new("lib"),
+        "lib",
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )
+    .map_err(Into::into)
     .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
     Ok((pkg_proxy, lib_proxy))
 }

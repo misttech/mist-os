@@ -64,9 +64,9 @@ async fn load_boot_drivers(
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
-    let meta = fuchsia_fs::open_directory(
+    let meta = fuchsia_fs::directory::open_directory_no_describe(
         &dir,
-        std::path::Path::new("meta"),
+        "meta",
         fio::OpenFlags::RIGHT_READABLE,
     )
     .context("boot: Failed to open meta")?;

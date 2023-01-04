@@ -22,7 +22,6 @@ use {
     lazy_static::lazy_static,
     library_loader,
     std::convert::{TryFrom, TryInto},
-    std::path::Path,
     std::path::PathBuf,
     thiserror::Error,
     tracing::*,
@@ -387,9 +386,9 @@ pub async fn configure_launcher(
             // The loader service should only be able to load files from `/pkg/lib`. Giving it a larger
             // scope is potentially a security vulnerability, as it could make it trivial for parts of
             // applications to get handles to things the application author didn't intend.
-            let lib_proxy = fuchsia_fs::open_directory(
+            let lib_proxy = fuchsia_fs::directory::open_directory_no_describe(
                 pkg_proxy,
-                &Path::new("lib"),
+                "lib",
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             )
             .map_err(|e| LaunchError::LibLoadError(e.to_string()))?;

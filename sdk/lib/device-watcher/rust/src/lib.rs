@@ -126,7 +126,7 @@ async fn recursive_wait_and_open_node_with_flags(
         let file = file.to_str().unwrap();
         let () = wait_for_file(&dir, file).await?;
         if components.peek().is_some() {
-            dir = fuchsia_fs::open_directory(&dir, std::path::Path::new(file), flags)?;
+            dir = fuchsia_fs::directory::open_directory_no_describe(&dir, file, flags)?;
         } else {
             break fuchsia_fs::directory::open_node_no_describe(&dir, file, flags, mode)
                 .map_err(Into::into);

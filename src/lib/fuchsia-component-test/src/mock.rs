@@ -82,7 +82,8 @@ impl MockHandles {
     ///
     /// ```
     /// let data_dir = mock_handles.clone_from_namespace("data")?;
-    /// let assets_dir = fuchsia_fs::open_directory(&data_dir, Path::new("assets"), ...)?;
+    /// let assets_dir =
+    ///     fuchsia_fs::directory::open_directory_no_describe(&data_dir, "assets", ...)?;
     /// ```
     pub fn clone_from_namespace(&self, directory_name: &str) -> Result<fio::DirectoryProxy, Error> {
         let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or(format_err!(
