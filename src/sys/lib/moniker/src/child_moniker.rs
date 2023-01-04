@@ -17,8 +17,6 @@ pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
     fn name(&self) -> &str;
 
     fn collection(&self) -> Option<&str>;
-
-    fn as_str(&self) -> &str;
 }
 
 /// An child moniker locally identifies a child component instance using the name assigned by
@@ -31,7 +29,6 @@ pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
 pub struct ChildMoniker {
     pub name: LongName,
     pub collection: Option<Name>,
-    rep: String,
 }
 
 impl ChildMonikerBase for ChildMoniker {
@@ -56,10 +53,6 @@ impl ChildMonikerBase for ChildMoniker {
     fn collection(&self) -> Option<&str> {
         self.collection.as_ref().map(|c| c.as_str())
     }
-
-    fn as_str(&self) -> &str {
-        &self.rep
-    }
 }
 
 impl ChildMoniker {
@@ -68,15 +61,14 @@ impl ChildMoniker {
         S: Into<String>,
     {
         let name = LongName::try_new(name)?;
-        let (collection, rep) = match collection {
+        let collection = match collection {
             Some(coll) => {
                 let coll_name = Name::try_new(coll)?;
-                let rep = format!("{}:{}", coll_name, name);
-                (Some(coll_name), rep)
+                Some(coll_name)
             }
-            None => (None, name.to_string()),
+            None => None,
         };
-        Ok(Self { name, collection, rep })
+        Ok(Self { name, collection })
     }
 }
 
@@ -100,7 +92,11 @@ impl PartialOrd for ChildMoniker {
 
 impl fmt::Display for ChildMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
+        if let Some(coll) = &self.collection {
+            write!(f, "{}:{}", coll, self.name)
+        } else {
+            write!(f, "{}", self.name)
+        }
     }
 }
 
@@ -116,14 +112,12 @@ mod tests {
         let m = ChildMoniker::try_new("test", None).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(None, m.collection());
-        assert_eq!("test", m.as_str());
         assert_eq!("test", format!("{}", m));
         assert_eq!(m, ChildMoniker::from("test"));
 
         let m = ChildMoniker::try_new("test", Some("coll")).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(Some("coll"), m.collection());
-        assert_eq!("coll:test", m.as_str());
         assert_eq!("coll:test", format!("{}", m));
         assert_eq!(m, ChildMoniker::from("coll:test"));
 

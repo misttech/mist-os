@@ -14,7 +14,7 @@ use {
     cm_rust::CapabilityPath,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
-    moniker::{ChildMonikerBase, RelativeMonikerBase},
+    moniker::RelativeMonikerBase,
     routing::{
         component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
     },
@@ -417,10 +417,10 @@ fn generate_moniker_based_storage_path(relative_moniker: &InstancedRelativeMonik
     );
 
     let mut path = relative_moniker.path().iter();
-    let mut dir_path = vec![path.next().unwrap().as_str().to_string()];
+    let mut dir_path = vec![path.next().unwrap().to_string()];
     while let Some(p) = path.next() {
         dir_path.push("children".to_string());
-        dir_path.push(p.as_str().to_string());
+        dir_path.push(p.to_string());
     }
 
     // Storage capabilities used to have a hardcoded set of types, which would be appended

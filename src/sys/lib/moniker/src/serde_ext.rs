@@ -19,7 +19,7 @@ impl Serialize for ChildMoniker {
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.as_str())
+        serializer.serialize_str(&self.to_string())
     }
 }
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
     std::{fmt, fmt::Display},
 };
 
@@ -36,8 +36,8 @@ impl NodePath {
 
     /// Construct string references that correspond to underlying
     /// `ChildMoniker` instances.
-    pub fn as_vec(&self) -> Vec<&str> {
-        self.0.iter().map(|moniker| moniker.as_str()).collect()
+    pub fn as_vec(&self) -> Vec<String> {
+        self.0.iter().map(|moniker| moniker.to_string()).collect()
     }
 }
 
@@ -50,7 +50,7 @@ impl Display for NodePath {
         let mut path_string = "".to_owned();
         for moniker in self.0.iter() {
             path_string.push('/');
-            path_string.push_str(moniker.as_str());
+            path_string.push_str(&moniker.to_string());
         }
         write!(f, "{}", path_string)
     }

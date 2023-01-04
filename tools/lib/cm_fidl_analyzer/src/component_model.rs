@@ -156,8 +156,10 @@ impl ModelBuilderForAnalyzer {
             }
             let child_moniker_str = child_moniker_str.unwrap();
 
-            let abs_moniker: AbsoluteMoniker = moniker_vec.into();
-            let child_moniker: ChildMoniker = child_moniker_str.into();
+            let abs_moniker: AbsoluteMoniker = AbsoluteMoniker::parse(&moniker_vec)
+                .expect("node path could not be converted back to absolute moniker");
+            let child_moniker: ChildMoniker = ChildMoniker::parse(child_moniker_str)
+                .expect("node path part could not be converted back to child moniker");
             if child_moniker.collection().is_none() {
                 errors.push(
                     BuildAnalyzerModelError::DynamicComponentWithoutCollection(

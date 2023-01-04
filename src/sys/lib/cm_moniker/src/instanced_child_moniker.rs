@@ -22,7 +22,6 @@ pub struct InstancedChildMoniker {
     name: LongName,
     collection: Option<Name>,
     instance: IncarnationId,
-    rep: String,
 }
 
 pub type IncarnationId = u32;
@@ -62,10 +61,6 @@ impl ChildMonikerBase for InstancedChildMoniker {
     fn collection(&self) -> Option<&str> {
         self.collection.as_ref().map(|c| c.as_str())
     }
-
-    fn as_str(&self) -> &str {
-        &self.rep
-    }
 }
 
 impl InstancedChildMoniker {
@@ -78,18 +73,14 @@ impl InstancedChildMoniker {
         S: Into<String>,
     {
         let name = LongName::try_new(name)?;
-        let (collection, rep) = match collection {
+        let collection = match collection {
             Some(coll) => {
                 let coll_name = Name::try_new(coll)?;
-                let rep = format!("{}:{}:{}", coll_name, name, instance);
-                (Some(coll_name), rep)
+                Some(coll_name)
             }
-            None => {
-                let rep = format!("{}:{}", name, instance);
-                (None, rep)
-            }
+            None => None,
         };
-        Ok(Self { name, collection, instance, rep })
+        Ok(Self { name, collection, instance })
     }
 
     /// Returns a moniker for a static child.
@@ -142,7 +133,11 @@ impl PartialOrd for InstancedChildMoniker {
 
 impl fmt::Display for InstancedChildMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
+        if let Some(coll) = &self.collection {
+            write!(f, "{}:{}:{}", coll, self.name, self.instance)
+        } else {
+            write!(f, "{}:{}", self.name, self.instance)
+        }
     }
 }
 
@@ -159,20 +154,18 @@ mod tests {
         assert_eq!("test", m.name());
         assert_eq!(None, m.collection());
         assert_eq!(42, m.instance());
-        assert_eq!("test:42", m.as_str());
         assert_eq!("test:42", format!("{}", m));
         assert_eq!(m, InstancedChildMoniker::from("test:42"));
-        assert_eq!("test", m.without_instance_id().as_str());
+        assert_eq!("test", m.without_instance_id().to_string());
         assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"test".into(), 42));
 
         let m = InstancedChildMoniker::try_new("test", Some("coll"), 42).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(Some("coll"), m.collection());
         assert_eq!(42, m.instance());
-        assert_eq!("coll:test:42", m.as_str());
         assert_eq!("coll:test:42", format!("{}", m));
         assert_eq!(m, InstancedChildMoniker::from("coll:test:42"));
-        assert_eq!("coll:test", m.without_instance_id().as_str());
+        assert_eq!("coll:test", m.without_instance_id().to_string());
         assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"coll:test".into(), 42));
 
         let max_coll_length_part = "f".repeat(MAX_NAME_LENGTH);

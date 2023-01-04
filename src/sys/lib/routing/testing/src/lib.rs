@@ -29,10 +29,7 @@ use {
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    moniker::{
-        AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker,
-        RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMonikerBase},
     routing::{
         capability_source::{
             AggregateCapability, CapabilitySourceInterface, ComponentCapability, InternalCapability,
@@ -194,11 +191,11 @@ pub fn generate_storage_path(
         dir_path.push(subdir);
     }
     if let Some(p) = path.next() {
-        dir_path.push(p.as_str().to_string());
+        dir_path.push(p.to_string());
     }
     while let Some(p) = path.next() {
         dir_path.push("children".to_string());
-        dir_path.push(p.as_str().to_string());
+        dir_path.push(p.to_string());
     }
 
     // Storage capabilities used to have a hardcoded set of types, which would be appended

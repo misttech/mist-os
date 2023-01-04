@@ -56,9 +56,7 @@ impl ComponentInstanceForAnalyzer {
 
     /// Returns a representation of the instance's position in the component instance tree.
     pub fn node_path(&self) -> NodePath {
-        NodePath::absolute_from_vec(
-            self.abs_moniker.path().into_iter().map(|m| m.as_str()).collect(),
-        )
+        NodePath::new(self.abs_moniker.path().clone())
     }
 
     // Creates a new root component instance.

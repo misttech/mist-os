@@ -22,7 +22,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::lock::Mutex,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     rand::Rng,
     std::{
         collections::hash_map::HashMap,
@@ -216,7 +216,7 @@ impl Hub {
                     instance
                         .children_directory
                         .add_node(
-                            &Hub::child_dir_name(child_moniker.as_str(), uuid),
+                            &Hub::child_dir_name(&child_moniker.to_string(), uuid),
                             controlled.clone(),
                         )
                         .map_err(|err| ModelError::HubDirError { moniker: moniker.clone(), err })?;

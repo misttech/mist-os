@@ -24,7 +24,7 @@ pub trait AbsoluteMonikerBase:
 
     fn new(path: Vec<Self::Part>) -> Self;
 
-    fn parse(path: &Vec<&str>) -> Result<Self, MonikerError> {
+    fn parse<T: AsRef<str>>(path: &[T]) -> Result<Self, MonikerError> {
         let path: Result<Vec<Self::Part>, MonikerError> =
             path.iter().map(|x| Self::Part::parse(x)).collect();
         Ok(Self::new(path?))
@@ -114,7 +114,7 @@ pub trait AbsoluteMonikerBase:
             write!(f, "/")?;
         } else {
             for segment in self.path().iter() {
-                write!(f, "/{}", segment.as_str())?
+                write!(f, "/{}", segment)?
             }
         }
         Ok(())
