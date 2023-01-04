@@ -246,7 +246,7 @@ class NodeManager {
 
   zx_status_t InitNodeManager();
 
-  F2fs *fs_ = nullptr;
+  F2fs *const fs_ = nullptr;
   SuperblockInfo *superblock_info_ = nullptr;
   block_t nat_blkaddr_ = 0;  // starting block address of NAT
 

@@ -6,7 +6,6 @@
 
 namespace f2fs {
 
-// TODO: guarantee no failure on the returned page.
 zx_status_t F2fs::GrabMetaPage(pgoff_t index, LockedPage *out) {
   if (zx_status_t ret = GetMetaVnode().GrabCachePage(index, out); ret != ZX_OK) {
     ZX_ASSERT_MSG(false, "GrabMetaPage() fails [addr: 0x%lx, ret: %d]\n", index, ret);
@@ -25,15 +24,15 @@ zx_status_t F2fs::GetMetaPage(pgoff_t index, LockedPage *out) {
     return ret;
   }
 
-  auto page_or =
-      MakeReadOperation(std::move(page), safemath::checked_cast<block_t>(index), PageType::kMeta);
-  if (page_or.is_error()) {
-    return page_or.status_value();
+  if (auto status =
+          MakeReadOperation(page, safemath::checked_cast<block_t>(index), PageType::kMeta);
+      status.is_error()) {
+    return status.status_value();
   }
 #if 0  // porting needed
   // mark_page_accessed(page);
 #endif
-  *out = std::move(*page_or);
+  *out = std::move(page);
   return ZX_OK;
 }
 

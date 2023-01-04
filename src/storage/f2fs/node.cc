@@ -894,18 +894,19 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
 
 zx::result<LockedPage> NodeManager::ReadNodePage(LockedPage page, nid_t nid, int type) {
   NodeInfo ni;
-
   GetNodeInfo(nid, ni);
-
   if (ni.blk_addr == kNullAddr) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-
-  auto page_or = fs_->MakeReadOperation(std::move(page), ni.blk_addr, PageType::kNode);
-  if (page_or.is_error()) {
-    return page_or.take_error();
+  if (page->IsUptodate()) {
+    return zx::ok(std::move(page));
   }
-  return zx::ok(std::move(*page_or));
+
+  auto status = fs_->MakeReadOperation(page, ni.blk_addr, PageType::kNode);
+  if (status.is_error()) {
+    return status.take_error();
+  }
+  return zx::ok(std::move(page));
 }
 
 zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
@@ -1233,8 +1234,6 @@ zx_status_t NodeManager::RestoreNodeSummary(uint32_t segno, SummaryBlock &sum) {
     sum_entry->nid = rn->footer.nid;
     sum_entry->version = 0;
     sum_entry->ofs_in_node = 0;
-
-    page->Invalidate();
   }
   return ZX_OK;
 }

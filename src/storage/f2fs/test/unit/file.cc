@@ -246,7 +246,7 @@ TEST_F(FileTest, MixedSizeWrite) {
   {
     WritebackOperation op = {.bSync = true};
     test_file_ptr->Writeback(op);
-    [[maybe_unused]] auto unused = test_file_ptr->InvalidatePages();
+    test_file_ptr->ResetFileCache();
   }
   w_buf_iter = w_buf;
   for (size_t i = 0; i < total_pages; ++i) {
@@ -284,9 +284,8 @@ TEST_F(FileTest, LargeChunkReadWrite) {
   {
     WritebackOperation op = {.bSync = true};
     test_file_vn->Writeback(op);
-    [[maybe_unused]] auto unused = test_file_vn->InvalidatePages();
+    test_file_vn->ResetFileCache();
   }
-
   std::vector<char> r_buf(kDataSize, 0);
   FileTester::ReadFromFile(test_file_vn.get(), r_buf.data(), kDataSize, 0);
   ASSERT_EQ(memcmp(w_buf.data(), r_buf.data(), kDataSize), 0);
@@ -353,7 +352,7 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   {
     WritebackOperation op = {.bSync = true};
     test_file_ptr->Writeback(op);
-    [[maybe_unused]] auto unused = test_file_ptr->InvalidatePages();
+    test_file_vn->ResetFileCache();
   }
   w_buf_iter = w_buf;
   for (size_t i = 0; i < total_pages; ++i) {
@@ -374,7 +373,7 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   test_file_vn = nullptr;
 }
 
-TEST_F(FileTest, Readahead) {
+TEST_F(FileTest, DISABLED_Readahead) {
   fbl::RefPtr<fs::Vnode> test_file;
   ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
 

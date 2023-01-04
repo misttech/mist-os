@@ -191,7 +191,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
   vnode->UnlockNewInode();
-
+  vnode->InitFileCache();
   fs->InsertVnode(vnode.get());
   vnode->MarkInodeDirty();
 }

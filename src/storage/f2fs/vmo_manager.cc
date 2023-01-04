@@ -6,24 +6,29 @@
 
 namespace f2fs {
 
-VmoMapping::VmoMapping(zx::vmo &unowned_vmo, pgoff_t index, size_t size)
+VmoMapping::VmoMapping(zx::vmo &unowned_vmo, pgoff_t index, size_t size, bool zero)
     : size_in_blocks_(size), index_(index), vmo_(unowned_vmo) {
   zx_vaddr_t addr;
+  size_t start_offset = 0;
   if (!unowned_vmo.is_valid()) {
     ZX_ASSERT(zx::vmo::create(page_to_address(get_size()), ZX_VMO_DISCARDABLE, &owned_vmo_) ==
               ZX_OK);
     ZX_ASSERT(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS, 0,
                                          vmo(), 0, page_to_address(get_size()), &addr) == ZX_OK);
   } else {
+    start_offset = page_to_address(index);
     ZX_ASSERT(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS, 0,
                                          vmo(), page_to_address(index), page_to_address(get_size()),
                                          &addr) == ZX_OK);
+  }
+  if (zero) {
+    ZX_ASSERT(vmo().op_range(ZX_VMO_OP_ZERO, start_offset, page_to_address(get_size()), nullptr,
+                             0) == ZX_OK);
   }
   address_ = addr;
 }
 
 VmoMapping::~VmoMapping() {
-  ZX_DEBUG_ASSERT(!active_pages());
   if (address()) {
     ZX_ASSERT(zx::vmar::root_self()->unmap(address(), page_to_address(get_size())) == ZX_OK);
   }
@@ -37,11 +42,6 @@ pgoff_t VmoMapping::address_to_page(zx_vaddr_t address) const {
   return safemath::CheckDiv<pgoff_t>(address, kPageSize).ValueOrDie();
 }
 
-void VmoMapping::Zero(pgoff_t offset) {
-  ZX_DEBUG_ASSERT(offset < get_size());
-  std::memset(reinterpret_cast<uint8_t *>(address()) + page_to_address(offset), 0, kBlockSize);
-}
-
 zx::result<zx_vaddr_t> VmoMapping::GetAddress(pgoff_t offset) const {
   ZX_DEBUG_ASSERT(offset < get_size());
   if (!address()) {
@@ -50,27 +50,34 @@ zx::result<zx_vaddr_t> VmoMapping::GetAddress(pgoff_t offset) const {
   return zx::ok(safemath::CheckAdd<zx_vaddr_t>(address(), page_to_address(offset)).ValueOrDie());
 }
 
-VmoPaged::VmoPaged(zx::vmo &vmo, pgoff_t index, size_t size) : VmoMapping(vmo, index, size) {}
+VmoPaged::VmoPaged(zx::vmo &vmo, pgoff_t index, size_t size, bool zero)
+    : VmoMapping(vmo, index, size, zero) {}
 
 VmoPaged::~VmoPaged() {}
 
-zx::result<bool> VmoPaged::Lock(pgoff_t offset) {
-  increase_active_pages();
-  return zx::ok(true);
+zx::result<bool> VmoPaged::Lock(pgoff_t offset) { return zx::ok(true); }
+
+zx_status_t VmoPaged::Unlock(pgoff_t offset) { return ZX_OK; }
+
+zx_status_t VmoPaged::Zero(pgoff_t start, pgoff_t len) {
+  ZX_DEBUG_ASSERT(start + len <= get_size());
+  return vmo().op_range(ZX_VMO_OP_ZERO, page_to_address(start + index()), page_to_address(len),
+                        nullptr, 0);
 }
 
-zx_status_t VmoPaged::Unlock(pgoff_t offset) {
-  decrease_active_pages();
-  return ZX_OK;
-}
-
-VmoNode::VmoNode(zx::vmo &vmo, pgoff_t index, size_t size) : VmoMapping(vmo, index, size) {
+VmoDiscardable::VmoDiscardable(zx::vmo &vmo, pgoff_t index, size_t size, bool zero)
+    : VmoMapping(vmo, index, size, zero) {
   page_bitmap_.resize(get_size(), false);
 }
 
-VmoNode::~VmoNode() {}
+VmoDiscardable::~VmoDiscardable() {}
 
-zx::result<bool> VmoNode::Lock(pgoff_t offset) {
+zx_status_t VmoDiscardable::Zero(pgoff_t start, pgoff_t len) {
+  ZX_DEBUG_ASSERT(start + len <= get_size());
+  return vmo().op_range(ZX_VMO_OP_ZERO, page_to_address(start), page_to_address(len), nullptr, 0);
+}
+
+zx::result<bool> VmoDiscardable::Lock(pgoff_t offset) {
   if (!active_pages()) {
     auto size = page_to_address(get_size());
     zx_status_t status = vmo().op_range(ZX_VMO_OP_TRY_LOCK, 0, size, nullptr, 0);
@@ -85,7 +92,10 @@ zx::result<bool> VmoNode::Lock(pgoff_t offset) {
               .ValueOrDie();
       end_offset = address_to_page(fbl::round_up(end_offset, kPageSize));
       for (; discarded_offset < end_offset; ++discarded_offset) {
-        page_bitmap_[discarded_offset] = false;
+        if (page_bitmap_[discarded_offset]) {
+          page_bitmap_[discarded_offset] = false;
+          decrease_active_pages();
+        }
       }
     }
     ZX_DEBUG_ASSERT(status == ZX_OK);
@@ -95,22 +105,27 @@ zx::result<bool> VmoNode::Lock(pgoff_t offset) {
   bool committed = page_bitmap_[offset_in_bitmap];
   if (!committed) {
     page_bitmap_[offset_in_bitmap] = true;
+    increase_active_pages();
   }
-  increase_active_pages();
   return zx::ok(committed);
 }
 
-zx_status_t VmoNode::Unlock(pgoff_t offset) {
-  if (decrease_active_pages()) {
-    return ZX_OK;
+zx_status_t VmoDiscardable::Unlock(pgoff_t offset) {
+  size_t offset_in_bitmap = offset % get_size();
+  if (page_bitmap_[offset_in_bitmap]) {
+    page_bitmap_[offset_in_bitmap] = false;
+    if (decrease_active_pages()) {
+      return ZX_OK;
+    }
   }
   return vmo().op_range(ZX_VMO_OP_UNLOCK, 0, page_to_address(get_size()), nullptr, 0);
 }
 
 zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index) __TA_EXCLUDES(mutex_) {
   std::lock_guard tree_lock(mutex_);
-  if (vmo_.is_valid()) {
-    if (index >= size_in_blocks_) {
+  bool zero = false;
+  if (index >= size_in_blocks_) {
+    if (vmo_.is_valid()) {
       // extend paged vmo
       // TODO: consider updating the content size
       // TODO: consider the shrinking case
@@ -119,30 +134,31 @@ zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index) __TA_EXCLUDES
       ZX_ASSERT_MSG(status == ZX_OK, "failed to resize paged vmo (%lu > %lu): %s",
                     size_in_blocks_ * kBlockSize, new_size, zx_status_get_string(status));
       size_in_blocks_ = new_size / kBlockSize;
+    } else {
+      size_in_blocks_ = fbl::round_up(index + 1, node_size_in_blocks_);
     }
-  } else {
-    ZX_ASSERT(index < size_in_blocks_);
+    // zero the appended area
+    zero = true;
   }
-  auto vmo_node_or = GetVmoNodeUnsafe(GetVmoNodeKey(index));
+  auto vmo_node_or = GetVmoNodeUnsafe(GetVmoNodeKey(index), zero);
   ZX_DEBUG_ASSERT(vmo_node_or.is_ok());
   return vmo_node_or.value()->Lock(index);
 }
 
 zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
-  std::lock_guard tree_lock(mutex_);
   ZX_ASSERT(index < size_in_blocks_);
-  auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
-  if (vmo_node_or.is_ok()) {
-    if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
-      return status;
-    }
-    if (evict) {
-      // TODO: consider using op_zero.
+  if (evict) {
+    fs::SharedLock tree_lock(mutex_);
+    auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
+    if (vmo_node_or.is_ok()) {
+      if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
+        return status;
+      }
       // TODO: consider removing a vmo_node when all regarding pages are invalidated.
-      vmo_node_or->Zero(GetOffsetInVmoNode(index));
     }
+    return vmo_node_or.status_value();
   }
-  return vmo_node_or.status_value();
+  return ZX_OK;
 }
 
 zx::result<zx_vaddr_t> VmoManager::GetAddress(pgoff_t index) {
@@ -190,14 +206,14 @@ zx::result<VmoMapping *> VmoManager::FindVmoNodeUnsafe(const pgoff_t index) {
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<VmoMapping *> VmoManager::GetVmoNodeUnsafe(const pgoff_t index) {
+zx::result<VmoMapping *> VmoManager::GetVmoNodeUnsafe(const pgoff_t index, bool zero) {
   VmoMapping *vmo_node = nullptr;
   if (auto vmo_node_or = FindVmoNodeUnsafe(index); vmo_node_or.is_error()) {
     std::unique_ptr<VmoMapping> new_node;
     if (mode_ == VmoMode::kDiscardable) {
-      new_node = std::make_unique<VmoNode>(vmo_, index, node_size_in_blocks_);
+      new_node = std::make_unique<VmoDiscardable>(vmo_, index, node_size_in_blocks_, zero);
     } else {
-      new_node = std::make_unique<VmoPaged>(vmo_, index, node_size_in_blocks_);
+      new_node = std::make_unique<VmoPaged>(vmo_, index, node_size_in_blocks_, zero);
     }
     vmo_node = new_node.get();
     vmo_tree_.insert(std::move(new_node));
@@ -207,12 +223,32 @@ zx::result<VmoMapping *> VmoManager::GetVmoNodeUnsafe(const pgoff_t index) {
   return zx::ok(vmo_node);
 }
 
+zx_status_t VmoManager::ZeroRange(pgoff_t start, pgoff_t end) {
+  end = std::min(end, size_in_blocks_);
+  if (start < end && end <= size_in_blocks_) {
+    fs::SharedLock lock(mutex_);
+    if (vmo_.is_valid()) {
+      return vmo_.op_range(ZX_VMO_OP_ZERO, start * kBlockSize, (end - start) * kBlockSize, nullptr,
+                           0);
+    } else {
+      auto end_node = fbl::round_up(end, node_size_in_blocks_);
+      for (auto i = start; i < end_node; i = GetVmoNodeKey(i + node_size_in_blocks_)) {
+        if (auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(i)); vmo_node_or.is_ok()) {
+          auto len = std::min(end - i, node_size_in_blocks_ - GetOffsetInVmoNode(i));
+          ZX_ASSERT(vmo_node_or->Zero(GetOffsetInVmoNode(i), len) == ZX_OK);
+        }
+      }
+    }
+  }
+  return ZX_OK;
+}
+
 pgoff_t VmoManager::GetOffsetInVmoNode(pgoff_t page_index) const {
   return page_index % node_size_in_blocks_;
 }
 
 pgoff_t VmoManager::GetVmoNodeKey(pgoff_t page_index) const {
-  return page_index - GetOffsetInVmoNode(page_index);
+  return fbl::round_down(page_index, node_size_in_blocks_);
 }
 
 }  // namespace f2fs

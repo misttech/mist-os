@@ -81,6 +81,7 @@
 #include "src/storage/f2fs/namestring.h"
 #include "src/storage/f2fs/storage_buffer.h"
 #include "src/storage/f2fs/writeback.h"
+#include "src/storage/f2fs/reader.h"
 #include "src/storage/f2fs/runner.h"
 #include "src/storage/f2fs/dirty_page_list.h"
 #include "src/storage/f2fs/vnode.h"
@@ -281,15 +282,16 @@ class F2fs final {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
 
-  zx::result<std::vector<LockedPage>> MakeReadOperations(std::vector<LockedPage> pages,
-                                                         std::vector<block_t> addrs, PageType type,
-                                                         bool is_sync = true);
-  zx::result<LockedPage> MakeReadOperation(LockedPage page, block_t blk_addr, PageType type,
-                                           bool is_sync = true);
+  zx::result<> MakeReadOperations(std::vector<LockedPage> &pages, std::vector<block_t> &addrs,
+                                  PageType type, bool is_sync = true);
+  zx::result<> MakeReadOperation(LockedPage &page, block_t blk_addr, PageType type,
+                                 bool is_sync = true);
+  zx::result<> MakeReadOperations(zx::vmo &vmo, std::vector<block_t> &addrs, PageType type,
+                                  bool is_sync = true);
   zx_status_t MakeTrimOperation(block_t blk_addr, block_t nblocks) const;
 
   void ScheduleWriter(sync_completion_t *completion = nullptr, PageList pages = {}) {
-    writer_->ScheduleSubmitPages(completion, std::move(pages));
+    writer_->ScheduleWriteBlocks(completion, std::move(pages));
   }
 
   void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);

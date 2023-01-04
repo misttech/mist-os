@@ -192,25 +192,48 @@ bool F2fs::IsValid() const {
 }
 
 // Fill the locked page with data located in the block address.
-zx::result<LockedPage> F2fs::MakeReadOperation(LockedPage page, block_t blk_addr, PageType type,
-                                               bool is_sync) {
+zx::result<> F2fs::MakeReadOperation(LockedPage& page, block_t blk_addr, PageType type,
+                                     bool is_sync) {
   if (page->IsUptodate()) {
-    return zx::ok(std::move(page));
+    return zx::ok();
   }
   std::vector<block_t> addrs = {blk_addr};
   std::vector<LockedPage> pages;
-  pages.push_back(std::move(page));
-  auto pages_or = MakeReadOperations(std::move(pages), std::move(addrs), type, is_sync);
-  if (pages_or.is_error()) {
-    return pages_or.take_error();
+  pages.emplace_back(page.CopyRefPtr(), false);
+  auto status = MakeReadOperations(pages, addrs, type, is_sync);
+  [[maybe_unused]] auto locked_page = pages[0].release(false);
+  if (status.is_error()) {
+    return status.take_error();
   }
-  return zx::ok(std::move((*pages_or)[0]));
+  return zx::ok();
 }
 
-zx::result<std::vector<LockedPage>> F2fs::MakeReadOperations(std::vector<LockedPage> pages,
-                                                             std::vector<block_t> addrs,
-                                                             PageType type, bool is_sync) {
-  return reader_->SubmitPages(std::move(pages), std::move(addrs));
+zx::result<> F2fs::MakeReadOperations(zx::vmo& vmo, std::vector<block_t>& addrs, PageType type,
+                                      bool is_sync) {
+  auto ret = reader_->ReadBlocks(vmo, addrs);
+  if (ret.is_error()) {
+    FX_LOGS(WARNING) << "failed to read blocks. " << ret.status_string();
+    if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
+      // It is not available when the block device is ZX_ERR_UNAVAILABLE or
+      // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
+      GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+    }
+  }
+  return ret;
+}
+
+zx::result<> F2fs::MakeReadOperations(std::vector<LockedPage>& pages, std::vector<block_t>& addrs,
+                                      PageType type, bool is_sync) {
+  auto ret = reader_->ReadBlocks(pages, addrs);
+  if (ret.is_error()) {
+    FX_LOGS(WARNING) << "failed to read blocks. " << ret.status_string();
+    if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
+      // It is not available when the block device is ZX_ERR_UNAVAILABLE or
+      // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
+      GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+    }
+  }
+  return ret;
 }
 
 zx_status_t F2fs::MakeTrimOperation(block_t blk_addr, block_t nblocks) const {

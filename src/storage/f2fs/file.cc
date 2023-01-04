@@ -293,45 +293,6 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 // }
 #endif
 
-pgoff_t File::GetReadaheadSize(size_t off, size_t len) {
-  const pgoff_t block_index_start = safemath::CheckDiv<pgoff_t>(off, kBlockSize).ValueOrDie();
-  const size_t offset_end = safemath::CheckAdd<size_t>(off, len).ValueOrDie();
-  const pgoff_t block_index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
-  const pgoff_t last_page = CheckedDivRoundUp<pgoff_t>(GetSize(), kBlockSize);
-  const pgoff_t request_size = block_index_end - block_index_start;
-
-  bool check_readahead = [&]() {
-    if (request_size >= kDefaultReadaheadSize) {
-      return false;
-    }
-
-    fbl::RefPtr<Page> first_page;
-    if (auto err = FindPage(block_index_start, &first_page); err == ZX_ERR_NOT_FOUND) {
-      // Start of file
-      if (off == 0) {
-        return true;
-      }
-
-      // Query the file cache and look for the traces(cached history pages) that a sequential stream
-      // would leave behind.
-      return CountContiguousPagesOnFileCache(block_index_start, request_size * 2) >=
-             request_size * 2;
-    }
-
-    return false;
-  }();
-
-  pgoff_t readahead_size = request_size;
-  if (check_readahead) {
-    readahead_size = kDefaultReadaheadSize;
-    if (block_index_start + readahead_size > last_page) {
-      readahead_size = last_page - block_index_start;
-    }
-  }
-  ZX_DEBUG_ASSERT(readahead_size >= request_size);
-  return readahead_size;
-}
-
 zx_status_t File::Read(void *data, size_t len, size_t off, size_t *out_actual) {
   TRACE_DURATION("f2fs", "File::Read", "event", "File::Read", "ino", Ino(), "offset",
                  off / kBlockSize, "length", len / kBlockSize);
@@ -353,9 +314,7 @@ zx_status_t File::Read(void *data, size_t len, size_t off, size_t *out_actual) {
   size_t off_in_buf = 0;
   size_t left = std::min(len, GetSize() - off);
 
-  pgoff_t read_size = GetReadaheadSize(off, len);
-
-  auto pages_or = GetLockedDataPages(block_index_start, block_index_start + read_size);
+  auto pages_or = GetLockedDataPages(block_index_start, block_index_end);
   if (pages_or.is_error()) {
     *out_actual = 0;
     return pages_or.status_value();
@@ -531,4 +490,17 @@ loff_t File::MaxFileSize(unsigned bits) {
   result <<= bits;
   return result;
 }
+
+zx_status_t File::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
+  if (flags & fuchsia_io::wire::VmoFlags::kExecute) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  // mmapped vnodes are not allowed to have inline data.
+  if (TestFlag(InodeInfoFlag::kInlineData)) {
+    ConvertInlineData();
+  }
+  return VnodeF2fs::GetVmo(flags, out_vmo);
+}
+
 }  // namespace f2fs

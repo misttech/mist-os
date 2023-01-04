@@ -361,7 +361,7 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
   return ZX_OK;
 }
 
-uint8_t *File::InlineDataPtr(Page *page) {
+uint8_t *VnodeF2fs::InlineDataPtr(Page *page) {
   Node *rn = page->GetAddress<Node>();
   Inode &ri = rn->i;
   return reinterpret_cast<uint8_t *>(
@@ -385,14 +385,20 @@ zx_status_t File::ReadInline(void *data, size_t len, size_t off, size_t *out_act
 
 zx_status_t File::ConvertInlineData() {
   LockedPage page;
-  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
-    return ret;
+  if (TestFlag(InodeInfoFlag::kDataExist)) {
+    if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
+      return ret;
+    }
   }
 
   LockedPage dnode_page;
   if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, 0, &dnode_page);
       err != ZX_OK) {
     return err;
+  }
+
+  if (!TestFlag(InodeInfoFlag::kInlineData)) {
+    return ZX_OK;
   }
 
   uint32_t ofs_in_dnode;
@@ -410,16 +416,16 @@ zx_status_t File::ConvertInlineData() {
     return err;
   }
 
-  page->WaitOnWriteback();
-  page->ZeroUserSegment();
+  if (TestFlag(InodeInfoFlag::kDataExist)) {
+    uint8_t *inline_data = InlineDataPtr(ipage);
+    page->WaitOnWriteback();
+    memcpy(page->GetAddress(), inline_data, GetSize());
+    page->ZeroUserSegment(GetSize());
+    page.SetDirty();
 
-  uint8_t *inline_data = InlineDataPtr(ipage);
-  memcpy(page->GetAddress(), inline_data, GetSize());
-
-  page.SetDirty();
-
-  ipage->WaitOnWriteback();
-  ipage->ZeroUserSegment(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
+    ipage->WaitOnWriteback();
+    ipage->ZeroUserSegment(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
+  }
   ClearFlag(InodeInfoFlag::kInlineData);
   ClearFlag(InodeInfoFlag::kDataExist);
 
@@ -429,10 +435,6 @@ zx_status_t File::ConvertInlineData() {
 }
 
 zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_t *out_actual) {
-  LockedPage page;
-  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
-    return ret;
-  }
   LockedPage inline_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
     return ret;
@@ -442,8 +444,6 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
 
   uint8_t *inline_data = InlineDataPtr(inline_page.get());
   memcpy(inline_data + offset, static_cast<const uint8_t *>(data), len);
-  // Apply changes to its paged VMO.
-  memcpy(page->GetAddress<uint8_t>() + offset, inline_data + offset, len);
 
   SetSize(std::max(static_cast<size_t>(GetSize()), offset + len));
   SetFlag(InodeInfoFlag::kDataExist);
@@ -461,10 +461,6 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
 }
 
 zx_status_t File::TruncateInline(size_t len, bool is_recover) {
-  LockedPage page;
-  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
-    return ret;
-  }
   LockedPage inline_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
     return ret;
@@ -476,8 +472,6 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
   size_t size_diff = (len > GetSize()) ? (len - GetSize()) : (GetSize() - len);
   size_t offset = ((len > GetSize()) ? GetSize() : len);
   memset(inline_data + offset, 0, size_diff);
-  // Apply changes to its paged VMO.
-  memset(page->GetAddress<uint8_t>() + offset, 0, size_diff);
 
   // When removing inline data during recovery, file size should not be modified.
   if (!is_recover) {

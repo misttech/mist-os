@@ -79,19 +79,18 @@ class VnodeF2fs : public fs::PagedVnode,
                                      fs::VnodeRepresentation *info) final;
 
   // For fs::PagedVnode
-  zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) final
+  virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override
       __TA_EXCLUDES(mutex_);
   void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
   void VmoDirty(uint64_t offset, uint64_t length) final {
     FX_LOGS(ERROR) << "Unsupported VmoDirty.";
   }
-  zx::result<zx::vmo> CreateAndPopulateVmo(const size_t offset, const size_t length)
+  zx::result<size_t> CreateAndPopulateVmo(zx::vmo &vmo, const size_t offset, const size_t length)
       __TA_EXCLUDES(mutex_);
   void OnNoPagedVmoClones() final __TA_REQUIRES(mutex_);
 
-  zx_status_t InvalidatePagedVmo(uint64_t offset, size_t len) __TA_EXCLUDES(mutex_);
+  void ReleasePagedVmoUnsafe() __TA_REQUIRES(mutex_);
   void ReleasePagedVmo() __TA_EXCLUDES(mutex_);
-  zx::result<bool> ReleasePagedVmoUnsafe() __TA_REQUIRES(mutex_);
 
 #if 0  // porting needed
   // void F2fsSetInodeFlags();
@@ -337,6 +336,7 @@ class VnodeF2fs : public fs::PagedVnode,
   void ClearXattrNid() { xattr_nid_ = 0; }
   uint16_t GetInlineXattrAddrs() const { return inline_xattr_size_; }
   void SetInlineXattrAddrs(const uint16_t addrs) { inline_xattr_size_ = addrs; }
+  uint8_t *InlineDataPtr(Page *page);
 
   uint16_t GetExtraISize() const { return extra_isize_; }
   void SetExtraISize(const uint16_t size) { extra_isize_ = size; }
@@ -400,14 +400,15 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetPages(page_offsets);
   }
 
-  uint64_t CountContiguousPagesOnFileCache(pgoff_t index, uint64_t max_scan) {
-    return file_cache_->CountContiguousPages(index, max_scan);
+  std::vector<bool> GetReadaheadPagesInfo(pgoff_t index, uint64_t max_scan) {
+    return file_cache_->GetReadaheadPagesInfo(index, max_scan);
   }
 
   pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
     return file_cache_->InvalidatePages(start, end);
   }
+  void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
   void ClearDirtyPages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
     if (!file_cache_->SetOrphan()) {
       file_cache_->ClearDirtyPages(start, end);

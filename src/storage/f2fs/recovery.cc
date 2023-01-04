@@ -269,12 +269,11 @@ void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
       return;
     }
 
-    auto page_or = MakeReadOperation(std::move(page), blkaddr, PageType::kNode);
-    if (page_or.is_error()) {
+    auto status = MakeReadOperation(page, blkaddr, PageType::kNode);
+    if (status.is_error()) {
       break;
     }
 
-    page = std::move(*page_or);
     if (cp_ver != page.GetPage<NodePage>().CpverOfNode()) {
       break;
     }

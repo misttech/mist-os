@@ -181,20 +181,27 @@ zx_status_t VnodeF2fs::FindDataPage(pgoff_t index, fbl::RefPtr<Page> *out) {
     return ZX_ERR_NOT_FOUND;
 
   // By fallocate(), there is no cached page, but with kNewAddr
-  if (data_blkaddr == kNewAddr)
+  if (data_blkaddr == kNewAddr) {
     return ZX_ERR_INVALID_ARGS;
+  }
 
   LockedPage locked_page;
   if (zx_status_t err = GrabCachePage(index, &locked_page); err != ZX_OK) {
     return err;
   }
 
-  auto page_or = fs()->MakeReadOperation(std::move(locked_page), data_blkaddr, PageType::kData);
-  if (page_or.is_error()) {
-    return page_or.status_value();
+  if (IsReg()) {
+    locked_page->SetUptodate();
+    *out = locked_page.release();
+    return ZX_OK;
   }
 
-  *out = (*page_or).release();
+  auto status = fs()->MakeReadOperation(locked_page, data_blkaddr, PageType::kData);
+  if (status.is_error()) {
+    return status.status_value();
+  }
+
+  *out = locked_page.release();
   return ZX_OK;
 }
 
@@ -282,6 +289,15 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::GetLockedDataPages(const pgoff_t 
     return zx::ok(std::move(addrs_and_pages.pages));
   }
 
+  if (IsReg()) {
+    for (uint32_t i = 0; i < addrs_and_pages.block_addrs.size(); ++i) {
+      if (addrs_and_pages.block_addrs[i] != kNullAddr && !addrs_and_pages.pages[i]->IsUptodate()) {
+        addrs_and_pages.pages[i]->SetUptodate();
+      }
+    }
+    return zx::ok(std::move(addrs_and_pages.pages));
+  }
+
   bool need_read_op = false;
   for (uint32_t i = 0; i < addrs_and_pages.block_addrs.size(); ++i) {
     if (addrs_and_pages.block_addrs[i] != kNullAddr && !addrs_and_pages.pages[i]->IsUptodate()) {
@@ -293,13 +309,13 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::GetLockedDataPages(const pgoff_t 
     return zx::ok(std::move(addrs_and_pages.pages));
   }
 
-  auto pages_or = fs()->MakeReadOperations(std::move(addrs_and_pages.pages),
-                                           std::move(addrs_and_pages.block_addrs), PageType::kData);
-  if (pages_or.is_error()) {
-    return pages_or.take_error();
+  auto status =
+      fs()->MakeReadOperations(addrs_and_pages.pages, addrs_and_pages.block_addrs, PageType::kData);
+  if (status.is_error()) {
+    return status.take_error();
   }
 
-  return pages_or.take_value();
+  return zx::ok(std::move(addrs_and_pages.pages));
 }
 
 // Caller ensures that this data page is never allocated.
@@ -340,9 +356,12 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
     return ZX_OK;
   }
 
-  auto page_or = fs()->MakeReadOperation(std::move(page), data_blkaddr, PageType::kData);
-  if (page_or.is_error()) {
-    return page_or.status_value();
+  if (data_blkaddr == kNewAddr) {
+    page->SetUptodate();
+    page->ZeroUserSegment();
+  } else {
+    ZX_ASSERT_MSG(data_blkaddr == kNewAddr, "%lu page should have kNewAddr but (0x%x)",
+                  page->GetKey(), data_blkaddr);
   }
 
   if (new_i_size && GetSize() < ((index + 1) << kPageCacheShift)) {
@@ -352,7 +371,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
     MarkInodeDirty();
   }
 
-  *out = std::move(*page_or);
+  *out = std::move(page);
   return ZX_OK;
 }
 
@@ -514,43 +533,6 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
     return result.take_error();
   } else {
     data_block_addresses = std::move(result.value());
-  }
-
-  std::vector<LockedPage> read_pages;
-  std::vector<block_t> read_addrs;
-  bool read_front_page = false, read_rear_page = false;
-  if (offset % kBlockSize) {
-    if (data_block_addresses.front() == kNewAddr && !data_pages.front()->IsUptodate()) {
-      data_pages.front()->ZeroUserSegment(0, offset % kBlockSize);
-    } else {
-      read_front_page = true;
-      read_pages.push_back(std::move(data_pages.front()));
-      read_addrs.emplace_back(data_block_addresses.front());
-    }
-  }
-  if (offset_end % kBlockSize) {
-    if (data_block_addresses.size() > 1 || !read_front_page) {
-      if (data_block_addresses.back() == kNewAddr && !data_pages.back()->IsUptodate()) {
-        data_pages.back()->ZeroUserSegment(offset_end % kBlockSize);
-      } else {
-        read_rear_page = true;
-        read_pages.push_back(std::move(data_pages.back()));
-        read_addrs.emplace_back(data_block_addresses.back());
-      }
-    }
-  }
-  if (read_pages.size()) {
-    auto pages_or =
-        fs()->MakeReadOperations(std::move(read_pages), std::move(read_addrs), PageType::kData);
-    if (pages_or.is_error()) {
-      return pages_or.take_error();
-    }
-    if (read_front_page) {
-      data_pages.front() = std::move((*pages_or).front());
-    }
-    if (read_rear_page) {
-      data_pages.back() = std::move((*pages_or).back());
-    }
   }
 
   return zx::ok(std::move(data_pages));

@@ -291,7 +291,9 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
     }
 
     node_page->WaitOnWriteback();
+    auto make_dirty = node_page->GetAddress<uint8_t>()[0];
     node_page.SetDirty();
+    node_page->GetAddress<uint8_t>()[0] = make_dirty;
   }
 
   return ZX_OK;
@@ -387,8 +389,10 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     data_page->WaitOnWriteback();
     // No need to add |data_page| to F2fs::dirty_data_page_list_ as victim Pages will be flushed
     // after this loop.
+    uint8_t make_dirty = data_page->GetAddress<uint8_t>()[0];
     data_page.SetDirty(false);
     data_page->SetColdData();
+    data_page->GetAddress<uint8_t>()[0] = make_dirty;
     if (gc_type == GcType::kFgGc) {
       // If |data_page| is already in the list, remove it.
       [[maybe_unused]] auto page = fs_->GetDirtyDataPageList().RemoveDirty(data_page);

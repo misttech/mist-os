@@ -260,12 +260,12 @@ TEST_F(MmapTest, VmoRead) {
     character = static_cast<uint8_t>(rand());
   }
 
+  // trigger page fault to invoke Vnode::VmoRead()
   FileTester::AppendToFile(test_file_ptr, write_buf, PAGE_SIZE);
 
   zx::vmo vmo;
   uint8_t read_buf[PAGE_SIZE];
   ASSERT_EQ(test_vnode->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo), ZX_OK);
-  test_vnode->VmoRead(0, PAGE_SIZE);
   vmo.read(read_buf, 0, PAGE_SIZE);
   vmo.reset();
   loop_.RunUntilIdle();
@@ -290,6 +290,7 @@ TEST_F(MmapTest, VmoReadException) {
     character = static_cast<uint8_t>(rand());
   }
 
+  // trigger page fault to invoke Vnode::VmoRead()
   FileTester::AppendToFile(test_file_ptr, write_buf, PAGE_SIZE);
 
   zx::vmo vmo;
@@ -297,7 +298,6 @@ TEST_F(MmapTest, VmoReadException) {
   ASSERT_EQ(test_vnode->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo), ZX_OK);
   vmo.reset();
   loop_.RunUntilIdle();
-  test_vnode->VmoRead(0, PAGE_SIZE);
 
   ASSERT_NE(memcmp(read_buf, write_buf, PAGE_SIZE), 0);
 
@@ -324,14 +324,12 @@ TEST_F(MmapTest, VmoReadSizeException) {
   zx::vmo vmo;
   uint8_t read_buf[PAGE_SIZE];
   ASSERT_EQ(test_vnode->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo), ZX_OK);
-  test_vnode->VmoRead(0, PAGE_SIZE);
   vmo.read(read_buf, 0, PAGE_SIZE);
   ASSERT_EQ(memcmp(read_buf, write_buf, PAGE_SIZE), 0);
 
   // Append to file after mmap
   FileTester::AppendToFile(test_file_ptr, write_buf, PAGE_SIZE);
   memset(read_buf, 0, PAGE_SIZE);
-  test_vnode->VmoRead(PAGE_SIZE, PAGE_SIZE);
   vmo.read(read_buf, PAGE_SIZE, PAGE_SIZE);
   ASSERT_NE(memcmp(read_buf, write_buf, PAGE_SIZE), 0);
 
@@ -356,6 +354,7 @@ TEST_F(MmapTest, AvoidPagedVmoRaceCondition) {
     character = static_cast<uint8_t>(rand());
   }
 
+  // trigger page fault to invoke Vnode::VmoRead()
   FileTester::AppendToFile(test_file_ptr, write_buf, PAGE_SIZE);
 
   // Clone a VMO from pager-backed VMO
@@ -366,11 +365,11 @@ TEST_F(MmapTest, AvoidPagedVmoRaceCondition) {
   vmo.reset();
   loop_.RunUntilIdle();
 
-  // Make sure pager-backed VMO is not freed
+  // Make sure pager-backed VMO is not freed without any clones
   ASSERT_EQ(test_vnode->HasPagedVmo(), true);
 
-  // Request a page fault assuming a race condition
-  test_vnode->VmoRead(0, PAGE_SIZE);
+  // it should be able to handle page fault without any clones
+  FileTester::AppendToFile(test_file_ptr, write_buf, PAGE_SIZE);
 
   // Make sure pager-backed VMO is not freed
   ASSERT_EQ(test_vnode->HasPagedVmo(), true);

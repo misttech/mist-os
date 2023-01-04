@@ -677,7 +677,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   // [prev.] [next] of inline_data flag
   //    o       o  -> 1. recover inline_data
   //    o       x  -> 2. remove inline_data, and then recover data blocks
-  //    x       o  -> 3. remove data blocks, and then recover inline_data (TODO)
 
   // 1. recover inline_data
   // Inline file creation
@@ -712,7 +711,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   inline_vnode = nullptr;
   ASSERT_EQ(root_dir->Close(), ZX_OK);
   root_dir = nullptr;
-
   // SPO and remount with roll-forward recovery
   FileTester::SuddenPowerOff(std::move(fs), &bc);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
@@ -762,40 +760,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
   FileTester::ReadFromFile(inline_file_ptr, r_buf, target_size, 0);
   ASSERT_EQ(memcmp(r_buf, w_buf, target_size), 0);
-
-  // TODO: We should consider converting data blocks to inline data.
-  // 3. remove inline_data, and then recover inline_data
-  // Truncate one byte, then it should be converted to inline
-  // target_size = inline_file_ptr->MaxInlineData() - 1;
-
-  // inline_vnode->Truncate(target_size);
-  // FileTester::CheckInlineFile(inline_vnode.get());
-  // ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
-
-  // ASSERT_EQ(inline_vnode->SyncFile(0, safemath::checked_cast<loff_t>(inline_vnode->GetSize()),
-  // 0),
-  //           ZX_OK);
-
-  // inline_file_ptr = nullptr;
-  // ASSERT_EQ(inline_vnode->Close(), ZX_OK);
-  // inline_vnode = nullptr;
-  // ASSERT_EQ(root_dir->Close(), ZX_OK);
-  // root_dir = nullptr;
-
-  // // SPO and remount with roll-forward recovery
-  // FileTester::SuddenPowerOff(std::move(fs), &bc);
-  // FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
-
-  // FileTester::CreateRoot(fs.get(), &root);
-  // root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
-
-  // FileTester::Lookup(root_dir.get(), inline_file_name, &inline_raw_vnode);
-  // inline_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_raw_vnode));
-  // inline_file_ptr = static_cast<File *>(inline_vnode.get());
-  // FileTester::CheckInlineFile(inline_vnode.get());
-
-  // FileTester::ReadFromFile(inline_file_ptr, r_buf, target_size, 0);
-  // ASSERT_EQ(memcmp(r_buf, w_buf, target_size), 0);
 
   inline_file_ptr = nullptr;
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);

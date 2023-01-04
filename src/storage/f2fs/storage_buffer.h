@@ -25,8 +25,8 @@ class VmoBufferKey : public fbl::DoublyLinkedListable<std::unique_ptr<VmoBufferK
   const uint64_t vmo_offset_;
 };
 
-class PageOperations;
-using VmoKeyList = fbl::DoublyLinkedList<std::unique_ptr<VmoBufferKey>>;
+class StorageOperations;
+using VmoKeyList = fbl::SizedDoublyLinkedList<std::unique_ptr<VmoBufferKey>>;
 
 // StorageBuffer implements an allocator for pre-allocated vmo buffers attached to a VmoidRegistry
 // object. When there are available buffers in the free list, allocation operations are O(1). If the
@@ -46,96 +46,69 @@ class StorageBuffer {
   StorageBuffer &operator=(const StorageBuffer &&) = delete;
   ~StorageBuffer();
 
-  // It tries to reserve |buffer_| for |page| subject to writeback. If successful,
-  // it pushes |page| to |io_pages_| after copying its contents to the reserved buffer.
-  // To allow readers to access |page| during writeback, it expects that |page| is unlocked
-  // with kWriteback flag set before. Any writers who want to access |page| wait for
-  // its writeback by calling Page::WaitOnWriteback(), but readers are free to
-  // access to it.
-  zx::result<size_t> ReserveWriteOperation(fbl::RefPtr<Page> page) __TA_EXCLUDES(mutex_);
-  // It sorts out which Pages need to transfer to fs::TransactionHandler and tries to reserve
-  // |buffer_| for the Pages for read I/Os. If successful, it returns PageOpeartions that
-  // convey BufferedOperations and the refptr of the Pages for read I/Os.
-  zx::result<PageOperations> ReserveReadOperations(std::vector<LockedPage> &pages,
-                                                   const std::vector<block_t> &addrs)
+  // It tries to reserve |buffer_| for |page| for writeback. If successful,
+  // it copies the contents of |page| to the reserved buffer.
+  zx::result<size_t> ReserveWriteOperation(Page &page) __TA_EXCLUDES(mutex_);
+  // It returns StorageOperations from |reserved_keys_| and |builder| for writeback.
+  StorageOperations TakeWriteOperations() __TA_EXCLUDES(mutex_);
+
+  // It tries to reserve |buffer_| for read I/Os. If successful, it returns StorageOpeartions that
+  // convey BufferedOperations to read blocks for |addrs|.
+  zx::result<StorageOperations> MakeReadOperations(const std::vector<block_t> &addrs)
       __TA_EXCLUDES(mutex_);
 
-  void ReleaseReadBuffers(const PageOperations &operation, const zx_status_t io_status)
-      __TA_EXCLUDES(mutex_);
-  void ReleaseWriteBuffers(const PageOperations &operation, const zx_status_t io_status)
-      __TA_EXCLUDES(mutex_);
-  // It returns PageOperations that convey BufferedOperations and |pages_| for write I/Os.
-  PageOperations TakeWriteOperations() __TA_EXCLUDES(mutex_);
+  void ReleaseBuffers(const StorageOperations &operation) __TA_EXCLUDES(mutex_);
+  const void *Data(const size_t offset) const {
+    ZX_ASSERT(offset < buffer_.capacity());
+    return buffer_.Data(offset);
+  }
 
  private:
   void Init() __TA_EXCLUDES(mutex_);
   const uint64_t max_blocks_;
   const uint32_t allocation_unit_;
-#ifdef __Fuchsia__
   storage::VmoBuffer buffer_;
-#else
-  storage::ArrayBuffer buffer_;
-#endif
   fs::BufferedOperationsBuilder builder_ __TA_GUARDED(mutex_);
-  std::vector<fbl::RefPtr<Page>> pages_ __TA_GUARDED(mutex_);
-  VmoKeyList free_list_ __TA_GUARDED(mutex_);
-  VmoKeyList inflight_list_ __TA_GUARDED(mutex_);
+  VmoKeyList free_keys_ __TA_GUARDED(mutex_);
+  VmoKeyList reserved_keys_ __TA_GUARDED(mutex_);
   std::condition_variable_any cvar_;
   fs::SharedMutex mutex_;
 };
 
-using PageOperationCallback = fit::function<void(const PageOperations &, const zx_status_t)>;
+using OperationCallback = fit::function<void(const StorageOperations &, zx_status_t status)>;
 // A utility class, holding a collection of write requests with data buffers of
 // StorageBuffer, ready to be transmitted to persistent storage.
-class PageOperations {
+class StorageOperations {
  public:
-  PageOperations() = delete;
-  PageOperations(std::vector<storage::BufferedOperation> operations,
-                 std::vector<fbl::RefPtr<Page>> io_pages, VmoKeyList list,
-                 PageOperationCallback io_completion)
-      : operations_(std::move(operations)),
-        io_pages_(std::move(io_pages)),
-        io_completion_(std::move(io_completion)),
-        list_(std::move(list)) {}
-  PageOperations(const PageOperations &operations) = delete;
-  PageOperations &operator=(const PageOperations &) = delete;
-  PageOperations(const PageOperations &&op) = delete;
-  PageOperations &operator=(const PageOperations &&) = delete;
-  PageOperations(PageOperations &&op) = default;
-  PageOperations &operator=(PageOperations &&) = default;
-  ~PageOperations() {
-    ZX_DEBUG_ASSERT(io_pages_.empty());
-    ZX_DEBUG_ASSERT(operations_.empty());
-    ZX_DEBUG_ASSERT(list_.is_empty());
-  }
+  StorageOperations() = delete;
+  StorageOperations(StorageBuffer &buffer, fs::BufferedOperationsBuilder &operations,
+                    VmoKeyList &keys)
+      : buffer_(buffer), operations_(operations.TakeOperations()), keys_(std::move(keys)) {}
+  StorageOperations(const StorageOperations &operations) = delete;
+  StorageOperations &operator=(const StorageOperations &) = delete;
+  StorageOperations(const StorageOperations &&op) = delete;
+  StorageOperations &operator=(const StorageOperations &&) = delete;
+  StorageOperations(StorageOperations &&op) = default;
+  StorageOperations &operator=(StorageOperations &&) = delete;
+  ~StorageOperations() { ZX_DEBUG_ASSERT(keys_.is_empty()); }
 
   std::vector<storage::BufferedOperation> TakeOperations() { return std::move(operations_); }
-  zx::result<> PopulatePage(void *data, size_t page_index) const {
-    if (page_index >= io_pages_.size()) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    std::memcpy(io_pages_[page_index]->GetAddress(), data, io_pages_[page_index]->BlockSize());
-    return zx::ok();
+
+  // When StorageOperations complete, Reader or Writer should call it to release storage
+  // buffers and handle the IO completion in |callback|.
+  zx_status_t Completion(zx_status_t io_status, OperationCallback callback) {
+    callback(*this, io_status);
+    buffer_.ReleaseBuffers(*this);
+    return io_status;
   }
-  // When the IOs for PageOperations complete, Reader or Writer calls it to release storage buffers
-  // and handle the IO completion with |io_pages_| according to |io_status|.
-  void Completion(zx_status_t io_status, PageCallback put_page) {
-    io_completion_(*this, io_status);
-    for (auto &page : io_pages_) {
-      put_page(std::move(page));
-    }
-    io_pages_.clear();
-    io_pages_.shrink_to_fit();
-  }
-  bool IsEmpty() const { return io_pages_.empty(); }
-  VmoKeyList TakeVmoKeys() const { return std::move(list_); }
-  size_t GetSize() const { return io_pages_.size(); }
+  bool IsEmpty() const { return keys_.is_empty(); }
+  VmoKeyList TakeVmoKeys() const { return std::move(keys_); }
+  VmoKeyList &VmoKeys() const { return keys_; }
 
  private:
+  StorageBuffer &buffer_;
   std::vector<storage::BufferedOperation> operations_;
-  mutable std::vector<fbl::RefPtr<Page>> io_pages_;
-  PageOperationCallback io_completion_;
-  mutable VmoKeyList list_;
+  mutable VmoKeyList keys_;
 };
 
 }  // namespace f2fs

@@ -5,19 +5,13 @@
 #ifndef SRC_STORAGE_F2FS_WRITEBACK_H_
 #define SRC_STORAGE_F2FS_WRITEBACK_H_
 
-#ifdef __Fuchsia__
 #include "src/lib/storage/vfs/cpp/journal/background_executor.h"
-#else  // __Fuchsia__
-#include <lib/fpromise/promise.h>
-#include <lib/fpromise/single_threaded_executor.h>
-
-#include <storage/buffer/array_buffer.h>
-#endif  // __Fuchsia__
 
 namespace f2fs {
 
 // F2fs flushes dirty pages when the number of dirty data pages exceeds a half of
 // |kMaxDirtyDataPages|.
+// TODO: When memorypressure is available with tests, we can remove it.
 constexpr int kMaxDirtyDataPages = 51200;
 
 // This class is final because there might be background threads running when its destructor runs
@@ -33,49 +27,33 @@ class Writer final {
   Writer &operator=(const Writer &&) = delete;
   ~Writer();
 
-  void ScheduleTask(fpromise::promise<> task);
+  // For writeback tasks. Refer to F2fs::ScheduleWriteback().
   void ScheduleWriteback(fpromise::promise<> task);
-  // It schedules SubmitPages().
-  // If |completion| is set, it notifies the caller of the |pages| write completion.
-  void ScheduleSubmitPages(sync_completion_t *completion = nullptr, PageList pages = {});
-
-  // It merges Pages to be written.
-  zx::result<> EnqueuePages() __TA_EXCLUDES(mutex_);
+  // It moves |pages| to |pages_| and schedules a task to request write I/Os for |pages_|.
+  // If |completion| is set, it notifies the caller when the task is completed.
+  void ScheduleWriteBlocks(sync_completion_t *completion = nullptr, PageList pages = {});
 
  private:
-  // It takes write operations from |writer_buffer_| and passes them to RunReqeusts()
-  // asynchronously. When the operations are complete, it wakes waiters on the completion of
-  // the Page writes.
-  fpromise::promise<> SubmitPages(sync_completion_t *completion);
+  // It returns a task to be scheduled on |executor_| for write IOs.
+  // The task builds StorageOperations for write requests of |pages_| and passes them to
+  // RunRequests(). When RunRequests() is completed, it wakes waiters who tried to write the
+  // writeback pages that StorageOperations conveys. In addition, it signals |completion| if
+  // it is not null.
+  fpromise::promise<> GetTaskForWriteIO(sync_completion_t *completion);
+  StorageOperations MakeStorageOperations(PageList &to_submit) __TA_EXCLUDES(mutex_);
+
+  // For disk write IO tasks.
+  void ScheduleTask(fpromise::promise<> task);
 
   std::mutex mutex_;
   PageList pages_ __TA_GUARDED(mutex_);
   std::unique_ptr<StorageBuffer> write_buffer_;
   fs::TransactionHandler *transaction_handler_ = nullptr;
-#ifdef __Fuchsia__
   fpromise::sequencer sequencer_;
+  // An executor to run tasks for disk write IOs.
   fs::BackgroundExecutor executor_;
+  // An executor to run writeback tasks. Refer to F2fs::ScheduleWriteback().
   fs::BackgroundExecutor writeback_executor_;
-#endif  // __Fuchsia__
-};
-
-class Reader {
- public:
-  Reader(Bcache *bc, size_t capacity);
-  Reader() = delete;
-  Reader(const Reader &) = delete;
-  Reader &operator=(const Reader &) = delete;
-  Reader(const Reader &&) = delete;
-  Reader &operator=(const Reader &&) = delete;
-
-  // It makes read operations from |writer_buffer_| and passes them to RunReqeusts()
-  // synchronously.
-  zx::result<std::vector<LockedPage>> SubmitPages(std::vector<LockedPage> pages,
-                                                  std::vector<block_t> addrs);
-
- private:
-  fs::TransactionHandler *transaction_handler_ = nullptr;
-  std::unique_ptr<StorageBuffer> buffer_;
 };
 
 }  // namespace f2fs

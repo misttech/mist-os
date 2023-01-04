@@ -36,6 +36,8 @@ static_library("f2fs") {
     "node.h",
     "node_page.cc",
     "node_page.h",
+    "reader.cc",
+    "reader.h",
     "recovery.cc",
     "runner.cc",
     "runner.h",
@@ -77,12 +79,6 @@ static_library("f2fs") {
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
-
-  if (is_linux) {
-    sources += [ "sync_host.cc" ]
-
-    public += [ "sync_host.h" ]
-  }
 
   if (is_fuchsia) {
     sources += [

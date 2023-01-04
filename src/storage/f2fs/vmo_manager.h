@@ -17,17 +17,16 @@ enum class VmoMode {
   kPaged,
 };
 
-constexpr size_t kMaxFileVmoSize = 4398046511104UL;
 class VmoMapping : public fbl::WAVLTreeContainable<std::unique_ptr<VmoMapping>> {
  public:
   VmoMapping() = delete;
-  explicit VmoMapping(zx::vmo &vmo, pgoff_t index, size_t size);
+  explicit VmoMapping(zx::vmo &vmo, pgoff_t index, size_t size, bool zero);
   virtual ~VmoMapping();
 
   virtual zx::result<bool> Lock(pgoff_t offset) = 0;
   virtual zx_status_t Unlock(pgoff_t offset) = 0;
+  virtual zx_status_t Zero(pgoff_t start, pgoff_t len) = 0;
 
-  void Zero(pgoff_t offset);
   zx::result<zx_vaddr_t> GetAddress(pgoff_t offset) const;
   pgoff_t GetKey() const { return index(); }
   uint64_t GetActivePages() const { return active_pages(); }
@@ -62,32 +61,37 @@ class VmoMapping : public fbl::WAVLTreeContainable<std::unique_ptr<VmoMapping>> 
 class VmoPaged : public VmoMapping {
  public:
   VmoPaged() = delete;
-  explicit VmoPaged(zx::vmo &vmo, pgoff_t index, size_t size);
+  explicit VmoPaged(zx::vmo &vmo, pgoff_t index, size_t size, bool zero);
   ~VmoPaged();
 
   zx::result<bool> Lock(pgoff_t offset) final;
   zx_status_t Unlock(pgoff_t offset) final;
+  zx_status_t Zero(pgoff_t start, pgoff_t len) final;
 };
 
 // It manages the lifecycle of a discardable Vmo that Pages use in each vnode.
-class VmoNode : public VmoMapping {
+class VmoDiscardable : public VmoMapping {
  public:
-  VmoNode() = delete;
-  VmoNode(const VmoNode &) = delete;
-  VmoNode &operator=(const VmoNode &) = delete;
-  VmoNode(const VmoNode &&) = delete;
-  VmoNode &operator=(const VmoNode &&) = delete;
-  explicit VmoNode(zx::vmo &vmo, pgoff_t index, size_t size);
+  VmoDiscardable() = delete;
+  VmoDiscardable(const VmoDiscardable &) = delete;
+  VmoDiscardable &operator=(const VmoDiscardable &) = delete;
+  VmoDiscardable(const VmoDiscardable &&) = delete;
+  VmoDiscardable &operator=(const VmoDiscardable &&) = delete;
+  explicit VmoDiscardable(zx::vmo &vmo, pgoff_t index, size_t size, bool zero);
 
-  ~VmoNode();
+  ~VmoDiscardable();
 
   // It ensures that |vmo_| keeps VMO_OP_LOCK as long as any Pages refer to it
-  // by calling Page::GetPage(). When it needs to reuse |vmo_| that it unlocked due to no
-  // reference to |vmo_|, it tries VMO_OP_TRY_LOCK to check if kernel has reclaimed any pages
-  // of |vmo_|. If so, it does VMO_OP_LOCK to check which pages were decommitted by kernel.
+  // by calling Page::GetPage(). When a valid page gets a new access to a |this|,
+  // it increases VmoMapping::active_pages_, and then decreases VmoMapping::active_pages_
+  // in Unlock() as a active page is truncated. When VmoMapping::active_pages_ reaches
+  // zero, Unlock() does VMO_OP_UNLOCK for page reclaim.
+  // When VmoMapping::active_pages is zero with new page access, it tries VMO_OP_TRY_LOCK
+  // to check which pages kernel has reclaimed.
   zx::result<bool> Lock(pgoff_t offset) final;
   // It unlocks |vmo_| when there is no Page using it.
   zx_status_t Unlock(pgoff_t offset) final;
+  zx_status_t Zero(pgoff_t start, pgoff_t len) final;
 
  private:
   // It tracks which Page has been decommitted by kernel during |vmo_| unlocked.
@@ -102,15 +106,21 @@ class VmoNode : public VmoMapping {
 // VmoMapping::size_in_blocks within the range of a vnode. A vmo node can be configured as a
 // discardable vmo or a part of a paged vmo. The size of a vmo node is set to
 // VmoManager::node_size_in_blocks_, and the va mapping of a vmo node keeps as long as the vmo node
-// is kept in |vmo_tree_| to reduce the cost of mapping operations.
+// is kept in |vmo_tree_|.
 class VmoManager {
  public:
   VmoManager() = delete;
   VmoManager(VmoMode mode, size_t size, zx::vmo vmo = {})
       : mode_(mode), node_size_in_blocks_(size), vmo_(std::move(vmo)) {
     if (vmo_.is_valid()) {
-      ZX_ASSERT(vmo_.get_size(&size_in_blocks_) == ZX_OK);
-      size_in_blocks_ /= kBlockSize;
+      size_t size_in_bytes;
+      ZX_ASSERT(vmo_.get_size(&size_in_bytes) == ZX_OK);
+      size_t new_size_in_bytes =
+          fbl::round_up(size_in_bytes, kBlockSize * kDefaultBlocksPerSegment);
+      size_in_blocks_ = new_size_in_bytes / kBlockSize;
+      if (new_size_in_bytes != size_in_bytes) {
+        ZX_ASSERT(vmo_.set_size(new_size_in_bytes) == ZX_OK);
+      }
     }
   }
   VmoManager(const VmoManager &) = delete;
@@ -122,6 +132,7 @@ class VmoManager {
   zx::result<bool> CreateAndLockVmo(pgoff_t index) __TA_EXCLUDES(mutex_);
   zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
   zx::result<zx_vaddr_t> GetAddress(pgoff_t index) __TA_EXCLUDES(mutex_);
+  zx_status_t ZeroRange(pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
   void Reset(bool shutdown = false) __TA_EXCLUDES(mutex_);
 
  private:
@@ -131,17 +142,17 @@ class VmoManager {
   using VmoTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, VmoMapping>;
   using VmoTree = fbl::WAVLTree<pgoff_t, std::unique_ptr<VmoMapping>, VmoTreeTraits>;
   zx::result<VmoMapping *> FindVmoNodeUnsafe(pgoff_t index) __TA_REQUIRES_SHARED(mutex_);
-  zx::result<VmoMapping *> GetVmoNodeUnsafe(pgoff_t index) __TA_REQUIRES(mutex_);
+  zx::result<VmoMapping *> GetVmoNodeUnsafe(pgoff_t index, bool zero) __TA_REQUIRES(mutex_);
 
   fs::SharedMutex mutex_;
   VmoTree vmo_tree_ __TA_GUARDED(mutex_);
   const VmoMode mode_;
 
   // the maximum file size (4TiB) in blocks
-  size_t size_in_blocks_ = kMaxFileVmoSize / kBlockSize;
+  size_t size_in_blocks_ = 0;
   const size_t node_size_in_blocks_ = 0;
   // a copy of paged vmo
-  zx::vmo vmo_;
+  zx::vmo vmo_ __TA_GUARDED(mutex_);
 };
 
 }  // namespace f2fs

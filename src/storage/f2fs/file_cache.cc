@@ -457,6 +457,8 @@ std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end) {
   {
     std::lock_guard tree_lock(tree_lock_);
     pages = CleanupPagesUnsafe(start, end);
+    // zero the range on the underlying vmo as |pages| have been evicted safely.
+    vmo_manager_->ZeroRange(start, end);
   }
   for (auto &page : pages) {
     if (page->IsDirty()) {
@@ -493,24 +495,43 @@ void FileCache::Reset() {
   vmo_manager_->Reset();
 }
 
-uint64_t FileCache::CountContiguousPages(pgoff_t index, uint64_t max_scan) {
-  if (index == 0) {
-    return 0;
-  }
-
+std::vector<bool> FileCache::GetReadaheadPagesInfo(pgoff_t index, size_t max_scan) {
   std::lock_guard tree_lock(tree_lock_);
+  std::vector<bool> read_blocks;
+  size_t num_read_blocks = kDefaultReadaheadSize;
+  read_blocks.reserve(num_read_blocks);
 
-  auto current_key = index - 1;
-  auto current = page_tree_.find(current_key);
-  uint64_t count = 0;
-  while (current_key >= 0 && current != page_tree_.end() && current_key == current->GetKey() &&
-         current->IsUptodate() && count < max_scan) {
-    --current;
-    --current_key;
-    ++count;
+  if (index > 0) {
+    auto current_key = index - 1;
+    auto current = page_tree_.find(current_key);
+    uint64_t count = 0;
+    while (current_key >= 0 && current != page_tree_.end() && current_key == current->GetKey() &&
+           current->IsUptodate() && count < max_scan) {
+      --current;
+      --current_key;
+      ++count;
+    }
+
+    if (count != max_scan && count != index) {
+      // It fails to detect seq. stream. Set the number of read blocks to 64KiB by default.
+      num_read_blocks = kDefaultReadaheadSize / 2;
+    }
   }
 
-  return count;
+  auto current = page_tree_.find(index);
+  for (size_t i = 0; i < num_read_blocks; ++i) {
+    read_blocks.push_back(true);
+    if (current != page_tree_.end() && current->GetKey() == index + i) {
+      if (current->IsDirty() || current->IsWriteback()) {
+        // no read IOs for dirty pages which are uptodate and pinned.
+        read_blocks[i] = false;
+        // the first page should be subject to read io as it triggers page fault.
+        ZX_ASSERT(i);
+      }
+      ++current;
+    }
+  }
+  return read_blocks;
 }
 
 std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOperation &operation) {
