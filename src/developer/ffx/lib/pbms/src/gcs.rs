@@ -7,49 +7,15 @@
 use {
     crate::AuthFlowChoice,
     anyhow::{bail, Context, Result},
-    errors::ffx_bail,
     gcs::{
         auth,
         client::{Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult},
         error::GcsError,
         gs_url::split_gs_url,
-        token_store::{read_boto_refresh_token, write_boto_refresh_token},
     },
-    std::path::{Path, PathBuf},
+    std::path::Path,
     structured_ui,
 };
-
-/// Returns the path to the .boto (gsutil) configuration file.
-pub(crate) async fn get_boto_path<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<Option<PathBuf>>
-where
-    I: structured_ui::Interface + Sync,
-{
-    tracing::debug!("get_boto_path");
-    if let AuthFlowChoice::Exec(_) = auth_flow {
-        // The .boto file is not used for exec.
-        return Ok(None);
-    }
-    // TODO(fxb/89584): Change to using ffx client Id and consent screen.
-    let boto: Option<PathBuf> =
-        ffx_config::get("flash.gcs.token").await.context("getting flash.gcs.token config value")?;
-    match &boto {
-        Some(boto_path) => {
-            if !boto_path.is_file() {
-                tracing::debug!("missing boto file at {:?}", boto_path);
-                update_refresh_token(&boto_path, auth_flow, ui)
-                    .await
-                    .context("Set up refresh token")?
-            }
-        }
-        None => ffx_bail!(
-            "GCS authentication configuration value \"flash.gcs.token\" not \
-            found. Set this value by running `ffx config set flash.gcs.token <path>` \
-            to the path of the .boto file."
-        ),
-    };
-
-    Ok(boto)
-}
 
 /// Return true if the blob is available.
 ///
@@ -152,21 +118,15 @@ where
         | AuthFlowChoice::Pkce
         | AuthFlowChoice::Oob
         | AuthFlowChoice::Device => {
-            let boto_path = get_boto_path(auth_flow, ui).await?;
-            let path =
-                boto_path.as_ref().expect("A .boto path is required. Please report as a bug.");
-            let refresh_token = read_boto_refresh_token(path).context("reading boto refresh")?;
-            let access_token = match auth::pkce::new_access_token(&refresh_token).await {
+            let credentials = credentials::Credentials::load_or_new().await;
+            let access_token = match auth::new_access_token(&credentials.gcs_credentials()).await {
                 Ok(a) => a,
                 Err(GcsError::NeedNewRefreshToken) => {
-                    update_refresh_token(&path, auth_flow, ui)
-                        .await
-                        .context("Updating refresh token")?;
+                    update_refresh_token(auth_flow, ui).await.context("Updating refresh token")?;
                     // Make one additional attempt now that the refresh token
                     // is updated.
-                    let refresh_token =
-                        read_boto_refresh_token(path).context("reading boto refresh")?;
-                    auth::pkce::new_access_token(&refresh_token).await?
+                    let credentials = credentials::Credentials::load_or_new().await;
+                    auth::new_access_token(&credentials.gcs_credentials()).await?
                 }
                 Err(_) => bail!("Failed to get new access token"),
             };
@@ -250,12 +210,12 @@ where
 /// Prompt the user to visit the OAUTH2 permissions web page and enter a new
 /// authorization code, then convert that to a refresh token and write that
 /// refresh token to the ~/.boto file.
-async fn update_refresh_token<I>(boto_path: &Path, auth_flow: &AuthFlowChoice, ui: &I) -> Result<()>
+async fn update_refresh_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<()>
 where
     I: structured_ui::Interface + Sync,
 {
-    tracing::debug!("update_refresh_token {:?}", boto_path);
-    println!("\nThe refresh token in the {:?} file needs to be updated.", boto_path);
+    tracing::debug!("update_refresh_token");
+    println!("\nThe refresh token needs to be updated.");
     let refresh_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce => {
             auth::pkce::new_refresh_token(ui).await.context("get refresh token")?
@@ -273,24 +233,23 @@ where
             bail!("The refresh token should not be updated when no-auth is used.");
         }
     };
-    tracing::debug!("Writing boto file {:?}", boto_path);
-    write_boto_refresh_token(boto_path, &refresh_token)?;
+    tracing::debug!("Writing credentials");
+    let mut credentials = credentials::Credentials::load_or_new().await;
+    credentials.oauth2.refresh_token = refresh_token.to_string();
+    credentials.save().await.context("writing refresh token")?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use {super::*, tempfile::NamedTempFile};
+    use super::*;
 
     // TODO(fxbug.dev/92773): This test requires mocks for interactivity and
     // https. The test is currently disabled.
     #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_refresh_token() {
-        let temp_file = NamedTempFile::new().expect("temp file");
         let ui = structured_ui::MockUi::new();
-        update_refresh_token(&temp_file.path(), &AuthFlowChoice::Default, &ui)
-            .await
-            .expect("set refresh token");
+        update_refresh_token(&AuthFlowChoice::Default, &ui).await.expect("set refresh token");
     }
 }

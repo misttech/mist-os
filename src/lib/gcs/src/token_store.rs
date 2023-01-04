@@ -11,10 +11,8 @@ use {
     fuchsia_hyper::HttpsClient,
     http::{request, StatusCode},
     hyper::{Body, Method, Request, Response},
-    once_cell::sync::OnceCell,
-    regex::Regex,
     serde_json,
-    std::{fmt, fs, path::Path, string::String},
+    std::{fmt, string::String},
     url::Url,
 };
 
@@ -95,6 +93,7 @@ impl TokenStore {
         if !access_token.is_empty() {
             // Passing the access token over a non-secure path is forbidden.
             if builder.uri_ref().and_then(|x| x.scheme()).map(|x| x.as_str()) == Some("https") {
+                tracing::debug!("maybe_authorize: adding Bearer Authorization");
                 return Ok(builder.header("Authorization", format!("Bearer {}", access_token)));
             }
         }
@@ -115,47 +114,40 @@ impl TokenStore {
         // undesirable leading slash. Trim it if present.
         let object = if object.starts_with('/') { &object[1..] } else { object };
 
-        let res = self
-            .attempt_download(https_client, bucket, object)
-            .await
-            .context("attempt_download")?;
-        match res.status() {
-            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => {
-                Err(GcsError::NeedNewAccessToken.into())
-            }
-            _ => Ok(res),
-        }
-    }
-
-    /// Make one attempt to read content of a stored object (blob) from GCS
-    /// without considering redirects or retries.
-    ///
-    /// Callers are expected to handle errors and call attempt_download() again
-    /// as desired (e.g. follow redirects).
-    async fn attempt_download(
-        &self,
-        https_client: &HttpsClient,
-        bucket: &str,
-        object: &str,
-    ) -> Result<Response<Body>> {
         let url = self
             .storage_base
             .join(&format!("{}/{}", bucket, object))
             .context("joining to storage base")?;
-        self.send_request(https_client, url).await
+        self.send_request(https_client, url).await.context("sending http(s) request")
     }
 
     /// Make one attempt to request data from GCS.
     ///
-    /// Callers are expected to handle errors and call attempt_download() again
-    /// as desired (e.g. follow redirects).
+    /// Callers are expected to handle errors and call send_request() again as
+    /// desired (e.g. follow redirects).
     async fn send_request(&self, https_client: &HttpsClient, url: Url) -> Result<Response<Body>> {
         tracing::debug!("https_client.request {:?}", url);
         let req = Request::builder().method(Method::GET).uri(url.into_string());
         let req = self.maybe_authorize(req).await.context("authorizing in send_request")?;
         let req = req.body(Body::empty()).context("creating request body")?;
+        let auth_used = req.headers().contains_key("Authorization");
 
         let res = https_client.request(req).await.context("https_client.request")?;
+        match res.status() {
+            // Status 403 (FORBIDDEN) means an access token is needed.
+            // If an access token was already used, there's no need in getting
+            // a new one, the server is saying NO to this request.
+            StatusCode::FORBIDDEN if !auth_used => {
+                tracing::debug!("send_request status {} (FORBIDDEN)", res.status());
+                bail!(GcsError::NeedNewAccessToken);
+            }
+            // Status 401 (UNAUTHORIZED) means the access token didn't work.
+            StatusCode::UNAUTHORIZED => {
+                tracing::debug!("send_request status {} (UNAUTHORIZED)", res.status());
+                bail!(GcsError::NeedNewAccessToken);
+            }
+            _ => (),
+        }
         Ok(res)
     }
 
@@ -236,10 +228,6 @@ impl TokenStore {
             }
             let res = self.send_request(https_client, url).await.context("sending request")?;
             match res.status() {
-                StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => {
-                    tracing::debug!("attempt_list status {}", res.status());
-                    bail!(GcsError::NeedNewAccessToken);
-                }
                 StatusCode::OK => {
                     let bytes = hyper::body::to_bytes(res.into_body())
                         .await
@@ -279,81 +267,9 @@ impl fmt::Debug for TokenStore {
     }
 }
 
-/// Fetch an existing refresh token from a .boto (gsutil) configuration file.
-///
-/// Tip, the `boto_path` is commonly "~/.boto". E.g.
-/// ```
-/// use home::home_dir;
-/// let boto_path = Path::new(&home_dir().expect("home dir")).join(".boto");
-/// ```
-///
-/// TODO(fxbug.dev/82014): Using an ffx specific token will be preferred once
-/// that feature is created. For the near term, an existing gsutil token is
-/// workable.
-///
-/// Alert: The refresh token is considered a private secret for the user. Do
-///        not print the token to a log or otherwise disclose it.
-pub fn read_boto_refresh_token<P>(boto_path: P) -> Result<String>
-where
-    P: AsRef<Path> + std::fmt::Debug,
-{
-    // Read the file at `boto_path` to retrieve a value from a line resembling
-    // "gs_oauth2_refresh_token = <string_of_chars>".
-    static GS_REFRESH_TOKEN_RE: OnceCell<Regex> = OnceCell::new();
-    let re = GS_REFRESH_TOKEN_RE
-        .get_or_init(|| Regex::new(r#"\n\s*gs_oauth2_refresh_token\s*=\s*(\S+)"#).expect("regex"));
-    let data = fs::read_to_string(boto_path.as_ref()).context("read_to_string boto_path")?;
-    let refresh_token = match re.captures(&data) {
-        Some(found) => found.get(1).expect("found at least one").as_str().to_string(),
-        None => bail!(
-            "A gs_oauth2_refresh_token entry was not found in {:?}. \
-            Please check that the file is writable, that there's available \
-            disk space, and authenticate again",
-            boto_path
-        ),
-    };
-    Ok(refresh_token)
-}
-
-/// Overwrite the 'gs_oauth2_refresh_token' in the file at `boto_path`.
-///
-/// TODO(fxbug.dev/82014): Using an ffx specific token will be preferred once
-/// that feature is created. For the near term, an existing gsutil token is
-/// workable.
-///
-/// Alert: The refresh token is considered a private secret for the user. Do
-///        not print the token to a log or otherwise disclose it.
-pub fn write_boto_refresh_token<P: AsRef<Path>>(boto_path: P, token: &str) -> Result<()> {
-    use std::{fs::set_permissions, os::unix::fs::PermissionsExt};
-    let boto_path = boto_path.as_ref();
-    let data = if !boto_path.is_file() {
-        fs::File::create(boto_path).context("Create .boto file")?;
-        const USER_READ_WRITE: u32 = 0o600;
-        let permissions = std::fs::Permissions::from_mode(USER_READ_WRITE);
-        set_permissions(&boto_path, permissions).context("Boto set permissions")?;
-        format!(
-            "# This file was created by the Fuchsia GCS lib.\
-            \n[GSUtil]\
-            \ngs_oauth2_refresh_token = {}\
-            \ndefault_project_id =\
-            \n",
-            token
-        )
-    } else {
-        static GS_UPDATE_REFRESH_TOKEN_RE: OnceCell<Regex> = OnceCell::new();
-        let re = GS_UPDATE_REFRESH_TOKEN_RE.get_or_init(|| {
-            Regex::new(r#"(\n\s*gs_oauth2_refresh_token\s*=\s*)\S*"#).expect("regex")
-        });
-        let data = fs::read_to_string(boto_path).context("replace boto refresh")?;
-        re.replace(&data, format!("${{1}}{}", token).as_str()).to_string()
-    };
-    fs::write(boto_path, data).context("Writing .boto file")?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
-    use {super::*, fuchsia_hyper::new_https_client, hyper::StatusCode, tempfile};
+    use {super::*, fuchsia_hyper::new_https_client, hyper::StatusCode};
 
     #[should_panic(expected = "Connection refused")]
     #[fuchsia_async::run_singlethreaded(test)]
@@ -368,32 +284,20 @@ mod test {
     async fn test_maybe_authorize() {
         let store = TokenStore::new().expect("creating token store");
         let req = Request::builder().method(Method::GET).uri("http://example.com/".to_string());
-        let req = store
-            .maybe_authorize(req)
-            .await
-            .context("authorizing in send_request")
-            .expect("maybe_authorize");
+        let req = store.maybe_authorize(req).await.expect("maybe_authorize");
         let headers = req.headers_ref().unwrap();
         // The authorization is not set because the access token is empty.
         assert!(!headers.contains_key("Authorization"));
 
         store.set_access_token("fake_token".to_string()).await;
         let req = Request::builder().method(Method::GET).uri("http://example.com/".to_string());
-        let req = store
-            .maybe_authorize(req)
-            .await
-            .context("authorizing in send_request")
-            .expect("maybe_authorize");
+        let req = store.maybe_authorize(req).await.expect("maybe_authorize");
         let headers = req.headers_ref().unwrap();
         // The authorization is not set because the uri is not https.
         assert!(!headers.contains_key("Authorization"));
 
         let req = Request::builder().method(Method::GET).uri("https://example.com/".to_string());
-        let req = store
-            .maybe_authorize(req)
-            .await
-            .context("authorizing in send_request")
-            .expect("maybe_authorize");
+        let req = store.maybe_authorize(req).await.expect("maybe_authorize");
         let headers = req.headers_ref().unwrap();
         // The authorization is set because there is a token and an https url.
         assert_eq!(headers["Authorization"], "Bearer fake_token");
@@ -414,21 +318,5 @@ mod test {
             .await
             .expect("client download");
         assert_eq!(res.status(), StatusCode::OK);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_gcs_read_write_refresh_token() {
-        let boto_temp = tempfile::TempDir::new().expect("temp dir");
-        let boto_path = boto_temp.path().join(".boto");
-        assert!(!boto_path.is_file());
-        // Test with no .boto file.
-        write_boto_refresh_token(&boto_path, "first-token").expect("write token");
-        assert!(boto_path.is_file());
-        let refresh_token = read_boto_refresh_token(&boto_path).expect("first token");
-        assert_eq!(refresh_token, "first-token".to_string());
-        // Test updating existing .boto file.
-        write_boto_refresh_token(&boto_path, "second-token").expect("write token");
-        let refresh_token = read_boto_refresh_token(&boto_path).expect("second token");
-        assert_eq!(refresh_token, "second-token".to_string());
     }
 }

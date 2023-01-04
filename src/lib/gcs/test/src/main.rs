@@ -8,7 +8,7 @@ use {
     anyhow::{Context, Result},
     fuchsia_hyper::new_https_client,
     gcs::{
-        auth::pkce::{new_access_token, new_refresh_token},
+        auth::{new_access_token, pkce::new_refresh_token, GcsCredentials},
         client::Client,
     },
 };
@@ -46,7 +46,8 @@ async fn auth_test() -> Result<()> {
     let mut err_out = std::io::stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
     let refresh_token = new_refresh_token(&ui).await.context("get refresh token")?;
-    let access_token = new_access_token(&refresh_token).await?;
+    let credentials = GcsCredentials::new(&refresh_token);
+    let access_token = new_access_token(&credentials).await?;
 
     let client = Client::initial()?;
     client.set_access_token(access_token).await;

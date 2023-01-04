@@ -5,7 +5,7 @@
 //! Download blob data from Google Cloud Storage (GCS).
 
 use {
-    crate::{token_store::TokenStore},
+    crate::token_store::TokenStore,
     anyhow::{bail, Context, Result},
     fuchsia_hyper::{new_https_client, HttpsClient},
     hyper::{body::HttpBody as _, header::CONTENT_LENGTH, Body, Response, StatusCode},
@@ -304,11 +304,7 @@ impl Client {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{auth::pkce::new_access_token, token_store::read_boto_refresh_token},
-        std::{fs::read_to_string, path::Path},
-    };
+    use {super::*, std::fs::read_to_string};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_client_factory_no_auth() {
@@ -334,27 +330,19 @@ mod test {
     /// This can be run with `fx test gcs_lib_test -- --ignored`.
     #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_client_factory_with_auth() {
-        // Set up authorized client.
-        use home::home_dir;
+    async fn test_client_with_auth() {
         let client = Client::initial().expect("creating client");
-
-        let boto_path = Path::new(&home_dir().expect("getting home dir")).join(".boto");
-        let refresh_token = read_boto_refresh_token(&boto_path).expect("reading refresh token");
-        let access_token =
-            new_access_token(&refresh_token).await.expect("getting new access token");
-        client.set_access_token(access_token).await;
 
         // Try downloading something that doesn't exist.
         let res =
-            client.stream("for_testing_does_not_exist", "face_test_object").await.expect("stream");
+            client.stream("for_testing_does_not_exist", "fake_test_object").await.expect("stream");
         assert_eq!(res.status(), 404);
 
         // Fetch something that does exist.
         let out_dir = tempfile::tempdir().unwrap();
         let out_file = out_dir.path().join("downloaded");
         client
-            .fetch_without_progress("fuchsia-sdk", "development/LATEST_LINUX", &out_file)
+            .fetch_without_progress("fuchsia", "development/LATEST_LINUX", &out_file)
             .await
             .expect("fetch");
         assert!(out_file.exists());
@@ -364,7 +352,7 @@ mod test {
         // Write the same data.
         let mut written = Vec::new();
         client
-            .write("fuchsia-sdk", "development/LATEST_LINUX", &mut written, &mut |_| {
+            .write("fuchsia", "development/LATEST_LINUX", &mut written, &mut |_| {
                 Ok(ProgressResponse::Continue)
             })
             .await
@@ -378,7 +366,7 @@ mod test {
         assert_eq!(fetched, written);
 
         // Stream the same data.
-        let res = client.stream("fuchsia-sdk", "development/LATEST_LINUX").await.expect("stream");
+        let res = client.stream("fuchsia", "development/LATEST_LINUX").await.expect("stream");
         assert_eq!(res.status(), 200);
         // The data is expected to be small (less than a KiB). For a non-test
         // keeping the whole file in memory may be impractical.

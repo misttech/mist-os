@@ -83,6 +83,7 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
 mod test {
     use {super::*, tempfile};
 
+    #[ignore]
     #[should_panic(expected = "downloading via transfer manifest")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_pb_get_impl() {

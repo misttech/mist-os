@@ -18,6 +18,7 @@ if (is_host) {
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/fms",
       "//src/developer/ffx/lib/sdk:lib",
+      "//src/developer/lib/credentials:lib",
       "//src/lib/fuchsia-hyper",
       "//src/lib/gcs",
       "//src/lib/structured_ui",

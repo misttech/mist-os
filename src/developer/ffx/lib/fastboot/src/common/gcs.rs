@@ -8,18 +8,13 @@
 
 use {
     crate::common::{done_time, file::FileResolver},
-    anyhow::{anyhow, bail, Result},
+    anyhow::{anyhow, bail, Context, Result},
     async_trait::async_trait,
     chrono::Utc,
-    errors::ffx_error,
-    gcs::{
-        auth::pkce::new_access_token,
-        client::{Client},
-        token_store::read_boto_refresh_token,
-    },
+    gcs::{auth::new_access_token, client::Client},
     sdk_metadata::ProductBundleV1,
     std::io::Write,
-    std::path::{Path, PathBuf},
+    std::path::Path,
     tempfile::{tempdir, TempDir},
 };
 
@@ -33,13 +28,10 @@ pub struct GcsResolver {
 impl GcsResolver {
     pub async fn new(version: String, bundle: String) -> Result<Self> {
         let temp_dir = tempdir()?;
-        // TODO(fxb/89584): Change to using ffx client Id and consent screen.
-        let boto_path = ffx_config::query("flash.gcs.token")
-            .get_file::<Option<PathBuf>>()
-            .await?
-            .ok_or(ffx_error!("GCS authentication not found."))?;
-        let refresh_token = read_boto_refresh_token(&boto_path)?;
-        let access_token = new_access_token(&refresh_token).await?;
+        let credentials = credentials::Credentials::load_or_new().await;
+        let access_token = new_access_token(&credentials.gcs_credentials())
+            .await
+            .context("getting access token")?;
 
         let client = Client::initial()?;
         client.set_access_token(access_token).await;
