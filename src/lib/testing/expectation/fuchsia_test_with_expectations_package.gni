@@ -35,6 +35,12 @@ import("//tools/cmc/build/expect_includes.gni")
 #     Type: string
 #     Default: target_name
 #
+#   renameable_subpackages (optional)
+#      A list of subpackages defined by scoped variables `package` (a
+#     `fuchsia_package()` target) and an optional `name`. See
+#     `fuchsia_package()` for more details.
+#     Type: list of scopes
+
 #   data_deps
 #   deps
 #   visibility
@@ -169,6 +175,7 @@ template("fuchsia_test_with_expectations_package") {
                              "test_specs",
                              "package_name",
                              "data_deps",
+                             "renameable_subpackages",
                              "visibility",
                            ])
     deps = _include_check_targets + [
