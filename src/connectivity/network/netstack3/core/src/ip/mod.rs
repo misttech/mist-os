@@ -315,7 +315,7 @@ trait IpTransportLayerContext<I: IpExt, C>: IpDeviceIdContext<I> {
 
 impl<
         I: IpExt,
-        C: crate::transport::udp::UdpStateNonSyncContext<I>
+        C: crate::transport::udp::StateNonSyncContext<I>
             + crate::transport::tcp::socket::NonSyncContext,
         SC: crate::transport::udp::UdpStateContext<I, C>
             + crate::transport::tcp::socket::TcpSyncContext<I, C>,
