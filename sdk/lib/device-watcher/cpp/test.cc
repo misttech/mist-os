@@ -22,17 +22,6 @@
 
 namespace {
 
-// The documentation on fs::SynchronousVfs claims that it is OK to destroy it before the dispatcher
-// on which it is running, but in practice this seems not so; when the fs::SynchronousVfs goes out
-// of scope before the dispatcher is stopped, concurrent access to the fs::SynchronousVfs by the
-// destructor and the dispatcher causes frequent crashes.
-//
-// TODO(https://fxbug.dev/116924): Remove this.
-auto StartThreadDeferCleanup(async::Loop& loop) {
-  return zx::make_result(loop.StartThread(),
-                         fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop)));
-}
-
 TEST(DeviceWatcherTest, Smoke) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
@@ -55,8 +44,7 @@ TEST(DeviceWatcherTest, Smoke) {
   fs::SynchronousVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
-  zx::result cleanup = StartThreadDeferCleanup(loop);
-  ASSERT_OK(cleanup);
+  ASSERT_OK(loop.StartThread());
 
   fbl::unique_fd dir;
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
@@ -91,8 +79,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
   fs::SynchronousVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
-  zx::result cleanup = StartThreadDeferCleanup(loop);
-  ASSERT_OK(cleanup);
+  ASSERT_OK(loop.StartThread());
 
   fbl::unique_fd dir;
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
@@ -130,8 +117,7 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
   fs::SynchronousVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
-  zx::result cleanup = StartThreadDeferCleanup(loop);
-  ASSERT_OK(cleanup);
+  ASSERT_OK(loop.StartThread());
 
   fbl::unique_fd dir;
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
