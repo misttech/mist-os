@@ -677,6 +677,7 @@ void Controller::InitDisplays() {
           const uint64_t display_id = device->id();
           display_devices_[i].reset();
           display_devices_[i] = QueryDisplay(ddi_id, display_id);
+          device = display_devices_[i].get();
           if (!device || !device->Init()) {
             display_devices_.erase(i);
           }
