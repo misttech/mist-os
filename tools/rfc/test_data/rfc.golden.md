@@ -45,14 +45,18 @@ This section may be used to describe how the design was socialized before
 advancing to the "Iterate" stage of the RFC process. For example: "This RFC went
 through a design review with the Component Framework team."
 
-## Design
+## Requirements
 
-This is the technically detailed version of your proposal.
+For the problem(s) solved by this RFC, what constrains the possible solutions?
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
 "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in
 [IETF RFC 2119](https://tools.ietf.org/html/rfc2119).
+
+## Design
+
+This is the technically detailed version of your proposal.
 
 _Prompt for Area: FIDL, replace with the relevant area(s)_
 
