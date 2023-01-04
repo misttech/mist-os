@@ -317,8 +317,8 @@ impl<
         I: IpExt,
         C: crate::transport::udp::StateNonSyncContext<I>
             + crate::transport::tcp::socket::NonSyncContext,
-        SC: crate::transport::udp::UdpStateContext<I, C>
-            + crate::transport::tcp::socket::TcpSyncContext<I, C>,
+        SC: crate::transport::udp::StateContext<I, C>
+            + crate::transport::tcp::socket::SyncContext<I, C>,
     > IpTransportLayerContext<I, C> for SC
 {
     type Tcp = crate::transport::tcp::socket::TcpIpTransportContext;

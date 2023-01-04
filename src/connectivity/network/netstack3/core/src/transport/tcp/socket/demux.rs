@@ -36,8 +36,8 @@ use crate::{
         seqnum::WindowSize,
         socket::{
             do_send_inner, Acceptor, Connection, ConnectionId, Listener, ListenerId,
-            MaybeClosedConnectionId, MaybeListener, NonSyncContext, SocketAddr,
-            TcpIpTransportContext, TcpSyncContext, TimerId,
+            MaybeClosedConnectionId, MaybeListener, NonSyncContext, SocketAddr, SyncContext,
+            TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, UserError,
@@ -67,7 +67,7 @@ where
             ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: TcpSyncContext<I, C>,
+    SC: SyncContext<I, C>,
 {
     fn receive_ip_packet(
         sync_ctx: &mut SC,

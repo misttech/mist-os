@@ -7,15 +7,16 @@ use net_types::ip::{Ipv4, Ipv6};
 use crate::{
     transport::{
         tcp::{
-            socket::{isn::IsnGenerator, TcpSockets, TcpSyncContext},
+            self,
+            socket::{isn::IsnGenerator, TcpSockets},
             TcpState,
         },
-        udp::{UdpSockets, UdpStateContext},
+        udp::{self, UdpSockets},
     },
     DeviceId, NonSyncContext, SyncCtx,
 };
 
-impl<C: NonSyncContext> TcpSyncContext<Ipv4, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C> {
     type IpTransportCtx = Self;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
@@ -39,7 +40,7 @@ impl<C: NonSyncContext> TcpSyncContext<Ipv4, C> for &'_ SyncCtx<C> {
     }
 }
 
-impl<C: NonSyncContext> TcpSyncContext<Ipv6, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C> {
     type IpTransportCtx = Self;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
@@ -63,7 +64,7 @@ impl<C: NonSyncContext> TcpSyncContext<Ipv6, C> for &'_ SyncCtx<C> {
     }
 }
 
-impl<C: NonSyncContext> UdpStateContext<Ipv4, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
     type IpSocketsCtx = Self;
 
     fn with_sockets<
@@ -91,7 +92,7 @@ impl<C: NonSyncContext> UdpStateContext<Ipv4, C> for &'_ SyncCtx<C> {
     }
 }
 
-impl<C: NonSyncContext> UdpStateContext<Ipv6, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
     type IpSocketsCtx = Self;
 
     fn with_sockets<
