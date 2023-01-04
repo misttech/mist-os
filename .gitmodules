@@ -128,11 +128,6 @@
 	url = https://fuchsia.googlesource.com/cobalt-registry
 	name = cobalt-registry
 	ignore = all
-[submodule "third_party/crashpad"]
-	path = third_party/crashpad
-	url = https://fuchsia.googlesource.com/third_party/crashpad
-	name = third_party/crashpad
-	ignore = all
 [submodule "third_party/curl"]
 	path = third_party/curl
 	url = https://fuchsia.googlesource.com/third_party/curl
