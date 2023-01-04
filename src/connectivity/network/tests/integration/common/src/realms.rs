@@ -129,7 +129,7 @@ impl ManagementAgent {
     pub fn get_program_args(&self) -> &[&'static str] {
         match self {
             Self::NetCfg(NetCfgVersion::Basic) | Self::NetCfg(NetCfgVersion::Advanced) => {
-                &["--min-severity", "DEBUG", "--allow-virtual-devices"]
+                &["--min-severity", "DEBUG"]
             }
         }
     }

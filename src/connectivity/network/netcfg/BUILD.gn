@@ -14,7 +14,6 @@ rustc_library("lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
-    "//sdk/fidl/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
@@ -42,7 +41,6 @@ rustc_library("lib") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/network/fidl_fuchsia_hardware_ethernet_ext",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/storage/fuchsia-vfs-watcher",
