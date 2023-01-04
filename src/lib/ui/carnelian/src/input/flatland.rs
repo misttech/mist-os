@@ -26,7 +26,11 @@ impl FlatlandMouseInputHandler {
     fn events_from_mouse_event(&mut self, mouse_event: &MouseEvent) -> Vec<Event> {
         let transform = Transform2D::identity();
         let event_time = mouse_event.timestamp.expect("timestamp") as u64;
-        let pointer_sample = mouse_event.pointer_sample.as_ref().expect("pointer_sample");
+        // pointer_sample is None for mouse events with MouseEventStreamInfo::Exited.
+        let pointer_sample = match mouse_event.pointer_sample.as_ref() {
+            Some(pointer_sample) => pointer_sample,
+            None => return Vec::new(),
+        };
         let position_in_viewport =
             pointer_sample.position_in_viewport.expect("position_in_viewport");
         let pressed_buttons: HashSet<u8> =
