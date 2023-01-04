@@ -18,6 +18,7 @@ pub(crate) mod prelude {
 
 use prelude::*;
 
+mod connectivity;
 mod console;
 mod development;
 mod diagnostics;
@@ -99,6 +100,13 @@ pub fn define_configuration(
     }
 
     // The real platform subsystems
+
+    connectivity::ConnectivitySubsystemConfig::define_configuration(
+        &context,
+        &config.platform.connectivity,
+        &mut builder,
+    )
+    .context("Configuring the 'connectivity' subsystem")?;
 
     console::ConsoleSubsystemConfig::define_configuration(
         &context,
