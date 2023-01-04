@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -51,7 +52,7 @@ X86::~X86() {
   }
 }
 
-int X86::Thread() {
+zx_status_t X86::DoInit() {
   zx_status_t status = SysmemInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SysmemInit() failed: %d", __func__, status);
@@ -72,21 +73,15 @@ int X86::Thread() {
   return ZX_OK;
 }
 
-zx_status_t X86::Start() {
-  int rc = thrd_create_with_name(
-      &thread_, [](void* arg) -> int { return reinterpret_cast<X86*>(arg)->Thread(); }, this,
-      "x86_start_thread");
-  if (rc != thrd_success) {
-    return ZX_ERR_INTERNAL;
-  }
-  return ZX_OK;
+void X86::DdkInit(ddk::InitTxn txn) {
+  async::PostTask(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                  [txn = std::move(txn), this]() mutable {
+                    zx_status_t status = DoInit();
+                    txn.Reply(status);
+                  });
 }
 
-void X86::DdkRelease() {
-  int exit_code;
-  thrd_join(thread_, &exit_code);
-  delete this;
-}
+void X86::DdkRelease() { delete this; }
 
 zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* out) {
   auto endpoints = fdf::CreateEndpoints<fpbus::PlatformBus>();
@@ -220,8 +215,7 @@ zx_status_t X86::Bind() {
   // Create the ACPI manager.
   acpi_manager_ = std::make_unique<acpi::FuchsiaManager>(acpi_.get(), &iommu_manager_, zxdev());
 
-  // Start up our protocol helpers and platform devices.
-  return Start();
+  return ZX_OK;
 }
 
 bool X86::RunUnitTests(void* ctx, zx_device_t* parent, zx_handle_t channel) {

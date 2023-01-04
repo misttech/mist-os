@@ -18,7 +18,6 @@
 #include <fbl/macros.h>
 #include <fbl/vector.h>
 
-#include "lib/fdf/dispatcher.h"
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/manager.h"
 #include "src/devices/lib/iommu/iommu-x86.h"
@@ -31,7 +30,8 @@ class SysSuspender : public fdf::WireServer<fuchsia_hardware_platform_bus::SysSu
 };
 
 class X86;
-using DeviceType = ddk::Device<X86, ddk::Messageable<fuchsia_hardware_acpi::Acpi>::Mixin>;
+using DeviceType =
+    ddk::Device<X86, ddk::Messageable<fuchsia_hardware_acpi::Acpi>::Mixin, ddk::Initializable>;
 
 // This is the main class for the X86 platform bus driver.
 class X86 : public DeviceType {
@@ -47,6 +47,7 @@ class X86 : public DeviceType {
 
   // Device protocol implementation.
   void DdkRelease();
+  void DdkInit(ddk::InitTxn txn);
 
   // ACPI protocol FIDL interface implementation.
   void ListTableEntries(ListTableEntriesCompleter::Sync& completer) override;
@@ -75,10 +76,10 @@ class X86 : public DeviceType {
 
   zx_status_t GoldfishControlInit();
 
-  // Register this instance with devmgr and launch the deferred initialization in Thread.
+  // Register this instance with devmgr.
   zx_status_t Bind();
-  zx_status_t Start();
-  int Thread();
+  // Asynchronously complete initialisation.
+  zx_status_t DoInit();
 
   IommuManager iommu_manager_{
       [](fx_log_severity_t severity, const char* file, int line, const char* msg, va_list args) {
@@ -87,8 +88,6 @@ class X86 : public DeviceType {
 
   // TODO(fxbug.dev/108070): migrate to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
-
-  thrd_t thread_;
 
   std::unique_ptr<acpi::Manager> acpi_manager_;
   std::unique_ptr<acpi::Acpi> acpi_;
