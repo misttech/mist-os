@@ -10,7 +10,11 @@ use {
     chrono::{DateTime, Duration, Utc},
     fuchsia_merkle::Hash,
     fuchsia_pkg::{BlobInfo, PackageManifest, PackageManifestList, PackagePath, SubpackageInfo},
-    std::collections::{hash_map, BTreeMap, HashMap, HashSet, VecDeque},
+    std::{
+        collections::{hash_map, BTreeMap, HashMap, HashSet},
+        future::Future,
+        pin::Pin,
+    },
     tempfile::TempDir,
     tuf::{
         crypto::HashAlgorithm, metadata::TargetPath, pouf::Pouf1,
@@ -30,8 +34,8 @@ const DEFAULT_SNAPSHOT_EXPIRATION: i64 = 30;
 /// Number of days from now before the timestamp metadata is expired.
 const DEFAULT_TIMESTAMP_EXPIRATION: i64 = 30;
 
-pub struct ToBeStagedPackage {
-    path: Option<Utf8PathBuf>,
+struct ToBeStagedPackage {
+    manifest_path: Option<Utf8PathBuf>,
     kind: ToBeStagedPackageKind,
 }
 
@@ -60,8 +64,8 @@ pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     refresh_metadata: bool,
     refresh_non_root_metadata: bool,
     inherit_from_trusted_targets: bool,
-    named_packages: HashMap<PackagePath, ToBeStagedPackage>,
-    additional_subpackages: HashMap<Hash, (Utf8PathBuf, PackageManifest)>,
+    named_packages: HashMap<PackagePath, Hash>,
+    staged_package_contents: HashMap<Hash, ToBeStagedPackage>,
     deps: HashSet<Utf8PathBuf>,
 }
 
@@ -109,7 +113,7 @@ where
             refresh_non_root_metadata: false,
             inherit_from_trusted_targets: true,
             named_packages: HashMap::new(),
-            additional_subpackages: HashMap::new(),
+            staged_package_contents: HashMap::new(),
             deps: HashSet::new(),
         }
     }
@@ -163,18 +167,6 @@ where
         self.add_package_manifest(Some(path), package).await
     }
 
-    pub async fn add_package_manifest(
-        self,
-        path: Option<Utf8PathBuf>,
-        manifest: PackageManifest,
-    ) -> Result<RepoBuilder<'a, R>> {
-        self.stage_package(ToBeStagedPackage {
-            path,
-            kind: ToBeStagedPackageKind::Manifest { manifest },
-        })
-        .await
-    }
-
     /// Stage the package manifests from the iterator of paths to be published.
     pub async fn add_packages(
         mut self,
@@ -186,6 +178,33 @@ where
         Ok(self)
     }
 
+    /// Stage a package manifest, which was optionally loaded from `path`, to be published.
+    pub async fn add_package_manifest(
+        self,
+        path: Option<Utf8PathBuf>,
+        manifest: PackageManifest,
+    ) -> Result<RepoBuilder<'a, R>> {
+        self.stage_named_package(
+            manifest.package_path(),
+            ToBeStagedPackage {
+                manifest_path: path,
+                kind: ToBeStagedPackageKind::Manifest { manifest },
+            },
+        )
+        .await
+    }
+
+    /// Stage all the top-level package manifests from `iter` to be published.
+    pub async fn add_package_manifests(
+        mut self,
+        iter: impl Iterator<Item = (Option<Utf8PathBuf>, PackageManifest)>,
+    ) -> Result<RepoBuilder<'a, R>> {
+        for (path, package) in iter {
+            self = self.add_package_manifest(path, package).await?;
+        }
+        Ok(self)
+    }
+
     /// Stage a package archive from the `path` to be published.
     pub async fn add_package_archive(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
         let archive_out = TempDir::new().unwrap();
@@ -193,10 +212,13 @@ where
             .with_context(|| format!("reading package archive {path}"))
             .expect("archive to manifest");
 
-        self.stage_package(ToBeStagedPackage {
-            path: Some(path),
-            kind: ToBeStagedPackageKind::Archive { _archive_out: archive_out, manifest },
-        })
+        self.stage_named_package(
+            manifest.package_path(),
+            ToBeStagedPackage {
+                manifest_path: Some(path),
+                kind: ToBeStagedPackageKind::Archive { _archive_out: archive_out, manifest },
+            },
+        )
         .await
     }
 
@@ -214,115 +236,88 @@ where
     /// Stage a top-level package manifest described by `package` from the
     /// `path` to be published. Duplicates are ignored unless registering two
     /// packages with the same package path and different package hashes.
-    pub async fn stage_package(mut self, package: ToBeStagedPackage) -> Result<RepoBuilder<'a, R>> {
-        // If the package was already included, by subpackage reference from
-        // another package, then its blobs and subpackages were already added.
-        // The package is being added as a named_package, so it can be removed
-        // from additional_subpackages (if present).
-        if self.additional_subpackages.remove(&package.manifest().hash()).is_none() {
-            // The package was _not_ among the known additional_subpackages, so
-            // add its blobs and subpackages.
-            for blob in package.manifest().blobs() {
-                self.deps.insert(blob.source_path.clone().into());
-            }
-            for subpackage in package.manifest().subpackages() {
-                self = self.add_subpackage(Utf8PathBuf::from(&subpackage.manifest_path)).await?;
-            }
-        }
+    async fn stage_named_package(
+        mut self,
+        package_path: PackagePath,
+        package: ToBeStagedPackage,
+    ) -> Result<RepoBuilder<'a, R>> {
+        let package_hash = package.manifest().hash();
 
-        if let Some(path) = package.path.clone() {
-            self.deps.insert(path);
-        }
+        self = self
+            .stage_package_contents(package)
+            .await
+            .with_context(|| format!("staging package path '{package_path}'"))?;
 
-        match self.named_packages.entry(package.manifest().package_path()) {
+        match self.named_packages.entry(package_path) {
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(package);
+                entry.insert(package_hash);
             }
             hash_map::Entry::Occupied(entry) => {
-                let old_package = entry.get();
+                let old_package = self.staged_package_contents.get(entry.get()).unwrap();
+                let new_package = self.staged_package_contents.get(&package_hash).unwrap();
 
-                check_manifests_are_equivalent(entry.key(), old_package, &package)?;
+                check_manifests_are_equivalent(old_package, new_package)
+                    .with_context(|| format!("staging package path '{}'", entry.key()))?;
             }
         }
 
         Ok(self)
     }
 
-    /// Stage all the top-level package manifests from `iter` to be published.
-    pub async fn add_package_manifests(
+    /// Stage an package such that the blobs will be published, but will not necessarily publish the
+    /// package to the TUF metadata. This is used both by `staged_named_package` and
+    /// `stage_subpackage` to queue up the manifests for publishing.
+    #[allow(clippy::map_entry)] // Clippy doesn't see that `self` is moved, and can't use `entry()`.
+    async fn stage_package_contents(
         mut self,
-        iter: impl Iterator<Item = (Option<Utf8PathBuf>, PackageManifest)>,
+        package: ToBeStagedPackage,
     ) -> Result<RepoBuilder<'a, R>> {
-        for (path, package) in iter {
-            self = self.add_package_manifest(path, package).await?;
+        if let Some(path) = &package.manifest_path {
+            self.deps.insert(Utf8PathBuf::from(path));
         }
+
+        let package_hash = package.manifest().hash();
+
+        // We'll only add the package manifest if we haven't already staged a manifest for this hash.
+        if !self.staged_package_contents.contains_key(&package_hash) {
+            // Mark all the package contents as a dependency.
+            for blob in package.manifest().blobs() {
+                self.deps.insert(Utf8PathBuf::from(&blob.source_path));
+            }
+
+            // Stage all subpackages.
+            for subpackage in package.manifest().subpackages() {
+                // We only need to stage the subpackage if we haven't staged this merkle.
+                if !self.staged_package_contents.contains_key(&subpackage.merkle) {
+                    let manifest_path = Utf8PathBuf::from(&subpackage.manifest_path);
+                    self = self.stage_subpackage(manifest_path).await?;
+                }
+            }
+
+            self.staged_package_contents.insert(package_hash, package);
+        };
+
         Ok(self)
     }
 
     /// Stage a subpackage's package manifest from the `path` to be published.
-    async fn add_subpackage(mut self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
-        let mut subpackage_paths = VecDeque::from([path]);
+    async fn stage_subpackage(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
+        let contents = async_fs::read(path.as_std_path())
+            .await
+            .with_context(|| format!("reading package manifest {path}"))?;
 
-        while let Some(path) = subpackage_paths.pop_front() {
-            if self.deps.get(&path).is_some() {
-                // The package was already added, either as a named target package
-                // or a previously referenced subpackage.
-                continue;
-            }
+        let manifest = PackageManifest::from_reader(&path, &contents[..])
+            .with_context(|| format!("reading package manifest {path}"))?;
 
-            let contents = async_fs::read(path.as_std_path())
-                .await
-                .with_context(|| format!("reading package manifest {path}"))?;
+        // Stage the subpackage. We will use `stage_package_contents` since we don't need to include
+        // the package in the TUF metadata. We're recursing, so we need to box our future.
+        let fut: Pin<Box<dyn Future<Output = _>>> =
+            Box::pin(self.stage_package_contents(ToBeStagedPackage {
+                manifest_path: Some(path),
+                kind: ToBeStagedPackageKind::Manifest { manifest },
+            }));
 
-            let package = PackageManifest::from_reader(&path, &contents[..])
-                .with_context(|| format!("reading package manifest {path}"))?;
-
-            subpackage_paths.extend(self.add_subpackage_manifest(path, package).into_iter());
-        }
-
-        Ok(self)
-    }
-
-    /// Add a package that is a subpackage of another package. If the same
-    /// package is later added as a named_package, it will be removed from
-    /// the list of additional subpackages.
-    ///
-    /// Returns the paths to subpackages referenced from this subpackage.
-    fn add_subpackage_manifest(
-        &mut self,
-        path: Utf8PathBuf,
-        package: PackageManifest,
-    ) -> Vec<Utf8PathBuf> {
-        if !self.deps.insert(path.clone()) {
-            // The package was already added, either as a named target package
-            // or a previously referenced subpackage.
-            return vec![];
-        }
-
-        // Track all the blobs from the package manifest as a dependency.
-        for blob in package.blobs() {
-            self.deps.insert(blob.source_path.clone().into());
-        }
-
-        let subpackages = package
-            .subpackages()
-            .iter()
-            .map(|subpackage| Utf8PathBuf::from(&subpackage.manifest_path))
-            .collect::<Vec<_>>();
-
-        match self.additional_subpackages.entry(package.hash()) {
-            hash_map::Entry::Vacant(entry) => {
-                entry.insert((path, package));
-            }
-            hash_map::Entry::Occupied(_) => {
-                // Multiple entries, even with different manifest paths, are
-                // possible, but since the `additional_subpackages` hashmap is
-                // only used to collect unique blobs, the duplicates can be
-                // ignored.
-            }
-        }
-
-        subpackages
+        fut.await
     }
 
     /// Stage all the packages pointed to by the package list to be published.
@@ -427,35 +422,16 @@ where
 
         // Gather up all package blobs, and separate out the the meta.far blobs.
         let mut staged_blobs = HashMap::new();
-        let mut package_meta_fars = HashMap::new();
-
-        for (package_path, package) in &self.named_packages {
-            let mut meta_far_blob = None;
+        for package in self.staged_package_contents.values() {
             for blob in package.manifest().blobs() {
-                if blob.path == PackageManifest::META_FAR_BLOB_PATH {
-                    if meta_far_blob.is_none() {
-                        meta_far_blob = Some(blob.clone());
-                    } else {
-                        return Err(anyhow!("multiple meta.far blobs in a package"));
-                    }
-                }
-
                 staged_blobs.insert(blob.merkle, blob.clone());
             }
-
-            let meta_far_blob = meta_far_blob
-                .ok_or_else(|| anyhow!("package does not contain entry for meta.far"))?;
-
-            package_meta_fars.insert(package_path, meta_far_blob);
         }
 
-        // Any additional_subpackages not added by name via `add_package()` are
-        // anonymous subpackages. Stage the anonymous subpackage blobs, but
-        // don't add the package to the repo as a named target.
-        for (_, anonymous_subpackage) in self.additional_subpackages.values() {
-            for blob in anonymous_subpackage.blobs() {
-                staged_blobs.insert(blob.merkle, blob.clone());
-            }
+        let mut package_meta_fars = HashMap::new();
+        for (package_path, package_hash) in &self.named_packages {
+            let meta_far_blob = staged_blobs.get(package_hash).unwrap();
+            package_meta_fars.insert(package_path, meta_far_blob);
         }
 
         // Make sure all the blobs exist.
@@ -518,7 +494,6 @@ where
 }
 
 fn check_manifests_are_equivalent(
-    package_path: &PackagePath,
     old_package: &ToBeStagedPackage,
     new_package: &ToBeStagedPackage,
 ) -> Result<()> {
@@ -529,12 +504,16 @@ fn check_manifests_are_equivalent(
 
     // Create a message that tries to explain why we have a conflict.
     let old_manifest_path =
-        old_package.path.as_ref().map(|path| path.as_str()).unwrap_or("<generated>");
+        old_package.manifest_path.as_ref().map(|path| path.as_str()).unwrap_or("<generated>");
     let new_manifest_path =
-        new_package.path.as_ref().map(|path| path.as_str()).unwrap_or("<generated>");
+        new_package.manifest_path.as_ref().map(|path| path.as_str()).unwrap_or("<generated>");
 
     let mut msg = vec![format!(
-        "conflict for repository path '{package_path}'\n  manifest paths:\n  - {old_manifest_path}\n  - {new_manifest_path}\n  differences:",
+        "conflict between package manifests\
+        \n  manifest paths:\
+        \n  - {old_manifest_path}\
+        \n  - {new_manifest_path}\
+        \n  differences:",
     )];
 
     #[derive(PartialEq, Eq)]
@@ -802,6 +781,7 @@ mod tests {
 
         const ANONYMOUS_SUBPACKAGE: &str = "anonymous_subpackage";
         const NAMED_SUBPACKAGE: &str = "named_subpackage";
+        const NAMED_PACKAGE: &str = "named_package";
         const SUPERPACKAGE: &str = "superpackage";
 
         // Create an anonymous subpackage (a subpackage that is not directly
@@ -842,6 +822,25 @@ mod tests {
         .unwrap();
         let namedsubpkg_meta_far_contents = std::fs::read(&namedsubpkg_meta_far_path).unwrap();
 
+        // Make a package that's a duplicate of `named_subpackage` but with different files. This
+        // will be added after `named_subpackage`, so we shouldn't try to read any of these files.
+        let namedpkg_dir = dir.join(NAMED_PACKAGE);
+        let (_, namedpkg_manifest) = test_utils::make_package_manifest(
+            NAMED_SUBPACKAGE,
+            namedpkg_dir.as_std_path(),
+            vec![(
+                "anon_subpackage_of_namedsubpkg".parse().unwrap(),
+                anonsubpkg_manifest.hash(),
+                anonsubpkg_manifest_path.clone().into(),
+            )],
+        );
+        let namedpkg_manifest_path = namedpkg_dir.join("named.manifest");
+        serde_json::to_writer(
+            std::fs::File::create(&namedpkg_manifest_path).unwrap(),
+            &namedpkg_manifest,
+        )
+        .unwrap();
+
         // Create a named package ("superpackage"), which will also be a superpackage
         // of both named_subpackage and anonymous_subpackage. Note that
         // named_subpackage is ALSO a superpackage of anonymous_subpackage, so
@@ -874,16 +873,38 @@ mod tests {
 
         // Add the two named packages. The anonymous subpackage will be added
         // automatically.
-        RepoBuilder::create(&repo, &repo_keys)
-            .add_package(superpkg_manifest_path)
+        let actual_deps = RepoBuilder::create(&repo, &repo_keys)
+            .add_package(superpkg_manifest_path.clone())
             .await
             .unwrap()
-            .add_package(namedsubpkg_manifest_path)
+            .add_package(namedsubpkg_manifest_path.clone())
+            .await
+            .unwrap()
+            .add_package(namedpkg_manifest_path.clone())
             .await
             .unwrap()
             .commit()
             .await
             .unwrap();
+
+        let mut expected_deps = BTreeSet::new();
+        expected_deps.insert(anonsubpkg_manifest_path);
+        expected_deps.extend(
+            anonsubpkg_manifest.blobs().iter().map(|blob| Utf8PathBuf::from(&blob.source_path)),
+        );
+        expected_deps.insert(namedsubpkg_manifest_path);
+        expected_deps.extend(
+            namedsubpkg_manifest.blobs().iter().map(|blob| Utf8PathBuf::from(&blob.source_path)),
+        );
+        expected_deps.insert(superpkg_manifest_path);
+        expected_deps.extend(
+            superpkg_manifest.blobs().iter().map(|blob| Utf8PathBuf::from(&blob.source_path)),
+        );
+        // We should only read from the `named_package` manifest, but none of the files that are in
+        // the manifest.
+        expected_deps.insert(namedpkg_manifest_path);
+
+        assert_eq!(actual_deps.into_iter().collect::<BTreeSet<_>>(), expected_deps);
 
         let repo_blobs = read_dir(&blob_repo_path);
 
