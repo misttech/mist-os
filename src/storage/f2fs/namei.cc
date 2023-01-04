@@ -12,11 +12,10 @@
 
 namespace f2fs {
 
-zx_status_t Dir::NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) {
+zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
   nid_t ino;
-  fbl::RefPtr<VnodeF2fs> vnode_refptr;
-  VnodeF2fs *vnode = nullptr;
+  fbl::RefPtr<VnodeF2fs> vnode;
 
   do {
     fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kFileOp));
@@ -25,12 +24,10 @@ zx_status_t Dir::NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) {
     }
   } while (false);
 
-  VnodeF2fs::Allocate(fs(), ino, mode, &vnode_refptr);
-
-  vnode = vnode_refptr.get();
-
+  if (auto ret = VnodeF2fs::Allocate(fs(), ino, mode, &vnode); ret != ZX_OK) {
+    return ret;
+  }
   vnode->SetUid(getuid());
-
   if (HasGid()) {
     vnode->SetGid(GetGid());
     if (S_ISDIR(mode))
@@ -39,8 +36,7 @@ zx_status_t Dir::NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) {
     vnode->SetGid(getgid());
   }
 
-  vnode->SetMode(static_cast<umode_t>(mode));
-  vnode->InitSize();
+  vnode->SetSize(0);
   vnode->InitNlink();
   vnode->InitBlocks();
 
@@ -62,10 +58,11 @@ zx_status_t Dir::NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   }
 
   vnode->SetFlag(InodeInfoFlag::kNewInode);
-  fs()->InsertVnode(vnode);
+
+  fs()->InsertVnode(vnode.get());
   vnode->MarkInodeDirty();
 
-  *out = std::move(vnode_refptr);
+  *out = std::move(vnode);
   return ZX_OK;
 }
 
@@ -94,15 +91,18 @@ void Dir::SetColdFile(VnodeF2fs &vnode) {
   }
 }
 
-zx_status_t Dir::DoCreate(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) {
+zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out) {
   SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
   fbl::RefPtr<VnodeF2fs> vnode_refptr;
   VnodeF2fs *vnode = nullptr;
 
-  if (zx_status_t err = NewInode(S_IFREG | mode, &vnode_refptr); err != ZX_OK)
+  if (zx_status_t err =
+          NewInode(safemath::CheckOr<umode_t>(S_IFREG, mode).ValueOrDie(), &vnode_refptr);
+      err != ZX_OK) {
     return err;
-  vnode = vnode_refptr.get();
+  }
 
+  vnode = vnode_refptr.get();
   vnode->SetName(name);
 
   if (!superblock_info.TestOpt(kMountDisableExtIdentify))
@@ -113,7 +113,7 @@ zx_status_t Dir::DoCreate(std::string_view name, uint32_t mode, fbl::RefPtr<fs::
     if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
       vnode->ClearNlink();
       vnode->UnlockNewInode();
-      fs()->GetVCache().RemoveDirty(vnode);
+      [[maybe_unused]] auto vnode_or = fs()->GetVCache().RemoveDirty(vnode);
       fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
@@ -265,11 +265,13 @@ zx_status_t Dir::DoUnlink(VnodeF2fs *vnode, std::string_view name) {
 // }
 #endif
 
-zx_status_t Dir::Mkdir(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) {
+zx_status_t Dir::Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out) {
   fbl::RefPtr<VnodeF2fs> vnode_refptr;
   VnodeF2fs *vnode = nullptr;
 
-  if (zx_status_t err = NewInode(S_IFDIR | mode, &vnode_refptr); err != ZX_OK)
+  if (zx_status_t err =
+          NewInode(safemath::CheckOr<umode_t>(S_IFDIR, mode).ValueOrDie(), &vnode_refptr);
+      err != ZX_OK)
     return err;
   vnode = vnode_refptr.get();
   vnode->SetName(name);
@@ -281,7 +283,7 @@ zx_status_t Dir::Mkdir(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vno
       vnode->ClearFlag(InodeInfoFlag::kIncLink);
       vnode->ClearNlink();
       vnode->UnlockNewInode();
-      fs()->GetVCache().RemoveDirty(vnode);
+      [[maybe_unused]] auto vnode_or = fs()->GetVCache().RemoveDirty(vnode);
       fs()->GetNodeManager().AddFreeNid(vnode->Ino());
       return err;
     }
@@ -539,9 +541,9 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
     }
 
     if (S_ISDIR(mode)) {
-      ret = Mkdir(name, mode, out);
+      ret = Mkdir(name, safemath::checked_cast<umode_t>(mode), out);
     } else {
-      ret = DoCreate(name, mode, out);
+      ret = DoCreate(name, safemath::checked_cast<umode_t>(mode), out);
     }
   }
   if (ret == ZX_OK) {

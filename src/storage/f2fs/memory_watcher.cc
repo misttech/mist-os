@@ -47,6 +47,7 @@ void MemoryPressureWatcher::OnLevelChanged(OnLevelChangedRequest& request,
       break;
     case fuchsia_memorypressure::Level::kNormal:
       level = MemoryPressure::kLow;
+      UpdateId();
       break;
   }
 

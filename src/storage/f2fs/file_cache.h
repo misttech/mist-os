@@ -27,15 +27,12 @@ enum class PageFlag {
   kPageWriteback,     // It is under writeback.
   kPageLocked,        // It is locked. Wait for it to be unlocked.
   kPageVmoLocked,     // Its vmo is locked to prevent mm from reclaiming it.
-  kPageMapped,        // It has a valid mapping to the address space.
   kPageActive,        // It is being referenced.
-  // TODO: Clear |kPageMmapped| when all mmaped areas are unmapped.
-  kPageMmapped,   // It is mmapped. Once set, it remains regardless of munmap.
-  kPageColdData,  // It is under garbage collecting. It must not be inplace updated.
+  kPageColdData,      // It is under garbage collecting. It must not be inplace updated.
   kPageFlagSize,
 };
 
-constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max();
+constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max() / kBlockSize;
 
 // It defines a writeback operation.
 struct WritebackOperation {
@@ -86,6 +83,7 @@ class Page : public PageRefCounted<Page>,
   pgoff_t GetIndex() const { return GetKey(); }
   VnodeF2fs &GetVnode() const;
   FileCache &GetFileCache() const;
+  VmoManager &GetVmoManager() const;
   // A caller is allowed to access |this| via address_ after GetPage().
   // Calling it ensures that VmoManager creates and maintains a vmo called VmoNode that
   // |this| will use. When VmoManager does not have the corresponding VmoNode, it creates
@@ -95,10 +93,12 @@ class Page : public PageRefCounted<Page>,
   zx_status_t GetPage();
   zx_status_t VmoOpUnlock(bool evict = false);
   zx::result<bool> VmoOpLock();
-  template <typename T = void>
-  T *GetAddress() const {
-    ZX_DEBUG_ASSERT(IsMapped());
-    return reinterpret_cast<T *>(address_);
+
+  template <typename U = void>
+  U *GetAddress() const {
+    auto address_or = GetVmoManager().GetAddress(index_);
+    ZX_DEBUG_ASSERT(address_or.is_ok());
+    return reinterpret_cast<U *>(*address_or);
   }
 
   bool IsUptodate() const { return TestFlag(PageFlag::kPageUptodate); }
@@ -106,12 +106,8 @@ class Page : public PageRefCounted<Page>,
   bool IsWriteback() const { return TestFlag(PageFlag::kPageWriteback); }
   bool IsLocked() const { return TestFlag(PageFlag::kPageLocked); }
   bool IsVmoLocked() const { return TestFlag(PageFlag::kPageVmoLocked); }
-  bool IsMapped() const { return TestFlag(PageFlag::kPageMapped); }
   bool IsActive() const { return TestFlag(PageFlag::kPageActive); }
-  bool IsMmapped() const { return TestFlag(PageFlag::kPageMmapped); }
   bool IsColdData() const { return TestFlag(PageFlag::kPageColdData); }
-
-  void ClearMapped() { ClearFlag(PageFlag::kPageMapped); }
 
   // Each Setxxx() method atomically sets a flag and returns the previous value.
   // It is called when the first reference is made.
@@ -148,10 +144,6 @@ class Page : public PageRefCounted<Page>,
   bool SetDirty();
   bool ClearDirtyForIo();
 
-  // It ensures that the contents of |this| is synchronized with the corresponding pager backed vmo.
-  void SetMmapped();
-  bool ClearMmapped();
-
   void SetColdData();
   bool ClearColdData();
 
@@ -161,13 +153,13 @@ class Page : public PageRefCounted<Page>,
   // its block address in a dnode or nat entry first.
   void Invalidate();
 
-  void ZeroUserSegment(uint64_t start, uint64_t end) const {
+  void ZeroUserSegment(size_t start = 0, size_t end = BlockSize()) const {
     if (start < end && end <= BlockSize()) {
       std::memset(GetAddress<uint8_t>() + start, 0, end - start);
     }
   }
 
-  static uint32_t BlockSize() { return kPageSize; }
+  static constexpr uint32_t BlockSize() { return kPageSize; }
   block_t GetBlockAddr() const { return block_addr_; }
   zx::result<> SetBlockAddr(block_t addr);
 
@@ -208,15 +200,9 @@ class Page : public PageRefCounted<Page>,
     return flags_[static_cast<uint8_t>(flag)].test_and_set(std::memory_order_acquire);
   }
 
-  // After a successful call to GetPage(), it has a valid mapping and virtual address
-  // through which a user can access to the vmo. It is valid only when IsMapped() returns true.
-  zx_vaddr_t address_ = 0;
   // It is used to track the status of a page by using PageFlag
   std::array<std::atomic_flag, static_cast<uint8_t>(PageFlag::kPageFlagSize)> flags_ = {
       ATOMIC_FLAG_INIT};
-#ifndef __Fuchsia__
-  FsBlock blk_;
-#endif  // __Fuchsia__
   // It indicates FileCache to which |this| belongs.
   FileCache *file_cache_ = nullptr;
   // It is used as the key of |this| in a lookup table (i.e., FileCache::page_tree_).
@@ -225,6 +211,7 @@ class Page : public PageRefCounted<Page>,
   // node id. For meta vnode, it points to the block address to which the metadata is written.
   const pgoff_t index_;
   block_t block_addr_ = kNullAddr;
+  [[maybe_unused]] uint32_t memory_pressure_id_ = 0;
 };
 
 // LockedPage is a wrapper class for f2fs::Page lock management.
@@ -314,11 +301,7 @@ class LockedPage final {
 
 class FileCache {
  public:
-#ifdef __Fuchsia__
   FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager);
-#else   // __Fuchsia__
-  FileCache(VnodeF2fs *vnode);
-#endif  // __Fuchsia__
   FileCache() = delete;
   FileCache(const FileCache &) = delete;
   FileCache &operator=(const FileCache &) = delete;
@@ -349,7 +332,8 @@ class FileCache {
   // It tries to write out dirty Pages that meets |operation| in |page_tree_|.
   pgoff_t Writeback(WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
   // It invalidates Pages within the range of |start| to |end| in |page_tree_|.
-  std::vector<LockedPage> InvalidatePages(pgoff_t start, pgoff_t end) __TA_EXCLUDES(tree_lock_);
+  std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax)
+      __TA_EXCLUDES(tree_lock_);
   // It removes all Pages from |page_tree_|. It should be called when no one can get access to
   // |vnode_|. (e.g., fbl_recycle()) It assumes that all active Pages are under writeback.
   void Reset() __TA_EXCLUDES(tree_lock_);
@@ -362,9 +346,7 @@ class FileCache {
   // Count contiguously cached pages in the range [index - max_scan, index - 1].
   uint64_t CountContiguousPages(pgoff_t index, uint64_t max_scan) __TA_EXCLUDES(tree_lock_);
   F2fs *fs() const;
-#ifdef __Fuchsia__
   VmoManager &GetVmoManager() { return *vmo_manager_; }
-#endif  // __Fuchsia__
 
  private:
   // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,
@@ -407,9 +389,7 @@ class FileCache {
   std::condition_variable_any recycle_cvar_;
   PageTree page_tree_ __TA_GUARDED(tree_lock_);
   VnodeF2fs *vnode_;
-#ifdef __Fuchsia__
   VmoManager *vmo_manager_;
-#endif  // __Fuchsia__
 };
 
 }  // namespace f2fs

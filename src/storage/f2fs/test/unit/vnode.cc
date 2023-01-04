@@ -44,7 +44,7 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
     node_page.SetDirty();
   }
 
-  ASSERT_EQ(fs.GetVCache().RemoveDirty(test_vnode.get()), ZX_OK);
+  ASSERT_TRUE(fs.GetVCache().RemoveDirty(test_vnode.get()).is_ok());
   fs.EvictVnode(test_vnode.get());
 
   // test vget
@@ -118,7 +118,6 @@ TEST_F(VnodeTest, EmptyOverridenMethods) {
   ASSERT_EQ(root_dir_->Write(buf, 0, kPageSize, &out), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(root_dir_->Append(buf, kPageSize, &end, &out), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(root_dir_->Truncate(0), ZX_ERR_NOT_SUPPORTED);
-  ASSERT_EQ(root_dir_->PopulateVmoWithInlineData(vmo).status_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(VnodeTest, Mode) {
@@ -162,10 +161,8 @@ TEST_F(VnodeTest, WriteInode) {
   NodeManager &node_manager = fs_->GetNodeManager();
 
   // 1. Check node ino exception
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &test_vnode), ZX_OK);
-  ASSERT_EQ(test_vnode->WriteInode(false), ZX_OK);
-  fs_->EvictVnode(test_vnode.get());
-  test_vnode = nullptr;
+  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &test_vnode),
+            ZX_ERR_NOT_FOUND);
 
   // 2. Check GetNodePage() exception
   FileTester::CreateChild(root_dir_.get(), S_IFDIR, "write_inode_dir");

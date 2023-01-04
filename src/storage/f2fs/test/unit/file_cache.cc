@@ -92,13 +92,10 @@ TEST_F(FileCacheTest, Map) {
   // Even after LockedPage is destructed, the mapping is maintained
   // since VmoManager keeps the mapping of VmoNode as long as its vnode is active.
   ASSERT_EQ(raw_ptr->IsLocked(), false);
-  ASSERT_EQ(raw_ptr->IsMapped(), true);
 
   {
     LockedPage page;
     vn->GrabCachePage(0, &page);
-    // |page| should be mapped as a new reference is added.
-    ASSERT_EQ(raw_ptr->IsMapped(), true);
     ASSERT_EQ(page->IsLocked(), true);
   }
 
@@ -186,21 +183,21 @@ TEST_F(FileCacheTest, WritebackOperation) {
                            }};
 
   // |vn| should not have any dirty Pages.
-  ASSERT_EQ(vn->GetDirtyPageCount(), 0);
+  ASSERT_EQ(vn->GetDirtyPageCount(), 0U);
   FileTester::AppendToFile(vn.get(), buf, kPageSize);
   FileTester::AppendToFile(vn.get(), buf, kPageSize);
   // Flush the Page of 1st block.
   {
     LockedPage page;
     vn->GrabCachePage(0, &page);
-    ASSERT_EQ(vn->GetDirtyPageCount(), 2);
+    ASSERT_EQ(vn->GetDirtyPageCount(), 2U);
     key = page->GetKey();
     auto unlocked_page = page.release();
     // Request writeback for dirty Pages. |unlocked_page| should be written out.
     key = 0;
     ASSERT_EQ(vn->Writeback(op), 1UL);
     // Writeback() should be able to flush |unlocked_page|.
-    ASSERT_EQ(vn->GetDirtyPageCount(), 1);
+    ASSERT_EQ(vn->GetDirtyPageCount(), 1U);
     ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kWriteback), 0);
     ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kDirtyData), 1);
     ASSERT_EQ(unlocked_page->IsWriteback(), false);
@@ -219,7 +216,7 @@ TEST_F(FileCacheTest, WritebackOperation) {
   op.bSync = false;
   // Now, 2nd Page meets op.if_page.
   ASSERT_EQ(vn->Writeback(op), 1UL);
-  ASSERT_EQ(vn->GetDirtyPageCount(), 0);
+  ASSERT_EQ(vn->GetDirtyPageCount(), 0U);
   ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kDirtyData), 0);
   // Set sync. writeback.
   op.bSync = true;
@@ -408,8 +405,6 @@ TEST_F(FileCacheTest, Basic) {
     ASSERT_EQ(page->IsUptodate(), false);
     ASSERT_EQ(page->IsDirty(), false);
     ASSERT_EQ(page->IsWriteback(), false);
-    // Every page should have a mapping.
-    ASSERT_EQ(page->IsMapped(), true);
     ASSERT_EQ(page->IsLocked(), true);
   }
 

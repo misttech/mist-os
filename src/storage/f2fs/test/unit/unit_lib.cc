@@ -104,7 +104,7 @@ void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) 
 
 void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) {
   fs->GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs> &vnode) {
-    fs->GetVCache().RemoveDirty(vnode.get());
+    [[maybe_unused]] auto vnode_or = fs->GetVCache().RemoveDirty(vnode.get());
     return ZX_OK;
   });
   fs->GetDirtyDataPageList().Reset();
@@ -187,7 +187,7 @@ void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2
   nid_t inode_nid;
   ASSERT_TRUE(fs->GetNodeManager().AllocNid(inode_nid).is_ok());
 
-  VnodeF2fs::Allocate(fs, inode_nid, mode, &vnode);
+  VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
   vnode->UnlockNewInode();

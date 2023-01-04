@@ -18,7 +18,7 @@ void F2fs::PutSuper() {
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     // In the checkpoint error case, flush the dirty vnode list.
     GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs> &vnode) {
-      GetVCache().RemoveDirty(vnode.get());
+      ZX_ASSERT(GetVCache().RemoveDirty(vnode.get()).is_ok());
       return ZX_OK;
     });
   }
@@ -346,8 +346,9 @@ zx_status_t F2fs::FillSuper() {
   superblock_info_->ClearOnRecovery();
   InitSuperblockInfo();
 
-  node_vnode_ = std::make_unique<VnodeF2fs>(this, GetSuperblockInfo().GetNodeIno());
-  meta_vnode_ = std::make_unique<VnodeF2fs>(this, GetSuperblockInfo().GetMetaIno());
+  node_vnode_ = std::make_unique<VnodeF2fs>(this, GetSuperblockInfo().GetNodeIno(), 0);
+  meta_vnode_ = std::make_unique<VnodeF2fs>(this, GetSuperblockInfo().GetMetaIno(), 0);
+
   reader_ = std::make_unique<Reader>(bc_.get(), kDefaultBlocksPerSegment);
   writer_ = std::make_unique<Writer>(
       bc_.get(),

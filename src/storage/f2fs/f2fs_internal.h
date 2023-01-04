@@ -67,7 +67,6 @@ enum class CountType {
   kDirtyNodes,
   kDirtyMeta,
   kDirtyData,
-  kMmapedData,
   kNrCountType,
 };
 
@@ -565,6 +564,7 @@ enum class InodeInfoFlag {
   kInlineDentry,  // used for inline dentry
   kDataExist,     // indicate data exists
   kBad,           // should drop this inode without purging
+  kFlagSize,
 };
 
 #if 0  // porting needed

@@ -71,7 +71,6 @@ zx::result<PageOperations> StorageBuffer::ReserveReadOperations(std::vector<Lock
     if (addr != kNullAddr && !pages[i]->IsUptodate()) {
       if (addr != kNewAddr) {
         std::lock_guard lock(mutex_);
-
         // If addr is invalid, free allocated keys.
         if (addr >= max_blocks_) {
           free_list_.splice(free_list_.end(), keys);
@@ -103,7 +102,7 @@ zx::result<PageOperations> StorageBuffer::ReserveReadOperations(std::vector<Lock
       } else {
         // If it is a newly allocated block, just zero it.
         // Refer to VnodeF2fs::GetLockedDataPages().
-        pages[i]->ZeroUserSegment(0, kPageSize);
+        pages[i]->ZeroUserSegment();
         pages[i]->SetUptodate();
       }
     }

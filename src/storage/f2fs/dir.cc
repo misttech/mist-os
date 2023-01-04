@@ -37,7 +37,7 @@ const unsigned char kTypeByMode[S_IFMT >> kStatShift] = {
 };
 #pragma GCC diagnostic pop
 
-Dir::Dir(F2fs *fs, ino_t ino) : VnodeF2fs(fs, ino) {}
+Dir::Dir(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
 block_t Dir::DirBlocks() { return safemath::checked_cast<block_t>(GetBlockCount()); }
 
@@ -347,7 +347,8 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
 }
 
 void Dir::UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) {
-  if (vnode->ClearFlag(InodeInfoFlag::kNewInode)) {
+  if (vnode->TestFlag(InodeInfoFlag::kNewInode)) {
+    vnode->ClearFlag(InodeInfoFlag::kNewInode);
     if (vnode->IsDir()) {
       IncNlink();
       SetFlag(InodeInfoFlag::kUpdateDir);
@@ -394,7 +395,8 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
   int namelen = static_cast<int>(name.length());
   int slots = (namelen + kNameLen - 1) / kNameLen;
   auto umount = fit::defer([&] {
-    if (ClearFlag(InodeInfoFlag::kUpdateDir)) {
+    if (TestFlag(InodeInfoFlag::kUpdateDir)) {
+      ClearFlag(InodeInfoFlag::kUpdateDir);
       WriteInode(false);
     }
   });
@@ -519,7 +521,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
       vnode->DropNlink();
       if (vnode->IsDir()) {
         vnode->DropNlink();
-        vnode->InitSize();
+        vnode->SetSize(0);
       }
       vnode->WriteInode(false);
       if (vnode->GetNlink() == 0) {

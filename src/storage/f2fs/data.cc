@@ -84,62 +84,62 @@ zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node
 #endif
 
 void VnodeF2fs::UpdateExtentCache(block_t blk_addr, pgoff_t file_offset) {
-  InodeInfo *fi = &fi_;
+#if 0  // TODO(fxbug.dev/118687): the extent cache has not been ported yet.
   pgoff_t start_fofs, end_fofs;
   block_t start_blkaddr, end_blkaddr;
 
   ZX_DEBUG_ASSERT(blk_addr != kNewAddr);
-
   do {
-    std::lock_guard ext_lock(fi->ext.ext_lock);
+    std::lock_guard ext_lock(extent_cache_lock);
 
-    start_fofs = fi->ext.fofs;
-    end_fofs = fi->ext.fofs + fi->ext.len - 1;
-    start_blkaddr = fi->ext.blk_addr;
-    end_blkaddr = fi->ext.blk_addr + fi->ext.len - 1;
+    start_fofs = extent_cache_.fofs;
+    end_fofs = extent_cache_.fofs + extent_cache_.->ext.len - 1;
+    start_blkaddr = extent_cache_blk_addr;
+    end_blkaddr = extent_cache_.blk_addr + extent_cache_.len - 1;
 
-    /* Drop and initialize the matched extent */
-    if (fi->ext.len == 1 && file_offset == start_fofs)
-      fi->ext.len = 0;
+    // Drop and initialize the matched extent
+    if (extent_cache_.len == 1 && file_offset == start_fofs) {
+      extent_cache_.len = 0;
+		}
 
-    /* Initial extent */
-    if (fi->ext.len == 0) {
+    // Initial extent
+    if (extent_cache_.len == 0) {
       if (blk_addr != kNullAddr) {
-        fi->ext.fofs = file_offset;
-        fi->ext.blk_addr = blk_addr;
-        fi->ext.len = 1;
+        extent_cache_.fofs = file_offset;
+        extent_cache_.blk_addr = blk_addr;
+        extent_cache_.len = 1;
       }
       break;
     }
 
-    /* Frone merge */
+    // Frone merge
     if (file_offset == start_fofs - 1 && blk_addr == start_blkaddr - 1) {
-      --fi->ext.fofs;
-      --fi->ext.blk_addr;
-      ++fi->ext.len;
+      --extent_cache_.fofs;
+      --extent_cache_.blk_addr;
+      ++extent_cache_.len;
       break;
     }
 
-    /* Back merge */
+    // Back merge
     if (file_offset == end_fofs + 1 && blk_addr == end_blkaddr + 1) {
-      ++fi->ext.len;
+      ++extent_cache_.len;
       break;
     }
 
     /* Split the existing extent */
-    if (fi->ext.len > 1 && file_offset >= start_fofs && file_offset <= end_fofs) {
+    if (extent_cache_.len > 1 && file_offset >= start_fofs && file_offset <= end_fofs) {
       if ((end_fofs - file_offset) < (fi->ext.len >> 1)) {
-        fi->ext.len = static_cast<uint32_t>(file_offset - start_fofs);
+        extent_cache_.len = static_cast<uint32_t>(file_offset - start_fofs);
       } else {
-        fi->ext.fofs = file_offset + 1;
-        fi->ext.blk_addr = static_cast<uint32_t>(start_blkaddr + file_offset - start_fofs + 1);
-        fi->ext.len -= file_offset - start_fofs + 1;
+        extent_cache_.fofs = file_offset + 1;
+        extent_cache_.blk_addr = static_cast<uint32_t>(start_blkaddr + file_offset - start_fofs + 1);
+        extent_cache_.len -= file_offset - start_fofs + 1;
       }
       break;
     }
     return;
   } while (false);
-
+#endif
   MarkInodeDirty();
 }
 
@@ -446,7 +446,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
     new_blk_addr = *addr_or;
     SetDataBlkaddr(dnode_page.GetPage<NodePage>(), ofs_in_dnode, new_blk_addr);
     UpdateExtentCache(new_blk_addr, file_offset);
-    UpdateVersion();
+    UpdateVersion(LeToCpu(fs()->GetSuperblockInfo().GetCheckpoint().checkpoint_ver));
   }
 
   return zx::ok(new_blk_addr);
@@ -463,7 +463,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bo
       page->ClearDirtyForIo();
       return zx::error(ZX_ERR_NOT_FOUND);
     }
-    page->ZeroUserSegment(offset, kPageSize);
+    page->ZeroUserSegment(offset);
   }
 
   // TODO: Consider skipping the wb for hot/warm blocks
@@ -520,15 +520,23 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   std::vector<block_t> read_addrs;
   bool read_front_page = false, read_rear_page = false;
   if (offset % kBlockSize) {
-    read_front_page = true;
-    read_pages.push_back(std::move(data_pages.front()));
-    read_addrs.emplace_back(data_block_addresses.front());
+    if (data_block_addresses.front() == kNewAddr && !data_pages.front()->IsUptodate()) {
+      data_pages.front()->ZeroUserSegment(0, offset % kBlockSize);
+    } else {
+      read_front_page = true;
+      read_pages.push_back(std::move(data_pages.front()));
+      read_addrs.emplace_back(data_block_addresses.front());
+    }
   }
   if (offset_end % kBlockSize) {
-    if (data_pages.size() > 1 || !read_front_page) {
-      read_rear_page = true;
-      read_pages.push_back(std::move(data_pages.back()));
-      read_addrs.emplace_back(data_block_addresses.back());
+    if (data_block_addresses.size() > 1 || !read_front_page) {
+      if (data_block_addresses.back() == kNewAddr && !data_pages.back()->IsUptodate()) {
+        data_pages.back()->ZeroUserSegment(offset_end % kBlockSize);
+      } else {
+        read_rear_page = true;
+        read_pages.push_back(std::move(data_pages.back()));
+        read_addrs.emplace_back(data_block_addresses.back());
+      }
     }
   }
   if (read_pages.size()) {

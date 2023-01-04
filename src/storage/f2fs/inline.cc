@@ -166,7 +166,7 @@ zx_status_t Dir::ConvertInlineDir() {
   }
 
   page->WaitOnWriteback();
-  page->ZeroUserSegment(0, kPageSize);
+  page->ZeroUserSegment();
 
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
 
@@ -213,8 +213,9 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
       ipage->WaitOnWriteback();
 
       if (zx_status_t err = InitInodeMetadata(vnode); err != ZX_OK) {
-        if (ClearFlag(InodeInfoFlag::kUpdateDir)) {
+        if (TestFlag(InodeInfoFlag::kUpdateDir)) {
           UpdateInode(ipage);
+          ClearFlag(InodeInfoFlag::kUpdateDir);
         }
         return zx::error(err);
       }
@@ -282,14 +283,12 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
 
   if (vnode) {
     clock_gettime(CLOCK_REALTIME, &cur_time);
-    SetCTime(cur_time);
-    SetMTime(cur_time);
     vnode->MarkInodeDirty();
     vnode->SetCTime(cur_time);
     vnode->DropNlink();
     if (vnode->IsDir()) {
       vnode->DropNlink();
-      vnode->InitSize();
+      vnode->SetSize(0);
     }
     vnode->WriteInode(false);
     if (vnode->GetNlink() == 0) {
@@ -369,25 +368,6 @@ uint8_t *File::InlineDataPtr(Page *page) {
       &ri.i_addr[GetExtraISize() / sizeof(uint32_t) + kInlineStartOffset]);
 }
 
-#ifdef __Fuchsia__
-zx::result<> File::PopulateVmoWithInlineData(zx::vmo &vmo) {
-  LockedPage inline_page;
-  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
-    return zx::error(ret);
-  }
-  // Fill |vmo| only when it has valid inline data.
-  if (TestFlag(InodeInfoFlag::kDataExist)) {
-    uint8_t *inline_data = InlineDataPtr(inline_page.get());
-    size_t size = GetSize();
-    if (size) {
-      vmo.write(inline_data, 0, size);
-    }
-  }
-  inline_page->SetMmapped();
-  return zx::ok();
-}
-#endif  // __Fuchsia__
-
 zx_status_t File::ReadInline(void *data, size_t len, size_t off, size_t *out_actual) {
   LockedPage inline_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
@@ -431,7 +411,7 @@ zx_status_t File::ConvertInlineData() {
   }
 
   page->WaitOnWriteback();
-  page->ZeroUserSegment(0, kPageSize);
+  page->ZeroUserSegment();
 
   uint8_t *inline_data = InlineDataPtr(ipage);
   memcpy(page->GetAddress(), inline_data, GetSize());
@@ -440,8 +420,6 @@ zx_status_t File::ConvertInlineData() {
 
   ipage->WaitOnWriteback();
   ipage->ZeroUserSegment(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
-  // Clear regarding flags since we moved inline data to a data Page.
-  ipage->ClearMmapped();
   ClearFlag(InodeInfoFlag::kInlineData);
   ClearFlag(InodeInfoFlag::kDataExist);
 
@@ -451,6 +429,10 @@ zx_status_t File::ConvertInlineData() {
 }
 
 zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_t *out_actual) {
+  LockedPage page;
+  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
+    return ret;
+  }
   LockedPage inline_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
     return ret;
@@ -460,10 +442,8 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
 
   uint8_t *inline_data = InlineDataPtr(inline_page.get());
   memcpy(inline_data + offset, static_cast<const uint8_t *>(data), len);
-  if (inline_page->IsMapped()) {
-    // Apply changes to its paged VMO.
-    ZX_ASSERT(WritePagedVmo(inline_data + offset, offset, len) == ZX_OK);
-  }
+  // Apply changes to its paged VMO.
+  memcpy(page->GetAddress<uint8_t>() + offset, inline_data + offset, len);
 
   SetSize(std::max(static_cast<size_t>(GetSize()), offset + len));
   SetFlag(InodeInfoFlag::kDataExist);
@@ -481,33 +461,33 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
 }
 
 zx_status_t File::TruncateInline(size_t len, bool is_recover) {
-  {
-    LockedPage inline_page;
-    if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
-      return ret;
-    }
-
-    inline_page->WaitOnWriteback();
-
-    uint8_t *inline_data = InlineDataPtr(inline_page.get());
-    size_t size_diff = (len > GetSize()) ? (len - GetSize()) : (GetSize() - len);
-    size_t offset = ((len > GetSize()) ? GetSize() : len);
-    memset(inline_data + offset, 0, size_diff);
-    if (inline_page->IsMapped()) {
-      // Apply changes to its paged VMO.
-      ZX_ASSERT(WritePagedVmo(inline_data + offset, offset, size_diff) == ZX_OK);
-    }
-
-    // When removing inline data during recovery, file size should not be modified.
-    if (!is_recover) {
-      SetSize(len);
-    }
-    if (len == 0) {
-      ClearFlag(InodeInfoFlag::kDataExist);
-    }
-
-    inline_page.SetDirty();
+  LockedPage page;
+  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
+    return ret;
   }
+  LockedPage inline_page;
+  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
+    return ret;
+  }
+
+  inline_page->WaitOnWriteback();
+
+  uint8_t *inline_data = InlineDataPtr(inline_page.get());
+  size_t size_diff = (len > GetSize()) ? (len - GetSize()) : (GetSize() - len);
+  size_t offset = ((len > GetSize()) ? GetSize() : len);
+  memset(inline_data + offset, 0, size_diff);
+  // Apply changes to its paged VMO.
+  memset(page->GetAddress<uint8_t>() + offset, 0, size_diff);
+
+  // When removing inline data during recovery, file size should not be modified.
+  if (!is_recover) {
+    SetSize(len);
+  }
+  if (len == 0) {
+    ClearFlag(InodeInfoFlag::kDataExist);
+  }
+  inline_page.SetDirty();
+
   timespec cur_time;
   clock_gettime(CLOCK_REALTIME, &cur_time);
   SetCTime(cur_time);

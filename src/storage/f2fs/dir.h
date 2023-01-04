@@ -11,7 +11,7 @@ extern const unsigned char kFiletypeTable[];
 
 class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
  public:
-  explicit Dir(F2fs *fs, ino_t ino);
+  explicit Dir(F2fs *fs, ino_t ino, umode_t mode);
 
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }
@@ -51,10 +51,10 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
       __TA_EXCLUDES(dir_mutex_);
   zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) final
       __TA_EXCLUDES(dir_mutex_);
-  zx_status_t DoCreate(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out)
+  zx_status_t DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out)
       __TA_REQUIRES(dir_mutex_);
-  zx_status_t NewInode(uint32_t mode, fbl::RefPtr<VnodeF2fs> *out) __TA_REQUIRES(dir_mutex_);
-  zx_status_t Mkdir(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out)
+  zx_status_t NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) __TA_REQUIRES(dir_mutex_);
+  zx_status_t Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out)
       __TA_REQUIRES(dir_mutex_);
   zx_status_t AddLink(std::string_view name, VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
   zx::result<bool> AddInlineEntry(std::string_view name, VnodeF2fs *vnode)
@@ -81,9 +81,6 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // recovery
   zx::result<> RecoverLink(VnodeF2fs &vnode) __TA_EXCLUDES(dir_mutex_);
 
-  // inline helper
-  uint64_t InlineDentryBitmapSize() const;
-
   // helper
   static uint32_t DirBuckets(uint32_t level, uint8_t dir_level);
   static uint32_t BucketBlocks(uint32_t level);
@@ -101,6 +98,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   bool IsEmptyInlineDir();
 
   // inline helper
+  uint64_t InlineDentryBitmapSize() const;
   uint8_t *InlineDentryBitmap(Page *page);
   DirEntry *InlineDentryArray(Page *page, VnodeF2fs &vnode);
   uint8_t (*InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen];

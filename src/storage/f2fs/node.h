@@ -163,7 +163,7 @@ class NodeManager {
   zx_status_t RecoverInodePage(NodePage &page);
 
   // Check whether the given nid is within node id range.
-  void CheckNidRange(const nid_t &nid) const { ZX_ASSERT(nid < max_nid_); }
+  zx_status_t CheckNidRange(const nid_t &nid) const { return nid < max_nid_; }
 
   // members for fsck and unit tests
   explicit NodeManager(SuperblockInfo *sb);

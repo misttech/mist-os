@@ -10,6 +10,8 @@ Page::Page(FileCache *file_cache, pgoff_t index) : file_cache_(file_cache), inde
 
 VnodeF2fs &Page::GetVnode() const { return file_cache_->GetVnode(); }
 
+VmoManager &Page::GetVmoManager() const { return file_cache_->GetVmoManager(); }
+
 FileCache &Page::GetFileCache() const { return *file_cache_; }
 
 Page::~Page() {
@@ -18,7 +20,6 @@ Page::~Page() {
   ZX_DEBUG_ASSERT(InListContainer() == false);
   ZX_DEBUG_ASSERT(IsDirty() == false);
   ZX_DEBUG_ASSERT(IsLocked() == false);
-  ZX_DEBUG_ASSERT(IsMmapped() == false);
 }
 
 void Page::RecyclePage() {
@@ -41,7 +42,7 @@ bool Page::SetDirty() {
       !flags_[static_cast<uint8_t>(PageFlag::kPageDirty)].test_and_set(std::memory_order_acquire)) {
     VnodeF2fs &vnode = GetVnode();
     SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-    vnode.MarkInodeDirty();
+    vnode.MarkInodeDirty(true);
     vnode.IncreaseDirtyPageCount();
     if (vnode.IsNode()) {
       superblock_info.IncreasePageCount(CountType::kDirtyNodes);
@@ -89,35 +90,16 @@ zx_status_t Page::GetPage() {
       ZX_DEBUG_ASSERT(!IsDirty());
       ZX_DEBUG_ASSERT(!IsWriteback());
       ClearUptodate();
-      ClearMapped();
     }
-    ZX_ASSERT(Map() == ZX_OK);
   }
+  ZX_ASSERT(committed_or.is_ok());
   return committed_or.status_value();
-}
-
-zx_status_t Page::Map() {
-  if (!SetFlag(PageFlag::kPageMapped)) {
-#ifdef __Fuchsia__
-    auto address_or = file_cache_->GetVmoManager().GetAddress(index_);
-    if (address_or.is_ok()) {
-      address_ = address_or.value();
-    }
-    return address_or.status_value();
-#else   // __Fuchsia__
-    address_ = reinterpret_cast<zx_vaddr_t>(blk_.GetData());
-#endif  // __Fuchsia__
-  }
-  return ZX_OK;
 }
 
 void Page::Invalidate() {
   ZX_DEBUG_ASSERT(IsLocked());
   ClearDirtyForIo();
   ClearColdData();
-  if (ClearMmapped()) {
-    ZX_ASSERT(GetVnode().InvalidatePagedVmo(GetIndex() * kBlockSize, kBlockSize) == ZX_OK);
-  }
   ClearUptodate();
 }
 
@@ -155,25 +137,6 @@ void Page::ClearWriteback() {
   }
 }
 
-void Page::SetMmapped() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  if (IsUptodate()) {
-    if (!SetFlag(PageFlag::kPageMmapped)) {
-      fs()->GetSuperblockInfo().IncreasePageCount(CountType::kMmapedData);
-    }
-  }
-}
-
-bool Page::ClearMmapped() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  if (IsMmapped()) {
-    fs()->GetSuperblockInfo().DecreasePageCount(CountType::kMmapedData);
-    ClearFlag(PageFlag::kPageMmapped);
-    return true;
-  }
-  return false;
-}
-
 void Page::SetColdData() {
   ZX_DEBUG_ASSERT(IsLocked());
   ZX_DEBUG_ASSERT(!IsWriteback());
@@ -204,14 +167,13 @@ bool LockedPage::SetDirty(bool add_to_list) {
   return ret;
 }
 
-#ifdef __Fuchsia__
 zx_status_t Page::VmoOpUnlock(bool evict) {
   ZX_DEBUG_ASSERT(InTreeContainer());
   // |evict| can be true only when the Page is clean or subject to invalidation.
   if (((!IsDirty() && !file_cache_->IsOrphan()) || evict) && IsVmoLocked()) {
     WaitOnWriteback();
     ClearFlag(PageFlag::kPageVmoLocked);
-    return file_cache_->GetVmoManager().UnlockVmo(index_, evict);
+    return GetVmoManager().UnlockVmo(index_, evict);
   }
   return ZX_OK;
 }
@@ -220,23 +182,13 @@ zx::result<bool> Page::VmoOpLock() {
   ZX_DEBUG_ASSERT(InTreeContainer());
   ZX_DEBUG_ASSERT(IsLocked());
   if (!SetFlag(PageFlag::kPageVmoLocked)) {
-    return file_cache_->GetVmoManager().CreateAndLockVmo(index_);
+    return GetVmoManager().CreateAndLockVmo(index_);
   }
   return zx::ok(true);
 }
-#else   // __Fuchsia__
-// Do nothing on Linux.
-zx_status_t Page::VmoOpUnlock(bool evict) { return ZX_OK; }
 
-zx::result<bool> Page::VmoOpLock() { return zx::ok(true); }
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 FileCache::FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager)
     : vnode_(vnode), vmo_manager_(vmo_manager) {}
-#else   // __Fuchsia__
-FileCache::FileCache(VnodeF2fs *vnode) : vnode_(vnode) {}
-#endif  // __Fuchsia__
 
 FileCache::~FileCache() {
   Reset();
@@ -504,7 +456,7 @@ std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end) {
   std::vector<LockedPage> pages;
   {
     std::lock_guard tree_lock(tree_lock_);
-    pages = GetLockedPagesUnsafe(start, end);
+    pages = CleanupPagesUnsafe(start, end);
   }
   for (auto &page : pages) {
     if (page->IsDirty()) {
@@ -537,8 +489,8 @@ void FileCache::Reset() {
     if (page->IsDirty()) {
       page->Invalidate();
     }
-    page->ClearMmapped();
   }
+  vmo_manager_->Reset();
 }
 
 uint64_t FileCache::CountContiguousPages(pgoff_t index, uint64_t max_scan) {
@@ -610,7 +562,7 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOper
           page.reset();
           ++nwritten;
         }
-      } else if (!page->IsMmapped() && (operation.bReleasePages || !vnode_->IsActive())) {
+      } else if (operation.bReleasePages || !vnode_->IsActive()) {
         // There is no other reference. It is safe to release it.
         EvictUnsafe(page.get());
         page.reset();

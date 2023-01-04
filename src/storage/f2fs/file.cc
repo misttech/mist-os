@@ -6,7 +6,7 @@
 
 namespace f2fs {
 
-File::File(F2fs *fs, ino_t ino) : VnodeF2fs(fs, ino) {}
+File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
 #if 0  // porting needed
 // int File::F2fsVmPageMkwrite(vm_area_struct *vma, vm_fault *vmf) {
@@ -440,14 +440,6 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     left -= cur_len;
 
     data_page.SetDirty();
-
-    if (data_page->IsMmapped()) {
-      SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-      size_t blocksize = superblock_info.GetBlocksize();
-      ZX_ASSERT(WritePagedVmo(data_page->GetAddress(), n * blocksize,
-                              std::min(blocksize, left + cur_len)) == ZX_OK);
-    }
-
     data_pages[index].reset();
 
     if (left == 0)

@@ -327,6 +327,8 @@ class F2fs final {
     }
   }
 
+  bool CompareAndSetMemoryPressureID(uint32_t &id);
+
  private:
   void StartMemoryPressureWatcher();
   // Flush all dirty meta Pages that meet |operation|.if_page.

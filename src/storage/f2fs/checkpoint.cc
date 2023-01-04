@@ -72,10 +72,11 @@ void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
     vnode->Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
   }
 #endif  // __Fuchsia__
-  if (vnode->ClearDirty()) {
+  if (vnode->IsDirty()) {
+    vnode->ClearDirty();
     // Set the orphan flag of filecache to prevent further dirty Pages.
     vnode->ClearDirtyPages();
-    ZX_ASSERT(GetVCache().RemoveDirty(vnode) == ZX_OK);
+    ZX_ASSERT(GetVCache().RemoveDirty(vnode).is_ok());
   }
 }
 
@@ -277,7 +278,7 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
   GetVCache().ForDirtyVnodesIf(
       [&](fbl::RefPtr<VnodeF2fs> &vnode) {
         if (!vnode->ShouldFlush()) {
-          GetVCache().RemoveDirty(vnode.get());
+          ZX_ASSERT(GetVCache().RemoveDirty(vnode.get()).is_ok());
         } else if (vnode->GetDirtyPageCount()) {
           auto nwritten = vnode->Writeback(operation);
           total_nwritten = safemath::CheckAdd<pgoff_t>(total_nwritten, nwritten).ValueOrDie();

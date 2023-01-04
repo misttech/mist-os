@@ -8,7 +8,7 @@
 namespace f2fs {
 class File : public VnodeF2fs, public fbl::Recyclable<File> {
  public:
-  explicit File(F2fs* fs, ino_t ino);
+  explicit File(F2fs* fs, ino_t ino, umode_t mode);
 
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }
@@ -33,9 +33,6 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   zx_status_t Append(const void* data, size_t len, size_t* out_end, size_t* out_actual) final
       __TA_EXCLUDES(mutex_);
   zx_status_t Truncate(size_t len) final __TA_EXCLUDES(mutex_);
-#ifdef __Fuchsia__
-  zx::result<> PopulateVmoWithInlineData(zx::vmo& vmo) final __TA_EXCLUDES(mutex_);
-#endif  // __Fuchsia__
   zx_status_t RecoverInlineData(NodePage& node_page) final __TA_EXCLUDES(mutex_);
 
  private:
