@@ -28,6 +28,7 @@ source_set("recognizers_v2") {
     "//sdk/lib/fit",
     "//src/ui/a11y/lib/gesture_manager/arena",
     "//src/ui/a11y/lib/gesture_manager/gesture_util",
+    "//src/ui/a11y/lib/gesture_manager/gesture_util_v2",
   ]
 
   deps = [
