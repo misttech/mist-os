@@ -124,6 +124,11 @@ protocol RemoteControl {
         addr net.SocketAddress;
         client client_end:ForwardCallback;
     }) -> () error TunnelError;
+
+    // Gets the current monotonic time in nanoseconds.
+    GetTime() -> (struct {
+        time int64;
+    });
 };
 
 protocol ForwardCallback {

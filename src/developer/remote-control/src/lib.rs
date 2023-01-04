@@ -229,6 +229,10 @@ impl RemoteControlService {
                 responder.send(&mut result)?;
                 Ok(())
             }
+            rcs::RemoteControlRequest::GetTime { responder } => {
+                responder.send(fuchsia_zircon::Time::get_monotonic().into_nanos())?;
+                Ok(())
+            }
         }
     }
 
