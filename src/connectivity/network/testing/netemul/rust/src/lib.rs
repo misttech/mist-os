@@ -234,6 +234,7 @@ pub struct InterfaceConfig<'a> {
 
 /// A realm within a netemul sandbox.
 #[must_use]
+#[derive(Clone)]
 pub struct TestRealm<'a> {
     realm: fnetemul::ManagedRealmProxy,
     name: Cow<'a, str>,
@@ -854,33 +855,27 @@ impl<'a> TestEndpoint<'a> {
             .add_to_stack(realm, if_config)
             .await
             .with_context(|| format!("failed to add {} to realm {}", self.name, realm.name))?;
-        let stack = realm
-            .connect_to_protocol::<fnet_stack::StackMarker>()
-            .context("failed to connect to stack")?;
-        let interface_state = realm
-            .connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .context("failed to connect to interfaces state")?;
-        Ok(TestInterface { endpoint: self, id, stack, interface_state, control, device_control })
+        Ok(TestInterface { endpoint: self, id, realm: realm.clone(), control, device_control })
     }
 }
 
 /// A [`TestEndpoint`] that is installed in a realm's Netstack.
+///
+/// Note that a [`TestInterface`] adds to the reference count of the underlying
+/// realm of its [`TestRealm`]. That is, a [`TestInterface`] that outlives the
+/// [`TestRealm`] it created is sufficient to keep the underlying realm alive.
 #[must_use]
 pub struct TestInterface<'a> {
     endpoint: TestEndpoint<'a>,
+    realm: TestRealm<'a>,
     id: u64,
-    // TODO(https://fxbug.dev/109169): We can remove this as part of Ethernet
-    // removal.
-    stack: fnet_stack::StackProxy,
-    interface_state: fnet_interfaces::StateProxy,
     control: fnet_interfaces_ext::admin::Control,
     device_control: Option<fnet_interfaces_admin::DeviceControlProxy>,
 }
 
 impl<'a> std::fmt::Debug for TestInterface<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let Self { endpoint, id, stack: _, interface_state: _, control: _, device_control: _ } =
-            self;
+        let Self { endpoint, id, realm: _, control: _, device_control: _ } = self;
         f.debug_struct("TestInterface")
             .field("endpoint", endpoint)
             .field("id", id)
@@ -912,9 +907,9 @@ impl<'a> TestInterface<'a> {
         &self.control
     }
 
-    /// Returns the interface's stack handle.
-    pub fn stack(&self) -> &fnet_stack::StackProxy {
-        &self.stack
+    /// Connects to fuchsia.net.stack in this interface's realm.
+    pub fn connect_stack(&self) -> Result<fnet_stack::StackProxy> {
+        self.realm.connect_to_protocol::<fnet_stack::StackMarker>()
     }
 
     /// Add a direct route from the interface to the given subnet.
@@ -922,12 +917,17 @@ impl<'a> TestInterface<'a> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
         let mut entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        self.stack.add_forwarding_entry(&mut entry).await.squash_result().with_context(|| {
-            format!(
-                "stack.add_forwarding_entry({:?}) for endpoint {} failed",
-                entry, self.endpoint.name
-            )
-        })
+        self.connect_stack()
+            .context("connect stack")?
+            .add_forwarding_entry(&mut entry)
+            .await
+            .squash_result()
+            .with_context(|| {
+                format!(
+                    "stack.add_forwarding_entry({:?}) for endpoint {} failed",
+                    entry, self.endpoint.name
+                )
+            })
     }
 
     /// Delete a direct route from the interface to the given subnet.
@@ -935,18 +935,24 @@ impl<'a> TestInterface<'a> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
         let mut entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        self.stack.del_forwarding_entry(&mut entry).await.squash_result().with_context(|| {
-            format!(
-                "stack.del_forwarding_entry({:?}) for endpoint {} failed",
-                entry, self.endpoint.name
-            )
-        })
+        self.connect_stack()
+            .context("connect stack")?
+            .del_forwarding_entry(&mut entry)
+            .await
+            .squash_result()
+            .with_context(|| {
+                format!(
+                    "stack.del_forwarding_entry({:?}) for endpoint {} failed",
+                    entry, self.endpoint.name
+                )
+            })
     }
 
     /// Gets the interface's properties.
     async fn get_properties(&self) -> Result<fnet_interfaces_ext::Properties> {
+        let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let properties = fnet_interfaces_ext::existing(
-            fnet_interfaces_ext::event_stream_from_state(&self.interface_state)?,
+            fnet_interfaces_ext::event_stream_from_state(&interface_state)?,
             fnet_interfaces_ext::InterfaceState::Unknown(self.id),
         )
         .await
@@ -994,12 +1000,14 @@ impl<'a> TestInterface<'a> {
         &self,
     ) -> Result<impl futures::Stream<Item = std::result::Result<fnet_interfaces::Event, fidl::Error>>>
     {
-        fnet_interfaces_ext::event_stream_from_state(&self.interface_state)
+        let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
+        fnet_interfaces_ext::event_stream_from_state(&interface_state)
             .context("event stream from state")
     }
 
     async fn set_dhcp_client_enabled(&self, enable: bool) -> Result<()> {
-        self.stack
+        self.connect_stack()
+            .context("connect stack")?
             .set_dhcp_client_enabled(self.id, enable)
             .await
             .context("failed to call SetDhcpClientEnabled")?
@@ -1081,14 +1089,18 @@ impl<'a> TestInterface<'a> {
         let subnet = fnet_ext::apply_subnet_mask(addr_with_prefix);
         let mut entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        let () = self.stack.del_forwarding_entry(&mut entry).await.squash_result().with_context(
-            || {
+        let () = self
+            .connect_stack()
+            .context("connect stack")?
+            .del_forwarding_entry(&mut entry)
+            .await
+            .squash_result()
+            .with_context(|| {
                 format!(
                     "stack.add_forwarding_entry({:?}) for endpoint {} failed",
                     entry, self.endpoint.name
                 )
-            },
-        )?;
+            })?;
         self.control.remove_address(&mut addr_with_prefix).await.context("FIDL error").and_then(
             |res| {
                 res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
@@ -1107,8 +1119,7 @@ impl<'a> TestInterface<'a> {
         let Self {
             endpoint: TestEndpoint { endpoint, name: _, _sandbox: _ },
             id: _,
-            stack: _,
-            interface_state: _,
+            realm: _,
             control,
             device_control,
         } = self;
@@ -1129,8 +1140,7 @@ impl<'a> TestInterface<'a> {
         let Self {
             endpoint: TestEndpoint { endpoint, name: _, _sandbox: _ },
             id: _,
-            stack: _,
-            interface_state: _,
+            realm: _,
             control,
             device_control,
         } = self;

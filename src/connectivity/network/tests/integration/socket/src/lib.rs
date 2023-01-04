@@ -470,7 +470,8 @@ async fn udp_send_msg_preflight_fidl(
         }
         UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled => {
             let () = iface
-                .stack()
+                .connect_stack()
+                .expect("connect stack")
                 .set_interface_ip_forwarding_deprecated(iface.id(), fnet::IpVersion::V4, true)
                 .await
                 .expect("set_interface_ip_forwarding_deprecated fidl error")
