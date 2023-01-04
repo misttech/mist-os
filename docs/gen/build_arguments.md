@@ -1139,19 +1139,19 @@ From //build/config/clang/crash_diagnostics.gni:7
 
 **Current value (from the default):** `"fuchsia"`
 
-From [//third_party/crashpad/src/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/55868da14e8967392b6625b39c6aeecbd4721ed2/src/build/crashpad_buildconfig.gni#22)
+From [//third_party/crashpad/src/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/build/crashpad_buildconfig.gni#22)
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From [//third_party/crashpad/src/util/net/tls.gni:19](https://fuchsia.googlesource.com/third_party/crashpad/+/55868da14e8967392b6625b39c6aeecbd4721ed2/src/util/net/tls.gni#19)
+From [//third_party/crashpad/src/util/net/tls.gni:21](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/util/net/tls.gni#21)
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
 **Current value (from the default):** `true`
 
-From [//third_party/crashpad/src/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/55868da14e8967392b6625b39c6aeecbd4721ed2/src/util/net/tls.gni#30)
+From [//third_party/crashpad/src/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/util/net/tls.gni#30)
 
 ### cts_version
 Name of the CTS version.
@@ -2481,7 +2481,7 @@ From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.c
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7d9bdde6f8d732767f0fce4273f492648335c77a/gn/perfetto.gni#150)
 
@@ -2515,7 +2515,7 @@ From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.c
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7d9bdde6f8d732767f0fce4273f492648335c77a/gn/perfetto.gni#251)
 
@@ -3404,7 +3404,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3603,16 +3603,21 @@ Path to file to use for recovery logo
 From //src/recovery/system/system_recovery_args.gni:7
 
 ### icu_disable_thin_archive
+If true, compile icu into a standalone static library. Currently this is
+only useful on Chrome OS.
 
 **Current value (from the default):** `false`
 
-From //third_party/icu/default/config.gni:22
+From //third_party/icu/default/config.gni:17
 
 ### icu_fuchsia_override_data_dir
+If set to nonempty, this is the label of the directory to be used to pull
+the ICU data files content.  The setting has effect only when building
+inside the Fuchsia source tree.
 
 **Current value (from the default):** `""`
 
-From //third_party/icu/default/config.gni:29
+From //third_party/icu/default/config.gni:22
 
 ### icu_major_version_number
 Contains the major version number of the ICU library, for dependencies that
@@ -3652,16 +3657,21 @@ and may be newer than what's available in the ICU data monolith.
 From //src/lib/icu/tzdata/icu_tzres_source.gni:16
 
 ### icu_use_data_file
+Tells icu to load an external data file rather than rely on the icudata
+being linked directly into the binary.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:9
+From //third_party/icu/default/config.gni:8
 
 ### icu_use_stub_data
+If true, then this creates a stub data file. This should be disabled if
+a custom data file will be used instead, in order to avoid conflicting
+symbols.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:16
+From //third_party/icu/default/config.gni:13
 
 ### images_config_label
 The images config information used during assembly.
@@ -7196,7 +7206,7 @@ From //build/security.gni:228
 ### thinlto_cache_dir
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7497,7 +7507,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
