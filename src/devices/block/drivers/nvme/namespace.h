@@ -56,6 +56,9 @@ class Namespace : public NamespaceDeviceType,
   // Process pending IO completions. Called in the IoLoop().
   void ProcessIoCompletions();
 
+  // Check that the range of Read/Write IO command is valid.
+  zx_status_t IsValidIoRwCommand(const block_op_t& op) const;
+
   Nvme* controller_;
   const uint32_t namespace_id_;
 

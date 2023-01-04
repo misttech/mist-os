@@ -11,9 +11,8 @@ namespace nvme {
 
 class NvmIoSubmission : public Submission {
  public:
-  constexpr static uint8_t kWriteOpcode = 0x01;
-  constexpr static uint8_t kReadOpcode = 0x02;
-  explicit NvmIoSubmission(bool is_write) : Submission(is_write ? kWriteOpcode : kReadOpcode) {}
+  explicit NvmIoSubmission(bool is_write)
+      : Submission(is_write ? IoCommandOpcode::kWrite : IoCommandOpcode::kRead) {}
 
  private:
   DEF_SUBFIELD(dword10, 31, 0, start_lba_lo);
@@ -33,6 +32,11 @@ class NvmIoSubmission : public Submission {
     set_start_lba_lo(lba & 0xffff'ffff);
     return *this;
   }
+};
+
+class NvmIoFlushSubmission : public Submission {
+ public:
+  explicit NvmIoFlushSubmission() : Submission(IoCommandOpcode::kFlush) {}
 };
 
 }  // namespace nvme

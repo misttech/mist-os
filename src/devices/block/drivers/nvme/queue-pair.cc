@@ -165,9 +165,8 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
     }
 
     // Read disk and write memory (PERM_WRITE), or read memory (PERM_READ) and write disk.
-    const uint32_t options = submission->opcode() == NvmIoSubmission::kWriteOpcode
-                                 ? ZX_BTI_PERM_READ
-                                 : ZX_BTI_PERM_WRITE;
+    const uint32_t options =
+        submission->opcode() == IoCommandOpcode::kWrite ? ZX_BTI_PERM_READ : ZX_BTI_PERM_WRITE;
     // These get unpinned in CheckForNewCompletion().
     zx_status_t status = bti_->pin(options, *data_vmo.value(), page_offset,
                                    page_count << kPageShift, page_list, page_count, &txn_data.pmt);

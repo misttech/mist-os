@@ -43,6 +43,23 @@ enum AdminCommandOpcode {
   kGetLBAStatus = 0x86,
 };
 
+// NVM Express Command Set Specification 1.0c, section 3.2 "NVM Command Set Commands".
+enum IoCommandOpcode {
+  kFlush = 0x00,
+  kWrite = 0x01,
+  kRead = 0x02,
+  kWriteUncorrectable = 0x04,
+  kCompare = 0x05,
+  kWriteZeroes = 0x08,
+  kDatasetManagement = 0x09,
+  kVerify = 0x0C,
+  kReservationRegister = 0x0D,
+  kReservationReport = 0x0E,
+  kReservationAcquire = 0x11,
+  kReservationRelease = 0x15,
+  kCopy = 0x19,
+};
+
 // NVM Express base specification 2.0, section 3.3.3.1, "Submission Queue Entry"
 struct Submission {
   template <typename U>

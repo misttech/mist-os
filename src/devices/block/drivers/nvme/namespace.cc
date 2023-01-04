@@ -47,18 +47,26 @@ void Namespace::ProcessIoSubmissions() {
       return;
     }
 
-    NvmIoSubmission submission(io_cmd->opcode == BLOCK_OP_WRITE);
-    submission.namespace_id = namespace_id_;
-    submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(io_cmd->op.rw.length - 1);
-    if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
-      submission.set_force_unit_access(true);
-    }
+    zx_status_t status;
+    if (io_cmd->opcode == BLOCK_OP_FLUSH) {
+      NvmIoFlushSubmission submission;
+      submission.namespace_id = namespace_id_;
 
-    // Convert op.rw.offset_vmo and op.rw.length to bytes.
-    zx_status_t status =
-        controller_->io_queue()->Submit(submission, zx::unowned_vmo(io_cmd->op.rw.vmo),
-                                        io_cmd->op.rw.offset_vmo * block_info_.block_size,
-                                        io_cmd->op.rw.length * block_info_.block_size, io_cmd);
+      status = controller_->io_queue()->Submit(submission, std::nullopt, 0, 0, io_cmd);
+    } else {
+      NvmIoSubmission submission(io_cmd->opcode == BLOCK_OP_WRITE);
+      submission.namespace_id = namespace_id_;
+      submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(io_cmd->op.rw.length - 1);
+      if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
+        submission.set_force_unit_access(true);
+      }
+
+      // Convert op.rw.offset_vmo and op.rw.length to bytes.
+      status =
+          controller_->io_queue()->Submit(submission, zx::unowned_vmo(io_cmd->op.rw.vmo),
+                                          io_cmd->op.rw.offset_vmo * block_info_.block_size,
+                                          io_cmd->op.rw.length * block_info_.block_size, io_cmd);
+    }
     switch (status) {
       case ZX_OK:
         break;
@@ -308,6 +316,22 @@ void Namespace::BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_si
   *out_block_op_size = sizeof(IoCommand);
 }
 
+zx_status_t Namespace::IsValidIoRwCommand(const block_op_t& op) const {
+  if (op.rw.length == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (op.rw.length > max_transfer_blocks_) {
+    zxlogf(ERROR, "Request exceeding max transfer size.");
+    return ZX_ERR_INVALID_ARGS;
+  }
+  // IO address range must fit within device.
+  if ((op.rw.offset_dev >= block_info_.block_count) ||
+      (block_info_.block_count - op.rw.offset_dev < op.rw.length)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  return ZX_OK;
+}
+
 void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callback, void* cookie) {
   IoCommand* io_cmd = containerof(op, IoCommand, op);
   io_cmd->completion_cb = callback;
@@ -317,34 +341,21 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
   switch (io_cmd->opcode) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
+      if (zx_status_t status = IsValidIoRwCommand(io_cmd->op); status != ZX_OK) {
+        IoCommandComplete(io_cmd, status);
+        return;
+      }
+      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu",
+             io_cmd->opcode == BLOCK_OP_WRITE ? "wr" : "rd", io_cmd->op.rw.length,
+             io_cmd->op.rw.offset_dev);
       break;
     case BLOCK_OP_FLUSH:
-      // TODO
-      IoCommandComplete(io_cmd, ZX_OK);
-      return;
+      zxlogf(TRACE, "Block IO: flush");
+      break;
     default:
       IoCommandComplete(io_cmd, ZX_ERR_NOT_SUPPORTED);
       return;
   }
-
-  if (io_cmd->op.rw.length == 0) {
-    IoCommandComplete(io_cmd, ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  if (io_cmd->op.rw.length > max_transfer_blocks_) {
-    zxlogf(ERROR, "Request exceeding max transfer size.");
-    IoCommandComplete(io_cmd, ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  // IO address range must fit within device.
-  if ((io_cmd->op.rw.offset_dev >= block_info_.block_count) ||
-      (block_info_.block_count - io_cmd->op.rw.offset_dev < io_cmd->op.rw.length)) {
-    IoCommandComplete(io_cmd, ZX_ERR_OUT_OF_RANGE);
-    return;
-  }
-
-  zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", io_cmd->opcode == BLOCK_OP_WRITE ? "wr" : "rd",
-         io_cmd->op.rw.length, io_cmd->op.rw.offset_dev);
 
   {
     fbl::AutoLock lock(&commands_lock_);
