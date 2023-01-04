@@ -20,15 +20,13 @@ struct eth_buffer;
 
 class DeviceBuffer {
  public:
-  using Contents =
-      std::variant<std::monostate, eth_buffer*, network::client::NetworkDeviceClient::Buffer>;
-  explicit DeviceBuffer(Contents contents);
+  explicit DeviceBuffer(network::client::NetworkDeviceClient::Buffer contents);
   cpp20::span<uint8_t> data();
   zx_status_t Send(size_t len);
   static zx::result<DeviceBuffer> Get(size_t len, bool block);
 
  private:
-  Contents contents_;
+  network::client::NetworkDeviceClient::Buffer contents_;
 };
 
 // Setup networking.

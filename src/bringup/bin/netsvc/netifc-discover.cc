@@ -27,60 +27,16 @@ cpp17::string_view SkipInstanceSigil(cpp17::string_view v) {
   return v;
 }
 
-struct Ethernet {
-  using Instance = fuchsia_hardware_ethernet::Controller;
-  using Info = DiscoveredInterface;
-  static constexpr const char* kDirectory = "/class/ethernet";
-
-  static std::optional<Info> get_interface_if_matching(fidl::ClientEnd<Instance> dev,
-                                                       const std::string& filename) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_ethernet::Device>();
-    if (endpoints.is_error()) {
-      printf("netifc: failed to create ethernet endpoints %s: %s\n", filename.c_str(),
-             endpoints.status_string());
-      return std::nullopt;
-    }
-    auto& [client, server] = endpoints.value();
-    {
-      fidl::Status result = fidl::WireCall(dev)->OpenSession(std::move(server));
-      if (!result.ok()) {
-        printf("netifc: failed to get Ethernet device info %s: %s\n", filename.c_str(),
-               result.status_string());
-        return std::nullopt;
-      }
-    }
-    fidl::WireResult result = fidl::WireCall(client)->GetInfo();
-    if (!result.ok()) {
-      printf("netifc: failed to get Ethernet device info %s: %s\n", filename.c_str(),
-             result.status_string());
-      return std::nullopt;
-    }
-    auto& resp = result.value();
-    if (resp.info.features & fuchsia_hardware_ethernet::wire::Features::kWlan) {
-      return std::nullopt;
-    }
-    DiscoveredInterface ret = {.device = std::move(client)};
-    static_assert(sizeof(resp.info.mac.octets) == sizeof(ret.mac.x));
-    std::copy(resp.info.mac.octets.begin(), resp.info.mac.octets.end(), std::begin(ret.mac.x));
-    return ret;
-  }
-
-  static void Process(std::optional<DiscoveredInterface>& discovered,
-                      async_dispatcher_t* dispatcher, Info info) {
-    discovered = std::move(info);
-  }
-};
-
 struct Netdevice {
-  using Instance = fuchsia_hardware_network::DeviceInstance;
   struct Info {
     fidl::ClientEnd<fuchsia_hardware_network::Device> device;
     fidl::ClientEnd<fuchsia_hardware_network::PortWatcher> port_watcher;
   };
   static constexpr const char* kDirectory = "/class/network";
 
-  static std::optional<Info> get_interface_if_matching(fidl::ClientEnd<Instance> instance,
-                                                       const std::string& filename) {
+  static std::optional<Info> get_interface_if_matching(
+      fidl::ClientEnd<fuchsia_hardware_network::DeviceInstance> instance,
+      const std::string& filename) {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Device>();
     if (endpoints.is_error()) {
       printf("netifc: failed to create netdevice endpoints %s: %s\n", filename.c_str(),
@@ -122,8 +78,8 @@ struct Netdevice {
     };
   }
 
-  static void Process(std::optional<DiscoveredInterface>& discovered,
-                      async_dispatcher_t* dispatcher, Info info) {
+  static void Process(std::optional<NetdeviceInterface>& discovered, async_dispatcher_t* dispatcher,
+                      Info info) {
     auto [device, watcher] = std::move(info);
     std::shared_ptr client_ptr =
         std::make_shared<fidl::WireClient<fuchsia_hardware_network::PortWatcher>>(
@@ -133,7 +89,7 @@ struct Netdevice {
   }
 
   static void Watch(
-      std::optional<DiscoveredInterface>& discovered,
+      std::optional<NetdeviceInterface>& discovered,
       const std::shared_ptr<fidl::WireClient<fuchsia_hardware_network::PortWatcher>>& watcher,
       fidl::ClientEnd<fuchsia_hardware_network::Device> dev) {
     (*watcher)->Watch().ThenExactlyOnce(
@@ -237,8 +193,9 @@ struct Netdevice {
           const fuchsia_net::wire::MacAddress& mac = result.value().address;
 
           // We have our device, store it and stop watching.
-          DiscoveredInterface& discovered_interface = discovered.emplace(DiscoveredInterface{
-              .device = NetdeviceInterface{.device = std::move(dev), .port_id = port_id},
+          NetdeviceInterface& discovered_interface = discovered.emplace(NetdeviceInterface{
+              .device = std::move(dev),
+              .port_id = port_id,
           });
           static_assert(sizeof(mac.octets) == sizeof(discovered_interface.mac.x));
           std::copy(mac.octets.begin(), mac.octets.end(), std::begin(discovered_interface.mac.x));
@@ -247,16 +204,16 @@ struct Netdevice {
   }
 };
 
-template <typename D>
-std::optional<typename D::Info> netifc_evaluate(cpp17::string_view topological_path,
-                                                fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
-                                                const std::string& dirname,
-                                                const std::string& filename) {
+std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_path,
+                                               fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                                               const std::string& dirname,
+                                               const std::string& filename) {
   printf("netifc: ? %s/%s\n", dirname.c_str(), filename.c_str());
 
-  fidl::ClientEnd<typename D::Instance> dev;
+  fidl::ClientEnd<fuchsia_hardware_network::DeviceInstance> dev;
   {
-    zx::result status = component::ConnectAt<typename D::Instance>(dir, filename.c_str());
+    zx::result status =
+        component::ConnectAt<fuchsia_hardware_network::DeviceInstance>(dir, filename.c_str());
     if (status.is_error()) {
       printf("netifc: failed to connect to %s/%s: %s\n", dirname.c_str(), filename.c_str(),
              status.status_string());
@@ -292,18 +249,17 @@ std::optional<typename D::Info> netifc_evaluate(cpp17::string_view topological_p
     }
   }
 
-  std::optional result = D::get_interface_if_matching(std::move(dev), filename);
+  std::optional result = Netdevice::get_interface_if_matching(std::move(dev), filename);
   if (result.has_value()) {
     printf("netsvc: using %s/%s\n", dirname.c_str(), filename.c_str());
   }
   return result;
 }
 
-template <typename D>
 zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
-    async_dispatcher_t* dispatcher, std::optional<DiscoveredInterface>& selected_ifc,
+    async_dispatcher_t* dispatcher, std::optional<NetdeviceInterface>& selected_ifc,
     const std::string& devdir, cpp17::string_view topological_path) {
-  const std::string classdir = devdir + D::kDirectory;
+  const std::string classdir = devdir + Netdevice::kDirectory;
   fbl::unique_fd dir(open(classdir.c_str(), O_DIRECTORY | O_RDONLY));
   if (!dir.is_valid()) {
     printf("failed to open %s: %s\n", classdir.c_str(), strerror(errno));
@@ -331,9 +287,9 @@ zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
       [dispatcher, classdir, topological_path, dir_channel = std::move(dir_channel), &selected_ifc](
           int dir_fd, const std::string& filename) {
         std::optional r =
-            netifc_evaluate<D>(topological_path, dir_channel.borrow(), classdir, filename);
+            netifc_evaluate(topological_path, dir_channel.borrow(), classdir, filename);
         if (r.has_value()) {
-          D::Process(selected_ifc, dispatcher, std::move(r.value()));
+          Netdevice::Process(selected_ifc, dispatcher, std::move(r.value()));
         }
       },
       dispatcher);
@@ -343,22 +299,14 @@ zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
 
 }  // namespace
 
-zx::result<DiscoveredInterface> netifc_discover(const std::string& devdir,
-                                                cpp17::string_view topological_path) {
+zx::result<NetdeviceInterface> netifc_discover(const std::string& devdir,
+                                               cpp17::string_view topological_path) {
   topological_path = SkipInstanceSigil(topological_path);
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  std::optional<DiscoveredInterface> selected_ifc;
+  std::optional<NetdeviceInterface> selected_ifc;
 
-  // Create watchers for the different device types. There's no deterministic
-  // ordering guarantee on a preferred device class. The first device found of
-  // either class is the selected device.
-  zx::result ethernet_watcher =
-      CreateWatcher<Ethernet>(loop.dispatcher(), selected_ifc, devdir, topological_path);
-  if (ethernet_watcher.is_error()) {
-    return ethernet_watcher.take_error();
-  }
   zx::result netdevice_watcher =
-      CreateWatcher<Netdevice>(loop.dispatcher(), selected_ifc, devdir, topological_path);
+      CreateWatcher(loop.dispatcher(), selected_ifc, devdir, topological_path);
   if (netdevice_watcher.is_error()) {
     return netdevice_watcher.take_error();
   }

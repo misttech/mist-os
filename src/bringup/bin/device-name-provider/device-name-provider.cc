@@ -115,8 +115,8 @@ int main(int argc, char** argv) {
       printf("device-name-provider: using default name \"%s\": netifc_discover(\"%s\", ...) = %s\n",
              device_name, args.devdir.c_str(), status.status_string());
     } else {
-      const auto& [dev, mac] = status.value();
-      device_id_get(mac.x, device_name, args.namegen);
+      const NetdeviceInterface& interface = status.value();
+      device_id_get(interface.mac.x, device_name, args.namegen);
       printf("device-name-provider: generated device name: %s\n", device_name);
     }
   }
