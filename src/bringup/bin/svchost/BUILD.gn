@@ -7,10 +7,6 @@ import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 import("//build/zircon/zx_library.gni")
 
-group("bootfs") {
-  deps = []
-}
-
 zx_library("crashsvc") {
   sdk = "source"
 

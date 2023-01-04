@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
 import("//build/test.gni")
@@ -70,8 +71,15 @@ fuchsia_unittest_package("pwrbtn-monitor-unittests") {
   deps = [ ":pwrbtn-monitor-unittests-bin" ]
 }
 
-component_manifest_resources("bootfs") {
+component_manifest_resources("meta") {
   sources = [ "meta/pwrbtn-monitor.cml" ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [
+    ":meta",
+    ":pwrbtn-monitor",
+  ]
 }
 
 group("tests") {

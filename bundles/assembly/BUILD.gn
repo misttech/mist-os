@@ -103,6 +103,19 @@ group("prod_only") {
 # move them to other AIBs that are included by all other products.
 #
 assembly_input_bundle("common_bringup") {
+  bootfs_files_labels = [
+    "//src/bringup:bootfs",
+    "//src/bringup/bin/console:bootfs",
+    "//src/bringup/bin/console-launcher:bootfs",
+    "//src/bringup/bin/debuglog:bootfs",
+    "//src/bringup/bin/device-name-provider:bootfs",
+    "//src/bringup/bin/dlog:bootfs",
+    "//src/bringup/bin/miscsvc:bootfs",
+    "//src/bringup/bin/netsvc:bootfs",
+    "//src/bringup/bin/ptysvc:bootfs",
+    "//src/bringup/bin/pwrbtn-monitor:bootfs",
+    "//src/bringup/bin/waitfor:bootfs",
+  ]
   bootfs_packages = [ "//src/bringup/bin/svchost:pkg" ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
