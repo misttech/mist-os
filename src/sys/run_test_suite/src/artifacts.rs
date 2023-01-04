@@ -45,15 +45,15 @@ where
 {
     match artifact {
         ftest_manager::Artifact::Stdout(socket) => {
-            let stdout = reporter.new_artifact(&ArtifactType::Stdout).await?;
+            let stdout = reporter.new_artifact(&ArtifactType::Stdout)?;
             Ok(copy_socket_artifact(socket, stdout).map_ok(|()| None).named("stdout").boxed())
         }
         ftest_manager::Artifact::Stderr(socket) => {
-            let stderr = reporter.new_artifact(&ArtifactType::Stderr).await?;
+            let stderr = reporter.new_artifact(&ArtifactType::Stderr)?;
             Ok(copy_socket_artifact(socket, stderr).map_ok(|()| None).named("stderr").boxed())
         }
         ftest_manager::Artifact::Log(syslog) => {
-            let syslog_artifact = reporter.new_artifact(&ArtifactType::Syslog).await?;
+            let syslog_artifact = reporter.new_artifact(&ArtifactType::Syslog)?;
             Ok(diagnostics::collect_logs(
                 test_diagnostics::LogStream::from_syslog(syslog)?,
                 syslog_artifact,
@@ -74,8 +74,7 @@ where
                     field: "directory_and_token",
                 })?;
             let directory_artifact = reporter
-                .new_directory_artifact(&DirectoryArtifactType::Custom, component_moniker)
-                .await?;
+                .new_directory_artifact(&DirectoryArtifactType::Custom, component_moniker)?;
             Ok(async move {
                 let directory = directory.into_proxy()?;
                 let result =
@@ -92,8 +91,7 @@ where
         }
         ftest_manager::Artifact::DebugData(iterator) => {
             let output_directory = reporter
-                .new_directory_artifact(&DirectoryArtifactType::Debug, None /* moniker */)
-                .await?;
+                .new_directory_artifact(&DirectoryArtifactType::Debug, None /* moniker */)?;
             Ok(artifacts::copy_debug_data(iterator.into_proxy()?, output_directory)
                 .map(|()| Ok(None))
                 .named("debug_data")

@@ -7,7 +7,6 @@ use {
         ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId,
         EntityInfo, ReportedOutcome, Reporter, Timestamp,
     },
-    async_trait::async_trait,
     std::io::{Error, Write},
     vte::{Parser, Perform},
 };
@@ -23,39 +22,38 @@ impl<R: Reporter> AnsiFilterReporter<R> {
     }
 }
 
-#[async_trait]
 impl<R: Reporter> Reporter for AnsiFilterReporter<R> {
-    async fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
-        self.inner.new_entity(entity, name).await
+    fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
+        self.inner.new_entity(entity, name)
     }
 
-    async fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
-        self.inner.set_entity_info(entity, info).await
+    fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
+        self.inner.set_entity_info(entity, info)
     }
 
-    async fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
-        self.inner.entity_started(entity, timestamp).await
+    fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
+        self.inner.entity_started(entity, timestamp)
     }
 
-    async fn entity_stopped(
+    fn entity_stopped(
         &self,
         entity: &EntityId,
         outcome: &ReportedOutcome,
         timestamp: Timestamp,
     ) -> Result<(), Error> {
-        self.inner.entity_stopped(entity, outcome, timestamp).await
+        self.inner.entity_stopped(entity, outcome, timestamp)
     }
 
-    async fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
-        self.inner.entity_finished(entity).await
+    fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
+        self.inner.entity_finished(entity)
     }
 
-    async fn new_artifact(
+    fn new_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &ArtifactType,
     ) -> Result<Box<DynArtifact>, Error> {
-        let inner_artifact = self.inner.new_artifact(entity, artifact_type).await?;
+        let inner_artifact = self.inner.new_artifact(entity, artifact_type)?;
         match artifact_type {
             // All the artifact types are enumerated here as we expect future artifacts
             // should not be filtered.
@@ -68,13 +66,13 @@ impl<R: Reporter> Reporter for AnsiFilterReporter<R> {
         }
     }
 
-    async fn new_directory_artifact(
+    fn new_directory_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &DirectoryArtifactType,
         component_moniker: Option<String>,
     ) -> Result<Box<DynDirectoryArtifact>, Error> {
-        self.inner.new_directory_artifact(entity, artifact_type, component_moniker).await
+        self.inner.new_directory_artifact(entity, artifact_type, component_moniker)
     }
 }
 

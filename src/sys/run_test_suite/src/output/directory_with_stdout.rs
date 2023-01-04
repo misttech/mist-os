@@ -9,8 +9,7 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
     ReportedOutcome, Reporter, SuiteId, Timestamp,
 };
-use async_trait::async_trait;
-use futures::lock::Mutex;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Error};
@@ -35,159 +34,120 @@ impl DirectoryWithStdoutReporter {
         })
     }
 
-    async fn get_locked_shell_reporter(
+    fn get_locked_shell_reporter(
         &self,
         suite: &SuiteId,
     ) -> impl '_ + std::ops::Deref<Target = ShellReporter<BufWriter<File>>> {
-        futures::lock::MutexGuard::map(self.shell_reporters.lock().await, |reporters| {
+        parking_lot::MutexGuard::map(self.shell_reporters.lock(), |reporters| {
             reporters.get_mut(suite).unwrap()
         })
     }
 }
 
-#[async_trait]
 impl Reporter for DirectoryWithStdoutReporter {
-    async fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
-        let dir_fut = self.directory_reporter.new_entity(entity, name);
+    fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
+        self.directory_reporter.new_entity(entity, name)?;
 
-        let shell_fut = async move {
-            match entity {
-                EntityId::Suite(suite_id) => {
-                    let human_readable_artifact = self.directory_reporter.add_report(entity)?;
-                    let shell_reporter = ShellReporter::new(human_readable_artifact);
-                    shell_reporter.new_entity(entity, name).await?;
-                    self.shell_reporters.lock().await.insert(*suite_id, shell_reporter);
-                    Ok(())
-                }
-                EntityId::Case { suite, .. } => {
-                    self.shell_reporters
-                        .lock()
-                        .await
-                        .get(suite)
-                        .unwrap()
-                        .new_entity(entity, name)
-                        .await
-                }
-                EntityId::TestRun => Ok(()),
+        match entity {
+            EntityId::Suite(suite_id) => {
+                let human_readable_artifact = self.directory_reporter.add_report(entity)?;
+                let shell_reporter = ShellReporter::new(human_readable_artifact);
+                shell_reporter.new_entity(entity, name)?;
+                self.shell_reporters.lock().insert(*suite_id, shell_reporter);
+                Ok(())
             }
-        };
-
-        futures::future::try_join(dir_fut, shell_fut).await.map(|((), ())| ())
+            EntityId::Case { suite, .. } => {
+                self.shell_reporters.lock().get(suite).unwrap().new_entity(entity, name)
+            }
+            EntityId::TestRun => Ok(()),
+        }
     }
 
-    async fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
-        let dir_fut = self.directory_reporter.set_entity_info(entity, info);
-        let shell_fut = async move {
-            let suite_id = match entity {
-                EntityId::Suite(suite) => Some(suite),
-                EntityId::Case { suite, .. } => Some(suite),
-                _ => None,
-            };
-            if let Some(suite) = suite_id {
-                self.get_locked_shell_reporter(suite).await.set_entity_info(entity, info).await;
-            }
-        };
+    fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
+        self.directory_reporter.set_entity_info(entity, info);
 
-        futures::future::join(dir_fut, shell_fut).await;
+        let suite_id = match entity {
+            EntityId::Suite(suite) => Some(suite),
+            EntityId::Case { suite, .. } => Some(suite),
+            _ => None,
+        };
+        if let Some(suite) = suite_id {
+            self.get_locked_shell_reporter(suite).set_entity_info(entity, info);
+        }
     }
 
-    async fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
-        let dir_fut = self.directory_reporter.entity_started(entity, timestamp);
+    fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
+        self.directory_reporter.entity_started(entity, timestamp)?;
 
-        let shell_fut = async move {
-            match entity {
-                EntityId::Suite(suite) => {
-                    let reporter = self.get_locked_shell_reporter(suite).await;
-                    // Since we create one reporter per suite, we should start the run at the
-                    // same time as the suite.
-                    reporter.entity_started(&EntityId::TestRun, timestamp).await?;
-                    reporter.entity_started(entity, timestamp).await
-                }
-                EntityId::Case { suite, .. } => {
-                    self.get_locked_shell_reporter(suite)
-                        .await
-                        .entity_started(entity, timestamp)
-                        .await
-                }
-                EntityId::TestRun => Ok(()),
+        match entity {
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
+                // Since we create one reporter per suite, we should start the run at the
+                // same time as the suite.
+                reporter.entity_started(&EntityId::TestRun, timestamp)?;
+                reporter.entity_started(entity, timestamp)
             }
-        };
-
-        futures::future::try_join(dir_fut, shell_fut).await.map(|((), ())| ())
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_started(entity, timestamp)
+            }
+            EntityId::TestRun => Ok(()),
+        }
     }
 
-    async fn entity_stopped(
+    fn entity_stopped(
         &self,
         entity: &EntityId,
         outcome: &ReportedOutcome,
         timestamp: Timestamp,
     ) -> Result<(), Error> {
-        let dir_fut = self.directory_reporter.entity_stopped(entity, outcome, timestamp);
+        self.directory_reporter.entity_stopped(entity, outcome, timestamp)?;
 
-        let shell_fut = async move {
-            match entity {
-                EntityId::Suite(suite) => {
-                    let reporter = self.get_locked_shell_reporter(suite).await;
-                    // Since we create one reporter per suite, we should stop the run at the
-                    // same time as the suite.
-                    reporter.entity_stopped(entity, outcome, timestamp).await?;
-                    reporter.entity_stopped(&EntityId::TestRun, outcome, timestamp).await
-                }
-                EntityId::Case { suite, .. } => {
-                    self.get_locked_shell_reporter(suite)
-                        .await
-                        .entity_stopped(entity, outcome, timestamp)
-                        .await
-                }
-                EntityId::TestRun => Ok(()),
+        match entity {
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
+                // Since we create one reporter per suite, we should stop the run at the
+                // same time as the suite.
+                reporter.entity_stopped(entity, outcome, timestamp)?;
+                reporter.entity_stopped(&EntityId::TestRun, outcome, timestamp)
             }
-        };
-
-        futures::future::try_join(dir_fut, shell_fut).await.map(|((), ())| ())
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_stopped(entity, outcome, timestamp)
+            }
+            EntityId::TestRun => Ok(()),
+        }
     }
 
-    async fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
-        let dir_fut = self.directory_reporter.entity_finished(entity);
+    fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
+        self.directory_reporter.entity_finished(entity)?;
 
-        let shell_fut = async move {
-            match entity {
-                EntityId::Suite(suite) => {
-                    let reporter = self.get_locked_shell_reporter(suite).await;
-                    // Since we create one reporter per suite, we should finish the run at the
-                    // same time as the suite.
-                    reporter.entity_finished(entity).await?;
-                    reporter.entity_finished(&EntityId::TestRun).await
-                }
-                EntityId::Case { suite, .. } => {
-                    self.get_locked_shell_reporter(suite).await.entity_finished(entity).await
-                }
-                EntityId::TestRun => Ok(()),
+        match entity {
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
+                // Since we create one reporter per suite, we should finish the run at the
+                // same time as the suite.
+                reporter.entity_finished(entity)?;
+                reporter.entity_finished(&EntityId::TestRun)
             }
-        };
-        futures::future::try_join(dir_fut, shell_fut).await.map(|((), ())| ())
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_finished(entity)
+            }
+            EntityId::TestRun => Ok(()),
+        }
     }
 
-    async fn new_artifact(
+    fn new_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &ArtifactType,
     ) -> Result<Box<DynArtifact>, Error> {
-        let shell_reporter_artifact_fut = async move {
-            Ok(match entity {
-                EntityId::Suite(suite) | EntityId::Case { suite, .. } => Some(
-                    self.get_locked_shell_reporter(suite)
-                        .await
-                        .new_artifact(entity, artifact_type)
-                        .await?,
-                ),
-                EntityId::TestRun => None,
-            })
+        let shell_reporter_artifact = match entity {
+            EntityId::Suite(suite) | EntityId::Case { suite, .. } => {
+                Some(self.get_locked_shell_reporter(suite).new_artifact(entity, artifact_type)?)
+            }
+            EntityId::TestRun => None,
         };
-        let (directory_reporter_artifact, shell_reporter_artifact) = futures::future::try_join(
-            self.directory_reporter.new_artifact(entity, artifact_type),
-            shell_reporter_artifact_fut,
-        )
-        .await?;
+        let directory_reporter_artifact =
+            self.directory_reporter.new_artifact(entity, artifact_type)?;
         match shell_reporter_artifact {
             Some(artifact) => {
                 Ok(Box::new(MultiplexedWriter::new(artifact, directory_reporter_artifact)))
@@ -196,33 +156,28 @@ impl Reporter for DirectoryWithStdoutReporter {
         }
     }
 
-    async fn new_directory_artifact(
+    fn new_directory_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &DirectoryArtifactType,
         component_moniker: Option<String>,
     ) -> Result<Box<DynDirectoryArtifact>, Error> {
         let component_moniker_clone = component_moniker.clone();
-        let shell_reporter_artifact_fut = async move {
-            Ok(match entity {
-                EntityId::Suite(suite) | EntityId::Case { suite, .. } => Some(
-                    self.get_locked_shell_reporter(suite)
-                        .await
-                        .new_directory_artifact(entity, artifact_type, component_moniker_clone)
-                        .await?,
-                ),
-                EntityId::TestRun => None,
-            })
+        let shell_reporter_artifact = match entity {
+            EntityId::Suite(suite) | EntityId::Case { suite, .. } => {
+                Some(self.get_locked_shell_reporter(suite).new_directory_artifact(
+                    entity,
+                    artifact_type,
+                    component_moniker_clone,
+                )?)
+            }
+            EntityId::TestRun => None,
         };
-        let (directory_reporter_artifact, shell_reporter_artifact) = futures::future::try_join(
-            self.directory_reporter.new_directory_artifact(
-                entity,
-                artifact_type,
-                component_moniker,
-            ),
-            shell_reporter_artifact_fut,
-        )
-        .await?;
+        let directory_reporter_artifact = self.directory_reporter.new_directory_artifact(
+            entity,
+            artifact_type,
+            component_moniker,
+        )?;
         match shell_reporter_artifact {
             Some(artifact) => {
                 Ok(Box::new(MultiplexedDirectoryWriter::new(artifact, directory_reporter_artifact)))
@@ -257,29 +212,24 @@ mod test {
         for suite_no in 0..3 {
             let suite_reporter = run_reporter
                 .new_suite(&format!("test-suite-{}", suite_no), &SuiteId(suite_no))
-                .await
                 .expect("create suite");
-            suite_reporter.started(Timestamp::Unknown).await.expect("start suite");
+            suite_reporter.started(Timestamp::Unknown).expect("start suite");
             let case_reporter =
-                suite_reporter.new_case("test-case", &CaseId(0)).await.expect("create test case");
-            case_reporter.started(Timestamp::Unknown).await.expect("start case");
+                suite_reporter.new_case("test-case", &CaseId(0)).expect("create test case");
+            case_reporter.started(Timestamp::Unknown).expect("start case");
             let mut case_stdout =
-                case_reporter.new_artifact(&ArtifactType::Stdout).await.expect("create stdout");
+                case_reporter.new_artifact(&ArtifactType::Stdout).expect("create stdout");
             writeln!(case_stdout, "Stdout for test case").expect("write to stdout");
             case_stdout.flush().expect("flush stdout");
-            case_reporter
-                .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-                .await
-                .expect("stop case");
-            case_reporter.finished().await.expect("finish case");
+            case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+            case_reporter.finished().expect("finish case");
             suite_reporter
                 .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-                .await
                 .expect("stop suite");
-            suite_reporter.finished().await.expect("finish suite");
+            suite_reporter.finished().expect("finish suite");
         }
-        run_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).await.expect("stop run");
-        run_reporter.finished().await.expect("finish run");
+        run_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop run");
+        run_reporter.finished().expect("finish run");
 
         let mut expected_test = ExpectedTestRun::new(directory::Outcome::Passed);
         for suite_no in 0..3 {

@@ -6,7 +6,6 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DirectoryWrite, DynArtifact, DynDirectoryArtifact,
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
-use async_trait::async_trait;
 use parking_lot::Mutex;
 use std::{collections::HashMap, io::Error, io::Write, path::Path, path::PathBuf, sync::Arc};
 
@@ -86,21 +85,20 @@ impl Write for InMemoryArtifact {
     }
 }
 
-#[async_trait]
 impl Reporter for InMemoryReporter {
-    async fn new_entity(&self, id: &EntityId, name: &str) -> Result<(), Error> {
+    fn new_entity(&self, id: &EntityId, name: &str) -> Result<(), Error> {
         self.entities.lock().entry(*id).or_default().name = name.to_string();
         Ok(())
     }
 
-    async fn set_entity_info(&self, _entity: &EntityId, _info: &EntityInfo) {}
+    fn set_entity_info(&self, _entity: &EntityId, _info: &EntityInfo) {}
 
-    async fn entity_started(&self, id: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
+    fn entity_started(&self, id: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
         self.entities.lock().entry(*id).or_default().started_time = Some(timestamp);
         Ok(())
     }
 
-    async fn entity_stopped(
+    fn entity_stopped(
         &self,
         id: &EntityId,
         outcome: &ReportedOutcome,
@@ -113,14 +111,14 @@ impl Reporter for InMemoryReporter {
         Ok(())
     }
 
-    async fn entity_finished(&self, id: &EntityId) -> Result<(), Error> {
+    fn entity_finished(&self, id: &EntityId) -> Result<(), Error> {
         let mut entities = self.entities.lock();
         let e = entities.entry(*id).or_default();
         e.is_finished = true;
         Ok(())
     }
 
-    async fn new_artifact(
+    fn new_artifact(
         &self,
         id: &EntityId,
         artifact_type: &ArtifactType,
@@ -133,7 +131,7 @@ impl Reporter for InMemoryReporter {
         Ok(Box::new(artifact))
     }
 
-    async fn new_directory_artifact(
+    fn new_directory_artifact(
         &self,
         id: &EntityId,
         artifact_type: &DirectoryArtifactType,

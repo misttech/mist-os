@@ -6,7 +6,6 @@ use crate::output::{
     noop::NoopDirectoryWriter, ArtifactType, DirectoryArtifactType, DynArtifact,
     DynDirectoryArtifact, EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
-use async_trait::async_trait;
 use fuchsia_async as fasync;
 use parking_lot::Mutex;
 use std::{
@@ -117,9 +116,8 @@ impl<W: 'static + Write + Send + Sync> ShellReporter<W> {
     }
 }
 
-#[async_trait]
 impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
-    async fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
+    fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
         let mut map = self.entity_state_map.lock();
         map.insert(entity.clone(), EntityState::new(name));
         if let EntityId::Case { suite, .. } = entity {
@@ -128,7 +126,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         Ok(())
     }
 
-    async fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
+    fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
         match (entity, info.expected_children) {
             (EntityId::TestRun, Some(children)) => {
                 self.expected_suites.lock().replace(children);
@@ -137,7 +135,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         }
     }
 
-    async fn entity_started(&self, entity: &EntityId, _: Timestamp) -> Result<(), Error> {
+    fn entity_started(&self, entity: &EntityId, _: Timestamp) -> Result<(), Error> {
         let mut writer = self.new_writer_handle(None);
         let mut entity_map_lock = self.entity_state_map.lock();
         let mut entity_entry = entity_map_lock.get_mut(entity).unwrap();
@@ -163,7 +161,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         Ok(())
     }
 
-    async fn entity_stopped(
+    fn entity_stopped(
         &self,
         entity: &EntityId,
         outcome: &ReportedOutcome,
@@ -190,7 +188,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         Ok(())
     }
 
-    async fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
+    fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
         let mut writer = self.new_writer_handle(None);
         let entity_map_lock = self.entity_state_map.lock();
         let entity_entry = entity_map_lock.get(entity).unwrap();
@@ -321,7 +319,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         Ok(())
     }
 
-    async fn new_artifact(
+    fn new_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &ArtifactType,
@@ -351,7 +349,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         })
     }
 
-    async fn new_directory_artifact(
+    fn new_directory_artifact(
         &self,
         _entity: &EntityId,
         _artifact_type: &DirectoryArtifactType,
@@ -375,45 +373,34 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut expected = "Running test 'test-suite'\n".to_string();
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        let case_1_reporter =
-            suite_reporter.new_case("case-1", &CaseId(0)).await.expect("create case");
-        let case_2_reporter =
-            suite_reporter.new_case("case-2", &CaseId(1)).await.expect("create case");
+        let case_1_reporter = suite_reporter.new_case("case-1", &CaseId(0)).expect("create case");
+        let case_2_reporter = suite_reporter.new_case("case-2", &CaseId(1)).expect("create case");
 
-        case_1_reporter.started(Timestamp::Unknown).await.expect("case started");
+        case_1_reporter.started(Timestamp::Unknown).expect("case started");
         expected.push_str("[RUNNING]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_2_reporter.started(Timestamp::Unknown).await.expect("case started");
+        case_2_reporter.started(Timestamp::Unknown).expect("case started");
         expected.push_str("[RUNNING]\tcase-2\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_1_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
+        case_1_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
         expected.push_str("[PASSED]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_2_reporter
-            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
+        case_2_reporter.stopped(&ReportedOutcome::Failed, Timestamp::Unknown).expect("stop case");
         expected.push_str("[FAILED]\tcase-2\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_1_reporter.finished().await.expect("finish case");
-        case_2_reporter.finished().await.expect("finish case");
-        suite_reporter
-            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
-        suite_reporter.finished().await.expect("finish suite");
+        case_1_reporter.finished().expect("finish case");
+        case_2_reporter.finished().expect("finish case");
+        suite_reporter.stopped(&ReportedOutcome::Failed, Timestamp::Unknown).expect("stop suite");
+        suite_reporter.finished().expect("finish suite");
 
         expected.push_str("\n");
         expected.push_str("Failed tests: case-2\n");
@@ -427,36 +414,31 @@ mod test {
         const NUM_SUITES: u32 = 5;
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        run_reporter.set_expected_suites(NUM_SUITES).await;
-        run_reporter.started(Timestamp::Unknown).await.expect("run started");
+        run_reporter.set_expected_suites(NUM_SUITES);
+        run_reporter.started(Timestamp::Unknown).expect("run started");
         let mut expected = "".to_string();
 
         for suite_number in 0..4 {
             let suite_name = format!("test-suite-{:?}", suite_number);
             let suite_reporter =
-                run_reporter.new_suite(&suite_name, &SuiteId(0)).await.expect("create suite");
-            suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+                run_reporter.new_suite(&suite_name, &SuiteId(0)).expect("create suite");
+            suite_reporter.started(Timestamp::Unknown).expect("case started");
             expected.push_str(&format!("Running test '{}'\n", &suite_name));
             assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-            let case_reporter =
-                suite_reporter.new_case("case-1", &CaseId(0)).await.expect("create case");
-            case_reporter.started(Timestamp::Unknown).await.expect("case started");
+            let case_reporter = suite_reporter.new_case("case-1", &CaseId(0)).expect("create case");
+            case_reporter.started(Timestamp::Unknown).expect("case started");
             expected.push_str("[RUNNING]\tcase-1\n");
             assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
-            case_reporter
-                .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-                .await
-                .expect("stop case");
+            case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
             expected.push_str("[PASSED]\tcase-1\n");
             assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-            case_reporter.finished().await.expect("finish case");
+            case_reporter.finished().expect("finish case");
             suite_reporter
                 .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-                .await
                 .expect("stop suite");
-            suite_reporter.finished().await.expect("finish suite");
+            suite_reporter.finished().expect("finish suite");
 
             expected.push_str("\n");
             expected.push_str(&format!(
@@ -475,41 +457,30 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut expected = "Running test 'test-suite'\n".to_string();
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        let case_1_reporter =
-            suite_reporter.new_case("case-1", &CaseId(0)).await.expect("create case");
-        let case_2_reporter =
-            suite_reporter.new_case("case-2", &CaseId(1)).await.expect("create case");
+        let case_1_reporter = suite_reporter.new_case("case-1", &CaseId(0)).expect("create case");
+        let case_2_reporter = suite_reporter.new_case("case-2", &CaseId(1)).expect("create case");
 
-        case_1_reporter.started(Timestamp::Unknown).await.expect("case started");
+        case_1_reporter.started(Timestamp::Unknown).expect("case started");
         expected.push_str("[RUNNING]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_1_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
+        case_1_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
         expected.push_str("[PASSED]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_2_reporter
-            .stopped(&ReportedOutcome::Skipped, Timestamp::Unknown)
-            .await
-            .expect("stop case");
+        case_2_reporter.stopped(&ReportedOutcome::Skipped, Timestamp::Unknown).expect("stop case");
         expected.push_str("[SKIPPED]\tcase-2\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_1_reporter.finished().await.expect("finish case");
-        case_2_reporter.finished().await.expect("finish case");
-        suite_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
-        suite_reporter.finished().await.expect("finish suite");
+        case_1_reporter.finished().expect("finish case");
+        case_2_reporter.finished().expect("finish case");
+        suite_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop suite");
+        suite_reporter.finished().expect("finish suite");
 
         expected.push_str("\n");
         expected.push_str("1 out of 1 attempted tests passed, 1 tests skipped...\n");
@@ -522,25 +493,22 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut syslog_writer =
-            suite_reporter.new_artifact(&ArtifactType::Syslog).await.expect("create syslog");
+            suite_reporter.new_artifact(&ArtifactType::Syslog).expect("create syslog");
 
         writeln!(syslog_writer, "[log] test syslog").expect("write to syslog");
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[log] test syslog\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected);
 
-        suite_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
+        suite_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop suite");
         writeln!(syslog_writer, "[log] more test syslog").expect("write to syslog");
         expected.push_str("[log] more test syslog\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected);
 
-        suite_reporter.finished().await.expect("finish suite");
+        suite_reporter.finished().expect("finish suite");
         expected.push_str("\n");
         expected.push_str("0 out of 0 tests passed...\n");
         expected.push_str("test-suite completed with result: PASSED\n");
@@ -552,35 +520,27 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("case started");
 
-        let case_reporter =
-            suite_reporter.new_case("case-0", &CaseId(0)).await.expect("create case");
-        case_reporter.started(Timestamp::Unknown).await.expect("case started");
-        case_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
-        case_reporter.finished().await.expect("finish case");
+        let case_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
+        case_reporter.started(Timestamp::Unknown).expect("case started");
+        case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+        case_reporter.finished().expect("finish case");
 
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[RUNNING]\tcase-0\n");
         expected.push_str("[PASSED]\tcase-0\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        suite_reporter
-            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
+        suite_reporter.stopped(&ReportedOutcome::Failed, Timestamp::Unknown).expect("stop suite");
         let mut restricted_log = suite_reporter
             .new_artifact(&ArtifactType::RestrictedLog)
-            .await
             .expect("create restricted log");
         write!(restricted_log, "suite restricted log").expect("write to restricted log");
         drop(restricted_log);
 
-        suite_reporter.finished().await.expect("finish suite");
+        suite_reporter.finished().expect("finish suite");
         expected.push_str("\n");
         expected.push_str("1 out of 1 tests passed...\n");
         expected.push_str("\nTest test-suite produced unexpected high-severity logs:\n");
@@ -597,23 +557,21 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("case started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("case started");
 
-        let case_0_reporter =
-            suite_reporter.new_case("case-0", &CaseId(0)).await.expect("create case");
-        let case_1_reporter =
-            suite_reporter.new_case("case-1", &CaseId(1)).await.expect("create case");
-        case_0_reporter.started(Timestamp::Unknown).await.expect("start case");
-        case_1_reporter.started(Timestamp::Unknown).await.expect("start case");
+        let case_0_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
+        let case_1_reporter = suite_reporter.new_case("case-1", &CaseId(1)).expect("create case");
+        case_0_reporter.started(Timestamp::Unknown).expect("start case");
+        case_1_reporter.started(Timestamp::Unknown).expect("start case");
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[RUNNING]\tcase-0\n[RUNNING]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
         let mut case_0_stdout =
-            case_0_reporter.new_artifact(&ArtifactType::Stdout).await.expect("create artifact");
+            case_0_reporter.new_artifact(&ArtifactType::Stdout).expect("create artifact");
         let mut case_1_stdout =
-            case_1_reporter.new_artifact(&ArtifactType::Stdout).await.expect("create artifact");
+            case_1_reporter.new_artifact(&ArtifactType::Stdout).expect("create artifact");
 
         writeln!(case_0_stdout, "stdout from case 0").expect("write to stdout");
         writeln!(case_1_stdout, "stdout from case 1").expect("write to stdout");
@@ -622,26 +580,17 @@ mod test {
         expected.push_str("[stdout - case-1]\nstdout from case 1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_0_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
-        case_1_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
+        case_0_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+        case_1_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
         expected.push_str("[PASSED]\tcase-0\n");
         expected.push_str("[PASSED]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        case_0_reporter.finished().await.expect("finish case");
-        case_1_reporter.finished().await.expect("finish case");
-        suite_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
+        case_0_reporter.finished().expect("finish case");
+        case_1_reporter.finished().expect("finish case");
+        suite_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop suite");
 
-        suite_reporter.finished().await.expect("finish suite");
+        suite_reporter.finished().expect("finish suite");
         expected.push_str("\n");
         expected.push_str("2 out of 2 tests passed...\n");
         expected.push_str("test-suite completed with result: PASSED\n");
@@ -653,46 +602,34 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("suite started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
-        let case_reporter =
-            suite_reporter.new_case("case-0", &CaseId(0)).await.expect("create case");
-        case_reporter.started(Timestamp::Unknown).await.expect("case started");
-        case_reporter
-            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
-            .await
-            .expect("stop case");
-        case_reporter.finished().await.expect("finish case");
+        let case_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
+        case_reporter.started(Timestamp::Unknown).expect("case started");
+        case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+        case_reporter.finished().expect("finish case");
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[RUNNING]\tcase-0\n[PASSED]\tcase-0\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
         // add a case that finishes with ERROR
-        let unfinished_case_1 =
-            suite_reporter.new_case("case-1", &CaseId(1)).await.expect("create case");
-        unfinished_case_1.started(Timestamp::Unknown).await.expect("case started");
-        unfinished_case_1
-            .stopped(&ReportedOutcome::Error, Timestamp::Unknown)
-            .await
-            .expect("stop case");
-        unfinished_case_1.finished().await.expect("finish case");
+        let unfinished_case_1 = suite_reporter.new_case("case-1", &CaseId(1)).expect("create case");
+        unfinished_case_1.started(Timestamp::Unknown).expect("case started");
+        unfinished_case_1.stopped(&ReportedOutcome::Error, Timestamp::Unknown).expect("stop case");
+        unfinished_case_1.finished().expect("finish case");
         expected.push_str("[RUNNING]\tcase-1\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
         // add a case that doesn't finish at all
-        let unfinished_case_2 =
-            suite_reporter.new_case("case-2", &CaseId(2)).await.expect("create case");
-        unfinished_case_2.started(Timestamp::Unknown).await.expect("case started");
-        unfinished_case_2.finished().await.expect("finish case");
+        let unfinished_case_2 = suite_reporter.new_case("case-2", &CaseId(2)).expect("create case");
+        unfinished_case_2.started(Timestamp::Unknown).expect("case started");
+        unfinished_case_2.finished().expect("finish case");
         expected.push_str("[RUNNING]\tcase-2\n");
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
 
-        suite_reporter
-            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
-            .await
-            .expect("stop suite");
-        suite_reporter.finished().await.expect("finish suite");
+        suite_reporter.stopped(&ReportedOutcome::Failed, Timestamp::Unknown).expect("stop suite");
+        suite_reporter.finished().expect("finish suite");
         expected.push_str("\n");
         expected.push_str("\nThe following test(s) never completed:\n");
         expected.push_str("case-1\n");
@@ -707,18 +644,16 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("suite started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
-        let case_reporter =
-            suite_reporter.new_case("case", &CaseId(0)).await.expect("create new case");
-        case_reporter.started(Timestamp::Unknown).await.expect("case started");
-        case_reporter.finished().await.expect("case finished");
+        let case_reporter = suite_reporter.new_case("case", &CaseId(0)).expect("create new case");
+        case_reporter.started(Timestamp::Unknown).expect("case started");
+        case_reporter.finished().expect("case finished");
         suite_reporter
             .stopped(&ReportedOutcome::Cancelled, Timestamp::Unknown)
-            .await
             .expect("stop suite");
-        suite_reporter.finished().await.expect("case finished");
+        suite_reporter.finished().expect("case finished");
 
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[RUNNING]\tcase\n");
@@ -735,18 +670,16 @@ mod test {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
         let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).await.expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).await.expect("suite started");
+            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
-        let case_reporter =
-            suite_reporter.new_case("case", &CaseId(0)).await.expect("create new case");
-        case_reporter.started(Timestamp::Unknown).await.expect("case started");
-        case_reporter.finished().await.expect("case finished");
+        let case_reporter = suite_reporter.new_case("case", &CaseId(0)).expect("create new case");
+        case_reporter.started(Timestamp::Unknown).expect("case started");
+        case_reporter.finished().expect("case finished");
         suite_reporter
             .stopped(&ReportedOutcome::DidNotFinish, Timestamp::Unknown)
-            .await
             .expect("stop suite");
-        suite_reporter.finished().await.expect("case finished");
+        suite_reporter.finished().expect("case finished");
 
         let mut expected = "Running test 'test-suite'\n".to_string();
         expected.push_str("[RUNNING]\tcase\n");

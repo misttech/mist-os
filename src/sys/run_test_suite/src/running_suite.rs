@@ -74,8 +74,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                 Err(e) => {
                     suite_state
                         .reporter
-                        .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)
-                        .await?;
+                        .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)?;
                     return Err(e);
                 }
                 Ok(event) => {
@@ -98,8 +97,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                 identifier,
                                 CollectedEntityState {
                                     reporter: suite_reporter
-                                        .new_case(&test_case_name, &CaseId(identifier))
-                                        .await?,
+                                        .new_case(&test_case_name, &CaseId(identifier))?,
                                     name: test_case_name,
                                     lifecycle: Lifecycle::Found,
                                     artifact_tasks: vec![],
@@ -119,7 +117,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                 Lifecycle::Found => {
                                     // TODO(fxbug.dev/79712): Record per-case runtime once we have an
                                     // accurate way to measure it.
-                                    entry.reporter.started(Timestamp::Unknown).await?;
+                                    entry.reporter.started(Timestamp::Unknown)?;
                                     entry.lifecycle = Lifecycle::Started;
                                 }
                                 other => {
@@ -168,10 +166,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                 Lifecycle::Started => {
                                     // TODO(fxbug.dev/79712): Record per-case runtime once we have an
                                     // accurate way to measure it.
-                                    entry
-                                        .reporter
-                                        .stopped(&status.into(), Timestamp::Unknown)
-                                        .await?;
+                                    entry.reporter.stopped(&status.into(), Timestamp::Unknown)?;
                                     entry.lifecycle = Lifecycle::Stopped;
                                 }
                                 other => {
@@ -225,7 +220,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                         ftest_manager::SuiteEventPayload::SuiteStarted(_) => {
                             match &suite_state.lifecycle {
                                 Lifecycle::Found => {
-                                    suite_state.reporter.started(timestamp).await?;
+                                    suite_state.reporter.started(timestamp)?;
                                     suite_state.lifecycle = Lifecycle::Started;
                                 }
                                 other => {
@@ -333,15 +328,15 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
         let CollectedEntityState { reporter, name, lifecycle, artifact_tasks } = test_case;
         match (lifecycle, early_termination_outcome.clone()) {
             (Lifecycle::Started | Lifecycle::Found, Some(early)) => {
-                reporter.stopped(&early.into(), Timestamp::Unknown).await?;
+                reporter.stopped(&early.into(), Timestamp::Unknown)?;
             }
             (Lifecycle::Found, None) => {
                 unfinished_test_case_names.push(name.clone());
-                reporter.stopped(&Outcome::Inconclusive.into(), Timestamp::Unknown).await?;
+                reporter.stopped(&Outcome::Inconclusive.into(), Timestamp::Unknown)?;
             }
             (Lifecycle::Started, None) => {
                 unfinished_test_case_names.push(name.clone());
-                reporter.stopped(&Outcome::DidNotFinish.into(), Timestamp::Unknown).await?;
+                reporter.stopped(&Outcome::DidNotFinish.into(), Timestamp::Unknown)?;
             }
             (Lifecycle::Stopped | Lifecycle::Finished, _) => (),
         }
@@ -359,7 +354,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
             warn!("Stopped polling artifacts for {} due to timeout", name);
         }
 
-        reporter.finished().await?;
+        reporter.finished()?;
     }
     if !unfinished_test_case_names.is_empty() {
         outcome = Outcome::error(UnexpectedEventError::CasesDidNotFinish {
@@ -394,7 +389,6 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                         restricted_logs_present.store(true, Ordering::Relaxed);
                         let mut log_artifact = match suite_reporter
                             .new_artifact(&ArtifactType::RestrictedLog)
-                            .await
                         {
                             Ok(artifact) => artifact,
                             Err(e) => {
@@ -422,7 +416,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
         outcome = Outcome::Failed;
     }
 
-    suite_reporter.stopped(&outcome.clone().into(), suite_finish_timestamp).await?;
+    suite_reporter.stopped(&outcome.clone().into(), suite_finish_timestamp)?;
 
     Ok(outcome)
 }
@@ -778,7 +772,7 @@ mod test {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).await.expect("create new suite");
+                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
 
             let suite =
                 RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
@@ -794,7 +788,7 @@ mod test {
                 .expect("collect results"),
                 Outcome::Passed
             );
-            suite_reporter.finished().await.expect("Reporter finished");
+            suite_reporter.finished().expect("Reporter finished");
 
             let reports = reporter.get_reports();
             let case = reports
@@ -852,7 +846,7 @@ mod test {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).await.expect("create new suite");
+                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
 
             let suite =
                 RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
@@ -868,7 +862,7 @@ mod test {
                 .expect("collect results"),
                 Outcome::Passed
             );
-            suite_reporter.finished().await.expect("Reporter finished");
+            suite_reporter.finished().expect("Reporter finished");
 
             let reports = reporter.get_reports();
             let case = reports
@@ -941,7 +935,7 @@ mod test {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).await.expect("create new suite");
+                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
 
             let suite =
                 RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, Some(1))
@@ -957,7 +951,7 @@ mod test {
                 .expect("collect results"),
                 Outcome::Passed
             );
-            suite_reporter.finished().await.expect("Reporter finished");
+            suite_reporter.finished().expect("Reporter finished");
 
             let reports = reporter.get_reports();
             let case = reports
@@ -1027,7 +1021,7 @@ mod test {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).await.expect("create new suite");
+                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
 
             let suite =
                 RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
@@ -1043,7 +1037,7 @@ mod test {
                 .expect("collect results"),
                 Outcome::Passed
             );
-            suite_reporter.finished().await.expect("Reporter finished");
+            suite_reporter.finished().expect("Reporter finished");
 
             let reports = reporter.get_reports();
             let case = reports
@@ -1101,7 +1095,7 @@ mod test {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).await.expect("create new suite");
+                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
 
             let suite = RunningSuite::wait_for_start(
                 proxy,
@@ -1122,7 +1116,7 @@ mod test {
                 .expect("collect results"),
                 Outcome::Timedout
             );
-            suite_reporter.finished().await.expect("Reporter finished");
+            suite_reporter.finished().expect("Reporter finished");
 
             let reports = reporter.get_reports();
             let case = reports

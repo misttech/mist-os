@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    async_trait::async_trait,
     fidl_fuchsia_test_manager as ftest_manager,
     std::{
         borrow::Borrow,
@@ -62,41 +61,35 @@ pub type CaseReporter<'a> = EntityReporter<CaseId, &'a DynReporter>;
 
 impl<E, T: Borrow<DynReporter>> EntityReporter<E, T> {
     /// Create a new artifact scoped to the suite.
-    pub async fn new_artifact(
-        &self,
-        artifact_type: &ArtifactType,
-    ) -> Result<Box<DynArtifact>, Error> {
-        self.reporter.borrow().new_artifact(&self.entity, artifact_type).await
+    pub fn new_artifact(&self, artifact_type: &ArtifactType) -> Result<Box<DynArtifact>, Error> {
+        self.reporter.borrow().new_artifact(&self.entity, artifact_type)
     }
 
     /// Create a new directory artifact scoped to the suite.
-    pub async fn new_directory_artifact(
+    pub fn new_directory_artifact(
         &self,
         artifact_type: &DirectoryArtifactType,
         component_moniker: Option<String>,
     ) -> Result<Box<DynDirectoryArtifact>, Error> {
-        self.reporter
-            .borrow()
-            .new_directory_artifact(&self.entity, artifact_type, component_moniker)
-            .await
+        self.reporter.borrow().new_directory_artifact(
+            &self.entity,
+            artifact_type,
+            component_moniker,
+        )
     }
 
     /// Record that the suite has started.
-    pub async fn started(&self, timestamp: Timestamp) -> Result<(), Error> {
-        self.reporter.borrow().entity_started(&self.entity, timestamp).await
+    pub fn started(&self, timestamp: Timestamp) -> Result<(), Error> {
+        self.reporter.borrow().entity_started(&self.entity, timestamp)
     }
 
     /// Record the outcome of the suite.
-    pub async fn stopped(
-        &self,
-        outcome: &ReportedOutcome,
-        timestamp: Timestamp,
-    ) -> Result<(), Error> {
-        self.reporter.borrow().entity_stopped(&self.entity, outcome, timestamp).await
+    pub fn stopped(&self, outcome: &ReportedOutcome, timestamp: Timestamp) -> Result<(), Error> {
+        self.reporter.borrow().entity_stopped(&self.entity, outcome, timestamp)
     }
     /// Finalize and persist the test run.
-    pub async fn finished(self) -> Result<(), Error> {
-        self.reporter.borrow().entity_finished(&self.entity).await
+    pub fn finished(self) -> Result<(), Error> {
+        self.reporter.borrow().entity_finished(&self.entity)
     }
 }
 
@@ -114,47 +107,39 @@ impl RunReporter {
     }
 
     /// Set the number of expected suites for the run.
-    pub async fn set_expected_suites(&self, expected_suites: u32) {
-        self.reporter
-            .set_entity_info(
-                &self.entity,
-                &EntityInfo { expected_children: Some(expected_suites), ..EntityInfo::default() },
-            )
-            .await
+    pub fn set_expected_suites(&self, expected_suites: u32) {
+        self.reporter.set_entity_info(
+            &self.entity,
+            &EntityInfo { expected_children: Some(expected_suites), ..EntityInfo::default() },
+        )
     }
 
     /// Record a new suite under the test run.
-    pub async fn new_suite(
-        &self,
-        url: &str,
-        suite_id: &SuiteId,
-    ) -> Result<SuiteReporter<'_>, Error> {
+    pub fn new_suite(&self, url: &str, suite_id: &SuiteId) -> Result<SuiteReporter<'_>, Error> {
         let entity = EntityId::Suite(*suite_id);
-        self.reporter.new_entity(&entity, url).await?;
+        self.reporter.new_entity(&entity, url)?;
         Ok(SuiteReporter { reporter: self.reporter.borrow(), entity, _entity_type: PhantomData })
     }
 }
 
 impl<'a> SuiteReporter<'a> {
     /// Record a new suite under the suite.
-    pub async fn new_case(&self, name: &str, case_id: &CaseId) -> Result<CaseReporter<'_>, Error> {
+    pub fn new_case(&self, name: &str, case_id: &CaseId) -> Result<CaseReporter<'_>, Error> {
         let suite = match self.entity.clone() {
             EntityId::Suite(suite) => suite,
             _ => panic!("Suite reporter should contain a suite"),
         };
         let entity = EntityId::Case { suite, case: *case_id };
-        self.reporter.new_entity(&entity, name).await?;
+        self.reporter.new_entity(&entity, name)?;
         Ok(CaseReporter { reporter: self.reporter.borrow(), entity, _entity_type: PhantomData })
     }
 
     /// Set the tags for this suite.
-    pub async fn set_tags(&self, tags: Vec<TestTag>) {
-        self.reporter
-            .set_entity_info(
-                &self.entity,
-                &EntityInfo { tags: Some(tags), ..EntityInfo::default() },
-            )
-            .await;
+    pub fn set_tags(&self, tags: Vec<TestTag>) {
+        self.reporter.set_entity_info(
+            &self.entity,
+            &EntityInfo { tags: Some(tags), ..EntityInfo::default() },
+        );
     }
 }
 
@@ -279,19 +264,18 @@ pub struct EntityInfo {
 /// As with `std::io::Write`, `Reporter` implementations are intended to be composable.
 /// An implementation of `Reporter` may contain other `Reporter` implementors and delegate
 /// calls to them.
-#[async_trait]
 pub trait Reporter: Send + Sync {
     /// Record a new test suite or test case. This should be called once per entity.
-    async fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error>;
+    fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error>;
 
     /// Add additional info for an entity.
-    async fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo);
+    fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo);
 
     /// Record that a test run, suite or case has started.
-    async fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error>;
+    fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error>;
 
     /// Record that a test run, suite, or case has stopped.
-    async fn entity_stopped(
+    fn entity_stopped(
         &self,
         entity: &EntityId,
         outcome: &ReportedOutcome,
@@ -302,17 +286,17 @@ pub trait Reporter: Send + Sync {
     /// an entity, no additional events or artifacts may be added to the entity.
     /// Implementations of `Reporter` may assume that `entity_finished` will be called no more
     /// than once for any entity.
-    async fn entity_finished(&self, entity: &EntityId) -> Result<(), Error>;
+    fn entity_finished(&self, entity: &EntityId) -> Result<(), Error>;
 
     /// Create a new artifact scoped to the referenced entity.
-    async fn new_artifact(
+    fn new_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &ArtifactType,
     ) -> Result<Box<DynArtifact>, Error>;
 
     /// Create a new artifact consisting of multiple files.
-    async fn new_directory_artifact(
+    fn new_directory_artifact(
         &self,
         entity: &EntityId,
         artifact_type: &DirectoryArtifactType,

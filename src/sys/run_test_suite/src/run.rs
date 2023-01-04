@@ -133,8 +133,8 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
             ..fidl_fuchsia_test_manager::RunOptions::EMPTY
         };
-        let suite = run_reporter.new_suite(&params.test_url, &suite_id).await?;
-        suite.set_tags(params.tags).await;
+        let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;
+        suite.set_tags(params.tags);
         suite_reporters.insert(suite_id, suite);
         let (suite_controller, suite_server_end) = fidl::endpoints::create_proxy()?;
         let suite_and_id_fut = RunningSuite::wait_for_start(
@@ -205,7 +205,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             .await;
             let suite_outcome = result.unwrap_or_else(|err| Outcome::error(err));
             // We should always persist results, even if something failed.
-            suite_reporter.finished().await?;
+            suite_reporter.finished()?;
             run_state.record_next_outcome(suite_outcome);
             if run_state.should_stop_run() {
                 stopped_prematurely = true;
@@ -219,7 +219,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             // each controller.
             suite_start_futs.clear();
             for (_id, reporter) in suite_reporters.drain() {
-                reporter.finished().await?;
+                reporter.finished()?;
             }
         }
         Result::<_, RunTestSuiteError>::Ok(run_state)
@@ -346,10 +346,9 @@ async fn run_tests<'a, F: 'a + Future<Output = ()> + Unpin>(
                 // These weren't recorded at all, so we need to drain and record they weren't
                 // started.
                 for (params, suite_id) in test_param_iter {
-                    let suite_reporter =
-                        run_reporter.new_suite(&params.test_url, &suite_id).await?;
-                    suite_reporter.set_tags(params.tags).await;
-                    suite_reporter.finished().await?;
+                    let suite_reporter = run_reporter.new_suite(&params.test_url, &suite_id)?;
+                    suite_reporter.set_tags(params.tags);
+                    suite_reporter.finished()?;
                 }
                 return Ok(run_state.final_outcome());
             }
@@ -393,11 +392,11 @@ where
     EI: Iterator<Item = TestParams> + ExactSizeIterator,
 {
     let params_iter = test_params.into_iter();
-    match run_reporter.started(Timestamp::Unknown).await {
+    match run_reporter.started(Timestamp::Unknown) {
         Ok(()) => (),
         Err(e) => return Outcome::error(e),
     }
-    run_reporter.set_expected_suites(params_iter.len() as u32).await;
+    run_reporter.set_expected_suites(params_iter.len() as u32);
     let test_outcome = match run_tests(
         connector,
         params_iter,
@@ -413,11 +412,11 @@ where
         }
     };
 
-    let report_result =
-        match run_reporter.stopped(&test_outcome.clone().into(), Timestamp::Unknown).await {
-            Ok(()) => run_reporter.finished().await,
-            Err(e) => Err(e),
-        };
+    let report_result = match run_reporter.stopped(&test_outcome.clone().into(), Timestamp::Unknown)
+    {
+        Ok(()) => run_reporter.finished(),
+        Err(e) => Err(e),
+    };
     if let Err(e) = report_result {
         warn!("Failed to record results: {:?}", e);
     }
