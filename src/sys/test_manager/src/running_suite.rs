@@ -83,7 +83,6 @@ impl RunningSuite {
     pub(crate) async fn launch(
         test_url: &str,
         facets: facet::SuiteFacets,
-        instance_name: Option<&str>,
         resolver: Arc<ResolverProxy>,
         above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
         debug_data_sender: DebugDataSender,
@@ -107,11 +106,7 @@ impl RunningSuite {
         )
         .await
         .map_err(LaunchTestError::InitializeTestRealm)?;
-        let instance = match instance_name {
-            None => builder.build().await,
-            Some(name) => builder.build_with_name(name).await,
-        }
-        .map_err(LaunchTestError::CreateTestRealm)?;
+        let instance = builder.build().await.map_err(LaunchTestError::CreateTestRealm)?;
         let test_realm_proxy = instance
             .root
             .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()

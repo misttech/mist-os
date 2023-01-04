@@ -183,8 +183,6 @@ impl TestRunBuilder {
         let (debug_data_processor, debug_data_sender) =
             DebugDataProcessor::new(debug_data_directory);
 
-        // Generate a random number in an attempt to prevent realm name collisions between runs.
-        let run_id: u32 = rand::random();
         let suite_scheduler_fut = async move {
             inspect_node_ref.set_execution_state(self_diagnostics::RunExecutionState::Executing);
 
@@ -217,7 +215,6 @@ impl TestRunBuilder {
                             parallel_suites,
                             inspect_node_ref,
                             &mut stop_recv,
-                            run_id,
                             debug_data_sender.clone(),
                         )
                         .await;
@@ -226,7 +223,6 @@ impl TestRunBuilder {
                             serial_suites,
                             inspect_node_ref,
                             &mut stop_recv,
-                            run_id,
                             debug_data_sender.clone(),
                         )
                         .await;
@@ -237,7 +233,6 @@ impl TestRunBuilder {
                             self.suites,
                             inspect_node_ref,
                             &mut stop_recv,
-                            run_id,
                             debug_data_sender.clone(),
                         )
                         .await;
@@ -367,7 +362,6 @@ impl Suite {
 pub(crate) async fn run_single_suite(
     suite: Suite,
     debug_data_sender: DebugDataSender,
-    instance_name: &str,
     inspect_node: Arc<self_diagnostics::SuiteInspectNode>,
 ) {
     let (mut sender, recv) = mpsc::channel(1024);
@@ -412,7 +406,6 @@ pub(crate) async fn run_single_suite(
         match running_suite::RunningSuite::launch(
             &test_url,
             facets,
-            Some(instance_name),
             resolver,
             above_root_capabilities_for_test,
             debug_data_sender,

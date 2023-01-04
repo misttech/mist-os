@@ -110,7 +110,6 @@ pub async fn run_test_manager_query_server(
                         RunningSuite::launch(
                             &test_url,
                             facets,
-                            None,
                             resolver.clone(),
                             above_root_capabilities_for_test.clone(),
                             sender,

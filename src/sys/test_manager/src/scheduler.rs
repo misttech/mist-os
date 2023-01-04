@@ -33,7 +33,6 @@ pub(crate) trait Scheduler {
         suites: Vec<test_suite::Suite>,
         inspect_node_ref: &self_diagnostics::RunInspectNode,
         stop_recv: &mut oneshot::Receiver<()>,
-        run_id: u32,
         debug_data_sender: DebugDataSender,
     );
 }
@@ -48,7 +47,6 @@ pub(crate) trait RunSuiteFn {
         &self,
         suite: Suite,
         debug_data_sender: DebugDataSender,
-        instance_name: &str,
         suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
     );
 }
@@ -62,7 +60,6 @@ impl Scheduler for SerialScheduler {
         suites: Vec<test_suite::Suite>,
         inspect_node_ref: &self_diagnostics::RunInspectNode,
         stop_recv: &mut oneshot::Receiver<()>,
-        run_id: u32,
         debug_data_sender: DebugDataSender,
     ) {
         // run test suites serially for now
@@ -72,15 +69,9 @@ impl Scheduler for SerialScheduler {
             if let Ok(Some(())) = stop_recv.try_recv() {
                 break;
             }
-            let instance_name = format!("{:?}-{:?}", run_id, suite_idx);
+            let instance_name = format!("{:?}", suite_idx);
             let suite_inspect = inspect_node_ref.new_suite(&instance_name, &suite.test_url);
-            test_suite::run_single_suite(
-                suite,
-                debug_data_sender.clone(),
-                &instance_name,
-                suite_inspect,
-            )
-            .await;
+            test_suite::run_single_suite(suite, debug_data_sender.clone(), suite_inspect).await;
         }
     }
 }
@@ -98,10 +89,9 @@ impl RunSuiteFn for RunSuiteObj {
         &self,
         suite: Suite,
         debug_data_sender: DebugDataSender,
-        instance_name: &str,
         suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
     ) {
-        test_suite::run_single_suite(suite, debug_data_sender, &instance_name, suite_inspect).await;
+        test_suite::run_single_suite(suite, debug_data_sender, suite_inspect).await;
     }
 }
 
@@ -112,7 +102,6 @@ impl<T: RunSuiteFn + std::marker::Sync + std::marker::Send> Scheduler for Parall
         suites: Vec<test_suite::Suite>,
         inspect_node_ref: &self_diagnostics::RunInspectNode,
         _stop_recv: &mut oneshot::Receiver<()>,
-        run_id: u32,
         debug_data_sender: DebugDataSender,
     ) {
         const MAX_PARALLEL_SUITES_DEFAULT: usize = 8;
@@ -131,10 +120,10 @@ impl<T: RunSuiteFn + std::marker::Sync + std::marker::Send> Scheduler for Parall
         stream::iter(suites)
             .for_each_concurrent(max_parallel_suites, |suite| async move {
                 let suite_idx_local = suite_idx_ref.fetch_add(1, Ordering::Relaxed);
-                let instance_name = format!("{:?}-parallel{:?}", run_id, suite_idx_local);
+                let instance_name = format!("parallel{:?}", suite_idx_local);
                 let suite_inspect = inspect_node_ref.new_suite(&instance_name, &suite.test_url);
                 self.suite_runner
-                    .run_suite(suite, debug_data_sender_ref.clone(), &instance_name, suite_inspect)
+                    .run_suite(suite, debug_data_sender_ref.clone(), suite_inspect)
                     .await;
             })
             .await;
@@ -192,7 +181,6 @@ mod tests {
             &self,
             suite: Suite,
             _debug_data_sender: DebugDataSender,
-            _instance_name: &str,
             _suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
         ) {
             let suite_url = suite.test_url;
@@ -221,9 +209,8 @@ mod tests {
                 .sender;
 
         let (_stop_sender, mut stop_recv) = oneshot::channel::<()>();
-        let run_id: u32 = rand::random();
 
-        parallel_executor.execute(suite_vec, &run_inspect, &mut stop_recv, run_id, sender).await;
+        parallel_executor.execute(suite_vec, &run_inspect, &mut stop_recv, sender).await;
 
         assert!(suite_runner
             .test_vec
