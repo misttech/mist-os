@@ -61,15 +61,6 @@ resource("tracing.config") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_component("component") {
-  component_name = "trace_manager"
-  manifest = "meta/trace_manager.cml"
-  deps = [
-    ":bin",
-    ":tracing.config",
-  ]
-}
-
 # A version of trace manager that does not include the built in trace
 # providers. Mainly used in tests which need tracing and use their own routed
 # trace manager rather than the one in core.
@@ -82,12 +73,16 @@ fuchsia_component("component_hermetic") {
   ]
 }
 
-fuchsia_package("trace_manager") {
+fuchsia_package_with_single_component("trace_manager") {
+  manifest = "meta/trace_manager.cml"
   deps = [
-    ":component",
-    "//src/performance/cpuperf_provider:component",
-    "//src/performance/ktrace_provider:component",
-    "//src/performance/perfetto-bridge:component",
+    ":bin",
+    ":tracing.config",
+  ]
+  subpackages = [
+    "//src/performance/cpuperf_provider",
+    "//src/performance/ktrace_provider",
+    "//src/performance/perfetto-bridge",
   ]
 }
 
