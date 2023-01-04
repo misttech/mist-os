@@ -13,7 +13,11 @@ group("tests") {
   ]
 }
 
-# Tests that use starnix_test_runner should depend on this.
+# Tests that use starnix_test_runner should depend on one of these.
 expect_includes("starnix_test") {
   includes = [ "starnix_test.shard.cml" ]
+}
+
+expect_includes("starnix_test_with_expectations") {
+  includes = [ "starnix_test_with_expectations.shard.cml" ]
 }

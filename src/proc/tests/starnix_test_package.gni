@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_test_package.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 # Define a test package for a linux test.
 #
@@ -33,11 +35,46 @@ template("starnix_test_package") {
   }
 }
 
+# Define a test package with expectations for a linux test.
+#
+# Arguments:
+#
+#   galaxy [mandatory]
+#   The target defining the galaxy package containing the starnix runner and the system image.
+#
+#   Any fuchsia_test_package arguments are supported.
+template("starnix_test_package_with_expectations") {
+  fuchsia_test_with_expectations_package(target_name) {
+    galaxy = invoker.galaxy
+    forward_variables_from(invoker, "*")
+
+    if (target_cpu == "x64") {
+      renameable_subpackages = [
+        {
+          name = "galaxy"
+          package = galaxy
+        },
+      ]
+    }
+  }
+}
+
 # Define a test package for a linux test running in a starbionic galaxy.
 #
 # The parameters are the same as fuchsia_test_package
 template("starbionic_test_package") {
   starnix_test_package(target_name) {
+    forward_variables_from(invoker, "*")
+
+    galaxy = "//src/proc/bin/galaxies/starbionic_test"
+  }
+}
+
+# Define a test package with expectations for a linux test running in a starbionic galaxy.
+#
+# The parameters are the same as fuchsia_test_package
+template("starbionic_test_package_with_expectations") {
+  starnix_test_package_with_expectations(target_name) {
     forward_variables_from(invoker, "*")
 
     galaxy = "//src/proc/bin/galaxies/starbionic_test"
