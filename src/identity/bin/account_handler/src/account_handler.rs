@@ -125,11 +125,6 @@ where
     /// Helper for outputting account handler information via fuchsia_inspect.
     inspect: Arc<inspect::AccountHandler>,
 
-    // TODO(fxb/116213): Remove this once interaction is completely rolled out.
-    /// Feature flag to enable/disable interaction protocol.
-    #[allow(dead_code)]
-    is_interaction_enabled: bool,
-
     /// The available mechanisms which can be used for Authentication.
     mechanisms: Vec<Mechanism>,
 }
@@ -142,7 +137,6 @@ where
     pub fn new(
         lifetime: AccountLifetime,
         inspector: &Inspector,
-        is_interaction_enabled: bool,
         mechanisms: Vec<Mechanism>,
         storage_manager_factory: Box<dyn Fn(&AccountId) -> SM + Send + Sync>,
     ) -> AccountHandler<SM> {
@@ -151,7 +145,6 @@ where
             state: Arc::new(Mutex::new(Lifecycle::Uninitialized { storage_manager_factory })),
             lifetime,
             inspect,
-            is_interaction_enabled,
             mechanisms,
         }
     }
@@ -842,13 +835,11 @@ mod tests {
     fn create_account_handler(
         lifetime: AccountLifetime,
         inspector: Arc<Inspector>,
-        is_interaction_enabled: bool,
         mechanisms: Vec<Mechanism>,
     ) -> (AccountHandlerControlProxy, impl Future<Output = ()>) {
         let test_object = AccountHandler::new(
             lifetime,
             &inspector,
-            is_interaction_enabled,
             mechanisms,
             /*storage_manager_factory=*/
             Box::new(|_| {
@@ -890,7 +881,6 @@ mod tests {
     {
         lifetime: AccountLifetime,
         inspector: Arc<Inspector>,
-        is_interaction_enabled: bool,
         mechanisms: Vec<Mechanism>,
         test_fn: TestFn,
     }
@@ -901,12 +891,8 @@ mod tests {
         Fut: Future<Output = TestResult>,
     {
         let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
-        let (proxy, server_fut) = create_account_handler(
-            args.lifetime,
-            args.inspector,
-            args.is_interaction_enabled,
-            args.mechanisms,
-        );
+        let (proxy, server_fut) =
+            create_account_handler(args.lifetime, args.inspector, args.mechanisms);
 
         let (test_res, _server_result) =
             executor.run_singlethreaded(join((args.test_fn)(proxy), server_fut));
@@ -921,7 +907,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
@@ -942,7 +927,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
@@ -968,7 +952,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -994,7 +977,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![Mechanism::Test])
                 .test_fn(|account_handler_proxy| {
                     async move {
@@ -1055,7 +1037,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![Mechanism::Test])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -1075,7 +1056,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
@@ -1111,7 +1091,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -1136,7 +1115,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1162,7 +1140,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
@@ -1229,7 +1206,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -1262,7 +1238,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(proxy.remove_account().await?, Err(ApiError::FailedPrecondition));
@@ -1282,7 +1257,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
@@ -1321,7 +1295,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
@@ -1351,7 +1324,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
@@ -1375,7 +1347,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![Mechanism::Test])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1400,7 +1371,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![Mechanism::Test, Mechanism::Password])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1425,7 +1395,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::new(Inspector::new()))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1450,7 +1419,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     account_handler_proxy
@@ -1494,7 +1462,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     account_handler_proxy
@@ -1521,7 +1488,6 @@ mod tests {
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
                 .inspector(Arc::clone(&inspector))
-                .is_interaction_enabled(true)
                 .mechanisms(vec![])
                 .test_fn(|account_handler_proxy| async move {
                     // Send the invalid request

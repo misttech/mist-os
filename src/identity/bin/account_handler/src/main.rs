@@ -152,7 +152,6 @@ fn main() -> Result<(), Error> {
     let account_handler = Arc::new(AccountHandler::new(
         lifetime,
         &inspector,
-        CONFIG.is_interaction_enabled,
         get_available_mechanisms(),
         Box::new(get_storage_manager),
     ));
