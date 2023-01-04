@@ -238,9 +238,14 @@ impl Socket {
         )
     }
 
-    // Private helper for reading without `&mut` self.
-    // This is used in the impls of `Read` for `Socket` and `&Socket`.
-    fn read_nomut(&self, buf: &mut [u8], cx: &mut Context<'_>) -> Poll<Result<usize, zx::Status>> {
+    /// Attempt to read from the socket, registering for wakeup if the socket doesn't have any
+    /// contents available. Used internally in the `AsyncRead` implementation, exposed for users
+    /// who know the concrete type they're using and don't want to pin the socket.
+    pub fn poll_read_ref(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, zx::Status>> {
         let clear_closed = ready!(self.poll_read_task(cx))?;
         let res = self.handle.read(buf);
         if res == Err(zx::Status::SHOULD_WAIT) {
@@ -253,9 +258,14 @@ impl Socket {
         Poll::Ready(res)
     }
 
-    // Private helper for writing without `&mut` self.
-    // This is used in the impls of `Write` for `Socket` and `&Socket`.
-    fn write_nomut(&self, buf: &[u8], cx: &mut Context<'_>) -> Poll<Result<usize, zx::Status>> {
+    /// Attempt to write into the socket, registering for wakeup if the socket is not ready. Used
+    /// internally in the `AsyncWrite` implementation, exposed for users who know the concrete type
+    /// they're using and don't want to pin the socket.
+    pub fn poll_write_ref(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, zx::Status>> {
         let clear_closed = ready!(self.poll_write_task(cx))?;
         let res = self.handle.write(buf);
         if res == Err(zx::Status::SHOULD_WAIT) {
@@ -326,7 +336,7 @@ impl AsyncRead for Socket {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        self.read_nomut(buf, cx).map_err(Into::into)
+        self.poll_read_ref(cx, buf).map_err(Into::into)
     }
 }
 
@@ -336,7 +346,7 @@ impl AsyncWrite for Socket {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.write_nomut(buf, cx).map_err(Into::into)
+        self.poll_write_ref(cx, buf).map_err(Into::into)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -354,7 +364,7 @@ impl<'a> AsyncRead for &'a Socket {
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        self.read_nomut(buf, cx).map_err(Into::into)
+        self.poll_read_ref(cx, buf).map_err(Into::into)
     }
 }
 
@@ -364,7 +374,7 @@ impl<'a> AsyncWrite for &'a Socket {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.write_nomut(buf, cx).map_err(Into::into)
+        self.poll_write_ref(cx, buf).map_err(Into::into)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
