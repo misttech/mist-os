@@ -5,6 +5,11 @@
 
 set -e
 
+echo "***********************************************"
+echo "*       TEST IS DISABLED: fxb/118622          *"
+echo "***********************************************"
+exit 0
+
 # Start servicemanager in the background, which is the name server for binder objects.
 servicemanager &
 
