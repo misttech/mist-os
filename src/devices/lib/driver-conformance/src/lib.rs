@@ -925,6 +925,8 @@ mod test {
     }
 
     fn create_dummy_ffx_test_results(output: &Path) -> Result<()> {
+        // TODO: Consider just including a tar in the source and extracting it instead of
+        // creating all the files each time.
         let suite_1_dir = output.join("123");
         let suite_1_syslog_path = suite_1_dir.join("syslog.txt");
         let suite_1_report_path = suite_1_dir.join("report.txt");
@@ -939,6 +941,12 @@ mod test {
         let case_3_stdout_path = case_3_dir.join("stdout.txt");
         let case_4_dir = output.join("987");
         let case_4_stdout_path = case_4_dir.join("stdout.txt");
+        let case_4_custom_dir = case_4_dir.join("custom_dir");
+        let case_4_custom_child_a = case_4_custom_dir.join("a");
+        let case_4_custom_child_b = case_4_custom_dir.join("b");
+        let case_4_custom_nest_dir = case_4_custom_dir.join("nest");
+        let case_4_custom_nest_child_c = case_4_custom_nest_dir.join("c");
+        let case_4_custom_nest_child_d = case_4_custom_nest_dir.join("d");
         let json_path = output.join("run_summary.json");
         fs::create_dir(suite_1_dir.as_path())?;
         let _ = File::create(suite_1_syslog_path.as_path())?.write_all(b"123_syslog")?;
@@ -954,6 +962,12 @@ mod test {
         let _ = File::create(case_3_stdout_path.as_path())?.write_all(b"654_stdout")?;
         fs::create_dir(case_4_dir.as_path())?;
         let _ = File::create(case_4_stdout_path.as_path())?.write_all(b"987_stdout")?;
+        fs::create_dir(case_4_custom_dir.as_path())?;
+        let _ = File::create(case_4_custom_child_a.as_path())?.write_all(b"custom_child_a")?;
+        let _ = File::create(case_4_custom_child_b.as_path())?.write_all(b"custom_child_b")?;
+        fs::create_dir(case_4_custom_nest_dir.as_path())?;
+        let _ = File::create(case_4_custom_nest_child_c.as_path())?.write_all(b"custom_child_c")?;
+        let _ = File::create(case_4_custom_nest_child_d.as_path())?.write_all(b"custom_child_d")?;
         let mut json_file = File::create(json_path.as_path())?;
         json_file.write_all(
             r#"{
@@ -1034,6 +1048,9 @@ mod test {
                         "artifacts": {
                           "stdout.txt": {
                             "artifact_type": "STDOUT"
+                          },
+                          "custom_dir": {
+                            "artifact_type": "CUSTOM"
                           }
                         },
                         "artifact_dir": "987",
@@ -1122,6 +1139,12 @@ mod test {
             (Path::new("test_results/654/stdout.txt"), "654_stdout".to_string()),
             (Path::new("test_results/987"), "".to_string()),
             (Path::new("test_results/987/stdout.txt"), "987_stdout".to_string()),
+            (Path::new("test_results/987/custom_dir"), "".to_string()),
+            (Path::new("test_results/987/custom_dir/a"), "custom_child_a".to_string()),
+            (Path::new("test_results/987/custom_dir/b"), "custom_child_b".to_string()),
+            (Path::new("test_results/987/custom_dir/nest"), "".to_string()),
+            (Path::new("test_results/987/custom_dir/nest/c"), "custom_child_c".to_string()),
+            (Path::new("test_results/987/custom_dir/nest/d"), "custom_child_d".to_string()),
             (Path::new("manifest.json"), "".to_string()),
         ]);
         let mut count: usize = 0;

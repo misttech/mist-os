@@ -117,19 +117,26 @@ impl SuperjetManifest {
         }
     }
 
-    fn copy_or_tar(source_path: &Path, destination_path: &Path) -> Result<()> {
-        if let Some(parent) = destination_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    fn copy_artifact(source_path: &Path, destination_path: &Path) -> Result<()> {
         if source_path.is_file() {
+            if let Some(parent) = destination_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
             fs::copy(source_path, destination_path)?;
         } else if source_path.is_dir() {
-            // TODO: Tar this so it is a single file.
             // This is possible according to ArtifactType::Custom defined in:
             // //src/sys/run_test_suite/directory/src/lib.rs
-            return Err(anyhow!("We do not support copying a directory to the tarball yet."));
+            fs::create_dir_all(destination_path)?;
+            // Recursively copy.
+            for entry in fs::read_dir(source_path)? {
+                let entry = entry?;
+                Self::copy_artifact(&entry.path(), &destination_path.join(entry.file_name()))?;
+            }
         } else {
-            return Err(anyhow!("The source is not a file or directory."));
+            return Err(anyhow!(
+                "The source `{}` is not a file or directory.",
+                source_path.display()
+            ));
         }
         Ok(())
     }
@@ -164,7 +171,7 @@ impl SuperjetManifest {
         let working_path = self.working_dir.path();
         let in_archive_path = dest_path_fn(artifact_path, source_base)?;
         let destination_path = working_path.join(in_archive_path.as_path());
-        SuperjetManifest::copy_or_tar(artifact_path, &destination_path)?;
+        SuperjetManifest::copy_artifact(artifact_path, &destination_path)?;
         Ok(in_archive_path)
     }
 
