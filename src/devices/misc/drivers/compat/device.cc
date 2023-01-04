@@ -28,6 +28,30 @@ namespace fcd = fuchsia_component_decl;
 
 namespace {
 
+struct ProtocolInfo {
+  std::string_view name;
+  uint32_t id;
+  uint32_t flags;
+};
+
+static constexpr ProtocolInfo kProtocolInfos[] = {
+#define DDK_PROTOCOL_DEF(tag, val, name, flags) {name, val, flags},
+#include <lib/ddk/protodefs.h>
+};
+
+fidl::StringView ProtocolIdToClassName(uint32_t protocol_id) {
+  for (const ProtocolInfo& info : kProtocolInfos) {
+    if (info.id != protocol_id) {
+      continue;
+    }
+    if (info.flags & PF_NOPUB) {
+      return {};
+    }
+    return fidl::StringView::FromExternal(info.name);
+  }
+  return {};
+}
+
 std::optional<fdf::wire::NodeProperty> fidl_offer_to_device_prop(fidl::AnyArena& arena,
                                                                  const char* fidl_offer) {
   static const std::unordered_map<std::string_view, uint32_t> kPropMap = {
@@ -164,7 +188,10 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
 
 Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, fdf::Logger* logger, async_dispatcher_t* dispatcher)
-    : devfs_server_(*this, dispatcher),
+    : devfs_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> controller) {
+        devfs_server_.ServeMultiplexed(controller.TakeChannel());
+      }),
+      devfs_server_(*this, dispatcher),
       name_(device.name),
       logger_(logger),
       dispatcher_(dispatcher),
@@ -175,12 +202,6 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
-  // Free the dev node first so that nothing will call into the device as it's being destructed
-  // further.
-  if (devfs_server_auto_free_) {
-    devfs_server_auto_free_.call();
-  }
-
   // We only shut down the devices that have a parent, since that means that *this* compat driver
   // owns the device. If the device does not have a parent, then ops_ belongs to another driver, and
   // it's that driver's responsibility to be shut down.
@@ -236,9 +257,7 @@ fpromise::promise<void> Device::UnbindOp() {
 
 void Device::CompleteUnbind() {
   // Remove ourself from devfs.
-  if (devfs_server_auto_free_) {
-    devfs_server_auto_free_.call();
-  }
+  devfs_connector_.reset();
 
   // Our unbind is finished, so close all outstanding connections to devfs clients.
   devfs_server_.CloseAllConnections([this]() {
@@ -348,14 +367,36 @@ fpromise::promise<void, zx_status_t> Device::Export() {
     options |= fuchsia_device_fs::wire::ExportOptions::kInvisible;
   }
 
-  auto devfs_status = driver()->ExportToDevfsSync(options, devfs_server_, dev_vnode_name,
-                                                  topological_path_, device_server_.proto_id());
-  if (devfs_status.is_error()) {
-    FDF_LOG(INFO, "Device %s failed to add to devfs: %s", topological_path_.c_str(),
-            devfs_status.status_string());
-    return fpromise::make_error_promise(devfs_status.status_value());
+  // Export to devfs.
+  {
+    if (!devfs_connector_.has_value()) {
+      FDF_LOG(ERROR, "Device %s failed to add to devfs: no devfs_connector",
+              topological_path_.c_str());
+      return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+    }
+
+    zx::result connector = devfs_connector_.value().Bind(dispatcher());
+    if (connector.is_error()) {
+      FDF_LOG(ERROR, "Device %s failed to create devfs connector: %s", topological_path_.c_str(),
+              connector.status_string());
+      return fpromise::make_error_promise(connector.error_value());
+    }
+
+    fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
+    fidl::WireResult result = driver()->devfs_exporter().sync()->ExportV2(
+        std::move(connector.value()), fidl::StringView::FromExternal(topological_path_), class_name,
+        options);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Device %s: devfs failed: calling export2 returned: %s",
+              topological_path_.c_str(), result.status_string());
+      return fpromise::make_error_promise(result.status());
+    }
+    if (result.value().is_error()) {
+      FDF_LOG(ERROR, "Device %s: devfs failed: export2 returned: %s", topological_path_.c_str(),
+              zx_status_get_string(result.value().error_value()));
+      return fpromise::make_error_promise(result.value().error_value());
+    }
   }
-  devfs_server_auto_free_ = std::move(*devfs_status);
 
   // TODO(fxdebug.dev/90735): When DriverDevelopment works in DFv2, don't print
   // this.
@@ -386,7 +427,7 @@ fpromise::promise<void, zx_status_t> Device::Export() {
       .and_then([has_init, this]() {
         // Make the device visible if it has an init function.
         if (has_init) {
-          auto status = driver()->devfs_exporter().exporter().sync()->MakeVisible(
+          fidl::WireResult status = driver()->devfs_exporter().sync()->MakeVisible(
               fidl::StringView::FromExternal(topological_path()));
           if (status->is_error()) {
             return fpromise::make_error_promise(status->error_value());

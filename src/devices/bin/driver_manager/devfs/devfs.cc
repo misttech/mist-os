@@ -130,7 +130,7 @@ Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
 bool Devnode::VnodeImpl::IsDirectory() const {
   return std::visit(
       overloaded{[&](const NoRemote&) { return true; }, [&](const Service&) { return false; },
-                 [&](const Connector&) { return false; },
+                 [&](const Connector& connector) { return !connector.connector.is_valid(); },
                  [&](const Remote& remote) { return !remote.connector.is_valid(); }},
       target_);
 }
@@ -165,7 +165,12 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   return std::visit(
       overloaded{[&](const NoRemote&) { return ZX_ERR_NOT_SUPPORTED; },
                  [&](const Service&) { return ZX_ERR_NOT_SUPPORTED; },
-                 [&](const Connector&) { return ZX_ERR_NOT_SUPPORTED; },
+                 [&](const Connector& connector) {
+                   if (!connector.connector.is_valid()) {
+                     return ZX_ERR_NOT_SUPPORTED;
+                   }
+                   return connector.connector->Connect(std::move(channel)).status();
+                 },
                  [&](const Remote& remote) {
                    if (remote.connector.is_valid()) {
                      return remote.connector->ConnectMultiplexed(std::move(channel)).status();
@@ -178,7 +183,7 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
 bool Devnode::VnodeImpl::IsService() const {
   return std::visit(
       overloaded{[&](const NoRemote&) { return false; }, [&](const Service&) { return false; },
-                 [&](const Connector&) { return false; },
+                 [&](const Connector& connector) { return connector.connector.is_valid(); },
                  [&](const Remote& remote) { return remote.connector.is_valid(); }},
       target_);
 }

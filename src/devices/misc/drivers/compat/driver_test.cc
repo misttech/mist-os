@@ -279,17 +279,16 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
 
 class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Exporter> {
  public:
-  void Export(ExportRequestView request, ExportCompleter::Sync& completer) override {
-    completer.ReplySuccess();
-  }
-
-  void ExportOptions(ExportOptionsRequestView request,
-                     ExportOptionsCompleter::Sync& completer) override {
-    auto pair = devfs_paths_.emplace(request->devfs_path.data(), request->devfs_path.size());
-    if (!pair.second) {
-      std::cerr << "Cannot export \"" << request->devfs_path.get() << "\": Path already exists";
+  void ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) override {
+    auto [i, inserted] = devfs_paths_.emplace(request->topological_path.get());
+    if (!inserted) {
+      std::cerr << "Cannot export \"" << request->topological_path.get()
+                << "\": Path already exists";
       completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
     }
+
+    connectors_.push_back(std::move(request->open_client));
+
     completer.ReplySuccess();
   }
 
@@ -306,6 +305,8 @@ class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Expor
   }
 
  private:
+  // We don't do anything with these clients but we hold on to them to keep them alive.
+  std::vector<fidl::ClientEnd<fuchsia_device_fs::Connector>> connectors_;
   std::unordered_set<std::string> devfs_paths_;
 };
 

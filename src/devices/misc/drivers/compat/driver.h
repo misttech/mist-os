@@ -10,7 +10,6 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/devfs/cpp/exporter.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fpromise/scope.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -55,15 +54,10 @@ class Driver : public fdf::DriverBase {
   zx::result<> SetProfileByRole(zx::unowned_thread thread, std::string_view role);
   zx::result<std::string> GetVariable(const char* name);
 
-  // Export a device to devfs. If this returns success, the deferred callback
-  // will remove the device from devfs when it goes out of scope.
-  // `device_server` must outlive the returned deferred callback.
-  zx::result<fit::deferred_callback> ExportToDevfsSync(
-      fuchsia_device_fs::wire::ExportOptions options, devfs_fidl::DeviceServer& device_server,
-      std::string name, std::string_view topological_path, uint32_t proto_id);
-
   Device& GetDevice() { return device_; }
-  const fdf::DevfsExporter& devfs_exporter() const { return devfs_exporter_; }
+  const fidl::WireSharedClient<fuchsia_device_fs::Exporter>& devfs_exporter() const {
+    return devfs_exporter_;
+  }
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
@@ -119,11 +113,7 @@ class Driver : public fdf::DriverBase {
   async::Executor executor_;
   std::string driver_path_;
 
-  // The vfs to serve nodes that we are putting into devfs.
-  std::unique_ptr<fs::SynchronousVfs> devfs_vfs_;
-  // The directory to store nodes that we are putting into devfs.
-  fbl::RefPtr<fs::PseudoDir> devfs_dir_;
-  fdf::DevfsExporter devfs_exporter_;
+  fidl::WireSharedClient<fuchsia_device_fs::Exporter> devfs_exporter_;
   std::string node_name_;
 
   std::unique_ptr<fdf::Logger> inner_logger_;

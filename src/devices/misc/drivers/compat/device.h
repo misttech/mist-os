@@ -14,6 +14,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/logger.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/scope.h>
@@ -170,9 +171,9 @@ class Device : public std::enable_shared_from_this<Device>,
   fidl::Arena<512> arena_;
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
 
+  std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_connector_;
+
   devfs_fidl::DeviceServer devfs_server_;
-  // This callback will remove `devfs_server_` from devfs when it goes out of scope.
-  fit::deferred_callback devfs_server_auto_free_;
 
   DeviceServer device_server_;
 

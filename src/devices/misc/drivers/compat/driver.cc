@@ -20,7 +20,6 @@
 #include <zircon/dlfcn.h>
 
 #include "src/devices/misc/drivers/compat/loader.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 
 namespace fboot = fuchsia_boot;
 namespace fdf {
@@ -148,32 +147,18 @@ Driver::~Driver() {
 }
 
 zx::result<> Driver::Start() {
-  devfs_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher());
-  devfs_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
+  // Connect to devfs exporter.
+  {
+    zx::result result = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    devfs_exporter_ = fidl::WireSharedClient(std::move(result.value()), dispatcher());
   }
-  // Start the devfs exporter.
-  auto serve_status = devfs_vfs_->Serve(devfs_dir_, endpoints->server.TakeChannel(),
-                                        fs::VnodeConnectionOptions::ReadWrite());
-  if (serve_status != ZX_OK) {
-    return zx::error(serve_status);
-  }
-
-  auto exporter = fdf::DevfsExporter::Create(
-      *context().incoming(), dispatcher(),
-      fidl::WireSharedClient(std::move(endpoints->client), dispatcher()));
-  if (exporter.is_error()) {
-    return zx::error(exporter.error_value());
-  }
-  devfs_exporter_ = std::move(*exporter);
 
   // Serve the diagnostics directory.
-  serve_status = ServeDiagnosticsDir();
-  if (serve_status != ZX_OK) {
-    return zx::error(serve_status);
+  if (zx_status_t status = ServeDiagnosticsDir(); status != ZX_OK) {
+    return zx::error(status);
   }
 
   auto compat_connect =
@@ -725,28 +710,6 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   return zx::ok(std::string(result->value.data(), result->value.size()));
-}
-
-zx::result<fit::deferred_callback> Driver::ExportToDevfsSync(
-    fuchsia_device_fs::wire::ExportOptions options, devfs_fidl::DeviceServer& device_server,
-    std::string name, std::string_view topological_path, uint32_t proto_id) {
-  auto service = fbl::MakeRefCounted<fs::Service>([&device_server](zx::channel channel) {
-    device_server.ServeMultiplexed(std::move(channel));
-    return ZX_OK;
-  });
-  zx_status_t add_status = devfs_dir_->AddEntry(name, service);
-  if (add_status != ZX_OK) {
-    return zx::error(add_status);
-  }
-  zx_status_t status = devfs_exporter_.ExportSync(name, topological_path, options, proto_id);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  auto callback = [this, service = std::move(service), name = std::move(name)]() {
-    devfs_vfs_->CloseAllConnectionsForVnode(*service, {});
-    devfs_dir_->RemoveEntry(name);
-  };
-  return zx::ok(fit::deferred_callback(callback));
 }
 
 zx::result<std::unique_ptr<fdf::DriverBase>> DriverFactory::CreateDriver(
