@@ -59,11 +59,10 @@ whose responsibilities and key interactions are summarized below:
 - **`account_handler`** - This large module is currently a menagerie of
   everything that did not fit cleanly into some other module. Over time we
   expect to refactor this into more modules with better cohesion, but the scope
-  of `account_manager` currently contains:
+  of `account_handler` currently contains:
   - Defining the top level component state
   - Defining the top-level "lifecycle" state machine for the component
   - Defining an sub-state machine for the component once it has been initialized
-  - Connecting to the correct authentication protocol based on configuration
   - Implementing a `fuchsia.identity.internal.AccountHandlerControl` server
   - Invoking the storage manager library.
 - **`account`** - This module defines the state of an unlocked account, uses the
