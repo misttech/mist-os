@@ -61,8 +61,8 @@
 #  - Files under '$SYSROOT/lib' are all tiny linker scripts that are either
 #    empty, or redirect to the right library binary, whose path depends
 #    on the current toolchain variant. For example, when in the
-#    //build/toolchain/fuchsia:x64-asan-ubsan toolchain, libc.so would
-#    redirect to 'user.libc_x64/-asan-ubsan/libc.so.debug' (where '.debug'
+#    //build/toolchain/fuchsia:x64-asan toolchain, libc.so would
+#    redirect to 'user.libc_x64/-asan/libc.so.debug' (where '.debug'
 #    means this is the unstripped version).
 #
 #    The non-empty linker scripts are created through a generated_file()

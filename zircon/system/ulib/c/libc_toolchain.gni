@@ -228,8 +228,8 @@ sysroot_crt1_obj =
 #   'echo' one with the 'profile' variant, and all other Fuchsia executables
 #   with the 'asan' one.
 #
-# - Even if no variant is enabled in a given build, the "asan" and "asan-ubsan"
-#   variants of the C library need to be built and exported to the Fuchsia SDK.
+# - Even if no variant is enabled in a given build, the "asan" variant of the
+#   C library need to be built and exported to the Fuchsia SDK.
 #   (see //zircon/system/ulib/c/sysroot_entries.gni for details).
 #
 # - The "system package" is a special Fuchsia package that contains system

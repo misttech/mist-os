@@ -25,7 +25,6 @@ arch/arm64/lib/libsyslog.so
 arch/arm64/lib/libtrace-engine.so
 arch/arm64/lib/libtrace-provider-so.so
 arch/arm64/lib/libvulkan.so
-arch/arm64/sysroot/dist/lib/asan-ubsan/ld.so.1
 arch/arm64/sysroot/dist/lib/asan/ld.so.1
 arch/arm64/sysroot/dist/lib/ld.so.1
 arch/arm64/sysroot/include/alloca.h

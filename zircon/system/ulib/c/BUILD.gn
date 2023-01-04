@@ -87,11 +87,8 @@ if (current_toolchain == default_toolchain) {
       # enough to fix the issue.
       exclude_variant_tags = [ "fuzzer" ]
 
-      # The Asan-based variants are needed to generate binaries for the SDK.
-      enable_variants = [
-        "asan",
-        "asan-ubsan",
-      ]
+      # The Asan-based variant is needed to generate binaries for the SDK.
+      enable_variants = [ "asan" ]
     }
   }
 } else if (toolchain_variant.base ==
