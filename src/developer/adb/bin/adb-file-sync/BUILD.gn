@@ -35,6 +35,7 @@ executable("adb-file-sync") {
     ":adb-file-sync-config",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
