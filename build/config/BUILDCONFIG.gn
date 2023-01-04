@@ -2948,9 +2948,6 @@ template("executable") {
 
     fdio_config = "//build/config/fuchsia:fdio_config"
     if (configs + [ fdio_config ] - [ fdio_config ] != configs) {
-      # Now that fdio is built in this very build, we can't get away with
-      # simply pointing the linker at the place where we know the fdio binary
-      # will reside: we need a proper dependency.
       deps += [ "//sdk/lib/fdio" ]
     }
 
