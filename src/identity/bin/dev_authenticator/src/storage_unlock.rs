@@ -30,37 +30,15 @@ lazy_static! {
     static ref NOT_MAGIC_PREKEY: PrekeyMaterial = PrekeyMaterial(vec![80; 32]);
 }
 
-/// Determines the behavior of the authenticator.
-#[derive(Debug, Clone, Copy)]
-pub enum Mode {
-    /// Enroll returns fixed enrollment data and magic prekey material.
-    /// Authenticate ignores enrollment data and returns magic prekey material.
-    AlwaysSucceed,
-
-    /// Enroll returns fixed enrollment data and magic prekey material.
-    /// Authenticate ignores enrollment data and returns prekey material which
-    /// is valid but not equal to the magic prekey.
-    AlwaysFailAuthentication,
-
-    /// Enroll returns fixed enrollment data and magic prekey material.
-    /// Authenticate ignores enrollment data and returns magic prekey material
-    /// if TestInteraction::SetSuccess() is called and a valid but different
-    /// prekey otherwise.
-    Interaction,
-}
-
 /// A development-only implementation of the
-/// fuchsia.identity.authentication.StorageUnlockMechanism fidl protocol
-/// that responds according to its `mode`.
+/// fuchsia.identity.authentication.StorageUnlockMechanism fidl protocol.
 pub struct StorageUnlockMechanism {
-    mode: Mode,
     clock: Clock,
 }
 
 impl StorageUnlockMechanism {
-    pub fn new(mode: Mode) -> Self {
+    pub fn new() -> Self {
         Self {
-            mode,
             clock: duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS)
                 .expect("Failed to duplicate UTC clock handle."),
         }
@@ -116,20 +94,14 @@ impl StorageUnlockMechanism {
                 return Err(ApiError::InvalidRequest);
             };
 
-        let prekey_material = match self.mode {
-            Mode::AlwaysSucceed => MAGIC_PREKEY.clone(),
-            Mode::AlwaysFailAuthentication => NOT_MAGIC_PREKEY.clone(),
-            Mode::Interaction => {
-                if TestInteraction::start(test_interaction_server_end).await? {
-                    MAGIC_PREKEY.clone()
-                } else {
-                    // If the client closed the TestInteraction channel, it
-                    // means there won't be any retries and the client has
-                    // given up on a successful result and aborted the attempt.
-                    warn!("TestInteraction channel closed. Aborting authentication.");
-                    return Err(ApiError::Aborted);
-                }
-            }
+        let prekey_material = if TestInteraction::start(test_interaction_server_end).await? {
+            MAGIC_PREKEY.clone()
+        } else {
+            // If the client closed the TestInteraction channel, it
+            // means there won't be any retries and the client has
+            // given up on a successful result and aborted the attempt.
+            warn!("TestInteraction channel closed. Aborting authentication.");
+            return Err(ApiError::Aborted);
         };
 
         // Take the ID of the first enrollment.
@@ -195,17 +167,16 @@ mod test {
         InteractionProtocolServerEnd::Password(server_end)
     }
 
-    /// Starts the StorageUnlockMechanism server in the specified `mode`. Then
-    /// it runs the `test_fn` checks its result. If `ok_server_result` is true,
-    /// we verify that the server should return an `Ok` value. Otherwise it
-    /// should return an error.
-    async fn run_proxy_test<Fn, Fut>(mode: Mode, ok_server_result: bool, test_fn: Fn)
+    /// Starts the StorageUnlockMechanism server. Then it runs the `test_fn` and
+    /// checks its result. If `ok_server_result` is true, we verify that the
+    /// server should return an `Ok` value. Otherwise it should return an error.
+    async fn run_proxy_test<Fn, Fut>(ok_server_result: bool, test_fn: Fn)
     where
         Fn: FnOnce(StorageUnlockMechanismProxy) -> Fut,
         Fut: Future<Output = Result<(), fidl::Error>>,
     {
         let (proxy, stream) = create_proxy_and_stream::<StorageUnlockMechanismMarker>().unwrap();
-        let mechanism = StorageUnlockMechanism::new(mode);
+        let mechanism = StorageUnlockMechanism::new();
         let server_fut = mechanism.handle_requests_from_stream(stream);
         let test_fut = test_fn(proxy);
 
@@ -219,82 +190,8 @@ mod test {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn always_succeed_enroll_and_authenticate_produce_same_prekey() {
-        run_proxy_test(Mode::AlwaysSucceed, true, |proxy| async move {
-            let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
-
-            let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-
-            let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy
-                    .authenticate(
-                        &mut create_test_interaction_protocol(),
-                        &mut vec![enrollment].iter_mut(),
-                    )
-                    .await?
-                    .unwrap();
-
-            assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
-            assert!(updated_enrollment_data.is_none());
-            assert_eq!(prekey_material, Some(enrollment_prekey));
-            Ok(())
-        })
-        .await
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn always_succeed_authenticate_multiple_enrollments() {
-        run_proxy_test(Mode::AlwaysSucceed, true, |proxy| async move {
-            let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: vec![3] };
-            let enrollment_2 = Enrollment { id: TEST_ENROLLMENT_ID_2, data: vec![12] };
-
-            let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy
-                    .authenticate(
-                        &mut create_test_interaction_protocol(),
-                        &mut vec![enrollment, enrollment_2].iter_mut(),
-                    )
-                    .await?
-                    .unwrap();
-
-            assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
-            assert!(updated_enrollment_data.is_none());
-            assert_eq!(prekey_material.as_ref(), Some(MAGIC_PREKEY.as_ref()));
-            Ok(())
-        })
-        .await
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn always_fail_authentication_enroll_and_authenticate() {
-        run_proxy_test(Mode::AlwaysFailAuthentication, true, |proxy| async move {
-            let (enrollment_data, enrollment_prekey) =
-                proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
-
-            let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: enrollment_data.clone() };
-            assert_eq!(enrollment_prekey, MAGIC_PREKEY.0);
-
-            let AttemptedEvent { enrollment_id, updated_enrollment_data, prekey_material, .. } =
-                proxy
-                    .authenticate(
-                        &mut create_test_interaction_protocol(),
-                        &mut vec![enrollment].iter_mut(),
-                    )
-                    .await?
-                    .unwrap();
-
-            assert_ne!(prekey_material.as_ref(), Some(MAGIC_PREKEY.as_ref()));
-            assert!(updated_enrollment_data.is_none());
-            assert_eq!(enrollment_id, Some(TEST_ENROLLMENT_ID));
-            Ok(())
-        })
-        .await
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn interaction_no_set_success_authentication_enroll_and_authenticate() {
-        run_proxy_test(Mode::Interaction, true, |proxy| async move {
+    async fn no_set_success_authentication_enroll_and_authenticate() {
+        run_proxy_test(true, |proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -316,11 +213,11 @@ mod test {
     }
 
     #[fuchsia::test(allow_stalls = true)]
-    async fn interaction_no_set_success_authentication_enroll_and_authenticate_timeout() {
+    async fn no_set_success_authentication_enroll_and_authenticate_timeout() {
         // Since we don't call SetSuccess on the TestInteraction channel, the
         // TestInteraction server handler, and hence the StorageUnlockMechanism
         // server handler will keep waiting and will not return.
-        run_proxy_test(Mode::Interaction, false, |proxy| async move {
+        run_proxy_test(false, |proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -348,7 +245,7 @@ mod test {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn interection_enroll_and_successfully_authenticate_produce_same_prekey() {
-        run_proxy_test(Mode::Interaction, true, |proxy| async move {
+        run_proxy_test(true, |proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -371,8 +268,8 @@ mod test {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn interaction_set_success_and_authenticate_multiple_enrollments() {
-        run_proxy_test(Mode::Interaction, true, |proxy| async move {
+    async fn set_success_and_authenticate_multiple_enrollments() {
+        run_proxy_test(true, |proxy| async move {
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: vec![3] };
             let enrollment_2 = Enrollment { id: TEST_ENROLLMENT_ID_2, data: vec![12] };
             let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
@@ -394,7 +291,7 @@ mod test {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn password_ipse_fail_enrollment_and_authentication() {
-        run_proxy_test(Mode::AlwaysFailAuthentication, true, |proxy| async move {
+        run_proxy_test(true, |proxy| async move {
             // Fail Enrollment since it only supports Test IPSE.
             assert_eq!(
                 proxy.enroll(&mut create_password_interaction_protocol()).await?,

@@ -6,13 +6,6 @@
     program: {
         runner: "elf",
         binary: "bin/dev_authenticator",
-
-        // TODO(fxb/116213): Remove this argument once we start operating
-        // exclusively in Interaction mode.
-        args: [
-            "--mode",
-            "INTERACTION",
-        ],
     },
     capabilities: [
         {
