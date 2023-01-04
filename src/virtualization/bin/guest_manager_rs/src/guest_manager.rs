@@ -21,9 +21,8 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     futures::{
-        channel::mpsc::{self, UnboundedSender},
-        select_biased,
-        stream::SelectAll,
+        future, select_biased,
+        stream::{FuturesUnordered, SelectAll},
         FutureExt, Stream, StreamExt,
     },
     std::collections::HashSet,
@@ -140,10 +139,13 @@ impl GuestManager {
         request_streams: St,
     ) -> Result<(), Error> {
         let mut on_closed = lifecycle.on_closed().extend_lifetime().fuse();
-        let (state_tx, mut state_rx) = mpsc::unbounded::<GuestManagerStateUpdate>();
 
         let mut request_streams = request_streams.fuse();
         let mut connections = SelectAll::new();
+
+        let mut run_futures: FuturesUnordered<future::LocalBoxFuture<'_, Result<(), GuestError>>> =
+            FuturesUnordered::new();
+        run_futures.push(Box::pin(future::pending::<Result<(), GuestError>>()));
 
         loop {
             select_biased! {
@@ -151,22 +153,24 @@ impl GuestManager {
                     result.map_err(|err| anyhow!(
                         "failed to wait on guest lifecycle proxy closed: {}", err))?;
                     tracing::error!("VMM component has unexpectedly stopped");
-                    state_tx
-                        .unbounded_send(
-                            GuestManagerStateUpdate::Status(GuestStatus::VmmUnexpectedTermination))
-                        .expect("unexpected end of state tx stream");
+                    self.status = GuestStatus::VmmUnexpectedTermination;
 
                     // The VMM component has terminated, create a new one by opening a new
                     // lifecycle channel.
                     lifecycle = Rc::new(connect_to_protocol::<GuestLifecycleMarker>()?);
                     on_closed = lifecycle.on_closed().extend_lifetime().fuse();
+
+                    // Any pending run future is now invalid.
+                    run_futures.clear();
+                    run_futures.push(Box::pin(future::pending::<Result<(), GuestError>>()));
+                }
+                run_result = run_futures.next() => {
+                    let run_result = run_result.expect("Should never resolve to Poll::Ready(None)");
+                    self.handle_guest_stopped(run_result);
                 }
                 stream = request_streams.next() => {
                     connections.push(stream.ok_or(anyhow!(
                         "unexpected end of stream of guest manager request streams"))?);
-                }
-                state = state_rx.next() => {
-                    self.apply_state_update(state.expect("unexpected end of state rx stream"));
                 }
                 request = connections.next() => {
                     let request = match request {
@@ -198,13 +202,12 @@ impl GuestManager {
                             }
 
                             let config = config.unwrap();
-                            GuestManager::handle_guest_started(
-                                GuestManager::snapshot_config(&config), state_tx.clone()).ok();
+                            self.handle_guest_started(&config);
                             let create =
                                 GuestManager::send_create_request(lifecycle.clone(), config).await;
                             if let Err(err) = create {
                                 // TODO(fxbug.dev/115695): Log and respond via responder.
-                                GuestManager::handle_guest_stopped(create, state_tx.clone());
+                                self.handle_guest_stopped(create);
                                 continue;
                             }
 
@@ -213,12 +216,11 @@ impl GuestManager {
                             // send a state update giving the guest manager a Running status.
                             // TODO(fxbug.dev/115695): Remove this comment when done.
 
-                            // Run returns when the guest has stopped. Detach this long running
-                            // async call to prevent blocking other tasks from running.
-                            fasync::Task::local(async move {
-                                let run = GuestManager::send_run_request(lifecycle.clone()).await;
-                                GuestManager::handle_guest_stopped(run, state_tx.clone());
-                            }).detach();
+                            // Run returns when the guest has stopped. Push this long running
+                            // async call into a FuturesUnordered to be polled by the select.
+                            assert!(run_futures.len() == 1);
+                            run_futures.push(
+                                Box::pin(GuestManager::send_run_request(lifecycle.clone())));
 
                             unimplemented!();
                         }
@@ -256,30 +258,18 @@ impl GuestManager {
         }
     }
 
-    fn apply_state_update(&mut self, update: GuestManagerStateUpdate) {
-        // Check for what enum value the state update is, and do the appropriate action.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-    }
-
-    fn handle_guest_stopped(
-        reason: Result<(), GuestError>,
-        state_tx: UnboundedSender<GuestManagerStateUpdate>,
-    ) {
+    fn handle_guest_stopped(&mut self, reason: Result<(), GuestError>) {
         // Send a state update setting the status to Stopped, provide a stop time, and set a
         // last error if needed.
         // TODO(fxbug.dev/115695): Implement this function and remove this comment.
         unimplemented!();
     }
 
-    fn handle_guest_started(
-        snapshot: GuestDescriptor,
-        state_tx: UnboundedSender<GuestManagerStateUpdate>,
-    ) -> Result<(), Error> {
-        state_tx.unbounded_send(GuestManagerStateUpdate::Status(GuestStatus::Starting))?;
-        state_tx.unbounded_send(GuestManagerStateUpdate::Started(fasync::Time::now().into()))?;
-        state_tx.unbounded_send(GuestManagerStateUpdate::GuestDescriptor(snapshot))?;
-        state_tx.unbounded_send(GuestManagerStateUpdate::ClearError)?;
-        Ok(())
+    fn handle_guest_started(&mut self, config: &GuestConfig) {
+        self.status = GuestStatus::Starting;
+        self.start_time = fasync::Time::now().into();
+        self.guest_descriptor = GuestManager::snapshot_config(config);
+        self.last_error = None;
     }
 
     fn get_merged_config(&self, user_config: GuestConfig) -> Result<GuestConfig, Error> {
@@ -415,6 +405,7 @@ mod tests {
         },
         fuchsia_async::WaitState,
         fuchsia_fs::{file, OpenFlags},
+        futures::channel::mpsc::{self, UnboundedSender},
         tempfile::tempdir,
     };
 
@@ -560,10 +551,10 @@ mod tests {
 
         assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
         assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert!(matches!(
+        assert_eq!(
             executor.run_singlethreaded(&mut launch_fut).unwrap(),
             Err(GuestManagerError::BadConfig)
-        ));
+        );
     }
 
     #[fuchsia::test]
@@ -604,10 +595,10 @@ mod tests {
 
         assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
         assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert!(matches!(
+        assert_eq!(
             executor.run_singlethreaded(&mut launch_fut).unwrap(),
             Err(GuestManagerError::BadConfig)
-        ));
+        );
     }
 
     #[fuchsia::test]
