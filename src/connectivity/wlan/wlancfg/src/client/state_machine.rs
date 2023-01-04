@@ -568,6 +568,7 @@ async fn connected_state(
             options.ap_state.tracked.signal.rssi_dbm,
             options.ap_state.tracked.signal.snr_db,
             bss_selection::EWMA_SMOOTHING_FACTOR,
+            bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
         ),
         options.ap_state.tracked.channel,
         past_connections,
@@ -776,7 +777,7 @@ async fn handle_connection_stats(
     // Send RSSI and RSSI velocity metrics
     telemetry_sender.send(TelemetryEvent::OnSignalReport {
         ind,
-        rssi_velocity: bss_quality_data.signal_data.rssi_velocity,
+        rssi_velocity: bss_quality_data.signal_data.ewma_rssi_velocity.get().round() as i8,
     });
 }
 
@@ -1381,6 +1382,7 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
+                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2370,6 +2372,7 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
+                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2468,6 +2471,7 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
+                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2679,6 +2683,7 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
+                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 average_tx_rate: 0,
             },
@@ -2942,6 +2947,7 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
+                    bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -3383,14 +3389,14 @@ mod tests {
         assert_eq!(stats.id, id);
         // EWMA RSSI and SNR should be between the initial and the newest values.
         let ewma_rssi_1 = stats.quality_data.signal_data.ewma_rssi;
-        assert_lt!(ewma_rssi_1.get(), init_rssi);
-        assert_gt!(ewma_rssi_1.get(), rssi_1);
+        assert_lt!(ewma_rssi_1.get(), init_rssi as f64);
+        assert_gt!(ewma_rssi_1.get(), rssi_1 as f64);
         let ewma_snr_1 = stats.quality_data.signal_data.ewma_snr;
-        assert_lt!(ewma_snr_1.get(), init_snr);
-        assert_gt!(ewma_snr_1.get(), snr_1);
+        assert_lt!(ewma_snr_1.get(), init_snr as f64);
+        assert_gt!(ewma_snr_1.get(), snr_1 as f64);
         // Check that RSSI velocity is negative.
-        let rssi_velocity_1 = stats.quality_data.signal_data.rssi_velocity;
-        assert_lt!(rssi_velocity_1, 0);
+        let rssi_velocity_1 = stats.quality_data.signal_data.ewma_rssi_velocity.get();
+        assert_lt!(rssi_velocity_1, 0.0);
         // Check that the BssQualityData includes the past connection data.
         assert_eq!(stats.quality_data.past_connections_list, past_connections.clone());
         // Check that the channel is included.
@@ -3410,8 +3416,7 @@ mod tests {
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::OnSignalReport { ind, rssi_velocity } => {
                 assert_eq!(ind, fidl_signal_report);
-                // Velocity should be greater than previous one since RSSI is higher,
-                assert_gt!(rssi_velocity, rssi_velocity_1);
+                assert_gt!(rssi_velocity, 0);
             });
         });
 
@@ -3427,7 +3432,7 @@ mod tests {
         assert_gt!(stats.quality_data.signal_data.ewma_rssi.get(), ewma_rssi_1.get());
         assert_gt!(stats.quality_data.signal_data.ewma_snr.get(), ewma_snr_1.get());
         // Check that RSSI velocity is greater than the previous velocity.
-        assert_gt!(stats.quality_data.signal_data.rssi_velocity, rssi_velocity_1);
+        assert_gt!(stats.quality_data.signal_data.ewma_rssi_velocity.get(), rssi_velocity_1);
         // Check that the BssQualityData includes the past connection data.
         assert_eq!(stats.quality_data.past_connections_list, past_connections);
         // Check that the channel is included.
@@ -3473,10 +3478,8 @@ mod tests {
         // Verify that telemetry events are sent for the signal report and a Roam Scan.
         assert_variant!(
             telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
+            Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity: _})) => {
                 assert_eq!(ind, fidl_signal_report);
-                // verify that RSSI velocity is negative since the signal report RSSI is lower.
-                assert_lt!(rssi_velocity, 0);
             }
         );
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));

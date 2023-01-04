@@ -34,11 +34,12 @@ impl EwmaPseudoDecibel {
         Self { current: initial_signal as f64, weighting_factor: n as f64 }
     }
 
-    pub fn get(&self) -> PseudoDecibel {
-        self.current.round() as PseudoDecibel
+    /// Returns the current EWMA value
+    pub fn get(&self) -> f64 {
+        self.current
     }
 
-    pub fn update_average(&mut self, next: PseudoDecibel) {
+    pub fn update_average(&mut self, next: impl Into<f64>) {
         self.current = calculate_ewma_update(self.current, next.into(), self.weighting_factor);
     }
 }
@@ -51,9 +52,7 @@ impl EwmaPseudoDecibel {
 /// abstraction for monitoring real-world signal changes.
 ///
 /// Intended to be used for RSSI Values, ranging from -128 to -1.
-pub fn calculate_pseudodecibel_velocity(
-    historical_pdb: Vec<PseudoDecibel>,
-) -> Result<PseudoDecibel, Error> {
+pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64, Error> {
     let n = i32::try_from(historical_pdb.len())?;
     if n < 2 {
         return Err(format_err!("At least two data points required to calculate velocity"));
@@ -66,7 +65,7 @@ pub fn calculate_pseudodecibel_velocity(
 
     // Least squares regression summations, returning an error if there are any overflows
     for (i, y) in historical_pdb.iter().enumerate() {
-        if *y >= 0 {
+        if *y >= 0.0 {
             return Err(format_err!(
                 "Function is intended for RSSI values, which should be -128 < n < 0"
             ));
@@ -85,115 +84,118 @@ pub fn calculate_pseudodecibel_velocity(
 
     // Calculate velocity from summations, returning an error if there are any overflows. Note that
     // in practice, the try_from should never fail, since the input values are bound from 0 to -128.
-    let velocity: i8 = i8::try_from(
-        (n.checked_mul(sum_xy).ok_or_else(|| format_err!("overflow in n * sum_xy"))?
-            - sum_x.checked_mul(sum_y).ok_or_else(|| format_err!("overflow in sum_x * sum_y"))?)
-            / (n.checked_mul(sum_x2).ok_or_else(|| format_err!("overflow in n * sum_x2"))?
-                - sum_x.checked_mul(sum_x).ok_or_else(|| format_err!("overflow in sum_x**2"))?),
-    )
-    .map_err(|_| format_err!("failed to convert final velocity to i8"))?;
-    Ok(velocity)
+    let velocity = (n.checked_mul(sum_xy).ok_or_else(|| format_err!("overflow in n * sum_xy"))?
+        - sum_x.checked_mul(sum_y).ok_or_else(|| format_err!("overflow in sum_x * sum_y"))?)
+        / (n.checked_mul(sum_x2).ok_or_else(|| format_err!("overflow in n * sum_x2"))?
+            - sum_x.checked_mul(sum_x).ok_or_else(|| format_err!("overflow in sum_x**2"))?);
+    Ok(velocity.into())
 }
 
 #[cfg(test)]
 mod tests {
-    use {super::*, test_util::assert_lt};
+    use {
+        super::*,
+        test_util::{assert_gt, assert_lt},
+    };
 
     #[fuchsia::test]
     fn test_simple_averaging_calculations() {
         let mut ewma_signal = EwmaPseudoDecibel::new(10, -50);
-        assert_eq!(ewma_signal.get(), -50);
+        assert_eq!(ewma_signal.get(), -50.0);
 
         // Validate average moves using exponential weighting
         ewma_signal.update_average(-60);
-        assert_eq!(ewma_signal.get(), -52);
+        assert_lt!(ewma_signal.get(), -50.0);
+        assert_gt!(ewma_signal.get(), -60.0);
 
         // Validate average will eventually stabilize.
         for _ in 0..20 {
             ewma_signal.update_average(-60)
         }
-        assert_eq!(ewma_signal.get(), -60);
+        assert_eq!(ewma_signal.get().round(), -60.0);
     }
 
     #[fuchsia::test]
     fn test_small_variation_averaging() {
         let mut ewma_signal = EwmaPseudoDecibel::new(5, -90);
-        assert_eq!(ewma_signal.get(), -90);
+        assert_eq!(ewma_signal.get(), -90.0);
 
         // Validate that a small change that does not change the i8 dBm average still changes the
         // internal f64 average.
         ewma_signal.update_average(-91);
-        assert_eq!(ewma_signal.get(), -90);
+        assert_eq!(ewma_signal.get().round(), -90.0);
         assert_lt!(ewma_signal.current, -90.0);
 
         // Validate that eventually the small changes are enough to change the i8 dbm average.
         for _ in 0..5 {
             ewma_signal.update_average(-91);
         }
-        assert_eq!(ewma_signal.get(), -91);
+        assert_lt!(ewma_signal.get(), -90.9);
     }
 
     /// Vector argument must have length >=2, and be negative.
     #[fuchsia::test]
     fn test_insufficient_args() {
         assert!(calculate_pseudodecibel_velocity(vec![]).is_err());
-        assert!(calculate_pseudodecibel_velocity(vec![-60]).is_err());
-        assert!(calculate_pseudodecibel_velocity(vec![-60, 20]).is_err());
+        assert!(calculate_pseudodecibel_velocity(vec![-60.0]).is_err());
+        assert!(calculate_pseudodecibel_velocity(vec![-60.0, 20.0]).is_err());
     }
 
     #[test]
     fn test_calculate_negative_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-60, -75]).expect("failed to calculate"),
-            -15
+            calculate_pseudodecibel_velocity(vec![-60.0, -75.0]).expect("failed to calculate"),
+            -15.0
         );
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-40, -50, -58, -64])
+            calculate_pseudodecibel_velocity(vec![-40.0, -50.0, -58.0, -64.0])
                 .expect("failed to calculate"),
-            -8
+            -8.0
         );
     }
 
     #[test]
     fn test_calculate_positive_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-48, -45]).expect("failed to calculate"),
-            3
+            calculate_pseudodecibel_velocity(vec![-48.0, -45.0]).expect("failed to calculate"),
+            3.0
         );
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-70, -55, -45, -30])
+            calculate_pseudodecibel_velocity(vec![-70.0, -55.0, -45.0, -30.0])
                 .expect("failed to calculate"),
-            13
+            13.0
         );
     }
 
     #[test]
     fn test_calculate_constant_zero_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-25, -25, -25, -25, -25, -25])
+            calculate_pseudodecibel_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
                 .expect("failed to calculate"),
-            0
+            0.0
         );
     }
 
     #[test]
     fn test_calculate_oscillating_zero_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-35, -45, -35, -25, -35, -45, -35,])
-                .expect("failed to calculate"),
-            0
+            calculate_pseudodecibel_velocity(
+                vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,]
+            )
+            .expect("failed to calculate"),
+            0.0
         );
     }
 
     #[test]
     fn test_calculate_min_max_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-1, -128]).expect("failed to calculate"),
-            -127
+            calculate_pseudodecibel_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
+            -127.0
         );
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-128, -1]).expect("failed to calculate"),
-            127
+            calculate_pseudodecibel_velocity(vec![-128.0, -1.0]).expect("failed to calculate"),
+            127.0
         );
     }
 }

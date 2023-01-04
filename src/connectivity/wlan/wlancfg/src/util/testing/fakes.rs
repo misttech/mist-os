@@ -5,7 +5,10 @@
 
 use {
     crate::{
-        client::{bss_selection::SignalData, scan, types as client_types},
+        client::{
+            bss_selection::{self, SignalData},
+            scan, types as client_types,
+        },
         config_management::{
             Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
             PastConnectionList, SavedNetworksManagerApi,
@@ -293,7 +296,12 @@ pub fn random_connection_data() -> PastConnectionData {
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
-        SignalData::new(rng.gen_range(-90..-20), rng.gen_range(10..50), 10),
+        SignalData::new(
+            rng.gen_range(-90..-20),
+            rng.gen_range(10..50),
+            bss_selection::EWMA_SMOOTHING_FACTOR,
+            bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
+        ),
         rng.gen::<u8>().into(),
     )
 }

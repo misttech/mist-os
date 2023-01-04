@@ -13,6 +13,10 @@ use {
 // Number of previous RSSI measurements to exponentially weigh into average.
 // TODO(fxbug.dev/84870): Tune smoothing factor.
 pub const EWMA_SMOOTHING_FACTOR: usize = 10;
+// Number of previous RSSI velocities to exponentially weigh into the average. Keeping the number
+// small lets the number react quickly and have a magnitude similar to if it weren't smoothed as
+// an EWMA, but makes the EWMA less resistant to momentary outliers.
+pub const EWMA_VELOCITY_SMOOTHING_FACTOR: usize = 3;
 
 pub const RSSI_AND_VELOCITY_SCORE_WEIGHT: f32 = 0.6;
 pub const SNR_SCORE_WEIGHT: f32 = 0.4;
@@ -26,7 +30,7 @@ pub const SUBOPTIMAL_SIGNAL_THRESHOLD: u8 = 45;
 pub struct SignalData {
     pub ewma_rssi: EwmaPseudoDecibel,
     pub ewma_snr: EwmaPseudoDecibel,
-    pub rssi_velocity: PseudoDecibel,
+    pub ewma_rssi_velocity: EwmaPseudoDecibel,
 }
 
 impl SignalData {
@@ -34,25 +38,27 @@ impl SignalData {
         initial_rssi: PseudoDecibel,
         initial_snr: PseudoDecibel,
         ewma_weight: usize,
+        ewma_velocity_weight: usize,
     ) -> Self {
         Self {
             ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
             ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
-            rssi_velocity: 0,
+            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0),
         }
     }
     pub fn update_with_new_measurement(&mut self, rssi: PseudoDecibel, snr: PseudoDecibel) {
         let prev_rssi = self.ewma_rssi.get();
         self.ewma_rssi.update_average(rssi);
         self.ewma_snr.update_average(snr);
-        self.rssi_velocity =
-            match calculate_pseudodecibel_velocity(vec![prev_rssi, self.ewma_rssi.get()]) {
-                Ok(velocity) => velocity,
-                Err(e) => {
-                    error!("Failed to update SignalData velocity: {:?}", e);
-                    self.rssi_velocity
-                }
-            };
+
+        match calculate_pseudodecibel_velocity(vec![prev_rssi, self.ewma_rssi.get()]) {
+            Ok(velocity) => {
+                self.ewma_rssi_velocity.update_average(velocity);
+            }
+            Err(e) => {
+                error!("Failed to calculate SignalData velocity: {:?}", e);
+            }
+        }
     }
 }
 
@@ -107,90 +113,133 @@ pub fn evaluate_current_bss(bss: BssQualityData) -> (u8, Vec<RoamReason>) {
 
 /// Scoring table from go/tq-bss-eval-design.
 fn score_signal_data(data: SignalData) -> u8 {
+    let ewma_rssi_velocity = data.ewma_rssi_velocity.get();
     let rssi_velocity_score = match data.ewma_rssi.get() {
-        PseudoDecibel::MIN..=-81 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 0,
-            -3 => 0,
-            -2 => 0,
-            -1..=1 => 0,
-            2 => 20,
-            3 => 18,
-            4..=PseudoDecibel::MAX => 10,
+        r if (f64::MIN..=-81.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 0,
+            v if (-2.7..-1.8).contains(&v) => 0,
+            v if (-1.8..-0.9).contains(&v) => 0,
+            v if (-0.9..=0.9).contains(&v) => 0,
+            v if (0.9..=1.8).contains(&v) => 20,
+            v if (1.8..=2.7).contains(&v) => 18,
+            v if (2.7..=f64::MAX).contains(&v) => 10,
+            _ => {
+                // This shouldn't happen because all possible values should be matched above. If
+                // there is an error, return 100 so that roaming is not triggered from this error.
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -80..=-76 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 0,
-            -3 => 0,
-            -2 => 0,
-            -1..=1 => 15,
-            2 => 28,
-            3 => 25,
-            4..=PseudoDecibel::MAX => 15,
+        r if (-81.0..=-76.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 0,
+            v if (-2.7..-1.8).contains(&v) => 0,
+            v if (-1.8..-0.9).contains(&v) => 0,
+            v if (-0.9..=0.9).contains(&v) => 15,
+            v if (0.9..=1.8).contains(&v) => 28,
+            v if (1.8..=2.7).contains(&v) => 25,
+            v if (2.7..=f64::MAX).contains(&v) => 15,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -75..=-71 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 0,
-            -3 => 5,
-            -2 => 15,
-            -1..=1 => 30,
-            2 => 45,
-            3 => 38,
-            4..=PseudoDecibel::MAX => 25,
+        r if (-75.0..=-71.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 0,
+            v if (-2.7..-1.8).contains(&v) => 5,
+            v if (-1.8..-0.9).contains(&v) => 15,
+            v if (-0.9..=0.9).contains(&v) => 30,
+            v if (0.9..=1.8).contains(&v) => 45,
+            v if (1.8..=2.7).contains(&v) => 38,
+            v if (2.7..=f64::MAX).contains(&v) => 4,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -70..=-66 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 10,
-            -3 => 18,
-            -2 => 30,
-            -1..=1 => 48,
-            2 => 60,
-            3 => 50,
-            4..=PseudoDecibel::MAX => 38,
+        r if (-70.0..=-66.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 10,
+            v if (-2.7..-1.8).contains(&v) => 18,
+            v if (-1.8..-0.9).contains(&v) => 30,
+            v if (-0.9..=0.9).contains(&v) => 48,
+            v if (0.9..=1.8).contains(&v) => 60,
+            v if (1.8..=2.7).contains(&v) => 50,
+            v if (2.7..=f64::MAX).contains(&v) => 38,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -65..=-61 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 20,
-            -3 => 30,
-            -2 => 45,
-            -1..=1 => 70,
-            2 => 75,
-            3 => 60,
-            4..=PseudoDecibel::MAX => 55,
+        r if (-65.0..=-61.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 20,
+            v if (-2.7..-1.8).contains(&v) => 30,
+            v if (-1.8..-0.9).contains(&v) => 45,
+            v if (-0.9..=0.9).contains(&v) => 70,
+            v if (0.9..=1.8).contains(&v) => 75,
+            v if (1.8..=2.7).contains(&v) => 60,
+            v if (2.7..=f64::MAX).contains(&v) => 55,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -60..=-56 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 40,
-            -3 => 50,
-            -2 => 63,
-            -1..=1 => 85,
-            2 => 85,
-            3 => 70,
-            4..=PseudoDecibel::MAX => 65,
+        r if (-60.0..=-56.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 40,
+            v if (-2.7..-1.8).contains(&v) => 50,
+            v if (-1.8..-0.9).contains(&v) => 63,
+            v if (-0.9..=0.9).contains(&v) => 85,
+            v if (0.9..=1.8).contains(&v) => 85,
+            v if (1.8..=2.7).contains(&v) => 70,
+            v if (2.7..=f64::MAX).contains(&v) => 65,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -55..=-51 => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 55,
-            -3 => 65,
-            -2 => 75,
-            -1..=1 => 95,
-            2 => 90,
-            3 => 80,
-            4..=PseudoDecibel::MAX => 75,
+        r if (-55.0..=-51.0).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 55,
+            v if (-2.7..-1.8).contains(&v) => 65,
+            v if (-1.8..-0.9).contains(&v) => 75,
+            v if (-0.9..=0.9).contains(&v) => 95,
+            v if (0.9..=1.8).contains(&v) => 90,
+            v if (1.8..=2.7).contains(&v) => 80,
+            v if (2.7..=f64::MAX).contains(&v) => 75,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
-        -50..=PseudoDecibel::MAX => match data.rssi_velocity {
-            PseudoDecibel::MIN..=-4 => 60,
-            -3 => 70,
-            -2 => 80,
-            -1..=1 => 100,
-            2 => 95,
-            3 => 90,
-            4..=PseudoDecibel::MAX => 80,
+        r if (-50.0..=f64::MAX).contains(&r) => match ewma_rssi_velocity {
+            v if (f64::MIN..-2.7).contains(&v) => 60,
+            v if (-2.7..-1.8).contains(&v) => 70,
+            v if (-1.8..-0.9).contains(&v) => 80,
+            v if (-0.9..=0.9).contains(&v) => 100,
+            v if (0.9..=1.8).contains(&v) => 95,
+            v if (1.8..=2.7).contains(&v) => 90,
+            v if (2.7..=f64::MAX).contains(&v) => 80,
+            _ => {
+                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
+                100
+            }
         },
+        unexpected_rssi => {
+            error!("Unexpected error occurreed scoring EWMA RSSI {}", unexpected_rssi);
+            100
+        }
     };
 
     let snr_score = match data.ewma_snr.get() {
-        PseudoDecibel::MIN..=10 => 0,
-        11..=15 => 15,
-        16..=20 => 37,
-        21..=25 => 53,
-        26..=30 => 68,
-        31..=35 => 80,
-        36..=40 => 95,
-        41..=PseudoDecibel::MAX => 100,
+        s if (f64::MIN..=10.0).contains(&s) => 0,
+        s if (10.0..=15.0).contains(&s) => 15,
+        s if (15.0..=20.0).contains(&s) => 37,
+        s if (20.0..=25.0).contains(&s) => 53,
+        s if (25.0..=3.00).contains(&s) => 68,
+        s if (30.0..=35.0).contains(&s) => 80,
+        s if (35.0..=40.0).contains(&s) => 95,
+        s if (40.0..=f64::MAX).contains(&s) => 100,
+        unexpected_snr => {
+            error!("Unxexpected error occurred scoring EWMA SNR {}", unexpected_snr);
+            100
+        }
     };
 
     return ((rssi_velocity_score as f32 * RSSI_AND_VELOCITY_SCORE_WEIGHT)
@@ -207,13 +256,14 @@ mod test {
 
     #[fuchsia::test]
     fn test_update_with_new_measurements() {
-        let mut signal_data = SignalData::new(-40, 30, EWMA_SMOOTHING_FACTOR);
+        let mut signal_data =
+            SignalData::new(-40, 30, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR);
         signal_data.update_with_new_measurement(-60, 15);
-        assert_lt!(signal_data.ewma_rssi.get(), -40);
-        assert_gt!(signal_data.ewma_rssi.get(), -60);
-        assert_lt!(signal_data.ewma_snr.get(), 30);
-        assert_gt!(signal_data.ewma_snr.get(), 15);
-        assert_lt!(signal_data.rssi_velocity, 0);
+        assert_lt!(signal_data.ewma_rssi.get(), -40.0);
+        assert_gt!(signal_data.ewma_rssi.get(), -60.0);
+        assert_lt!(signal_data.ewma_snr.get(), 30.0);
+        assert_gt!(signal_data.ewma_snr.get(), 15.0);
+        assert_lt!(signal_data.ewma_rssi_velocity.get(), 0.0);
     }
 
     #[fuchsia::test]
@@ -223,15 +273,21 @@ mod test {
 
     #[fuchsia::test]
     fn test_trivial_signal_data_scores() {
-        let strong_clear_stable_signal = SignalData::new(-55, 35, 10);
-        let weak_clear_stable_signal = SignalData::new(-80, 35, 10);
+        let strong_clear_stable_signal =
+            SignalData::new(-55, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let weak_clear_stable_signal = SignalData::new(-80, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
 
-        let mut strong_clear_degrading_signal = SignalData::new(-55, 35, 10);
-        strong_clear_degrading_signal.rssi_velocity = -3;
-        let mut weak_clear_improving_signal = SignalData::new(-80, 35, 10);
-        weak_clear_improving_signal.rssi_velocity = 2;
+        let mut strong_clear_degrading_signal =
+            SignalData::new(-55, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        strong_clear_degrading_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3);
+        let mut weak_clear_improving_signal =
+            SignalData::new(-80, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        weak_clear_improving_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 2);
 
-        let strong_noisy_stable_signal = SignalData::new(-55, 15, 10);
+        let strong_noisy_stable_signal =
+            SignalData::new(-55, 15, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
 
         assert_gt!(
             score_signal_data(strong_clear_stable_signal),
@@ -258,7 +314,7 @@ mod test {
     fn test_evaluate_trivial_roam_reasons() {
         // Low RSSI and SNR
         let weak_signal_bss = BssQualityData::new(
-            SignalData::new(-90, 5, 10),
+            SignalData::new(-90, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
             channel::Channel::new(11, channel::Cbw::Cbw20),
             PastConnectionList::new(),
         );
@@ -267,7 +323,7 @@ mod test {
 
         // Moderate RSSI, low SNR
         let low_snr_bss = BssQualityData::new(
-            SignalData::new(-65, 5, 10),
+            SignalData::new(-65, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
             channel::Channel::new(11, channel::Cbw::Cbw20),
             PastConnectionList::new(),
         );
