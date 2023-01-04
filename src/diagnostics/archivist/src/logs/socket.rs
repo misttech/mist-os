@@ -4,15 +4,21 @@
 use super::stats::LogStreamStats;
 use crate::logs::error::StreamError;
 use crate::logs::stored_message::StoredMessage;
-use diagnostics_message::MAX_DATAGRAM_LEN;
 use fuchsia_async as fasync;
-use futures::io::AsyncReadExt;
-use std::{marker::PhantomData, sync::Arc};
+use fuchsia_zircon as zx;
+use futures::Stream;
+use std::{
+    marker::PhantomData,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
     /// Attempt to parse a message from the given buffer
-    fn wrap_bytes(bytes: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError>;
+    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>)
+        -> Result<StoredMessage, StreamError>;
 }
 
 /// An encoding that can parse the legacy [logger/syslog wire format]
@@ -28,22 +34,22 @@ pub struct LegacyEncoding;
 pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
-    fn wrap_bytes(buf: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
-        StoredMessage::legacy(buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+        StoredMessage::legacy(&buf, stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: &[u8], stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
         StoredMessage::structured(buf, stats)
     }
 }
 
 #[must_use = "don't drop logs on the floor please!"]
 pub struct LogMessageSocket<E> {
+    buffer: Vec<u8>,
     stats: Arc<LogStreamStats>,
     socket: fasync::Socket,
-    buffer: [u8; MAX_DATAGRAM_LEN],
     _encoder: PhantomData<E>,
 }
 
@@ -51,7 +57,7 @@ impl LogMessageSocket<LegacyEncoding> {
     /// Creates a new `LogMessageSocket` from the given `socket` that reads the legacy format.
     pub fn new(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
+        Self { socket, stats, _encoder: PhantomData, buffer: Vec::new() }
     }
 }
 
@@ -60,23 +66,28 @@ impl LogMessageSocket<StructuredEncoding> {
     /// format.
     pub fn new_structured(socket: fasync::Socket, stats: Arc<LogStreamStats>) -> Self {
         stats.open_socket();
-        Self { socket, buffer: [0; MAX_DATAGRAM_LEN], stats, _encoder: PhantomData }
+        Self { socket, stats, _encoder: PhantomData, buffer: Vec::new() }
     }
 }
 
-impl<E> LogMessageSocket<E>
+impl<E> Stream for LogMessageSocket<E>
 where
     E: Encoding + Unpin,
 {
-    pub async fn next(&mut self) -> Result<StoredMessage, StreamError> {
-        let len = self.socket.read(&mut self.buffer).await?;
+    type Item = Result<StoredMessage, StreamError>;
 
-        if len == 0 {
-            return Err(StreamError::Closed);
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match this.socket.poll_datagram(cx, &mut this.buffer) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Err(zx::Status::PEER_CLOSED)) => Poll::Ready(None),
+            Poll::Ready(Err(status)) => Poll::Ready(Some(Err(status.into()))),
+            Poll::Ready(Ok(0)) => Poll::Ready(None),
+            Poll::Ready(Ok(_len)) => {
+                let buf = std::mem::take(&mut this.buffer);
+                Poll::Ready(Some(E::wrap_bytes(buf, this.stats.clone())))
+            }
         }
-
-        let msg_bytes = &self.buffer[..len];
-        E::wrap_bytes(msg_bytes, self.stats.clone())
     }
 }
 
@@ -96,6 +107,7 @@ mod tests {
     };
     use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
     use fuchsia_zircon as zx;
+    use futures::StreamExt;
     use std::io::Cursor;
 
     #[fasync::run_until_stalled(test)]
@@ -123,7 +135,7 @@ mod tests {
         .set_message("BBBBB".to_string())
         .build();
 
-        let bytes = ls.next().await.unwrap();
+        let bytes = ls.next().await.unwrap().unwrap();
         assert_eq!(bytes.size(), METADATA_SIZE + 6 /* tag */+ 6 /* msg */,);
         let result_message = bytes.parse(&TEST_IDENTITY).unwrap();
         assert_eq!(result_message, expected_p);
@@ -131,7 +143,7 @@ mod tests {
         // write one more time
         sin.write(packet.as_bytes()).unwrap();
 
-        let result_message = ls.next().await.unwrap().parse(&TEST_IDENTITY).unwrap();
+        let result_message = ls.next().await.unwrap().unwrap().parse(&TEST_IDENTITY).unwrap();
         assert_eq!(result_message, expected_p);
     }
 
@@ -169,14 +181,14 @@ mod tests {
         let mut stream = LogMessageSocket::new_structured(socket, Default::default());
 
         sin.write(encoded).unwrap();
-        let bytes = stream.next().await.unwrap();
+        let bytes = stream.next().await.unwrap().unwrap();
         let result_message = bytes.parse(&TEST_IDENTITY).unwrap();
         assert_eq!(bytes.size(), encoded.len());
         assert_eq!(result_message, expected_p);
 
         // write again
         sin.write(encoded).unwrap();
-        let result_message = stream.next().await.unwrap().parse(&TEST_IDENTITY).unwrap();
+        let result_message = stream.next().await.unwrap().unwrap().parse(&TEST_IDENTITY).unwrap();
         assert_eq!(result_message, expected_p);
     }
 }
