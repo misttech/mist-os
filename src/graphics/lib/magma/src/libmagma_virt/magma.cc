@@ -9,7 +9,7 @@
 #include <sys/mman.h>
 
 #include "src/graphics/lib/magma/include/virtio/virtio_magma.h"
-#include "src/graphics/lib/magma/src/libmagma_linux/virtmagma_util.h"
+#include "src/graphics/lib/magma/src/libmagma_virt/virtmagma_util.h"
 
 static pthread_once_t gOnceFlag = PTHREAD_ONCE_INIT;
 static int gDefaultFd;

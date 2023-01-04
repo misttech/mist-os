@@ -165,7 +165,7 @@ pub fn device_release(
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE as u32;
 }
 
-/// `WireDescriptor` matches the struct used by libmagma_linux to encode some fields of the magma
+/// `WireDescriptor` matches the struct used by libmagma_virt to encode some fields of the magma
 /// command descriptor.
 #[repr(C)]
 #[derive(FromBytes, AsBytes, Default, Debug)]

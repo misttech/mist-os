@@ -53,7 +53,7 @@ executable("virtmagma_image_tests") {
   sources = [ "virtmagma_image_tests.cc" ]
 
   deps = [
-    "//src/graphics/lib/magma/src/libmagma_linux",
+    "//src/graphics/lib/magma/src/libmagma_virt",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/mesa/include:drm-uapi",
   ]
@@ -66,7 +66,7 @@ executable("virtmagma_unit_tests") {
 
   deps = [
     "//src/graphics/lib/magma/include/virtio",
-    "//src/graphics/lib/magma/src/libmagma_linux:virtmagma_headers",
+    "//src/graphics/lib/magma/src/libmagma_virt:virtmagma_headers",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

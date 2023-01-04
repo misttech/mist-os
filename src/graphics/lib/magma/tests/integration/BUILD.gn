@@ -108,7 +108,7 @@ executable("virtmagma_conformance_tests") {
 
   deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/src/libmagma_linux",
+    "$magma_build_root/src/libmagma_virt",
     "$magma_build_root/tests/helper:magma_map_cpu",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
@@ -134,7 +134,7 @@ executable("virtmagma_no_cpp_test") {
 
   deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/src/libmagma_linux",
+    "$magma_build_root/src/libmagma_virt",
   ]
 
   disable_syslog_backend = true

@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/lib/magma/include/virtio/virtio_magma.h"
-#include "src/graphics/lib/magma/src/libmagma_linux/virtmagma.h"
+#include "src/graphics/lib/magma/src/libmagma_virt/virtmagma.h"
 
 class VirtMagmaUnitTest : public ::testing::Test {
  protected:

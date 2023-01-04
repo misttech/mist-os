@@ -13,12 +13,12 @@ curl -s "https://fuchsia.googlesource.com/fuchsia/+/HEAD/scripts/bootstrap?forma
 
 pushd fuchsia
 scripts/fx set core.x64 --release --no-goma
-scripts/fx build src/graphics/lib/magma/src/libmagma_linux:libmagma_linux_x64_shared
+scripts/fx build src/graphics/lib/magma/src/libmagma_virt:libmagma_linux_x64_shared
 popd
 
 mkdir -p install/include install/lib
 cp -v fuchsia/src/graphics/lib/magma/include/magma/*.h install/include
 cp -v fuchsia/src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_defs.h install/include
-cp -v fuchsia/out/default/linux_x64-shared/obj/src/graphics/lib/magma/src/libmagma_linux/libmagma_linux.a install/lib
+cp -v fuchsia/out/default/linux_x64-shared/obj/src/graphics/lib/magma/src/libmagma_virt/libmagma_virt.a install/lib
 
 rm -rf fuchsia

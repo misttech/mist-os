@@ -21,7 +21,7 @@ foreach test : ['virtmagma_unit_tests', 'virtmagma_image_tests']
     sources: files_unit_test,
     include_directories : [inc_configuration, inc_top, inc_magma, inc_platform],
     cpp_args: cpp_args,
-    link_with : [libmagma_linux],
+    link_with : [libmagma_virt],
     dependencies : [gtest_dep, dl_dep, drm_dep],
     install : false,
   )
@@ -43,7 +43,7 @@ test_magma = executable(
   include_directories : [inc_configuration, inc_top, inc_magma, inc_msd_intel_gen,
     inc_platform],
   cpp_args: cpp_args + ['-DVIRTMAGMA=1'],
-  link_with : [libmagma_linux],
+  link_with : [libmagma_virt],
   dependencies : [gtest_dep],
   install : false,
 )

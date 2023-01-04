@@ -5,7 +5,7 @@
 #ifndef SRC_PROC_LIB_MAGMA_WRAPPER_H_
 #define SRC_PROC_LIB_MAGMA_WRAPPER_H_
 
-#include <libmagma_linux/virtmagma.h>
+#include <libmagma_virt/virtmagma.h>
 #include <magma/magma.h>
 #include <virtio/virtio_magma.h>
 

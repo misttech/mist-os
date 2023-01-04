@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_LINUX_VIRTMAGMA_UTIL_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_LINUX_VIRTMAGMA_UTIL_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_VIRT_VIRTMAGMA_UTIL_H_
+#define SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_VIRT_VIRTMAGMA_UTIL_H_
 
 #include <errno.h>
 #include <sys/fcntl.h>
@@ -110,4 +110,4 @@ using virtmagma_perf_count_pool_t =
     VirtmagmaObject<magma_perf_count_pool_t, magma_connection_t, 0x4444>;
 using virtmagma_device_t = VirtmagmaObject<magma_device_t, OwnedFd, 0x5555>;
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_LINUX_VIRTMAGMA_UTIL_H_
+#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_VIRT_VIRTMAGMA_UTIL_H_
