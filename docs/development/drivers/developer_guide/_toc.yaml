@@ -12,6 +12,8 @@ toc:
   path: /docs/development/drivers/developer_guide/ethernet.md
 - title: "Write a ramdisk driver"
   path: /docs/development/drivers/developer_guide/ramdisk.md
+- title: "Create a composite node"
+  path: /docs/development/drivers/developer_guide/composite-node.md
 
 
 - title: "Drivers rubric"
