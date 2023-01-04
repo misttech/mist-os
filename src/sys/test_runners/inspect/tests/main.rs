@@ -37,7 +37,7 @@ async fn run_test(
     let test_manager = builder
         .add_child(
             "test_manager",
-            "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/test_manager_for_tests.cm",
+            "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/test_manager.cm",
             ChildOptions::new(),
         )
         .await?;

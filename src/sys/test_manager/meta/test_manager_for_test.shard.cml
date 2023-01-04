@@ -7,7 +7,7 @@
     children: [
         {
             name: "test_manager",
-            url: "#meta/test_manager_for_tests.cm",
+            url: "#meta/test_manager.cm",
         },
     ],
     offer: [
