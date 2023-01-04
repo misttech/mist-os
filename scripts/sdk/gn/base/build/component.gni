@@ -112,7 +112,7 @@ template("fuchsia_component_manifest") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      if (fuchsia_code_coverage) {
+      if (fuchsia_code_coverage && _manifest_version == "v2") {
         deps += [ ":${merged_manifest}" ]
       }
     }
