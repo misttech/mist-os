@@ -41,12 +41,13 @@ namespace wlan::iwlwifi {
 
 WlanSoftmacDevice::WlanSoftmacDevice(zx_device* parent, iwl_trans* drvdata, uint16_t iface_id,
                                      struct iwl_mvm_vif* mvmvif)
-    : ddk::Device<WlanSoftmacDevice, ddk::Initializable, ddk::Unbindable, ddk::ServiceConnectable>(
-          parent),
+    : ddk::Device<WlanSoftmacDevice, ddk::Initializable, ddk::Unbindable>(parent),
       mvmvif_(mvmvif),
       drvdata_(drvdata),
       iface_id_(iface_id),
-      mac_started(false) {}
+      mac_started(false),
+      outgoing_dir_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
+      serving_wlan_softmac_instance_(false) {}
 
 WlanSoftmacDevice::~WlanSoftmacDevice() {}
 
@@ -422,19 +423,14 @@ void WlanSoftmacDevice::DdkRelease() {
 
 void WlanSoftmacDevice::DdkUnbind(ddk::UnbindTxn txn) {
   IWL_DEBUG_INFO(this, "Unbinding iwlwifi mac-device\n");
+  zx::result res =
+      outgoing_dir_.RemoveService<fuchsia_wlan_softmac::Service>(fdf::kDefaultInstance);
+  if (res.is_error()) {
+    IWL_ERR(this, "Failed to remove WlanSoftmac service from outgoing directory: %s\n",
+            res.status_string());
+  }
   mac_unbind(mvmvif_);
   txn.Reply();
-}
-
-zx_status_t WlanSoftmacDevice::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
-  // Ensure they are requesting the correct protocol.
-  if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_softmac::WlanSoftmac>) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end(std::move(channel));
-  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
-  return ZX_OK;
 }
 
 void WlanSoftmacDevice::Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet) {
@@ -467,6 +463,34 @@ void WlanSoftmacDevice::ScanComplete(const zx_status_t status, const uint64_t sc
             "result.status: %d, scan_id=%zu, status=%s\n",
             result.status(), scan_id, zx_status_get_string(status));
   }
+}
+
+zx_status_t WlanSoftmacDevice::ServeWlanSoftmacProtocol(
+    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end) mutable {
+    if (serving_wlan_softmac_instance_) {
+      zxlogf(ERROR, "Cannot bind WlanSoftmac server: Already serving WlanSoftmac");
+      return;
+    }
+
+    serving_wlan_softmac_instance_ = true;
+    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
+  };
+  fuchsia_wlan_softmac::Service::InstanceHandler handler({.wlan_softmac = std::move(protocol)});
+  auto status = outgoing_dir_.AddService<fuchsia_wlan_softmac::Service>(std::move(handler));
+  if (status.is_error()) {
+    IWL_ERR(this, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+            status.status_string());
+    return status.error_value();
+  }
+  auto result = outgoing_dir_.Serve(std::move(server_end));
+  if (result.is_error()) {
+    IWL_ERR(this, "%s(): Failed to serve outgoing directory: %s\n", __func__,
+            result.status_string());
+    return result.error_value();
+  }
+
+  return ZX_OK;
 }
 
 }  // namespace wlan::iwlwifi

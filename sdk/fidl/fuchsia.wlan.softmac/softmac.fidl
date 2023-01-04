@@ -445,3 +445,7 @@ protocol WlanSoftmac {
         params fuchsia.hardware.wlan.associnfo.WlanWmmParams;
     }) -> () error zx.status;
 };
+
+service Service {
+    wlan_softmac client_end:WlanSoftmac;
+};

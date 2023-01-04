@@ -45,6 +45,7 @@ fuchsia_driver("wlantap_driver-driver") {
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_wire",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_hlcpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_convert",
     "//src/connectivity/wlan/lib/common/cpp:common",

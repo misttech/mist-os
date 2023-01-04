@@ -7,6 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <mutex>
@@ -27,18 +28,18 @@ namespace {
 
 // TODO(fxbug.dev/93459) Prune unnecessary fields from phy_config
 struct WlantapMacImpl : WlantapMac,
-                        public ddk::Device<WlantapMacImpl, ddk::Initializable, ddk::Unbindable,
-                                           ddk::ServiceConnectable>,
+                        public ddk::Device<WlantapMacImpl, ddk::Initializable, ddk::Unbindable>,
                         public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
   WlantapMacImpl(zx_device_t* phy_device, wlan_common::WlanMacRole role,
                  const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config,
                  Listener* listener, zx::channel sme_channel)
-      : ddk::Device<WlantapMacImpl, ddk::Initializable, ddk::Unbindable, ddk::ServiceConnectable>(
-            phy_device),
+      : ddk::Device<WlantapMacImpl, ddk::Initializable, ddk::Unbindable>(phy_device),
         role_(role),
         phy_config_(phy_config),
         listener_(listener),
-        sme_channel_(std::move(sme_channel)) {}
+        sme_channel_(std::move(sme_channel)),
+        outgoing_dir_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
+        serving_wlan_softmac_instance_(false) {}
 
   zx_status_t InitWlanSoftmacIfcClient() {
     // Create dispatcher for FIDL client of WlanSoftmacIfc protocol.
@@ -61,55 +62,26 @@ struct WlantapMacImpl : WlantapMac,
     return ZX_OK;
   }
 
-  zx_status_t InitWlanSoftmacServer() {
-    // Create dispatcher for FIDL server of WlanSoftmac protocol.
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, WLAN_SOFTMAC_DISPATCHER_NAME, [&](fdf_dispatcher_t*) {
-          if (unbind_txn_) {
-            wlan_softmac_ifc_dispatcher_.ShutdownAsync();
-            return;
-          }
-          zxlogf(ERROR, "%s shutdown for reason other than MAC device unbind.",
-                 WLAN_SOFTMAC_DISPATCHER_NAME);
-        });
-    if (dispatcher.is_error()) {
-      return dispatcher.status_value();
-    }
-    wlan_softmac_dispatcher_ = *std::move(dispatcher);
-
-    return ZX_OK;
-  }
-
   void DdkInit(ddk::InitTxn txn) {
-    zx_status_t ret = InitWlanSoftmacServer();
-    ZX_ASSERT_MSG(ret == ZX_OK, "%s(): %s create failed%s\n", __func__,
-                  WLAN_SOFTMAC_DISPATCHER_NAME, zx_status_get_string(ret));
-
-    ret = InitWlanSoftmacIfcClient();
+    auto ret = InitWlanSoftmacIfcClient();
     ZX_ASSERT_MSG(ret == ZX_OK, "%s(): %s create failed%s\n", __func__,
                   WLAN_SOFTMAC_IFC_DISPATCHER_NAME, zx_status_get_string(ret));
-
     txn.Reply(ZX_OK);
   }
 
   void DdkUnbind(ddk::UnbindTxn txn) {
-    // ddk::UnbindTxn::Reply() will be called when the WlanSoftmacIfc dispatcher is shutdown. This
-    // DdkUnbind triggers the following sequence.
-    //
-    //   1. WlanSoftmac dispatcher ShutdownAsync() called.
-    //   2. WlanSoftmac dispatcher shutdown handler calls WlanSoftmacIfc dispatcher ShutdownAsync().
-    //   3. WlanSoftmacIfc dispatcher shutdown handler calls ddk::UnbindTxn::Reply().
+    // ddk::UnbindTxn::Reply() will be called when the WlanSoftmacIfc dispatcher
+    // is shutdown.
     unbind_txn_ = std::move(txn);
-    wlan_softmac_dispatcher_.ShutdownAsync();
+    zx::result res = outgoing_dir_.RemoveService<fuchsia_wlan_softmac::Service>("default");
+    if (res.is_error()) {
+      zxlogf(ERROR, "Failed to remove WlanSoftmac service from outgoing directory: %s",
+             res.status_string());
+    }
+    wlan_softmac_ifc_dispatcher_.ShutdownAsync();
   }
 
   void DdkRelease() { delete this; }
-
-  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel) {
-    fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end(std::move(channel));
-    fdf::BindServer(wlan_softmac_dispatcher_.get(), std::move(server_end), this);
-    return ZX_OK;
-  }
 
   // WlanSoftmac protocol impl
 
@@ -299,6 +271,32 @@ struct WlantapMacImpl : WlantapMac,
 
   virtual void RemoveDevice() override { DdkAsyncRemove(); }
 
+  zx_status_t ServeWlanSoftmacProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+    auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmac> server_end) mutable {
+      if (serving_wlan_softmac_instance_) {
+        zxlogf(ERROR, "Cannot bind WlanSoftmac server: Already serving WlanSoftmac");
+        return;
+      }
+
+      serving_wlan_softmac_instance_ = true;
+      fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
+    };
+
+    fuchsia_wlan_softmac::Service::InstanceHandler handler({.wlan_softmac = std::move(protocol)});
+    auto status = outgoing_dir_.AddService<fuchsia_wlan_softmac::Service>(std::move(handler));
+    if (status.is_error()) {
+      zxlogf(ERROR, "Failed to add service to outgoing directory: %s", status.status_string());
+      return status.error_value();
+    }
+    auto result = outgoing_dir_.Serve(std::move(server_end));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve outgoing directory: %s", status.status_string());
+      return result.error_value();
+    }
+
+    return ZX_OK;
+  }
+
   uint16_t id_;
   wlan_common::WlanMacRole role_;
   std::mutex lock_;
@@ -313,12 +311,13 @@ struct WlantapMacImpl : WlantapMac,
   const char* WLAN_SOFTMAC_IFC_DISPATCHER_NAME = "wlan-softmac-ifc-client";
   fdf::Dispatcher wlan_softmac_ifc_dispatcher_;
 
-  // Dispatcher for FIDL server of WlanSoftmac protocol.
-  const char* WLAN_SOFTMAC_DISPATCHER_NAME = "wlan-softmac-server";
-  fdf::Dispatcher wlan_softmac_dispatcher_;
-
   // Store unbind txn for async reply.
   std::optional<::ddk::UnbindTxn> unbind_txn_;
+
+  // Serves fuchsia_wlan_softmac::Service.
+  driver::OutgoingDirectory outgoing_dir_;
+
+  bool serving_wlan_softmac_instance_;
 };
 
 }  // namespace
@@ -333,8 +332,28 @@ zx_status_t CreateWlantapMac(zx_device_t* parent_phy, const wlan_common::WlanMac
   std::unique_ptr<WlantapMacImpl> wlan_softmac(
       new WlantapMacImpl(parent_phy, role, phy_config, listener, std::move(sme_channel)));
 
-  zx_status_t status =
-      wlan_softmac->DdkAdd(::ddk::DeviceAddArgs(name).set_proto_id(ZX_PROTOCOL_WLAN_SOFTMAC));
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "%s: failed to create endpoints: %s", __func__, endpoints.status_string());
+    return endpoints.status_value();
+  }
+
+  auto status = wlan_softmac->ServeWlanSoftmacProtocol(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: failed to serve wlan softmac service: %s", __func__,
+           zx_status_get_string(status));
+    return status;
+  }
+  std::array offers = {
+      fuchsia_wlan_softmac::Service::Name,
+  };
+
+  // The outgoing directory will only be accessible by the driver that binds to
+  // the newly created device.
+  status = wlan_softmac->DdkAdd(::ddk::DeviceAddArgs(name)
+                                    .set_proto_id(ZX_PROTOCOL_WLAN_SOFTMAC)
+                                    .set_runtime_service_offers(offers)
+                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not add device: %d", __func__, status);
     return status;

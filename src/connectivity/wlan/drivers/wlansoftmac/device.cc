@@ -215,7 +215,7 @@ zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
   return ZX_OK;
 }
 
-Device::Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftmac> client)
+Device::Device(zx_device_t* device)
     : ddk::Device<Device, ddk::Unbindable>(device), parent_(device) {
   infof("Creating a new WLAN device.");
   debugfn();
@@ -249,10 +249,6 @@ Device::Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_softmac::WlanSof
   }
 
   client_dispatcher_ = *std::move(dispatcher);
-
-  // Create the client dispatcher for fuchsia_wlan_softmac::WlanSoftmac protocol.
-  client_ = fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>(std::move(client),
-                                                                     client_dispatcher_.get());
 }
 
 Device::~Device() { debugfn(); }
@@ -261,17 +257,18 @@ Device::~Device() { debugfn(); }
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
-zx_status_t Device::Bind(fdf::Channel channel) __TA_NO_THREAD_SAFETY_ANALYSIS {
+zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
   debugfn();
   infof("Binding our new WLAN softmac device.");
 
   zx_status_t status;
-  status = DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_softmac::WlanSoftmac>,
-                             std::move(channel));
-  if (status != ZX_OK) {
-    errorf("DdkServiceConnect failed: %s", zx_status_get_string(status));
-    return status;
+  zx::result<fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftmac>> client_end =
+      DdkConnectRuntimeProtocol<fuchsia_wlan_softmac::Service::WlanSoftmac>();
+  if (client_end.is_error()) {
+    errorf("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
+    return client_end.status_value();
   }
+  client_ = fdf::WireSharedClient(*std::move(client_end), client_dispatcher_.get());
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {

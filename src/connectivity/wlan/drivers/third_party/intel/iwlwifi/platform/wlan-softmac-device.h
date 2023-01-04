@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/component/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <memory>
@@ -23,9 +24,9 @@ namespace wlan::iwlwifi {
 class MvmSta;
 class WlanSoftmacDevice;
 
-class WlanSoftmacDevice : public ddk::Device<WlanSoftmacDevice, ddk::Initializable, ddk::Unbindable,
-                                             ddk::ServiceConnectable>,
-                          public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
+class WlanSoftmacDevice
+    : public ddk::Device<WlanSoftmacDevice, ddk::Initializable, ddk::Unbindable>,
+      public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
  public:
   WlanSoftmacDevice(zx_device* parent, iwl_trans* drvdata, uint16_t iface_id,
                     struct iwl_mvm_vif* mvmvif);
@@ -34,7 +35,6 @@ class WlanSoftmacDevice : public ddk::Device<WlanSoftmacDevice, ddk::Initializab
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
-  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel);
 
   // WlanSoftmac protocol implementation.
   void Query(fdf::Arena& arena, QueryCompleter::Sync& completer);
@@ -73,6 +73,9 @@ class WlanSoftmacDevice : public ddk::Device<WlanSoftmacDevice, ddk::Initializab
   void Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet);
   void ScanComplete(zx_status_t status, uint64_t scan_id);
 
+  // Serves the WlanSoftmac protocol on `server_end`.
+  zx_status_t ServeWlanSoftmacProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
   // Helper function
   bool IsValidChannel(const fuchsia_wlan_common::wire::WlanChannel* channel);
 
@@ -92,6 +95,11 @@ class WlanSoftmacDevice : public ddk::Device<WlanSoftmacDevice, ddk::Initializab
 
   // The FIDL client to communicate with Wlan device.
   fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmacIfc> client_;
+
+  // Serves fuchsia_wlan_softmac::Service.
+  driver::OutgoingDirectory outgoing_dir_;
+
+  bool serving_wlan_softmac_instance_;
 };
 
 }  // namespace wlan::iwlwifi

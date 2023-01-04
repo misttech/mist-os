@@ -14,14 +14,8 @@
 zx_status_t wlan_bind(void* ctx, zx_device_t* device) {
   std::printf("%s\n", __func__);
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmac>();
-  if (endpoints.is_error()) {
-    errorf("Failed to create endpoint: %s", zx_status_get_string(endpoints.status_value()));
-    return endpoints.status_value();
-  }
-
-  auto wlandev = std::make_unique<wlan::Device>(device, std::move(endpoints->client));
-  auto status = wlandev->Bind(endpoints->server.TakeHandle());
+  auto wlandev = std::make_unique<wlan::Device>(device);
+  auto status = wlandev->Bind();
   if (status != ZX_OK) {
     errorf("Failed to bind: %d\n", status);
     return status;

@@ -57,7 +57,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
 
     ASSERT_FALSE(dispatcher.is_error());
 
-    driver_dispatcher = *std::move(dispatcher);
+    driver_dispatcher_ = *std::move(dispatcher);
 
     client_ =
         fdf::WireSyncClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(std::move(endpoints->client));
@@ -66,7 +66,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
     // the caller. The FIDL protocol that is being served uses driver transport
     // and so it must be bound to an fdf dispatcher.
     libsync::Completion connected;
-    async::PostTask(driver_dispatcher.async_dispatcher(), [&]() {
+    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
       ASSERT_EQ(device_->DdkServiceConnect(
                     fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
                     endpoints->server.TakeHandle()),
@@ -82,7 +82,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
   }
 
   ~WlanPhyImplDeviceTest() {
-    driver_dispatcher.ShutdownAsync();
+    driver_dispatcher_.ShutdownAsync();
     completion_.Wait();
   }
 
@@ -124,7 +124,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
   wlan::iwlwifi::WlanPhyImplDevice* device_;
 
   fdf::WireSyncClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client_;
-  fdf::Dispatcher driver_dispatcher;
+  fdf::Dispatcher driver_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;
 };
@@ -228,11 +228,11 @@ TEST_F(WlanPhyImplDeviceTest, PhyCreateDestroySingleInterface) {
 
   // Remove interface
   EXPECT_EQ(ZX_OK, DestroyIface(0));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[0], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 1);
 
-  mock_ddk::ReleaseFlaggedDevices(device_->zxdev());
+  mock_ddk::ReleaseFlaggedDevices(device_->zxdev(), driver_dispatcher_.async_dispatcher());
 }  // namespace
 
 TEST_F(WlanPhyImplDeviceTest, PhyCreateDestroyMultipleInterfaces) {
@@ -266,7 +266,7 @@ TEST_F(WlanPhyImplDeviceTest, PhyCreateDestroyMultipleInterfaces) {
 
   // Remove the 2nd interface
   EXPECT_EQ(ZX_OK, DestroyIface(1));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[1], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 3);
 
@@ -293,25 +293,25 @@ TEST_F(WlanPhyImplDeviceTest, PhyCreateDestroyMultipleInterfaces) {
 
   // Remove the 2nd interface
   EXPECT_EQ(ZX_OK, DestroyIface(1));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[1], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 4);
 
   // Remove the 3rd interface
   EXPECT_EQ(ZX_OK, DestroyIface(2));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[2], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 3);
 
   // Remove the 4th interface
   EXPECT_EQ(ZX_OK, DestroyIface(3));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[3], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 2);
 
   // Remove the 1st interface
   EXPECT_EQ(ZX_OK, DestroyIface(0));
-  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent_.get(), driver_dispatcher_.async_dispatcher());
   ASSERT_EQ(mvm->mvmvif[0], nullptr);
   ASSERT_EQ(fake_parent_->descendant_count(), 1);
 

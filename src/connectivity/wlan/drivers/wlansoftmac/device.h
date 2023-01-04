@@ -56,10 +56,10 @@ class Device : public DeviceInterface,
                ddk::Device<Device, ddk::Unbindable>,
                public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
-  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftmac> client);
+  explicit Device(zx_device_t* device);
   ~Device();
 
-  zx_status_t Bind(fdf::Channel channel);
+  zx_status_t Bind();
 
   // ddk device methods
   void EthUnbind();

@@ -113,9 +113,29 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   auto wlan_softmac_device =
       std::make_unique<WlanSoftmacDevice>(parent(), drvdata(), out_iface_id, mvmvif);
 
-  if ((status = wlan_softmac_device->DdkAdd(
-           ::ddk::DeviceAddArgs("iwlwifi-wlan-softmac").set_proto_id(ZX_PROTOCOL_WLAN_SOFTMAC))) !=
-      ZX_OK) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    IWL_ERR(this, "failed to create endpoints: %s\n", endpoints.status_string());
+    completer.buffer(arena).ReplyError(endpoints.status_value());
+    return;
+  }
+
+  status = wlan_softmac_device->ServeWlanSoftmacProtocol(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    IWL_ERR(this, "failed to serve wlan softmac service: %s\n", zx_status_get_string(status));
+    return;
+  }
+  std::array<const char*, 1> offers{
+      fuchsia_wlan_softmac::Service::Name,
+  };
+
+  // The outgoing directory will only be accessible by the driver that binds to
+  // the newly created device.
+  status = wlan_softmac_device->DdkAdd(::ddk::DeviceAddArgs("iwlwifi-wlan-softmac")
+                                           .set_proto_id(ZX_PROTOCOL_WLAN_SOFTMAC)
+                                           .set_runtime_service_offers(offers)
+                                           .set_outgoing_dir(endpoints->client.TakeChannel()));
+  if (status != ZX_OK) {
     IWL_ERR(this, "%s() failed mac device add: %s\n", __func__, zx_status_get_string(status));
     phy_create_iface_undo(drvdata(), out_iface_id);
     completer.buffer(arena).ReplyError(status);
