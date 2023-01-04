@@ -620,9 +620,7 @@ param const params[] = {
         }
       },
       { 0xC2E4C3A9, {
-          { param::INTEL,  { { 0x0, 0x9A48 } } },
-          { param::INTEL,  { { 0x9A49, 0x9A49 } } }, // Xe TGL GT2 - Fuchsia: fxbug.dev/115402
-          { param::INTEL,  { { 0x9A4A, UINT32_MAX } } },
+          { param::INTEL,  {} }, // Xe TGL GT2 - Fuchsia: fxbug.dev/115402
           { param::NVIDIA, { { param::NVIDIA_VOLTA, UINT32_MAX } } },
         }
       },
