@@ -10,14 +10,14 @@ use {
         CapabilityName, CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource,
     },
     fidl_fuchsia_component_decl as fdecl,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
+    moniker::{AbsoluteMoniker, ExtendedMoniker},
     routing::{
         capability_source::{CapabilitySourceInterface, ComponentCapability, InternalCapability},
         component_instance::ComponentInstanceInterface,
         config::{
-            AllowlistEntry, CapabilityAllowlistKey, CapabilityAllowlistSource,
-            ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
-            JobPolicyAllowlists, RuntimeConfig, SecurityPolicy,
+            AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
+            CapabilityAllowlistSource, ChildPolicyAllowlists, DebugCapabilityAllowlistEntry,
+            DebugCapabilityKey, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy,
         },
         policy::GlobalPolicyChecker,
     },
@@ -82,8 +82,12 @@ where
                 capability: CapabilityTypeName::Event,
             },
             vec![
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar", "baz"])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "foo", "bar",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "foo", "bar", "baz",
+                ])),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -128,9 +132,16 @@ where
                 capability: CapabilityTypeName::Protocol,
             },
             vec![
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "core"])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root",
+                    "bootstrap",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root", "core",
+                ])),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -184,9 +195,16 @@ where
                 capability: CapabilityTypeName::Protocol,
             },
             vec![
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "core"])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "foo",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root",
+                    "bootstrap",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root", "core",
+                ])),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -236,9 +254,16 @@ where
                 capability: CapabilityTypeName::Storage,
             },
             vec![
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "core"])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "foo",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root",
+                    "bootstrap",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root", "core",
+                ])),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -288,8 +313,8 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
             },
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["foo"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["foo"])),
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -298,8 +323,11 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bootstrap_env".to_string(),
             },
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["foo"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                "root",
+                "bootstrap",
+            ])),
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0"].into());
@@ -370,8 +398,10 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bar_env".to_string(),
             },
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["bar"])),
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["root", "bootstrap1"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["bar"])),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["root", "bootstrap1"]))
+                .any_descendant(),
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -380,8 +410,13 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
             },
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["foo"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap2"])),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["foo"]))
+                .any_descendant(),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                "root",
+                "bootstrap2",
+            ])),
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -390,8 +425,12 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "baz_env".to_string(),
             },
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["baz"])),
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["root", "bootstrap3"])),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["baz"]))
+                .any_descendant(),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["root", "bootstrap3"]))
+                .any_descendant(),
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
@@ -488,11 +527,10 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "bar_env".to_string(),
             },
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["bar"])),
-            AllowlistEntry::Collection(
-                AbsoluteMoniker::from(vec!["root", "bootstrap"]),
-                "coll1".to_string(),
-            ),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["bar"])),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["root", "bootstrap"]))
+                .any_descendant_in_collection("coll1"),
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -501,8 +539,11 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "foo_env".to_string(),
             },
-            AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["foo"]), "coll2".to_string()),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "bootstrap2"])),
+            AllowlistEntryBuilder::new().exact("foo").any_descendant_in_collection("coll2"),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                "root",
+                "bootstrap2",
+            ])),
         );
         config_builder.add_debug_capability_policy(
             DebugCapabilityKey {
@@ -511,11 +552,11 @@ where
                 capability: CapabilityTypeName::Protocol,
                 env_name: "baz_env".to_string(),
             },
-            AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["baz"]), "coll3".to_string()),
-            AllowlistEntry::Collection(
-                AbsoluteMoniker::from(vec!["root", "bootstrap3"]),
-                "coll4".to_string(),
-            ),
+            AllowlistEntryBuilder::new().exact("baz").any_descendant_in_collection("coll3"),
+            AllowlistEntryBuilder::new()
+                .exact("root")
+                .exact("bootstrap3")
+                .any_descendant_in_collection("coll4"),
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
@@ -614,8 +655,12 @@ where
                 capability: CapabilityTypeName::Directory,
             },
             vec![
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root"])),
-                AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root", "core"])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root",
+                ])),
+                AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                    "root", "core",
+                ])),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -662,8 +707,8 @@ where
                 capability: CapabilityTypeName::Protocol,
             },
             vec![
-                AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["tests"])),
-                AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["core", "tests"])),
+                AllowlistEntryBuilder::new().exact("tests").any_descendant(),
+                AllowlistEntryBuilder::new().exact("core").exact("tests").any_descendant(),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
@@ -710,8 +755,8 @@ where
                 capability: CapabilityTypeName::Protocol,
             },
             vec![
-                AllowlistEntry::Collection(AbsoluteMoniker::root(), "tests".into()),
-                AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["core"]), "tests".into()),
+                AllowlistEntryBuilder::new().any_descendant_in_collection("tests"),
+                AllowlistEntryBuilder::new().exact("core").any_descendant_in_collection("tests"),
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());

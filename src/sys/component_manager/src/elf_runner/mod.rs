@@ -634,7 +634,7 @@ mod tests {
             model::testing::test_helpers::{create_fs_with_mock_logsink, MockServiceRequest},
         },
         ::routing::{
-            config::{AllowlistEntry, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy},
+            config::{AllowlistEntryBuilder, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy},
             policy::ScopedPolicyChecker,
         },
         anyhow::Error,
@@ -1314,9 +1314,7 @@ mod tests {
         let config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
-                    ambient_mark_vmo_exec: vec![AllowlistEntry::Exact(AbsoluteMoniker::from(
-                        vec!["foo"],
-                    ))],
+                    ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1399,7 +1397,7 @@ mod tests {
             use_builtin_process_launcher: should_use_builtin_process_launcher(),
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
-                    main_process_critical: vec![AllowlistEntry::Exact(AbsoluteMoniker::root())],
+                    main_process_critical: vec![AllowlistEntryBuilder::new().build()],
                     ..Default::default()
                 },
                 ..Default::default()

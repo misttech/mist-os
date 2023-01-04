@@ -37,8 +37,8 @@ use {
         component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
         config::{
-            AllowlistEntry, CapabilityAllowlistKey, CapabilityAllowlistSource,
-            DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+            AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
+            CapabilityAllowlistSource, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
         },
         error::RoutingError,
         event::EventSubscription,
@@ -3538,7 +3538,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let mut allowlist = HashSet::new();
-        allowlist.insert(AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])));
+        allowlist.insert(AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(
+            vec!["b"],
+        )));
 
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
@@ -3649,8 +3651,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
 
         let mut allowlist = HashSet::new();
-        allowlist.insert(AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])));
-        allowlist.insert(AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b", "c"])));
+        allowlist.insert(AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(
+            vec!["b"],
+        )));
+        allowlist.insert(AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(
+            vec!["b", "c"],
+        )));
 
         let mut builder = T::new("a", components);
         builder.add_capability_policy(
@@ -3807,8 +3813,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntry::Exact(AbsoluteMoniker::root()),
-            AllowlistEntry::Exact(AbsoluteMoniker::root()),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::root()),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::root()),
         ));
 
         let mut builder = T::new("a", components);
@@ -3918,8 +3924,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["b"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["b"])),
         ));
 
         let mut builder = T::new("a", components);
@@ -4045,8 +4051,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b", "d"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["b", "d"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["b"])),
         ));
 
         let mut builder = T::new("a", components);
@@ -4189,8 +4195,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b", "d", "e"])),
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["b"])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec![
+                "b", "d", "e",
+            ])),
+            AllowlistEntryBuilder::build_exact_from_moniker(&AbsoluteMoniker::from(vec!["b"])),
         ));
 
         let mut builder = T::new("a", components);
@@ -4333,8 +4341,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let mut allowlist = HashSet::new();
         allowlist.insert(DebugCapabilityAllowlistEntry::new(
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["b"])),
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["b"])),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["b"]))
+                .any_descendant(),
+            AllowlistEntryBuilder::new()
+                .exact_from_moniker(&AbsoluteMoniker::from(vec!["b"]))
+                .any_descendant(),
         ));
 
         let mut builder = T::new("a", components);

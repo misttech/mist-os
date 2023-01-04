@@ -136,7 +136,7 @@ mod tests {
             hooks::Hooks,
             testing::{mocks::MockRunner, routing_test_helpers::*},
         },
-        ::routing::config::{AllowlistEntry, JobPolicyAllowlists, SecurityPolicy},
+        ::routing::config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
         anyhow::Error,
         assert_matches::assert_matches,
         cm_rust::{CapabilityDecl, RunnerDecl},
@@ -200,9 +200,7 @@ mod tests {
         let config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
-                    ambient_mark_vmo_exec: vec![AllowlistEntry::Exact(AbsoluteMoniker::from(
-                        vec!["foo"],
-                    ))],
+                    ambient_mark_vmo_exec: vec![AllowlistEntryBuilder::new().exact("foo").build()],
                     ..Default::default()
                 },
                 ..Default::default()

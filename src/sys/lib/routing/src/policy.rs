@@ -7,14 +7,12 @@ use {
         capability_source::CapabilitySourceInterface,
         component_instance::ComponentInstanceInterface,
         config::{
-            AllowlistEntry, CapabilityAllowlistKey, CapabilityAllowlistSource, DebugCapabilityKey,
-            RuntimeConfig,
+            AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
+            DebugCapabilityKey, RuntimeConfig,
         },
     },
     fuchsia_zircon_status as zx,
-    moniker::{
-        AbsoluteMoniker, ChildMonikerBase, ExtendedMoniker, RelativeMoniker, RelativeMonikerBase,
-    },
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
     std::sync::{Arc, Weak},
     thiserror::Error,
     tracing::{error, warn},
@@ -214,8 +212,16 @@ impl GlobalPolicyChecker {
 
         match self.config.security_policy.capability_policy.get(&policy_key) {
             Some(entries) => {
+                let parts = target_moniker
+                    .path()
+                    .clone()
+                    .into_iter()
+                    .map(|c| AllowlistMatcher::Exact(c))
+                    .collect();
+                let entry = AllowlistEntry { matchers: parts };
+
                 // Use the HashSet to find any exact matches quickly.
-                if entries.contains(&AllowlistEntry::Exact(target_moniker.clone())) {
+                if entries.contains(&entry) {
                     return Ok(());
                 }
 
@@ -312,31 +318,68 @@ pub(crate) fn allowlist_entry_matches(
     allowlist_entry: &AllowlistEntry,
     target_moniker: &AbsoluteMoniker,
 ) -> bool {
-    match allowlist_entry {
-        AllowlistEntry::Exact(moniker) => {
-            // An exact absolute moniker must match everything but the instance ID,
-            // which won't be deterministic in a dynamic collection of components.
-            moniker == target_moniker
-        }
-        AllowlistEntry::Realm(realm) => {
-            // For a Realm entry we are looking for the target_moniker to be
-            // contained in the realm. Children are allowed but not the realm itself.
-            if let Ok(relative) = RelativeMoniker::scope_down(realm, target_moniker) {
-                !relative.path().is_empty()
-            } else {
-                false
+    let mut iter = target_moniker.path().iter();
+
+    if allowlist_entry.matchers.is_empty() && !target_moniker.is_root() {
+        // If there are no matchers in the allowlist, the moniker must be the root.
+        // Anything else will not match.
+        return false;
+    }
+
+    for matcher in &allowlist_entry.matchers {
+        let cur_child = if let Some(target_child) = iter.next() {
+            target_child
+        } else {
+            // We have more matchers, but the moniker has already ended.
+            return false;
+        };
+        match matcher {
+            AllowlistMatcher::Exact(child) => {
+                if cur_child != child {
+                    // The child does not exactly match.
+                    return false;
+                }
+            }
+            // Any child is acceptable. Continue with remaining matchers.
+            AllowlistMatcher::AnyChild => continue,
+            // Any descendant at this point is acceptable.
+            AllowlistMatcher::AnyDescendant => return true,
+            AllowlistMatcher::AnyDescendantInCollection(expected_collection) => {
+                if let Some(collection) = cur_child.collection() {
+                    if collection == expected_collection.as_str() {
+                        // This child is in a collection and the name matches.
+                        // Because we allow any descendant, return true immediately.
+                        return true;
+                    } else {
+                        // This child is in a collection but the name does not match.
+                        return false;
+                    }
+                } else {
+                    // This child is not in a collection, so it does not match.
+                    return false;
+                }
+            }
+            AllowlistMatcher::AnyChildInCollection(expected_collection) => {
+                if let Some(collection) = cur_child.collection() {
+                    if collection != expected_collection.as_str() {
+                        // This child is in a collection but the name does not match.
+                        return false;
+                    }
+                } else {
+                    // This child is not in a collection, so it does not match.
+                    return false;
+                }
             }
         }
-        AllowlistEntry::Collection(realm, collection) => {
-            // For a Collection entry we are looking for the target_moniker to be
-            // contained in the realm and that the first element of
-            // the down path is in a collection with a matching name.
-            if let Ok(relative) = RelativeMoniker::scope_down(realm, target_moniker) {
-                relative.path().get(0).map_or(false, |first| first.collection() == Some(collection))
-            } else {
-                false
-            }
-        }
+    }
+
+    if iter.next().is_some() {
+        // We've gone through all the matchers, but there are still children
+        // in the moniker. Descendant cases are already handled above, so this
+        // must be a failure to match.
+        false
+    } else {
+        true
     }
 }
 
@@ -413,7 +456,8 @@ mod tests {
     use {
         super::*,
         crate::config::{
-            ChildPolicyAllowlists, JobPolicyAllowlists, RuntimeConfig, SecurityPolicy,
+            AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, RuntimeConfig,
+            SecurityPolicy,
         },
         assert_matches::assert_matches,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
@@ -426,7 +470,7 @@ mod tests {
         let allowed = AbsoluteMoniker::from(vec!["foo", "bar"]);
         let disallowed_child_of_allowed = AbsoluteMoniker::from(vec!["foo", "bar", "baz"]);
         let disallowed = AbsoluteMoniker::from(vec!["baz", "fiz"]);
-        let allowlist_exact = AllowlistEntry::Exact(allowed.clone());
+        let allowlist_exact = AllowlistEntryBuilder::new().exact_from_moniker(&allowed).build();
         assert!(allowlist_entry_matches(&allowlist_exact, &allowed));
         assert!(!allowlist_entry_matches(&allowlist_exact, &root));
         assert!(!allowlist_entry_matches(&allowlist_exact, &disallowed));
@@ -435,7 +479,8 @@ mod tests {
         let allowed_realm_root = AbsoluteMoniker::from(vec!["qux"]);
         let allowed_child_of_realm = AbsoluteMoniker::from(vec!["qux", "quux"]);
         let allowed_nested_child_of_realm = AbsoluteMoniker::from(vec!["qux", "quux", "foo"]);
-        let allowlist_realm = AllowlistEntry::Realm(allowed_realm_root.clone());
+        let allowlist_realm =
+            AllowlistEntryBuilder::new().exact_from_moniker(&allowed_realm_root).any_descendant();
         assert!(!allowlist_entry_matches(&allowlist_realm, &allowed_realm_root));
         assert!(allowlist_entry_matches(&allowlist_realm, &allowed_child_of_realm));
         assert!(allowlist_entry_matches(&allowlist_realm, &allowed_nested_child_of_realm));
@@ -447,14 +492,58 @@ mod tests {
         let collection_nested_child =
             AbsoluteMoniker::from(vec!["corge", "collection:child", "inner-child"]);
         let non_collection_child = AbsoluteMoniker::from(vec!["corge", "grault"]);
-        let allowlist_collection =
-            AllowlistEntry::Collection(collection_holder.clone(), "collection".into());
+        let allowlist_collection = AllowlistEntryBuilder::new()
+            .exact_from_moniker(&collection_holder)
+            .any_descendant_in_collection("collection");
         assert!(!allowlist_entry_matches(&allowlist_collection, &collection_holder));
         assert!(allowlist_entry_matches(&allowlist_collection, &collection_child));
         assert!(allowlist_entry_matches(&allowlist_collection, &collection_nested_child));
         assert!(!allowlist_entry_matches(&allowlist_collection, &non_collection_child));
         assert!(!allowlist_entry_matches(&allowlist_collection, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_collection, &root));
+
+        let collection_a = AbsoluteMoniker::from(vec!["foo", "bar:a", "baz", "qux"]);
+        let collection_b = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz", "qux"]);
+        let parent_not_allowed = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz"]);
+        let collection_not_allowed = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz"]);
+        let different_collection_not_allowed =
+            AbsoluteMoniker::from(vec!["foo", "test:b", "baz", "qux"]);
+        let allowlist_exact_in_collection = AllowlistEntryBuilder::new()
+            .exact("foo")
+            .any_child_in_collection("bar")
+            .exact("baz")
+            .exact("qux")
+            .build();
+        assert!(allowlist_entry_matches(&allowlist_exact_in_collection, &collection_a));
+        assert!(allowlist_entry_matches(&allowlist_exact_in_collection, &collection_b));
+        assert!(!allowlist_entry_matches(&allowlist_exact_in_collection, &parent_not_allowed));
+        assert!(!allowlist_entry_matches(&allowlist_exact_in_collection, &collection_not_allowed));
+        assert!(!allowlist_entry_matches(
+            &allowlist_exact_in_collection,
+            &different_collection_not_allowed
+        ));
+
+        let any_child_allowlist = AllowlistEntryBuilder::new().exact("core").any_child().build();
+        let allowed = AbsoluteMoniker::from(vec!["core", "abc"]);
+        let disallowed_1 = AbsoluteMoniker::from(vec!["not_core", "abc"]);
+        let disallowed_2 = AbsoluteMoniker::from(vec!["core", "abc", "def"]);
+        assert!(allowlist_entry_matches(&any_child_allowlist, &allowed));
+        assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_1));
+        assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_2));
+
+        let multiwildcard_allowlist = AllowlistEntryBuilder::new()
+            .exact("core")
+            .any_child()
+            .any_child_in_collection("foo")
+            .any_descendant();
+        let allowed = AbsoluteMoniker::from(vec!["core", "abc", "foo:def", "ghi"]);
+        let disallowed_1 = AbsoluteMoniker::from(vec!["not_core", "abc", "foo:def", "ghi"]);
+        let disallowed_2 = AbsoluteMoniker::from(vec!["core", "abc", "not_foo:def", "ghi"]);
+        let disallowed_3 = AbsoluteMoniker::from(vec!["core", "abc", "foo:def"]);
+        assert!(allowlist_entry_matches(&multiwildcard_allowlist, &allowed));
+        assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_1));
+        assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_2));
+        assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_3));
     }
 
     #[test]
@@ -486,24 +575,24 @@ mod tests {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
                     ambient_mark_vmo_exec: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                     main_process_critical: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                     create_raw_processes: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                 },
                 capability_policy: HashMap::new(),
                 debug_capability_policy: HashMap::new(),
                 child_policy: ChildPolicyAllowlists {
                     reboot_on_terminate: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                 },
             },
@@ -552,8 +641,8 @@ mod tests {
                     ambient_mark_vmo_exec: vec![],
                     main_process_critical: vec![],
                     create_raw_processes: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                 },
                 capability_policy: HashMap::new(),
@@ -611,16 +700,16 @@ mod tests {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
                     ambient_mark_vmo_exec: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                     main_process_critical: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                     create_raw_processes: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                 },
                 capability_policy: HashMap::new(),
@@ -680,8 +769,8 @@ mod tests {
                 debug_capability_policy: HashMap::new(),
                 child_policy: ChildPolicyAllowlists {
                     reboot_on_terminate: vec![
-                        AllowlistEntry::Exact(allowed1.clone()),
-                        AllowlistEntry::Exact(allowed2.clone()),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed1),
+                        AllowlistEntryBuilder::build_exact_from_moniker(&allowed2),
                     ],
                 },
             },
@@ -705,7 +794,9 @@ mod tests {
                 capability_policy: HashMap::new(),
                 debug_capability_policy: HashMap::new(),
                 child_policy: ChildPolicyAllowlists {
-                    reboot_on_terminate: vec![AllowlistEntry::Exact(allowed1.clone())],
+                    reboot_on_terminate: vec![AllowlistEntryBuilder::build_exact_from_moniker(
+                        &allowed1,
+                    )],
                 },
             },
             ..Default::default()

@@ -6,20 +6,22 @@ use {
     crate::policy::allowlist_entry_matches,
     anyhow::{format_err, Context, Error},
     cm_rust::{CapabilityName, CapabilityTypeName, FidlIntoNative},
-    cm_types::{symmetrical_enums, Name, Url},
+    cm_types::{symmetrical_enums, Name, ParseError, Url},
     fidl::encoding::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_internal::{
         self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
         DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
     },
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, MonikerError},
+    moniker::{
+        AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, ExtendedMoniker,
+        MonikerError,
+    },
     std::{
         collections::{HashMap, HashSet},
         convert::TryFrom,
         iter::FromIterator,
         path::Path,
-        str::FromStr,
     },
     thiserror::Error,
     tracing::log,
@@ -108,19 +110,79 @@ pub struct RuntimeConfig {
 
 /// A single security policy allowlist entry.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum AllowlistEntry {
-    /// Allow the component with this exact AbsoluteMoniker.
-    /// Example string form in config: "/foo/bar", "/foo/bar/baz"
-    Exact(AbsoluteMoniker),
-    /// Allow any components that are children of this AbsoluteMoniker. In other words, a
-    /// prefix match against the target moniker.
-    /// Example string form in config: "/foo/**", "/foo/bar/**"
-    Realm(AbsoluteMoniker),
-    /// Allow any components that are in AbsoluteMoniker's collection with the given name.
-    /// Also a prefix match against the target moniker but additionally scoped to a specific
-    /// collection.
-    /// Example string form in config: "/foo/tests:**", "/bootstrap/drivers:**"
-    Collection(AbsoluteMoniker, String),
+pub struct AllowlistEntry {
+    // A list of matchers that apply to each child in a moniker.
+    // If this list is empty, we must only allow the root moniker.
+    pub matchers: Vec<AllowlistMatcher>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum AllowlistMatcher {
+    /// Allow the child with this exact ChildMoniker.
+    /// Examples: "bar", "foo:bar", "baz"
+    Exact(ChildMoniker),
+    /// Allow any descendant of this realm.
+    /// This is indicated by "**" in a config file.
+    AnyDescendant,
+    /// Allow any child of this realm.
+    /// This is indicated by "*" in a config file.
+    AnyChild,
+    /// Allow any child of a particular collection in this realm.
+    /// This is indicated by "<collection>:*" in a config file.
+    AnyChildInCollection(Name),
+    /// Allow any descendant of a particular collection in this realm.
+    /// This is indicated by "<collection>:**" in a config file.
+    AnyDescendantInCollection(Name),
+}
+
+pub struct AllowlistEntryBuilder {
+    parts: Vec<AllowlistMatcher>,
+}
+
+impl AllowlistEntryBuilder {
+    pub fn new() -> Self {
+        Self { parts: vec![] }
+    }
+
+    pub fn build_exact_from_moniker(m: &AbsoluteMoniker) -> AllowlistEntry {
+        Self::new().exact_from_moniker(m).build()
+    }
+
+    pub fn exact(mut self, name: &str) -> Self {
+        self.parts.push(AllowlistMatcher::Exact(ChildMoniker::parse(name).unwrap()));
+        self
+    }
+
+    pub fn exact_from_moniker(mut self, m: &AbsoluteMoniker) -> Self {
+        let mut parts = m.path().clone().into_iter().map(|c| AllowlistMatcher::Exact(c)).collect();
+        self.parts.append(&mut parts);
+        self
+    }
+
+    pub fn any_child(mut self) -> Self {
+        self.parts.push(AllowlistMatcher::AnyChild);
+        self
+    }
+
+    pub fn any_descendant(mut self) -> AllowlistEntry {
+        self.parts.push(AllowlistMatcher::AnyDescendant);
+        self.build()
+    }
+
+    pub fn any_descendant_in_collection(mut self, collection: &str) -> AllowlistEntry {
+        self.parts
+            .push(AllowlistMatcher::AnyDescendantInCollection(Name::try_new(collection).unwrap()));
+        self.build()
+    }
+
+    pub fn any_child_in_collection(mut self, collection: &str) -> Self {
+        self.parts.push(AllowlistMatcher::AnyChildInCollection(Name::try_new(collection).unwrap()));
+        self
+    }
+
+    pub fn build(self) -> AllowlistEntry {
+        AllowlistEntry { matchers: self.parts }
+    }
 }
 
 /// Runtime security policy.
@@ -366,17 +428,15 @@ impl RuntimeConfig {
 }
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum AllowlistEntryError {
-    #[error("Moniker parsing error in realm allowlist entry: {0:?}")]
-    RealmEntryInvalidMoniker(String, #[source] MonikerError),
-    #[error("Collection allowlist entry missing a realm: {0:?}")]
-    CollectionEntryMissingRealm(String),
-    #[error("Invalid collection name ({1:?}) in allowlist entry: {0:?}")]
-    InvalidCollectionName(String, String),
-    #[error("Moniker parsing error in collection allowlist entry: {0:?}")]
-    CollectionEntryInvalidMoniker(String, #[source] MonikerError),
-    #[error("Moniker parsing error in allowlist entry: {0:?}")]
-    OtherInvalidMoniker(String, #[source] MonikerError),
+pub enum AllowlistEntryParseError {
+    #[error("Invalid child moniker ({0:?}) in allowlist entry: {1:?}")]
+    InvalidChildMoniker(String, #[source] MonikerError),
+    #[error("Invalid collection name ({0:?}) in allowlist entry: {1:?}")]
+    InvalidCollectionName(String, #[source] ParseError),
+    #[error("Allowlist entry ({0:?}) must start with a '/'")]
+    NoLeadingSlash(String),
+    #[error("Allowlist entry ({0:?}) must have '**' wildcard only at the end")]
+    DescendantWildcardOnlyAtEnd(String),
 }
 
 fn parse_allowlist_entries(strs: &Option<Vec<String>>) -> Result<Vec<AllowlistEntry>, Error> {
@@ -384,39 +444,64 @@ fn parse_allowlist_entries(strs: &Option<Vec<String>>) -> Result<Vec<AllowlistEn
         Some(strs) => strs,
         None => return Ok(Vec::new()),
     };
-    strs.iter().map(|s| parse_allowlist_entry(s)).collect()
+
+    let mut entries = vec![];
+    for input in strs {
+        let entry = parse_allowlist_entry(input)?;
+        entries.push(entry);
+    }
+    Ok(entries)
 }
 
-fn parse_allowlist_entry(entry: &str) -> Result<AllowlistEntry, Error> {
-    if let Some(prefix) = entry.strip_suffix("/**") {
-        let realm = if prefix.is_empty() {
-            AbsoluteMoniker::root()
-        } else {
-            AbsoluteMoniker::parse_str(prefix)
-                .map_err(|e| AllowlistEntryError::RealmEntryInvalidMoniker(entry.to_string(), e))?
-        };
-        Ok(AllowlistEntry::Realm(realm))
-    } else if let Some(prefix) = entry.strip_suffix(":**") {
-        let (realm, collection) = prefix
-            .rsplit_once('/')
-            .ok_or_else(|| AllowlistEntryError::CollectionEntryMissingRealm(entry.to_string()))?;
-        Name::from_str(&collection).map_err(|_| {
-            AllowlistEntryError::InvalidCollectionName(entry.to_string(), collection.into())
-        })?;
-
-        let realm = if realm.is_empty() {
-            AbsoluteMoniker::root()
-        } else {
-            AbsoluteMoniker::parse_str(realm).map_err(|e| {
-                AllowlistEntryError::CollectionEntryInvalidMoniker(entry.to_string(), e)
-            })?
-        };
-        Ok(AllowlistEntry::Collection(realm, collection.to_string()))
+fn parse_allowlist_entry(input: &str) -> Result<AllowlistEntry, AllowlistEntryParseError> {
+    let entry = if let Some(entry) = input.strip_prefix('/') {
+        entry
     } else {
-        let realm = AbsoluteMoniker::parse_str(entry)
-            .map_err(|e| AllowlistEntryError::OtherInvalidMoniker(entry.to_string(), e))?;
-        Ok(AllowlistEntry::Exact(realm))
+        return Err(AllowlistEntryParseError::NoLeadingSlash(input.to_string()));
+    };
+
+    if entry.is_empty() {
+        return Ok(AllowlistEntry { matchers: vec![] });
     }
+
+    if entry.contains("**") && !entry.ends_with("**") {
+        return Err(AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(input.to_string()));
+    }
+
+    let mut parts = vec![];
+    for name in entry.split('/') {
+        let part = match name {
+            "**" => AllowlistMatcher::AnyDescendant,
+            "*" => AllowlistMatcher::AnyChild,
+            name => {
+                if let Some(collection_name) = name.strip_suffix(":**") {
+                    let collection_name = Name::try_new(collection_name).map_err(|e| {
+                        AllowlistEntryParseError::InvalidCollectionName(
+                            collection_name.to_string(),
+                            e,
+                        )
+                    })?;
+                    AllowlistMatcher::AnyDescendantInCollection(collection_name)
+                } else if let Some(collection_name) = name.strip_suffix(":*") {
+                    let collection_name = Name::try_new(collection_name).map_err(|e| {
+                        AllowlistEntryParseError::InvalidCollectionName(
+                            collection_name.to_string(),
+                            e,
+                        )
+                    })?;
+                    AllowlistMatcher::AnyChildInCollection(collection_name)
+                } else {
+                    let child_moniker = ChildMoniker::parse(name).map_err(|e| {
+                        AllowlistEntryParseError::InvalidChildMoniker(name.to_string(), e)
+                    })?;
+                    AllowlistMatcher::Exact(child_moniker)
+                }
+            }
+        };
+        parts.push(part);
+    }
+
+    Ok(AllowlistEntry { matchers: parts })
 }
 
 fn as_usize_or_default(value: Option<u32>, default: usize) -> usize {
@@ -894,14 +979,14 @@ mod tests {
                 security_policy: SecurityPolicy {
                     job_policy: JobPolicyAllowlists {
                         ambient_mark_vmo_exec: vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::root()),
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar"])),
+                            AllowlistEntryBuilder::new().build(),
+                            AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
                         ],
                         main_process_critical: vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["something", "important"])),
+                            AllowlistEntryBuilder::new().exact("something").exact("important").build(),
                         ],
                         create_raw_processes: vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["another", "thing"])),
+                            AllowlistEntryBuilder::new().exact("another").exact("thing").build(),
                         ],
                     },
                     capability_policy: HashMap::from_iter(vec![
@@ -912,9 +997,9 @@ mod tests {
                             capability: CapabilityTypeName::Protocol,
                         },
                         HashSet::from_iter(vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["bootstrap"])),
-                            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["core"])),
-                            AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["core", "test_manager"]), "tests".into()),
+                            AllowlistEntryBuilder::new().exact("bootstrap").build(),
+                            AllowlistEntryBuilder::new().exact("core").any_descendant(),
+                            AllowlistEntryBuilder::new().exact("core").exact("test_manager").any_descendant_in_collection("tests"),
                         ].iter().cloned())
                         ),
                         (CapabilityAllowlistKey {
@@ -924,8 +1009,8 @@ mod tests {
                             capability: CapabilityTypeName::Event,
                         },
                         HashSet::from_iter(vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar"])),
-                            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["foo", "bar"])),
+                            AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
+                            AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant(),
                         ].iter().cloned())
                         ),
                     ].iter().cloned()),
@@ -939,8 +1024,8 @@ mod tests {
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar", "baz"])),
-                                    AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar"])),
+                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").exact("baz").build(),
+                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
                                 )
                             ])
                         ),
@@ -953,8 +1038,8 @@ mod tests {
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo", "bar", "baz"])),
-                                    AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["foo"])),
+                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").exact("baz").build(),
+                                    AllowlistEntryBuilder::new().exact("foo").build(),
                                 )
                             ])
                         ),
@@ -967,8 +1052,8 @@ mod tests {
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["foo", "bar"])),
-                                    AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["foo"])),
+                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant(),
+                                    AllowlistEntryBuilder::new().exact("foo").any_descendant(),
                                 )
                             ])
                         ),
@@ -981,15 +1066,15 @@ mod tests {
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["foo", "bar"]), "coll".to_string()),
-                                    AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["root"])),
+                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant_in_collection("coll"),
+                                    AllowlistEntryBuilder::new().exact("root").build(),
                                 )
                             ])
                         ),
                     ]),
                     child_policy: ChildPolicyAllowlists {
                         reboot_on_terminate: vec![
-                            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["something", "important"])),
+                            AllowlistEntryBuilder::new().exact("something").exact("important").build(),
                         ],
                     },
                 },
@@ -1051,10 +1136,9 @@ mod tests {
                 reboot_on_terminate_enabled: None,
                 ..component_internal::Config::EMPTY
             },
-            AllowlistEntryError,
-            AllowlistEntryError::OtherInvalidMoniker(
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::NoLeadingSlash(
                 "bad".into(),
-                MonikerError::InvalidMoniker { rep: "bad".into()},
             )
         ),
         invalid_capability_policy_empty_allowlist_cap => (
@@ -1267,52 +1351,60 @@ mod tests {
             "/foo/**".into(),
             "/coll:**".into(),
             "/core/test_manager/tests:**".into(),
+            "/core/ffx-laboratory:*/echo_client".into(),
+            "/core/*/ffx-laboratory:*/**".into(),
+            "/core/*/bar".into(),
         ]), vec![
-            AllowlistEntry::Exact(AbsoluteMoniker::from(vec!["core"])),
-            AllowlistEntry::Realm(AbsoluteMoniker::root()),
-            AllowlistEntry::Realm(AbsoluteMoniker::from(vec!["foo"])),
-            AllowlistEntry::Collection(AbsoluteMoniker::root(), "coll".into()),
-            AllowlistEntry::Collection(AbsoluteMoniker::from(vec!["core", "test_manager"]), "tests".into())
+            AllowlistEntryBuilder::new().exact("core").build(),
+            AllowlistEntryBuilder::new().any_descendant(),
+            AllowlistEntryBuilder::new().exact("foo").any_descendant(),
+            AllowlistEntryBuilder::new().any_descendant_in_collection("coll"),
+            AllowlistEntryBuilder::new().exact("core").exact("test_manager").any_descendant_in_collection("tests"),
+            AllowlistEntryBuilder::new().exact("core").any_child_in_collection("ffx-laboratory").exact("echo_client").build(),
+            AllowlistEntryBuilder::new().exact("core").any_child().any_child_in_collection("ffx-laboratory").any_descendant(),
+            AllowlistEntryBuilder::new().exact("core").any_child().exact("bar").build(),
         ])
     }
 
     test_entries_err! {
         invalid_realm_entry => (
             &Some(vec!["/foo/**".into(), "bar/**".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::RealmEntryInvalidMoniker(
-                "bar/**".into(),
-                MonikerError::InvalidMoniker { rep: "bar".into() })),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::NoLeadingSlash("bar/**".into())),
         invalid_realm_in_collection_entry => (
             &Some(vec!["/foo/coll:**".into(), "bar/coll:**".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::CollectionEntryInvalidMoniker(
-                "bar/coll:**".into(),
-                MonikerError::InvalidMoniker { rep: "bar".into() })),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::NoLeadingSlash("bar/coll:**".into())),
         missing_realm_in_collection_entry => (
             &Some(vec!["coll:**".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::CollectionEntryMissingRealm("coll:**".into())),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::NoLeadingSlash("coll:**".into())),
         missing_collection_name => (
             &Some(vec!["/foo/coll:**".into(), "/:**".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::InvalidCollectionName(
-                "/:**".into(),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::InvalidCollectionName(
                 "".into(),
+                ParseError::InvalidLength
             )),
         invalid_collection_name => (
             &Some(vec!["/foo/coll:**".into(), "/*:**".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::InvalidCollectionName(
-                "/*:**".into(),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::InvalidCollectionName(
                 "*".into(),
+                ParseError::InvalidValue
             )),
         invalid_exact_entry => (
             &Some(vec!["/foo/bar*".into()]),
-            AllowlistEntryError,
-            AllowlistEntryError::OtherInvalidMoniker(
-                "/foo/bar*".into(),
-                MonikerError::InvalidMonikerPart { 0: ParseError::InvalidValue })),
-
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::InvalidChildMoniker(
+                "bar*".into(),
+                MonikerError::InvalidMonikerPart { 0: ParseError::InvalidValue }
+            )),
+        descendant_wildcard_in_between => (
+            &Some(vec!["/foo/**/bar".into()]),
+            AllowlistEntryParseError,
+            AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(
+                "/foo/**/bar".into(),
+            )),
     }
 }

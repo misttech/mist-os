@@ -184,7 +184,7 @@ mod tests {
         super::*,
         ::routing::{
             config::{
-                AllowlistEntry, ChildPolicyAllowlists, JobPolicyAllowlists, RuntimeConfig,
+                AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, RuntimeConfig,
                 SecurityPolicy,
             },
             policy::{PolicyError, ScopedPolicyChecker},
@@ -204,9 +204,15 @@ mod tests {
             Arc::new(RuntimeConfig {
                 security_policy: SecurityPolicy {
                     job_policy: JobPolicyAllowlists {
-                        ambient_mark_vmo_exec: vec![AllowlistEntry::Exact(TEST_MONIKER.clone())],
-                        main_process_critical: vec![AllowlistEntry::Exact(TEST_MONIKER.clone())],
-                        create_raw_processes: vec![AllowlistEntry::Exact(TEST_MONIKER.clone())],
+                        ambient_mark_vmo_exec: vec![
+                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
+                        ],
+                        main_process_critical: vec![
+                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
+                        ],
+                        create_raw_processes: vec![
+                            AllowlistEntryBuilder::build_exact_from_moniker(&TEST_MONIKER),
+                        ],
                     },
                     capability_policy: HashMap::new(),
                     debug_capability_policy: HashMap::new(),
