@@ -222,29 +222,18 @@ typedef struct magma_poll_item {
   uint32_t unused;
 } magma_poll_item_t;
 
-// A buffer plus its associated relocations referenced by a command buffer
+// A buffer referenced by a command buffer descriptor
 struct magma_exec_resource {
   uint64_t buffer_id;
   uint64_t offset;
   uint64_t length;
 };
 
+// A resource to be executed by a command buffer descriptor
 struct magma_exec_command_buffer {
   uint32_t resource_index;
   uint32_t unused;
   uint64_t start_offset;
-} __attribute__((__aligned__(8)));
-
-// A batch buffer to be executed plus the resources required to execute it
-// Ensure 8 byte alignment for semaphores and resources that may follow in a stream.
-// DEPRECATED - TODO(fxb/86670) remove
-struct magma_command_buffer {
-  uint32_t resource_count;
-  uint32_t batch_buffer_resource_index;  // resource index of the batch buffer to execute
-  uint64_t batch_start_offset;           // relative to the starting offset of the buffer
-  uint32_t wait_semaphore_count;
-  uint32_t signal_semaphore_count;
-  uint64_t flags;
 } __attribute__((__aligned__(8)));
 
 struct magma_command_descriptor {
@@ -295,18 +284,6 @@ enum MAGMA_MAP_FLAGS {
   MAGMA_MAP_FLAG_EXECUTE = (1 << 2),
   MAGMA_MAP_FLAG_GROWABLE = (1 << 3),
   MAGMA_MAP_FLAG_VENDOR_0 = (1 << MAGMA_MAP_FLAG_VENDOR_SHIFT),
-};
-
-// DEPRECATED. The top 16 bits are reserved for vendor-specific flags.
-#define MAGMA_GPU_MAP_FLAG_VENDOR_SHIFT MAGMA_MAP_FLAG_VENDOR_SHIFT
-
-// DEPRECATED.
-enum MAGMA_GPU_MAP_FLAGS {
-  MAGMA_GPU_MAP_FLAG_READ = MAGMA_MAP_FLAG_READ,
-  MAGMA_GPU_MAP_FLAG_WRITE = MAGMA_MAP_FLAG_WRITE,
-  MAGMA_GPU_MAP_FLAG_EXECUTE = MAGMA_MAP_FLAG_EXECUTE,
-  MAGMA_GPU_MAP_FLAG_GROWABLE = MAGMA_MAP_FLAG_GROWABLE,
-  MAGMA_GPU_MAP_FLAG_VENDOR_0 = MAGMA_MAP_FLAG_VENDOR_0,
 };
 
 typedef struct {
