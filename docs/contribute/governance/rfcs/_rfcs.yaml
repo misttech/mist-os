@@ -2655,3 +2655,17 @@
   reviewers: ['cpu@google.com', 'alexlegg@google.com', 'claridge@google.com', 'curtisgalloway@google.com', 'achyb@google.com']
   submitted: '2022-11-18'
   reviewed: '2022-12-15'
+
+- name: 'RFC-0204'
+  title: 'VMO Reference Child'
+  short_description: 'VMO child type for reference tracking.'
+  authors: ['rashaeqbal@google.com']
+  file: '0204_vmo_reference_child.md'
+  area: ['Kernel']
+  issue: ['81316']
+  gerrit_change_id: ['751426']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'cpu@google.com', 'godtamit@google.com']
+  consulted: ['brettw@google.com', 'cdrllrd@google.com', 'csuter@google.com', 'travisg@google.com']
+  submitted: '2023-01-04'
+  reviewed: '2023-01-03'
