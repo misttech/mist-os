@@ -9,7 +9,6 @@
 #include <lib/async/cpp/sequence_checker.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
-#include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/function.h>
@@ -50,6 +49,12 @@ namespace component {
 // are migrated to the new C++ bindings, that library will be removed.
 class OutgoingDirectory final {
  public:
+  // The name of the default FIDL Service instance.
+  static constexpr const char kDefaultServiceInstance[] = "default";
+
+  // The path referencing the outgoing services directory.
+  static constexpr const char kServiceDirectory[] = "svc";
+
   // Creates an OutgoingDirectory which will serve requests when
   // |Serve| or |ServeFromStartupInfo()| is called.
   //
@@ -134,7 +139,7 @@ class OutgoingDirectory final {
   template <typename Protocol, typename ServerImpl>
   zx::result<> AddProtocol(std::unique_ptr<ServerImpl> impl,
                            cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-    return AddProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(impl), name);
+    return AddProtocolAt<Protocol>(kServiceDirectory, std::move(impl), name);
   }
 
   // Same as |AddProtocol| except that a typed handler is used. The
@@ -152,7 +157,7 @@ class OutgoingDirectory final {
       cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
 
-    return AddUnmanagedProtocolAt<Protocol>(kServiceDirectoryWithNoSlash, std::move(handler), name);
+    return AddUnmanagedProtocolAt<Protocol>(kServiceDirectory, std::move(handler), name);
   }
 
   // Same as above but is untyped. This method is generally discouraged but
@@ -226,7 +231,7 @@ class OutgoingDirectory final {
   // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
   template <typename Service>
   zx::result<> AddService(ServiceInstanceHandler handler,
-                          cpp17::string_view instance = kDefaultInstance) {
+                          cpp17::string_view instance = kDefaultServiceInstance) {
     static_assert(fidl::IsService<Service>(), "Type of |Service| must be FIDL service");
 
     return AddService(std::move(handler), Service::Name, instance);
@@ -234,7 +239,7 @@ class OutgoingDirectory final {
 
   // Same as above but is untyped.
   zx::result<> AddService(ServiceInstanceHandler handler, cpp17::string_view service,
-                          cpp17::string_view instance = kDefaultInstance);
+                          cpp17::string_view instance = kDefaultServiceInstance);
 
   // Serve a subdirectory at the root of this outgoing directory.
   //
@@ -317,13 +322,13 @@ class OutgoingDirectory final {
   // outgoing.RemoveService<lib_example::MyService>("my-instance");
   // ```
   template <typename Service>
-  zx::result<> RemoveService(cpp17::string_view instance = kDefaultInstance) {
+  zx::result<> RemoveService(cpp17::string_view instance = kDefaultServiceInstance) {
     return RemoveService(Service::Name, instance);
   }
 
   // Same as above but untyped.
   zx::result<> RemoveService(cpp17::string_view service,
-                             cpp17::string_view instance = kDefaultInstance);
+                             cpp17::string_view instance = kDefaultServiceInstance);
 
   // Removes the subdirectory on the provided |directory_name|.
   //

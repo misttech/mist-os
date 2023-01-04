@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/svc/dir.h>
@@ -105,7 +104,7 @@ zx::result<> OutgoingDirectory::ServeFromStartupInfo() {
 }
 
 zx::result<> OutgoingDirectory::AddUnmanagedProtocol(AnyHandler handler, cpp17::string_view name) {
-  return AddUnmanagedProtocolAt(std::move(handler), kServiceDirectoryWithNoSlash, name);
+  return AddUnmanagedProtocolAt(std::move(handler), kServiceDirectory, name);
 }
 
 zx::result<> OutgoingDirectory::AddUnmanagedProtocolAt(AnyHandler handler, cpp17::string_view path,
@@ -202,7 +201,7 @@ zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler,
 }
 
 zx::result<> OutgoingDirectory::RemoveProtocol(cpp17::string_view name) {
-  return RemoveProtocolAt(kServiceDirectoryWithNoSlash, name);
+  return RemoveProtocolAt(kServiceDirectory, name);
 }
 
 zx::result<> OutgoingDirectory::RemoveProtocolAt(cpp17::string_view directory,
@@ -255,8 +254,8 @@ zx::result<> OutgoingDirectory::RemoveService(cpp17::string_view service,
 
   // Remove svc_dir_t entry first so that channels close _before_ we remove
   // pointer values out from underneath handlers.
-  std::string service_path = std::string(kServiceDirectoryWithNoSlash) +
-                             std::string(kSvcPathDelimiter) + std::string(service);
+  std::string service_path =
+      std::string(kServiceDirectory) + std::string(kSvcPathDelimiter) + std::string(service);
 #if __Fuchsia_API_level__ >= 10
   zx_status_t status = svc_directory_remove_entry(
       inner().root_, service_path.c_str(), service_path.size(), instance.data(), instance.size());
@@ -318,8 +317,7 @@ void OutgoingDirectory::UnbindAllConnections(cpp17::string_view name) {
 
 std::string OutgoingDirectory::MakePath(cpp17::string_view service, cpp17::string_view instance) {
   std::stringstream path;
-  path << kServiceDirectoryWithNoSlash << kSvcPathDelimiter << service << kSvcPathDelimiter
-       << instance;
+  path << kServiceDirectory << kSvcPathDelimiter << service << kSvcPathDelimiter << instance;
   return path.str();
 }
 
