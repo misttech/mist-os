@@ -206,7 +206,7 @@ impl H264EncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     fn get_frame_rate(&self) -> usize {

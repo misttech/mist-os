@@ -4,7 +4,6 @@
 
 use byteorder::{ByteOrder, NativeEndian};
 use fidl_fuchsia_media::*;
-use fuchsia_zircon as zx;
 use itertools::Itertools;
 use stream_processor_test::*;
 
@@ -45,7 +44,7 @@ impl PcmAudio {
         Self { pcm_format, buffer }
     }
 
-    pub fn create_from_data(pcm_format: PcmFormat, raw_data: Vec<i16>) -> Self {
+    pub fn create_from_data(pcm_format: PcmFormat, raw_data: &[i16]) -> Self {
         Self {
             pcm_format,
             buffer: raw_data.iter().flat_map(|pcm_sample| pcm_sample.to_ne_bytes()).collect(),
@@ -72,18 +71,16 @@ impl TimestampGenerator {
     }
 }
 
-#[allow(dead_code)]
-pub struct PcmAudioStream<I, E> {
+pub struct PcmAudioStream<I> {
     pub pcm_audio: PcmAudio,
-    pub encoder_settings: E,
+    pub encoder_settings: EncoderSettings,
     pub frames_per_packet: I,
     pub timebase: Option<u64>,
 }
 
-impl<I, E> PcmAudioStream<I, E>
+impl<I> PcmAudioStream<I>
 where
     I: Iterator<Item = usize> + Clone,
-    E: Fn() -> EncoderSettings,
 {
     pub fn bytes_per_second(&self) -> usize {
         self.pcm_audio.pcm_format.frames_per_second as usize
@@ -99,17 +96,16 @@ where
     }
 }
 
-impl<I, E> ElementaryStream for PcmAudioStream<I, E>
+impl<I> ElementaryStream for PcmAudioStream<I>
 where
     I: Iterator<Item = usize> + Clone,
-    E: Fn() -> EncoderSettings,
 {
     fn format_details(&self, format_details_version_ordinal: u64) -> FormatDetails {
         FormatDetails {
             domain: Some(DomainFormat::Audio(AudioFormat::Uncompressed(
                 AudioUncompressedFormat::Pcm(self.pcm_audio.pcm_format.clone()),
             ))),
-            encoder_settings: Some((self.encoder_settings)()),
+            encoder_settings: Some(self.encoder_settings.clone()),
             format_details_version_ordinal: Some(format_details_version_ordinal),
             mime_type: Some(String::from(PCM_MIME_TYPE)),
             oob_bytes: None,
@@ -161,82 +157,87 @@ where
     }
 }
 
-fn dummy_encode_settings() -> EncoderSettings {
+#[cfg(test)]
+mod test {
+    use super::*;
+    use fuchsia_zircon as zx;
+
     // Settings are arbitrary; we just need to construct an instance.
-    EncoderSettings::Sbc(SbcEncoderSettings {
+    const DUMMY_ENCODER_SETTINGS: EncoderSettings = EncoderSettings::Sbc(SbcEncoderSettings {
         sub_bands: SbcSubBands::SubBands8,
         allocation: SbcAllocation::AllocLoudness,
         block_count: SbcBlockCount::BlockCount16,
         channel_mode: SbcChannelMode::JointStereo,
         bit_pool: 59,
-    })
-}
+    });
 
-#[test]
-fn elementary_chunk_data() {
-    let pcm_format = PcmFormat {
-        pcm_mode: AudioPcmMode::Linear,
-        bits_per_sample: 16,
-        frames_per_second: 44100,
-        channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
-    };
-    let pcm_audio = PcmAudio::create_saw_wave(pcm_format, /*frame_count=*/ 100);
-
-    let stream = PcmAudioStream {
-        pcm_audio: pcm_audio.clone(),
-        encoder_settings: dummy_encode_settings,
-        frames_per_packet: (0..).map(|_| 40),
-        timebase: None,
-    };
-
-    let actual: Vec<u8> = stream.stream().flat_map(|chunk| chunk.data.clone()).collect();
-    assert_eq!(pcm_audio.buffer, actual);
-}
-
-#[test]
-fn saw_wave_matches_hash() {
-    use hex;
-    use mundane::hash::*;
-
-    /// This was obtained by writing the buffer out to file and inspecting the wave on each channel.
-    const GOLDEN_DIGEST: &str = "2bf4f233a179f0cb572b72570a28c07a334e406baa7fb4fc65f641b82d0ae64a";
-
-    let pcm_audio = PcmAudio::create_saw_wave(
-        PcmFormat {
+    #[fuchsia::test]
+    fn elementary_chunk_data() {
+        let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
             frames_per_second: 44100,
             channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
-        },
-        /*frame_count=*/ 50000,
-    );
+        };
+        let pcm_audio = PcmAudio::create_saw_wave(pcm_format, /*frame_count=*/ 100);
 
-    let actual_digest = hex::encode(Sha256::hash(&pcm_audio.buffer).bytes());
-    assert_eq!(&actual_digest, GOLDEN_DIGEST);
-}
+        let stream = PcmAudioStream {
+            pcm_audio: pcm_audio.clone(),
+            encoder_settings: DUMMY_ENCODER_SETTINGS,
+            frames_per_packet: (0..).map(|_| 40),
+            timebase: None,
+        };
 
-#[test]
-fn stream_timestamps() {
-    let pcm_format = PcmFormat {
-        pcm_mode: AudioPcmMode::Linear,
-        bits_per_sample: 16,
-        frames_per_second: 50,
-        channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
-    };
-    let pcm_audio = PcmAudio::create_saw_wave(pcm_format, /*frame_count=*/ 100);
+        let actual: Vec<u8> = stream.stream().flat_map(|chunk| chunk.data.clone()).collect();
+        assert_eq!(pcm_audio.buffer, actual);
+    }
 
-    let stream = PcmAudioStream {
-        pcm_audio: pcm_audio.clone(),
-        encoder_settings: dummy_encode_settings,
-        frames_per_packet: (0..).map(|_| 50),
-        timebase: Some(zx::Duration::from_seconds(1).into_nanos() as u64),
-    };
+    #[fuchsia::test]
+    fn saw_wave_matches_hash() {
+        use hex;
+        use mundane::hash::*;
 
-    let mut chunks = stream.stream();
+        /// This was obtained by writing the buffer out to file and inspecting the wave on each channel.
+        const GOLDEN_DIGEST: &str =
+            "2bf4f233a179f0cb572b72570a28c07a334e406baa7fb4fc65f641b82d0ae64a";
 
-    assert_eq!(chunks.next().and_then(|chunk| chunk.timestamp), Some(0));
-    assert_eq!(
-        chunks.next().and_then(|chunk| chunk.timestamp),
-        Some(zx::Duration::from_seconds(1).into_nanos() as u64)
-    );
+        let pcm_audio = PcmAudio::create_saw_wave(
+            PcmFormat {
+                pcm_mode: AudioPcmMode::Linear,
+                bits_per_sample: 16,
+                frames_per_second: 44100,
+                channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
+            },
+            /*frame_count=*/ 50000,
+        );
+
+        let actual_digest = hex::encode(Sha256::hash(&pcm_audio.buffer).bytes());
+        assert_eq!(&actual_digest, GOLDEN_DIGEST);
+    }
+
+    #[fuchsia::test]
+    fn stream_timestamps() {
+        let pcm_format = PcmFormat {
+            pcm_mode: AudioPcmMode::Linear,
+            bits_per_sample: 16,
+            frames_per_second: 50,
+            channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
+        };
+        let pcm_audio = PcmAudio::create_saw_wave(pcm_format, /*frame_count=*/ 100);
+
+        let stream = PcmAudioStream {
+            pcm_audio: pcm_audio.clone(),
+            encoder_settings: DUMMY_ENCODER_SETTINGS,
+            frames_per_packet: (0..).map(|_| 50),
+            timebase: Some(zx::Duration::from_seconds(1).into_nanos() as u64),
+        };
+
+        let mut chunks = stream.stream();
+
+        assert_eq!(chunks.next().and_then(|chunk| chunk.timestamp), Some(0));
+        assert_eq!(
+            chunks.next().and_then(|chunk| chunk.timestamp),
+            Some(zx::Duration::from_seconds(1).into_nanos() as u64)
+        );
+    }
 }

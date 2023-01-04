@@ -10,6 +10,7 @@ use fidl_table_validation::*;
 use fuchsia_stream_processors::*;
 use hex::{decode, encode};
 use mundane::hash::{Digest, Hasher, Sha256};
+use num_traits::PrimInt;
 use std::io::Write;
 use std::{convert::TryInto, fmt, rc::Rc};
 
@@ -85,6 +86,34 @@ impl OutputValidator for OutputPacketCountValidator {
     }
 }
 
+/// Validates that the output contains the expected number of bytes.
+pub struct OutputDataSizeValidator {
+    pub expected_output_data_size: usize,
+}
+
+#[async_trait(?Send)]
+impl OutputValidator for OutputDataSizeValidator {
+    async fn validate(&self, output: &[Output]) -> Result<(), Error> {
+        let actual_output_data_size: usize = output
+            .iter()
+            .map(|output| match output {
+                Output::Packet(p) => p.data.len(),
+                _ => 0,
+            })
+            .sum();
+
+        if actual_output_data_size != self.expected_output_data_size {
+            return Err(FatalError(format!(
+                "actual output data size: {}; expected output data size: {}",
+                actual_output_data_size, self.expected_output_data_size
+            ))
+            .into());
+        }
+
+        Ok(())
+    }
+}
+
 /// Validates that a stream terminates with Eos.
 pub struct TerminatesWithValidator {
     pub expected_terminal_output: Output,
@@ -147,7 +176,7 @@ pub struct BytesValidator {
 impl BytesValidator {
     fn write_and_hash(
         &self,
-        mut file: impl Write,
+        mut writer: impl Write,
         oob: &[u8],
         packets: &[&OutputPacket],
     ) -> Result<(), Error> {
@@ -156,7 +185,7 @@ impl BytesValidator {
         hasher.update(oob);
 
         for packet in packets {
-            file.write_all(&packet.data)?;
+            writer.write_all(&packet.data)?;
             hasher.update(&packet.data);
         }
 
@@ -173,14 +202,14 @@ impl BytesValidator {
 
         Ok(())
     }
+}
 
-    fn output_file(&self) -> Result<impl Write, Error> {
-        Ok(if let Some(file) = self.output_file {
-            Box::new(std::fs::File::create(file)?) as Box<dyn Write>
-        } else {
-            Box::new(std::io::sink()) as Box<dyn Write>
-        })
-    }
+fn output_writer(output_file: Option<&'static str>) -> Result<impl Write, Error> {
+    Ok(if let Some(file) = output_file {
+        Box::new(std::fs::File::create(file)?) as Box<dyn Write>
+    } else {
+        Box::new(std::io::sink()) as Box<dyn Write>
+    })
 }
 
 #[async_trait(?Send)]
@@ -196,7 +225,7 @@ impl OutputValidator for BytesValidator {
             .clone()
             .unwrap_or(vec![]);
 
-        self.write_and_hash(self.output_file()?, oob.as_slice(), &packets)
+        self.write_and_hash(output_writer(self.output_file)?, oob.as_slice(), &packets)
     }
 }
 
@@ -262,5 +291,92 @@ impl fmt::Debug for ExpectedDigest {
         write!(w, "\tlabel: {}", self.label)?;
         write!(w, "\tbytes: {}", encode(self.bytes))?;
         write!(w, "}}")
+    }
+}
+
+/// Validates that the RMSE of output data and the expected data
+/// falls within an acceptable range.
+#[allow(unused)]
+pub struct RmseValidator<T> {
+    pub output_file: Option<&'static str>,
+    pub expected_data: Vec<T>,
+    pub expected_rmse: f64,
+    // By how much percentage should we allow the calculated RMSE value to
+    // differ from the expected RMSE.
+    pub rmse_diff_tolerance: f64,
+    pub data_len_diff_tolerance: u32,
+    pub output_converter: fn(Vec<u8>) -> Vec<T>,
+}
+
+pub fn calculate_rmse<T: PrimInt + std::fmt::Debug>(
+    expected_data: &[T],
+    actual_data: &[T],
+    acceptable_len_diff: u32,
+) -> Result<f64, Error> {
+    // There could be a slight difference to the length of the expected data
+    // and the actual data due to the way some codecs deal with left over data
+    // at the end of the stream. This can be caused by minimum block size and
+    // how some codecs may choose to pad out the last block or insert a silence
+    // data at the start. Ensure the difference in length between expected and
+    // actual data is not too much.
+    let compare_len = std::cmp::min(expected_data.len(), actual_data.len());
+    if std::cmp::max(expected_data.len(), actual_data.len()) - compare_len
+        > acceptable_len_diff.try_into().unwrap()
+    {
+        return Err(FatalError(format!(
+            "Expected data (len {}) and the actual data (len {}) have significant length difference and cannot be compared.",
+            expected_data.len(), actual_data.len(),
+        )).into());
+    }
+    let expected_data = &expected_data[..compare_len];
+    let actual_data = &actual_data[..compare_len];
+
+    let mut rmse = 0.0;
+    let mut n = 0;
+    for data in std::iter::zip(actual_data.iter(), expected_data.iter()) {
+        let b1: f64 = num_traits::cast::cast(*data.0).unwrap();
+        let b2: f64 = num_traits::cast::cast(*data.1).unwrap();
+        rmse += (b1 - b2).powi(2);
+        n += 1;
+    }
+    Ok((rmse / n as f64).sqrt())
+}
+
+impl<T: PrimInt + std::fmt::Debug> RmseValidator<T> {
+    fn write_and_calc_rsme(
+        &self,
+        mut writer: impl Write,
+        packets: &[&OutputPacket],
+    ) -> Result<(), Error> {
+        let mut output_data: Vec<u8> = Vec::new();
+        for packet in packets {
+            writer.write_all(&packet.data)?;
+            packet.data.iter().for_each(|item| output_data.push(*item));
+        }
+
+        let actual_data = (self.output_converter)(output_data);
+
+        let rmse = calculate_rmse(
+            self.expected_data.as_slice(),
+            actual_data.as_slice(),
+            self.data_len_diff_tolerance,
+        )?;
+        info!("RMSE is {}", rmse);
+        if (rmse - self.expected_rmse).abs() > self.rmse_diff_tolerance {
+            return Err(FatalError(format!(
+                "expected rmse: {}; actual rmse: {}; rmse diff tolerance {}",
+                self.expected_rmse, rmse, self.rmse_diff_tolerance,
+            ))
+            .into());
+        }
+        Ok(())
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: PrimInt + std::fmt::Debug> OutputValidator for RmseValidator<T> {
+    async fn validate(&self, output: &[Output]) -> Result<(), Error> {
+        let packets: Vec<&OutputPacket> = output_packets(output).collect();
+        self.write_and_calc_rsme(output_writer(self.output_file)?, &packets)
     }
 }

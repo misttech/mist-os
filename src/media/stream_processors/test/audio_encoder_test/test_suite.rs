@@ -17,7 +17,7 @@ pub const TEST_PCM_FRAME_COUNT: usize = 3000;
 pub struct AudioEncoderTestCase {
     /// Encoder settings.
     // This is a function because FIDL unions are not Copy or Clone.
-    pub settings: Rc<dyn Fn() -> EncoderSettings>,
+    pub settings: EncoderSettings,
     /// The number of PCM input frames per encoded frame.
     pub input_framelength: usize,
     pub channel_count: usize,
@@ -75,7 +75,7 @@ impl AudioEncoderTestCase {
             let pcm_audio = hash_test.input_audio;
             let stream = Rc::new(PcmAudioStream {
                 pcm_audio,
-                encoder_settings: move || (settings)(),
+                encoder_settings: settings.clone(),
                 frames_per_packet: (0..).map(move |_| easy_framelength),
                 timebase: None,
             });
@@ -107,7 +107,7 @@ impl AudioEncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     async fn test_termination(&self) -> Result<()> {
@@ -130,7 +130,7 @@ impl AudioEncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     async fn test_early_termination(&self) -> Result<()> {
@@ -169,7 +169,7 @@ impl AudioEncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     async fn test_timestamps(&self) -> Result<()> {
@@ -226,13 +226,13 @@ impl AudioEncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     fn create_test_stream(
         &self,
         frames_per_packet: impl Iterator<Item = usize> + Clone,
-    ) -> Rc<PcmAudioStream<impl Iterator<Item = usize> + Clone, impl Fn() -> EncoderSettings>> {
+    ) -> Rc<PcmAudioStream<impl Iterator<Item = usize> + Clone>> {
         let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
@@ -247,7 +247,7 @@ impl AudioEncoderTestCase {
         let settings = self.settings.clone();
         Rc::new(PcmAudioStream {
             pcm_audio,
-            encoder_settings: move || (settings)(),
+            encoder_settings: settings.clone(),
             frames_per_packet: frames_per_packet,
             timebase: Some(zx::Duration::from_seconds(1).into_nanos() as u64),
         })

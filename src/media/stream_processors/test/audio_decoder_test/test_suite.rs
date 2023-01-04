@@ -62,6 +62,6 @@ impl AudioDecoderTestCase {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 }

@@ -95,7 +95,7 @@ fn test_bear() -> std::result::Result<(), ::anyhow::Error> {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }
 
@@ -149,7 +149,7 @@ fn test_serial_bear_on_same_codec() -> std::result::Result<(), ::anyhow::Error> 
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }
 
@@ -192,7 +192,7 @@ fn bear_with_sei_itu_t35() -> Result<(), anyhow::Error> {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }
 
@@ -238,7 +238,7 @@ fn bear_with_large_sei_itu_t35() -> Result<(), anyhow::Error> {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }
 
@@ -277,7 +277,7 @@ fn bear_with_gaps() -> Result<(), anyhow::Error> {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }
 
@@ -314,6 +314,6 @@ fn test_bear_avcc() -> std::result::Result<(), ::anyhow::Error> {
             stream_processor_factory: Rc::new(DecoderFactory),
         };
 
-        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run())
+        fuchsia_async::TestExecutor::new()?.run_singlethreaded(spec.run()).map(|_| ())
     })
 }

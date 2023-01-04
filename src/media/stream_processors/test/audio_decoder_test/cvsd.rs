@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use fidl::encoding::Decodable;
 use fidl_fuchsia_media::*;
+use std::{fs, io, path::Path};
 use stream_processor_test::*;
 
 /// Represents an CVSD elementary stream.
@@ -12,6 +13,10 @@ pub struct CvsdStream {
 }
 
 impl CvsdStream {
+    /// Constructs an CVSD elementary stream from a file with raw elementary stream data.
+    pub fn from_file(filename: impl AsRef<Path>, chunk_frames: usize) -> io::Result<Self> {
+        Ok(CvsdStream { data: fs::read(filename)?, chunk_frames })
+    }
     /// Constructs an CVSD elementary stream from raw data.
     pub fn from_data(data: Vec<u8>, chunk_frames: usize) -> Self {
         CvsdStream { data, chunk_frames }

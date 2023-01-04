@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem as sysmem;
 use fuchsia_zircon as zx;
-use log::*;
 use std::io::Write;
 use std::rc::Rc;
 use stream_processor_encoder_factory::*;
@@ -121,7 +120,7 @@ impl H265EncoderTestCase {
             stream_processor_factory: Rc::new(EncoderFactory),
         };
 
-        spec.run().await
+        spec.run().await.map(|_| ())
     }
 
     fn get_frame_rate(&self) -> usize {
