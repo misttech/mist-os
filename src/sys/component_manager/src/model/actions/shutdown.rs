@@ -888,7 +888,7 @@ mod tests {
     /// Returns a `ComponentRef` for a child by parsing the moniker. Panics if
     /// the moniker is malformed.
     fn child(moniker: &str) -> ComponentRef {
-        ChildMoniker::from(moniker).into()
+        ChildMoniker::try_from(moniker).unwrap().into()
     }
 
     #[fuchsia::test]
@@ -1135,8 +1135,14 @@ mod tests {
                 // NOTE: The environment must be set in the `Child`, even though
                 // it can theoretically be inferred from the collection
                 // declaration.
-                Child { moniker: "coll:dyn1".into(), environment_name: Some("env".to_string()) },
-                Child { moniker: "coll:dyn2".into(), environment_name: Some("env".to_string()) },
+                Child {
+                    moniker: "coll:dyn1".try_into().unwrap(),
+                    environment_name: Some("env".to_string()),
+                },
+                Child {
+                    moniker: "coll:dyn2".try_into().unwrap(),
+                    environment_name: Some("env".to_string()),
+                },
             ],
             dynamic_offers: vec![],
         };
@@ -1411,11 +1417,11 @@ mod tests {
                 // NOTE: The environment must be set in the `Child`, even though
                 // it can theoretically be inferred from the collection declaration.
                 Child {
-                    moniker: "coll:dyn1".into(),
+                    moniker: "coll:dyn1".try_into().unwrap(),
                     environment_name: Some("resolver_env".to_string()),
                 },
                 Child {
-                    moniker: "coll:dyn2".into(),
+                    moniker: "coll:dyn2".try_into().unwrap(),
                     environment_name: Some("resolver_env".to_string()),
                 },
             ],
@@ -1460,10 +1466,10 @@ mod tests {
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
-                Child { moniker: "coll:dyn1".into(), environment_name: None },
-                Child { moniker: "coll:dyn2".into(), environment_name: None },
-                Child { moniker: "coll:dyn3".into(), environment_name: None },
-                Child { moniker: "coll:dyn4".into(), environment_name: None },
+                Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn3".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn4".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
@@ -1531,10 +1537,10 @@ mod tests {
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
-                Child { moniker: "coll1:dyn1".into(), environment_name: None },
-                Child { moniker: "coll1:dyn2".into(), environment_name: None },
-                Child { moniker: "coll2:dyn1".into(), environment_name: None },
-                Child { moniker: "coll2:dyn2".into(), environment_name: None },
+                Child { moniker: "coll1:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll1:dyn2".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll2:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll2:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
@@ -1591,8 +1597,8 @@ mod tests {
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
-                Child { moniker: "coll:dyn1".into(), environment_name: None },
-                Child { moniker: "coll:dyn2".into(), environment_name: None },
+                Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
@@ -1626,8 +1632,8 @@ mod tests {
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
-                Child { moniker: "coll:dyn1".into(), environment_name: None },
-                Child { moniker: "coll:dyn2".into(), environment_name: None },
+                Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
@@ -1666,8 +1672,8 @@ mod tests {
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
-                Child { moniker: "coll:dyn1".into(), environment_name: None },
-                Child { moniker: "coll:dyn2".into(), environment_name: None },
+                Child { moniker: "coll:dyn1".try_into().unwrap(), environment_name: None },
+                Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Child(ChildRef {
@@ -3039,7 +3045,7 @@ mod tests {
             let state = component_a.lock_state().await;
             match *state {
                 InstanceState::Resolved(ref s) => {
-                    s.get_child(&"b".into()).expect("child b not found").clone()
+                    s.get_child(&"b".try_into().unwrap()).expect("child b not found").clone()
                 }
                 _ => panic!("not resolved"),
             }

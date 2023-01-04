@@ -588,9 +588,9 @@ mod tests {
         // Verify that the component topology matches expectations.
         let actual_children = get_live_children(test.component()).await;
         let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
-        expected_children.insert("coll:a".into());
-        expected_children.insert("coll:b".into());
-        expected_children.insert(format!("coll:{}", long_name).as_str().into());
+        expected_children.insert("coll:a".try_into().unwrap());
+        expected_children.insert("coll:b".try_into().unwrap());
+        expected_children.insert(format!("coll:{}", long_name).as_str().try_into().unwrap());
         assert_eq!(actual_children, expected_children);
         assert_eq!(format!("(system(coll:a,coll:b,coll:{}))", long_name), test.hook.print());
     }
@@ -1045,7 +1045,7 @@ mod tests {
         {
             let actual_children = get_live_children(test.component()).await;
             let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
-            expected_children.insert("coll:b".into());
+            expected_children.insert("coll:b".try_into().unwrap());
             let child_b = get_live_child(test.component(), "coll:b").await;
             assert!(!execution_is_shut_down(&child_b).await);
             assert_eq!(actual_children, expected_children);

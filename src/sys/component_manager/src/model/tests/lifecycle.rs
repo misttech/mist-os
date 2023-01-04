@@ -175,8 +175,8 @@ async fn bind_parent_then_child() {
     // Validate children. system is resolved, but not echo.
     let actual_children = get_live_children(&*model.root()).await;
     let mut expected_children: HashSet<ChildMoniker> = HashSet::new();
-    expected_children.insert("system".into());
-    expected_children.insert("echo".into());
+    expected_children.insert("system".try_into().unwrap());
+    expected_children.insert("echo".try_into().unwrap());
     assert_eq!(actual_children, expected_children);
 
     let system_component = get_live_child(&*model.root(), "system").await;
@@ -295,7 +295,7 @@ async fn bind_eager_children() {
 
     // Start the top component, and check that it and the eager components were started.
     {
-        let m = AbsoluteMoniker::new(vec!["a".into()]);
+        let m = AbsoluteMoniker::parse_str("/a").unwrap();
         let res = model.start_instance(&m, &StartReason::Root).await;
         assert!(res.is_ok());
         mock_runner
@@ -364,7 +364,7 @@ async fn bind_eager_children_reentrant() {
     // Start the top component, and check that it and the eager components were started.
     {
         let (f, bind_handle) = async move {
-            let m = AbsoluteMoniker::new(vec!["a".into()]);
+            let m = AbsoluteMoniker::parse_str("/a").unwrap();
             model.start_instance(&m, &StartReason::Root).await
         }
         .remote_handle();
@@ -420,7 +420,7 @@ async fn bind_action_sequence() {
         .expect("subscribe to event stream");
 
     // Child of root should start out discovered but not resolved yet.
-    let m = AbsoluteMoniker::new(vec!["system".into()]);
+    let m = AbsoluteMoniker::parse_str("/system").unwrap();
     model.start().await;
     event_stream.wait_until(EventType::Resolved, vec![].into()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();

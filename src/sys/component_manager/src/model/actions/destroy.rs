@@ -170,9 +170,12 @@ pub mod tests {
             .await
             .expect("shutdown failed");
         // Register destroy child action, and wait for it. Component should be destroyed.
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
         {
             let events: Vec<_> = test
@@ -197,9 +200,12 @@ pub mod tests {
             .expect_err("successfully bound to a after shutdown");
 
         // Destroy the component again. This succeeds, but has no additional effect.
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
     }
 
@@ -240,9 +246,12 @@ pub mod tests {
 
         // Register destroy child action, and wait for it. Components should be destroyed.
         let component_container = test.look_up(vec!["container"].into()).await;
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("container".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("container".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(is_child_deleted(&component_root, &component_container).await);
         assert!(is_destroyed(&component_container).await);
         assert!(is_destroyed(&component_a).await);
@@ -270,9 +279,12 @@ pub mod tests {
         assert!(execution_is_shut_down(&component_b.clone()).await);
 
         // Now delete child "a". This should cause all components to be destroyed.
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
         assert!(is_destroyed(&component_a).await);
 
@@ -357,9 +369,10 @@ pub mod tests {
 
         let component_root = test.model.root().clone();
         let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildMoniker::from("a")).expect("child a not found").clone()
-            }
+            InstanceState::Resolved(ref s) => s
+                .get_child(&ChildMoniker::try_from("a").unwrap())
+                .expect("child a not found")
+                .clone(),
             _ => panic!("not resolved"),
         };
 
@@ -376,7 +389,10 @@ pub mod tests {
         // This eventually leads to a destroy action on `a`.
         let destroy_child_fut = {
             let mut actions = component_root.lock_actions().await;
-            actions.register_no_wait(&component_root, DestroyChildAction::new("a".into(), 0))
+            actions.register_no_wait(
+                &component_root,
+                DestroyChildAction::new("a".try_into().unwrap(), 0),
+            )
         };
 
         // Check that the destroy action is waiting on the mock action.
@@ -477,9 +493,10 @@ pub mod tests {
         // Shut down component so we can destroy it.
         let component_root = test.look_up(vec![].into()).await;
         let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildMoniker::from("a")).expect("child a not found").clone()
-            }
+            InstanceState::Resolved(ref s) => s
+                .get_child(&ChildMoniker::try_from("a").unwrap())
+                .expect("child a not found")
+                .clone(),
             _ => panic!("not resolved"),
         };
         ActionSet::register(component_a.clone(), ShutdownAction::new())
@@ -495,7 +512,10 @@ pub mod tests {
         // Register DestroyChild.
         let nf = {
             let mut actions = component_root.lock_actions().await;
-            actions.register_no_wait(&component_root, DestroyChildAction::new("a".into(), 0))
+            actions.register_no_wait(
+                &component_root,
+                DestroyChildAction::new("a".try_into().unwrap(), 0),
+            )
         };
 
         // Wait for Discover action, which should be registered by Destroy, followed by
@@ -524,9 +544,10 @@ pub mod tests {
         assert!(is_executing(&component_a).await);
         // Get component_b without resolving it.
         let component_b = match *component_a.lock_state().await {
-            InstanceState::Resolved(ref s) => {
-                s.get_child(&ChildMoniker::from("b")).expect("child b not found").clone()
-            }
+            InstanceState::Resolved(ref s) => s
+                .get_child(&ChildMoniker::try_from("b").unwrap())
+                .expect("child b not found")
+                .clone(),
             _ => panic!("not resolved"),
         };
 
@@ -534,9 +555,12 @@ pub mod tests {
         ActionSet::register(component_a.clone(), ShutdownAction::new())
             .await
             .expect("shutdown failed");
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
         assert!(is_destroyed(&component_b).await);
 
@@ -609,9 +633,12 @@ pub mod tests {
         ActionSet::register(component_a.clone(), ShutdownAction::new())
             .await
             .expect("shutdown failed");
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("delete child failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("delete child failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
@@ -627,7 +654,7 @@ pub mod tests {
                     panic!("not resolved");
                 }
             };
-            assert_eq!(children, vec!["x".into()]);
+            assert_eq!(children, vec!["x".try_into().unwrap()]);
         }
         {
             let mut events: Vec<_> = test
@@ -721,9 +748,12 @@ pub mod tests {
         ActionSet::register(component_a.clone(), ShutdownAction::new())
             .await
             .expect("shutdown failed");
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("delete child failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("delete child failed");
         assert!(is_child_deleted(&component_root, &component_a).await);
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
@@ -807,9 +837,12 @@ pub mod tests {
             );
         }
 
-        ActionSet::register(component_b.clone(), DestroyChildAction::new("d".into(), 0))
-            .await
-            .expect_err("d's destroy succeeded unexpectedly");
+        ActionSet::register(
+            component_b.clone(),
+            DestroyChildAction::new("d".try_into().unwrap(), 0),
+        )
+        .await
+        .expect_err("d's destroy succeeded unexpectedly");
 
         // Register delete action on "a", and wait for it. but "d"
         // returns an error so the delete action on "a" does not succeed.
@@ -817,9 +850,12 @@ pub mod tests {
         // In this state, "d" is marked destroyed but hasn't been removed from the
         // children list of "b". "c" is destroyed and has been removed from the children
         // list of "b".
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect_err("destroy succeeded unexpectedly");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect_err("destroy succeeded unexpectedly");
         assert!(has_child(&component_root, "a").await);
         assert!(has_child(&component_a, "b").await);
         assert!(!has_child(&component_b, "c").await);
@@ -850,9 +886,12 @@ pub mod tests {
 
         // Register destroy action on "a" again. "d"'s delete succeeds, and "a" is deleted
         // this time.
-        ActionSet::register(component_root.clone(), DestroyChildAction::new("a".into(), 0))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            component_root.clone(),
+            DestroyChildAction::new("a".try_into().unwrap(), 0),
+        )
+        .await
+        .expect("destroy failed");
         assert!(!has_child(&component_root, "a").await);
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
@@ -909,11 +948,11 @@ pub mod tests {
         let component_root = test.look_up(vec![].into()).await;
         let destroy_fut_1 = ActionSet::register(
             component_root.clone(),
-            DestroyChildAction::new("coll:a".into(), 1),
+            DestroyChildAction::new("coll:a".try_into().unwrap(), 1),
         );
         let destroy_fut_2 = ActionSet::register(
             component_root.clone(),
-            DestroyChildAction::new("coll:a".into(), 1),
+            DestroyChildAction::new("coll:a".try_into().unwrap(), 1),
         );
 
         let component_a = test.look_up(vec!["coll:a"].into()).await;

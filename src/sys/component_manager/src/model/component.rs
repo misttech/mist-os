@@ -2903,14 +2903,14 @@ pub mod tests {
         assert_eq!(
             vec![
                 shutdown::Child {
-                    moniker: "a".into(),
+                    moniker: "a".try_into().unwrap(),
                     environment_name: Some("env_a".to_string()),
                 },
                 shutdown::Child {
-                    moniker: "b".into(),
+                    moniker: "b".try_into().unwrap(),
                     environment_name: Some("env_b".to_string()),
                 },
-                shutdown::Child { moniker: "c".into(), environment_name: None },
+                shutdown::Child { moniker: "c".try_into().unwrap(), environment_name: None },
             ],
             children
         );
@@ -3014,14 +3014,20 @@ pub mod tests {
             pretty_assertions::assert_eq!(
                 vec![
                     shutdown::Child {
-                        moniker: "a".into(),
+                        moniker: "a".try_into().unwrap(),
                         environment_name: Some("env_a".to_string()),
                     },
-                    shutdown::Child { moniker: "b".into(), environment_name: None },
-                    shutdown::Child { moniker: "coll_1:a".into(), environment_name: None },
-                    shutdown::Child { moniker: "coll_1:b".into(), environment_name: None },
+                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
-                        moniker: "coll_2:a".into(),
+                        moniker: "coll_1:a".try_into().unwrap(),
+                        environment_name: None
+                    },
+                    shutdown::Child {
+                        moniker: "coll_1:b".try_into().unwrap(),
+                        environment_name: None
+                    },
+                    shutdown::Child {
+                        moniker: "coll_2:a".try_into().unwrap(),
                         environment_name: Some("env_b".to_string()),
                     },
                 ],
@@ -3034,9 +3040,12 @@ pub mod tests {
         }
 
         // Destroy `coll_1:b`. It should not be listed. The dynamic offer should be deleted.
-        ActionSet::register(root_component.clone(), DestroyChildAction::new("coll_1:b".into(), 2))
-            .await
-            .expect("destroy failed");
+        ActionSet::register(
+            root_component.clone(),
+            DestroyChildAction::new("coll_1:b".try_into().unwrap(), 2),
+        )
+        .await
+        .expect("destroy failed");
 
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
@@ -3046,13 +3055,16 @@ pub mod tests {
             pretty_assertions::assert_eq!(
                 vec![
                     shutdown::Child {
-                        moniker: "a".into(),
+                        moniker: "a".try_into().unwrap(),
                         environment_name: Some("env_a".to_string()),
                     },
-                    shutdown::Child { moniker: "b".into(), environment_name: None },
-                    shutdown::Child { moniker: "coll_1:a".into(), environment_name: None },
+                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
-                        moniker: "coll_2:a".into(),
+                        moniker: "coll_1:a".try_into().unwrap(),
+                        environment_name: None
+                    },
+                    shutdown::Child {
+                        moniker: "coll_2:a".try_into().unwrap(),
                         environment_name: Some("env_b".to_string()),
                     },
                 ],
@@ -3110,14 +3122,20 @@ pub mod tests {
             pretty_assertions::assert_eq!(
                 vec![
                     shutdown::Child {
-                        moniker: "a".into(),
+                        moniker: "a".try_into().unwrap(),
                         environment_name: Some("env_a".to_string()),
                     },
-                    shutdown::Child { moniker: "b".into(), environment_name: None },
-                    shutdown::Child { moniker: "coll_1:a".into(), environment_name: None },
-                    shutdown::Child { moniker: "coll_1:b".into(), environment_name: None },
+                    shutdown::Child { moniker: "b".try_into().unwrap(), environment_name: None },
                     shutdown::Child {
-                        moniker: "coll_2:a".into(),
+                        moniker: "coll_1:a".try_into().unwrap(),
+                        environment_name: None
+                    },
+                    shutdown::Child {
+                        moniker: "coll_1:b".try_into().unwrap(),
+                        environment_name: None
+                    },
+                    shutdown::Child {
+                        moniker: "coll_2:a".try_into().unwrap(),
                         environment_name: Some("env_b".to_string()),
                     },
                 ],

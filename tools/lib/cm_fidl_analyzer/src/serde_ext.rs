@@ -43,15 +43,13 @@ impl<'de> Visitor<'de> for NodePathVisitor {
         Ok(NodePath::new(
             value
                 .split("/")
-                .filter_map(
-                    |component| {
-                        if component.is_empty() {
-                            None
-                        } else {
-                            Some(component.into())
-                        }
-                    },
-                )
+                .filter_map(|component| {
+                    if component.is_empty() {
+                        None
+                    } else {
+                        Some(component.try_into().unwrap())
+                    }
+                })
                 .collect(),
         ))
     }

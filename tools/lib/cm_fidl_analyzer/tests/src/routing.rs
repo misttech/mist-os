@@ -2489,7 +2489,7 @@ mod tests {
                     AnalyzerModelError::RoutingError(
                         RoutingError::ExposeFromChildInstanceNotFound {
                             capability_id: "bad_protocol".to_string(),
-                            child_moniker: "c".into(),
+                            child_moniker: "c".try_into().unwrap(),
                             moniker: b_component.abs_moniker().clone(),
                         },
                     )
@@ -2606,7 +2606,7 @@ mod tests {
                     AnalyzerModelError::RoutingError(
                         RoutingError::OfferFromChildInstanceNotFound {
                             capability_id: "fuchsia.examples.Echo".to_string(),
-                            child_moniker: "c".into(),
+                            child_moniker: "c".try_into().unwrap(),
                             moniker: root_component.abs_moniker().clone(),
                         },
                     )

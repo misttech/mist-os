@@ -1229,7 +1229,7 @@ async fn destroying_instance_kills_framework_service_task() {
 
     // Destroy `b`. This should cause the task hosted for `Realm` to be cancelled.
     let root = test.model.look_up(&vec![].into()).await.unwrap();
-    ActionSet::register(root.clone(), DestroyChildAction::new("b".into(), 0))
+    ActionSet::register(root.clone(), DestroyChildAction::new("b".try_into().unwrap(), 0))
         .await
         .expect("destroy failed");
     let mut event_stream = proxy.take_event_stream();
@@ -1339,7 +1339,8 @@ async fn destroying_instance_blocks_on_routing() {
     // Destroy `b`.
     let root = test.model.look_up(&vec![].into()).await.unwrap();
     let mut actions = root.lock_actions().await;
-    let destroy_nf = actions.register_no_wait(&root, DestroyChildAction::new("b".into(), 0));
+    let destroy_nf =
+        actions.register_no_wait(&root, DestroyChildAction::new("b".try_into().unwrap(), 0));
     drop(actions);
 
     // Give the destroy action some time to complete. Sleeping is not an ideal testing strategy,

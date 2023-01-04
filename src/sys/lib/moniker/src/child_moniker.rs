@@ -72,9 +72,11 @@ impl ChildMoniker {
     }
 }
 
-impl From<&str> for ChildMoniker {
-    fn from(rep: &str) -> Self {
-        ChildMoniker::parse(rep).expect(&format!("child moniker failed to parse: {}", rep))
+impl TryFrom<&str> for ChildMoniker {
+    type Error = MonikerError;
+
+    fn try_from(rep: &str) -> Result<Self, MonikerError> {
+        ChildMoniker::parse(rep)
     }
 }
 
@@ -113,13 +115,13 @@ mod tests {
         assert_eq!("test", m.name());
         assert_eq!(None, m.collection());
         assert_eq!("test", format!("{}", m));
-        assert_eq!(m, ChildMoniker::from("test"));
+        assert_eq!(m, ChildMoniker::try_from("test").unwrap());
 
         let m = ChildMoniker::try_new("test", Some("coll")).unwrap();
         assert_eq!("test", m.name());
         assert_eq!(Some("coll"), m.collection());
         assert_eq!("coll:test", format!("{}", m));
-        assert_eq!(m, ChildMoniker::from("coll:test"));
+        assert_eq!(m, ChildMoniker::try_from("coll:test").unwrap());
 
         let max_coll_length_part = "f".repeat(MAX_NAME_LENGTH);
         let max_name_length_part = "f".repeat(MAX_LONG_NAME_LENGTH);

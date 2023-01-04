@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(m, AbsoluteMoniker::from(vec!["a", "coll:b"]));
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some("coll"));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
-        assert_eq!(m.leaf(), Some(&ChildMoniker::from("coll:b")));
+        assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("coll:b").unwrap()));
     }
 
     #[test]
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!("/a", format!("{}", m.parent().unwrap()));
         assert_eq!("/", format!("{}", m.parent().unwrap().parent().unwrap()));
         assert_eq!(None, m.parent().unwrap().parent().unwrap().parent());
-        assert_eq!(m.leaf(), Some(&ChildMoniker::from("b")));
+        assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("b").unwrap()));
     }
 
     #[test]

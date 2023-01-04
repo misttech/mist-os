@@ -157,7 +157,7 @@ mod tests {
         assert_eq!("test:42", format!("{}", m));
         assert_eq!(m, InstancedChildMoniker::from("test:42"));
         assert_eq!("test", m.without_instance_id().to_string());
-        assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"test".into(), 42));
+        assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"test".try_into().unwrap(), 42));
 
         let m = InstancedChildMoniker::try_new("test", Some("coll"), 42).unwrap();
         assert_eq!("test", m.name());
@@ -166,7 +166,10 @@ mod tests {
         assert_eq!("coll:test:42", format!("{}", m));
         assert_eq!(m, InstancedChildMoniker::from("coll:test:42"));
         assert_eq!("coll:test", m.without_instance_id().to_string());
-        assert_eq!(m, InstancedChildMoniker::from_child_moniker(&"coll:test".into(), 42));
+        assert_eq!(
+            m,
+            InstancedChildMoniker::from_child_moniker(&"coll:test".try_into().unwrap(), 42)
+        );
 
         let max_coll_length_part = "f".repeat(MAX_NAME_LENGTH);
         let max_name_length_part: LongName = "f".repeat(MAX_LONG_NAME_LENGTH).parse().unwrap();

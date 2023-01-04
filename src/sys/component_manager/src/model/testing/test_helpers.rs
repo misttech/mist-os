@@ -131,7 +131,7 @@ pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
 /// Returns true if the given live child exists.
 pub async fn has_live_child<'a>(component: &'a ComponentInstance, child: &'a str) -> bool {
     match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.get_child(&child.into()).is_some(),
+        InstanceState::Resolved(ref s) => s.get_child(&child.try_into().unwrap()).is_some(),
         _ => panic!("not resolved"),
     }
 }
@@ -140,7 +140,7 @@ pub async fn has_live_child<'a>(component: &'a ComponentInstance, child: &'a str
 pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -> bool {
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) => {
-            s.children().map(|(k, _)| k.clone()).any(|m| m == moniker.into())
+            s.children().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
         }
         InstanceState::Destroyed => false,
         _ => panic!("not resolved"),
@@ -150,7 +150,9 @@ pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -
 /// Return the incarnation id of the given child.
 pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &'a str) -> u32 {
     match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.get_child(&moniker.into()).unwrap().incarnation_id(),
+        InstanceState::Resolved(ref s) => {
+            s.get_child(&moniker.try_into().unwrap()).unwrap().incarnation_id()
+        }
         _ => panic!("not resolved"),
     }
 }
@@ -170,7 +172,7 @@ pub async fn get_live_child<'a>(
     child: &'a str,
 ) -> Arc<ComponentInstance> {
     match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.get_child(&child.into()).unwrap().clone(),
+        InstanceState::Resolved(ref s) => s.get_child(&child.try_into().unwrap()).unwrap().clone(),
         _ => panic!("not resolved"),
     }
 }

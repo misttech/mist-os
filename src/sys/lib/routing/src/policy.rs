@@ -603,7 +603,7 @@ mod tests {
         assert_vmex_allowed_matches!(config, allowed2, Ok(()));
         assert_vmex_disallowed!(config, AbsoluteMoniker::root());
         assert_vmex_disallowed!(config, allowed1.parent().unwrap());
-        assert_vmex_disallowed!(config, allowed1.child(ChildMoniker::from("baz")));
+        assert_vmex_disallowed!(config, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
 
         drop(strong_config);
         assert_vmex_allowed_matches!(config, allowed1, Err(PolicyError::PolicyUnavailable));
@@ -656,7 +656,10 @@ mod tests {
         assert_create_raw_processes_allowed_matches!(config, allowed2, Ok(()));
         assert_create_raw_processes_disallowed!(config, AbsoluteMoniker::root());
         assert_create_raw_processes_disallowed!(config, allowed1.parent().unwrap());
-        assert_create_raw_processes_disallowed!(config, allowed1.child(ChildMoniker::from("baz")));
+        assert_create_raw_processes_disallowed!(
+            config,
+            allowed1.child(ChildMoniker::try_from("baz").unwrap())
+        );
 
         drop(strong_config);
         assert_create_raw_processes_allowed_matches!(
@@ -723,7 +726,7 @@ mod tests {
         assert_critical_allowed_matches!(config, allowed2, Ok(()));
         assert_critical_disallowed!(config, AbsoluteMoniker::root());
         assert_critical_disallowed!(config, allowed1.parent().unwrap());
-        assert_critical_disallowed!(config, allowed1.child(ChildMoniker::from("baz")));
+        assert_critical_disallowed!(config, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
 
         drop(strong_config);
         assert_critical_allowed_matches!(config, allowed1, Err(PolicyError::PolicyUnavailable));
@@ -781,7 +784,7 @@ mod tests {
         assert_reboot_allowed_matches!(config, allowed2, Ok(()));
         assert_reboot_disallowed!(config, AbsoluteMoniker::root());
         assert_reboot_disallowed!(config, allowed1.parent().unwrap());
-        assert_reboot_disallowed!(config, allowed1.child(ChildMoniker::from("baz")));
+        assert_reboot_disallowed!(config, allowed1.child(ChildMoniker::try_from("baz").unwrap()));
 
         // Nonempty config and disabled.
         let config = Arc::new(RuntimeConfig {

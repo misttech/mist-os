@@ -71,7 +71,7 @@ pub mod tests {
         ActionSet::register(component_a.clone(), StopAction::new(false, false))
             .await
             .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".into()).await);
+        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
         {
             let events: Vec<_> = test
                 .test_hook
@@ -89,7 +89,7 @@ pub mod tests {
         ActionSet::register(component_a.clone(), StopAction::new(false, false))
             .await
             .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".into()).await);
+        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
         {
             let events: Vec<_> = test
                 .test_hook
@@ -193,7 +193,7 @@ pub mod tests {
         // Let the stop continue.
         continue_tx.send(()).unwrap();
         nf.await.unwrap();
-        assert!(is_stopped(&component_root, &"a".into()).await);
+        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
         {
             let events: Vec<_> = test
                 .test_hook
@@ -227,8 +227,8 @@ pub mod tests {
         ActionSet::register(component_a.clone(), StopAction::new(false, true))
             .await
             .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".into()).await);
-        assert!(is_stopped(&component_a, &"aa".into()).await);
+        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
+        assert!(is_stopped(&component_a, &"aa".try_into().unwrap()).await);
         {
             let events: Vec<_> = test
                 .test_hook
@@ -249,8 +249,8 @@ pub mod tests {
         ActionSet::register(component_a.clone(), StopAction::new(false, true))
             .await
             .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".into()).await);
-        assert!(is_stopped(&component_a, &"aa".into()).await);
+        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
+        assert!(is_stopped(&component_a, &"aa".try_into().unwrap()).await);
         {
             let events: Vec<_> = test
                 .test_hook
