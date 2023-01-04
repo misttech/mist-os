@@ -21,7 +21,7 @@ use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::StorageAccess;
 
 use async_trait::async_trait;
-use fuchsia_syslog::fx_log_warn;
+use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
@@ -184,10 +184,14 @@ impl InputControllerInner {
 
         let cam_state = self.get_cam_sw_state().ok();
         if let Some(state) = cam_state {
-            self.push_cam_sw_state(state).await
-        } else {
-            Ok(())
+            // Camera setup failure should not prevent start of service. This also allows
+            // clients to see that the camera may not be useable.
+            if let Err(e) = self.push_cam_sw_state(state).await {
+                fx_log_err!("Unable to restore camera state: {e:?}");
+                self.set_cam_err_state(state);
+            }
         }
+        Ok(())
     }
 
     async fn set_sw_camera_mute(&mut self, disabled: bool, name: String) -> SettingHandlerResult {
@@ -318,6 +322,17 @@ impl InputControllerInner {
             .map_err(|_| {
                 ControllerError::UnexpectedError("Could not find camera software state".into())
             })
+    }
+
+    /// Set the camera state into an error condition.
+    fn set_cam_err_state(&mut self, mut state: DeviceState) {
+        state.set(DeviceState::ERROR, true);
+        self.input_device_state.set_source_state(
+            InputDeviceType::CAMERA,
+            DEFAULT_CAMERA_NAME.to_string(),
+            DeviceStateSource::SOFTWARE,
+            state,
+        )
     }
 
     /// Forwards the given software state to the camera3 api. Will first establish
@@ -473,6 +488,19 @@ impl controller::Handle for InputController {
 
 #[cfg(test)]
 mod tests {
+    use crate::handler::setting_handler::controller::Handle;
+    use crate::handler::setting_handler::ClientImpl;
+    use crate::input::input_device_configuration::{InputDeviceConfiguration, SourceState};
+    use crate::message::MessageHubUtil;
+    use crate::service::message::MessengerType;
+    use crate::service_context::ServiceContext;
+    use crate::storage::{Payload as StoragePayload, StorageRequest, StorageResponse};
+    use crate::tests::fakes::service_registry::ServiceRegistry;
+    use crate::{service, Address};
+
+    use fuchsia_async as fasync;
+    use settings_storage::UpdateState;
+
     use super::*;
 
     #[test]
@@ -562,5 +590,109 @@ mod tests {
         );
 
         assert_eq!(current.input_device_state, expected_input_state);
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_camera_error_on_restore() {
+        let message_hub = service::MessageHub::create_hub();
+
+        // Create the messenger that the client proxy uses to send messages.
+        let (controller_messenger, _) = message_hub
+            .create(MessengerType::Unbound)
+            .await
+            .expect("Unable to create agent messenger");
+
+        // Note that no camera service is registered, to mimic scenarios where devices do not
+        // have a functioning camera service.
+        let service_registry = ServiceRegistry::create();
+
+        let service_context =
+            ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None);
+
+        // This isn't actually the signature for the notifier, but it's unused in this test, so just
+        // provide the signature of its own messenger to the client proxy.
+        let signature = controller_messenger.get_signature();
+
+        // Create a fake storage receptor used to receive and respond to storage messages.
+        let (_, mut storage_receptor) = message_hub
+            .create(MessengerType::Addressable(Address::Storage))
+            .await
+            .expect("Unable to create agent messenger");
+
+        // Spawn a task that mimics the storage agent by responding to read/write calls.
+        fasync::Task::spawn(async move {
+            loop {
+                if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
+                    if let Ok(StoragePayload::Request(storage_request)) =
+                        StoragePayload::try_from(payload)
+                    {
+                        match storage_request {
+                            StorageRequest::Read(_, _) => {
+                                // Just respond with the default value as we're not testing storage.
+                                let _ = message_client
+                                    .reply(service::Payload::Storage(StoragePayload::Response(
+                                        StorageResponse::Read(
+                                            InputInfoSources::default_value().into(),
+                                        ),
+                                    )))
+                                    .send();
+                            }
+                            StorageRequest::Write(_, _) => {
+                                // Just respond with Unchanged as we're not testing storage.
+                                let _ = message_client
+                                    .reply(service::Payload::Storage(StoragePayload::Response(
+                                        StorageResponse::Write(Ok(UpdateState::Unchanged)),
+                                    )))
+                                    .send();
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .detach();
+
+        let client_proxy = ClientProxy::new(
+            Arc::new(ClientImpl::for_test(
+                Default::default(),
+                controller_messenger,
+                signature,
+                Arc::new(service_context),
+                SettingType::Input,
+            )),
+            SettingType::Input,
+        )
+        .await;
+        let controller = InputController::create_with_config(
+            client_proxy,
+            InputConfiguration {
+                devices: vec![InputDeviceConfiguration {
+                    device_name: DEFAULT_CAMERA_NAME.to_string(),
+                    device_type: InputDeviceType::CAMERA,
+                    source_states: vec![SourceState {
+                        source: DeviceStateSource::SOFTWARE,
+                        state: 0,
+                    }],
+                    mutable_toggle_state: 0,
+                }],
+            },
+        )
+        .await
+        .expect("Should have controller");
+
+        // Restore should pass.
+        let result = controller.handle(Request::Restore).await;
+        assert_eq!(result, Some(Ok(None)));
+
+        // But the camera state should show an error.
+        let result = controller.handle(Request::Get).await;
+        let Some(Ok(Some(SettingInfo::Input(input_info)))) = result else {
+            panic!("Expected Input response. Got {result:?}");
+        };
+        let camera_state = input_info
+            .input_device_state
+            .get_state(InputDeviceType::CAMERA, DEFAULT_CAMERA_NAME.to_string())
+            .unwrap();
+        assert!(camera_state.has_state(DeviceState::ERROR));
     }
 }
