@@ -80,7 +80,7 @@ executable("crash_reporter_unittest_exe") {
     "//src/developer/forensics/utils/cobalt",
     "//src/lib/fsl",
     "//src/lib/timekeeper:testing",
-    "//third_party/crashpad/util",
+    "//third_party/crashpad/src/util",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
@@ -230,7 +230,7 @@ executable("sized_data_reader_unittest_exe") {
     "//src/developer/forensics/crash_reports:sized_data_reader",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
-    "//third_party/crashpad/util",
+    "//third_party/crashpad/src/util",
     "//third_party/googletest:gtest",
   ]
 }
@@ -535,7 +535,7 @@ group("tests") {
     ":crash-reports-tests",
 
     # To run the Crashpad tests.
-    "//third_party/crashpad:tests",
+    "//third_party/crashpad/src:tests",
   ]
 
   visibility += [ "//src/developer/forensics:tests" ]

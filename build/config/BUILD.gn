@@ -849,7 +849,7 @@ config("Wno-conversion") {
     "//src/ui/tools/tiles_ctl:*",
     "//src/virtualization/third_party/fdt:*",
     "//third_party/acpica/*",
-    "//third_party/crashpad/*",
+    "//third_party/crashpad/src/*",
     "//third_party/glfw/*",
     "//third_party/iperf/*",
     "//third_party/libc-tests/*",

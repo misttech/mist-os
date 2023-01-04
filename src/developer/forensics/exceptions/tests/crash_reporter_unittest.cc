@@ -27,8 +27,8 @@
 #include "src/lib/fostr/fidl/fuchsia/exception/formatting.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/test/test_settings.h"
-#include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
-#include "third_party/crashpad/util/file/string_file.h"
+#include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
+#include "third_party/crashpad/src/util/file/string_file.h"
 
 namespace forensics {
 namespace exceptions {

@@ -8,7 +8,7 @@ group("zx") {
   public_deps = [ "//zircon/system/ulib/zx" ]
   visibility = [
     "//third_party/android/device/generic/goldfish-opengl:*",
-    "//third_party/crashpad/third_party/fuchsia:*",
+    "//third_party/crashpad/src/third_party/fuchsia:*",
     "//third_party/github.com/ARM-software/*:*",
     "//third_party/imgtec-pvr-rgx-km:*",
     "//third_party/openssh-portable:*",

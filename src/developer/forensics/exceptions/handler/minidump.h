@@ -10,7 +10,7 @@
 #include <optional>
 #include <string>
 
-#include <third_party/crashpad/util/file/string_file.h>
+#include <third_party/crashpad/src/util/file/string_file.h>
 
 namespace forensics {
 namespace exceptions {

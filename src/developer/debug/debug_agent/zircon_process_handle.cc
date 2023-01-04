@@ -15,10 +15,10 @@
 #include "src/developer/debug/debug_agent/zircon_utils.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/message_loop_fuchsia.h"
-#include "third_party/crashpad/minidump/minidump_file_writer.h"
-#include "third_party/crashpad/snapshot/fuchsia/process_snapshot_fuchsia.h"
-#include "third_party/crashpad/util/file/string_file.h"
-#include "third_party/crashpad/util/fuchsia/scoped_task_suspend.h"
+#include "third_party/crashpad/src/minidump/minidump_file_writer.h"
+#include "third_party/crashpad/src/snapshot/fuchsia/process_snapshot_fuchsia.h"
+#include "third_party/crashpad/src/util/file/string_file.h"
+#include "third_party/crashpad/src/util/fuchsia/scoped_task_suspend.h"
 
 namespace debug_agent {
 

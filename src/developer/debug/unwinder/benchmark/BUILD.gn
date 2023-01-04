@@ -17,7 +17,7 @@ executable("benchmark") {
     "//src/developer/debug/third_party/libunwindstack",
     "//src/developer/debug/unwinder",
     "//src/developer/debug/zxdb/symbols",
-    "//third_party/crashpad/compat",
-    "//third_party/crashpad/snapshot",
+    "//third_party/crashpad/src/compat",
+    "//third_party/crashpad/src/snapshot",
   ]
 }

@@ -107,7 +107,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
     "//src/media/audio/drivers/intel-hda/controller/*",
     "//src/settings/*",
     "//third_party/alacritty/alacritty_terminal/*",
-    "//third_party/crashpad/*",
+    "//third_party/crashpad/src/*",
     "//zircon/third_party/uapp/dash/*",
   ]
 

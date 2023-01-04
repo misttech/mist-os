@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
-#include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
+#include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
 namespace forensics {
 namespace exceptions {

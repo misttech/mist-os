@@ -12,8 +12,8 @@
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
-#include "third_party/crashpad/snapshot/memory_snapshot.h"
-#include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
+#include "third_party/crashpad/src/snapshot/memory_snapshot.h"
+#include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
 namespace zxdb {
 

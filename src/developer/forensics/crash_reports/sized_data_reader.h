@@ -6,7 +6,7 @@
 #define SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_SIZED_DATA_READER_H_
 
 #include "src/developer/forensics/utils/sized_data.h"
-#include "third_party/crashpad/util/file/file_reader.h"
+#include "third_party/crashpad/src/util/file/file_reader.h"
 
 namespace forensics {
 namespace crash_reports {

@@ -17,9 +17,9 @@
 #include "src/developer/debug/zxdb/client/minidump_memory.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "third_party/crashpad/snapshot/cpu_context.h"
-#include "third_party/crashpad/snapshot/memory_snapshot.h"
-#include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
+#include "third_party/crashpad/src/snapshot/cpu_context.h"
+#include "third_party/crashpad/src/snapshot/memory_snapshot.h"
+#include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
 namespace zxdb {
 

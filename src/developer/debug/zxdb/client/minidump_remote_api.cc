@@ -17,7 +17,7 @@
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "third_party/crashpad/snapshot/memory_map_region_snapshot.h"
+#include "third_party/crashpad/src/snapshot/memory_map_region_snapshot.h"
 
 using debug::RegisterCategory;
 using debug::RegisterID;

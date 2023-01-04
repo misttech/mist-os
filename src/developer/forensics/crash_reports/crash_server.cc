@@ -19,11 +19,11 @@
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/substitute.h"
-#include "third_party/crashpad/util/net/http_body.h"
-#include "third_party/crashpad/util/net/http_headers.h"
-#include "third_party/crashpad/util/net/http_multipart_builder.h"
-#include "third_party/crashpad/util/net/http_transport.h"
-#include "third_party/crashpad/util/net/url.h"
+#include "third_party/crashpad/src/util/net/http_body.h"
+#include "third_party/crashpad/src/util/net/http_headers.h"
+#include "third_party/crashpad/src/util/net/http_multipart_builder.h"
+#include "third_party/crashpad/src/util/net/http_transport.h"
+#include "third_party/crashpad/src/util/net/url.h"
 
 namespace forensics {
 namespace crash_reports {

@@ -11,7 +11,7 @@
 #include <unwindstack/Memory.h>
 
 #include "src/developer/debug/unwinder/memory.h"
-#include "third_party/crashpad/snapshot/minidump/process_snapshot_minidump.h"
+#include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
 namespace benchmark {
 

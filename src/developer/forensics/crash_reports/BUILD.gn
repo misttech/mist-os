@@ -108,7 +108,7 @@ source_set("crash_server") {
     "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
-    "//third_party/crashpad/util:net",
+    "//third_party/crashpad/src/util:net",
     "//third_party/mini_chromium/src/base",
   ]
 
@@ -279,7 +279,7 @@ source_set("sized_data_reader") {
 
   public_deps = [
     "//src/developer/forensics/utils:sized_data",
-    "//third_party/crashpad/util",
+    "//third_party/crashpad/src/util",
     "//third_party/mini_chromium/src/base",
   ]
 
