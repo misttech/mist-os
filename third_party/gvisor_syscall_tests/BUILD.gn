@@ -501,9 +501,6 @@ syscall_test_suite(generic_test_label) {
   use_expectations_framework = true
 }
 syscall_test_suite(loopback_test_label) {
-  test_specs = {
-    timeout_secs = 1200
-  }
 }
 syscall_test_suite(loopback_isolated_test_label) {
 }
