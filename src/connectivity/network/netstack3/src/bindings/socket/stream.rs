@@ -677,22 +677,16 @@ impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
         let fidl = match self.id {
             SocketId::Unbound(_, _) => return Err(fposix::Errno::Einval),
             SocketId::Bound(id, _) => {
-                let BoundInfo { addr, port, device } = get_bound_info::<I, _>(sync_ctx, id);
-                // TODO(https://fxbug.dev/102103): Support setting device.
-                assert_eq!(device, None);
+                let BoundInfo { addr, port, device: _ } = get_bound_info::<I, _>(sync_ctx, id);
                 (addr, port).into_fidl()
             }
             SocketId::Listener(id) => {
-                let BoundInfo { addr, port, device } = get_listener_info::<I, _>(sync_ctx, id);
-                // TODO(https://fxbug.dev/102103): Support setting device.
-                assert_eq!(device, None);
+                let BoundInfo { addr, port, device: _ } = get_listener_info::<I, _>(sync_ctx, id);
                 (addr, port).into_fidl()
             }
             SocketId::Connection(id) => {
-                let ConnectionInfo { local_addr, remote_addr: _, device } =
+                let ConnectionInfo { local_addr, remote_addr: _, device: _ } =
                     get_connection_info::<I, _>(sync_ctx, id);
-                // TODO(https://fxbug.dev/102103): Support setting device.
-                assert_eq!(device, None);
                 local_addr.into_fidl()
             }
         };
