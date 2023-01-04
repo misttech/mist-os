@@ -229,7 +229,7 @@ class DeviceInspect {
 
   void set_composite() { device_node_.CreateBool("composite", true, &static_values_); }
   void set_fragment() { device_node_.CreateBool("fragment", true, &static_values_); }
-  void set_proxy() { device_node_.CreateBool("proxy", true, &static_values_); }
+  void set_fidl_proxy() { device_node_.CreateBool("fidl_proxy", true, &static_values_); }
 
   void set_flags(uint32_t flags);
 

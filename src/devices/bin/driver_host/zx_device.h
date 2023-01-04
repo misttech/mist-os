@@ -41,7 +41,7 @@
 #include "src/devices/lib/fidl/device_server.h"
 
 class CompositeDevice;
-class ProxyDevice;
+class FidlProxyDevice;
 class DeviceControllerConnection;
 class DriverHostContext;
 class DeviceInspect;
@@ -410,11 +410,11 @@ struct zx_device
   bool is_composite() const;
   fbl::RefPtr<CompositeDevice> composite();
 
-  void set_proxy(fbl::RefPtr<ProxyDevice> proxy);
-  fbl::RefPtr<ProxyDevice> take_proxy();
+  void set_fidl_proxy(fbl::RefPtr<FidlProxyDevice> fidl_proxy);
+  fbl::RefPtr<FidlProxyDevice> take_fidl_proxy();
 
-  bool is_proxy() const;
-  fbl::RefPtr<ProxyDevice> proxy();
+  bool is_fidl_proxy() const;
+  fbl::RefPtr<FidlProxyDevice> fidl_proxy();
 
   const DevicePowerStates& GetPowerStates() const;
   const PerformanceStates& GetPerformanceStates() const;
@@ -530,10 +530,10 @@ struct zx_device
   // this points to the composite control structure.
   fbl::RefPtr<CompositeDevice> composite_;
 
-  // True when this device is a proxy device.
-  bool is_proxy_ = false;
+  // True when this device is a FIDL proxy device.
+  bool is_fidl_proxy_ = false;
 
-  fbl::RefPtr<ProxyDevice> proxy_;
+  fbl::RefPtr<FidlProxyDevice> fidl_proxy_;
 
   // Identifier assigned by devmgr that can be used to assemble composite
   // devices.

@@ -12,8 +12,8 @@
 
 #include "src/devices/bin/driver_host/composite_device.h"
 #include "src/devices/bin/driver_host/driver_host.h"
+#include "src/devices/bin/driver_host/fidl_proxy_device.h"
 #include "src/devices/bin/driver_host/log.h"
-#include "src/devices/bin/driver_host/proxy_device.h"
 #include "src/devices/lib/fidl/device_server.h"
 #include "src/devices/lib/log/log.h"
 
@@ -274,7 +274,7 @@ void zx_device::fbl_recycle() TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   composite_.reset();
-  proxy_.reset();
+  fidl_proxy_.reset();
 
   driver_host_context_->QueueDeviceForFinalization(this);
 }
@@ -334,17 +334,17 @@ bool zx_device::is_composite() const { return is_composite_ && !!composite_; }
 
 fbl::RefPtr<CompositeDevice> zx_device::composite() { return composite_; }
 
-fbl::RefPtr<ProxyDevice> zx_device::take_proxy() { return std::move(proxy_); }
+fbl::RefPtr<FidlProxyDevice> zx_device::take_fidl_proxy() { return std::move(fidl_proxy_); }
 
-void zx_device::set_proxy(fbl::RefPtr<ProxyDevice> proxy) {
-  proxy_ = std::move(proxy);
-  is_proxy_ = true;
-  inspect_->set_proxy();
+void zx_device::set_fidl_proxy(fbl::RefPtr<FidlProxyDevice> fidl_proxy) {
+  fidl_proxy_ = std::move(fidl_proxy);
+  is_fidl_proxy_ = true;
+  inspect_->set_fidl_proxy();
 }
 
-bool zx_device::is_proxy() const { return is_proxy_ && !!proxy_; }
+bool zx_device::is_fidl_proxy() const { return is_fidl_proxy_ && !!fidl_proxy_; }
 
-fbl::RefPtr<ProxyDevice> zx_device::proxy() { return proxy_; }
+fbl::RefPtr<FidlProxyDevice> zx_device::fidl_proxy() { return fidl_proxy_; }
 
 bool zx_device::IsPerformanceStateSupported(uint32_t requested_state) {
   if (requested_state >= fuchsia_device::wire::kMaxDevicePerformanceStates) {

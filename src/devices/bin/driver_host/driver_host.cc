@@ -49,10 +49,10 @@
 #include "src/devices/bin/driver_host/device_controller_connection.h"
 #include "src/devices/bin/driver_host/driver.h"
 #include "src/devices/bin/driver_host/env.h"
+#include "src/devices/bin/driver_host/fidl_proxy_device.h"
 #include "src/devices/bin/driver_host/log.h"
 #include "src/devices/bin/driver_host/main.h"
 #include "src/devices/bin/driver_host/node_group_desc_util.h"
-#include "src/devices/bin/driver_host/proxy_device.h"
 #include "src/devices/bin/driver_host/proxy_iostate.h"
 #include "src/devices/bin/driver_host/scheduler_profile.h"
 #include "src/devices/bin/driver_host/tracing.h"
@@ -616,7 +616,7 @@ StatusOrConn DriverHostControllerConnection::CreateFidlProxyDevice(
     CreateDeviceRequestView& request) {
   auto& proxy = request->type.fidl_proxy();
 
-  auto driver = GetProxyDriver(driver_host_context_);
+  auto driver = GetFidlProxyDriver(driver_host_context_);
   if (driver == nullptr) {
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -628,7 +628,7 @@ StatusOrConn DriverHostControllerConnection::CreateFidlProxyDevice(
   }
 
   fbl::RefPtr<zx_device_t> dev;
-  zx_status_t status = zx_device::Create(driver_host_context_, "proxy", *std::move(drv), &dev);
+  zx_status_t status = zx_device::Create(driver_host_context_, "fidl-proxy", *std::move(drv), &dev);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -639,9 +639,9 @@ StatusOrConn DriverHostControllerConnection::CreateFidlProxyDevice(
   auto newconn =
       DeviceControllerConnection::Create(driver_host_context_, dev, std::move(coordinator));
 
-  InitializeProxyDevice(dev, std::move(proxy.incoming_dir));
+  InitializeFidlProxyDevice(dev, std::move(proxy.incoming_dir));
 
-  VLOGF(1, "Created device proxy %p '%s'", dev.get(), dev->name());
+  VLOGF(1, "Created device FIDL proxy %p '%s'", dev.get(), dev->name());
 
   return zx::ok(std::move(newconn));
 }
@@ -785,7 +785,7 @@ StatusOrConn DriverHostControllerConnection::CreateStubDevice(CreateDeviceReques
   // This method is used for creating driverless proxies in case of misc, root, test devices.
   // Since there are no proxy drivers backing the device, a dummy proxy driver will be used for
   // device creation.
-  auto driver = GetProxyDriver(driver_host_context_);
+  auto driver = GetFidlProxyDriver(driver_host_context_);
   if (driver == nullptr) {
     return zx::error(ZX_ERR_INTERNAL);
   }

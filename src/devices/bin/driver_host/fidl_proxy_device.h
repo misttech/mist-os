@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST_PROXY_DEVICE_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST_PROXY_DEVICE_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_FIDL_PROXY_DEVICE_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_FIDL_PROXY_DEVICE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/driver.h>
@@ -12,17 +12,17 @@
 #include "src/devices/bin/driver_host/zx_device.h"
 
 // Modifies |device| to have the appropriate protocol_id, ctx, and ops tables
-// for a proxy device
-void InitializeProxyDevice(const fbl::RefPtr<zx_device>& device,
-                           fidl::ClientEnd<fuchsia_io::Directory> incoming_dir);
+// for a FIDL proxy device.
+void InitializeFidlProxyDevice(const fbl::RefPtr<zx_device>& device,
+                               fidl::ClientEnd<fuchsia_io::Directory> incoming_dir);
 
-// Returns a zx_driver instance for proxy devices
-fbl::RefPtr<zx_driver> GetProxyDriver(DriverHostContext* ctx);
+// Returns a zx_driver instance for FIDL proxy devices.
+fbl::RefPtr<zx_driver> GetFidlProxyDriver(DriverHostContext* ctx);
 
-class ProxyDevice : public fbl::RefCounted<ProxyDevice> {
+class FidlProxyDevice : public fbl::RefCounted<FidlProxyDevice> {
  public:
-  explicit ProxyDevice(fbl::RefPtr<zx_device> device) : device_(std::move(device)) {}
-  ~ProxyDevice() = default;
+  explicit FidlProxyDevice(fbl::RefPtr<zx_device> device) : device_(std::move(device)) {}
+  ~FidlProxyDevice() = default;
 
   zx::result<> ConnectToProtocol(const char* protocol, zx::channel request);
   zx::result<> ConnectToProtocol(const char* service_name, const char* protocol,
@@ -32,4 +32,4 @@ class ProxyDevice : public fbl::RefCounted<ProxyDevice> {
   fbl::RefPtr<zx_device> device_;
 };
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST_PROXY_DEVICE_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_FIDL_PROXY_DEVICE_H_

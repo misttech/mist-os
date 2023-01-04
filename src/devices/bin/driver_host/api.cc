@@ -25,7 +25,7 @@
 
 #include "src/devices/bin/driver_host/composite_device.h"
 #include "src/devices/bin/driver_host/driver_host.h"
-#include "src/devices/bin/driver_host/proxy_device.h"
+#include "src/devices/bin/driver_host/fidl_proxy_device.h"
 #include "src/devices/bin/driver_host/scheduler_profile.h"
 #include "src/devices/lib/fidl/transaction.h"
 
@@ -550,10 +550,12 @@ __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const cha
                                                   zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_proxy()) {
+  if (!device->is_fidl_proxy()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return device->proxy()->ConnectToProtocol(protocol_name, zx::channel(request)).status_value();
+  return device->fidl_proxy()
+      ->ConnectToProtocol(protocol_name, zx::channel(request))
+      .status_value();
 }
 
 __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
@@ -604,10 +606,10 @@ __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const ch
                                                    const char* protocol_name, zx_handle_t request) {
   ZX_DEBUG_ASSERT_MSG(device && device->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device",
                       device);
-  if (!device->is_proxy()) {
+  if (!device->is_fidl_proxy()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return device->proxy()
+  return device->fidl_proxy()
       ->ConnectToProtocol(service_name, protocol_name, zx::channel(request))
       .status_value();
 }
