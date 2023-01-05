@@ -146,7 +146,6 @@
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.logger.Log",
                 "fuchsia.net.name.Lookup",
-                "fuchsia.pkg.PackageResolverAdmin",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.posix.socket.Provider",

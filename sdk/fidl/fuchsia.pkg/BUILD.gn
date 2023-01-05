@@ -12,7 +12,6 @@ fidl("fuchsia.pkg") {
   ]
 
   sources = [
-    "admin.fidl",
     "cache.fidl",
     "common.fidl",
     "cup.fidl",

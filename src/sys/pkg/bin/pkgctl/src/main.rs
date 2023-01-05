@@ -7,19 +7,18 @@
 
 use {
     crate::args::{
-        Args, Command, ExperimentCommand, ExperimentDisableCommand, ExperimentEnableCommand,
-        ExperimentSubCommand, GcCommand, GetHashCommand, OpenCommand, PkgStatusCommand,
-        RepoAddCommand, RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand,
-        RepoConfigFormat, RepoRemoveCommand, RepoShowCommand, RepoSubCommand, ResolveCommand,
-        RuleClearCommand, RuleCommand, RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand,
+        Args, Command, GcCommand, GetHashCommand, OpenCommand, PkgStatusCommand, RepoAddCommand,
+        RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand, RepoConfigFormat,
+        RepoRemoveCommand, RepoShowCommand, RepoSubCommand, ResolveCommand, RuleClearCommand,
+        RuleCommand, RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand,
         RuleReplaceFileCommand, RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
     },
     crate::v1repoconf::{validate_host, SourceConfig},
     anyhow::{bail, format_err, Context as _},
     fidl_fuchsia_net_http::{self as http},
     fidl_fuchsia_pkg::{
-        self as fpkg, PackageCacheMarker, PackageResolverAdminMarker, PackageResolverMarker,
-        PackageUrl, RepositoryManagerMarker, RepositoryManagerProxy,
+        self as fpkg, PackageCacheMarker, PackageResolverMarker, PackageUrl,
+        RepositoryManagerMarker, RepositoryManagerProxy,
     },
     fidl_fuchsia_pkg_ext::{
         BlobId, RepositoryConfig, RepositoryConfigBuilder, RepositoryStorageType,
@@ -374,21 +373,6 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                         }
                     })
                     .await?;
-                }
-            }
-
-            Ok(0)
-        }
-        Command::Experiment(ExperimentCommand { subcommand }) => {
-            let admin = connect_to_protocol::<PackageResolverAdminMarker>()
-                .context("Failed to connect to package resolver admin service")?;
-
-            match subcommand {
-                ExperimentSubCommand::Enable(ExperimentEnableCommand { experiment }) => {
-                    admin.set_experiment_state(experiment, true).await?;
-                }
-                ExperimentSubCommand::Disable(ExperimentDisableCommand { experiment }) => {
-                    admin.set_experiment_state(experiment, false).await?;
                 }
             }
 

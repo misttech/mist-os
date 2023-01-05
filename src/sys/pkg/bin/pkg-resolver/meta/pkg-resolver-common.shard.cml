@@ -16,7 +16,6 @@
             protocol: [
                 "fuchsia.pkg.Cup",
                 "fuchsia.pkg.PackageResolver",
-                "fuchsia.pkg.PackageResolverAdmin",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
             ],
@@ -70,7 +69,6 @@
             protocol: [
                 "fuchsia.pkg.Cup",
                 "fuchsia.pkg.PackageResolver",
-                "fuchsia.pkg.PackageResolverAdmin",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
             ],

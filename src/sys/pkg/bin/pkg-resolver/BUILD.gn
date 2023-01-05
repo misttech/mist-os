@@ -90,7 +90,6 @@ rustc_library("lib") {
     "src/config.rs",
     "src/eager_package_manager.rs",
     "src/error.rs",
-    "src/experiment.rs",
     "src/inspect_util.rs",
     "src/main.rs",
     "src/metrics_util.rs",

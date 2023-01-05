@@ -130,7 +130,6 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.logger.Log",
-                "fuchsia.pkg.PackageResolverAdmin",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.process.Resolver",

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::error::Error, argh::FromArgs, fidl_fuchsia_pkg::ExperimentToggle as Experiment,
-    fidl_fuchsia_pkg_ext::BlobId, fidl_fuchsia_pkg_rewrite_ext::RuleConfig, std::path::PathBuf,
+    argh::FromArgs, fidl_fuchsia_pkg_ext::BlobId, fidl_fuchsia_pkg_rewrite_ext::RuleConfig,
+    std::path::PathBuf,
 };
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -21,7 +21,6 @@ pub enum Command {
     Open(OpenCommand),
     Repo(RepoCommand),
     Rule(RuleCommand),
-    Experiment(ExperimentCommand),
     Gc(GcCommand),
     GetHash(GetHashCommand),
     PkgStatus(PkgStatusCommand),
@@ -223,43 +222,6 @@ pub struct RuleReplaceJsonCommand {
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
-    name = "experiment",
-    note = "Experiments may be added or removed over time and should not be considered stable.",
-    note = "Known experiments:",
-    note = "  lightbulb      no-op experiment"
-)]
-/// Manage runtime experiment states.
-pub struct ExperimentCommand {
-    #[argh(subcommand)]
-    pub subcommand: ExperimentSubCommand,
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand)]
-pub enum ExperimentSubCommand {
-    Enable(ExperimentEnableCommand),
-    Disable(ExperimentDisableCommand),
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "enable")]
-/// Enable the given experiment.
-pub struct ExperimentEnableCommand {
-    #[argh(positional, from_str_fn(parse_experiment_id))]
-    pub experiment: Experiment,
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "disable")]
-/// Disable the given experiment.
-pub struct ExperimentDisableCommand {
-    #[argh(positional, from_str_fn(parse_experiment_id))]
-    pub experiment: Experiment,
-}
-
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(
-    subcommand,
     name = "gc",
     note = "This deletes any cached packages that are not present in the static and dynamic index.",
     note = "Any blobs associated with these packages will be removed if they are not referenced by another component or package.",
@@ -291,13 +253,6 @@ pub struct GetHashCommand {
 pub struct PkgStatusCommand {
     #[argh(positional)]
     pub pkg_url: String,
-}
-
-fn parse_experiment_id(experiment: &str) -> Result<Experiment, String> {
-    match experiment {
-        "lightbulb" => Ok(Experiment::Lightbulb),
-        experiment => Err(Error::ExperimentId(experiment.to_owned()).to_string()),
-    }
 }
 
 fn parse_rule_config(config: &str) -> Result<RuleConfig, String> {
@@ -572,44 +527,6 @@ mod tests {
         assert_matches!(
             Args::from_args(CMD_NAME, &["rule", "replace", "json", "{"]),
             Err(argh::EarlyExit { output: _, status: _ })
-        );
-    }
-
-    #[test]
-    fn experiment_ok() {
-        assert_eq!(
-            Args::from_args(CMD_NAME, &["experiment", "enable", "lightbulb"]).unwrap(),
-            Args {
-                command: Command::Experiment(ExperimentCommand {
-                    subcommand: ExperimentSubCommand::Enable(ExperimentEnableCommand {
-                        experiment: Experiment::Lightbulb
-                    })
-                })
-            }
-        );
-
-        assert_eq!(
-            Args::from_args(CMD_NAME, &["experiment", "disable", "lightbulb"]).unwrap(),
-            Args {
-                command: Command::Experiment(ExperimentCommand {
-                    subcommand: ExperimentSubCommand::Disable(ExperimentDisableCommand {
-                        experiment: Experiment::Lightbulb
-                    })
-                })
-            }
-        );
-    }
-
-    #[test]
-    fn experiment_unknown() {
-        assert_matches!(
-            Args::from_args(CMD_NAME, &["experiment", "enable", "unknown"]),
-            Err(argh::EarlyExit { output, status: Err(()) }) if output.contains("unknown")
-        );
-
-        assert_matches!(
-            Args::from_args(CMD_NAME, &["experiment", "disable", "unknown"]),
-            Err(argh::EarlyExit { output, status: Err(()) }) if output.contains("unknown")
         );
     }
 

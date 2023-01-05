@@ -43,7 +43,6 @@
                 "fuchsia.logger.Log",
                 "fuchsia.media.Audio",
                 "fuchsia.net.name.Lookup",
-                "fuchsia.pkg.PackageResolverAdmin",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.posix.socket.Provider",

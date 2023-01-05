@@ -5,7 +5,6 @@
 use {
     crate::{
         cache::{BlobFetcher, CacheError, MerkleForError, ToResolveError, ToResolveStatus},
-        experiment::Experiments,
         inspect_util::{self, InspectableRepositoryConfig},
         repository::Repository,
     },
@@ -37,7 +36,6 @@ use {
 
 /// [RepositoryManager] controls access to all the repository configs used by the package resolver.
 pub struct RepositoryManager {
-    _experiments: Experiments,
     dynamic_configs_path: Option<String>,
     static_configs: HashMap<RepositoryUrl, InspectableRepositoryConfig>,
     dynamic_configs: HashMap<RepositoryUrl, InspectableRepositoryConfig>,
@@ -413,7 +411,6 @@ pub struct RepositoryManagerBuilder<S = UnsetCobaltSender, N = UnsetInspectNode>
     persisted_repos_dir: Option<String>,
     static_configs: HashMap<RepositoryUrl, Arc<RepositoryConfig>>,
     dynamic_configs: HashMap<RepositoryUrl, Arc<RepositoryConfig>>,
-    experiments: Experiments,
     cobalt_sender: S,
     inspect_node: N,
     local_mirror: Option<LocalMirrorProxy>,
@@ -470,7 +467,6 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
     pub async fn new<P>(
         data_proxy: Option<fio::DirectoryProxy>,
         dynamic_configs_path: Option<P>,
-        experiments: Experiments,
         tuf_metadata_timeout: std::time::Duration,
     ) -> Result<Self, (Self, LoadError)>
     where
@@ -496,7 +492,6 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
                 .into_iter()
                 .map(|config| (config.repo_url().clone(), Arc::new(config)))
                 .collect(),
-            experiments,
             cobalt_sender: UnsetCobaltSender,
             inspect_node: UnsetInspectNode,
             local_mirror: None,
@@ -511,7 +506,6 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
         }
     }
 
-    /// Create a new builder with no enabled experiments.
     #[cfg(test)]
     pub async fn new_test<P>(
         data_dir: &tempfile::TempDir,
@@ -525,13 +519,7 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )
         .unwrap();
-        Self::new(
-            Some(proxy),
-            dynamic_configs_path,
-            Experiments::none(),
-            std::time::Duration::from_secs(30),
-        )
-        .await
+        Self::new(Some(proxy), dynamic_configs_path, std::time::Duration::from_secs(30)).await
     }
 
     /// Adds these static [RepoConfigs](RepoConfig) to the [RepositoryManager].
@@ -559,7 +547,6 @@ impl<S> RepositoryManagerBuilder<S, UnsetInspectNode> {
             persisted_repos_dir: self.persisted_repos_dir,
             static_configs: self.static_configs,
             dynamic_configs: self.dynamic_configs,
-            experiments: self.experiments,
             cobalt_sender: self.cobalt_sender,
             inspect_node,
             local_mirror: self.local_mirror,
@@ -580,7 +567,6 @@ impl<N> RepositoryManagerBuilder<UnsetCobaltSender, N> {
             persisted_repos_dir: self.persisted_repos_dir,
             static_configs: self.static_configs,
             dynamic_configs: self.dynamic_configs,
-            experiments: self.experiments,
             cobalt_sender,
             inspect_node: self.inspect_node,
             local_mirror: self.local_mirror,
@@ -654,7 +640,6 @@ impl RepositoryManagerBuilder<ProtocolSender<MetricEvent>, inspect::Node> {
                 self.dynamic_configs,
                 &inspect.dynamic_configs_node,
             ),
-            _experiments: self.experiments,
             repositories: Arc::new(RwLock::new(HashMap::new())),
             cobalt_sender: self.cobalt_sender,
             inspect,

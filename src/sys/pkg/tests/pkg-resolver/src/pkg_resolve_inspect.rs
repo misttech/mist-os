@@ -42,7 +42,6 @@ async fn initial_inspect_state() {
                 tuf_config_name: OptionDebugStringProperty::<String>::None,
                 source: OptionDebugStringProperty::<String>::None,
             },
-            experiments: {},
             repository_manager: {
                 dynamic_configs_path: format!("{:?}", Some(std::path::Path::new("repositories.json"))),
                 dynamic_configs: {},

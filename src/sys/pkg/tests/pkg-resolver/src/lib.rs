@@ -16,10 +16,8 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_pkg::{
-        self as fpkg, CupMarker, CupProxy, ExperimentToggle as Experiment, GetInfoError,
-        PackageCacheMarker, PackageResolverAdminMarker, PackageResolverAdminProxy,
-        PackageResolverMarker, PackageResolverProxy, RepositoryManagerMarker,
-        RepositoryManagerProxy, WriteError,
+        self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
+        PackageResolverProxy, RepositoryManagerMarker, RepositoryManagerProxy, WriteError,
     },
     fidl_fuchsia_pkg_ext::{
         self as pkg, RepositoryConfig, RepositoryConfigBuilder, RepositoryConfigs,
@@ -746,7 +744,6 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
-                    .capability(Capability::protocol::<fpkg::PackageResolverAdminMarker>())
                     .capability(Capability::protocol::<fpkg::RepositoryManagerMarker>())
                     .capability(Capability::protocol::<fpkg_rewrite::EngineMarker>())
                     .capability(Capability::protocol::<fpkg::CupMarker>())
@@ -827,7 +824,6 @@ where
 }
 
 pub struct Proxies {
-    pub resolver_admin: PackageResolverAdminProxy,
     pub resolver: PackageResolverProxy,
     pub repo_manager: RepositoryManagerProxy,
     pub rewrite_engine: fpkg_rewrite::EngineProxy,
@@ -840,9 +836,6 @@ impl Proxies {
             resolver: realm
                 .connect_to_protocol_at_exposed_dir::<PackageResolverMarker>()
                 .expect("connect to package resolver"),
-            resolver_admin: realm
-                .connect_to_protocol_at_exposed_dir::<PackageResolverAdminMarker>()
-                .expect("connect to package resolver admin"),
             repo_manager: realm
                 .connect_to_protocol_at_exposed_dir::<RepositoryManagerMarker>()
                 .expect("connect to repository manager"),
@@ -900,14 +893,6 @@ impl TestEnv<BlobfsRamdisk> {
 }
 
 impl<B: Blobfs> TestEnv<B> {
-    pub async fn set_experiment_state(&self, experiment: Experiment, state: bool) {
-        self.proxies
-            .resolver_admin
-            .set_experiment_state(experiment, state)
-            .await
-            .expect("experiment state to toggle");
-    }
-
     pub async fn register_repo(&self, repo: &ServedRepository) {
         self.register_repo_at_url(repo, "fuchsia-pkg://test").await;
     }

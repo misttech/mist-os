@@ -12,9 +12,6 @@ pub enum Error {
 
     #[error("{}", _0)]
     BlobId(BlobIdParseError),
-
-    #[error("invalid experiment id {}", _0)]
-    ExperimentId(String),
 }
 
 impl From<serde_json::Error> for Error {

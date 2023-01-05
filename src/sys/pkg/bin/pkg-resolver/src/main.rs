@@ -21,7 +21,6 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_inspect as inspect, fuchsia_trace as ftrace,
     futures::{prelude::*, stream::FuturesUnordered},
-    parking_lot::RwLock,
     std::{
         io,
         sync::Arc,
@@ -36,7 +35,6 @@ mod clock;
 mod config;
 mod eager_package_manager;
 mod error;
-mod experiment;
 mod inspect_util;
 mod metrics_util;
 mod ota_channel;
@@ -54,7 +52,6 @@ mod test_util;
 use crate::{
     cache::BasePackageIndex,
     config::Config,
-    experiment::Experiments,
     ota_channel::ChannelInspectState,
     repository_manager::{RepositoryManager, RepositoryManagerBuilder},
     repository_service::RepositoryService,
@@ -141,10 +138,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     let channel_inspect_state =
         ChannelInspectState::new(inspector.root().create_child("omaha_channel"));
 
-    let experiment_state = experiment::State::new(inspector.root().create_child("experiments"));
-    let experiment_state = Arc::new(RwLock::new(experiment_state));
-    let experiments = Arc::clone(&experiment_state).into();
-
     let futures = FuturesUnordered::new();
 
     let (mut cobalt_sender, cobalt_fut) = ProtocolConnector::new_with_buffer_size(
@@ -184,7 +177,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     let repo_manager = Arc::new(AsyncRwLock::new(
         load_repo_manager(
             inspector.root().create_child("repository_manager"),
-            experiments,
             &config,
             cobalt_sender.clone(),
             local_mirror.clone(),
@@ -357,7 +349,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
 
 async fn load_repo_manager(
     node: inspect::Node,
-    experiments: Experiments,
     config: &Config,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     local_mirror: Option<LocalMirrorProxy>,
@@ -371,7 +362,6 @@ async fn load_repo_manager(
     let builder = match RepositoryManagerBuilder::new(
         data_proxy,
         dynamic_repo_path,
-        experiments,
         tuf_metadata_timeout,
     )
     .await
