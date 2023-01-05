@@ -78,7 +78,6 @@ group("bootstrap-zedboot") {
   deps = [
     "//src/bringup/bundles:bootstrap",
     "//src/storage/bundles:bootstrap",
-    "//src/sys/bundles:bootstrap",
   ]
 }
 

@@ -70,7 +70,6 @@ assembled_system("guest") {
     "//src/storage/bin/umount",
     "//src/storage/fvm/driver",
     "//src/sys/bin/psutils",
-    "//src/sys/bundles:bootstrap",
     "//src/sys/component_manager:component_manager_bootfs_config",
     "//src/ui/input/drivers/hid",
     "//src/ui/input/drivers/hid-input-report",
