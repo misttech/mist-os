@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <algorithm>
 #include <memory>
@@ -24,7 +25,28 @@ namespace audio::da7219 {
 class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecConnector> {
  public:
   explicit ServerConnector(Logger* logger, std::shared_ptr<Core> core, bool is_input)
-      : logger_(logger), core_(core), is_input_(is_input) {}
+      : logger_(logger),
+        core_(core),
+        is_input_(is_input),
+        devfs_connector_(fit::bind_member<&ServerConnector::BindConnector>(this)) {}
+
+  // Bind the trampoline server.
+  void BindConnector(fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server) {
+    auto on_unbound = [this](ServerConnector*, fidl::UnbindInfo info,
+                             fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server_end) {
+      if (info.is_peer_closed()) {
+        DA7219_LOG(DEBUG, "Client disconnected");
+      } else if (!info.is_user_initiated() && info.status() != ZX_ERR_CANCELED) {
+        // Do not log canceled cases which happens too often in particular in test cases.
+        DA7219_LOG(ERROR, "Client connection unbound: %s", info.status_string());
+      }
+    };
+    fidl::BindServer(core_->dispatcher(), std::move(server), this, std::move(on_unbound));
+  }
+
+  driver_devfs::Connector<fuchsia_hardware_audio::CodecConnector>& devfs_connector() {
+    return devfs_connector_;
+  }
 
  private:
   // Bind the server without the trampoline.
@@ -58,6 +80,7 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
   std::shared_ptr<Core> core_;
   bool is_input_;
   std::unique_ptr<Server> server_;
+  driver_devfs::Connector<fuchsia_hardware_audio::CodecConnector> devfs_connector_;
 };
 
 class Driver : public fdf::DriverBase {

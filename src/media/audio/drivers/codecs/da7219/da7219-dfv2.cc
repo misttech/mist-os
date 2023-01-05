@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <lib/driver/component/cpp/service_client.h>
+#include <lib/fit/defer.h>
 
 namespace audio::da7219 {
 
@@ -80,22 +81,9 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
   } else {
     server_output_ = std::make_shared<ServerConnector>(logger_.get(), core_, false);
   }
-  auto result = handler.add_codec_connector(
-      [this, is_input](fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> request) -> void {
-        auto on_unbound = [this](
-                              ServerConnector*, fidl::UnbindInfo info,
-                              fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server_end) {
-          if (info.is_peer_closed()) {
-            DA7219_LOG(DEBUG, "Client disconnected");
-          } else if (!info.is_user_initiated() && info.status() != ZX_ERR_CANCELED) {
-            // Do not log canceled cases which happens too often in particular in test cases.
-            DA7219_LOG(ERROR, "Client connection unbound: %s", info.status_string());
-          }
-        };
-        fidl::BindServer(dispatcher(), std::move(request),
-                         is_input ? server_input_.get() : server_output_.get(),
-                         std::move(on_unbound));
-      });
+
+  auto result = handler.add_codec_connector(fit::bind_member<&ServerConnector::BindConnector>(
+      is_input ? server_input_.get() : server_output_.get()));
   ZX_ASSERT(result.is_ok());
 
   result = context().outgoing()->AddService<fuchsia_hardware_audio::CodecConnectorService>(
@@ -108,32 +96,51 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
   // Serve using devfs.
   compat::Context::ConnectAndCreate(
       &context(), dispatcher(),
-      [this,
+      [this, is_input,
        name_copy = std::string(name)](zx::result<std::unique_ptr<compat::Context>> result) mutable {
+        // If we hit an error this will reset our node which signals that the driver framework
+        // should stop us.
+        auto reset_node = fit::defer([this]() { node().reset(); });
+
         if (result.is_error()) {
           FDF_SLOG(ERROR, "Failed to get compat::Context", KV("status", result.status_string()));
-          // Reset the node to signal unbind to the driver framework.
-          node().reset();
           return;
         }
         compat_context_ = std::move(result.value());
         auto devfs_path = compat_context_->TopologicalPath(name_copy);
-        auto service_path = std::string(fuchsia_hardware_audio::CodecConnectorService::Name) + "/" +
-                            name_copy + "/" +
-                            fuchsia_hardware_audio::CodecConnectorService::CodecConnector::Name;
 
-        auto status = compat_context_->devfs_exporter().ExportSync(
-            service_path, devfs_path, fuchsia_device_fs::ExportOptions(), 6 /*ZX_PROTOCOL_CODEC*/);
-        if (status != ZX_OK) {
-          FDF_SLOG(ERROR, "Failed to export to devfs: %s",
-                   KV("status", zx_status_get_string(status)));
-          // Reset the node to signal unbind to the driver framework.
-          node().reset();
+        zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+        if (connection.is_error()) {
+          FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
+                   KV("status", connection.status_string()));
           return;
         }
 
-        FDF_SLOG(INFO, "Exported", KV("service_path", service_path.c_str()),
-                 KV("devfs_path", devfs_path.c_str()));
+        fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
+        ServerConnector& server = is_input ? *server_input_.get() : *server_output_.get();
+
+        zx::result connector = server.devfs_connector().Bind(dispatcher());
+        if (connector.is_error()) {
+          FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
+                   KV("status", connector.status_string()));
+          return;
+        }
+        fidl::WireResult export_result = devfs_exporter->ExportV2(
+            std::move(connector.value()), fidl::StringView::FromExternal(devfs_path),
+            fidl::StringView::FromExternal("codec"), fuchsia_device_fs::ExportOptions());
+        if (!export_result.ok()) {
+          FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+                   KV("status", export_result.status_string()));
+          return;
+        }
+        if (export_result.value().is_error()) {
+          FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+                   KV("status", zx_status_get_string(export_result.value().error_value())));
+          return;
+        }
+
+        reset_node.cancel();
+        FDF_SLOG(INFO, "Exported", KV("devfs_path", devfs_path.c_str()));
       });
   return zx::ok();
 }
