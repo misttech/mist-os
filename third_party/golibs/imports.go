@@ -22,7 +22,6 @@ import (
 	_ "github.com/pkg/sftp"
 	_ "github.com/sasha-s/go-deadlock"
 	_ "github.com/spdx/tools-golang/builder"
-	_ "github.com/spdx/tools-golang/builder/builder2v2"
 	_ "github.com/spdx/tools-golang/spdx/common"
 	_ "github.com/spdx/tools-golang/spdx/v2_2"
 	_ "github.com/spdx/tools-golang/utils"
