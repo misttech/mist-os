@@ -14,6 +14,7 @@
 #include <soc/aml-a1/a1-hw.h>
 
 #include "clover.h"
+#include "src/devices/board/drivers/clover/clover-i2c-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/i2c.h"
 
@@ -111,13 +112,19 @@ zx_status_t Clover::I2cInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
+  auto result = pbus_.buffer(arena)->AddComposite(
+      fidl::ToWire(fidl_arena, i2c_dev),
+      platform_bus_composite::MakeFidlFragment(fidl_arena, clover_i2c_fragments,
+                                               std::size(clover_i2c_fragments)),
+      "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "NodeAdd I2c(i2c_dev) request failed: %s", result.FormatDescription().data());
+    zxlogf(ERROR, "AddComposite I2c(i2c_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "NodeAdd I2c(i2c_dev) failed: %s", zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "AddComposite I2c(i2c_dev) failed: %s",
+           zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 

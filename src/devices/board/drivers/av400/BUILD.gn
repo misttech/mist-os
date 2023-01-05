@@ -276,6 +276,16 @@ driver_bind_rules("av400-nna-bind") {
   ]
 }
 
+driver_bind_rules("av400-i2c-bind") {
+  rules = "bind/av400-i2c.bind"
+  header_output = "av400-i2c-bind.h"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 fuchsia_driver("av400-driver") {
   output_name = "av400"
   configs += [
@@ -314,6 +324,7 @@ fuchsia_driver("av400-driver") {
     ":av400-cpu-bind_header",
     ":av400-dsp-bind_header",
     ":av400-emmc-bind_header",
+    ":av400-i2c-bind_header",
     ":av400-nna-bind_header",
     ":av400-power-domain-bind_header",
     ":av400-power-regulator-bind_header",

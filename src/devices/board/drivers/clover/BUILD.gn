@@ -61,6 +61,16 @@ driver_bind_rules("clover-sdio-bind") {
   ]
 }
 
+driver_bind_rules("clover-i2c-bind") {
+  rules = "bind/clover-i2c.bind"
+  header_output = "clover-i2c-bind.h"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 fuchsia_driver("clover-driver") {
   output_name = "clover"
   configs += [
@@ -86,6 +96,7 @@ fuchsia_driver("clover-driver") {
   deps = [
     ":clover-bind",
     ":clover-cpu-bind_header",
+    ":clover-i2c-bind_header",
     ":clover-sdio-bind_header",
     ":clover-spi-0-bind_header",
     ":clover-tee-bind_header",

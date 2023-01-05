@@ -254,7 +254,7 @@ TEST_F(DeviceEnumerationTest, CloverTest) {
       "sys/platform/05:08:a/thermal",
       "class/thermal/000",
       "sys/platform/05:08:24/ram",
-      "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2/i2c/aml-i2c",
       "sys/platform/05:00:19/spi-0/aml-spi-0/spi/spi-0-0",
       "sys/platform/00:00:29",                 // registers device
       "sys/platform/05:08:1d/aml-pwm-device",  // pwm
@@ -270,7 +270,7 @@ TEST_F(DeviceEnumerationTest, Av400Test) {
       "sys/platform/05:07:1/aml-gpio",
       "sys/platform/05:07:1d",  // pwm
       "sys/platform/05:07:2c/clocks",
-      "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2/i2c/aml-i2c",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:07:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc",
       "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",

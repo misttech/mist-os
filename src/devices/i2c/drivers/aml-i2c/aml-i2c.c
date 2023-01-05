@@ -437,8 +437,11 @@ static zx_status_t aml_i2c_bind(void* ctx, zx_device_t* parent) {
   }
 
   if ((status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &i2c->pdev)) != ZX_OK) {
-    zxlogf(ERROR, "aml_i2c_bind: ZX_PROTOCOL_PDEV not available");
-    goto fail;
+    if ((status = device_get_fragment_protocol(parent, "pdev", ZX_PROTOCOL_PDEV, &i2c->pdev)) !=
+        ZX_OK) {
+      zxlogf(ERROR, "aml_i2c_bind: ZX_PROTOCOL_PDEV not available");
+      goto fail;
+    }
   }
 
   pdev_device_info_t info;
