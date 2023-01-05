@@ -1214,6 +1214,278 @@
           "name": "DirectoryCapability",
           "type": "ClassDeclarationImpl"
         },
+        "EventListener": {
+          "ConstructorDeclarationImpl": {
+            "EventListener": {
+              "SimpleFormalParameterImpl": {
+                "eventStream": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "eventStream",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "fcomponent.EventStreamProxy"
+                },
+                "started": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": true,
+                  "isOptionalNamed": true,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": false,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": false,
+                  "name": "started",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "void Function(String moniker)?"
+                },
+                "stopped": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": true,
+                  "isOptionalNamed": true,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": false,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": false,
+                  "name": "stopped",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "void Function(String moniker, int stoppedStatus)?"
+                }
+              },
+              "name": "EventListener",
+              "type": "ConstructorDeclarationImpl"
+            },
+            "EventListener.callback": {
+              "SimpleFormalParameterImpl": {
+                "callback": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "callback",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "Future<void> Function(fcomponent.Event event)"
+                },
+                "eventStream": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "eventStream",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "fcomponent.EventStreamProxy"
+                }
+              },
+              "name": "EventListener.callback",
+              "type": "ConstructorDeclarationImpl"
+            }
+          },
+          "MethodDeclarationImpl": {
+            "close": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "close",
+              "returnType": "void",
+              "type": "MethodDeclarationImpl"
+            },
+            "listen": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "listen",
+              "returnType": "Future<void>",
+              "type": "MethodDeclarationImpl"
+            }
+          },
+          "name": "EventListener",
+          "type": "ClassDeclarationImpl"
+        },
+        "EventStreamCapability": {
+          "ConstructorDeclarationImpl": {
+            "EventStreamCapability": {
+              "FieldFormalParameterImpl": {
+                "this.filter": {
+                  "name": "this.filter",
+                  "type": "FieldFormalParameterImpl"
+                },
+                "this.path": {
+                  "name": "this.path",
+                  "type": "FieldFormalParameterImpl"
+                },
+                "this.scope": {
+                  "name": "this.scope",
+                  "type": "FieldFormalParameterImpl"
+                }
+              },
+              "SimpleFormalParameterImpl": {
+                "as": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": true,
+                  "isOptionalNamed": true,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": false,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": false,
+                  "name": "as",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "null"
+                },
+                "name": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "name",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "null"
+                }
+              },
+              "name": "EventStreamCapability",
+              "type": "ConstructorDeclarationImpl"
+            },
+            "EventStreamCapability.from": {
+              "SimpleFormalParameterImpl": {
+                "o": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "o",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "EventStreamCapability"
+                }
+              },
+              "name": "EventStreamCapability.from",
+              "type": "ConstructorDeclarationImpl"
+            }
+          },
+          "ExtendsClause": {
+            "name": "Capability",
+            "type": "extends"
+          },
+          "MethodDeclarationImpl": {
+            "==": {
+              "SimpleFormalParameterImpl": {
+                "o": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "o",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "Object"
+                }
+              },
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": true,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "==",
+              "returnType": "bool",
+              "type": "MethodDeclarationImpl"
+            },
+            "hashCode": {
+              "isAbstract": false,
+              "isGetter": true,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "hashCode",
+              "returnType": "int",
+              "type": "MethodDeclarationImpl"
+            },
+            "toFidlType": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "toFidlType",
+              "returnType": "ftest.Capability",
+              "type": "MethodDeclarationImpl"
+            },
+            "toString": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "toString",
+              "returnType": "String",
+              "type": "MethodDeclarationImpl"
+            }
+          },
+          "VariableDeclarationImpl": {
+            "filter": {
+              "isConst": false,
+              "isFinal": true,
+              "isLate": false,
+              "name": "filter",
+              "type": "VariableDeclarationImpl",
+              "varType": "fdata.Dictionary?"
+            },
+            "path": {
+              "isConst": false,
+              "isFinal": false,
+              "isLate": false,
+              "name": "path",
+              "type": "VariableDeclarationImpl",
+              "varType": "String?"
+            },
+            "scope": {
+              "isConst": false,
+              "isFinal": true,
+              "isLate": false,
+              "name": "scope",
+              "type": "VariableDeclarationImpl",
+              "varType": "List<fdecl.Ref>?"
+            }
+          },
+          "name": "EventStreamCapability",
+          "type": "ClassDeclarationImpl"
+        },
         "ProtocolCapability": {
           "ConstructorDeclarationImpl": {
             "ProtocolCapability": {

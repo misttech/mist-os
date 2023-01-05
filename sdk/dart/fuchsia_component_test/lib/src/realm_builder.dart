@@ -11,6 +11,7 @@ import 'package:fidl/fidl.dart' as fidl;
 import 'package:fidl_fuchsia_component/fidl_async.dart' as fcomponent;
 import 'package:fidl_fuchsia_component_config/fidl_async.dart' as fconfig;
 import 'package:fidl_fuchsia_component_decl/fidl_async.dart' as fdecl;
+import 'package:fidl_fuchsia_data/fidl_async.dart' as fdata;
 import 'package:fidl_fuchsia_diagnostics_types/fidl_async.dart' as fdiagtypes;
 import 'package:fidl_fuchsia_component_test/fidl_async.dart' as ftest;
 import 'package:fidl_fuchsia_io/fidl_async.dart' as fio;
@@ -411,7 +412,7 @@ abstract class Capability {
 }
 
 /// A protocol capability, which may be routed between components. Created by
-/// [Capability.protocol()].
+/// [Capability.withProtocol()].
 class ProtocolCapability extends Capability {
   fdecl.DependencyType type;
 
@@ -468,7 +469,7 @@ class ProtocolCapability extends Capability {
 }
 
 /// A directory capability, which may be routed between components. Created by
-/// [Capability.directory()].
+/// [Capability.withDirectory()].
 class DirectoryCapability extends Capability {
   fdecl.DependencyType type;
 
@@ -543,7 +544,7 @@ class DirectoryCapability extends Capability {
 }
 
 /// A storage capability, which may be routed between components. Created by
-/// [Capability.storage()].
+/// [Capability.withStorage()].
 class StorageCapability extends Capability {
   /// The path at which this storage capability will be provided or used. Only
   /// relevant if the route's source or target is a legacy or local component,
@@ -577,7 +578,7 @@ class StorageCapability extends Capability {
 }
 
 /// A service capability, which may be routed between components. Created by
-/// [Capability.service()].
+/// [Capability.withService()].
 class ServiceCapability extends Capability {
   /// The path at which this service capability will be provided or used. Only
   /// relevant if the route's source or target is a legacy or local component,
@@ -614,6 +615,168 @@ class ServiceCapability extends Capability {
   @override
   String toString() {
     return _capabilityToString('path = $path');
+  }
+}
+
+/// A event stream capability, which may be routed between components. Created
+/// by [Capability.withEventStream()].
+class EventStreamCapability extends Capability {
+  /// The path at which this event stream capability will be provided or used.
+  /// Only relevant if the route's source or target is a legacy or local
+  /// component, as these are the only components that realm builder will
+  /// generate a modern component manifest for.
+  String? path;
+
+  /// A filter to apply on the event.
+  final fdata.Dictionary? filter;
+
+  /// A list of objects underneath this component to downscope the event to.
+  /// Example: #my_child_component, #my_child_collection.
+  final List<fdecl.Ref>? scope;
+
+  EventStreamCapability(name, {as, this.path, this.filter, this.scope})
+      : super(name, as);
+
+  EventStreamCapability.from(EventStreamCapability o)
+      : path = o.path,
+        filter = o.filter,
+        scope = o.scope,
+        super(o.name, o.as);
+
+  @override
+  ftest.Capability toFidlType() {
+    return ftest.Capability.withEventStream(ftest.EventStream(
+        name: name, as: as, path: path, filter: filter, scope: scope));
+  }
+
+  @override
+  bool operator ==(Object o) =>
+      o is EventStreamCapability &&
+      name == o.name &&
+      as == o.as &&
+      path == o.path &&
+      filter == o.filter &&
+      ListEquality().equals(scope, o.scope);
+
+  @override
+  int get hashCode =>
+      name.hashCode +
+      as.hashCode +
+      path.hashCode +
+      filter.hashCode +
+      scope.hashCode;
+
+  @override
+  String toString() {
+    return _capabilityToString(
+        'path = $path, filter = $filter, scope = $scope');
+  }
+}
+
+/// Convenience wrapper to listen for [fuchsia.component.EventStream] events.
+class EventListener {
+  final fcomponent.EventStreamProxy _eventStream;
+
+  final Completer _listening = new Completer();
+
+  final Future<void> Function(EventListener self, fcomponent.Event event)
+      _callback;
+
+  final Future<void> Function(fcomponent.Event event)? _onEventCallback;
+
+  final void Function(String moniker)? _started;
+  final void Function(String moniker, int stoppedStatus)? _stopped;
+
+  /// Responds to an incoming EventStream event (via [onEvent()]) by matching
+  /// the event type to any of one or more given callbacks. Events with missing
+  /// (null) values for any required callback parameters are ignored. For
+  /// example, the [stopped] callback will only be called for events of
+  /// [fcomponent.EventType.stopped] if both the [moniker] and [stoppedStatus]
+  /// are non-null.)
+  EventListener(
+    fcomponent.EventStreamProxy eventStream, {
+    void Function(String moniker)? started,
+    void Function(String moniker, int stoppedStatus)? stopped,
+  })  : _eventStream = eventStream,
+        _onEventCallback = null,
+        _started = started,
+        _stopped = stopped,
+        _callback = _handleTypedEventCallbacks;
+
+  /// Constructs an EventStream listener with the given [onEvent()] callback.
+  EventListener.callback(
+    fcomponent.EventStreamProxy eventStream,
+    Future<void> Function(fcomponent.Event event) callback,
+  )   : _eventStream = eventStream,
+        _onEventCallback = callback,
+        _started = null,
+        _stopped = null,
+        _callback = _handleEventListenerCallback;
+
+  static Future<void> _handleEventListenerCallback(
+    EventListener self,
+    fcomponent.Event event,
+  ) {
+    return self._onEventCallback!(event);
+  }
+
+  static Future<void> _handleTypedEventCallbacks(
+    EventListener self,
+    fcomponent.Event event,
+  ) async {
+    self._callTypedEventHandlers(event);
+  }
+
+  void _callTypedEventHandlers(fcomponent.Event event) {
+    String? moniker = event.header?.moniker;
+    if (moniker == null) {
+      return;
+    }
+    switch (event.header?.eventType) {
+      case fcomponent.EventType.started:
+        if (_started != null) {
+          _started!(moniker);
+        }
+        break;
+
+      case fcomponent.EventType.stopped:
+        if (_stopped != null) {
+          int? stoppedStatus = event.payload?.stopped?.status;
+          if (stoppedStatus != null) {
+            _stopped!(moniker, stoppedStatus);
+          }
+        }
+        break;
+    }
+    return;
+  }
+
+  /// Listening for events until [close()].
+  Future<void> listen() async {
+    await _eventStream.waitForReady();
+    try {
+      while (!_listening.isCompleted) {
+        for (final event in await _eventStream.getNext()) {
+          if (!_listening.isCompleted) {
+            _callback(this, event);
+          }
+        }
+      }
+    } on fidl.FidlError catch (err, stacktrace) {
+      if (!_listening.isCompleted) {
+        rethrow;
+      }
+    }
+    return _listening.future;
+  }
+
+  /// Stop listening for events. The [EventListener] and given [EventStream]
+  /// will not be useable after this call.
+  void close() {
+    if (!_listening.isCompleted) {
+      _listening.complete();
+    }
+    _eventStream.ctrl.close();
   }
 }
 

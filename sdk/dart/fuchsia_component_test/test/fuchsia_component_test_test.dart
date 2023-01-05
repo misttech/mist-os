@@ -25,6 +25,7 @@ import 'dart:typed_data';
 const String echoClientUrl = '#meta/echo_client.cm';
 const String echoServerUrl = '#meta/echo_server.cm';
 const String echoClientWithBinderUrl = '#meta/echo_client_with_binder.cm';
+const String echoServerWithBinderUrl = '#meta/echo_server_with_binder.cm';
 const String echoClientWithBinderArg = 'Hello Fuchsia!';
 const String echoClientStructuredConfigUrl = '#meta/echo_client_sc.cm';
 
@@ -443,7 +444,7 @@ void main() {
       }
     });
 
-    test('start by binding', () async {
+    test('start by binding without events', () async {
       RealmInstance? realmInstance;
       try {
         final builder = await RealmBuilder.create();
@@ -515,6 +516,261 @@ void main() {
         final requestedEchoString = await echoRequestReceived.future;
 
         expect(requestedEchoString, echoClientWithBinderArg);
+      } on Exception catch (err, stacktrace) {
+        checkCommonExceptions(err, stacktrace);
+        rethrow;
+      } finally {
+        if (realmInstance != null) {
+          realmInstance.root.close();
+        }
+      }
+    });
+
+    test('start by binding with events', () async {
+      RealmInstance? realmInstance;
+      String? serverMoniker;
+      try {
+        final builder = await RealmBuilder.create();
+
+        const serverName = 'v2Server';
+        const serverBinder = 'serverBinder';
+
+        // This test leverages the `echo_server` binary, with an augmented
+        // component manifest that exposes `fuchsia.component.Binder`. The
+        // `echo_server` will automatically start if a client connects to its
+        // `Echo` service, but this test doesn't do that. It leverages the fact
+        // that the component will launch and execute a loop waiting for
+        // requests, which can make the state easier to bug if the event does
+        // not arrive.
+        final v2Server = await builder.addChild(
+          serverName,
+          echoServerWithBinderUrl,
+        );
+
+        // Route logging to child
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(flogger.LogSink.$serviceName))
+          ..from(Ref.parent())
+          ..to(Ref.child(v2Server)));
+
+        // Route the child's Binder service to parent, so the test can connect
+        // to it to start the child.
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(fcomponent.Binder.$serviceName,
+              as: serverBinder))
+          ..from(Ref.child(v2Server))
+          ..to(Ref.parent()));
+
+        // Connect to the EventStream.
+        final eventStream = fcomponent.EventStreamProxy();
+        await (services.Incoming.fromSvcPath()..connectToService(eventStream))
+            .close();
+
+        // Register callbacks for started events, and complete a Future when
+        // called.
+        final completeWaitForStart = Completer();
+        unawaited(EventListener(
+          eventStream,
+          started: (String moniker) {
+            if (moniker == serverMoniker) {
+              completeWaitForStart.complete();
+            }
+          },
+        ).listen());
+
+        // Start the realmInstance. The child component (the server) is not
+        // "eager", so it should not start automatically.
+        realmInstance = await builder.build();
+        final scopedInstance = realmInstance.root;
+        serverMoniker = './${scopedInstance.collectionName}:'
+            '${scopedInstance.childName}/$serverName';
+
+        // Start the server
+        /*serverBinder=*/ scopedInstance.connectToProtocolAtPath(
+          fcomponent.BinderProxy(),
+          serverBinder,
+        );
+
+        // Wait for the server "started" event
+        await completeWaitForStart.future;
+
+        // Note, since this test abruptly stopped the child component, a
+        // non-zero (error) status is likely.
+      } on Exception catch (err, stacktrace) {
+        checkCommonExceptions(err, stacktrace);
+        rethrow;
+      } finally {
+        if (realmInstance != null) {
+          realmInstance.root.close();
+        }
+      }
+    });
+
+    test('route echo between two v2 components', () async {
+      RealmInstance? realmInstance;
+      EventListener? eventListener;
+      try {
+        final builder = await RealmBuilder.create();
+
+        const echoServerName = 'v2EchoServer';
+        const echoClientName = 'v2EchoClient';
+
+        final v2EchoServer = await builder.addChild(
+          echoServerName,
+          echoServerUrl,
+        );
+        final v2EchoClient = await builder.addChild(
+          echoClientName,
+          echoClientUrl,
+          ChildOptions()..eager(),
+        );
+
+        // Route logging to children
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(flogger.LogSink.$serviceName))
+          ..from(Ref.parent())
+          ..to(Ref.child(v2EchoServer))
+          ..to(Ref.child(v2EchoClient)));
+
+        // Route the echo service from server to client
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(fecho.Echo.$serviceName))
+          ..from(Ref.child(v2EchoServer))
+          ..to(Ref.child(v2EchoClient)));
+
+        // Connect to the framework's EventStream.
+        final eventStream = fcomponent.EventStreamProxy();
+        await (services.Incoming.fromSvcPath()..connectToService(eventStream))
+            .close();
+
+        // Listen for "stopped" events.
+        //
+        // NOTE: This requires the test CML include a `use` for the subscribed
+        // event type(s), for example:
+        //
+        // ```cml
+        //   use: [
+        //     {
+        //         event_stream: [
+        //             "started",
+        //             "stopped",
+        //         ],
+        //         from: "parent",
+        //     },
+        //   ],
+        // ```
+        final completeWaitForStop = Completer<int>();
+        eventListener =
+            EventListener(eventStream, stopped: (String moniker, int status) {
+          // Since EchoClient is [eager()], it may start and stop before the
+          // async [builder.build()] completes. [realmInstance.root.childName]
+          // would not be known before this stopped event is received, so
+          // [endsWith()] is the best solution here.
+          if (moniker.endsWith('/$echoClientName')) {
+            completeWaitForStop.complete(status);
+          }
+        });
+        unawaited(eventListener.listen());
+
+        // Start the realm instance.
+        realmInstance = await builder.build();
+
+        // Wait for the client to stop, and check for a successful exit status.
+        final stoppedStatus = await completeWaitForStop.future;
+        expect(stoppedStatus, 0);
+      } on Exception catch (err, stacktrace) {
+        checkCommonExceptions(err, stacktrace);
+        rethrow;
+      } finally {
+        if (eventListener != null) {
+          // Ensure the listener will not trigger callbacks on component events
+          // from other tests.
+          eventListener.close();
+        }
+        if (realmInstance != null) {
+          realmInstance.root.close();
+        }
+      }
+    });
+
+    test(
+        'route echo between two v2 components with async any Event type callback',
+        () async {
+      RealmInstance? realmInstance;
+      try {
+        final builder = await RealmBuilder.create();
+
+        const echoServerName = 'v2EchoServer';
+        const echoClientName = 'v2EchoClient';
+
+        final v2EchoServer = await builder.addChild(
+          echoServerName,
+          echoServerUrl,
+        );
+        final v2EchoClient = await builder.addChild(
+          echoClientName,
+          echoClientUrl,
+          ChildOptions()..eager(),
+        );
+
+        // Route logging to children
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(flogger.LogSink.$serviceName))
+          ..from(Ref.parent())
+          ..to(Ref.child(v2EchoServer))
+          ..to(Ref.child(v2EchoClient)));
+
+        // Route the echo service from server to client
+        await builder.addRoute(Route()
+          ..capability(ProtocolCapability(fecho.Echo.$serviceName))
+          ..from(Ref.child(v2EchoServer))
+          ..to(Ref.child(v2EchoClient)));
+
+        // Connect to the framework's EventStream.
+        final eventStream = fcomponent.EventStreamProxy();
+        await (services.Incoming.fromSvcPath()..connectToService(eventStream))
+            .close();
+
+        // Listen for "stopped" events.
+        //
+        // NOTE: This requires the test CML include a `use` for the subscribed
+        // event type(s), for example:
+        //
+        // ```cml
+        //   use: [
+        //     {
+        //         event_stream: [
+        //             "started",
+        //             "stopped",
+        //         ],
+        //         from: "parent",
+        //     },
+        //   ],
+        // ```
+        final completeWaitForStop = Completer<int>();
+        unawaited(
+            EventListener.callback(eventStream, (fcomponent.Event event) async {
+          if (event.header?.eventType == fcomponent.EventType.stopped) {
+            String? moniker = event.header?.moniker;
+            int? stoppedStatus = event.payload?.stopped?.status;
+            if (stoppedStatus != null &&
+                (moniker?.endsWith('/$echoClientName') ?? false)) {
+              // Since the EventListener is not closed at the end of this test,
+              // it's possible another test could re-trigger the callback, so
+              // ensure the Completer only completes once.
+              if (!completeWaitForStop.isCompleted) {
+                completeWaitForStop.complete(stoppedStatus);
+              }
+            }
+          }
+        }).listen());
+
+        // Start the realm instance.
+        realmInstance = await builder.build();
+
+        // Wait for the client to stop, and check for a successful exit status.
+        final stoppedStatus = await completeWaitForStop.future;
+        expect(stoppedStatus, 0);
       } on Exception catch (err, stacktrace) {
         checkCommonExceptions(err, stacktrace);
         rethrow;

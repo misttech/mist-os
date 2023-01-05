@@ -6,6 +6,15 @@
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
+    use: [
+        {
+            event_stream: [
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+        },
+    ],
     offer: [
         {
             storage: "data",
