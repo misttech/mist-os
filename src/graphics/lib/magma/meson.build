@@ -34,7 +34,7 @@ files_libmagma_linux = files(
 thread_dep = dependency('threads')
 
 libmagma_virt = static_library(
-  'magma_linux',
+  'magma_virt',
   sources: [files_libmagma_linux, magma_generic_cc, virtio_magma_h],
   cpp_args: cpp_args,
   c_args: c_args,

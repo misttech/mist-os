@@ -1,8 +1,0 @@
-# Copyright 2022 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# TODO(fxbug.dev/118657) - remove when //third_party/mesa updated
-group("libmagma_linux") {
-  public_deps = [ "//src/graphics/lib/magma/src/libmagma_virt" ]
-}
