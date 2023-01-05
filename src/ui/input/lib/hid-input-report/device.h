@@ -27,6 +27,30 @@ enum class ParseResult : uint32_t {
   kItemNotFound = 7,
 };
 
+inline const char* ParseResultGetString(ParseResult result) {
+  switch (result) {
+    case ParseResult::kOk:
+      return "kOk";
+    case ParseResult::kNoMemory:
+      return "kNoMemory";
+    case ParseResult::kTooManyItems:
+      return "kTooManyItems";
+    case ParseResult::kReportSizeMismatch:
+      return "kReportSizeMismatch";
+    case ParseResult::kNoCollection:
+      return "kNoCollection";
+    case ParseResult::kBadReport:
+      return "kBadReport";
+    case ParseResult::kNotImplemented:
+      return "kNotImplemented";
+    case ParseResult::kItemNotFound:
+      return "kItemNotFound";
+
+    default:
+      return "Unrecognized ParseResult";
+  }
+}
+
 enum class DeviceType : uint32_t {
   kMouse = 1,
   kSensor = 2,

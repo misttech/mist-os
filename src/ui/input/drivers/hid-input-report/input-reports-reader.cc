@@ -7,9 +7,30 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 
+#include <span>
+
 #include <fbl/auto_lock.h>
 
 namespace hid_input_report_dev {
+
+namespace {
+
+constexpr size_t kPerLine = 16;
+
+void hexdump(const cpp20::span<const uint8_t> data) {
+  constexpr uint32_t kCharsPerByte = 3;
+  for (size_t i = 0; i < data.size_bytes(); i += kPerLine) {
+    size_t line_size = std::min(kPerLine, data.size_bytes() - i);
+    char line[kCharsPerByte * line_size];
+    for (size_t j = 0; j < line_size; j++) {
+      sprintf(&line[kCharsPerByte * j], "%02X ", data[i + j]);
+    }
+
+    zxlogf(INFO, "hid-dump(%zu): %s", i, line);
+  }
+}
+
+}  // namespace
 
 std::unique_ptr<InputReportsReader> InputReportsReader::Create(
     InputReportBase* base, uint32_t reader_id, async_dispatcher_t* dispatcher,
@@ -91,9 +112,12 @@ void InputReportsReader::ReceiveReport(const uint8_t* raw_report, size_t raw_rep
     return;
   }
 
-  if (device->ParseInputReport(raw_report, raw_report_size, report_allocator_, report) !=
-      hid_input_report::ParseResult::kOk) {
-    zxlogf(ERROR, "ReceiveReport: Device failed to parse report correctly\n");
+  if (hid_input_report::ParseResult result =
+          device->ParseInputReport(raw_report, raw_report_size, report_allocator_, report);
+      result != hid_input_report::ParseResult::kOk) {
+    zxlogf(ERROR, "ReceiveReport: Device failed to parse report correctly %s (%d)",
+           ParseResultGetString(result), result);
+    hexdump(cpp20::span<const uint8_t>{raw_report, raw_report_size});
     return;
   }
 
