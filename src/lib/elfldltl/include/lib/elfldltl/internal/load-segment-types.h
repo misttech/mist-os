@@ -33,11 +33,11 @@ class LoadConstantSegmentType : public SegmentType {
 
   constexpr bool readable() const { return flags_ & Flags::kRead; }
 
-  constexpr bool writable() const { return flags_ & Flags::kWrite; }
+  constexpr std::false_type writable() const { return {}; }
 
   constexpr bool executable() const { return flags_ & Flags::kExecute; }
 
-  constexpr bool relro() const { return writable(); }
+  constexpr bool relro() const { return flags_ & Flags::kWrite; }
 
  private:
   using Flags = PhdrBase::Flags;

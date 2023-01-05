@@ -25,4 +25,4 @@ CONSTINIT auto data = []() constexpr {
   return ret;
 }();
 
-extern "C" const TestData test_data{&rodata, (int*)&data, &bss};
+extern "C" CONSTINIT const TestData test_data{&rodata, &data.front(), &bss};
