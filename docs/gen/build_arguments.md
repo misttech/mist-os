@@ -1139,19 +1139,19 @@ From //build/config/clang/crash_diagnostics.gni:7
 
 **Current value (from the default):** `"fuchsia"`
 
-From [//third_party/crashpad/src/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/build/crashpad_buildconfig.gni#22)
+From [//third_party/crashpad/src/build/crashpad_buildconfig.gni:22](https://fuchsia.googlesource.com/third_party/crashpad/+/f91f1e423ccd222b2f3afdee2f11d7281f8dc74f/src/build/crashpad_buildconfig.gni#22)
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From [//third_party/crashpad/src/util/net/tls.gni:21](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/util/net/tls.gni#21)
+From [//third_party/crashpad/src/util/net/tls.gni:19](https://fuchsia.googlesource.com/third_party/crashpad/+/f91f1e423ccd222b2f3afdee2f11d7281f8dc74f/src/util/net/tls.gni#19)
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
 **Current value (from the default):** `true`
 
-From [//third_party/crashpad/src/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/cd3fbf44f80df903cbbbb017082206d5a2c2c409/src/util/net/tls.gni#30)
+From [//third_party/crashpad/src/util/net/tls.gni:30](https://fuchsia.googlesource.com/third_party/crashpad/+/f91f1e423ccd222b2f3afdee2f11d7281f8dc74f/src/util/net/tls.gni#30)
 
 ### cts_version
 Name of the CTS version.
@@ -2481,7 +2481,7 @@ From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.c
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7d9bdde6f8d732767f0fce4273f492648335c77a/gn/perfetto.gni#150)
 
@@ -2515,7 +2515,7 @@ From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.c
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7d9bdde6f8d732767f0fce4273f492648335c77a/gn/perfetto.gni#251)
 
@@ -2626,7 +2626,7 @@ From [//third_party/perfetto/gn/perfetto.gni:302](https://fuchsia.googlesource.c
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:151
+From //src/power/power-manager/BUILD.gn:152
 
 ### enable_recovery_ui_v2
 Whether to use the new UX UI
@@ -3404,7 +3404,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -4509,7 +4509,7 @@ From //src/graphics/drivers/msd-vsi-vip/BUILD.gn:14
 
 **Current value (from the default):** `[]`
 
-From //src/bringup/bin/netsvc/BUILD.gn:21
+From //src/bringup/bin/netsvc/BUILD.gn:22
 
 ### omaha_app_id
 Default app id will always return no update.
@@ -7206,7 +7206,7 @@ From //build/security.gni:228
 ### thinlto_cache_dir
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7507,7 +7507,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
@@ -7677,7 +7677,7 @@ From //src/bringup/bin/virtcon/virtcon_args.gni:8
 If true, use a wayland server linked into the virtio_wl device instead of using
 a wayland_bridge component.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/virtualization/bin/args.gni:11
 
@@ -7818,7 +7818,7 @@ Whether or not to include the live_usb component in the build.
 
 **Current value (from the default):** `false`
 
-From //src/sys/live_usb/BUILD.gn:15
+From //src/sys/live_usb/BUILD.gn:16
 
 ### wlancfg_config_type
 Selects the wlan configuration type to use. Choices:
@@ -7972,14 +7972,14 @@ TODO(fxbug.dev/67565) - remove once external sync FD extensions fully supported
 
 **Current value (from the default):** `false`
 
-From [//third_party/mesa/src/intel/vulkan/BUILD.gn:27](https://fuchsia.googlesource.com/third_party/mesa/+/d5a0a71ecd0613737b9ceaa31bf9d78056ae9000/src/intel/vulkan/BUILD.gn#27)
+From [//third_party/mesa/src/intel/vulkan/BUILD.gn:27](https://fuchsia.googlesource.com/third_party/mesa/+/39884aa86f1ad4b1526beed2bcb70b74a7c771c2/src/intel/vulkan/BUILD.gn#27)
 
 ### anv_use_max_ram
 Give maximum possible memory to Vulkan heap
 
 **Current value (from the default):** `false`
 
-From [//third_party/mesa/src/intel/vulkan/BUILD.gn:30](https://fuchsia.googlesource.com/third_party/mesa/+/d5a0a71ecd0613737b9ceaa31bf9d78056ae9000/src/intel/vulkan/BUILD.gn#30)
+From [//third_party/mesa/src/intel/vulkan/BUILD.gn:30](https://fuchsia.googlesource.com/third_party/mesa/+/39884aa86f1ad4b1526beed2bcb70b74a7c771c2/src/intel/vulkan/BUILD.gn#30)
 
 ### build_libvulkan_goldfish
 
