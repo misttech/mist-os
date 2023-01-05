@@ -247,7 +247,7 @@ TEST_F(DeviceEnumerationTest, CloverTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/clover",
       "sys/platform/05:08:1/aml-gpio",
-      "sys/platform/05:00:34/aml-spinand/nand",
+      "sys/platform/05:00:35/aml-spinand/nand",
       "sys/platform/05:08:32/clocks",
       "sys/platform/00:00:1b/sysmem",
       "sys/platform/00:00:e/tee/optee",

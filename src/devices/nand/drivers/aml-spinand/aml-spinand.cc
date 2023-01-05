@@ -118,14 +118,6 @@ zx_status_t AmlSpiNand::RawNandWritePageHwecc(const uint8_t *data, size_t data_s
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint32_t page_in_block = nand_page / flash_chip_->mem_org.pages_per_eraseblock;
-  // bad block table
-  OobOps mode = OobOps::kOpsPlaceOob;
-  if (page_in_block >= config_.aml_uboot.table_start_block &&
-      page_in_block <= config_.aml_uboot.table_end_block) {
-    mode = OobOps::kOpsAutoOob;
-  }
-
   zx_status_t status;
   // Enable ecc function
   status = SpiNandUpdateCfg(kCfgEccEnable, kCfgEccEnable);
@@ -134,7 +126,7 @@ zx_status_t AmlSpiNand::RawNandWritePageHwecc(const uint8_t *data, size_t data_s
     return status;
   }
 
-  status = SpiNandWritePage(mode, nand_page, data, data_size, oob, oob_size);
+  status = SpiNandWritePage(OobOps::kOpsAutoOob, nand_page, data, data_size, oob, oob_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SpiNandWritePage failed");
   }
@@ -155,14 +147,6 @@ zx_status_t AmlSpiNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t *data, 
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint32_t page_in_block = nand_page / flash_chip_->mem_org.pages_per_eraseblock;
-  // bad block table
-  OobOps mode = OobOps::kOpsPlaceOob;
-  if (page_in_block >= config_.aml_uboot.table_start_block &&
-      page_in_block <= config_.aml_uboot.table_end_block) {
-    mode = OobOps::kOpsAutoOob;
-  }
-
   zx_status_t status;
   // Enable ecc function
   status = SpiNandUpdateCfg(kCfgEccEnable, kCfgEccEnable);
@@ -172,8 +156,8 @@ zx_status_t AmlSpiNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t *data, 
   }
 
   uint8_t ecc_bitflips = 0;
-  status = SpiNandReadPage(mode, nand_page, data, data_size, data_actual, oob, oob_size, oob_actual,
-                           &ecc_bitflips);
+  status = SpiNandReadPage(OobOps::kOpsAutoOob, nand_page, data, data_size, data_actual, oob,
+                           oob_size, oob_actual, &ecc_bitflips);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SpiNandReadPage failed");
     return status;
@@ -644,11 +628,6 @@ zx_status_t AmlSpiNand::Create(void *ctx, zx_device_t *parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  auto nand_config = ddk::GetMetadata<nand_config_t>(parent, DEVICE_METADATA_PRIVATE);
-  if (!nand_config.is_ok()) {
-    return nand_config.error_value();
-  }
-
   std::optional<fdf::MmioBuffer> controller_mmio;
   status = pdev.MapMmio(0, &controller_mmio);
   if (status != ZX_OK) {
@@ -666,8 +645,7 @@ zx_status_t AmlSpiNand::Create(void *ctx, zx_device_t *parent) {
   auto spifc = std::make_unique<AmlSpiFlashController>(std::move(controller_mmio.value()),
                                                        std::move(clk_mmio.value()));
 
-  auto spinand =
-      std::make_unique<AmlSpiNand>(parent, std::move(spifc), nand_config->bad_block_config);
+  auto spinand = std::make_unique<AmlSpiNand>(parent, std::move(spifc));
   status = spinand->Init();
   if (status != ZX_OK) {
     zxlogf(ERROR, "AML spi nand init failed");

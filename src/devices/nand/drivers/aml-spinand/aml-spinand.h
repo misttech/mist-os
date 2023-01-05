@@ -31,9 +31,8 @@ using DeviceType = ddk::Device<AmlSpiNand, ddk::Unbindable>;
 
 class AmlSpiNand : public DeviceType, public ddk::RawNandProtocol<AmlSpiNand, ddk::base_protocol> {
  public:
-  explicit AmlSpiNand(zx_device_t *parent, std::unique_ptr<AmlSpiFlashController> flash_controller,
-                      bad_block_config_t config)
-      : DeviceType(parent), flash_controller_(std::move(flash_controller)), config_(config) {}
+  explicit AmlSpiNand(zx_device_t *parent, std::unique_ptr<AmlSpiFlashController> flash_controller)
+      : DeviceType(parent), flash_controller_(std::move(flash_controller)) {}
 
   static zx_status_t Create(void *ctx, zx_device_t *parent);
 
@@ -156,7 +155,6 @@ class AmlSpiNand : public DeviceType, public ddk::RawNandProtocol<AmlSpiNand, dd
   std::optional<FlashChipInfo> flash_chip_;
   SpiNandDev nand_dev_;
   PlatData device_config_;
-  const bad_block_config_t config_;
 };
 
 }  // namespace amlspinand
