@@ -25,7 +25,7 @@
 //! }
 //! ```
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 mod runtime;
 pub use self::runtime::*;
