@@ -411,7 +411,6 @@ struct zx_device
   fbl::RefPtr<CompositeDevice> composite();
 
   void set_fidl_proxy(fbl::RefPtr<FidlProxyDevice> fidl_proxy);
-  fbl::RefPtr<FidlProxyDevice> take_fidl_proxy();
 
   bool is_fidl_proxy() const;
   fbl::RefPtr<FidlProxyDevice> fidl_proxy();

@@ -334,8 +334,6 @@ bool zx_device::is_composite() const { return is_composite_ && !!composite_; }
 
 fbl::RefPtr<CompositeDevice> zx_device::composite() { return composite_; }
 
-fbl::RefPtr<FidlProxyDevice> zx_device::take_fidl_proxy() { return std::move(fidl_proxy_); }
-
 void zx_device::set_fidl_proxy(fbl::RefPtr<FidlProxyDevice> fidl_proxy) {
   fidl_proxy_ = std::move(fidl_proxy);
   is_fidl_proxy_ = true;
