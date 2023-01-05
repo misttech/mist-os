@@ -204,10 +204,6 @@ impl LogsArtifactsContainer {
     /// Handle `LogSink` protocol on `stream`. Each socket received from the `LogSink` client is
     /// drained by a `Task` which is sent on `sender`. The `Task`s do not complete until their
     /// sockets have been closed.
-    ///
-    /// Sends an `OnRegisterInterest` message right away so producers know someone is listening.
-    /// We send `Interest::EMPTY` unless a different interest has previously been specified for
-    /// this component.
     pub async fn handle_log_sink(
         self: &Arc<Self>,
         stream: LogSinkRequestStream,
@@ -393,10 +389,10 @@ impl LogsArtifactsContainer {
         self.buffer.push_back(message);
     }
 
-    /// Set the `Interest` for this component, calling `LogSink/OnRegisterInterest` with all
-    /// control handles if it is a change from the previous interest. For any match that is also
-    /// contained in `previous_selectors`, the previous values will be removed from the set of
-    /// interests.
+    /// Set the `Interest` for this component, notifying all active `LogSink/WaitForInterestChange`
+    /// hanging gets with the new interset if it is a change from the previous interest.
+    /// For any match that is also contained in `previous_selectors`, the previous values will be
+    /// removed from the set of interests.
     pub async fn update_interest(
         &self,
         interest_selectors: &[LogInterestSelector],
@@ -465,8 +461,9 @@ impl LogsArtifactsContainer {
         }
     }
 
-    /// Resets the `Interest` for this component, calling `LogSink/OnRegisterInterest` with the
-    /// lowest interest found in the set of requested interests for all control handles.
+    /// Resets the `Interest` for this component, notifying all active
+    /// `LogSink/WaitForInterestChange` hanging gets with the lowest interest found in the set of
+    /// requested interests for all control handles.
     pub async fn reset_interest(&self, interest_selectors: &[LogInterestSelector]) {
         for selector in interest_selectors {
             if selectors::match_moniker_against_component_selector(

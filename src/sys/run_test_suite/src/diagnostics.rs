@@ -23,7 +23,8 @@ pub(crate) struct LogDisplayConfiguration {
 }
 
 // TODO(fxbug.dev/54198, fxbug.dev/70581): deprecate this when implementing metadata selectors for
-// logs or when we support OnRegisterInterest that can be sent to *all* test components.
+// logs or when we support automatically sending interest updates to all test components on startup.
+// We currently don't have a way of setting the interest of a test realm before creating that realm.
 #[derive(Clone, Default)]
 pub(crate) struct LogCollectionOptions {
     /// The maximum allowed severity for logs.
