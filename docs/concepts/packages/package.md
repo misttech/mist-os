@@ -98,8 +98,9 @@ minimum contains one content-addressed `BLOB` named [`meta.far`](#meta-far).
 Note: For more information on the Fuchsia archive format (FAR), see
 [Fuchsia archive format (FAR)](/docs/development/source_code/archive_format.md).
 
-In Fuchsia, you build a package with the `pm` tool, which exists in the
-`//tools/` directory of the Fuchsia GN SDK.
+In Fuchsia, you build a package with the `ffx package build` command or the
+legacy `pm` tool, which both exist in the `//tools/` directory of the
+Fuchsia IDK.
 
 Essentially, a package is a tree of zero or more content-addressed items.
 A package contains the following:
@@ -126,9 +127,9 @@ The `meta/` directory of a package contains at minimum two files:
 
 * `meta/contents`
 
-   The contents file. This file is created by the `pm update` tool, which is executed
-   with the `pm build` tool. This file maps the user-facing file names of a
-   package to the Merkle root of those files.
+   The contents file. This file is created by the `ffx package build` command,
+   (or the legacy `pm update` and `pm build` commands). This file maps the
+   user-facing file names of a package to the Merkle root of those files.
 
 If the package declares subpackages, the `meta/` directory also contains:
 
