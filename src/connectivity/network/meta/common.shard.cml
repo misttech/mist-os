@@ -153,11 +153,6 @@
             to: [ "#reachability" ],
         },
         {
-            directory: "dev-class-ethernet",
-            from: "parent",
-            to: [ "#netcfg" ],
-        },
-        {
             directory: "dev-class-network",
             from: "parent",
             to: [ "#netcfg" ],

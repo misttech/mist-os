@@ -200,8 +200,6 @@ pub mod constants {
         }
         // These capability names and filepaths should match the devfs capabilities used by netcfg
         // in its component manifest, i.e. netcfg.cml.
-        pub const DEV_CLASS_ETHERNET: &str = "dev-class-ethernet";
-        pub const CLASS_ETHERNET_PATH: &str = "class/ethernet";
         pub const DEV_CLASS_NETWORK: &str = "dev-class-network";
         pub const CLASS_NETWORK_PATH: &str = "class/network";
     }
@@ -358,15 +356,6 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     >(
                                         constants::dns_resolver::COMPONENT_NAME,
                                     )),
-                                    fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
-                                        name: Some(
-                                            constants::netcfg::DEV_CLASS_ETHERNET.to_string(),
-                                        ),
-                                        subdir: Some(
-                                            constants::netcfg::CLASS_ETHERNET_PATH.to_string(),
-                                        ),
-                                        ..fnetemul::DevfsDep::EMPTY
-                                    }),
                                     fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                                         name: Some(
                                             constants::netcfg::DEV_CLASS_NETWORK.to_string(),

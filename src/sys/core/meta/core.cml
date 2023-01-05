@@ -260,13 +260,6 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-class-ethernet",
-            to: [ "#network" ],
-            subdir: "ethernet",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
             as: "dev-class-network",
             to: [ "#network" ],
             subdir: "network",
