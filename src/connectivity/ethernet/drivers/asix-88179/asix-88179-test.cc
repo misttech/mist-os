@@ -138,14 +138,18 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
   }
 
   zx::result<bool> GetDeviceOnline() {
-    std::optional<fuchsia_hardware_network::wire::PortStatus> status;
-    zx::result handle =
-        client_->WatchStatus(port_id_, [&status](auto new_status) { status = new_status; });
+    std::optional<bool> online;
+    zx::result handle = client_->WatchStatus(
+        port_id_, [&online](fuchsia_hardware_network::wire::PortStatus status) {
+          ASSERT_TRUE(status.has_flags());
+          online = static_cast<bool>(status.flags() &
+                                     fuchsia_hardware_network::wire::StatusFlags::kOnline);
+        });
     if (handle.is_error()) {
       return handle.take_error();
     }
-    RunLoopUntil([&status]() { return status.has_value(); });
-    return zx::ok(status.value().flags() & fuchsia_hardware_network::wire::StatusFlags::kOnline);
+    RunLoopUntil([&online]() { return online.has_value(); });
+    return zx::ok(online.value());
   }
 
   void WaitDeviceOnline() {
