@@ -6,8 +6,8 @@
 use {
     crate::client::types,
     fidl_fuchsia_wlan_common_security as fidl_security,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     ieee80211::{Bssid, Ssid},
     rand::Rng as _,
     std::convert::TryFrom,
@@ -186,5 +186,26 @@ pub fn generate_random_disconnect_mlme_event_name() -> fidl_sme::DisconnectMlmeE
         0 => fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
         1 => fidl_sme::DisconnectMlmeEventName::DisassociateIndication,
         _ => panic!(),
+    }
+}
+
+pub fn generate_random_fidl_network_config() -> fidl_policy::NetworkConfig {
+    let mut rng = rand::thread_rng();
+    let ssid = format!("random SSID {}", rng.gen::<i32>());
+
+    generate_random_fidl_network_config_with_ssid(&ssid)
+}
+
+pub fn generate_random_fidl_network_config_with_ssid(ssid: &str) -> fidl_policy::NetworkConfig {
+    let mut rng = rand::thread_rng();
+    let credential_bytes = format!("rand pass {}", rng.gen::<i32>()).into_bytes();
+
+    fidl_policy::NetworkConfig {
+        id: Some(fidl_policy::NetworkIdentifier {
+            ssid: ssid.to_string().into_bytes(),
+            type_: fidl_policy::SecurityType::Wpa2,
+        }),
+        credential: Some(fidl_policy::Credential::Password(credential_bytes)),
+        ..fidl_policy::NetworkConfig::EMPTY
     }
 }

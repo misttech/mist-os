@@ -473,7 +473,10 @@ mod tests {
             config_management::{Credential, NetworkConfig, SecurityType, WPA_PSK_BYTE_LEN},
             mode_management::iface_manager_api::SmeForScan,
             telemetry::{TelemetryEvent, TelemetrySender},
-            util::testing::fakes::{FakeSavedNetworksManager, FakeScanRequester},
+            util::testing::{
+                fakes::{FakeSavedNetworksManager, FakeScanRequester},
+                generate_random_fidl_network_config, generate_random_fidl_network_config_with_ssid,
+            },
         },
         anyhow::{format_err, Error},
         async_trait::async_trait,
@@ -644,9 +647,13 @@ mod tests {
 
     struct TestValues {
         saved_networks: SavedNetworksPtr,
+        net_id_open: fidl_policy::NetworkIdentifier,
+        net_id_wpa2_w_password: fidl_policy::NetworkIdentifier,
+        net_id_wpa2_w_psk: fidl_policy::NetworkIdentifier,
         provider: fidl_policy::ClientProviderProxy,
         requests: fidl_policy::ClientProviderRequestStream,
         iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+        iface_mgr_req_recvr: mpsc::Receiver<IfaceManagerRequest>,
         scan_requester: Arc<FakeScanRequester>,
         update_sender: mpsc::UnboundedSender<listener::ClientListenerMessage>,
         listener_updates: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
@@ -659,16 +666,35 @@ mod tests {
     // Client Controller APIs in tests. The stash id should be the test name so that each
     // test will have a unique persistent store behind it.
     fn test_setup() -> TestValues {
+        let net_id_open = fidl_policy::NetworkIdentifier {
+            ssid: "foobar".to_string().into_bytes(),
+            type_: fidl_policy::SecurityType::None,
+        };
+        let net_id_wpa2_w_password = fidl_policy::NetworkIdentifier {
+            ssid: b"foobar-wpa2".to_vec(),
+            type_: fidl_policy::SecurityType::Wpa2,
+        };
+        let net_id_wpa2_w_psk = fidl_policy::NetworkIdentifier {
+            ssid: b"foobar-psk".to_vec(),
+            type_: fidl_policy::SecurityType::Wpa2,
+        };
+
         let presaved_default_configs = vec![
-            (NetworkIdentifier::try_from("foobar", SecurityType::None).unwrap(), Credential::None),
-            (
-                NetworkIdentifier::try_from("foobar-protected", SecurityType::Wpa2).unwrap(),
-                Credential::Password(b"supersecure".to_vec()),
-            ),
-            (
-                NetworkIdentifier::try_from("foobar-psk", SecurityType::Wpa2).unwrap(),
-                Credential::Psk(vec![64; WPA_PSK_BYTE_LEN].to_vec()),
-            ),
+            fidl_policy::NetworkConfig {
+                id: Some(net_id_open.clone()),
+                credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
+                ..fidl_policy::NetworkConfig::EMPTY
+            },
+            fidl_policy::NetworkConfig {
+                id: Some(net_id_wpa2_w_password.clone()),
+                credential: Some(fidl_policy::Credential::Password(b"foobar-password".to_vec())),
+                ..fidl_policy::NetworkConfig::EMPTY
+            },
+            fidl_policy::NetworkConfig {
+                id: Some(net_id_wpa2_w_psk.clone()),
+                credential: Some(fidl_policy::Credential::Psk(vec![64; WPA_PSK_BYTE_LEN].to_vec())),
+                ..fidl_policy::NetworkConfig::EMPTY
+            },
         ];
         let saved_networks =
             Arc::new(FakeSavedNetworksManager::new_with_saved_networks(presaved_default_configs));
@@ -679,7 +705,7 @@ mod tests {
 
         let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create ClientSmeProxy");
-        let (req_sender, _req_recvr) = mpsc::channel(1);
+        let (req_sender, iface_mgr_req_recvr) = mpsc::channel(1);
         let iface_manager = FakeIfaceManager::new(proxy.clone(), req_sender);
         let iface_manager = Arc::new(Mutex::new(iface_manager));
         let scan_requester = Arc::new(FakeScanRequester::new());
@@ -688,9 +714,13 @@ mod tests {
 
         TestValues {
             saved_networks,
+            net_id_open,
+            net_id_wpa2_w_password,
+            net_id_wpa2_w_psk,
             provider,
             requests,
             iface_manager,
+            iface_mgr_req_recvr,
             scan_requester,
             update_sender,
             listener_updates,
@@ -769,10 +799,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -809,10 +836,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar-protected".to_vec(),
-            type_: fidl_policy::SecurityType::Wpa2,
-        });
+        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_password.clone());
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -849,10 +873,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar-psk".to_vec(),
-            type_: fidl_policy::SecurityType::Wpa2,
-        });
+        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_psk.clone());
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -870,10 +891,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let mut test_values = test_setup();
 
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-
+        // Create a Fake IfaceManager without WPA3 support for this test.
         let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create ClientSmeProxy");
         let (req_sender, _req_recvr) = mpsc::channel(1);
@@ -882,12 +900,12 @@ mod tests {
             Arc::new(Mutex::new(iface_manager));
 
         let serve_fut = serve_provider_requests(
-            Arc::clone(&iface_manager),
+            iface_manager,
             test_values.update_sender,
-            Arc::clone(&test_values.saved_networks),
+            test_values.saved_networks,
             test_values.scan_requester,
             test_values.client_provider_lock,
-            requests,
+            test_values.requests,
             test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
@@ -896,7 +914,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut test_values.listener_updates.next()),
@@ -923,9 +941,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
-            Arc::clone(&test_values.iface_manager),
+            test_values.iface_manager,
             test_values.update_sender,
-            Arc::clone(&test_values.saved_networks),
+            test_values.saved_networks.clone(),
             test_values.scan_requester,
             test_values.client_provider_lock,
             test_values.requests,
@@ -967,7 +985,7 @@ mod tests {
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
             test_values.update_sender,
-            Arc::clone(&test_values.saved_networks),
+            test_values.saved_networks,
             test_values.scan_requester,
             test_values.client_provider_lock,
             test_values.requests,
@@ -999,10 +1017,7 @@ mod tests {
         });
 
         // Perform a connect operation.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar-protected".to_vec(),
-            type_: fidl_policy::SecurityType::Wpa2,
-        });
+        let connect_fut = controller.connect(&mut test_values.net_id_wpa2_w_password.clone());
         pin_mut!(connect_fut);
 
         // Process connect request and verify connect response.
@@ -1047,7 +1062,7 @@ mod tests {
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
             test_values.update_sender,
-            Arc::clone(&test_values.saved_networks),
+            test_values.saved_networks,
             test_values.scan_requester.clone(),
             test_values.client_provider_lock,
             test_values.requests,
@@ -1084,19 +1099,14 @@ mod tests {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
 
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-
-        let test_values = test_setup();
-        let (update_sender, mut listener_updates) = mpsc::unbounded();
+        let mut test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
-            update_sender,
+            test_values.update_sender,
             saved_networks.clone(),
             test_values.scan_requester,
             test_values.client_provider_lock,
-            requests,
+            test_values.requests,
             test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
@@ -1105,9 +1115,12 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut listener_updates.next()), Poll::Ready(_));
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.listener_updates.next()),
+            Poll::Ready(_)
+        );
 
         // Save some network
         let network_id = fidl_policy::NetworkIdentifier {
@@ -1140,19 +1153,14 @@ mod tests {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
 
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-
-        let test_values = test_setup();
-        let (update_sender, mut listener_updates) = mpsc::unbounded();
+        let mut test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager.clone(),
-            update_sender,
+            test_values.update_sender,
             saved_networks.clone(),
             test_values.scan_requester,
             test_values.client_provider_lock,
-            requests,
+            test_values.requests,
             test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
@@ -1175,9 +1183,12 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut listener_updates.next()), Poll::Ready(_));
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.listener_updates.next()),
+            Poll::Ready(_)
+        );
 
         // Save some network
         let network_id = fidl_policy::NetworkIdentifier {
@@ -1210,30 +1221,17 @@ mod tests {
     #[fuchsia::test]
     fn save_network_overwrite_disconnects() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut test_values = test_setup();
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-        let scan_requester = Arc::new(FakeScanRequester::new());
-
-        let (update_sender, mut listener_updates) = mpsc::unbounded();
-
-        // Create a fake IfaceManager to handle client requests.
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
-        let (req_sender, mut req_recvr) = mpsc::channel(1);
-        let iface_manager = FakeIfaceManager::new(proxy, req_sender);
-        let iface_manager = Arc::new(Mutex::new(iface_manager));
 
         let serve_fut = serve_provider_requests(
-            iface_manager,
-            update_sender,
+            test_values.iface_manager,
+            test_values.update_sender,
             saved_networks.clone(),
-            scan_requester,
-            Arc::new(Mutex::new(())),
-            requests,
-            TelemetrySender::new(telemetry_sender),
+            test_values.scan_requester,
+            test_values.client_provider_lock,
+            test_values.requests,
+            test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
 
@@ -1241,9 +1239,12 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut listener_updates.next()), Poll::Ready(_));
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.listener_updates.next()),
+            Poll::Ready(_)
+        );
 
         // Save the network directly.
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
@@ -1265,7 +1266,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Check that the iface manager was asked to disconnect from some network
-        assert_variant!(exec.run_until_stalled(&mut req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
+        assert_variant!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
             assert_eq!(net_id, network_id.clone());
             assert_eq!(reason, client_types::DisconnectReason::NetworkConfigUpdated);
         });
@@ -1280,19 +1281,14 @@ mod tests {
         saved_networks.fail_all_stores = true;
         let saved_networks = Arc::new(saved_networks);
 
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-
-        let test_values = test_setup();
-        let (update_sender, mut listener_updates) = mpsc::unbounded();
+        let mut test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
-            update_sender,
+            test_values.update_sender,
             saved_networks.clone(),
             test_values.scan_requester,
             test_values.client_provider_lock,
-            requests,
+            test_values.requests,
             test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
@@ -1301,9 +1297,12 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut listener_updates.next()), Poll::Ready(_));
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.listener_updates.next()),
+            Poll::Ready(_)
+        );
 
         // Create a network config whose password is too short. FIDL network config does not
         // require valid fields unlike our crate define config. We should not be able to
@@ -1337,30 +1336,16 @@ mod tests {
     #[fuchsia::test]
     fn test_remove_a_network() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
-        let saved_networks = Arc::new(FakeSavedNetworksManager::new());
-        let scan_requester = Arc::new(FakeScanRequester::new());
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-
-        let (update_sender, mut listener_updates) = mpsc::unbounded();
-
-        // Create a fake IfaceManager to handle client requests.
-        let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
-            .expect("failed to create ClientSmeProxy");
-        let (req_sender, mut req_recvr) = mpsc::channel(1);
-        let iface_manager = FakeIfaceManager::new(proxy, req_sender);
-        let iface_manager = Arc::new(Mutex::new(iface_manager));
+        let mut test_values = test_setup();
 
         let serve_fut = serve_provider_requests(
-            iface_manager,
-            update_sender,
-            saved_networks.clone(),
-            scan_requester,
-            Arc::new(Mutex::new(())),
-            requests,
-            TelemetrySender::new(telemetry_sender),
+            test_values.iface_manager,
+            test_values.update_sender,
+            test_values.saved_networks.clone(),
+            test_values.scan_requester,
+            test_values.client_provider_lock,
+            test_values.requests,
+            test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
 
@@ -1368,21 +1353,17 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut listener_updates.next()), Poll::Ready(_));
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.listener_updates.next()),
+            Poll::Ready(_)
+        );
 
-        // Save the network directly.
-        let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
-        let credential = Credential::None;
-        let save_fut = saved_networks.store(network_id.clone(), credential.clone());
-        pin_mut!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
-
-        // Request to remove some network
+        // Request to a network that is saved
         let network_config = fidl_policy::NetworkConfig {
-            id: Some(fidl_policy::NetworkIdentifier::from(network_id.clone())),
-            credential: Some(fidl_policy::Credential::from(credential.clone())),
+            id: Some(test_values.net_id_open.clone()),
+            credential: Some(fidl_policy::Credential::None(fidl_policy::Empty)),
             ..fidl_policy::NetworkConfig::EMPTY
         };
         let mut remove_fut = controller.remove_network(network_config.clone());
@@ -1394,100 +1375,74 @@ mod tests {
         // Successfully removing a network should always request a disconnect from IfaceManager,
         // which will know whether we are connected to the network to disconnect from. This checks
         // that the IfaceManager is told to disconnect (if connected).
-        assert_variant!(exec.run_until_stalled(&mut req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
-            assert_eq!(net_id, network_id.clone());
+        assert_variant!(exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()), Poll::Ready(Some(IfaceManagerRequest::Disconnect(net_id, reason))) => {
+            assert_eq!(net_id, test_values.net_id_open.clone().into());
             assert_eq!(reason, client_types::DisconnectReason::NetworkUnsaved);
         });
         assert_variant!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert!(exec.run_singlethreaded(saved_networks.lookup(&network_id)).is_empty());
+        assert!(exec
+            .run_singlethreaded(
+                test_values.saved_networks.lookup(&test_values.net_id_open.clone().into())
+            )
+            .is_empty());
 
         // Removing a network that is not saved should not trigger a disconnect.
         let mut remove_fut = controller.remove_network(network_config.clone());
         // Process the remove request on the server side and handle requests to stash on the way.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut req_recvr.next()), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.iface_mgr_req_recvr.next()),
+            Poll::Pending
+        );
         assert_variant!(exec.run_until_stalled(&mut remove_fut), Poll::Ready(Ok(Ok(()))));
     }
 
     #[fuchsia::test]
-    fn get_saved_network() {
-        // save a network
-        let network_id = NetworkIdentifier::try_from("foobar", SecurityType::Wpa2).unwrap();
-        let credential = Credential::Password(b"password".to_vec());
-        let saved_networks = vec![(network_id.clone(), credential.clone())];
-
-        let expected_id = network_id.into();
-        let expected_credential = credential.into();
-        let expected_configs = vec![fidl_policy::NetworkConfig {
-            id: Some(expected_id),
-            credential: Some(expected_credential),
-            ..fidl_policy::NetworkConfig::EMPTY
-        }];
-
+    fn test_get_saved_network() {
+        let expected_configs = vec![generate_random_fidl_network_config()];
         let expected_num_sends = 1;
-        test_get_saved_networks(saved_networks, expected_configs, expected_num_sends);
+        run_get_saved_networks_test(expected_configs, expected_num_sends);
     }
 
     #[fuchsia::test]
-    fn get_saved_networks_multiple_chunks() {
+    fn test_get_saved_networks_multiple_chunks() {
         // Save MAX_CONFIGS_PER_RESPONSE + 1 configs so that get_saved_networks should respond with
         // 2 chunks of responses plus one response with an empty vector.
-        let mut saved_networks = vec![];
-        let mut expected_configs = vec![];
+        let mut configs = vec![];
         for index in 0..MAX_CONFIGS_PER_RESPONSE + 1 {
             // Create unique network config to be saved.
-            let ssid = client_types::Ssid::try_from(format!("some_config{}", index)).unwrap();
-            let net_id = NetworkIdentifier::new(ssid.clone(), SecurityType::None);
-            saved_networks.push((net_id, Credential::None));
-
-            // Create corresponding FIDL value and add to list of expected configs/
-            let ssid = client_types::Ssid::try_from(format!("some_config{}", index)).unwrap();
-            let net_id = fidl_policy::NetworkIdentifier {
-                ssid: ssid.to_vec(),
-                type_: fidl_policy::SecurityType::None,
-            };
-            let credential = fidl_policy::Credential::None(fidl_policy::Empty);
-            let network_config = fidl_policy::NetworkConfig {
-                id: Some(net_id),
-                credential: Some(credential),
-                ..fidl_policy::NetworkConfig::EMPTY
-            };
-            expected_configs.push(network_config);
+            let ssid = format!("some_config{}", index);
+            let network_config = generate_random_fidl_network_config_with_ssid(&ssid);
+            configs.push(network_config);
         }
 
         let expected_num_sends = 2;
-        test_get_saved_networks(saved_networks, expected_configs, expected_num_sends);
+        run_get_saved_networks_test(configs, expected_num_sends);
     }
 
     /// Test that get saved networks with the given saved networks
     /// test_id: the name of the test to create a unique persistent store for each test
-    /// saved_configs: list of NetworkIdentifier and Credential pairs that are to be stored to the
-    ///     SavedNetworksManager in the test.
-    /// expected_configs: list of FIDL NetworkConfigs that we expect to get from get_saved_networks
+    /// configs: list of FIDL NetworkConfigs that we expect to get from get_saved_networks and
+    ///          and which are returned by SavedNetworksManager
     /// expected_num_sends: number of chunks of results we expect to get from get_saved_networks.
     ///     This is not counting the empty vector that signifies no more results.
-    fn test_get_saved_networks(
-        saved_configs: Vec<(NetworkIdentifier, Credential)>,
-        expected_configs: Vec<fidl_policy::NetworkConfig>,
+    fn run_get_saved_networks_test(
+        configs: Vec<fidl_policy::NetworkConfig>,
         expected_num_sends: usize,
     ) {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
         let saved_networks =
-            Arc::new(FakeSavedNetworksManager::new_with_saved_networks(saved_configs));
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
+            Arc::new(FakeSavedNetworksManager::new_with_saved_networks(configs.clone()));
 
         let test_values = test_setup();
-        let (update_sender, _listener_updates) = mpsc::unbounded();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
-            update_sender,
+            test_values.update_sender,
             saved_networks.clone(),
             test_values.scan_requester,
             test_values.client_provider_lock,
-            requests,
+            test_values.requests,
             test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
@@ -1496,7 +1451,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a new controller.
-        let (controller, _update_stream) = request_controller(&provider);
+        let (controller, _update_stream) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue request to get the list of saved networks.
@@ -1519,7 +1474,7 @@ mod tests {
             if i < expected_num_sends - 1 {
                 assert_eq!(results.len(), MAX_CONFIGS_PER_RESPONSE);
             } else {
-                assert_eq!(results.len(), expected_configs.len() % MAX_CONFIGS_PER_RESPONSE);
+                assert_eq!(results.len(), configs.len() % MAX_CONFIGS_PER_RESPONSE);
             }
             saved_networks_results.extend(results);
         }
@@ -1531,10 +1486,10 @@ mod tests {
         assert!(results.is_empty());
 
         // check whether each network we saved is in the results and that nothing else is there.
-        for network_config in &expected_configs {
+        for network_config in &configs {
             assert!(saved_networks_results.contains(network_config));
         }
-        assert_eq!(expected_configs.len(), saved_networks_results.len());
+        assert_eq!(configs.len(), saved_networks_results.len());
     }
 
     #[fuchsia::test]
@@ -1618,10 +1573,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure first controller is operable. Issue connect request.
-        let connect_fut = controller1.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller1.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.
@@ -1633,10 +1585,7 @@ mod tests {
         );
 
         // Ensure second controller is not operable. Issue connect request.
-        let connect_fut = controller2.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller2.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request from second controller. Verify failure.
@@ -1658,10 +1607,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Ensure third controller is operable. Issue connect request.
-        let connect_fut = controller3.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller3.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request from third controller. Verify success.
@@ -1793,23 +1739,18 @@ mod tests {
     #[fuchsia::test]
     fn no_client_interface() {
         let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
-        let saved_networks = Arc::new(FakeSavedNetworksManager::new());
-        let scan_requester = Arc::new(FakeScanRequester::new());
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let test_values = test_setup();
+
         let iface_manager = Arc::new(Mutex::new(FakeIfaceManagerNoIfaces {}));
 
-        let (provider, requests) = create_proxy::<fidl_policy::ClientProviderMarker>()
-            .expect("failed to create ClientProvider proxy");
-        let requests = requests.into_stream().expect("failed to create stream");
-        let (update_sender, _listener_updates) = mpsc::unbounded();
         let serve_fut = serve_provider_requests(
             iface_manager,
-            update_sender,
-            saved_networks,
-            scan_requester,
-            Arc::new(Mutex::new(())),
-            requests,
-            TelemetrySender::new(telemetry_sender),
+            test_values.update_sender,
+            test_values.saved_networks,
+            test_values.scan_requester,
+            test_values.client_provider_lock,
+            test_values.requests,
+            test_values.telemetry_sender,
         );
         pin_mut!(serve_fut);
 
@@ -1817,21 +1758,18 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Request a controller.
-        let (controller, _) = request_controller(&provider);
+        let (controller, _) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Issue connect request.
-        let connect_fut = controller.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedNotSupported))
+            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedIncompatibleMode))
         );
     }
 
@@ -1959,10 +1897,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
         // Ensure the new controller works by issuing a connect request.
-        let connect_fut = controller2.connect(&mut fidl_policy::NetworkIdentifier {
-            ssid: b"foobar".to_vec(),
-            type_: fidl_policy::SecurityType::None,
-        });
+        let connect_fut = controller2.connect(&mut test_values.net_id_open.clone());
         pin_mut!(connect_fut);
 
         // Process connect request from first controller. Verify success.

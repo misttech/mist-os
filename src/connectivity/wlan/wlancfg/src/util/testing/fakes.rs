@@ -15,7 +15,8 @@ use {
         },
     },
     async_trait::async_trait,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, lock::Mutex},
     log::{info, warn},
     rand::Rng,
@@ -82,13 +83,21 @@ impl FakeSavedNetworksManager {
 
     /// Create FakeSavedNetworksManager, saving network configs with the specified
     /// network identifiers and credentials at init.
-    pub fn new_with_saved_networks(network_configs: Vec<(NetworkIdentifier, Credential)>) -> Self {
-        let saved_networks = network_configs
-            .into_iter()
-            .filter_map(|(id, cred)| {
-                NetworkConfig::new(id.clone(), cred, false).ok().map(|config| (id, vec![config]))
-            })
-            .collect::<HashMap<NetworkIdentifier, Vec<NetworkConfig>>>();
+    pub fn new_with_saved_networks(network_configs: Vec<fidl_policy::NetworkConfig>) -> Self {
+        let mut saved_networks = HashMap::<NetworkIdentifier, Vec<NetworkConfig>>::new();
+        for config in network_configs.into_iter() {
+            let id: NetworkIdentifier =
+                config.id.expect("test config is missing network identifier").into();
+            let credential = config
+                .credential
+                .expect("test config is missing credential")
+                .try_into()
+                .expect("test credential is not valid");
+            let config = NetworkConfig::new(id.clone(), credential, false)
+                .expect("provided config is not valid");
+
+            saved_networks.entry(id).or_default().push(config);
+        }
 
         Self {
             saved_networks: Mutex::new(saved_networks),
