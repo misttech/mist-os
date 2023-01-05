@@ -14,22 +14,9 @@ group("end_to_end_deps") {
   deps = [ "//src/experiences/bin/ermine_testserver" ]
 }
 
-if (is_host) {
-  host_test_data("scuba_goldens") {
-    sources = [
-      "//src/experiences/tests/e2e/test/scuba_goldens/simple_browser_rearranging_tab_after.png",
-      "//src/experiences/tests/e2e/test/scuba_goldens/simple_browser_rearranging_tab_before.png",
-    ]
-    outputs = [ "$root_out_dir/scuba_goldens/{{source_file_part}}" ]
-  }
-}
-
 dart_test("experiences_ermine_session_shell_e2e_test") {
   null_safe = true
-  sources = [
-    "ermine_intl_test.dart",
-    "ermine_spinning_square_view_test.dart",
-  ]
+  sources = [ "ermine_intl_test.dart" ]
 
   deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_dart",
