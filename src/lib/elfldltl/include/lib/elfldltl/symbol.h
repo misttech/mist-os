@@ -356,6 +356,31 @@ class SymbolInfo {
   typename Elf::size_type soname_ = 0;
 };
 
+// This constructs a SymbolInfo that just contains a single undefined symbol.
+// It can be used with a resolver function (see link.h and resolve.h).
+template <class Elf>
+class SymbolInfoForSingleLookup : public SymbolInfo<Elf> {
+ public:
+  using typename SymbolInfo<Elf>::Sym;
+
+  constexpr SymbolInfoForSingleLookup() = default;
+
+  constexpr SymbolInfoForSingleLookup(const SymbolInfoForSingleLookup&) = default;
+
+  explicit constexpr SymbolInfoForSingleLookup(std::string_view name,
+                                               ElfSymType type = ElfSymType::kNoType,
+                                               ElfSymBind bind = ElfSymBind::kGlobal)
+      : symbol_{.info = Sym::MakeInfo(bind, type)} {
+    this->set_strtab(name);
+    this->set_symtab(cpp20::span{&symbol_, 1});
+  }
+
+  const Sym& symbol() const { return symbol_; }
+
+ private:
+  Sym symbol_;
+};
+
 }  // namespace elfldltl
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SYMBOL_H_

@@ -38,8 +38,7 @@ class TestSymtab {
     sym.name = AddString(name);
     sym.value = value;
     sym.size = size;
-    sym.info = static_cast<uint8_t>((static_cast<uint8_t>(bind) << 4) |  //
-                                    (static_cast<uint8_t>(type) << 0));
+    sym.info = Sym::MakeInfo(bind, type);
     sym.shndx = shndx;
     symtab_.push_back(sym);
     return *this;

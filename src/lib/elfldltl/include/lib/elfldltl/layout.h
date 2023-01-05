@@ -368,6 +368,11 @@ struct Elf : private Layout<Class, Data> {
     constexpr ElfSymBind bind() const { return static_cast<ElfSymBind>(this->info() >> 4); }
 
     constexpr ElfSymType type() const { return static_cast<ElfSymType>(this->info() & 0xf); }
+
+    static constexpr uint8_t MakeInfo(ElfSymBind bind, ElfSymType type) {
+      return static_cast<uint8_t>((static_cast<uint8_t>(bind) << 4) |
+                                  (static_cast<uint8_t>(type) << 0));
+    }
   };
 
   struct Rel {
