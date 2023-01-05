@@ -6,26 +6,15 @@ fashion to what `TUN/TAP` interfaces provide on other OSes.
 
 ## Setup
 
-To use it in your CFv2 tests, depend upon the network-tun v2 component from
-your test package, and include the manifest shard in your `cml` file in order
-to inject the manifest (recommended):
+To use it in your tests, depend upon the network-tun component from your test
+package, and include the manifest shard in your `cml` file in order to inject
+the manifest:
 
 ```json5
 {
     include: [
         "//src/connectivity/network/tun/network-tun/meta/network-tun-test.shard.cml",
     ],
-}
-```
-
-To use it in legacy tests, depend upon the network-tun v1 component from your test
-package, and inject the manifest in your test's `cmx` file (deprecated):
-
-```json
-{
-   "injected-services": {
-      "fuchsia.net.tun.Control": "fuchsia-pkg://fuchsia.com/your-test-pkg#meta/network-tun.cmx"
-   }
 }
 ```
 
