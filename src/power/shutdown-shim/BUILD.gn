@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/dist/component_manifest_resources.gni")
 
 executable("shutdown-shim") {
@@ -34,7 +35,7 @@ component_manifest_resources("meta") {
   sources = [ "meta/shutdown-shim.cml" ]
 }
 
-group("bootfs") {
+bootfs_files_for_assembly("bootfs") {
   deps = [
     ":meta",
     ":shutdown-shim",

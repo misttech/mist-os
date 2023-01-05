@@ -119,6 +119,8 @@ assembly_input_bundle("common_bringup") {
     "//src/devices/bin/driver-index:bootfs",
     "//src/devices/bin/driver_host:bootfs",
     "//src/devices/bin/driver_manager:bootfs",
+    "//src/power/power-manager:bootfs",
+    "//src/power/shutdown-shim:bootfs",
   ]
   bootfs_packages = [ "//src/bringup/bin/svchost:pkg" ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]

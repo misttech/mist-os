@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/dist/component_manifest_resources.gni")
@@ -174,7 +175,7 @@ group("power-manager") {
   ]
 }
 
-group("bootfs") {
+bootfs_files_for_assembly("bootfs") {
   deps = [
     ":bin",
     ":default_component_config",
