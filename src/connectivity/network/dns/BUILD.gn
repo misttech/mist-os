@@ -108,7 +108,6 @@ rustc_binary("bin_with_fake_time") {
 }
 
 fuchsia_unittest_package("dns-resolver-tests") {
-  v2 = true
   deps = [ ":bin_test" ]
 }
 

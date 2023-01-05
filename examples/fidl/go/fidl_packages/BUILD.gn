@@ -20,7 +20,6 @@ go_library("fidl-example-go") {
 
 fuchsia_unittest_package("fidl-example-go-tests") {
   deps = [ ":fidl-example-go-test" ]
-  v2 = true
 }
 
 group("fidl_packages") {

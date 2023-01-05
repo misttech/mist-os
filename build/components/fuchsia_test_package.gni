@@ -75,17 +75,6 @@ import("fuchsia_test_component_manifest.gni")
 #     Type: string
 #     Default: target_name
 #
-#   wrap_cmx_test_with_cml_test (optional)
-#     If enabled, test_components that are legacy (v1) tests with cmx manifests
-#     will be wrapped with a modern (v2) test with a cml manifest. The launch
-#     URL of the wrapper will be derived from the wrapped test's launch URL.
-#     For instance:
-#       fuchsia-pkg://fuchsia.com/package#meta/test_component.cmx
-#     will become:
-#       fuchsia-pkg://fuchsia.com/package#meta/test_component.cm
-#     Type: bool
-#     Default: true
-#
 #   renameable_subpackages (optional)
 #      A list of subpackages defined by scoped variables `package` (a
 #     `fuchsia_package()` target) and an optional `name`. See
@@ -120,11 +109,6 @@ template("fuchsia_test_package") {
       test_specs = invoker.test_specs
     }
 
-    wrap_cmx_test_with_cml_test = true
-    if (defined(invoker.wrap_cmx_test_with_cml_test)) {
-      wrap_cmx_test_with_cml_test = invoker.wrap_cmx_test_with_cml_test
-    }
-
     test_deps = []
     foreach(test, invoker.test_components) {
       test_target_name = get_label_info(test, "name")
@@ -133,8 +117,7 @@ template("fuchsia_test_package") {
       manifest_name = get_path_info(manifest_name[0], "file")
 
       _wrapped_legacy_test = false
-      if (wrap_cmx_test_with_cml_test &&
-          get_path_info(manifest_name, "extension") == "cmx") {
+      if (get_path_info(manifest_name, "extension") == "cmx") {
         _wrapped_legacy_test = true
         modern_generated_name =
             "${target_name}_${test_target_name}_modern_generated"

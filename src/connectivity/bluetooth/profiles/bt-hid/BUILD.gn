@@ -60,7 +60,6 @@ fuchsia_package("bt-hid") {
 }
 
 fuchsia_unittest_package("bt-hid-tests") {
-  v2 = true
   deps = [ ":bin_test" ]
 }
 

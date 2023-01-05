@@ -63,33 +63,29 @@ import("fuchsia_test_component_manifest.gni")
 #     Type: string
 #     Default: target_name
 #
-#   v2 (optional)
-#     If specified and set to false, will generate a CFv1 (.cmx) manifest.
-#     If `manifest` is specified then this is ignored.
-#     Type: boolean
-#
-#   required_offers (optional, v2 only)
+#   required_offers (optional)
 #     A list of protocols that must be offered to every child and collection declared
 #     in the CML file.
 #     Type: list of strings
 #     Default: []
 #
-#   required_uses (optional, v2 only)
+#   required_uses (optional)
 #     A list of protocols that must be used by every child and collection declared
 #     in the CML file.
 #     Type: list of strings
 #     Default: []
 #
 #   restricted_features (optional)
-#     The set of restricted CML features to allow. Only applicable to v2 components.
+#     The set of restricted CML features to allow.
 #     The set of features is allowlisted here: //tools/cmc/build/restricted_features/BUILD.gn
 #     where each feature name is represented by a group of the same name.
 #     Type: list of strings
 #     Default: []
 #
 #   deprecated_legacy_test_execution (optional)
-#     If set for a v2 test, the test will be forced to use ELF runner,
-#     which sacrifices isolation for higher performance.
+#     The test will be forced to use ELF runner.
+#     ELF runner has fewer features than other specialized runners,
+#     but in some cases may offer faster test execution.
 #     Type: boolean
 #
 #   data_deps
@@ -100,17 +96,12 @@ template("fuchsia_unittest_component") {
     assert(
         !(defined(invoker.deprecated_legacy_test_execution) &&
               invoker.deprecated_legacy_test_execution &&
-              (defined(invoker.manifest) ||
-                   (defined(invoker.v2) && !invoker.v2))),
-        "cannot specify both deprecated_legacy_test_execution with either v2 = false or an explicit manifest")
+              defined(invoker.manifest)),
+        "cannot specify both deprecated_legacy_test_execution and an explicit manifest")
     if (!defined(invoker.manifest)) {
       generated_target = "${target_name}_generated_manifest"
       fuchsia_test_component_manifest(generated_target) {
-        forward_variables_from(invoker,
-                               [
-                                 "deps",
-                                 "v2",
-                               ])
+        forward_variables_from(invoker, [ "deps" ])
         visibility = [ ":*" ]
       }
       manifest = get_target_outputs(":$generated_target")

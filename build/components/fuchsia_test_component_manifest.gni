@@ -11,11 +11,6 @@ import("//tools/cmc/build/cmc.gni")
 #
 # Parameters
 #
-#   v2 (optional)
-#     If specified and set to false, will generate a CFv1 (.cmx) manifest,
-#     otherwise a CFv2 (.cml) manifest is generated.
-#     Type: boolean
-#
 #   deps
 #   metadata
 #   visibility
@@ -52,11 +47,7 @@ template("fuchsia_test_component_manifest") {
   other_target = "${target_name}_other"
   generated_file(other_target) {
     deps = invoker_deps
-    if (!defined(invoker.v2) || invoker.v2) {
-      data_keys = [ "test_component_manifest_cml" ]
-    } else {
-      data_keys = [ "test_component_manifest_cmx" ]
-    }
+    data_keys = [ "test_component_manifest_cml" ]
     walk_keys = [ "test_component_manifest_barrier" ]
     outputs = [ "$target_out_dir/${target_name}.json" ]
     output_conversion = "json"
@@ -67,12 +58,7 @@ template("fuchsia_test_component_manifest") {
   cmc_merge(target_name) {
     forward_variables_from(invoker, [ "visibility" ])
     testonly = true
-    output_name = invoker.target_name
-    if (!defined(invoker.v2) || invoker.v2) {
-      output_name += ".cml"
-    } else {
-      output_name += ".cmx"
-    }
+    output_name = invoker.target_name + ".cml"
     deps = [
       ":$other_target",
       ":$program_target",

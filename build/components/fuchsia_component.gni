@@ -30,7 +30,7 @@ import("//tools/cmc/build/cmx.gni")
 #     Type: list of strings
 #
 #   restricted_features (optional)
-#     The set of restricted CML features to allow. Only applicable to v2 components.
+#     The set of restricted CML features to allow.
 #     The set of features is allowlisted here: //tools/cmc/build/restricted_features/BUILD.gn
 #     where each feature name is represented by a group of the same name.
 #     Type: list of strings
@@ -219,7 +219,7 @@ template("fuchsia_component_manifest") {
 #     Default: true
 #
 #   restricted_features (optional)
-#     The set of restricted CML features to allow. Only applicable to v2 components.
+#     The set of restricted CML features to allow.
 #     The set of features is allowlisted here: //tools/cmc/build/restricted_features/BUILD.gn
 #     where each feature name is represented by a group of the same name.
 #     Type: list of strings

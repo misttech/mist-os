@@ -56,7 +56,7 @@ import("fuchsia_package.gni")
 #     Type: string, GN label e.g. `:my-manifest`
 #
 #   restricted_features (optional)
-#     The set of restricted CML features to allow. Only applicable to v2 components.
+#     The set of restricted CML features to allow.
 #     The set of features is allowlisted here: //tools/cmc/build/restricted_features/BUILD.gn
 #     where each feature name is represented by a group of the same name.
 #     Type: list of strings

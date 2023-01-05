@@ -49,25 +49,20 @@ import("fuchsia_unittest_component.gni")
 #     `fx gn outputs out/default path/to/your:<target_name>_component_generated_manifest`
 #     Type: path
 #
-#   v2 (optional)
-#     If specified and set to false, will generate a CFv1 (.cmx) manifest.
-#     If `manifest` is specified then this is ignored.
-#     Type: boolean
-#
-#   required_offers (optional, v2 only)
+#   required_offers (optional)
 #     A list of protocols that must be offered to every child and collection declared
 #     in the CML file.
 #     Type: list of strings
 #     Default: []
 #
-#   required_uses (optional, v2 only)
+#   required_uses (optional)
 #     A list of protocols that must be used by every child and collection declared
 #     in the CML file.
 #     Type: list of strings
 #     Default: []
 #
 #   restricted_features (optional)
-#     The set of restricted CML features to allow. Only applicable to v2 components.
+#     The set of restricted CML features to allow.
 #     The set of features is allowlisted here: //tools/cmc/build/restricted_features/BUILD.gn
 #     where each feature name is represented by a group of the same name.
 #     Type: list of strings
@@ -79,20 +74,10 @@ import("fuchsia_unittest_component.gni")
 #     Type: scope
 #
 #   deprecated_legacy_test_execution (optional)
-#     If set for a v2 test, the test will be forced to use ELF runner,
-#     which sacrifices isolation for higher performance.
+#     The test will be forced to use ELF runner.
+#     ELF runner has fewer features than other specialized runners,
+#     but in some cases may offer faster test execution.
 #     Type: boolean
-#
-#   wrap_cmx_test_with_cml_test (optional)
-#     If enabled, test_components that are legacy (v1) tests with cmx manifests
-#     will be wrapped with a modern (v2) test with a cml manifest. The launch
-#     URL of the wrapper will be derived from the wrapped test's launch URL.
-#     For instance:
-#       fuchsia-pkg://fuchsia.com/package#meta/test_component.cmx
-#     will become:
-#       fuchsia-pkg://fuchsia.com/package#meta/test_component.cm
-#     Type: bool
-#     Default: true
 #
 #   data_deps
 #   deps
@@ -111,7 +96,6 @@ template("fuchsia_unittest_package") {
                                "required_uses",
                                "restricted_features",
                                "deprecated_legacy_test_execution",
-                               "v2",
                              ])
       if (!defined(component_name)) {
         if (defined(invoker.package_name)) {
@@ -137,7 +121,6 @@ template("fuchsia_unittest_package") {
                              [
                                "package_name",
                                "visibility",
-                               "wrap_cmx_test_with_cml_test",
                              ])
       test_specs = _test_specs
       test_components = [ ":$component_target" ]

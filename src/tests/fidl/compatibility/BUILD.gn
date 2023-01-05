@@ -115,7 +115,6 @@ foreach(test, fidl_compatibility_tests_categories) {
   # Generate a CML.
   fuchsia_test_component_manifest(generate_label) {
     visibility = [ ":*" ]
-    v2 = true
 
     metadata = {
       test_component_manifest_cml = [
