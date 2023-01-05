@@ -13,7 +13,7 @@ use {
     ::routing::event::EventFilter,
     async_trait::async_trait,
     cm_rust::CapabilityName,
-    fuchsia_async as fasync,
+    cm_task_scope::TaskScope,
     futures::{channel::mpsc, future::join_all, stream, SinkExt, StreamExt},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker},
     std::{
@@ -74,12 +74,13 @@ impl EventSynthesizer {
 
     /// Spawns a synthesis task for the requested `events`. Resulting events will be sent on the
     /// `sender` channel.
-    pub fn spawn_synthesis(
+    pub async fn spawn_synthesis(
         &self,
         sender: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         events: HashMap<CapabilityName, Vec<EventDispatcherScope>>,
+        scope: &TaskScope,
     ) {
-        SynthesisTask::new(&self, sender, events).spawn()
+        SynthesisTask::new(&self, sender, events).spawn(scope).await
     }
 }
 
@@ -125,28 +126,29 @@ impl SynthesisTask {
 
     /// Spawns a task that will synthesize all events that were requested when creating the
     /// `SynthesisTask`
-    pub fn spawn(self) {
+    pub async fn spawn(self, scope: &TaskScope) {
         if self.event_infos.is_empty() {
             return;
         }
-        fasync::Task::spawn(async move {
-            // If we can't find the component then we can't synthesize events.
-            // This isn't necessarily an error as the model or component might've been
-            // destroyed in the intervening time, so we just exit early.
-            if let Some(model) = self.model.upgrade() {
-                let sender = self.sender;
-                let futs = self
-                    .event_infos
-                    .into_iter()
-                    .map(|event_info| Self::run(&model, sender.clone(), event_info));
-                for result in join_all(futs).await {
-                    if let Err(error) = result {
-                        error!(?error, "Event synthesis failed");
+        scope
+            .add_task(async move {
+                // If we can't find the component then we can't synthesize events.
+                // This isn't necessarily an error as the model or component might've been
+                // destroyed in the intervening time, so we just exit early.
+                if let Some(model) = self.model.upgrade() {
+                    let sender = self.sender;
+                    let futs = self
+                        .event_infos
+                        .into_iter()
+                        .map(|event_info| Self::run(&model, sender.clone(), event_info));
+                    for result in join_all(futs).await {
+                        if let Err(error) = result {
+                            error!(?error, "Event synthesis failed");
+                        }
                     }
                 }
-            }
-        })
-        .detach();
+            })
+            .await;
     }
 
     /// Performs a depth-first traversal of the component instance tree. It adds to the stream a
@@ -262,6 +264,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
+            component::WeakExtendedInstance,
             events::{
                 registry::{EventRegistry, RoutedEvent},
                 stream::EventStream,
@@ -273,6 +276,7 @@ mod tests {
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
         fuchsia_component::server::ServiceFs,
+        routing::component_instance::ComponentInstanceInterface,
     };
 
     struct CreateStreamArgs<'a> {
@@ -290,12 +294,15 @@ mod tests {
         test.builtin_environment.emit_diagnostics_for_test(&mut fs).expect("emitting diagnostics");
 
         let registry = test.builtin_environment.event_registry.clone();
-        let mut event_stream = create_stream(CreateStreamArgs {
-            registry: &registry,
-            scope_monikers: vec![],
-            events: vec![EventType::DirectoryReady],
-            include_builtin: true,
-        })
+        let mut event_stream = create_stream(
+            &test,
+            CreateStreamArgs {
+                registry: &registry,
+                scope_monikers: vec![],
+                events: vec![EventType::DirectoryReady],
+                include_builtin: true,
+            },
+        )
         .await;
 
         let (event, _) = event_stream.next().await.expect("got running event");
@@ -307,7 +314,7 @@ mod tests {
         }
     }
 
-    async fn create_stream<'a>(args: CreateStreamArgs<'a>) -> EventStream {
+    async fn create_stream<'a>(test: &RoutingTest, args: CreateStreamArgs<'a>) -> EventStream {
         let mut scopes = args
             .scope_monikers
             .into_iter()
@@ -333,7 +340,7 @@ mod tests {
             .collect();
         args.registry
             .subscribe_with_routed_events(
-                &ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()),
+                &WeakExtendedInstance::Component(test.model.root().as_weak()),
                 events,
             )
             .await

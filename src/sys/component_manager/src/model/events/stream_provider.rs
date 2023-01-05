@@ -4,6 +4,7 @@
 
 use {
     crate::model::{
+        component::WeakExtendedInstance,
         error::ModelError,
         events::{
             error::EventsError,
@@ -20,7 +21,6 @@ use {
         collections::HashMap,
         sync::{Arc, Weak},
     },
-    tracing::warn,
 };
 
 /// V2 variant of EventStreamAttachment
@@ -104,25 +104,29 @@ impl EventStreamProvider {
     /// conditions.
     pub async fn create_v2_static_event_stream(
         self: &Arc<Self>,
-        subscriber: &ExtendedMoniker,
+        subscriber: &WeakExtendedInstance,
         stream_name: String,
         subscription: EventSubscription,
         path: String,
     ) -> Result<(), ModelError> {
         let registry = self.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
-        let event_stream = registry.subscribe_v2(&subscriber, vec![subscription]).await?;
-        let absolute_path = AbsolutePath { target_moniker: subscriber.clone(), path };
+        let event_stream = registry.subscribe_v2(subscriber, vec![subscription]).await?;
+        let subscriber_moniker = subscriber.extended_moniker();
+        let absolute_path = AbsolutePath { target_moniker: subscriber_moniker.clone(), path };
         let mut state = self.state.lock().await;
-        if !state.subscription_component_lookup.contains_key(&subscriber) {
-            state.subscription_component_lookup.insert(subscriber.clone(), HashMap::new());
+        if !state.subscription_component_lookup.contains_key(&subscriber_moniker) {
+            state.subscription_component_lookup.insert(subscriber_moniker.clone(), HashMap::new());
         }
-        if let Some(subscriptions) = state.subscription_component_lookup.get_mut(&subscriber) {
+        if let Some(subscriptions) =
+            state.subscription_component_lookup.get_mut(&subscriber_moniker)
+        {
             if !subscriptions.contains_key(&absolute_path) {
                 subscriptions.insert(absolute_path.clone(), vec![]);
             }
             let path_list = subscriptions.get_mut(&absolute_path).unwrap();
             path_list.push(stream_name.clone());
-            let event_streams = state.streams_v2.entry(subscriber.clone()).or_insert(vec![]);
+            let event_streams =
+                state.streams_v2.entry(subscriber_moniker.clone()).or_insert(vec![]);
             event_streams.push(EventStreamAttachmentV2 {
                 name: stream_name,
                 server_end: Some(event_stream),
@@ -161,7 +165,7 @@ impl EventStreamProvider {
 
     async fn try_route_v2_events(
         self: &Arc<Self>,
-        target_moniker: &AbsoluteMoniker,
+        subscriber: &WeakExtendedInstance,
         decl: &ComponentDecl,
     ) -> Result<bool, ModelError> {
         let mut routed_v2 = false;
@@ -169,7 +173,7 @@ impl EventStreamProvider {
             match use_decl {
                 UseDecl::EventStream(decl) => {
                     self.create_v2_static_event_stream(
-                        &ExtendedMoniker::ComponentInstance(target_moniker.clone()),
+                        subscriber,
                         decl.source_name.to_string(),
                         EventSubscription { event_name: decl.source_name.clone() },
                         decl.target_path.to_string(),
@@ -185,7 +189,7 @@ impl EventStreamProvider {
 
     async fn on_component_resolved(
         self: &Arc<Self>,
-        target_moniker: &AbsoluteMoniker,
+        target: &WeakExtendedInstance,
         decl: &ComponentDecl,
     ) -> Result<(), ModelError> {
         // NOTE: We can't have deprecated and new events
@@ -198,7 +202,7 @@ impl EventStreamProvider {
         // TODO(https://fxbug.dev/81980): Remove once fully migrated.
         // Note that a component can still use v1 and v2 events, and can get the v1
         // events as long as all the v2 events fail to route.
-        let (routed_v2, err) = match self.try_route_v2_events(target_moniker, decl).await {
+        let (routed_v2, err) = match self.try_route_v2_events(target, decl).await {
             Ok(routed) => (routed, None),
             Err(error) => (false, Some(error)),
         };
@@ -229,10 +233,12 @@ impl Hook for EventStreamProvider {
             EventPayload::Destroyed => {
                 self.on_component_destroyed(target_moniker).await;
             }
-            EventPayload::Resolved { decl, .. } => {
-                self.on_component_resolved(target_moniker, decl)
-                    .await
-                    .unwrap_or_else(|err| warn!(%err, "Error handling component resolved"));
+            EventPayload::Resolved { decl, component, .. } => {
+                self.on_component_resolved(
+                    &WeakExtendedInstance::Component(component.clone()),
+                    decl,
+                )
+                .await?;
             }
             _ => {}
         }

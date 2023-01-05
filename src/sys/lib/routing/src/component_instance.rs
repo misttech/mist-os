@@ -16,7 +16,7 @@ use {
     cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     derivative::Derivative,
-    moniker::{AbsoluteMoniker, ChildMoniker},
+    moniker::{AbsoluteMoniker, ChildMoniker, ExtendedMoniker},
     std::{
         clone::Clone,
         sync::{Arc, Weak},
@@ -232,7 +232,8 @@ pub enum ExtendedInstanceInterface<C: ComponentInstanceInterface> {
 }
 
 /// A type implementing `ComponentInstanceInterface` or its `TopInstance`, as a weak pointer.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub enum WeakExtendedInstanceInterface<C: ComponentInstanceInterface> {
     Component(WeakComponentInstanceInterface<C>),
     AboveRoot(Weak<C::TopInstance>),
@@ -251,6 +252,13 @@ impl<C: ComponentInstanceInterface> WeakExtendedInstanceInterface<C> {
                     p.upgrade().ok_or(ComponentInstanceError::cm_instance_unavailable())?,
                 ))
             }
+        }
+    }
+
+    pub fn extended_moniker(&self) -> ExtendedMoniker {
+        match self {
+            Self::Component(p) => ExtendedMoniker::ComponentInstance(p.abs_moniker.clone()),
+            Self::AboveRoot(_) => ExtendedMoniker::ComponentManager,
         }
     }
 }

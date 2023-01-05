@@ -563,8 +563,14 @@ pub async fn new_event_stream(
     builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
     events: Vec<CapabilityName>,
 ) -> (EventSource, EventStream) {
-    let mut event_source =
-        builtin_environment.as_ref().lock().await.event_source_factory.create_for_above_root();
+    let mut event_source = builtin_environment
+        .as_ref()
+        .lock()
+        .await
+        .event_source_factory
+        .create_for_above_root()
+        .await
+        .expect("created event source");
     let event_stream = event_source
         .subscribe(events.into_iter().map(|event| EventSubscription::new(event)).collect())
         .await

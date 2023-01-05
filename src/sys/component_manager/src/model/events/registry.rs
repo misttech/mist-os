@@ -8,7 +8,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, InstanceState},
+            component::{ComponentInstance, ExtendedInstance, InstanceState, WeakExtendedInstance},
             error::ModelError,
             events::{
                 dispatcher::{EventDispatcher, EventDispatcherScope},
@@ -165,7 +165,7 @@ impl EventRegistry {
     /// Subscribes to events of a provided set of EventTypes.
     pub async fn subscribe_v2(
         &self,
-        subscriber: &ExtendedMoniker,
+        subscriber: &WeakExtendedInstance,
         subscriptions: Vec<EventSubscription>,
     ) -> Result<EventStream, ModelError> {
         // Register event capabilities if any. It identifies the sources of these events (might be
@@ -178,7 +178,7 @@ impl EventRegistry {
             }
         }
 
-        let events = match &subscriber {
+        let events = match subscriber.extended_moniker() {
             ExtendedMoniker::ComponentManager => event_names
                 .iter()
                 .map(|source_name| RoutedEvent {
@@ -212,7 +212,7 @@ impl EventRegistry {
     /// Subscribes to events of a provided set of EventTypes.
     pub async fn subscribe(
         &self,
-        subscriber: &ExtendedMoniker,
+        subscriber: &WeakExtendedInstance,
         subscriptions: Vec<EventSubscription>,
     ) -> Result<EventStream, ModelError> {
         // Register event capabilities if any. It identifies the sources of these events (might be
@@ -224,7 +224,7 @@ impl EventRegistry {
                 return Err(EventsError::duplicate_event(subscription.event_name).into());
             }
         }
-        let events = match &subscriber {
+        let events = match subscriber.extended_moniker() {
             ExtendedMoniker::ComponentManager => event_names
                 .iter()
                 .map(|source_name| RoutedEvent {
@@ -236,7 +236,7 @@ impl EventRegistry {
                 })
                 .collect(),
             ExtendedMoniker::ComponentInstance(target_moniker) => {
-                let route_result = self.route_events(target_moniker, &event_names).await?;
+                let route_result = self.route_events(&target_moniker, &event_names).await?;
                 // Each target name that we routed, will have an associated scope. The number of
                 // scopes must be equal to the number of target names.
                 let total_scopes: usize =
@@ -257,7 +257,7 @@ impl EventRegistry {
 
     pub async fn subscribe_with_routed_events(
         &self,
-        subscriber: &ExtendedMoniker,
+        subscriber: &WeakExtendedInstance,
         mut events: Vec<RoutedEvent>,
     ) -> Result<EventStream, ModelError> {
         // TODO(fxbug.dev/48510): get rid of this channel and use FIDL directly.
@@ -268,7 +268,7 @@ impl EventRegistry {
             event.source_name = CapabilityName::from(event_name_remap(event.source_name.str()));
             let dispatchers = dispatcher_map.entry(event.source_name.clone()).or_insert(vec![]);
             let dispatcher = event_stream.create_dispatcher(
-                subscriber.clone(),
+                subscriber.extended_moniker(),
                 event.scopes.clone(),
                 event.route.clone(),
             );
@@ -282,8 +282,12 @@ impl EventRegistry {
             event_stream.route = events[0].route.clone();
         }
 
+        let task_scope = match subscriber.upgrade()? {
+            ExtendedInstance::Component(subscriber) => subscriber.nonblocking_task_scope(),
+            ExtendedInstance::AboveRoot(subscriber) => subscriber.task_scope(),
+        };
         let events = events.into_iter().map(|event| (event.source_name, event.scopes)).collect();
-        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events);
+        self.event_synthesizer.spawn_synthesis(event_stream.sender(), events, &task_scope).await;
 
         Ok(event_stream)
     }
@@ -543,6 +547,7 @@ mod tests {
         futures::StreamExt,
         maplit::hashmap,
         moniker::AbsoluteMoniker,
+        routing::component_instance::ComponentInstanceInterface,
     };
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
@@ -578,7 +583,7 @@ mod tests {
 
         let mut event_stream_a = event_registry
             .subscribe(
-                &ExtendedMoniker::ComponentManager,
+                &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(EventType::Discovered.into())],
             )
             .await
@@ -588,7 +593,7 @@ mod tests {
 
         let mut event_stream_b = event_registry
             .subscribe(
-                &ExtendedMoniker::ComponentManager,
+                &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(EventType::Discovered.into())],
             )
             .await
@@ -631,7 +636,7 @@ mod tests {
 
         let mut event_stream_a = event_registry
             .subscribe(
-                &ExtendedMoniker::ComponentManager,
+                &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(EventType::CapabilityRequested.into())],
             )
             .await
@@ -644,7 +649,7 @@ mod tests {
 
         let mut event_stream_b = event_registry
             .subscribe(
-                &ExtendedMoniker::ComponentManager,
+                &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(EventType::CapabilityRequested.into())],
             )
             .await
@@ -750,11 +755,11 @@ mod tests {
         );
 
         let subscriber =
-            ExtendedMoniker::ComponentInstance(AbsoluteMoniker::parse_str("/foo").unwrap());
+            model.look_up(&AbsoluteMoniker::parse_str("/foo").unwrap()).await.unwrap().as_weak();
 
         let _event_stream = event_registry
             .subscribe(
-                &subscriber,
+                &WeakExtendedInstance::Component(subscriber),
                 vec![
                     EventSubscription::new("bar_requested".into()),
                     EventSubscription::new("foo_requested".into()),

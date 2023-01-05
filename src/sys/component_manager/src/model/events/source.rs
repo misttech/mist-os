@@ -6,6 +6,7 @@ use {
     crate::{
         capability::CapabilityProvider,
         model::{
+            component::{ExtendedInstance, WeakExtendedInstance},
             error::ModelError,
             events::{
                 error::EventsError,
@@ -25,7 +26,11 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,
-    std::{path::PathBuf, sync::Weak},
+    routing::component_instance::ComponentInstanceInterface,
+    std::{
+        path::PathBuf,
+        sync::{Arc, Weak},
+    },
 };
 
 // Event source v2 (supporting event streams)
@@ -51,11 +56,12 @@ impl EventSourceV2 {
     ) -> Result<EventStream, ModelError> {
         let registry = self.v1.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
         let mut static_streams = vec![];
+        let subscriber_moniker = self.v1.subscriber.extended_moniker();
         if let Some(stream_provider) = self.v1.stream_provider.upgrade() {
             for request in requests {
                 if let Some(res) = stream_provider
                     .take_v2_static_event_stream(
-                        &self.v1.subscriber,
+                        &subscriber_moniker,
                         request.event_name.to_string(),
                     )
                     .await
@@ -96,11 +102,11 @@ impl EventSourceV2 {
     /// if the event stream has already been consumed.
     async fn subscribe_all(
         &mut self,
-        target_moniker: ExtendedMoniker,
+        subscriber_moniker: ExtendedMoniker,
         path: String,
     ) -> Result<Option<EventStream>, ModelError> {
         if let Some(stream_provider) = self.v1.stream_provider.upgrade() {
-            if let Some(event_names) = stream_provider.take_events(target_moniker, path).await {
+            if let Some(event_names) = stream_provider.take_events(subscriber_moniker, path).await {
                 let subscriptions = event_names
                     .into_iter()
                     .map(|name| EventSubscription { event_name: CapabilityName::from(name) })
@@ -115,8 +121,6 @@ impl EventSourceV2 {
 /// A system responsible for implementing basic events functionality on a scoped realm.
 #[derive(Clone)]
 pub struct EventSource {
-    model: Weak<Model>,
-
     /// A shared reference to the event registry used to subscribe and dispatch events.
     registry: Weak<EventRegistry>,
 
@@ -124,26 +128,37 @@ pub struct EventSource {
     /// server end of the static event streams.
     stream_provider: Weak<EventStreamProvider>,
 
-    /// The moniker of the component subscribing to events.
-    subscriber: ExtendedMoniker,
+    /// Reference to the component subscribing to events.
+    subscriber: WeakExtendedInstance,
 }
 
 impl EventSource {
-    pub fn new(
+    pub async fn new(
         subscriber: ExtendedMoniker,
         model: Weak<Model>,
         registry: Weak<EventRegistry>,
         stream_provider: Weak<EventStreamProvider>,
-    ) -> Self {
-        Self { model, registry, stream_provider, subscriber }
+    ) -> Result<Self, ModelError> {
+        let subscriber = {
+            let model = model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
+            match &subscriber {
+                ExtendedMoniker::ComponentInstance(m) => {
+                    WeakExtendedInstance::Component(model.look_up(&m).await?.as_weak())
+                }
+                ExtendedMoniker::ComponentManager => {
+                    WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance()))
+                }
+            }
+        };
+        Ok(Self { registry, stream_provider, subscriber })
     }
 
-    pub fn new_for_above_root(
+    pub async fn new_for_above_root(
         model: Weak<Model>,
         registry: Weak<EventRegistry>,
         stream_provider: Weak<EventStreamProvider>,
-    ) -> Self {
-        Self::new(ExtendedMoniker::ComponentManager, model, registry, stream_provider)
+    ) -> Result<Self, ModelError> {
+        Self::new(ExtendedMoniker::ComponentManager, model, registry, stream_provider).await
     }
 
     /// Subscribes to events provided in the `requests` vector.
@@ -174,19 +189,15 @@ impl CapabilityProvider for EventSourceV2 {
         // Spawn the task in the component's task scope so that when the component is destroyed,
         // the task is cancelled and does not leak (similar to how framework capabilities are
         // scoped).
-        let model = self.v1.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
-        let task_scope = match &self.v1.subscriber {
-            ExtendedMoniker::ComponentInstance(m) => {
-                let target = model.look_up(&m).await?;
-                target.nonblocking_task_scope()
-            }
-            ExtendedMoniker::ComponentManager => model.top_instance().task_scope(),
+        let task_scope = match self.v1.subscriber.upgrade()? {
+            ExtendedInstance::Component(target) => target.nonblocking_task_scope(),
+            ExtendedInstance::AboveRoot(target) => target.task_scope(),
         };
         let server_end = channel::take_channel(server_end);
         let stream = ServerEnd::<fcomponent::EventStreamMarker>::new(server_end);
         task_scope
             .add_task(async move {
-                let moniker = self.v1.subscriber.clone();
+                let moniker = self.v1.subscriber.extended_moniker();
                 if let Ok(Some(event_stream)) = self
                     .subscribe_all(moniker, relative_path.into_os_string().into_string().unwrap())
                     .await
