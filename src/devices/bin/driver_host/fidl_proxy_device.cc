@@ -4,72 +4,26 @@
 
 #include "src/devices/bin/driver_host/fidl_proxy_device.h"
 
+#include <lib/fdio/directory.h>
+#include <lib/zx/result.h>
+
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "lib/fdio/directory.h"
-#include "lib/zx/result.h"
 #include "src/devices/bin/driver_host/driver_host_context.h"
-
-namespace {
-
-class FidlProxyDeviceInstance {
- public:
-  FidlProxyDeviceInstance(zx_device_t* zxdev, fidl::ClientEnd<fuchsia_io::Directory> incoming_dir)
-      : zxdev_(zxdev), incoming_dir_(std::move(incoming_dir)) {}
-
-  static std::unique_ptr<FidlProxyDeviceInstance> Create(
-      fbl::RefPtr<zx_device> zxdev, fidl::ClientEnd<fuchsia_io::Directory> incoming_dir) {
-    // Leak a reference to the zxdev here.  It will be cleaned up by the
-    // device_unbind_reply() in Unbind().
-    return std::make_unique<FidlProxyDeviceInstance>(fbl::ExportToRawPtr(&zxdev),
-                                                     std::move(incoming_dir));
-  }
-
-  zx::result<> ConnectToProtocol(const char* protocol, zx::channel request) {
-    fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
-    path.Append("svc/");
-    path.Append(protocol);
-    return zx::make_result(
-        fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));
-  }
-
-  zx::result<> ConnectToProtocol(const char* service, const char* protocol, zx::channel request) {
-    fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
-    path.AppendPrintf("svc/%s/default/%s", service, protocol);
-    return zx::make_result(
-        fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));
-  }
-
-  void Release() { delete this; }
-
-  void Unbind() { device_unbind_reply(zxdev_); }
-
- private:
-  zx_device_t* zxdev_;
-  fidl::ClientEnd<fuchsia_io::Directory> incoming_dir_;
-};
-
-}  // namespace
 
 void InitializeFidlProxyDevice(const fbl::RefPtr<zx_device>& dev,
                                fidl::ClientEnd<fuchsia_io::Directory> incoming_dir) {
-  static const zx_protocol_device_t fidl_proxy_device_ops = []() {
-    zx_protocol_device_t ops = {};
-    ops.unbind = [](void* ctx) { static_cast<FidlProxyDeviceInstance*>(ctx)->Unbind(); };
-    ops.release = [](void* ctx) { static_cast<FidlProxyDeviceInstance*>(ctx)->Release(); };
-    return ops;
-  }();
+  static const zx_protocol_device_t empty_device_ops = {};
 
-  auto fidl_proxy = fbl::MakeRefCounted<FidlProxyDevice>(dev);
+  fbl::RefPtr<FidlProxyDevice> fidl_proxy_device =
+      fbl::MakeRefCounted<FidlProxyDevice>(std::move(incoming_dir));
 
-  auto new_device = FidlProxyDeviceInstance::Create(dev, std::move(incoming_dir));
+  dev->set_fidl_proxy(fidl_proxy_device);
 
-  dev->set_fidl_proxy(fidl_proxy);
-  dev->set_ops(&fidl_proxy_device_ops);
-  dev->set_ctx(new_device.release());
-  // Flag that when this is cleaned up, we should run its release hook.
-  dev->set_flag(DEV_FLAG_ADDED);
+  // FIDL proxies aren't real devices, so they don't have a context object or any device operations.
+  dev->set_ctx(nullptr);
+  dev->set_ops(&empty_device_ops);
 }
 
 fbl::RefPtr<zx_driver> GetFidlProxyDriver(DriverHostContext* ctx) {
@@ -89,12 +43,16 @@ fbl::RefPtr<zx_driver> GetFidlProxyDriver(DriverHostContext* ctx) {
 }
 
 zx::result<> FidlProxyDevice::ConnectToProtocol(const char* protocol, zx::channel request) {
-  return static_cast<FidlProxyDeviceInstance*>(device_->ctx())
-      ->ConnectToProtocol(protocol, std::move(request));
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+  path.AppendPrintf("svc/%s", protocol);
+  return zx::make_result(
+      fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));
 }
 
 zx::result<> FidlProxyDevice::ConnectToProtocol(const char* service, const char* protocol,
                                                 zx::channel request) {
-  return static_cast<FidlProxyDeviceInstance*>(device_->ctx())
-      ->ConnectToProtocol(service, protocol, std::move(request));
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+  path.AppendPrintf("svc/%s/default/%s", service, protocol);
+  return zx::make_result(
+      fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));
 }
