@@ -87,7 +87,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let component = self.make_component(vec!["foo:0", "bar:0"].into());
+        let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
 
         let event_capability = CapabilitySourceInterface::<C>::Framework {
             capability: InternalCapability::Event(CapabilityName::from("running")),
@@ -190,7 +190,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let component = self.make_component(vec!["foo:0"].into());
+        let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySourceInterface::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
@@ -242,7 +242,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let component = self.make_component(vec!["foo:0"].into());
+        let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySourceInterface::<C>::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
@@ -302,7 +302,7 @@ where
             AllowlistEntryBuilder::new().exact("root").exact("bootstrap").build(),
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let component = self.make_component(vec!["foo:0"].into());
+        let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
         let protocol_capability = CapabilitySourceInterface::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
@@ -435,7 +435,7 @@ where
         let target_moniker = AbsoluteMoniker::try_from(vec!["target"]).unwrap();
 
         for (source, dest, env) in valid_cases {
-            let component = self.make_component(source.clone().into());
+            let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySourceInterface::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
@@ -457,7 +457,7 @@ where
         }
 
         for (source, dest, env) in invalid_cases {
-            let component = self.make_component(source.clone().into());
+            let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySourceInterface::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
@@ -563,7 +563,7 @@ where
         let target_moniker = AbsoluteMoniker::try_from(vec!["target"]).unwrap();
 
         for (source, dest, env) in valid_cases {
-            let component = self.make_component(source.clone().into());
+            let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySourceInterface::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
@@ -585,7 +585,7 @@ where
         }
 
         for (source, dest, env) in invalid_cases {
-            let component = self.make_component(source.clone().into());
+            let component = self.make_component(source.clone().try_into().unwrap());
             let protocol_capability = CapabilitySourceInterface::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),

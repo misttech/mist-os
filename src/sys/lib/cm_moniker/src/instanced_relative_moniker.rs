@@ -90,7 +90,7 @@ mod tests {
     use {
         super::*,
         crate::instanced_abs_moniker::InstancedAbsoluteMoniker,
-        moniker::{ChildMonikerBase, MonikerError},
+        moniker::{AbsoluteMonikerBase, ChildMonikerBase, MonikerError},
         std::convert::TryInto,
     };
 
@@ -111,70 +111,70 @@ mod tests {
     #[test]
     fn instanced_relative_monikers_scope_down() {
         let me = InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec![].into(),
-            &vec![].into(),
+            &InstancedAbsoluteMoniker::root(),
+            &InstancedAbsoluteMoniker::root(),
         )
         .unwrap();
         assert_eq!(true, me.is_self());
         assert_eq!(".", format!("{}", me));
 
         let me = InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a:1", "b:2", "c:3"].into(),
-            &vec!["a:1", "b:2", "c:3"].into(),
+            &vec!["a:1", "b:2", "c:3"].try_into().unwrap(),
+            &vec!["a:1", "b:2", "c:3"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(true, me.is_self());
         assert_eq!(".", format!("{}", me));
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a:1", "b:2"].into(),
-            &vec![].into(),
+            &vec!["a:1", "b:2"].try_into().unwrap(),
+            &InstancedAbsoluteMoniker::root(),
         )
         .unwrap_err();
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a:1", "b:2", "c:3", "d:4"].into(),
-            &vec!["a:1", "b:2"].into(),
+            &vec!["a:1", "b:2", "c:3", "d:4"].try_into().unwrap(),
+            &vec!["a:1", "b:2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         let descendant = InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec![].into(),
-            &vec!["a:1", "b:2"].into(),
+            &InstancedAbsoluteMoniker::root(),
+            &vec!["a:1", "b:2"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
         assert_eq!("./a:1/b:2", format!("{}", descendant));
 
         let descendant = InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a:1", "b:2"].into(),
-            &vec!["a:1", "b:2", "c:3", "d:4"].into(),
+            &vec!["a:1", "b:2"].try_into().unwrap(),
+            &vec!["a:1", "b:2", "c:3", "d:4"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
         assert_eq!("./c:3/d:4", format!("{}", descendant));
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a:1"].into(),
-            &vec!["b:2"].into(),
+            &vec!["a:1"].try_into().unwrap(),
+            &vec!["b:2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["c:3", "a:1"].into(),
-            &vec!["c:3", "b:2"].into(),
+            &vec!["c:3", "a:1"].try_into().unwrap(),
+            &vec!["c:3", "b:2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["a0:1", "a:1"].into(),
-            &vec!["b0:2", "b:2"].into(),
+            &vec!["a0:1", "a:1"].try_into().unwrap(),
+            &vec!["b0:2", "b:2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         InstancedRelativeMoniker::scope_down::<InstancedAbsoluteMoniker>(
-            &vec!["c:3", "d:4", "a0:1", "a:1"].into(),
-            &vec!["c:3", "d:4", "b0:2", "b:2"].into(),
+            &vec!["c:3", "d:4", "a0:1", "a:1"].try_into().unwrap(),
+            &vec!["c:3", "d:4", "b0:2", "b:2"].try_into().unwrap(),
         )
         .unwrap_err();
     }

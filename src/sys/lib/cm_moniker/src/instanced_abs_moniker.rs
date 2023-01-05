@@ -5,7 +5,7 @@
 use {
     crate::instanced_child_moniker::InstancedChildMoniker,
     core::cmp::{self, Ord, Ordering},
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError},
     std::{fmt, hash::Hash},
 };
 
@@ -52,9 +52,11 @@ impl AbsoluteMonikerBase for InstancedAbsoluteMoniker {
     }
 }
 
-impl From<Vec<&str>> for InstancedAbsoluteMoniker {
-    fn from(rep: Vec<&str>) -> Self {
-        Self::parse(&rep).expect(&format!("instanced absolute moniker failed to parse: {:?}", &rep))
+impl TryFrom<Vec<&str>> for InstancedAbsoluteMoniker {
+    type Error = MonikerError;
+
+    fn try_from(rep: Vec<&str>) -> Result<Self, MonikerError> {
+        Self::parse(&rep)
     }
 }
 
@@ -87,7 +89,7 @@ mod tests {
         let root = InstancedAbsoluteMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!("/", format!("{}", root));
-        assert_eq!(root, InstancedAbsoluteMoniker::from(vec![]));
+        assert_eq!(root, InstancedAbsoluteMoniker::try_from(vec![]).unwrap());
 
         let m = InstancedAbsoluteMoniker::new(vec![
             InstancedChildMoniker::try_new("a", None, 1).unwrap(),
@@ -95,7 +97,7 @@ mod tests {
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("/a:1/coll:b:2", format!("{}", m));
-        assert_eq!(m, InstancedAbsoluteMoniker::from(vec!["a:1", "coll:b:2"]));
+        assert_eq!(m, InstancedAbsoluteMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some("coll"));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf().map(|m| m.instance()), Some(2));
