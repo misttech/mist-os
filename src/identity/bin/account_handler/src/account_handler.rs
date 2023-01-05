@@ -28,19 +28,10 @@ use {
     fuchsia_inspect::{Inspector, Property},
     futures::{channel::oneshot, lock::Mutex, prelude::*},
     identity_common::{EnrollmentData, PrekeyMaterial, TaskGroupError},
-    lazy_static::lazy_static,
     std::{convert::TryInto, fmt, sync::Arc},
     storage_manager::StorageManager,
     tracing::{error, info, warn},
 };
-
-lazy_static! {
-    /// Temporary pre-key material which constitutes a successful authentication
-    /// attempt, for manual and automatic tests. This constant is specifically
-    /// for the developer authenticator implementations
-    /// (see src/identity/bin/dev_authenticator) and needs to stay in sync.
-    static ref MAGIC_PREKEY: [u8; 32] = [77; 32];
-}
 
 // A static enrollment id which represents the only enrollment.
 const ENROLLMENT_ID: u64 = 0;
@@ -538,9 +529,7 @@ where
                     "Could not decrypt key material from SingleEnrollment: there were no \
                       enrollments."
                 );
-                // TODO(fxbug.dev/104199): Once we can expect enrollments in all
-                // unit tests, we can remove this fake value.
-                Ok(*MAGIC_PREKEY)
+                Err(ApiError::FailedPrecondition)
             }
         }
     }
