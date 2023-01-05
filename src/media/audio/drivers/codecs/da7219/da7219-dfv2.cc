@@ -28,36 +28,33 @@ zx::result<zx::interrupt> Driver::GetIrq() const {
 }
 
 zx::result<> Driver::Start() {
-  auto i2c = context().incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c000");
+  zx::result i2c = context().incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c000");
   if (!i2c.is_ok()) {
-    DA7219_LOG(ERROR, "Could not get I2C client");
-    return zx::error(i2c.status_value());
+    DA7219_LOG(ERROR, "Could not get I2C client: %s", i2c.status_string());
+    return i2c.take_error();
   }
-  auto irq = GetIrq();
+  zx::result irq = GetIrq();
   if (!irq.is_ok()) {
-    DA7219_LOG(ERROR, "Could not get IRQ");
-    return zx::error(i2c.status_value());
+    DA7219_LOG(ERROR, "Could not get IRQ: %s", irq.status_string());
+    return irq.take_error();
   }
 
   // There is a core class that implements the core logic and interaction with the hardware, and a
   // Server class that allows the creation of multiple instances (one for input and one for output).
   core_ = std::make_shared<Core>(logger_.get(), std::move(i2c.value()), std::move(irq.value()));
-  zx_status_t status = core_->Initialize();
-  if (status != ZX_OK) {
-    DA7219_LOG(ERROR, "Could not initialize");
+  if (zx_status_t status = core_->Initialize(); status != ZX_OK) {
+    DA7219_LOG(ERROR, "Could not initialize: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  zx::result<> output = Serve(std::string(name()).append("-output"), false);
-  if (!output.is_ok()) {
+  if (zx::result output = Serve(std::string(name()).append("-output"), false); output.is_error()) {
     FDF_SLOG(ERROR, "Could not serve output server", KV("status", output.status_string()));
-    return zx::error(output.status_value());
+    return output.take_error();
   }
 
-  zx::result<> input = Serve(std::string(name()).append("-input"), true);
-  if (!input.is_ok()) {
+  if (zx::result input = Serve(std::string(name()).append("-input"), true); input.is_error()) {
     FDF_SLOG(ERROR, "Could not serve input server", KV("status", input.status_string()));
-    return zx::error(input.status_value());
+    return input.take_error();
   }
 
   FDF_SLOG(INFO, "Started");
