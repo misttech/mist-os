@@ -222,6 +222,15 @@
   related_guides: [""]
   area: ["Component Framework"]
 
+- term: "Child node"
+  short_description: "A <a href=\"/docs/glossary#node\">node</a> that receives
+  <a href=\"/docs/glossary#resource\">resources</a> from
+  <a href=\"/docs/glossary#parent-driver\">parent driver(s)</a>."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 - term: "CIPD"
   short_description: "A cloud service for storing and distributing packages. Packages can be
   arbitrary collections of files, but most often contain prebuilt binaries."
@@ -530,7 +539,7 @@
   <a href=\"/docs/glossary#driver-manager\">driver manager</a>."
   see_also: ["<a href=\"/docs/development/drivers/developer_guide/driver-development.md\">Fuchsia driver development</a>",
              "<a href=\"/src/devices\">Driver source code</a>",
-             "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
+             "<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
@@ -1125,9 +1134,18 @@
   properties. A node can be thought of as a hardware or virtual device, or a node can be a part
   of a hardware device."
   full_description: ""
-  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
   related_guides: [""]
-  area: ["System", "Devices"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Node topology"
+  short_description: "The node topology describes the parent-child relationships between
+  <a href=\"/docs/glossary#node\">nodes</a> in a Fuchsia system. These nodes form a single node
+  topology, expressed in a <a href=\"https://en.wikipedia.org/wiki/Directed_acyclic_graph\">directed acyclic graph</a>."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "offer"
   short_description: "A keyword for a component instance to route a capability that was exposed to it."
@@ -1212,6 +1230,15 @@
   related_guides: [""]
   area: ["Component Framework"]
 
+- term: "Parent driver"
+  short_description: "A driver that provides <a href=\"/docs/glossary#resource\">resources</a> from
+  its <a href=\"/docs/glossary#node\">node</a> to its
+  <a href=\"/docs/glossary#child-node\">child nodes</a>."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Drivers and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 - term: "Paver"
   short_description: "A tool in Zircon that installs partition images to internal storage of a
   device."
@@ -1239,6 +1266,16 @@
   see_also: ["<a href=\"/docs/glossary#koid\">"]
   related_guides: [""]
   area: ["Zircon"]
+
+- term: "Platform device"
+  short_description: "A <a href=\"/docs/glossary#node\">node</a> added by the
+  <a href=\"/docs/glossary#board-driver\">board driver</a> to the
+  <a href=\"/docs/glossary#platform-bus\">platform bus</a>."
+  full_description: ""
+  see_also: [""]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus.md\">Platform Bus</a>"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 
 - term: "Platform bus"
   short_description: "The first driver loaded in Fuchsia. The platform bus is the root driver and
