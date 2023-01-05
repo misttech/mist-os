@@ -187,7 +187,11 @@ fuog_ViewDescriptor GeometryProvider::ExtractViewDescriptor(
   // Angle of a line segment with coordinates (x1,y1) and (x2,y2) is defined as tan inverse
   // (y2-y1/x2-x1). As the return value is in radians multiply it by 180/PI.
   FX_DCHECK(extent_in_context_dx != 0 || extent_in_context_dy != 0)
-      << "top left and top right coordinates cannot be the same";
+      << "top left and top right coordinates cannot be the same. inputs: "
+      << extent_in_context_top_right[0] << ", " << extent_in_context_top_left[0] << ", "
+      << extent_in_context_top_right[1] << ", " << extent_in_context_top_left[1] << ", "
+      << view_node.bounding_box.min[0] << ", " << view_node.bounding_box.min[1] << ", "
+      << view_node.bounding_box.max[0] << ", " << view_node.bounding_box.max[1];
   auto angle_context = atan2(extent_in_context_dy, extent_in_context_dx) * (180. / M_PI);
 
   // Change the range of |angle_context| from [-pi,pi] to [0,2*pi).
