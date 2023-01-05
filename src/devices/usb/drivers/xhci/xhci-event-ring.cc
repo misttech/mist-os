@@ -101,6 +101,7 @@ zx_status_t EventRing::Init(size_t page_size, const zx::bti& bti, fdf::MmioBuffe
   if (interrupter_node != nullptr) {
     total_event_trbs_ = interrupter_node->CreateUint("Total Event TRBs", 0);
     max_single_irq_event_trbs_ = interrupter_node->CreateUint("Max single IRQ event TRBs", 0);
+    events_ = interrupter_node->CreateChild("Events");
   }
 
   zx_status_t status =
@@ -594,6 +595,10 @@ zx_status_t EventRing::HandleIRQ() {
       ++processed_trbs;
       switch (control->Type()) {
         case Control::PortStatusChangeEvent:
+          if (!port_status_change_event_) {
+            port_status_change_event_ = events_.CreateUint("PortStatusChangeEvent", 0);
+          }
+          port_status_change_event_->Add(1);
           HandlePortStatusChangeInterrupt();
           break;
         case Control::CommandCompletionEvent: {
@@ -606,15 +611,27 @@ zx_status_t EventRing::HandleIRQ() {
           HandleTransferInterrupt();
           break;
         case Control::MFIndexWrapEvent: {
+          if (!mf_index_wrap_event_) {
+            mf_index_wrap_event_ = events_.CreateUint("MFIndexWrapEvent", 0);
+          }
+          mf_index_wrap_event_->Add(1);
           hci_->MfIndexWrapped();
         } break;
         case Control::HostControllerEvent:
+          if (!host_controller_event_) {
+            host_controller_event_ = events_.CreateUint("HostControllerEvent", 0);
+          }
+          host_controller_event_->Add(1);
           // NOTE: We can't really do anything here. This typically indicates some kind of error
           // condition.
           zxlogf(DEBUG, "Host controller event: %u",
                  static_cast<CommandCompletionEvent*>(erdp_virt_)->CompletionCode());
           break;
         default:
+          if (!unhandled_events_) {
+            unhandled_events_ = events_.CreateLinearUintHistogram("UnhandledEvents", 1, 1, 40);
+          }
+          unhandled_events_->Insert(control->Type());
           zxlogf(ERROR, "Unexpected transfer event: %u", control->Type());
           break;
       }
@@ -654,6 +671,12 @@ void EventRing::HandlePortStatusChangeInterrupt() {
 }
 
 zx_status_t EventRing::HandleCommandCompletionInterrupt() {
+  auto completion_event = static_cast<CommandCompletionEvent*>(erdp_virt_);
+  if (!command_completion_event_) {
+    command_completion_event_ =
+        events_.CreateLinearUintHistogram("CommandCompletionEvent", 1, 1, 40);
+  }
+  command_completion_event_->Insert(completion_event->CompletionCode());
   // We do not expect to receive command completion events with invalid TRB pointers, so we always
   // check the pointer against the command ring pending TRB queue. Section 6.4.2.2 states that not
   // all command completion events have valid TRB pointers, but it's not clear in what case that
@@ -667,7 +690,6 @@ zx_status_t EventRing::HandleCommandCompletionInterrupt() {
     return ZX_ERR_BAD_STATE;
   }
 
-  auto completion_event = static_cast<CommandCompletionEvent*>(erdp_virt_);
   if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
     // Log all failing commands for now. As error handling is added to the command callbacks, this
     // can be reduced.
@@ -682,7 +704,11 @@ zx_status_t EventRing::HandleCommandCompletionInterrupt() {
 }
 
 void EventRing::HandleTransferInterrupt() {
+  if (!transfer_event_) {
+    transfer_event_ = events_.CreateLinearUintHistogram("TransferEvent", 1, 1, 40);
+  }
   auto transfer_event = static_cast<TransferEvent*>(erdp_virt_);
+  transfer_event_->Insert(transfer_event->CompletionCode());
 
   auto device_state = &hci_->GetDeviceState()[transfer_event->SlotID() - 1];
   fbl::AutoLock l(&device_state->transaction_lock());

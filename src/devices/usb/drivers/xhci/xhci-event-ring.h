@@ -227,6 +227,13 @@ class EventRing {
   inspect::UintProperty total_event_trbs_;
   inspect::UintProperty max_single_irq_event_trbs_;
   uint64_t max_single_irq_event_trbs_value_{0};
+  inspect::Node events_;
+  std::optional<inspect::UintProperty> port_status_change_event_;
+  std::optional<inspect::LinearUintHistogram> command_completion_event_;
+  std::optional<inspect::LinearUintHistogram> transfer_event_;
+  std::optional<inspect::UintProperty> mf_index_wrap_event_;
+  std::optional<inspect::UintProperty> host_controller_event_;
+  std::optional<inspect::LinearUintHistogram> unhandled_events_;
 
   std::optional<trace_async_id_t> async_id_;
 };
