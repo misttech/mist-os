@@ -81,34 +81,34 @@ zx_status_t Imx8mmEvk::GpioInit() {
   // I2C1
   pinconfig_metadata.pin_config_entry[11] = {
       IOMUXC_I2C1_SCL_I2C1_SCL,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   pinconfig_metadata.pin_config_entry[12] = {
       IOMUXC_I2C1_SDA_I2C1_SDA,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   // I2C2
   pinconfig_metadata.pin_config_entry[13] = {
       IOMUXC_I2C2_SCL_I2C2_SCL,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   pinconfig_metadata.pin_config_entry[14] = {
       IOMUXC_I2C2_SDA_I2C2_SDA,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   // I2C3
   pinconfig_metadata.pin_config_entry[15] = {
       IOMUXC_I2C3_SCL_I2C3_SCL,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   pinconfig_metadata.pin_config_entry[16] = {
       IOMUXC_I2C3_SDA_I2C3_SDA,
-      (PE(0b0) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b110)),
   };
 
   // UART1
