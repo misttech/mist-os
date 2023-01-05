@@ -77,4 +77,11 @@
             from: "self",
         },
     ],
+    config: {
+        // Whether to fetch delivery blob or uncompressed blob.
+        fetch_delivery_blob: { type: "bool" },
+
+        // Whether to fallback to uncompressed blob if fetching delivery blob fails.
+        delivery_blob_fallback: { type: "bool" },
+    },
 }

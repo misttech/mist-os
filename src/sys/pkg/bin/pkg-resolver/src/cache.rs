@@ -35,67 +35,16 @@ mod inspect;
 mod resume;
 mod retry;
 
-/// Root of typesafe builder for BlobFetchParams.
-#[derive(Clone, Copy, Debug)]
-pub struct BlobFetchParamsBuilderNeedsHeaderNetworkTimeout;
-
-impl BlobFetchParamsBuilderNeedsHeaderNetworkTimeout {
-    pub fn header_network_timeout(
-        self,
-        header_network_timeout: Duration,
-    ) -> BlobFetchParamsBuilderNeedsBodyNetworkTimeout {
-        BlobFetchParamsBuilderNeedsBodyNetworkTimeout { header_network_timeout }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct BlobFetchParamsBuilderNeedsBodyNetworkTimeout {
-    header_network_timeout: Duration,
-}
-
-impl BlobFetchParamsBuilderNeedsBodyNetworkTimeout {
-    pub fn body_network_timeout(
-        self,
-        body_network_timeout: Duration,
-    ) -> BlobFetchParamsBuilderNeedsDownloadResumptionAttemptsLimit {
-        BlobFetchParamsBuilderNeedsDownloadResumptionAttemptsLimit {
-            header_network_timeout: self.header_network_timeout,
-            body_network_timeout,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct BlobFetchParamsBuilderNeedsDownloadResumptionAttemptsLimit {
-    header_network_timeout: Duration,
-    body_network_timeout: Duration,
-}
-
-impl BlobFetchParamsBuilderNeedsDownloadResumptionAttemptsLimit {
-    pub fn download_resumption_attempts_limit(
-        self,
-        download_resumption_attempts_limit: u64,
-    ) -> BlobFetchParams {
-        BlobFetchParams {
-            header_network_timeout: self.header_network_timeout,
-            body_network_timeout: self.body_network_timeout,
-            download_resumption_attempts_limit,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, typed_builder::TypedBuilder)]
 pub struct BlobFetchParams {
     header_network_timeout: Duration,
     body_network_timeout: Duration,
     download_resumption_attempts_limit: u64,
+    fetch_delivery_blob: bool,
+    delivery_blob_fallback: bool,
 }
 
 impl BlobFetchParams {
-    pub fn builder() -> BlobFetchParamsBuilderNeedsHeaderNetworkTimeout {
-        BlobFetchParamsBuilderNeedsHeaderNetworkTimeout
-    }
-
     pub fn header_network_timeout(&self) -> Duration {
         self.header_network_timeout
     }
@@ -106,6 +55,16 @@ impl BlobFetchParams {
 
     pub fn download_resumption_attempts_limit(&self) -> u64 {
         self.download_resumption_attempts_limit
+    }
+
+    pub fn fetch_delivery_blob(&self) -> bool {
+        self.fetch_delivery_blob
+    }
+
+    // TODO(fxbug.dev/118495): use this when implementing fallback
+    #[allow(dead_code)]
+    pub fn delivery_blob_fallback(&self) -> bool {
+        self.delivery_blob_fallback
     }
 }
 
@@ -671,7 +630,11 @@ async fn fetch_blob(
                 http_client,
                 &context.mirrors,
                 merkle,
-                fpkg::BlobType::Uncompressed,
+                if blob_fetch_params.fetch_delivery_blob() {
+                    fpkg::BlobType::Delivery
+                } else {
+                    fpkg::BlobType::Uncompressed
+                },
                 context.opener,
                 context.expected_len,
                 blob_fetch_params,

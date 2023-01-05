@@ -125,6 +125,7 @@ pub fn main() -> Result<(), Error> {
 
 async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error> {
     let config = Config::load_from_config_data_or_default();
+    let structured_config = pkg_resolver_config::Config::take_from_startup_handle();
 
     let pkg_cache_proxy = fuchsia_component::client::connect_to_protocol::<PackageCacheMarker>()
         .context("error connecting to package cache")?;
@@ -225,7 +226,10 @@ async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error
         cache::BlobFetchParams::builder()
             .header_network_timeout(args.blob_network_header_timeout)
             .body_network_timeout(args.blob_network_body_timeout)
-            .download_resumption_attempts_limit(args.blob_download_resumption_attempts_limit),
+            .download_resumption_attempts_limit(args.blob_download_resumption_attempts_limit)
+            .fetch_delivery_blob(structured_config.fetch_delivery_blob)
+            .delivery_blob_fallback(structured_config.delivery_blob_fallback)
+            .build(),
     );
     futures.push(blob_fetch_queue.boxed_local());
 

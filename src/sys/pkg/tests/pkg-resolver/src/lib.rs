@@ -344,6 +344,7 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     tuf_repo_config_boot_arg: Option<String>,
     local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
     resolver_variant: ResolverVariant,
+    fetch_delivery_blob: Option<bool>,
 }
 
 impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, fn() -> Mounts> {
@@ -374,6 +375,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             tuf_repo_config_boot_arg: None,
             local_mirror_repo: None,
             resolver_variant: ResolverVariant::DefaultArgs,
+            fetch_delivery_blob: None,
         }
     }
 }
@@ -399,6 +401,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             resolver_variant: self.resolver_variant,
+            fetch_delivery_blob: self.fetch_delivery_blob,
         }
     }
 
@@ -425,6 +428,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             resolver_variant: self.resolver_variant,
+            fetch_delivery_blob: self.fetch_delivery_blob,
         }
     }
 
@@ -438,6 +442,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             resolver_variant: self.resolver_variant,
+            fetch_delivery_blob: self.fetch_delivery_blob,
         }
     }
     pub fn tuf_repo_config_boot_arg(mut self, repo: String) -> Self {
@@ -453,6 +458,12 @@ where
 
     pub fn resolver_variant(mut self, variant: ResolverVariant) -> Self {
         self.resolver_variant = variant;
+        self
+    }
+
+    // TODO(fxbug.dev/118745): write tests using this.
+    pub fn fetch_delivery_blob(mut self, fetch_delivery_blob: bool) -> Self {
+        self.fetch_delivery_blob = Some(fetch_delivery_blob);
         self
     }
 
@@ -582,6 +593,14 @@ where
             .add_child(PKG_RESOLVER_CHILD_NAME, self.resolver_variant.url(), ChildOptions::new())
             .await
             .unwrap();
+
+        if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
+            builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
+            builder
+                .set_config_value_bool(&pkg_resolver, "fetch_delivery_blob", fetch_delivery_blob)
+                .await
+                .unwrap();
+        }
 
         builder
             .add_route(

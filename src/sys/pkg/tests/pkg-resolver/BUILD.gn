@@ -407,46 +407,66 @@ renamed_binary("pkg_resolver-binary") {
   source_deps = [ "//src/sys/pkg/bin/grand-swd-binary" ]
 }
 
-fuchsia_component("pkg_resolver-component") {
+template("pkg_resolver_component_and_config") {
+  manifest_name = "${target_name}-manifest"
+  fuchsia_component_manifest(manifest_name) {
+    component_name = invoker.component_name
+    manifest = invoker.manifest
+  }
+
+  config_name = "${target_name}-config"
+  fuchsia_structured_config_values(config_name) {
+    cm_label = ":${manifest_name}"
+    values = {
+      fetch_delivery_blob = false
+      delivery_blob_fallback = false
+    }
+  }
+
+  fuchsia_component("${target_name}-component") {
+    cm_label = ":${manifest_name}"
+    deps = [
+      ":${config_name}",
+      ":pkg_resolver-binary",
+    ]
+  }
+}
+
+pkg_resolver_component_and_config("pkg_resolver") {
   component_name = "pkg-resolver"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-test-common.shard.cml"
 }
 
-fuchsia_component("pkg_resolver_allow_local_mirror-component") {
+pkg_resolver_component_and_config("pkg_resolver_allow_local_mirror") {
   component_name = "pkg-resolver-allow-local-mirror"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-allow-local-mirror.cml"
 }
 
-fuchsia_component("pkg_resolver_short_tuf_metadata_timeout-component") {
+pkg_resolver_component_and_config("pkg_resolver_short_tuf_metadata_timeout") {
   component_name = "pkg-resolver-short-tuf-metadata-timeout"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-short-tuf-metadata-timeout.cml"
 }
 
-fuchsia_component("pkg_resolver_zero_tuf_metadata_timeout-component") {
+pkg_resolver_component_and_config("pkg_resolver_zero_tuf_metadata_timeout") {
   component_name = "pkg-resolver-zero-tuf-metadata-timeout"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-zero-tuf-metadata-timeout.cml"
 }
 
-fuchsia_component(
-    "pkg_resolver_zero_blob_download_resumption_attempts-component") {
+pkg_resolver_component_and_config(
+    "pkg_resolver_zero_blob_download_resumption_attempts") {
   component_name = "pkg-resolver-zero-blob-download-resumption-attempts"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-zero-blob-download-resumption-attempts.cml"
 }
 
-fuchsia_component("pkg_resolver_zero_blob_network_body_timeout-component") {
+pkg_resolver_component_and_config(
+    "pkg_resolver_zero_blob_network_body_timeout") {
   component_name = "pkg-resolver-zero-blob-network-body-timeout"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-zero-blob-network-body-timeout.cml"
 }
 
-fuchsia_component("pkg_resolver_zero_blob_network_header_timeout-component") {
+pkg_resolver_component_and_config(
+    "pkg_resolver_zero_blob_network_header_timeout") {
   component_name = "pkg-resolver-zero-blob-network-header-timeout"
-  deps = [ ":pkg_resolver-binary" ]
   manifest = "meta/pkg-resolver-zero-blob-network-header-timeout.cml"
 }
 

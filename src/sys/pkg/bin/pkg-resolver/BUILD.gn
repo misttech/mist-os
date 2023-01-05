@@ -16,6 +16,7 @@ rustc_library("lib") {
   edition = "2021"
 
   deps = [
+    ":config_lib",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
@@ -66,6 +67,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tuf",
+    "//third_party/rust_crates:typed-builder",
   ]
 
   test_deps = [
@@ -120,14 +122,25 @@ grand_swd_binary("bin") {
   output_name = "pkg_resolver"
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "pkg-resolver"
   manifest = "meta/pkg-resolver.cml"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
+group("production-component-and-config") {
+  public_deps = [
+    ":component",
+    ":config_values_from_gn",
+  ]
+}
+
 fuchsia_package("pkg-resolver") {
-  deps = [ ":component" ]
+  deps = [ ":production-component-and-config" ]
 }
 
 fuchsia_component("unit-tests-root") {
@@ -168,6 +181,20 @@ pkg_resolver_config("enable_dynamic_configuration") {
 resolver_persisted_repos_config("persisted_repos_dir") {
   persisted_repos_dir = "repos"
   deps = [ "//build/validate:non_production_tag" ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  cm_label = ":manifest"
+  name = "pkg_resolver_config"
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn") {
+  cm_label = ":manifest"
+  values = {
+    fetch_delivery_blob = false
+    delivery_blob_fallback = false
+  }
 }
 
 group("tests") {
