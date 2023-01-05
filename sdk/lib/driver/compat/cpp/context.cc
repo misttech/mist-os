@@ -18,36 +18,6 @@ void Context::ConnectAndCreate(fdf::DriverContext* driver_context, async_dispatc
   }
   context->parent_device_.Bind(std::move(result.value()), dispatcher);
 
-  // Connect to DevfsExporter.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return callback(endpoints.take_error());
-  }
-  auto status = driver_context->outgoing()->Serve(std::move(endpoints->server));
-  if (status.is_error()) {
-    return callback(status.take_error());
-  }
-  auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (svc_endpoints.is_error()) {
-    return callback(svc_endpoints.take_error());
-  }
-  auto response =
-      fidl::WireCall(endpoints->client)
-          ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                     fuchsia_io::wire::OpenFlags::kRightWritable,
-                 0, "svc/", fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeHandle()));
-  if (response.status() != ZX_OK) {
-    return callback(zx::error(response.status()));
-  }
-
-  auto exporter = fdf::DevfsExporter::Create(
-      *driver_context->incoming(), dispatcher,
-      fidl::WireSharedClient(std::move(svc_endpoints->client), dispatcher));
-  if (exporter.is_error()) {
-    return callback(zx::error(exporter.error_value()));
-  }
-  context->devfs_exporter_ = std::move(*exporter);
-
   // Get the topological path.
   auto context_ptr = context.get();
   context_ptr->parent_device_->GetTopologicalPath().Then(
