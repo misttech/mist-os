@@ -423,6 +423,29 @@
   related_guides: [""]
   area: ["Component Framework"]
 
+- term: "Composite driver"
+  short_description: "A <a href=\"/docs/glossary#driver\">driver</a> that only
+  binds to a <a href=\"/docs/glossary#composite-node\">composite node</a>. A driver
+  can be defined as a composite via its
+  <a href=\"/docs/glossary#bind-rules\">bind rules</a>."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Composite node"
+  short_description: "A <a href=\"/docs/glossary#node\">node</a> with multiple
+  parents. The <a href=\"/docs/glossary#driver\">driver</a> that is bound to the
+  composite node can access the combined
+  <a href=\"/docs/glossary#resource\">resources</a> provided by the
+  <a href=\"/docs/glossary#parent-driver\">parent drivers</a>. Formerly known as
+  a composite device."
+  full_description: ""
+  see_also: ["<a href=\"/docs/concepts/drivers/drivers_and_nodes.md\">Driver and nodes</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 - term: "Concurrent device driver"
   short_description: "A
   <a href=\"/docs/glossary#hardware-driver\">hardware driver</a> that supports multiple
@@ -718,6 +741,16 @@
   see_also: ["<a href=\"http://flutter.dev\">flutter.dev</a>"]
   related_guides: [""]
   area: ["General", "Flutter"]
+
+- term: "Fragment"
+  short_description: "A fragment is a <a href=\"/docs/glossary#node\">node</a> that composes a
+  Driver Framework v1 <a href=\"/docs/glossary#composite-node\">composite node</a>. Each fragment
+  binds to a fragment <a href=\"/docs/glossary#driver\">driver</a> which provides protocols and
+  metadata to the composite node. Only used in Driver Framework v1."
+  full_description: ""
+  see_also: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/composite.md\">Composite devices</a>"]
+  related_guides: [""]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "FTP"
   short_description: "Deprecated, replaced by RFC. An FTP is the way developers can suggest changes
