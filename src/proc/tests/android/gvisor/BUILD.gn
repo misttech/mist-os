@@ -20,7 +20,7 @@ expect_includes("gvisor_test") {
   includes = [ "meta/gvisor.shard.cml" ]
 
   # Uses starbionic_test_runner
-  deps = [ "//src/proc/tests:starnix_test" ]
+  deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
 }
 
 template("gvisor_test_component") {
@@ -30,6 +30,7 @@ template("gvisor_test_component") {
 
   meta_dir = "//src/proc/tests/android/gvisor/meta"
   starnix_test_component(target_name) {
+    use_expectations = true
     deps = [ ":gvisor_test" ]
   }
 }
@@ -335,7 +336,7 @@ zip_resource("gvisor_runfiles") {
   dest_prefix = "data/tests"
 }
 
-starbionic_test_package("starnix_gvisor_tests") {
+starbionic_test_package_with_expectations("starnix_gvisor_tests") {
   deps = [
     ":gvisor_runfiles",
     "//src/connectivity/network/netstack:component",
@@ -347,17 +348,23 @@ starbionic_test_package("starnix_gvisor_tests") {
     test_components += [ ":${test_name}" ]
   }
 
+  expectations = "expectations/default.json5"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    timeout_secs = 600
+  }
+
   # TODO(fxbug.dev/114774): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.
   if (is_coverage) {
-    test_specs = {
-      environments = [
-        {
-          dimensions = qemu_env
-          tags = [ "disabled" ]
-        },
-      ]
-    }
+    test_specs.environments = [
+      {
+        dimensions = qemu_env
+        tags = [ "disabled" ]
+      },
+    ]
   }
 }
 
