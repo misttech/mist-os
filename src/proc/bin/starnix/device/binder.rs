@@ -29,7 +29,7 @@ use crate::task::{
 use crate::types::*;
 use bitflags::bitflags;
 use derivative::Derivative;
-use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
+use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
@@ -2023,8 +2023,15 @@ impl std::fmt::Debug for CurrentBinderTask<'_> {
 
 /// Implementation of `BinderTask` and `CurrentBinderTask` for a remote client.
 struct RemoteBinderTask {
-    process: zx::Process,
+    process: Option<zx::Process>,
+    process_accessor: Option<fbinder::ProcessAccessorSynchronousProxy>,
     kernel: Arc<Kernel>,
+}
+
+impl RemoteBinderTask {
+    fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
+        errno_from_code!(e.into_primitive() as i16)
+    }
 }
 
 impl std::fmt::Debug for RemoteBinderTask {
@@ -2038,19 +2045,31 @@ const max_process_read_write_memory_size: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteBinderTask {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        let mut index = 0;
-        while index < bytes.len() {
-            let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
-            let bytes_count = self
-                .process
-                .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
-                .map_err(|_| errno!(EINVAL))?;
-            if bytes_count == 0 {
-                return error!(EINVAL);
+        if let Some(process_accessor) = self.process_accessor.as_ref() {
+            let result = process_accessor
+                .read_memory(addr.ptr() as u64, bytes.len() as u64, zx::Time::INFINITE)
+                .map_err(|_| errno!(ENOENT))?;
+            let vmo = result.map_err(Self::map_fidl_posix_errno)?;
+            vmo.read(bytes, 0).map_err(|e| {
+                log_warn!("Got an error when reading from vmo: {:?}", e);
+                errno!(EFAULT)
+            })
+        } else if let Some(process) = self.process.as_ref() {
+            let mut index = 0;
+            while index < bytes.len() {
+                let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
+                let bytes_count = process
+                    .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
+                    .map_err(|_| errno!(EINVAL))?;
+                if bytes_count == 0 {
+                    return error!(EINVAL);
+                }
+                index += bytes_count;
             }
-            index += bytes_count;
+            Ok(())
+        } else {
+            error!(ENOTSUP)
         }
-        Ok(())
     }
 
     fn read_memory_partial(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<usize, Errno> {
@@ -2058,19 +2077,31 @@ impl MemoryAccessor for RemoteBinderTask {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        let mut index = 0;
-        while index < bytes.len() {
-            let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
-            let bytes_count = self
-                .process
-                .write_memory(addr.ptr() + index, &bytes[index..(index + len)])
-                .map_err(|_| errno!(EINVAL))?;
-            if bytes_count == 0 {
-                break;
+        if let Some(process_accessor) = self.process_accessor.as_ref() {
+            let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
+            vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
+            vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
+            process_accessor
+                .write_memory(addr.ptr() as u64, vmo, zx::Time::INFINITE)
+                .map_err(|_| errno!(ENOENT))?
+                .map_err(Self::map_fidl_posix_errno)?;
+            Ok(bytes.len())
+        } else if let Some(process) = self.process.as_ref() {
+            let mut index = 0;
+            while index < bytes.len() {
+                let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
+                let bytes_count = process
+                    .write_memory(addr.ptr() + index, &bytes[index..(index + len)])
+                    .map_err(|_| errno!(EINVAL))?;
+                if bytes_count == 0 {
+                    break;
+                }
+                index += bytes_count;
             }
-            index += bytes_count;
+            Ok(index)
+        } else {
+            error!(ENOTSUP)
         }
-        Ok(index)
     }
 }
 
@@ -2179,7 +2210,8 @@ impl BinderDriver {
     pub fn open_external(
         self: &Arc<Self>,
         kernel: &Arc<Kernel>,
-        process: zx::Process,
+        process: Option<zx::Process>,
+        process_accessor: Option<ClientEnd<fbinder::ProcessAccessorMarker>>,
         server_end: ServerEnd<fbinder::BinderMarker>,
     ) -> fasync::Task<()> {
         let kernel = kernel.clone();
@@ -2187,10 +2219,16 @@ impl BinderDriver {
 
         fasync::Task::local(
             async move {
+                let process_accessor = process_accessor.map(|process_accessor| {
+                    fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel())
+                });
                 let binder_process = driver.create_process(kernel.pids.write().allocate_pid());
                 let identifier = binder_process.identifier;
-                let remote_binder_task =
-                    Arc::new(RemoteBinderTask { process, kernel: kernel.clone() });
+                let remote_binder_task = Arc::new(RemoteBinderTask {
+                    process,
+                    process_accessor,
+                    kernel: kernel.clone(),
+                });
                 driver.remote_tasks.write().insert(identifier, remote_binder_task.clone());
                 scopeguard::defer! {
                     driver.procs.write().remove(&identifier);
@@ -3397,7 +3435,8 @@ mod tests {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::create_proxy;
+    use fidl::endpoints::{create_endpoints, create_proxy};
+    use fuchsia_async::LocalExecutor;
     use memoffset::offset_of;
 
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
@@ -6000,8 +6039,61 @@ mod tests {
             .expect("binder dev open failed");
     }
 
+    /// Spawn a new thread that will run a test implementation of the ProcessAccessor protocol.
+    /// The thread will stop when the client is disconnected.
+    fn spawn_new_process_accessor_thread(
+        server_end: ServerEnd<fbinder::ProcessAccessorMarker>,
+    ) -> std::thread::JoinHandle<Result<(), anyhow::Error>> {
+        std::thread::spawn(move || {
+            let mut executor = LocalExecutor::new()?;
+            executor.run_singlethreaded(async move {
+                let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
+                    fasync::Channel::from_channel(server_end.into_channel())?,
+                );
+                while let Some(event) = stream.try_next().await? {
+                    match event {
+                        fbinder::ProcessAccessorRequest::WriteMemory {
+                            address,
+                            content,
+                            responder,
+                        } => {
+                            let size = content.get_content_size()?;
+                            // SAFETY: This is not safe and rely on the client being correct.
+                            let buffer = unsafe {
+                                std::slice::from_raw_parts_mut(address as *mut u8, size as usize)
+                            };
+                            content.read(buffer, 0)?;
+                            responder.send(&mut Ok(()))?;
+                        }
+                        fbinder::ProcessAccessorRequest::ReadMemory {
+                            address,
+                            length,
+                            responder,
+                        } => {
+                            let vmo = zx::Vmo::create(length)?;
+                            // SAFETY: This is not safe and rely on the client being correct.
+                            let buffer = unsafe {
+                                std::slice::from_raw_parts(address as *const u8, length as usize)
+                            };
+                            vmo.write(buffer, 0)?;
+                            vmo.set_content_size(&length)?;
+                            responder.send(&mut Ok(vmo))?;
+                        }
+                    }
+                }
+                Ok(())
+            })
+        })
+    }
+
     #[fuchsia::test]
     async fn external_binder_connection() {
+        let (process_accessor_client_end, process_accessor_server_end) =
+            create_endpoints::<fbinder::ProcessAccessorMarker>().expect("endpoints");
+
+        let process_accessor_thread =
+            spawn_new_process_accessor_thread(process_accessor_server_end);
+
         let (binder_proxy, binder_server_end) =
             create_proxy::<fbinder::BinderMarker>().expect("proxy");
         let task = fasync::Task::spawn(async move {
@@ -6013,11 +6105,9 @@ mod tests {
             let context_manager_proc = driver.create_process(1);
             let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
             driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
-
-            let process = fuchsia_runtime::process_self()
-                .duplicate(zx::Rights::SAME_RIGHTS)
-                .expect("process");
-            driver.open_external(&kernel, process, binder_server_end).await;
+            driver
+                .open_external(&kernel, None, Some(process_accessor_client_end), binder_server_end)
+                .await;
         });
         const vmo_size: usize = 10 * 1024 * 1024;
         let vmo = zx::Vmo::create(vmo_size as u64).expect("Vmo::create");
@@ -6042,15 +6132,25 @@ mod tests {
         assert_eq!(version.protocol_version, BINDER_CURRENT_PROTOCOL_VERSION as i32);
         std::mem::drop(binder_proxy);
         task.await;
+
+        process_accessor_thread.join().expect("join").expect("success");
     }
 
     #[fuchsia::test]
     fn remote_binder_task() {
         const vector_size: usize = max_process_read_write_memory_size * 3 / 2;
+        let (process_accessor_client_end, process_accessor_server_end) =
+            create_endpoints::<fbinder::ProcessAccessorMarker>().expect("endpoints");
+
+        let process_accessor_thread =
+            spawn_new_process_accessor_thread(process_accessor_server_end);
+
+        let process_accessor = Some(fbinder::ProcessAccessorSynchronousProxy::new(
+            process_accessor_client_end.into_channel(),
+        ));
+
         let (kernel, _task) = create_kernel_and_task();
-        let process =
-            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
-        let remote_binder_task = RemoteBinderTask { process, kernel };
+        let remote_binder_task = RemoteBinderTask { process: None, process_accessor, kernel };
         let mut vector = Vec::with_capacity(vector_size);
         for i in 0..vector_size {
             vector.push((i & 255) as u8);
@@ -6069,6 +6169,9 @@ mod tests {
             .expect("read_memory");
         assert_eq!(vector[1], 1);
         assert_eq!(vector, other_vector);
+
+        std::mem::drop(remote_binder_task);
+        process_accessor_thread.join().expect("join").expect("success");
     }
 }
 

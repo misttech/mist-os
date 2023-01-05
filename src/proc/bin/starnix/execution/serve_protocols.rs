@@ -64,7 +64,8 @@ pub async fn serve_dev_binder(
             fbinder::DevBinderRequest::Open { payload, control_handle } => {
                 let result: Result<(), Error> = (|| {
                     let path = payload.path.ok_or_else(|| errno!(EINVAL))?;
-                    let process = payload.process.ok_or_else(|| errno!(EINVAL))?;
+                    let process = payload.process;
+                    let process_accessor = payload.process_accessor;
                     let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
                     let node = galaxy.system_task.lookup_path_from_root(&path)?;
                     let device_type = node.entry.node.info().rdev;
@@ -75,7 +76,9 @@ pub async fn serve_dev_binder(
                         .get(&device_type)
                         .ok_or_else(|| errno!(ENOTSUP))?
                         .clone();
-                    binder_driver.open_external(&galaxy.kernel, process, binder).detach();
+                    binder_driver
+                        .open_external(&galaxy.kernel, process, process_accessor, binder)
+                        .detach();
                     Ok(())
                 })();
                 if result.is_err() {

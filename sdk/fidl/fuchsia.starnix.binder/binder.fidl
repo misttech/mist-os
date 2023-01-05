@@ -8,6 +8,27 @@ using fuchsia.posix;
 
 const MAX_PATH_LENGTH uint64 = 4095;
 
+/// Protocol that gives the binder driver access to the client process'
+/// resources.
+protocol ProcessAccessor {
+    /// Writes the contents of `content` to `address` in the process memory,
+    /// using the vmo content size to determine the number of bytes to write.
+    WriteMemory(resource struct {
+        address uint64;
+        content zx.handle:VMO;
+    }) -> () error fuchsia.posix.Errno;
+
+    /// Returns the `length` bytes of the memory of the process at `address` in
+    /// the `content` vmo. Th returned vmo's content size must always be exactly
+    /// `length`.
+    ReadMemory(struct {
+        address uint64;
+        length uint64;
+    }) -> (resource struct {
+        content zx.handle:VMO;
+    }) error fuchsia.posix.Errno;
+};
+
 /// Give access to the binder nodes.
 @discoverable
 protocol DevBinder {
@@ -23,9 +44,8 @@ protocol DevBinder {
         /// TODO(fxb/112325): Find a better way to give access to the proces memory.
         2: process zx.handle:PROCESS;
 
-        // TODO(qsr): Add a client to a protocol allowing access to the fd
-        // table of the client.
-        3: reserved;
+        /// The service giving the binder driver access to the resources of the client process.
+        3: process_accessor client_end:ProcessAccessor;
 
         /// The request to the Binder protocol implementation.
         /// Mandatory
