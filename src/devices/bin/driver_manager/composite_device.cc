@@ -134,7 +134,7 @@ std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromDriverIndex(
                                                               fbl::Array<const zx_bind_inst_t>());
     dev->fragments_.push_back(std::move(fragment));
   }
-  dev->driver_index_driver_ = driver.driver_info;
+  dev->driver_.emplace(driver.driver_info);
   return dev;
 }
 
@@ -259,6 +259,28 @@ zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
 zx_status_t CompositeDevice::TryAssemble() {
   ZX_ASSERT(!device_);
 
+  // If unavailable, search for a driver that binds to the composite.
+  if (!driver_.has_value()) {
+    if (!GetPrimaryFragment() || !GetPrimaryFragment()->bound_device()) {
+      return ZX_ERR_SHOULD_WAIT;
+    }
+
+    auto coordinator = GetPrimaryFragment()->bound_device()->coordinator;
+    auto match_result = coordinator->bind_driver_manager().MatchCompositeDevice(
+        *this, DriverLoader::MatchDeviceConfig{});
+    if (match_result.is_error()) {
+      if (match_result.status_value() == ZX_ERR_NOT_FOUND) {
+        return ZX_ERR_SHOULD_WAIT;
+      }
+
+      LOGF(ERROR, "Failed to match driver to composite: %s",
+           zx_status_get_string(match_result.status_value()));
+      return match_result.status_value();
+    }
+
+    driver_.emplace(match_result.value());
+  }
+
   for (auto& fragment : fragments_) {
     if (!fragment.IsReady()) {
       return ZX_ERR_SHOULD_WAIT;
@@ -337,20 +359,21 @@ zx_status_t CompositeDevice::TryAssemble() {
     }
   }
 
-  status = device_->SignalReadyForBind();
+  // Bind |driver_| to |device_|.
+  status = coordinator->AttemptBind(driver_.value(), device_);
   if (status != ZX_OK) {
-    return status;
-  }
-  if (from_driver_index_) {
-    zx_status_t status = coordinator->AttemptBind(driver_index_driver_, device_);
-    if (status != ZX_OK) {
-      LOGF(ERROR, "%s: Failed to bind composite driver '%s' to device '%s': %s", __func__,
-           driver_index_driver_.name(), device_->name().data(), zx_status_get_string(status));
-    }
+    LOGF(ERROR, "%s: Failed to bind driver '%s' to device '%s': %s", __func__,
+         driver_.value().name(), device_->name().data(), zx_status_get_string(status));
     return status;
   }
 
   return ZX_OK;
+}
+
+void CompositeDevice::SetDriverAndAssemble(MatchedDriverInfo driver) {
+  ZX_ASSERT(!driver_.has_value());
+  driver_.emplace(driver);
+  TryAssemble();
 }
 
 void CompositeDevice::UnbindFragment(CompositeDeviceFragment* fragment) {

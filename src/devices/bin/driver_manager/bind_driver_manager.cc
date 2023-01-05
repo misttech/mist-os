@@ -152,6 +152,24 @@ zx_status_t BindDriverManager::MatchAndBind(const fbl::RefPtr<Device>& dev,
   return ZX_OK;
 }
 
+zx::result<> BindDriverManager::MatchAndBindCompositeDevice(
+    CompositeDevice& composite, const DriverLoader::MatchDeviceConfig& config) {
+  if (composite.HasDriver()) {
+    return zx::error(ZX_ERR_ALREADY_BOUND);
+  }
+
+  auto match_result = MatchCompositeDevice(composite, config);
+  if (match_result.is_error()) {
+    if (match_result.status_value() == ZX_ERR_NOT_FOUND) {
+      return zx::ok();
+    }
+    return match_result.take_error();
+  }
+
+  composite.SetDriverAndAssemble(match_result.value());
+  return zx::ok();
+}
+
 void BindDriverManager::BindAllDevices(const DriverLoader::MatchDeviceConfig& config) {
   for (auto& dev : coordinator_->device_manager()->devices()) {
     auto dev_ref = fbl::RefPtr(&dev);
@@ -160,6 +178,16 @@ void BindDriverManager::BindAllDevices(const DriverLoader::MatchDeviceConfig& co
       continue;
     }
     if (status != ZX_OK) {
+      return;
+    }
+  }
+
+  for (auto& composite : coordinator_->device_manager()->composite_devices()) {
+    auto result = MatchAndBindCompositeDevice(composite, config);
+    if (result.status_value() == ZX_ERR_ALREADY_BOUND) {
+      continue;
+    }
+    if (!result.is_ok()) {
       return;
     }
   }
@@ -192,6 +220,19 @@ zx_status_t BindDriverManager::MatchAndBindNodeGroups(const fbl::RefPtr<Device>&
   }
 
   return ZX_OK;
+}
+
+zx::result<MatchedDriverInfo> BindDriverManager::MatchCompositeDevice(
+    CompositeDevice& composite, const DriverLoader::MatchDeviceConfig& config) {
+  auto matched_drivers = coordinator_->driver_loader().MatchDeviceDriverIndex(
+      composite.properties(), composite.str_properties(), 0, config);
+  for (auto driver : matched_drivers) {
+    if (auto info = std::get_if<MatchedDriverInfo>(&driver); info) {
+      return zx::ok(*info);
+    }
+  }
+
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx_status_t BindDriverManager::BindDriverToFragment(const MatchedCompositeDriverInfo& driver,
