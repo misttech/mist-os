@@ -32,6 +32,9 @@ import("//build/product.gni")
 #   memory(optional) the memory object which matches the schema. The default is
 #       { quantity = 8192 units = "megabytes" }.
 #
+#   storage(optional) the storage object which matches the schema. The default is
+#       { quantity = 2 units = "gigabytes" }.
+#
 #   testonly (optional)
 #   visibility (optional)
 #     Standard GN meaning.
@@ -95,6 +98,17 @@ template("virtual_device_specification") {
     }
   }
 
+  _storage = {
+  }
+  if (defined(invoker.storage)) {
+    _storage = invoker.storage
+  } else {
+    _storage = {
+      quantity = 2
+      units = "gigabytes"
+    }
+  }
+
   file_contents = {
     schema_id = schema_id
     data = {
@@ -115,10 +129,7 @@ template("virtual_device_specification") {
         }
         window_size = emu_window_size
         memory = _memory
-        storage = {
-          quantity = 2
-          units = "gigabytes"
-        }
+        storage = _storage
       }
       ports = {
         ssh = 22

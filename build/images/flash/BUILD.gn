@@ -550,6 +550,21 @@ if (board_is_emu) {
     }
   }
   compatible_devices += [ "${device_name}-min" ]
+
+  # Add a Large configuration
+  virtual_device_labels += [ ":virtual_device_specification_large" ]
+  virtual_device_specification("virtual_device_specification_large") {
+    testonly = true
+    name = "${device_name}-large"
+    description =
+        "Larger configuration for running this product with extra storage"
+    output = "$root_build_dir/virtual_device_large.json"
+    storage = {
+      quantity = 10
+      units = "gigabytes"
+    }
+  }
+  compatible_devices += [ "${device_name}-large" ]
 }
 
 # Physical device manifest should only be generated for physical boards.
