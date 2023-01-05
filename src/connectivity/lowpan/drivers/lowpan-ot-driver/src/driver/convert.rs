@@ -197,6 +197,19 @@ impl FromExt<&ot::DnssdCounters> for fidl_fuchsia_lowpan_experimental::DnssdCoun
     }
 }
 
+impl FromExt<&ot::LeaderData> for fidl_fuchsia_lowpan_experimental::LeaderData {
+    fn from_ext(x: &ot::LeaderData) -> Self {
+        fidl_fuchsia_lowpan_experimental::LeaderData {
+            partition_id: Some(x.partition_id()),
+            weight: Some(x.weighting()),
+            network_data_version: Some(x.data_version()),
+            stable_network_data_version: Some(x.stable_data_version()),
+            router_id: Some(x.leader_router_id()),
+            ..fidl_fuchsia_lowpan_experimental::LeaderData::EMPTY
+        }
+    }
+}
+
 pub trait UpdateOperationalDataset<T> {
     fn update_from(&mut self, data: &T) -> Result<(), anyhow::Error>;
 }

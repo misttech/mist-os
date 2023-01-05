@@ -12,7 +12,6 @@ use lowpan_driver_common::net::BackboneInterface;
 use lowpan_driver_common::AsyncConditionWait;
 use lowpan_driver_common::Driver as LowpanDriver;
 use lowpan_driver_common::ZxResult;
-use openthread::ot::LeaderData;
 
 /// Helpers for API-related tasks.
 impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
@@ -834,7 +833,6 @@ where
         let driver_state = self.driver_state.lock();
 
         let ot = &driver_state.ot_instance;
-        let leader_data = ot.get_leader_data().ok();
 
         Ok(Telemetry {
             rssi: Some(ot.get_rssi()),
@@ -846,10 +844,8 @@ where
             thread_router_id: Some(ot::rloc16_to_router_id(ot.get_rloc16())),
             thread_network_data_version: Some(ot.net_data_get_version()),
             thread_stable_network_data_version: Some(ot.net_data_get_stable_version()),
-            thread_leader_weight: leader_data.as_ref().map(LeaderData::weighting),
             channel_index: Some(ot.get_channel().into()),
             tx_power: ot.get_transmit_power().ok(),
-            thread_leader_router_id: leader_data.as_ref().map(LeaderData::leader_router_id),
             thread_network_data: ot.net_data_as_vec(false).ok(),
             thread_stable_network_data: ot.net_data_as_vec(true).ok(),
             thread_border_routing_counters: Some(ot.ip6_get_border_routing_counters().into_ext()),
@@ -863,6 +859,7 @@ where
                 ..SrpServerInfo::EMPTY
             }),
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),
+            leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
             ..Telemetry::EMPTY
         })
     }

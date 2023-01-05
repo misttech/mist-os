@@ -659,9 +659,6 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.thread_link_mode {
                             inspector.root().record_uint("thread_link_mode", x.into());
                         }
-                        if let Some(x) = telemetry_data.thread_leader_weight {
-                            inspector.root().record_uint("thread_leader_weight", x.into());
-                        }
                         if let Some(x) = telemetry_data.thread_network_data_version {
                             inspector.root().record_uint("thread_network_data_version", x.into());
                         }
@@ -669,9 +666,6 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                             inspector
                                 .root()
                                 .record_uint("thread_stable_network_data_version", x.into());
-                        }
-                        if let Some(x) = telemetry_data.thread_leader_router_id {
-                            inspector.root().record_uint("thread_leader_router_id", x.into());
                         }
                         if let Some(x) = telemetry_data.thread_network_data {
                             inspector.root().record_bytes("thread_network_data", x);
@@ -801,14 +795,39 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         if let Some(x) = telemetry_data.srp_server_info {
                             inspector.root().record_child("srp_server", |srp_server_info_child| {
                                 if let Some(y) = x.state {
-                                    srp_server_info_child.record_string("state", format!("{:?}", y))
+                                    srp_server_info_child
+                                        .record_string("state", format!("{:?}", y));
                                 }
                                 if let Some(y) = x.port {
-                                    srp_server_info_child.record_uint("port", y.into())
+                                    srp_server_info_child.record_uint("port", y.into());
                                 }
                                 if let Some(y) = x.address_mode {
                                     srp_server_info_child
-                                        .record_string("address_mode", format!("{:?}", y))
+                                        .record_string("address_mode", format!("{:?}", y));
+                                }
+                            });
+                        }
+                        if let Some(x) = telemetry_data.leader_data {
+                            inspector.root().record_child("leader_data", |leader_data_child| {
+                                if let Some(y) = x.partition_id {
+                                    leader_data_child.record_uint("partition_id", y.into());
+                                }
+                                if let Some(y) = x.weight {
+                                    leader_data_child.record_uint("weight", y.into());
+                                    inspector.root().record_uint("thread_leader_weight", y.into());
+                                }
+                                if let Some(y) = x.network_data_version {
+                                    leader_data_child.record_uint("network_data_version", y.into());
+                                }
+                                if let Some(y) = x.stable_network_data_version {
+                                    leader_data_child
+                                        .record_uint("stable_network_data_version", y.into());
+                                }
+                                if let Some(y) = x.router_id {
+                                    leader_data_child.record_uint("router_id", y.into());
+                                    inspector
+                                        .root()
+                                        .record_uint("thread_leader_router_id", y.into());
                                 }
                             });
                         }
