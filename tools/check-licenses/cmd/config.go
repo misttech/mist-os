@@ -72,8 +72,6 @@ type CheckLicensesConfig struct {
 	// Flag stating whether or not check-licenses should generate
 	// a NOTICE file.
 	OutputLicenseFile bool `json:"outputLicenseFile"`
-
-	Filters []string
 }
 
 // Create a new CheckLicensesConfig object by reading in a config.json file.
@@ -159,8 +157,6 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 	if c.BuildInfoBoard == "" {
 		c.BuildInfoBoard = other.BuildInfoBoard
 	}
-
-	c.Filters = append(c.Filters, other.Filters...)
 
 	return nil
 }

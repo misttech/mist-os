@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	defaultConfigFile = "{FUCHSIA_DIR}/tools/check-licenses/cmd/_config.json"
-	defaultTarget     = "//:default"
+	defaultTarget = "//:default"
 )
 
 var (
@@ -26,8 +25,7 @@ var (
 )
 
 var (
-	configFile_deprecated = flag.String("config_file", "", "Deprecated, but kept around for backwards compatibility.")
-
+	configFile     = flag.String("config_file", "{FUCHSIA_DIR}/tools/check-licenses/cmd/_config.json", "Root config file path.")
 	fuchsiaDir     = flag.String("fuchsia_dir", os.Getenv("FUCHSIA_DIR"), "Location of the fuchsia root directory (//).")
 	buildDir       = flag.String("build_dir", os.Getenv("FUCHSIA_BUILD_DIR"), "Location of GN build directory.")
 	outDir         = flag.String("out_dir", "/tmp/check-licenses", "Directory to write outputs to.")
@@ -163,8 +161,8 @@ func mainImpl() error {
 	ConfigVars["{SPDX_DOC_NAME}"] = spdxDocName
 
 	// configFile
-	configFile := strings.ReplaceAll(defaultConfigFile, "{FUCHSIA_DIR}", *fuchsiaDir)
-	Config, err = NewCheckLicensesConfig(configFile)
+	*configFile = strings.ReplaceAll(*configFile, "{FUCHSIA_DIR}", *fuchsiaDir)
+	Config, err = NewCheckLicensesConfig(*configFile)
 	if err != nil {
 		return err
 	}
