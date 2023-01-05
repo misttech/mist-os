@@ -143,6 +143,12 @@ config("suppress-tsan.DO-NOT-USE-THIS") {
   visibility = []
 }
 
+# TODO(fxbug.dev/118709): Remove this config once all usages of it have been resolved.
+config("suppress-hwasan.DO-NOT-USE-THIS") {
+  cflags = [ "-fno-sanitize=hwaddress" ]
+  visibility = []
+}
+
 config("suppress-ubsan.DO-NOT-USE-THIS") {
   cflags = [ "-fno-sanitize=undefined" ]
   visibility = [
