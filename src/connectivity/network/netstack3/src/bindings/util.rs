@@ -620,17 +620,23 @@ pub(crate) trait TryIntoFidlWithContext<F>: Sized {
 /// [`C: TryIntoFidlWithContext<F>`].
 ///
 /// [`C: TryIntoFidlWithContext<F>`]: TryIntoFidlWithContext
-pub(crate) trait TryFromCoreWithContext<C>: Sized
-where
-    C: TryIntoFidlWithContext<Self>,
-{
+pub(crate) trait TryFromCoreWithContext<C>: Sized {
+    /// The type of error returned from [`try_from_core_with_ctx`].
+    ///
+    /// [`try_from_core_with_ctx`]: TryFromCoreWithContext::try_from_core_with_ctx
+    type Error;
+
     /// Attempt to convert from `core` into an instance of `Self`.
-    fn try_from_core_with_ctx<X: ConversionContext>(ctx: &X, core: C) -> Result<Self, C::Error> {
+    fn try_from_core_with_ctx<X: ConversionContext>(ctx: &X, core: C) -> Result<Self, Self::Error>;
+}
+
+impl<F, C: TryIntoFidlWithContext<F>> TryFromCoreWithContext<C> for F {
+    type Error = C::Error;
+
+    fn try_from_core_with_ctx<X: ConversionContext>(ctx: &X, core: C) -> Result<Self, Self::Error> {
         core.try_into_fidl_with_ctx(ctx)
     }
 }
-
-impl<F, C: TryIntoFidlWithContext<F>> TryFromCoreWithContext<C> for F {}
 
 /// A FIDL type which can be fallibly converted into the core type `C` given a
 /// context that implements [`ConversionContext`].
@@ -639,17 +645,23 @@ impl<F, C: TryIntoFidlWithContext<F>> TryFromCoreWithContext<C> for F {}
 /// [`C: TryFromFidlWithContext<F>`].
 ///
 /// [`C: TryFromFidlWithContext<F>`]: TryFromFidlWithContext
-pub(crate) trait TryIntoCoreWithContext<C>: Sized
-where
-    C: TryFromFidlWithContext<Self>,
-{
+pub(crate) trait TryIntoCoreWithContext<C>: Sized {
+    /// The type of error returned from [`try_into_core_with_ctx`].
+    ///
+    /// [`try_into_core_with_ctx`]: TryIntoCoreWithContext::try_into_core_with_ctx
+    type Error;
+
     /// Attempt to convert from `self` into an instance of `C`.
-    fn try_into_core_with_ctx<X: ConversionContext>(self, ctx: &X) -> Result<C, C::Error> {
+    fn try_into_core_with_ctx<X: ConversionContext>(self, ctx: &X) -> Result<C, Self::Error>;
+}
+
+impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
+    type Error = C::Error;
+
+    fn try_into_core_with_ctx<X: ConversionContext>(self, ctx: &X) -> Result<C, Self::Error> {
         C::try_from_fidl_with_ctx(ctx, self)
     }
 }
-
-impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {}
 
 #[derive(Debug, PartialEq)]
 pub struct DeviceNotFoundError;
