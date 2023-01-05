@@ -36,6 +36,7 @@ std::unique_ptr<TpmCmdHeader> make_cmd_header(
 }  // namespace
 
 using fuchsia_hardware_tpmimpl::wire::RegisterAddress;
+using fuchsia_hardware_tpmimpl::wire::kTpmMaxDataTransfer;
 
 zx_status_t TpmDevice::Create(void *ctx, zx_device_t *parent) {
   ddk::TpmImplProtocolClient tpm(parent);
@@ -286,7 +287,7 @@ zx_status_t TpmDevice::DoCommand(TpmCommand &cmd) {
     if (status != ZX_OK) {
       return status;
     }
-    size_t burst_count = sts.burst_count();
+    size_t burst_count = std::min(sts.burst_count(), kTpmMaxDataTransfer);
     size_t burst = std::min(burst_count, command_size - 1);
     zxlogf(DEBUG, "Writing burst of %zu bytes, burst_count = %zu cmd_size = %zu", burst,
            burst_count, command_size);
@@ -400,7 +401,8 @@ zx_status_t TpmDevice::ReadFromFifo(cpp20::span<uint8_t> data) {
   }
   size_t read = 0;
   while (read < data.size_bytes() && sts.data_avail()) {
-    size_t burst_count = std::min(static_cast<size_t>(sts.burst_count()), data.size_bytes() - read);
+    size_t max_burst = std::min(sts.burst_count(), kTpmMaxDataTransfer);
+    size_t burst_count = std::min(max_burst, data.size_bytes() - read);
     if (burst_count != 0) {
       auto result = tpm_->Read(0, RegisterAddress::kTpmDataFifo, burst_count);
       if (!result.ok()) {
