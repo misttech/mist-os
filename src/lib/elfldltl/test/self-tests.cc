@@ -83,7 +83,12 @@ TEST(ElfldltlSelfTests, Memory) {
   auto memory = Self::Memory();
   const auto bias = Self::LoadBias();
 
-  static const int something_in_memory = 0x12345678;
+  // The image is materialized from linker-generated symbols like __ehdr_start
+  // and _end, which won't have any tags. So the image pointer will reliably be
+  // tagged as zero, though it covers all the tagged globals in the program.
+  // The test works just fine, but is incompatible with hwasan, so we can just disable
+  // hwasan for these particular globals.
+  [[clang::no_sanitize("hwaddress")]] static const int something_in_memory = 0x12345678;
 
   const auto rodata_addr = reinterpret_cast<uintptr_t>(&something_in_memory);
   auto array = memory.ReadArray<int>(rodata_addr - bias, 1);
@@ -100,7 +105,7 @@ TEST(ElfldltlSelfTests, Memory) {
   EXPECT_EQ(0xabcdef, something_on_stack);
 
   // Set an initial value for a data word that will be overwritten by Store.
-  static int mutable_in_memory;
+  [[clang::no_sanitize("hwaddress")]] static int mutable_in_memory;
   mutable_in_memory = 0xbad;
 
   // This cast to integer for the Memory API makes the compiler lose track of
