@@ -8,7 +8,6 @@ use {
         experiment::Experiments,
         inspect_util::{self, InspectableRepositoryConfig},
         repository::Repository,
-        DEFAULT_TUF_METADATA_TIMEOUT,
     },
     anyhow::{anyhow, Context as _},
     cobalt_sw_delivery_registry as metrics,
@@ -461,11 +460,6 @@ impl<S, N> RepositoryManagerBuilder<S, N> {
         self.local_mirror = proxy;
         self
     }
-
-    pub fn tuf_metadata_timeout(mut self, timeout: Duration) -> Self {
-        self.tuf_metadata_timeout = timeout;
-        self
-    }
 }
 
 impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
@@ -477,6 +471,7 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
         data_proxy: Option<fio::DirectoryProxy>,
         dynamic_configs_path: Option<P>,
         experiments: Experiments,
+        tuf_metadata_timeout: std::time::Duration,
     ) -> Result<Self, (Self, LoadError)>
     where
         P: Into<String>,
@@ -505,7 +500,7 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
             cobalt_sender: UnsetCobaltSender,
             inspect_node: UnsetInspectNode,
             local_mirror: None,
-            tuf_metadata_timeout: DEFAULT_TUF_METADATA_TIMEOUT,
+            tuf_metadata_timeout,
             data_proxy,
         };
 
@@ -530,7 +525,13 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )
         .unwrap();
-        Self::new(Some(proxy), dynamic_configs_path, Experiments::none()).await
+        Self::new(
+            Some(proxy),
+            dynamic_configs_path,
+            Experiments::none(),
+            std::time::Duration::from_secs(30),
+        )
+        .await
     }
 
     /// Adds these static [RepoConfigs](RepoConfig) to the [RepositoryManager].
@@ -1746,7 +1747,7 @@ mod tests {
                     },
                     repos: {},
                     persisted_repos_dir: format!("{:?}", env.persisted_repos_dir),
-                    tuf_metadata_timeout_seconds: DEFAULT_TUF_METADATA_TIMEOUT.as_secs(),
+                    tuf_metadata_timeout_seconds: 30u64,
                 }
             }
         );
@@ -1777,7 +1778,7 @@ mod tests {
                     },
                     repos: {},
                     persisted_repos_dir: format!("{:?}", env.persisted_repos_dir),
-                    tuf_metadata_timeout_seconds: DEFAULT_TUF_METADATA_TIMEOUT.as_secs(),
+                    tuf_metadata_timeout_seconds: 30u64,
                 }
             }
         );

@@ -17,7 +17,7 @@ use {
     http_uri_ext::HttpUriExt as _,
     lib::{
         extra_blob_contents, make_pkg_with_extra_blobs, resolve_package, test_package_bin,
-        test_package_cml, ResolverVariant, TestEnv, TestEnvBuilder, EMPTY_REPO_PATH,
+        test_package_cml, TestEnv, TestEnvBuilder, EMPTY_REPO_PATH,
     },
     rand::prelude::*,
     std::{
@@ -897,7 +897,7 @@ async fn resolve_local_mirror() {
     );
 
     let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::AllowLocalMirror)
+        .allow_local_mirror(true)
         .local_mirror_repo(&repo, "fuchsia-pkg://test".parse().unwrap())
         .build()
         .await;

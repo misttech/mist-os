@@ -309,42 +309,17 @@ pub fn clone_directory_proxy(
     ClientEnd::<fio::DirectoryMarker>::new(client.into_channel()).into_proxy().unwrap()
 }
 
-pub enum ResolverVariant {
-    DefaultArgs,
-    AllowLocalMirror,
-    ZeroTufMetadataTimeout,
-    ShortTufMetadataTimeout,
-    ZeroBlobNetworkHeaderTimeout,
-    ZeroBlobNetworkBodyTimeout,
-    ZeroBlobDownloadResumptionAttemptsLimit,
-}
-
-impl ResolverVariant {
-    fn url(&self) -> &'static str {
-        use ResolverVariant::*;
-        match self {
-            DefaultArgs => "#meta/pkg-resolver.cm",
-            AllowLocalMirror => "#meta/pkg-resolver-allow-local-mirror.cm",
-            ZeroTufMetadataTimeout => "#meta/pkg-resolver-zero-tuf-metadata-timeout.cm",
-            ShortTufMetadataTimeout => "#meta/pkg-resolver-short-tuf-metadata-timeout.cm",
-            ZeroBlobNetworkHeaderTimeout => {
-                "#meta/pkg-resolver-zero-blob-network-header-timeout.cm"
-            }
-            ZeroBlobNetworkBodyTimeout => "#meta/pkg-resolver-zero-blob-network-body-timeout.cm",
-            ZeroBlobDownloadResumptionAttemptsLimit => {
-                "#meta/pkg-resolver-zero-blob-download-resumption-attempts.cm"
-            }
-        }
-    }
-}
-
 pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blobfs_and_system_image: BlobfsAndSystemImageFut,
     mounts: MountsFn,
     tuf_repo_config_boot_arg: Option<String>,
     local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
-    resolver_variant: ResolverVariant,
     fetch_delivery_blob: Option<bool>,
+    allow_local_mirror: Option<bool>,
+    tuf_metadata_timeout_seconds: Option<u32>,
+    blob_network_header_timeout_seconds: Option<u32>,
+    blob_network_body_timeout_seconds: Option<u32>,
+    blob_download_resumption_attempts_limit: Option<u32>,
 }
 
 impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, fn() -> Mounts> {
@@ -374,8 +349,12 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             },
             tuf_repo_config_boot_arg: None,
             local_mirror_repo: None,
-            resolver_variant: ResolverVariant::DefaultArgs,
             fetch_delivery_blob: None,
+            allow_local_mirror: None,
+            tuf_metadata_timeout_seconds: None,
+            blob_network_header_timeout_seconds: None,
+            blob_network_body_timeout_seconds: None,
+            blob_download_resumption_attempts_limit: None,
         }
     }
 }
@@ -400,8 +379,12 @@ where
             mounts: self.mounts,
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
-            resolver_variant: self.resolver_variant,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            allow_local_mirror: self.allow_local_mirror,
+            tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
+            blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
+            blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
+            blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
         }
     }
 
@@ -427,8 +410,12 @@ where
             mounts: self.mounts,
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
-            resolver_variant: self.resolver_variant,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            allow_local_mirror: self.allow_local_mirror,
+            tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
+            blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
+            blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
+            blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
         }
     }
 
@@ -441,8 +428,12 @@ where
             mounts: || mounts,
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
-            resolver_variant: self.resolver_variant,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            allow_local_mirror: self.allow_local_mirror,
+            tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
+            blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
+            blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
+            blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
         }
     }
     pub fn tuf_repo_config_boot_arg(mut self, repo: String) -> Self {
@@ -456,13 +447,39 @@ where
         self
     }
 
-    pub fn resolver_variant(mut self, variant: ResolverVariant) -> Self {
-        self.resolver_variant = variant;
+    pub fn allow_local_mirror(mut self, allow: bool) -> Self {
+        assert_eq!(self.allow_local_mirror, None);
+        self.allow_local_mirror = Some(allow);
+        self
+    }
+
+    pub fn tuf_metadata_timeout_seconds(mut self, seconds: u32) -> Self {
+        assert_eq!(self.tuf_metadata_timeout_seconds, None);
+        self.tuf_metadata_timeout_seconds = Some(seconds);
+        self
+    }
+
+    pub fn blob_network_header_timeout_seconds(mut self, seconds: u32) -> Self {
+        assert_eq!(self.blob_network_header_timeout_seconds, None);
+        self.blob_network_header_timeout_seconds = Some(seconds);
+        self
+    }
+
+    pub fn blob_network_body_timeout_seconds(mut self, seconds: u32) -> Self {
+        assert_eq!(self.blob_network_body_timeout_seconds, None);
+        self.blob_network_body_timeout_seconds = Some(seconds);
+        self
+    }
+
+    pub fn blob_download_resumption_attempts_limit(mut self, limit: u32) -> Self {
+        assert_eq!(self.blob_download_resumption_attempts_limit, None);
+        self.blob_download_resumption_attempts_limit = Some(limit);
         self
     }
 
     // TODO(fxbug.dev/118745): write tests using this.
     pub fn fetch_delivery_blob(mut self, fetch_delivery_blob: bool) -> Self {
+        assert_eq!(self.fetch_delivery_blob, None);
         self.fetch_delivery_blob = Some(fetch_delivery_blob);
         self
     }
@@ -590,16 +607,79 @@ where
             .unwrap();
 
         let pkg_resolver = builder
-            .add_child(PKG_RESOLVER_CHILD_NAME, self.resolver_variant.url(), ChildOptions::new())
+            .add_child(PKG_RESOLVER_CHILD_NAME, "#meta/pkg-resolver.cm", ChildOptions::new())
             .await
             .unwrap();
 
-        if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
+        if self.fetch_delivery_blob.is_some()
+            || self.allow_local_mirror.is_some()
+            || self.tuf_metadata_timeout_seconds.is_some()
+            || self.blob_network_header_timeout_seconds.is_some()
+            || self.blob_network_body_timeout_seconds.is_some()
+            || self.blob_download_resumption_attempts_limit.is_some()
+        {
             builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
-            builder
-                .set_config_value_bool(&pkg_resolver, "fetch_delivery_blob", fetch_delivery_blob)
-                .await
-                .unwrap();
+            if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
+                builder
+                    .set_config_value_bool(
+                        &pkg_resolver,
+                        "fetch_delivery_blob",
+                        fetch_delivery_blob,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(allow_local_mirror) = self.allow_local_mirror {
+                builder
+                    .set_config_value_bool(&pkg_resolver, "allow_local_mirror", allow_local_mirror)
+                    .await
+                    .unwrap();
+            }
+            if let Some(tuf_metadata_timeout_seconds) = self.tuf_metadata_timeout_seconds {
+                builder
+                    .set_config_value_uint32(
+                        &pkg_resolver,
+                        "tuf_metadata_timeout_seconds",
+                        tuf_metadata_timeout_seconds,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(blob_network_header_timeout_seconds) =
+                self.blob_network_header_timeout_seconds
+            {
+                builder
+                    .set_config_value_uint32(
+                        &pkg_resolver,
+                        "blob_network_header_timeout_seconds",
+                        blob_network_header_timeout_seconds,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(blob_network_body_timeout_seconds) = self.blob_network_body_timeout_seconds
+            {
+                builder
+                    .set_config_value_uint32(
+                        &pkg_resolver,
+                        "blob_network_body_timeout_seconds",
+                        blob_network_body_timeout_seconds,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(blob_download_resumption_attempts_limit) =
+                self.blob_download_resumption_attempts_limit
+            {
+                builder
+                    .set_config_value_uint32(
+                        &pkg_resolver,
+                        "blob_download_resumption_attempts_limit",
+                        blob_download_resumption_attempts_limit,
+                    )
+                    .await
+                    .unwrap();
+            }
         }
 
         builder

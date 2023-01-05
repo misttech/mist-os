@@ -65,7 +65,8 @@ async fn initial_inspect_state() {
                 fetch_delivery_blob: false,
                 delivery_blob_fallback: false,
                 queue: {},
-            }
+            },
+            structured_config: contains {},
         }
     );
     env.stop().await;

@@ -83,5 +83,20 @@
 
         // Whether to fallback to uncompressed blob if fetching delivery blob fails.
         delivery_blob_fallback: { type: "bool" },
+
+        // Whether to allow resolving packages using fuchsia.pkg/LocalMirror.
+        allow_local_mirror: { type: "bool" },
+
+        // The timeout, in seconds, to use when performing TUF metadata network operations.
+        tuf_metadata_timeout_seconds: { type: "uint32" },
+
+        // The timeout, in seconds, to use when GET'ing a blob HTTP header.
+        blob_network_header_timeout_seconds: { type: "uint32" },
+
+        // The timeout, in seconds, to use when waiting for a blob's HTTP body bytes.
+        blob_network_body_timeout_seconds: { type: "uint32" },
+
+        // The maximum number of times to try resuming a blob download using HTTP range requests.
+        blob_download_resumption_attempts_limit: { type: "uint32" },
     },
 }

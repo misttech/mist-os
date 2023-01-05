@@ -336,7 +336,6 @@ fn get_root_keys(config: &RepositoryConfig) -> Result<Vec<PublicKey>, anyhow::Er
 mod tests {
     use {
         super::*,
-        crate::DEFAULT_TUF_METADATA_TIMEOUT,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         fuchsia_pkg_testing::{
@@ -424,7 +423,7 @@ mod tests {
                 cobalt_sender,
                 inspect::Inspector::new().root().create_child("inner-node"),
                 None,
-                DEFAULT_TUF_METADATA_TIMEOUT,
+                std::time::Duration::from_secs(30),
             )
             .await
         }
@@ -743,7 +742,6 @@ mod tests {
 mod inspect_tests {
     use {
         super::*,
-        crate::DEFAULT_TUF_METADATA_TIMEOUT,
         fuchsia_async as fasync,
         fuchsia_inspect::assert_data_tree,
         fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
@@ -781,7 +779,7 @@ mod inspect_tests {
             dummy_sender(),
             inspector.root().create_child("repo-node"),
             None,
-            DEFAULT_TUF_METADATA_TIMEOUT,
+            std::time::Duration::from_secs(30),
         )
         .await
         .expect("created Repository");
@@ -836,7 +834,7 @@ mod inspect_tests {
             dummy_sender(),
             inspector.root().create_child("repo-node"),
             None,
-            DEFAULT_TUF_METADATA_TIMEOUT,
+            std::time::Duration::from_secs(30),
         )
         .await
         .expect("created Repository");
@@ -897,7 +895,7 @@ mod inspect_tests {
             dummy_sender(),
             inspector.root().create_child("repo-node"),
             None,
-            DEFAULT_TUF_METADATA_TIMEOUT,
+            std::time::Duration::from_secs(30),
         )
         .await
         .expect("created opened repo");

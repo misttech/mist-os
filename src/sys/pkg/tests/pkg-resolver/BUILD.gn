@@ -407,67 +407,22 @@ renamed_binary("pkg_resolver-binary") {
   source_deps = [ "//src/sys/pkg/bin/grand-swd-binary" ]
 }
 
-template("pkg_resolver_component_and_config") {
-  manifest_name = "${target_name}-manifest"
-  fuchsia_component_manifest(manifest_name) {
-    component_name = invoker.component_name
-    manifest = invoker.manifest
-  }
-
-  config_name = "${target_name}-config"
-  fuchsia_structured_config_values(config_name) {
-    cm_label = ":${manifest_name}"
-    values = {
-      fetch_delivery_blob = false
-      delivery_blob_fallback = false
-    }
-  }
-
-  fuchsia_component("${target_name}-component") {
-    cm_label = ":${manifest_name}"
-    deps = [
-      ":${config_name}",
-      ":pkg_resolver-binary",
-    ]
-  }
-}
-
-pkg_resolver_component_and_config("pkg_resolver") {
+fuchsia_component_manifest("pkg-resolver-manifest") {
   component_name = "pkg-resolver"
-  manifest = "meta/pkg-resolver-test-common.shard.cml"
+  manifest = "meta/pkg-resolver-for-test.cml"
 }
 
-pkg_resolver_component_and_config("pkg_resolver_allow_local_mirror") {
-  component_name = "pkg-resolver-allow-local-mirror"
-  manifest = "meta/pkg-resolver-allow-local-mirror.cml"
+fuchsia_structured_config_values("pkg-resolver-config") {
+  cm_label = ":pkg-resolver-manifest"
+  values_source = "//src/sys/pkg/bin/pkg-resolver/config/values.json5"
 }
 
-pkg_resolver_component_and_config("pkg_resolver_short_tuf_metadata_timeout") {
-  component_name = "pkg-resolver-short-tuf-metadata-timeout"
-  manifest = "meta/pkg-resolver-short-tuf-metadata-timeout.cml"
-}
-
-pkg_resolver_component_and_config("pkg_resolver_zero_tuf_metadata_timeout") {
-  component_name = "pkg-resolver-zero-tuf-metadata-timeout"
-  manifest = "meta/pkg-resolver-zero-tuf-metadata-timeout.cml"
-}
-
-pkg_resolver_component_and_config(
-    "pkg_resolver_zero_blob_download_resumption_attempts") {
-  component_name = "pkg-resolver-zero-blob-download-resumption-attempts"
-  manifest = "meta/pkg-resolver-zero-blob-download-resumption-attempts.cml"
-}
-
-pkg_resolver_component_and_config(
-    "pkg_resolver_zero_blob_network_body_timeout") {
-  component_name = "pkg-resolver-zero-blob-network-body-timeout"
-  manifest = "meta/pkg-resolver-zero-blob-network-body-timeout.cml"
-}
-
-pkg_resolver_component_and_config(
-    "pkg_resolver_zero_blob_network_header_timeout") {
-  component_name = "pkg-resolver-zero-blob-network-header-timeout"
-  manifest = "meta/pkg-resolver-zero-blob-network-header-timeout.cml"
+fuchsia_component("pkg-resolver-component") {
+  cm_label = ":pkg-resolver-manifest"
+  deps = [
+    ":pkg-resolver-config",
+    ":pkg_resolver-binary",
+  ]
 }
 
 resource("ca.cert-resource") {
@@ -499,19 +454,11 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
     ":empty-repo",
 
     # For ramdisk devices, needed to back blobfs (which in turn backs pkg-cache)
+    ":pkg-resolver-component",
+    "//src/connectivity/network/dns:component",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/pkg-local-mirror",
-
-    # pkg-resolver components that vary by program arguments
-    ":pkg_resolver-component",
-    ":pkg_resolver_allow_local_mirror-component",
-    ":pkg_resolver_short_tuf_metadata_timeout-component",
-    ":pkg_resolver_zero_blob_download_resumption_attempts-component",
-    ":pkg_resolver_zero_blob_network_body_timeout-component",
-    ":pkg_resolver_zero_blob_network_header_timeout-component",
-    ":pkg_resolver_zero_tuf_metadata_timeout-component",
-    "//src/connectivity/network/dns:component",
 
     # Isolated, low-deps netstack
     "//src/connectivity/network/netstack:component",

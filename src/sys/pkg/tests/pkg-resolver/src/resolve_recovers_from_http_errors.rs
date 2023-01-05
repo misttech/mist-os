@@ -13,8 +13,8 @@ use {
         Package, PackageBuilder, RepositoryBuilder,
     },
     lib::{
-        extra_blob_contents, make_pkg_with_extra_blobs, ResolverVariant, TestEnvBuilder,
-        EMPTY_REPO_PATH, FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING,
+        extra_blob_contents, make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH,
+        FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING,
     },
     std::{net::Ipv4Addr, sync::Arc},
 };
@@ -259,10 +259,7 @@ async fn blob_timeout_causes_new_tcp_connection() {
             .unwrap(),
     );
 
-    let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::ZeroBlobNetworkBodyTimeout)
-        .build()
-        .await;
+    let env = TestEnvBuilder::new().blob_network_body_timeout_seconds(0).build().await;
 
     let server = repo
         .server()

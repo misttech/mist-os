@@ -30,7 +30,6 @@ use {
     tracing::{error, info, warn},
 };
 
-mod args;
 mod cache;
 mod cache_package_index;
 mod clock;
@@ -53,7 +52,6 @@ mod util;
 mod test_util;
 
 use crate::{
-    args::Args,
     cache::BasePackageIndex,
     config::Config,
     experiment::Experiments,
@@ -90,18 +88,6 @@ const STATIC_RULES_PATH: &str = "rewrites.json";
 // Relative to /data.
 const DYNAMIC_RULES_PATH: &str = "rewrites.json";
 
-// Repository size is currently 100 KB. Allowing for 10x growth and assuming a
-// 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf
-// HttpRepository) results in a duration of (10 * 100,000 B) / (4,096 B/s) = 244 seconds.
-// Round to the minute boundary to make it more clear when reconstructing logs
-// that there is a designed timeout involved.
-// TODO(fxbug.dev/62300) replace with granular timeouts in rust-tuf.
-const DEFAULT_TUF_METADATA_TIMEOUT: Duration = Duration::from_secs(240);
-
-const DEFAULT_BLOB_NETWORK_BODY_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_BLOB_NETWORK_HEADER_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_BLOB_DOWNLOAD_RESUMPTION_ATTEMPTS_LIMIT: u64 = 50;
-
 // The TCP keepalive timeout here in effect acts as a sort of between bytes timeout for connections
 // that are no longer established. Explicit timeouts are used around request futures to guard
 // against cases where both sides agree the connection is established, but the client expects more
@@ -115,7 +101,7 @@ pub fn main() -> Result<(), Error> {
     info!("starting package resolver");
 
     let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
-    executor.run_singlethreaded(main_inner_async(startup_time, argh::from_env())).map_err(|err| {
+    executor.run_singlethreaded(main_inner_async(startup_time)).map_err(|err| {
         // Use anyhow to print the error chain.
         let err = anyhow!(err);
         error!("error running pkg-resolver: {:#}", err);
@@ -123,14 +109,14 @@ pub fn main() -> Result<(), Error> {
     })
 }
 
-async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error> {
+async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     let config = Config::load_from_config_data_or_default();
     let structured_config = pkg_resolver_config::Config::take_from_startup_handle();
 
     let pkg_cache_proxy = fuchsia_component::client::connect_to_protocol::<PackageCacheMarker>()
         .context("error connecting to package cache")?;
     let pkg_cache = fidl_fuchsia_pkg_ext::cache::Client::from_proxy(pkg_cache_proxy);
-    let local_mirror = if args.allow_local_mirror {
+    let local_mirror = if structured_config.allow_local_mirror {
         Some(
             connect_to_protocol::<LocalMirrorMarker>()
                 .context("error connecting to local mirror")?,
@@ -149,6 +135,9 @@ async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error
     let system_cache_list = Arc::new(cache_package_index::from_proxy(pkg_cache.proxy()).await);
 
     let inspector = fuchsia_inspect::Inspector::new();
+    inspector
+        .root()
+        .record_child("structured_config", |node| structured_config.record_inspect(node));
     let channel_inspect_state =
         ChannelInspectState::new(inspector.root().create_child("omaha_channel"));
 
@@ -199,7 +188,7 @@ async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error
             &config,
             cobalt_sender.clone(),
             local_mirror.clone(),
-            args.tuf_metadata_timeout,
+            std::time::Duration::from_secs(structured_config.tuf_metadata_timeout_seconds.into()),
             data_proxy.clone(),
         )
         .await,
@@ -224,9 +213,15 @@ async fn main_inner_async(startup_time: Instant, args: Args) -> Result<(), Error
         cobalt_sender.clone(),
         local_mirror,
         cache::BlobFetchParams::builder()
-            .header_network_timeout(args.blob_network_header_timeout)
-            .body_network_timeout(args.blob_network_body_timeout)
-            .download_resumption_attempts_limit(args.blob_download_resumption_attempts_limit)
+            .header_network_timeout(std::time::Duration::from_secs(
+                structured_config.blob_network_header_timeout_seconds.into(),
+            ))
+            .body_network_timeout(std::time::Duration::from_secs(
+                structured_config.blob_network_body_timeout_seconds.into(),
+            ))
+            .download_resumption_attempts_limit(
+                structured_config.blob_download_resumption_attempts_limit.into(),
+            )
             .fetch_delivery_blob(structured_config.fetch_delivery_blob)
             .delivery_blob_fallback(structured_config.delivery_blob_fallback)
             .build(),
@@ -373,16 +368,20 @@ async fn load_repo_manager(
     // to update the system.
     let dynamic_repo_path =
         if config.enable_dynamic_configuration() { Some(DYNAMIC_REPO_PATH) } else { None };
-    let builder = match RepositoryManagerBuilder::new(data_proxy, dynamic_repo_path, experiments)
-        .await
-        .unwrap_or_else(|(builder, err)| {
-            error!("error loading dynamic repo config: {:#}", anyhow!(err));
-            builder
-        })
-        .tuf_metadata_timeout(tuf_metadata_timeout)
-        .with_local_mirror(local_mirror)
-        .inspect_node(node)
-        .load_static_configs_dir(STATIC_REPO_DIR)
+    let builder = match RepositoryManagerBuilder::new(
+        data_proxy,
+        dynamic_repo_path,
+        experiments,
+        tuf_metadata_timeout,
+    )
+    .await
+    .unwrap_or_else(|(builder, err)| {
+        error!("error loading dynamic repo config: {:#}", anyhow!(err));
+        builder
+    })
+    .with_local_mirror(local_mirror)
+    .inspect_node(node)
+    .load_static_configs_dir(STATIC_REPO_DIR)
     {
         Ok(builder) => {
             cobalt_sender.send(

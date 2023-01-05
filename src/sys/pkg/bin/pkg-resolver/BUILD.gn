@@ -53,7 +53,6 @@ rustc_library("lib") {
     "//src/sys/pkg/lib/version",
     "//src/sys/pkg/lib/work-queue",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
@@ -82,7 +81,6 @@ rustc_library("lib") {
 
   source_root = "src/main.rs"
   sources = [
-    "src/args.rs",
     "src/cache.rs",
     "src/cache/inspect.rs",
     "src/cache/resume.rs",
@@ -191,10 +189,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
-  values = {
-    fetch_delivery_blob = false
-    delivery_blob_fallback = false
-  }
+  values_source = "config/values.json5"
 }
 
 group("tests") {

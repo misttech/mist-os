@@ -5,7 +5,7 @@ use {
     cobalt_sw_delivery_registry as metrics,
     fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
     fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
-    lib::{ResolverVariant, TestEnvBuilder, EMPTY_REPO_PATH},
+    lib::{TestEnvBuilder, EMPTY_REPO_PATH},
     std::sync::Arc,
 };
 
@@ -58,7 +58,7 @@ async fn resolve_local_and_remote_mirrors_fails() {
     );
 
     let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::AllowLocalMirror)
+        .allow_local_mirror(true)
         .local_mirror_repo(&repo, "fuchsia-pkg://test".parse().unwrap())
         .build()
         .await;
@@ -80,10 +80,7 @@ async fn create_tuf_client_timeout() {
     let repo =
         Arc::new(RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH).build().await.unwrap());
 
-    let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::ZeroTufMetadataTimeout)
-        .build()
-        .await;
+    let env = TestEnvBuilder::new().tuf_metadata_timeout_seconds(0).build().await;
     let server = repo
         .server()
         .response_overrider(responder::ForPath::new("/1.root.json", responder::Hang))
@@ -115,10 +112,7 @@ async fn update_tuf_client_timeout() {
     // pkg-resolver uses this timeout when creating and updating tuf metadata, so since this test
     // hangs the update, the timeout needs to be long enough for the create to succeed.
     // TODO(fxbug.dev/66946) have separate tuf client create and update timeout durations.
-    let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::ShortTufMetadataTimeout)
-        .build()
-        .await;
+    let env = TestEnvBuilder::new().tuf_metadata_timeout_seconds(10).build().await;
 
     // pkg-resolver uses tuf::client::Client::with_trusted_root_keys to create its TUF client.
     // That method will only retrieve the specified version of the root metadata (1 for these
@@ -162,10 +156,7 @@ async fn download_blob_header_timeout() {
             .unwrap(),
     );
 
-    let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::ZeroBlobNetworkHeaderTimeout)
-        .build()
-        .await;
+    let env = TestEnvBuilder::new().blob_network_header_timeout_seconds(0).build().await;
 
     let server = repo
         .server()
@@ -203,10 +194,7 @@ async fn download_blob_body_timeout() {
             .unwrap(),
     );
 
-    let env = TestEnvBuilder::new()
-        .resolver_variant(ResolverVariant::ZeroBlobNetworkBodyTimeout)
-        .build()
-        .await;
+    let env = TestEnvBuilder::new().blob_network_body_timeout_seconds(0).build().await;
 
     let server = repo
         .server()
