@@ -71,9 +71,15 @@ pub(super) struct Inner {
 }
 
 impl Inner {
+    #[allow(deprecated)]
     #[cfg_attr(trace_level_logging, track_caller)]
-    // TODO(https://fxbug.dev/115386) make this API and its callers infallible
     pub fn new(time: ExecutorTime, is_local: bool) -> Result<Self, zx::Status> {
+        Self::try_new(time, is_local)
+    }
+
+    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+    #[cfg_attr(trace_level_logging, track_caller)]
+    pub fn try_new(time: ExecutorTime, is_local: bool) -> Result<Self, zx::Status> {
         #[cfg(trace_level_logging)]
         let source = Some(Location::caller());
         #[cfg(not(trace_level_logging))]

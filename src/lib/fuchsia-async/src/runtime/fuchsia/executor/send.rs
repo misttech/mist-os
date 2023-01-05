@@ -51,7 +51,14 @@ impl fmt::Debug for SendExecutor {
 
 impl SendExecutor {
     /// Create a new multi-threaded executor.
+    #[allow(deprecated)]
     pub fn new(num_threads: usize) -> Result<Self, zx::Status> {
+        Self::try_new(num_threads)
+    }
+
+    /// Deprecated, will be deleted.
+    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+    pub fn try_new(num_threads: usize) -> Result<Self, zx::Status> {
         let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ false)?);
         inner.clone().set_local(TimerHeap::default());
         Ok(Self { inner, threads: Vec::default(), num_threads })

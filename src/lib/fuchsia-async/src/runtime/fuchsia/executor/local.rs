@@ -50,7 +50,14 @@ impl fmt::Debug for LocalExecutor {
 
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
+    #[allow(deprecated)]
     pub fn new() -> Result<Self, zx::Status> {
+        Self::try_new()
+    }
+
+    /// Deprecated, will be deleted.
+    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+    pub fn try_new() -> Result<Self, zx::Status> {
         let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ true)?);
         inner.clone().set_local(TimerHeap::default());
         let main_task =
@@ -152,12 +159,26 @@ pub struct TestExecutor {
 
 impl TestExecutor {
     /// Create a new executor for testing.
+    #[allow(deprecated)]
     pub fn new() -> Result<Self, zx::Status> {
+        Self::try_new()
+    }
+
+    /// Deprecated, will be deleted.
+    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+    pub fn try_new() -> Result<Self, zx::Status> {
         Ok(Self { local: LocalExecutor::new()?, next_packet: None })
     }
 
     /// Create a new single-threaded executor running with fake time.
+    #[allow(deprecated)]
     pub fn new_with_fake_time() -> Result<Self, zx::Status> {
+        Self::try_new_with_fake_time()
+    }
+
+    /// Deprecated, will be deleted.
+    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+    pub fn try_new_with_fake_time() -> Result<Self, zx::Status> {
         let inner = Arc::new(Inner::new(
             ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
             /* is_local */ true,

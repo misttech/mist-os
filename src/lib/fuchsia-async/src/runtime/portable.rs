@@ -139,7 +139,14 @@ pub mod executor {
 
     impl SendExecutor {
         /// Create a new executor running with actual time.
+        #[allow(deprecated)]
         pub fn new(num_threads: usize) -> Result<Self, zx_status::Status> {
+            Self::try_new(num_threads)
+        }
+
+        /// Deprecated, will be deleted.
+        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+        pub fn try_new(num_threads: usize) -> Result<Self, zx_status::Status> {
             Ok(Self { num_threads })
         }
 
@@ -180,7 +187,14 @@ pub mod executor {
 
     impl LocalExecutor {
         /// Create a new executor.
+        #[allow(deprecated)]
         pub fn new() -> Result<Self, zx_status::Status> {
+            Self::try_new()
+        }
+
+        /// Deprecated, will be deleted.
+        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+        pub fn try_new() -> Result<Self, zx_status::Status> {
             Ok(Self {})
         }
 
@@ -201,7 +215,14 @@ pub mod executor {
 
     impl TestExecutor {
         /// Create a new executor for testing.
+        #[allow(deprecated)]
         pub fn new() -> Result<Self, zx_status::Status> {
+            Self::try_new()
+        }
+
+        /// Deprecated, will be deleted.
+        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
+        pub fn try_new() -> Result<Self, zx_status::Status> {
             Ok(Self {})
         }
 
