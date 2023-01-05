@@ -210,6 +210,22 @@ impl FromExt<&ot::LeaderData> for fidl_fuchsia_lowpan_experimental::LeaderData {
     }
 }
 
+impl FromExt<&ot::SrpServerResponseCounters>
+    for fidl_fuchsia_lowpan_experimental::SrpServerResponseCounters
+{
+    fn from_ext(x: &ot::SrpServerResponseCounters) -> Self {
+        fidl_fuchsia_lowpan_experimental::SrpServerResponseCounters {
+            success_response: Some(x.success()),
+            server_failure_response: Some(x.server_failure()),
+            format_error_response: Some(x.format_error()),
+            name_exists_response: Some(x.name_exists()),
+            refused_response: Some(x.refused()),
+            other_response: Some(x.other()),
+            ..fidl_fuchsia_lowpan_experimental::SrpServerResponseCounters::EMPTY
+        }
+    }
+}
+
 pub trait UpdateOperationalDataset<T> {
     fn update_from(&mut self, data: &T) -> Result<(), anyhow::Error>;
 }

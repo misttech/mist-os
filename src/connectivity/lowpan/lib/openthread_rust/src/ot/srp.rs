@@ -418,6 +418,10 @@ pub trait SrpServer {
     fn srp_server_get_domain(&self) -> &CStr;
 
     /// Functional equivalent of
+    /// [`otsys::otSrpServerGetResponseCounters`](crate::otsys::otSrpServerGetResponseCounters).
+    fn srp_server_get_response_counters(&self) -> &SrpServerResponseCounters;
+
+    /// Functional equivalent of
     /// [`otsys::otSrpServerGetNextHost`](crate::otsys::otSrpServerGetNextHost).
     fn srp_server_next_host<'a>(
         &'a self,
@@ -474,6 +478,10 @@ impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
 
     fn srp_server_get_domain(&self) -> &CStr {
         self.as_ref().srp_server_get_domain()
+    }
+
+    fn srp_server_get_response_counters(&self) -> &SrpServerResponseCounters {
+        self.as_ref().srp_server_get_response_counters()
     }
 
     fn srp_server_next_host<'a>(
@@ -544,6 +552,15 @@ impl SrpServer for Instance {
 
     fn srp_server_get_domain(&self) -> &CStr {
         unsafe { CStr::from_ptr(otSrpServerGetDomain(self.as_ot_ptr())) }
+    }
+
+    fn srp_server_get_response_counters(&self) -> &SrpServerResponseCounters {
+        unsafe {
+            SrpServerResponseCounters::ref_from_ot_ptr(otSrpServerGetResponseCounters(
+                self.as_ot_ptr(),
+            ))
+            .unwrap()
+        }
     }
 
     fn srp_server_next_host<'a>(

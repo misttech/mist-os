@@ -805,6 +805,39 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                     srp_server_info_child
                                         .record_string("address_mode", format!("{:?}", y));
                                 }
+                                if let Some(y) = x.response_counters {
+                                    srp_server_info_child.record_child(
+                                        "response_counters",
+                                        |response_counters_child| {
+                                            if let Some(z) = y.success_response {
+                                                response_counters_child
+                                                    .record_uint("success_response", z.into());
+                                            }
+                                            if let Some(z) = y.server_failure_response {
+                                                response_counters_child.record_uint(
+                                                    "server_failure_response",
+                                                    z.into(),
+                                                );
+                                            }
+                                            if let Some(z) = y.format_error_response {
+                                                response_counters_child
+                                                    .record_uint("format_error_response", z.into());
+                                            }
+                                            if let Some(z) = y.name_exists_response {
+                                                response_counters_child
+                                                    .record_uint("name_exists_response", z.into());
+                                            }
+                                            if let Some(z) = y.refused_response {
+                                                response_counters_child
+                                                    .record_uint("refused_response", z.into());
+                                            }
+                                            if let Some(z) = y.other_response {
+                                                response_counters_child
+                                                    .record_uint("other_response", z.into());
+                                            }
+                                        },
+                                    );
+                                }
                             });
                         }
                         if let Some(x) = telemetry_data.leader_data {

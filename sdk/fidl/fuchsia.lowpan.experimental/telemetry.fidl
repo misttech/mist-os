@@ -172,6 +172,41 @@ type SrpServerInfo = table {
         /// Thread network data is published as anycast addresses.
         ANYCAST = 2;
     };
+
+    /// The response counters of the SRP server.
+    ///
+    /// Required.
+    4: response_counters @generated_name("SrpServerResponseCounters") table {
+        /// The number of successful responses.
+        ///
+        /// Required.
+        1: success_response uint32;
+
+        /// The number of 'server failure' responses.
+        ///
+        /// Required.
+        2: server_failure_response uint32;
+
+        /// The number of 'format error' responses.
+        ///
+        /// Required.
+        3: format_error_response uint32;
+
+        /// The number of 'name exists' responses.
+        ///
+        /// Required.
+        4: name_exists_response uint32;
+
+        /// The number of 'refused' responses.
+        ///
+        /// Required.
+        5: refused_response uint32;
+
+        /// The number of 'other' responses.
+        ///
+        /// Required.
+        6: other_response uint32;
+    };
 };
 
 

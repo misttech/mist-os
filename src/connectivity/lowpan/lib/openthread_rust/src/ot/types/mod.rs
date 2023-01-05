@@ -30,6 +30,7 @@ mod route_preference;
 mod router_info;
 mod scan_results;
 mod security_policy;
+mod srp_server_response_counters;
 mod timestamp;
 mod tlv;
 
@@ -63,6 +64,7 @@ pub use route_preference::*;
 pub use router_info::*;
 pub use scan_results::*;
 pub use security_policy::*;
+pub use srp_server_response_counters::*;
 pub use timestamp::*;
 pub use tlv::*;
 
