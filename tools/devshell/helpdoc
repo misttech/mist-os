@@ -24,8 +24,14 @@
 ##     --archive                 creates a compressed archive at OUTPUT_PATH.
 ##                                 If specified, output will be compressed
 ##                                 and OUTPUT_PATH must end with .tgz or .tar.gz.
-##     --depfile                 creates a depfile for helpdoc generation. Must be run with archive
+##                                 This must be the last option specified before the OUTPUT_PATH
+##     --depfile DEPFILENAME     creates a depfile for helpdoc generation. Must be run with archive
 
+# The generated documentation is laid out with all commands in /cmd/<cmd>.md is to make the URL predictable and stable. Categories
+# are arbitrary texts and used to change often, it is undesirable that a category change invalidates the previous command help URL.
+# Since the table of contents for each category needs to be in a file named _toc.yaml, these files are generated in the per-category directory along with a README.md, which links to the markdown in ../cmd.
+
+# shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 
 categories=()
@@ -115,26 +121,31 @@ function main {
             fx-command-help
             exit 1
           fi
-    initial_deps=""${archive_path}":  ../../scripts/fx ../../scripts/fx-help.awk
-"${archive_path}":  ../../tools/devshell/lib/fx-cmd-locator.sh ../../tools/devshell/lib/vars.sh
-"${archive_path}":  ../../tools/devshell/lib/fx-optional-features.sh ../../tools/devshell/lib/metrics.sh
-"${archive_path}":  ../../tools/devshell/lib/platform.sh "
+   # This creates the depfile without quoting the archive_path or any of
+   # the dependencies labels/filenames. According to the MAKEFILE documentation
+   # which defines the format of depfiles, it is not clear if quoting will correctly
+   # deal with special characters, vs. using \ to escape them.
+    initial_deps="${archive_path}:  ../../scripts/fx ../../scripts/fx-help.awk
+${archive_path}:  ../../tools/devshell/lib/fx-cmd-locator.sh ../../tools/devshell/lib/vars.sh
+${archive_path}:  ../../tools/devshell/lib/fx-optional-features.sh ../../tools/devshell/lib/metrics.sh
+${archive_path}:  ../../tools/devshell/lib/platform.sh "
     echo -n "$initial_deps" >> "${depfile_prefix}"
     for vendor_dir in "${FUCHSIA_DIR}"/vendor/*/scripts/devshell; do
       for d in "${vendor_dir}"/*; do
           echo "vendor file ${d}"
           if [[ "${d}" != *"/*" ]]; then
             if hash realpath >/dev/null 2>&1; then
-              rel_path=`realpath --relative-to="${PWD}" "$d"`
+              rel_path="$(realpath --relative-to="${PWD}" "$d")"
             else
               rel_path="$(realpath_relative_to_pwd "${d}")"
             fi
-            printf %s ""${rel_path}" " >> "${depfile_prefix}"
+            printf %s "${rel_path} " >> "${depfile_prefix}"
           fi
       done
     done
   fi
 
+  # Make the cmd subdirectory to hold the per-command generated markdown.
   mkdir -p "${base_out}/cmd"
 
   # initializes the main index.md
@@ -165,7 +176,6 @@ function main {
     echo "[fx source code](https://cs.opensource.google/fuchsia/fuchsia/+/main:scripts/fx)"
   } > "${base_out}/fx.md"
 
-  local dirs
   if [[ "${show_vendor}" -eq 1 ]]; then
     for d in "${FUCHSIA_DIR}"/vendor/*/scripts/devshell; do
       if [[ -d "${d}" ]]; then
@@ -213,19 +223,18 @@ function main {
 }
 
 function realpath_relative_to_pwd {
-  local path="$1"
-  local rp
-  local -i status
+  local path="$1" rp source target
 
-  local source target
   source="${PWD}"
   target="${path}"
   back=
   common_part="${source}"
+  # shellcheck disable=SC2295
   while [[ "${target#$common_part}" == "${target}" ]]; do
     common_part="$(dirname "${common_part}")"
     back="../${back}"
   done
+  # shellcheck disable=SC2295
   rp="${back}${target#$common_part/}"
   echo "${rp}"
 }
@@ -242,7 +251,8 @@ function _md_main_table_header {
 }
 
 function print-redacted-fx-help {
-  local filter="$(mktemp)"
+  local filter
+  filter="$(mktemp)"
   cat > "${filter}" <<EOF
   NR==1 || NR==3, /^$/ {
     print
@@ -260,17 +270,20 @@ EOF
 }
 
 function handle-directory {
-  local d="$1"
-  local files=( "${d}"/* )
-  local cmds=()
+  local d files cmds
+
+  d="$1"
+  files=( "${d}"/* )
+  cmds=()
+
   for f in "${files[@]}"; do
     if [[ "${create_depfile}" -eq 1 ]]; then
       if hash realpath >/dev/null 2>&1; then
-        rel_path=`realpath --relative-to="${PWD}" "$f"`
+        rel_path="$(realpath --relative-to="${PWD}" "$f")"
       else
         rel_path="$(realpath_relative_to_pwd "${f}")"
       fi
-      printf %s ""${rel_path}" " >> "${depfile_prefix}"
+      printf %s "${rel_path} " >> "${depfile_prefix}"
     fi
 
     if [[ -f "${f}" && ( -x "${f}" || "${f: -3}" == ".fx" ) ]]; then
@@ -344,14 +357,18 @@ function create-main-toc {
   unset IFS
 
   for category in "${sorted[@]}"; do
+    local norm_cat
+
     echo "Processing category ${category}"
-    local norm_cat="$(normalize "${category}")"
+    norm_cat="$(normalize "${category}")"
+    # Make the category sub-dir to hold the toc.
+    mkdir -p "${base_out}/${norm_cat}"
     # Appends the category to the global _toc.yaml
     {
       echo "- title: \"${category} commands\""
-      echo "  path: ${toc_prefix}/${norm_cat}.md"
+      echo "  path: ${toc_prefix}/${norm_cat}/README.md"
       echo "  section:"
-      echo "  - include: ${toc_prefix}/${norm_cat}_toc.yaml"
+      echo "  - include: ${toc_prefix}/${norm_cat}/_toc.yaml"
     } >> "${base_out}/_toc.yaml"
   done
 }
@@ -366,11 +383,14 @@ function get-category-title {
 }
 
 function maybe-add-category {
-  local category="$1"
-  local norm_cat="$(normalize "${category}")"
-  local cat_base="${base_out}/${norm_cat}"
-  local toc="${cat_base}_toc.yaml"
+  local cat_base category norm_cat toc
+  category="$1"
+  cat_base="${base_out}/${norm_cat}/README.md"
+  norm_cat="$(normalize "${category}")"
+  toc="${base_out}/${norm_cat}/_toc.yaml"
 
+  # Make the category sub-dir to hold the toc.
+  mkdir -p "${base_out}/${norm_cat}"
   if [[ ! -f "${toc}" ]]; then
     # initializes the per-category _toc.yaml
     {
@@ -383,7 +403,7 @@ function maybe-add-category {
       echo
       echo "Command | Description"
       echo "------- | -----------"
-    } > "${cat_base}.md"
+    } > "${cat_base}"
   fi
   echo "${norm_cat}"
 }
@@ -398,28 +418,37 @@ function escape-jinja {
 }
 
 function handle-command {
-  local cmd_path="$1"
-  local category="$(get_metadata_camelcase "${cmd_path}" "CATEGORY")"
-  if [[ -z "${category}" ]]; then
+  local category cat_url cmd_name cmd_path cmd_url deprecated deprecated_str filename norm_cat rel_path summary
+
+  cmd_path="$1"
+  cmd_name="$(basename "${cmd_path}" ".fx")"
+
+  category="$(get_metadata_camelcase "${cmd_path}" "CATEGORY")"
+   if [[ -z "${category}" ]]; then
     category="Other"
   fi
+
+  norm_cat="$(maybe-add-category "${category}")"
+
+  # categories is a global list.
   categories+=( "${category}" )
-  local norm_cat="$(maybe-add-category "${category}")"
-  local cmd_name="$(basename "${cmd_path}" ".fx")"
-  local filename="${base_out}/cmd/${cmd_name}.md"
-  local deprecated_str=""
-  local deprecated="$(get_binary_metadata "${cmd_path}" "DEPRECATED")"
+
+  # filename is the name of the generated markdown for this command.
+  filename="${base_out}/cmd/${cmd_name}.md"
+  deprecated_str=""
+  deprecated="$(get_binary_metadata "${cmd_path}" "DEPRECATED")"
+
   if [[ "${deprecated}" -eq 1 ]]; then
     if [[ "${show_deprecated}" -eq 0 ]]; then
       return
     fi
     deprecated_str="DEPRECATED! "
   fi
-  local summary="${deprecated_str}$(get_summary "${cmd_path}")"
-  local cmd_url="cmd/${cmd_name}.md"
-  local cat_url="${norm_cat}.md"
 
-  local rel_path="${cmd_path#${FUCHSIA_DIR}/}"
+  summary="${deprecated_str}$(get_summary "${cmd_path}")"
+  cmd_url="cmd/${cmd_name}.md"
+  cat_url="${norm_cat}/README.md"
+  rel_path="${cmd_path#"${FUCHSIA_DIR}"/}"
 
   # Creates the per-command markdown file
   {
@@ -443,8 +472,8 @@ function handle-command {
 
   # Appends the command to the per-category index
   {
-    echo "[${cmd_name}](cmd/${cmd_name}.md) | ${summary}"
-  } >> "${base_out}/${norm_cat}.md"
+    echo "[${cmd_name}](../${cmd_url}) | ${summary}"
+  } >> "${base_out}/${norm_cat}/README.md"
 
   # Appends the command to the global index
   {
@@ -455,7 +484,7 @@ function handle-command {
   {
     echo "- title: \"${deprecated_str}${cmd_name}\""
     echo "  path: ${toc_prefix}/${cmd_url}"
-  } >> "${base_out}/${norm_cat}_toc.yaml"
+  } >> "${base_out}/${norm_cat}/_toc.yaml"
 
 }
 
