@@ -253,7 +253,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     name: "started".into(),
                 },
             ] {
-                model.check_use(vec!["c"].into(), check_use).await;
+                model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
             }
         }
     }
@@ -413,7 +413,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
             ] {
-                model.check_use(vec!["c"].into(), check_use).await;
+                model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
             }
         }
     }

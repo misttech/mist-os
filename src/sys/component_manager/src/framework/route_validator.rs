@@ -361,7 +361,7 @@ mod tests {
         model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = model.find_resolved(&vec!["my_child"].into()).await;
+        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -390,7 +390,7 @@ mod tests {
         assert!(report.error.is_none());
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.find_resolved(&vec!["my_child"].into()).await;
+        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
 
         // Validate `my_child`
@@ -467,7 +467,7 @@ mod tests {
         model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = model.find_resolved(&vec!["my_child"].into()).await;
+        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -500,7 +500,7 @@ mod tests {
         assert!(report.error.is_some());
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.find_resolved(&vec!["my_child"].into()).await;
+        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
     }
 }

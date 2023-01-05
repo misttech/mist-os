@@ -467,18 +467,20 @@ mod tests {
     #[test]
     fn allowlist_entry_checker() {
         let root = AbsoluteMoniker::root();
-        let allowed = AbsoluteMoniker::from(vec!["foo", "bar"]);
-        let disallowed_child_of_allowed = AbsoluteMoniker::from(vec!["foo", "bar", "baz"]);
-        let disallowed = AbsoluteMoniker::from(vec!["baz", "fiz"]);
+        let allowed = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
+        let disallowed_child_of_allowed =
+            AbsoluteMoniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
+        let disallowed = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
         let allowlist_exact = AllowlistEntryBuilder::new().exact_from_moniker(&allowed).build();
         assert!(allowlist_entry_matches(&allowlist_exact, &allowed));
         assert!(!allowlist_entry_matches(&allowlist_exact, &root));
         assert!(!allowlist_entry_matches(&allowlist_exact, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_exact, &disallowed_child_of_allowed));
 
-        let allowed_realm_root = AbsoluteMoniker::from(vec!["qux"]);
-        let allowed_child_of_realm = AbsoluteMoniker::from(vec!["qux", "quux"]);
-        let allowed_nested_child_of_realm = AbsoluteMoniker::from(vec!["qux", "quux", "foo"]);
+        let allowed_realm_root = AbsoluteMoniker::try_from(vec!["qux"]).unwrap();
+        let allowed_child_of_realm = AbsoluteMoniker::try_from(vec!["qux", "quux"]).unwrap();
+        let allowed_nested_child_of_realm =
+            AbsoluteMoniker::try_from(vec!["qux", "quux", "foo"]).unwrap();
         let allowlist_realm =
             AllowlistEntryBuilder::new().exact_from_moniker(&allowed_realm_root).any_descendant();
         assert!(!allowlist_entry_matches(&allowlist_realm, &allowed_realm_root));
@@ -487,11 +489,12 @@ mod tests {
         assert!(!allowlist_entry_matches(&allowlist_realm, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_realm, &root));
 
-        let collection_holder = AbsoluteMoniker::from(vec!["corge"]);
-        let collection_child = AbsoluteMoniker::from(vec!["corge", "collection:child"]);
+        let collection_holder = AbsoluteMoniker::try_from(vec!["corge"]).unwrap();
+        let collection_child =
+            AbsoluteMoniker::try_from(vec!["corge", "collection:child"]).unwrap();
         let collection_nested_child =
-            AbsoluteMoniker::from(vec!["corge", "collection:child", "inner-child"]);
-        let non_collection_child = AbsoluteMoniker::from(vec!["corge", "grault"]);
+            AbsoluteMoniker::try_from(vec!["corge", "collection:child", "inner-child"]).unwrap();
+        let non_collection_child = AbsoluteMoniker::try_from(vec!["corge", "grault"]).unwrap();
         let allowlist_collection = AllowlistEntryBuilder::new()
             .exact_from_moniker(&collection_holder)
             .any_descendant_in_collection("collection");
@@ -502,12 +505,13 @@ mod tests {
         assert!(!allowlist_entry_matches(&allowlist_collection, &disallowed));
         assert!(!allowlist_entry_matches(&allowlist_collection, &root));
 
-        let collection_a = AbsoluteMoniker::from(vec!["foo", "bar:a", "baz", "qux"]);
-        let collection_b = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz", "qux"]);
-        let parent_not_allowed = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz"]);
-        let collection_not_allowed = AbsoluteMoniker::from(vec!["foo", "bar:b", "baz"]);
+        let collection_a = AbsoluteMoniker::try_from(vec!["foo", "bar:a", "baz", "qux"]).unwrap();
+        let collection_b = AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz", "qux"]).unwrap();
+        let parent_not_allowed = AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let collection_not_allowed =
+            AbsoluteMoniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
         let different_collection_not_allowed =
-            AbsoluteMoniker::from(vec!["foo", "test:b", "baz", "qux"]);
+            AbsoluteMoniker::try_from(vec!["foo", "test:b", "baz", "qux"]).unwrap();
         let allowlist_exact_in_collection = AllowlistEntryBuilder::new()
             .exact("foo")
             .any_child_in_collection("bar")
@@ -524,9 +528,9 @@ mod tests {
         ));
 
         let any_child_allowlist = AllowlistEntryBuilder::new().exact("core").any_child().build();
-        let allowed = AbsoluteMoniker::from(vec!["core", "abc"]);
-        let disallowed_1 = AbsoluteMoniker::from(vec!["not_core", "abc"]);
-        let disallowed_2 = AbsoluteMoniker::from(vec!["core", "abc", "def"]);
+        let allowed = AbsoluteMoniker::try_from(vec!["core", "abc"]).unwrap();
+        let disallowed_1 = AbsoluteMoniker::try_from(vec!["not_core", "abc"]).unwrap();
+        let disallowed_2 = AbsoluteMoniker::try_from(vec!["core", "abc", "def"]).unwrap();
         assert!(allowlist_entry_matches(&any_child_allowlist, &allowed));
         assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_1));
         assert!(!allowlist_entry_matches(&any_child_allowlist, &disallowed_2));
@@ -536,10 +540,12 @@ mod tests {
             .any_child()
             .any_child_in_collection("foo")
             .any_descendant();
-        let allowed = AbsoluteMoniker::from(vec!["core", "abc", "foo:def", "ghi"]);
-        let disallowed_1 = AbsoluteMoniker::from(vec!["not_core", "abc", "foo:def", "ghi"]);
-        let disallowed_2 = AbsoluteMoniker::from(vec!["core", "abc", "not_foo:def", "ghi"]);
-        let disallowed_3 = AbsoluteMoniker::from(vec!["core", "abc", "foo:def"]);
+        let allowed = AbsoluteMoniker::try_from(vec!["core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_1 =
+            AbsoluteMoniker::try_from(vec!["not_core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_2 =
+            AbsoluteMoniker::try_from(vec!["core", "abc", "not_foo:def", "ghi"]).unwrap();
+        let disallowed_3 = AbsoluteMoniker::try_from(vec!["core", "abc", "foo:def"]).unwrap();
         assert!(allowlist_entry_matches(&multiwildcard_allowlist, &allowed));
         assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_1));
         assert!(!allowlist_entry_matches(&multiwildcard_allowlist, &disallowed_2));
@@ -567,10 +573,10 @@ mod tests {
         let strong_config = Arc::new(RuntimeConfig::default());
         let config = Arc::downgrade(&strong_config);
         assert_vmex_disallowed!(config, AbsoluteMoniker::root());
-        assert_vmex_disallowed!(config, AbsoluteMoniker::from(vec!["foo"]));
+        assert_vmex_disallowed!(config, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
 
-        let allowed1 = AbsoluteMoniker::from(vec!["foo", "bar"]);
-        let allowed2 = AbsoluteMoniker::from(vec!["baz", "fiz"]);
+        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
         let strong_config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
@@ -631,10 +637,13 @@ mod tests {
         let strong_config = Arc::new(RuntimeConfig::default());
         let config = Arc::downgrade(&strong_config);
         assert_create_raw_processes_disallowed!(config, AbsoluteMoniker::root());
-        assert_create_raw_processes_disallowed!(config, AbsoluteMoniker::from(vec!["foo"]));
+        assert_create_raw_processes_disallowed!(
+            config,
+            AbsoluteMoniker::try_from(vec!["foo"]).unwrap()
+        );
 
-        let allowed1 = AbsoluteMoniker::from(vec!["foo", "bar"]);
-        let allowed2 = AbsoluteMoniker::from(vec!["baz", "fiz"]);
+        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
         let strong_config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
@@ -695,10 +704,10 @@ mod tests {
         let strong_config = Arc::new(RuntimeConfig::default());
         let config = Arc::downgrade(&strong_config);
         assert_critical_disallowed!(config, AbsoluteMoniker::root());
-        assert_critical_disallowed!(config, AbsoluteMoniker::from(vec!["foo"]));
+        assert_critical_disallowed!(config, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
 
-        let allowed1 = AbsoluteMoniker::from(vec!["foo", "bar"]);
-        let allowed2 = AbsoluteMoniker::from(vec!["baz", "fiz"]);
+        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
         let strong_config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
@@ -756,11 +765,11 @@ mod tests {
         let config =
             Arc::new(RuntimeConfig { reboot_on_terminate_enabled: true, ..Default::default() });
         assert_reboot_disallowed!(config, AbsoluteMoniker::root());
-        assert_reboot_disallowed!(config, AbsoluteMoniker::from(vec!["foo"]));
+        assert_reboot_disallowed!(config, AbsoluteMoniker::try_from(vec!["foo"]).unwrap());
 
         // Nonempty config and enabled.
-        let allowed1 = AbsoluteMoniker::from(vec!["foo", "bar"]);
-        let allowed2 = AbsoluteMoniker::from(vec!["baz", "fiz"]);
+        let allowed1 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
+        let allowed2 = AbsoluteMoniker::try_from(vec!["baz", "fiz"]).unwrap();
         let config = Arc::new(RuntimeConfig {
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {

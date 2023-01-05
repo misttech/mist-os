@@ -183,7 +183,7 @@ async fn use_in_collection_from_parent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".into(),
@@ -197,7 +197,7 @@ async fn use_in_collection_from_parent() {
 
     // Use storage and confirm its existence.
     test.check_use(
-        vec!["b", "coll:c"].into(),
+        vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(InstancedRelativeMoniker::try_from(vec!["coll:c:1"]).unwrap()),
@@ -208,7 +208,7 @@ async fn use_in_collection_from_parent() {
     )
     .await;
     test.check_use(
-        vec!["b", "coll:c"].into(),
+        vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/cache".try_into().unwrap(),
             storage_relation: Some(InstancedRelativeMoniker::try_from(vec!["coll:c:1"]).unwrap()),
@@ -239,7 +239,7 @@ async fn use_in_collection_from_parent() {
         .await,
         vec!["coll:c:1".to_string()],
     );
-    test.destroy_dynamic_child(vec!["b"].into(), "coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "coll", "c").await;
 
     // Confirm storage no longer exists.
     assert_eq!(
@@ -363,7 +363,7 @@ async fn use_in_collection_from_grandparent() {
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "coll",
         ChildDecl {
             name: "c".into(),
@@ -377,7 +377,7 @@ async fn use_in_collection_from_grandparent() {
 
     // Use storage and confirm its existence.
     test.check_use(
-        vec!["b", "coll:c"].into(),
+        vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -390,7 +390,7 @@ async fn use_in_collection_from_grandparent() {
     )
     .await;
     test.check_use(
-        vec!["b", "coll:c"].into(),
+        vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/cache".try_into().unwrap(),
             storage_relation: Some(
@@ -422,7 +422,7 @@ async fn use_in_collection_from_grandparent() {
         .await,
         vec!["coll:c:1".to_string()]
     );
-    test.destroy_dynamic_child(vec!["b"].into(), "coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "coll", "c").await;
 
     // Confirm storage no longer exists.
     assert_eq!(
@@ -934,7 +934,7 @@ async fn storage_persistence_relative_moniker_path() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -952,7 +952,7 @@ async fn storage_persistence_relative_moniker_path() {
         .unwrap();
 
     // destroy [c:1]
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect the [c:1] storage and data to persist
     test.check_test_subdir_contents(
@@ -963,7 +963,7 @@ async fn storage_persistence_relative_moniker_path() {
 
     // recreate dynamic child [c:2]
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -981,7 +981,7 @@ async fn storage_persistence_relative_moniker_path() {
         .unwrap();
 
     // destroy [c:2]
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect the [c:1] and [c:2] storage and data to persist
     test.check_test_subdir_contents(
@@ -991,7 +991,7 @@ async fn storage_persistence_relative_moniker_path() {
     .await;
 
     // check that the file can be destroyed by storage admin
-    let namespace = test.bind_and_get_namespace(vec!["b"].into()).await;
+    let namespace = test.bind_and_get_namespace(vec!["b"].try_into().unwrap()).await;
     let storage_admin_proxy = capability_util::connect_to_svc_in_namespace::<
         fsys::StorageAdminMarker,
     >(
@@ -1119,7 +1119,7 @@ async fn storage_persistence_instance_id_path() {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
             appmgr_moniker: None,
-            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].into()),
+            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].try_into().unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -1132,7 +1132,7 @@ async fn storage_persistence_instance_id_path() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1148,14 +1148,14 @@ async fn storage_persistence_instance_id_path() {
     test.create_static_file(&Path::new(&format!("{}/c1", instance_id)), "hippos").await.unwrap();
 
     // destroy [c:1]
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect the [c:1] storage and data to persist
     test.check_test_subdir_contents(&instance_id, vec!["c1".to_string()]).await;
 
     // recreate dynamic child [c:2]
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1171,13 +1171,13 @@ async fn storage_persistence_instance_id_path() {
     test.create_static_file(&Path::new(&format!("{}/c2", instance_id)), "sharks").await.unwrap();
 
     // destroy [c:2]
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect the [c:1] and [c:2] storage and data to persist
     test.check_test_subdir_contents(&instance_id, vec!["c1".to_string(), "c2".to_string()]).await;
 
     // destroy the persistent storage with a storage admin request
-    let namespace = test.bind_and_get_namespace(vec!["b"].into()).await;
+    let namespace = test.bind_and_get_namespace(vec!["b"].try_into().unwrap()).await;
     let storage_admin_proxy = capability_util::connect_to_svc_in_namespace::<
         fsys::StorageAdminMarker,
     >(
@@ -1333,7 +1333,7 @@ async fn storage_persistence_inheritance() {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
             appmgr_moniker: None,
-            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].into()),
+            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].try_into().unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -1346,7 +1346,7 @@ async fn storage_persistence_inheritance() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1360,7 +1360,7 @@ async fn storage_persistence_inheritance() {
 
     // write to [c:1] storage
     test.check_use(
-        vec!["b", "persistent_coll:c"].into(),
+        vec!["b", "persistent_coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1375,7 +1375,7 @@ async fn storage_persistence_inheritance() {
 
     // start d:0 and write to storage
     test.check_use(
-        vec!["b", "persistent_coll:c", "d"].into(),
+        vec!["b", "persistent_coll:c", "d"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1391,7 +1391,7 @@ async fn storage_persistence_inheritance() {
 
     // create [e:1] under the lower collection
     test.create_dynamic_child(
-        vec!["b", "persistent_coll:c"].into(),
+        vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "lower_coll",
         ChildDecl {
             name: "e".into(),
@@ -1405,7 +1405,7 @@ async fn storage_persistence_inheritance() {
 
     // write to [e:1] storage
     test.check_use(
-        vec!["b", "persistent_coll:c", "lower_coll:e"].into(),
+        vec!["b", "persistent_coll:c", "lower_coll:e"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1439,7 +1439,7 @@ async fn storage_persistence_inheritance() {
     .await;
 
     // destroy [c:1], which will also shutdown d:0 and lower_coll:e:1
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect [c:1], d:0, and [e:1] storage and data to persist
     test.check_test_subdir_contents(&instance_id, vec!["hippos".to_string()]).await;
@@ -1600,7 +1600,7 @@ async fn storage_persistence_disablement() {
         instances: vec![component_id_index::InstanceIdEntry {
             instance_id: Some(instance_id.clone()),
             appmgr_moniker: None,
-            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].into()),
+            moniker: Some(vec!["b".into(), "persistent_coll:c".into()].try_into().unwrap()),
         }],
         ..component_id_index::Index::default()
     })
@@ -1613,7 +1613,7 @@ async fn storage_persistence_disablement() {
 
     // create [c:1] under the storage persistent collection
     test.create_dynamic_child(
-        vec!["b"].into(),
+        vec!["b"].try_into().unwrap(),
         "persistent_coll",
         ChildDecl {
             name: "c".into(),
@@ -1627,7 +1627,7 @@ async fn storage_persistence_disablement() {
 
     // write to [c:1] storage
     test.check_use(
-        vec!["b", "persistent_coll:c"].into(),
+        vec!["b", "persistent_coll:c"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1642,7 +1642,7 @@ async fn storage_persistence_disablement() {
 
     // start d:0 and write to storage
     test.check_use(
-        vec!["b", "persistent_coll:c", "d"].into(),
+        vec!["b", "persistent_coll:c", "d"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1658,7 +1658,7 @@ async fn storage_persistence_disablement() {
 
     // create [e:1] under the non persistent collection
     test.create_dynamic_child(
-        vec!["b", "persistent_coll:c"].into(),
+        vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "non_persistent_coll",
         ChildDecl {
             name: "e".into(),
@@ -1672,7 +1672,7 @@ async fn storage_persistence_disablement() {
 
     // write to [e:1] storage
     test.check_use(
-        vec!["b", "persistent_coll:c", "non_persistent_coll:e"].into(),
+        vec!["b", "persistent_coll:c", "non_persistent_coll:e"].try_into().unwrap(),
         CheckUse::Storage {
             path: "/data".try_into().unwrap(),
             storage_relation: Some(
@@ -1714,7 +1714,7 @@ async fn storage_persistence_disablement() {
     .await;
 
     // destroy [c:1], which will shutdown d:0 and destroy [e:1]
-    test.destroy_dynamic_child(vec!["b"].into(), "persistent_coll", "c").await;
+    test.destroy_dynamic_child(vec!["b"].try_into().unwrap(), "persistent_coll", "c").await;
 
     // expect [c:1], d:0 storage and data to persist
     test.check_test_subdir_contents(&instance_id, vec!["hippos".to_string()]).await;

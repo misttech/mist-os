@@ -141,7 +141,7 @@ pub mod tests {
         assert_matches::assert_matches,
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
-        moniker::ChildMoniker,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
         routing::error::ComponentInstanceError,
         std::sync::Arc,
     };
@@ -165,10 +165,10 @@ pub mod tests {
         ];
         // Resolve components without starting them.
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
@@ -212,11 +212,11 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Resolve each component.
-        test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].into()).await;
+        test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Unresolve, recursively.
         ActionSet::register(component_a.clone(), UnresolveAction::new())
@@ -260,9 +260,9 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.start(vec![].into()).await;
-        let component_a = test.start(vec!["a"].into()).await;
-        test.start(vec!["a", "b"].into()).await;
+        test.start(AbsoluteMoniker::root()).await;
+        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
+        test.start(vec!["a", "b"].try_into().unwrap()).await;
 
         let mut event_stream =
             setup_unresolve_test_event_stream(&test, vec![EventType::Unresolved]).await;
@@ -274,8 +274,14 @@ pub mod tests {
         };
 
         // Confirm that the Unresolved events are emitted in the expected recursive order.
-        event_stream.wait_until(EventType::Unresolved, vec!["a", "b"].into()).await.unwrap();
-        event_stream.wait_until(EventType::Unresolved, vec!["a"].into()).await.unwrap();
+        event_stream
+            .wait_until(EventType::Unresolved, vec!["a", "b"].try_into().unwrap())
+            .await
+            .unwrap();
+        event_stream
+            .wait_until(EventType::Unresolved, vec!["a"].try_into().unwrap())
+            .await
+            .unwrap();
         nf.await.unwrap();
 
         // Now attempt to unresolve again with another UnresolveAction.
@@ -312,16 +318,17 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];
-        let test = ActionsTest::new("root", components, Some(vec!["container"].into())).await;
+        let test =
+            ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
 
         // Create dynamic instances in "coll".
         test.create_dynamic_child("coll", "a").await;
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_container = test.look_up(vec!["container"].into()).await;
-        let component_a = test.look_up(vec!["container", "coll:a"].into()).await;
-        let component_b = test.look_up(vec!["container", "coll:b"].into()).await;
+        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
+        let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_container.abs_moniker, &StartReason::Eager)
             .await
@@ -389,7 +396,7 @@ pub mod tests {
     async fn unresolve_action_fails_on_new_component() {
         let components = vec![("root", ComponentDeclBuilder::new().build())];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
         // This setup circumvents the registration of the Discover action on component_a.
         {
             let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
@@ -403,7 +410,7 @@ pub mod tests {
             assert!(resolved_state.add_child_no_discover(&component_root, &child, None).is_ok());
         }
 
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
         let component_a = match *component_root.lock_state().await {
             InstanceState::Resolved(ref s) => s
                 .get_child(&ChildMoniker::try_from("a").unwrap())

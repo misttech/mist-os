@@ -206,6 +206,7 @@ pub mod tests {
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     };
 
     #[fuchsia::test]
@@ -267,28 +268,46 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Not resolved, so not found.
-        assert_matches!(test.model.find_resolved(&vec!["a"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "c"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "d"].into()).await, None);
+        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
+        assert_matches!(test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
+            None
+        );
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
+            None
+        );
 
         // Resolve each component.
-        test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].into()).await;
+        test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Now they can all be found.
-        assert_matches!(test.model.find_resolved(&vec!["a"].into()).await, Some(_));
+        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
         assert_eq!(
-            test.model.find_resolved(&vec!["a"].into()).await.unwrap().component_url,
+            test.model.find_resolved(&vec!["a"].try_into().unwrap()).await.unwrap().component_url,
             "test:///a",
         );
-        assert_matches!(test.model.find_resolved(&vec!["a", "b"].into()).await, Some(_));
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "c"].into()).await, Some(_));
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "d"].into()).await, Some(_));
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "nonesuch"].into()).await, None);
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await,
+            Some(_)
+        );
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
+            Some(_)
+        );
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
+            Some(_)
+        );
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "nonesuch"].try_into().unwrap()).await,
+            None
+        );
 
         // Unresolve, recursively.
         ActionSet::register(component_a.clone(), UnresolveAction::new())
@@ -301,9 +320,15 @@ pub mod tests {
         assert!(is_discovered(&component_c).await);
         assert!(is_discovered(&component_d).await);
 
-        assert_matches!(test.model.find_resolved(&vec!["a"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "c"].into()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b", "d"].into()).await, None);
+        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
+        assert_matches!(test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
+            None
+        );
+        assert_matches!(
+            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
+            None
+        );
     }
 }

@@ -171,7 +171,7 @@ mod tests {
         let koid_raw = 123;
         let koid = zx::Koid::from_raw(koid_raw);
         let url = "456".to_string();
-        let moniker = AbsoluteMoniker::from(vec!["a"]);
+        let moniker = AbsoluteMoniker::try_from(vec!["a"]).unwrap();
         let crash_report = ComponentCrashInfo { url: url.clone(), moniker: moniker.clone() };
 
         assert_eq!(

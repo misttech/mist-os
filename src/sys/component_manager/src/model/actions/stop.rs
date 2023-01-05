@@ -50,7 +50,7 @@ pub mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         futures::channel::oneshot,
         futures::lock::Mutex,
-        moniker::AbsoluteMoniker,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         std::sync::{atomic::Ordering, Weak},
     };
 
@@ -63,11 +63,11 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].into()).await;
+        test.start(vec!["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and wait for it. Component should be stopped.
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         ActionSet::register(component_a.clone(), StopAction::new(false, false))
             .await
             .expect("stop failed");
@@ -82,7 +82,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].into())],);
+            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
         }
 
         // Execute action again, same state and no new events.
@@ -100,7 +100,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].into())],);
+            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
         }
     }
 
@@ -163,7 +163,8 @@ pub mod tests {
         // Cause Stop to be interrupted so we can inspect state.
         let (stopped_tx, stopped_rx) = oneshot::channel::<()>();
         let (continue_tx, continue_rx) = oneshot::channel::<()>();
-        let stop_hook = Arc::new(StopHook::new(vec!["a"].into(), stopped_tx, continue_rx));
+        let stop_hook =
+            Arc::new(StopHook::new(vec!["a"].try_into().unwrap(), stopped_tx, continue_rx));
         let components = vec![
             ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
             ("a", component_decl_with_test_runner()),
@@ -171,13 +172,13 @@ pub mod tests {
         let test = ActionsTest::new_with_hooks("root", components, None, stop_hook.hooks()).await;
 
         // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].into()).await;
+        test.start(vec!["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and make sure there are two clients waiting on the action
         // (the test, and the task spawned by the exit listener), plus the reference in ActionSet,
         // for a total of 3
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let mut actions = component_a.lock_actions().await;
         let nf = actions.register_no_wait(&component_a, StopAction::new(false, false));
         drop(actions);
@@ -204,7 +205,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].into())],);
+            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
         }
     }
 
@@ -218,12 +219,12 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].into()).await;
-        test.start(vec!["a", "aa"].into()).await;
+        test.start(vec!["a"].try_into().unwrap()).await;
+        test.start(vec!["a", "aa"].try_into().unwrap()).await;
 
         // Register `stopped` action, and wait for it. Component should be stopped.
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         ActionSet::register(component_a.clone(), StopAction::new(false, true))
             .await
             .expect("stop failed");
@@ -241,7 +242,10 @@ pub mod tests {
                 .collect();
             assert_eq!(
                 events,
-                vec![Lifecycle::Stop(vec!["a", "aa"].into()), Lifecycle::Stop(vec!["a"].into()),],
+                vec![
+                    Lifecycle::Stop(vec!["a", "aa"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                ],
             );
         }
 
@@ -263,7 +267,10 @@ pub mod tests {
                 .collect();
             assert_eq!(
                 events,
-                vec![Lifecycle::Stop(vec!["a", "aa"].into()), Lifecycle::Stop(vec!["a"].into()),],
+                vec![
+                    Lifecycle::Stop(vec!["a", "aa"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                ],
             );
         }
     }

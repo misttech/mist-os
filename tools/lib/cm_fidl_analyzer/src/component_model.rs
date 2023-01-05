@@ -1616,7 +1616,7 @@ mod tests {
         let (child_runner_registrar, child_runner) = get_child_runner_result.unwrap();
         match child_runner_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::from(vec![]));
+                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_runner to be registered by the root instance")
@@ -1631,7 +1631,7 @@ mod tests {
         let (child_resolver_registrar, child_resolver) = get_child_resolver_result.unwrap();
         match child_resolver_registrar {
             ExtendedInstanceInterface::Component(instance) => {
-                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::from(vec![]));
+                assert_eq!(instance.abs_moniker(), &AbsoluteMoniker::root());
             }
             ExtendedInstanceInterface::AboveRoot(_) => {
                 panic!("expected child_env_resolver to be registered by the root instance")

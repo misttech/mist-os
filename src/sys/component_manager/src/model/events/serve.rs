@@ -462,7 +462,7 @@ mod tests {
     // Output: (rejected)
     #[test]
     fn test_validate_and_filter_event_empty_moniker() {
-        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![]));
+        let mut event = ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root());
         let route = vec![
             ComponentEventRoute { component: "<root>".to_string(), scope: None },
             ComponentEventRoute {
@@ -491,7 +491,7 @@ mod tests {
             ComponentEventRoute { component: "c".to_string(), scope: None },
         ];
         assert!(super::validate_and_filter_event(&mut event, &route));
-        assert_eq!(event, ExtendedMoniker::ComponentInstance(AbsoluteMoniker::new(vec![])));
+        assert_eq!(event, ExtendedMoniker::ComponentInstance(AbsoluteMoniker::root()));
     }
 
     // Route: a(b)/b(c)/c

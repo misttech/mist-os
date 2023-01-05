@@ -108,11 +108,15 @@ mod tests {
         test.model.root().hooks.install(stats.hooks()).await;
 
         let root_timestamp =
-            start_and_get_timestamp(test.model.clone(), vec![].into()).await.into_nanos();
+            start_and_get_timestamp(test.model.clone(), AbsoluteMoniker::root()).await.into_nanos();
         let a_timestamp =
-            start_and_get_timestamp(test.model.clone(), vec!["a"].into()).await.into_nanos();
+            start_and_get_timestamp(test.model.clone(), vec!["a"].try_into().unwrap())
+                .await
+                .into_nanos();
         let b_timestamp =
-            start_and_get_timestamp(test.model.clone(), vec!["a", "b"].into()).await.into_nanos();
+            start_and_get_timestamp(test.model.clone(), vec!["a", "b"].try_into().unwrap())
+                .await
+                .into_nanos();
 
         assert_data_tree!(inspector, root: {
             start_times: {

@@ -23,7 +23,7 @@ impl NodePath {
     /// Construct NodePath from string references that correspond to parsable
     /// `ChildMoniker` instances.
     pub fn absolute_from_vec(vec: Vec<&str>) -> Self {
-        let abs_moniker: AbsoluteMoniker = vec.into();
+        let abs_moniker: AbsoluteMoniker = vec.try_into().unwrap();
         Self::new(abs_moniker.path().clone())
     }
 

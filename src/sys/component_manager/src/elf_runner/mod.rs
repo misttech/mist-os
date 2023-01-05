@@ -1325,7 +1325,7 @@ mod tests {
         let runner = new_elf_runner_for_test(&config);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&config),
-            AbsoluteMoniker::from(vec!["foo"]),
+            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
         ));
         let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
             .expect("could not create component controller endpoints");

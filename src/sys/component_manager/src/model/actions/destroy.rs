@@ -144,7 +144,7 @@ pub mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
-        moniker::ChildMoniker,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
         std::fmt::Debug,
         std::sync::atomic::Ordering,
     };
@@ -157,8 +157,8 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         // Start the component. This should cause the component to have an `Execution`.
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_a.abs_moniker, &StartReason::Eager)
             .await
@@ -189,7 +189,10 @@ pub mod tests {
                 .collect();
             assert_eq!(
                 events,
-                vec![Lifecycle::Stop(vec!["a"].into()), Lifecycle::Destroy(vec!["a"].into())],
+                vec![
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
+                ],
             );
         }
 
@@ -217,17 +220,18 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];
-        let test = ActionsTest::new("root", components, Some(vec!["container"].into())).await;
+        let test =
+            ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
 
         // Create dynamic instances in "coll".
         test.create_dynamic_child("coll", "a").await;
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_root = test.look_up(vec![].into()).await;
-        let component_container = test.look_up(vec!["container"].into()).await;
-        let component_a = test.look_up(vec!["container", "coll:a"].into()).await;
-        let component_b = test.look_up(vec!["container", "coll:b"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
+        let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_container.abs_moniker, &StartReason::Eager)
             .await
@@ -245,7 +249,7 @@ pub mod tests {
         assert!(is_executing(&component_b).await);
 
         // Register destroy child action, and wait for it. Components should be destroyed.
-        let component_container = test.look_up(vec!["container"].into()).await;
+        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
         ActionSet::register(
             component_root.clone(),
             DestroyChildAction::new("container".try_into().unwrap(), 0),
@@ -266,9 +270,9 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
@@ -302,8 +306,8 @@ pub mod tests {
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Destroy(vec!["a", "b"].into()),
-                    Lifecycle::Destroy(vec!["a"].into()),
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap()),
                 ]
             );
         }
@@ -477,7 +481,7 @@ pub mod tests {
     async fn destroy_registers_discover() {
         let components = vec![("root", ComponentDeclBuilder::new().build())];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
         // This setup circumvents the registration of the Discover action on component_a.
         {
             let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
@@ -497,7 +501,7 @@ pub mod tests {
         .await;
 
         // Shut down component so we can destroy it.
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
         let component_a = match *component_root.lock_state().await {
             InstanceState::Resolved(ref s) => s
                 .get_child(&ChildMoniker::try_from("a").unwrap())
@@ -526,8 +530,11 @@ pub mod tests {
 
         // Wait for Discover action, which should be registered by Destroy, followed by
         // Destroyed.
-        event_stream.wait_until(EventType::Discovered, vec!["a"].into()).await.unwrap();
-        event_stream.wait_until(EventType::Destroyed, vec!["a"].into()).await.unwrap();
+        event_stream
+            .wait_until(EventType::Discovered, vec!["a"].try_into().unwrap())
+            .await
+            .unwrap();
+        event_stream.wait_until(EventType::Destroyed, vec!["a"].try_into().unwrap()).await.unwrap();
         nf.await.unwrap();
         assert!(is_child_deleted(&component_root, &component_a).await);
     }
@@ -541,8 +548,8 @@ pub mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         test.model
             .start_instance(&component_a.abs_moniker, &StartReason::Eager)
             .await
@@ -584,9 +591,9 @@ pub mod tests {
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["a"].into()),
-                    Lifecycle::Destroy(vec!["a", "b"].into()),
-                    Lifecycle::Destroy(vec!["a"].into())
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
                 ]
             );
         }
@@ -611,12 +618,12 @@ pub mod tests {
             ("x", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].into()).await;
-        let component_x = test.look_up(vec!["x"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_x = test.look_up(vec!["x"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
@@ -679,14 +686,17 @@ pub mod tests {
             assert_eq!(
                 first,
                 vec![
-                    Lifecycle::Stop(vec!["a", "b", "c"].into()),
-                    Lifecycle::Stop(vec!["a", "b", "d"].into())
+                    Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap())
                 ]
             );
             let next: Vec<_> = events.drain(0..2).collect();
             assert_eq!(
                 next,
-                vec![Lifecycle::Stop(vec!["a", "b"].into()), Lifecycle::Stop(vec!["a"].into())]
+                vec![
+                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                ]
             );
 
             // The leaves could be destroyed in any order.
@@ -695,15 +705,15 @@ pub mod tests {
             assert_eq!(
                 first,
                 vec![
-                    Lifecycle::Destroy(vec!["a", "b", "c"].into()),
-                    Lifecycle::Destroy(vec!["a", "b", "d"].into())
+                    Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a", "b", "d"].try_into().unwrap())
                 ]
             );
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Destroy(vec!["a", "b"].into()),
-                    Lifecycle::Destroy(vec!["a"].into())
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
                 ]
             );
         }
@@ -727,10 +737,10 @@ pub mod tests {
             ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_b2 = test.look_up(vec!["a", "b", "b"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_b2 = test.look_up(vec!["a", "b", "b"].try_into().unwrap()).await;
 
         // Start the second `b`.
         test.model
@@ -785,15 +795,15 @@ pub mod tests {
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["a", "b", "b"].into()),
-                    Lifecycle::Stop(vec!["a", "b"].into()),
-                    Lifecycle::Stop(vec!["a"].into()),
+                    Lifecycle::Stop(vec!["a", "b", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
                     // This component instance is never resolved but we still invoke the Destroy
                     // hook on it.
-                    Lifecycle::Destroy(vec!["a", "b", "b", "b"].into()),
-                    Lifecycle::Destroy(vec!["a", "b", "b"].into()),
-                    Lifecycle::Destroy(vec!["a", "b"].into()),
-                    Lifecycle::Destroy(vec!["a"].into())
+                    Lifecycle::Destroy(vec!["a", "b", "b", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a", "b", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
                 ]
             );
         }
@@ -818,11 +828,11 @@ pub mod tests {
             ("d", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
         test.model
@@ -880,7 +890,8 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            let expected: Vec<_> = vec![Lifecycle::Destroy(vec!["a", "b", "c"].into())];
+            let expected: Vec<_> =
+                vec![Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap())];
             assert_eq!(events, expected);
         }
 
@@ -917,15 +928,15 @@ pub mod tests {
             let mut first: Vec<_> = events.drain(0..2).collect();
             first.sort_unstable();
             let expected: Vec<_> = vec![
-                Lifecycle::Destroy(vec!["a", "b", "c"].into()),
-                Lifecycle::Destroy(vec!["a", "b", "d"].into()),
+                Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Destroy(vec!["a", "b", "d"].try_into().unwrap()),
             ];
             assert_eq!(first, expected);
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Destroy(vec!["a", "b"].into()),
-                    Lifecycle::Destroy(vec!["a"].into())
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
                 ]
             );
         }
@@ -941,17 +952,17 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];
-        let test = ActionsTest::new("root", components, Some(vec![].into())).await;
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
 
         // Create dynamic instance in "coll".
         test.create_dynamic_child("coll", "a").await;
 
         // Start the component so we can witness it getting stopped.
-        test.start(vec!["coll:a"].into()).await;
+        test.start(vec!["coll:a"].try_into().unwrap()).await;
 
         // We're going to run the destroy action for `a` twice. One after the other finishes, so
         // the actions semantics don't dedup them to the same work item.
-        let component_root = test.look_up(vec![].into()).await;
+        let component_root = test.look_up(AbsoluteMoniker::root()).await;
         let destroy_fut_1 = ActionSet::register(
             component_root.clone(),
             DestroyChildAction::new("coll:a".try_into().unwrap(), 1),
@@ -961,7 +972,7 @@ pub mod tests {
             DestroyChildAction::new("coll:a".try_into().unwrap(), 1),
         );
 
-        let component_a = test.look_up(vec!["coll:a"].into()).await;
+        let component_a = test.look_up(vec!["coll:a"].try_into().unwrap()).await;
         assert!(!is_child_deleted(&component_root, &component_a).await);
 
         destroy_fut_1.await.expect("destroy failed");
@@ -969,11 +980,11 @@ pub mod tests {
 
         // Now recreate `a`
         test.create_dynamic_child("coll", "a").await;
-        test.start(vec!["coll:a"].into()).await;
+        test.start(vec!["coll:a"].try_into().unwrap()).await;
 
         // Run the second destroy fut, it should leave the newly created `a` alone
         destroy_fut_2.await.expect("destroy failed");
-        let component_a = test.look_up(vec!["coll:a"].into()).await;
+        let component_a = test.look_up(vec!["coll:a"].try_into().unwrap()).await;
         assert_eq!(get_incarnation_id(&component_root, "coll:a").await, 2);
         assert!(!is_child_deleted(&component_root, &component_a).await);
 
@@ -990,8 +1001,8 @@ pub mod tests {
             assert_eq!(
                 events,
                 vec![
-                    Lifecycle::Stop(vec!["coll:a"].into()),
-                    Lifecycle::Destroy(vec!["coll:a"].into()),
+                    Lifecycle::Stop(vec!["coll:a"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["coll:a"].try_into().unwrap()),
                 ],
             );
         }

@@ -358,7 +358,7 @@ mod tests {
 
         match ActionSet::register(child.clone(), StartAction::new(StartReason::Debug)).await {
             Err(ModelError::InstanceShutDown { moniker: m }) => {
-                assert_eq!(AbsoluteMoniker::from(vec![TEST_CHILD_NAME]), m);
+                assert_eq!(AbsoluteMoniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
             }
             e => panic!("Unexpected result from component start: {:?}", e),
         }
@@ -375,8 +375,8 @@ mod tests {
         assert_eq!(
             events,
             vec![
-                Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].into()),
-                Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].into())
+                Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap()),
+                Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap())
             ]
         );
     }
@@ -462,7 +462,7 @@ mod tests {
         ];
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
 
-        let child = test_topology.look_up(vec![child_name].into()).await;
+        let child = test_topology.look_up(vec![child_name].try_into().unwrap()).await;
 
         (test_topology, child)
     }
@@ -479,7 +479,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn check_should_return_early() {
-        let m = AbsoluteMoniker::from(vec!["foo"]);
+        let m = AbsoluteMoniker::try_from(vec!["foo"]).unwrap();
         let es = ExecutionState::new();
 
         // Checks based on InstanceState:

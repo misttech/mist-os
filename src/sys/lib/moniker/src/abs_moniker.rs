@@ -148,9 +148,11 @@ impl AbsoluteMonikerBase for AbsoluteMoniker {
     }
 }
 
-impl From<Vec<&str>> for AbsoluteMoniker {
-    fn from(rep: Vec<&str>) -> Self {
-        Self::parse(&rep).expect(&format!("absolute moniker failed to parse: {:?}", &rep))
+impl TryFrom<Vec<&str>> for AbsoluteMoniker {
+    type Error = MonikerError;
+
+    fn try_from(rep: Vec<&str>) -> Result<Self, MonikerError> {
+        Self::parse(&rep)
     }
 }
 
@@ -190,7 +192,8 @@ mod tests {
         let root = AbsoluteMoniker::root();
         assert_eq!(true, root.is_root());
         assert_eq!("/", format!("{}", root));
-        assert_eq!(root, AbsoluteMoniker::from(vec![]));
+        assert_eq!(root, AbsoluteMoniker::new(vec![]));
+        assert_eq!(root, AbsoluteMoniker::try_from(vec![]).unwrap());
 
         let m = AbsoluteMoniker::new(vec![
             ChildMoniker::try_new("a", None).unwrap(),
@@ -198,7 +201,7 @@ mod tests {
         ]);
         assert_eq!(false, m.is_root());
         assert_eq!("/a/coll:b", format!("{}", m));
-        assert_eq!(m, AbsoluteMoniker::from(vec!["a", "coll:b"]));
+        assert_eq!(m, AbsoluteMoniker::try_from(vec!["a", "coll:b"]).unwrap());
         assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some("coll"));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("coll:b").unwrap()));
@@ -223,7 +226,7 @@ mod tests {
 
     #[test]
     fn absolute_moniker_descendant() {
-        let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].into();
+        let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].try_into().unwrap();
 
         let relative: RelativeMoniker = vec!["c:test3", "d:test4"].try_into().unwrap();
         let descendant = scope_root.descendant(&relative);

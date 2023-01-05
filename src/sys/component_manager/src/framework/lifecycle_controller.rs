@@ -519,8 +519,10 @@ mod tests {
         });
 
         lifecycle_proxy.resolve(".").await.unwrap().unwrap();
-        let component_a = test_model_result.model.look_up(&vec!["a"].into()).await.unwrap();
-        let component_b = test_model_result.model.look_up(&vec!["a", "b"].into()).await.unwrap();
+        let component_a =
+            test_model_result.model.look_up(&vec!["a"].try_into().unwrap()).await.unwrap();
+        let component_b =
+            test_model_result.model.look_up(&vec!["a", "b"].try_into().unwrap()).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
 

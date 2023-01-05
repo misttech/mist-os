@@ -78,7 +78,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
 
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -143,7 +143,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -208,7 +208,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -273,7 +273,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: None,
@@ -353,7 +353,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -437,7 +437,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.add_subdir_to_data_directory("subdir_1");
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -525,7 +525,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -605,7 +605,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -683,7 +683,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].into(),
+                vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -763,7 +763,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         model.add_subdir_to_data_directory("subdir_1");
         model
             .check_use(
-                vec!["c"].into(),
+                vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -899,7 +899,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].into(),
+                vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -913,7 +913,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c"].into(),
+                vec!["c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/cache".try_into().unwrap(),
                     storage_relation: Some(
@@ -927,7 +927,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "d"].into(),
+                vec!["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -941,7 +941,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             .await;
         model
             .check_use(
-                vec!["c", "d"].into(),
+                vec!["c", "d"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/cache".try_into().unwrap(),
                     storage_relation: Some(
@@ -1005,7 +1005,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: None,
@@ -1061,7 +1061,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: None,
@@ -1115,7 +1115,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: None,
@@ -1195,7 +1195,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: None,
@@ -1268,7 +1268,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
 
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -1368,7 +1368,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         // instance `b` uses instance-id based paths.
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(
@@ -1386,7 +1386,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
         let storage_relation = InstancedRelativeMoniker::try_from(vec!["b:0", "c:0"]).unwrap();
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::Storage {
                     path: "/storage".try_into().unwrap(),
                     storage_relation: Some(storage_relation.clone()),

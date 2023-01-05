@@ -177,6 +177,7 @@ mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints,
         fidl_fuchsia_sys2 as fsys,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         std::{boxed::Box, convert::TryFrom, sync::Arc, time::Duration},
     };
 
@@ -200,11 +201,11 @@ mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Start each component.
-        test.start(vec![].into()).await;
-        let component_a = test.start(vec!["a"].into()).await;
-        let component_b = test.start(vec!["a", "b"].into()).await;
-        let component_c = test.start(vec!["a", "b", "c"].into()).await;
-        let component_d = test.start(vec!["a", "b", "d"].into()).await;
+        test.start(AbsoluteMoniker::root()).await;
+        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.start(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.start(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.start(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Wire up connections to SystemController
         let sys_controller = Box::new(SystemControllerCapabilityProvider::new(
@@ -295,8 +296,8 @@ mod tests {
             let test = ActionsTest::new_with_hooks("root", components, None, vec![hooks_reg]).await;
 
             // Start root and `a`.
-            test.start(vec![].into()).await;
-            let component_a = test.start(vec!["a"].into()).await;
+            test.start(AbsoluteMoniker::root()).await;
+            let component_a = test.start(vec!["a"].try_into().unwrap()).await;
 
             // Wire up connections to SystemController
             let sys_controller = Box::new(SystemControllerCapabilityProvider::new(

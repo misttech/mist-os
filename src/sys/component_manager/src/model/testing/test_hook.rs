@@ -258,12 +258,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_hook_test() {
         let root = AbsoluteMoniker::root();
-        let a: AbsoluteMoniker = vec!["a"].into();
-        let ab: AbsoluteMoniker = vec!["a", "b"].into();
-        let ac: AbsoluteMoniker = vec!["a", "c"].into();
-        let abd: AbsoluteMoniker = vec!["a", "b", "d"].into();
-        let abe: AbsoluteMoniker = vec!["a", "b", "e"].into();
-        let acf: AbsoluteMoniker = vec!["a", "c", "f"].into();
+        let a: AbsoluteMoniker = vec!["a"].try_into().unwrap();
+        let ab: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
+        let ac: AbsoluteMoniker = vec!["a", "c"].try_into().unwrap();
+        let abd: AbsoluteMoniker = vec!["a", "b", "d"].try_into().unwrap();
+        let abe: AbsoluteMoniker = vec!["a", "b", "e"].try_into().unwrap();
+        let acf: AbsoluteMoniker = vec!["a", "c", "f"].try_into().unwrap();
 
         // Try adding parent followed by children then verify the topology string
         // is correct.

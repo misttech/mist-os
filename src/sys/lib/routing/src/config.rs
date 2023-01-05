@@ -1003,7 +1003,7 @@ mod tests {
                         ].iter().cloned())
                         ),
                         (CapabilityAllowlistKey {
-                            source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::from(vec!["foo", "bar"])),
+                            source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap()),
                             source_name: CapabilityName::from("running"),
                             source: CapabilityAllowlistSource::Framework,
                             capability: CapabilityTypeName::Event,

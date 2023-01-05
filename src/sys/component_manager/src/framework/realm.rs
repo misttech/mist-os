@@ -441,7 +441,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client,
         futures::lock::Mutex,
-        moniker::AbsoluteMoniker,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
         std::convert::TryFrom,
@@ -552,7 +552,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec!["system"].into(),
+            vec!["system"].try_into().unwrap(),
         )
         .await;
 
@@ -580,7 +580,7 @@ mod tests {
 
             // Ensure that an event exists for the new child
             event_stream
-                .wait_until(EventType::Discovered, vec!["system", moniker].into())
+                .wait_until(EventType::Discovered, vec!["system", moniker].try_into().unwrap())
                 .await
                 .unwrap();
         }
@@ -620,7 +620,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec!["system"].into(),
+            vec!["system"].try_into().unwrap(),
         )
         .await;
 
@@ -984,7 +984,7 @@ mod tests {
                 ("a", component_decl_with_exposed_binder()),
                 ("b", component_decl_with_exposed_binder()),
             ],
-            vec!["system"].into(),
+            vec!["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1034,9 +1034,12 @@ mod tests {
         fasync::Task::spawn(f).detach();
 
         // The component should be stopped (shut down) before it is destroyed.
-        event_stream.wait_until(EventType::Stopped, vec!["system", "coll:a"].into()).await.unwrap();
         event_stream
-            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].into())
+            .wait_until(EventType::Stopped, vec!["system", "coll:a"].try_into().unwrap())
+            .await
+            .unwrap();
+        event_stream
+            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].try_into().unwrap())
             .await
             .unwrap();
 
@@ -1085,7 +1088,7 @@ mod tests {
                 ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
                 ("system", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
             ],
-            vec!["system"].into(),
+            vec!["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1146,7 +1149,7 @@ mod tests {
                 ("system", ComponentDeclBuilder::new().add_single_run_collection("coll").build()),
                 ("a", component_decl_with_test_runner()),
             ],
-            vec!["system"].into(),
+            vec!["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1161,7 +1164,10 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        event_stream.wait_until(EventType::Started, vec!["system", "coll:a"].into()).await.unwrap();
+        event_stream
+            .wait_until(EventType::Started, vec!["system", "coll:a"].try_into().unwrap())
+            .await
+            .unwrap();
 
         // Started action completes.
 
@@ -1176,7 +1182,7 @@ mod tests {
         child.stop_instance_internal(false, false).await.unwrap();
 
         event_stream
-            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].into())
+            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].try_into().unwrap())
             .await
             .unwrap();
 
@@ -1191,7 +1197,7 @@ mod tests {
         // Create a root component with a collection.
         let mut test = RealmCapabilityTest::new(
             vec![("root", ComponentDeclBuilder::new().add_transient_collection("coll").build())],
-            vec![].into(),
+            AbsoluteMoniker::root(),
         )
         .await;
 
@@ -1241,7 +1247,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec![].into(),
+            AbsoluteMoniker::root(),
         )
         .await;
         let (_event_source, mut event_stream) = test
@@ -1258,14 +1264,16 @@ mod tests {
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
-        let event = event_stream.wait_until(EventType::Resolved, vec!["system"].into()).await;
+        let event =
+            event_stream.wait_until(EventType::Resolved, vec!["system"].try_into().unwrap()).await;
         assert!(event.is_some());
 
         // Assert that event stream doesn't have any outstanding messages.
         // This ensures that EventType::Started for "system" has not been
         // registered.
-        let event =
-            event_stream.wait_until(EventType::Started, vec!["system"].into()).now_or_never();
+        let event = event_stream
+            .wait_until(EventType::Started, vec!["system"].try_into().unwrap())
+            .now_or_never();
         assert!(event.is_none());
 
         // Now that it was asserted that "system:0" has yet to start,
@@ -1273,7 +1281,8 @@ mod tests {
         let echo_proxy =
             client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
                 .expect("failed to open hippo service");
-        let event = event_stream.wait_until(EventType::Started, vec!["system"].into()).await;
+        let event =
+            event_stream.wait_until(EventType::Started, vec!["system"].try_into().unwrap()).await;
         assert!(event.is_some());
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
@@ -1302,7 +1311,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec![].into(),
+            AbsoluteMoniker::root(),
         )
         .await;
 
@@ -1333,14 +1342,17 @@ mod tests {
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
-        let event = event_stream.wait_until(EventType::Resolved, vec!["coll:system"].into()).await;
+        let event = event_stream
+            .wait_until(EventType::Resolved, vec!["coll:system"].try_into().unwrap())
+            .await;
         assert!(event.is_some());
 
         // Assert that event stream doesn't have any outstanding messages.
         // This ensures that EventType::Started for "system" has not been
         // registered.
-        let event =
-            event_stream.wait_until(EventType::Started, vec!["coll:system"].into()).now_or_never();
+        let event = event_stream
+            .wait_until(EventType::Started, vec!["coll:system"].try_into().unwrap())
+            .now_or_never();
         assert!(event.is_none());
 
         // Now that it was asserted that "system" has yet to start,
@@ -1348,7 +1360,9 @@ mod tests {
         let echo_proxy =
             client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
                 .expect("failed to open hippo service");
-        let event = event_stream.wait_until(EventType::Started, vec!["coll:system"].into()).await;
+        let event = event_stream
+            .wait_until(EventType::Started, vec!["coll:system"].try_into().unwrap())
+            .await;
         assert!(event.is_some());
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
@@ -1374,7 +1388,7 @@ mod tests {
                 ("system", component_decl_with_test_runner()),
                 ("unrunnable", component_decl_with_test_runner()),
             ],
-            vec![].into(),
+            AbsoluteMoniker::root(),
         )
         .await;
         test.mock_runner.cause_failure("unrunnable");

@@ -2633,7 +2633,10 @@ pub mod tests {
 
         let model = test.model.clone();
         let (f, bind_handle) = async move {
-            model.start_instance(&vec![].into(), &StartReason::Root).await.expect("failed to bind")
+            model
+                .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
+                .await
+                .expect("failed to bind")
         }
         .remote_handle();
         fasync::Task::spawn(f).detach();
@@ -2680,15 +2683,15 @@ pub mod tests {
             .await
             .expect("couldn't susbscribe to event stream");
 
-        let a_moniker: AbsoluteMoniker = vec!["a"].into();
-        let b_moniker: AbsoluteMoniker = vec!["a", "b"].into();
+        let a_moniker: AbsoluteMoniker = vec!["a"].try_into().unwrap();
+        let b_moniker: AbsoluteMoniker = vec!["a", "b"].try_into().unwrap();
 
         let component_b = test.look_up(b_moniker.clone()).await;
 
         // Start the root so it and its eager children start.
         let _root = test
             .model
-            .start_instance(&vec![].into(), &StartReason::Root)
+            .start_instance(&AbsoluteMoniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
         test.runner
@@ -2740,11 +2743,11 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Resolve each component.
-        test.look_up(vec![].into()).await;
-        let component_a = test.look_up(vec!["a"].into()).await;
-        let component_b = test.look_up(vec!["a", "b"].into()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].into()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].into()).await;
+        test.look_up(AbsoluteMoniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Just unresolve component a and children
         assert_matches!(component_a.unresolve().await, Ok(()));
@@ -2789,7 +2792,7 @@ pub mod tests {
 
         let a_realm = test
             .model
-            .start_instance(&AbsoluteMoniker::from(vec!["a"]), &StartReason::Root)
+            .start_instance(&AbsoluteMoniker::try_from(vec!["a"]).unwrap(), &StartReason::Root)
             .await
             .unwrap();
         assert_eq!(None, a_realm.instance_id());
@@ -2799,7 +2802,13 @@ pub mod tests {
         event_stream: &mut EventStream,
         event_type: EventType,
     ) -> zx::Time {
-        event_stream.wait_until(event_type, vec![].into()).await.unwrap().event.timestamp.clone()
+        event_stream
+            .wait_until(event_type, AbsoluteMoniker::root())
+            .await
+            .unwrap()
+            .event
+            .timestamp
+            .clone()
     }
 
     #[fuchsia::test]
@@ -2975,7 +2984,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
 
-        let test = ActionsTest::new("root", components, Some(vec![].into())).await;
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
 
         test.create_dynamic_child("coll_1", "a").await;
         test.create_dynamic_child_with_args(
@@ -3014,7 +3023,7 @@ pub mod tests {
             availability: Availability::Required,
         });
 
-        let root_component = test.look_up(vec![].into()).await;
+        let root_component = test.look_up(AbsoluteMoniker::root()).await;
 
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");
@@ -3189,7 +3198,7 @@ pub mod tests {
             ("static_child", component_decl_with_test_runner()),
         ];
 
-        let test = ActionsTest::new("root", components, Some(vec![].into())).await;
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(
@@ -3226,7 +3235,7 @@ pub mod tests {
                 .build(),
         )];
 
-        let test = ActionsTest::new("root", components, Some(vec![].into())).await;
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(
@@ -3261,7 +3270,7 @@ pub mod tests {
                 .build(),
         )];
 
-        let test = ActionsTest::new("root", components, Some(vec![].into())).await;
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
 
         let res = test
             .create_dynamic_child_with_args(

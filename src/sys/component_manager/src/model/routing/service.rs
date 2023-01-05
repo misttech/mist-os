@@ -1240,17 +1240,17 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
         let bar_component = test
             .model
-            .look_up(&vec!["coll:bar"].into())
+            .look_up(&vec!["coll:bar"].try_into().unwrap())
             .await
             .expect("failed to find bar instance");
         let baz_component = test
             .model
-            .look_up(&vec!["coll:baz"].into())
+            .look_up(&vec!["coll:baz"].try_into().unwrap())
             .await
             .expect("failed to find baz instance");
 
@@ -1312,7 +1312,7 @@ mod tests {
 
         let baz_component = test
             .model
-            .look_up(&vec!["coll:baz"].into())
+            .look_up(&vec!["coll:baz"].try_into().unwrap())
             .await
             .expect("failed to find baz instance");
         // Test that removal of instances works
@@ -1344,7 +1344,7 @@ mod tests {
 
         let baz_component = test
             .model
-            .look_up(&vec!["coll:baz"].into())
+            .look_up(&vec!["coll:baz"].try_into().unwrap())
             .await
             .expect("failed to find baz instance");
 
@@ -1369,7 +1369,7 @@ mod tests {
 
         let baz_component = test
             .model
-            .look_up(&vec!["coll:baz"].into())
+            .look_up(&vec!["coll:baz"].try_into().unwrap())
             .await
             .expect("failed to find baz instance");
 
@@ -1417,7 +1417,7 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
 
@@ -1494,12 +1494,12 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
         let bar_component = test
             .model
-            .look_up(&vec!["coll:bar"].into())
+            .look_up(&vec!["coll:bar"].try_into().unwrap())
             .await
             .expect("failed to find bar instance");
 
@@ -1563,7 +1563,7 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
 
@@ -1646,7 +1646,7 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
 
@@ -1733,7 +1733,7 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll:foo"].into())
+            .look_up(&vec!["coll:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
 

@@ -219,8 +219,12 @@ mod tests {
 
         // Case 1: The started component's moniker matches the allowlist entry above.
         let url = "xxx://test";
-        let _task_scope =
-            start_component_through_hooks(&hooks, AbsoluteMoniker::from(vec!["foo"]), url).await?;
+        let _task_scope = start_component_through_hooks(
+            &hooks,
+            AbsoluteMoniker::try_from(vec!["foo"]).unwrap(),
+            url,
+        )
+        .await?;
         runner.wait_for_url(&url).await;
         let checker = runner.last_checker().expect("No PolicyChecker held by MockRunner");
         assert_matches!(checker.ambient_mark_vmo_exec_allowed(), Ok(()));
@@ -302,7 +306,7 @@ mod tests {
             .await;
 
         // Bind the root component.
-        universe.start_instance(&vec![].into()).await.expect("bind failed");
+        universe.start_instance(&AbsoluteMoniker::root()).await.expect("bind failed");
 
         // Ensure the instance starts up.
         mock_runner.wait_for_url("test:///a_resolved").await;
@@ -342,7 +346,7 @@ mod tests {
             .await;
 
         // Bind the child component.
-        universe.start_instance(&vec!["b"].into()).await.expect("bind failed");
+        universe.start_instance(&vec!["b"].try_into().unwrap()).await.expect("bind failed");
 
         // Ensure the instances started up.
         mock_runner.wait_for_urls(&["test:///b_resolved"]).await;

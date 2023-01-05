@@ -164,68 +164,71 @@ mod tests {
 
     #[test]
     fn relative_monikers_scope_down() {
-        let me =
-            RelativeMoniker::scope_down::<AbsoluteMoniker>(&vec![].into(), &vec![].into()).unwrap();
+        let me = RelativeMoniker::scope_down::<AbsoluteMoniker>(
+            &AbsoluteMoniker::root(),
+            &AbsoluteMoniker::root(),
+        )
+        .unwrap();
         assert_eq!(true, me.is_self());
         assert_eq!(".", format!("{}", me));
 
         let me = RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a:test1", "b:test2", "c:test3"].into(),
-            &vec!["a:test1", "b:test2", "c:test3"].into(),
+            &vec!["a:test1", "b:test2", "c:test3"].try_into().unwrap(),
+            &vec!["a:test1", "b:test2", "c:test3"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(true, me.is_self());
         assert_eq!(".", format!("{}", me));
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a:test1", "b:test2"].into(),
-            &vec![].into(),
+            &vec!["a:test1", "b:test2"].try_into().unwrap(),
+            &AbsoluteMoniker::root(),
         )
         .unwrap_err();
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a:test1", "b:test2", "c:test3", "d:test4"].into(),
-            &vec!["a:test1", "b:test2"].into(),
+            &vec!["a:test1", "b:test2", "c:test3", "d:test4"].try_into().unwrap(),
+            &vec!["a:test1", "b:test2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         let descendant = RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec![].into(),
-            &vec!["a:test1", "b:test2"].into(),
+            &AbsoluteMoniker::root(),
+            &vec!["a:test1", "b:test2"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
         assert_eq!("./a:test1/b:test2", format!("{}", descendant));
 
         let descendant = RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a:test1", "b:test2"].into(),
-            &vec!["a:test1", "b:test2", "c:test3", "d:test4"].into(),
+            &vec!["a:test1", "b:test2"].try_into().unwrap(),
+            &vec!["a:test1", "b:test2", "c:test3", "d:test4"].try_into().unwrap(),
         )
         .unwrap();
         assert_eq!(false, descendant.is_self());
         assert_eq!("./c:test3/d:test4", format!("{}", descendant));
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a:test1"].into(),
-            &vec!["b:test2"].into(),
+            &vec!["a:test1"].try_into().unwrap(),
+            &vec!["b:test2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["c:test3", "a:test1"].into(),
-            &vec!["c:test3", "b:test2"].into(),
+            &vec!["c:test3", "a:test1"].try_into().unwrap(),
+            &vec!["c:test3", "b:test2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["a0:test1", "a:test1"].into(),
-            &vec!["b0:test2", "b:test2"].into(),
+            &vec!["a0:test1", "a:test1"].try_into().unwrap(),
+            &vec!["b0:test2", "b:test2"].try_into().unwrap(),
         )
         .unwrap_err();
 
         RelativeMoniker::scope_down::<AbsoluteMoniker>(
-            &vec!["c:test3", "d:test4", "a0:test1", "a:test1"].into(),
-            &vec!["c:test3", "d:test4", "b0:test2", "b:test2"].into(),
+            &vec!["c:test3", "d:test4", "a0:test1", "a:test1"].try_into().unwrap(),
+            &vec!["c:test3", "d:test4", "b0:test2", "b:test2"].try_into().unwrap(),
         )
         .unwrap_err();
     }
@@ -261,8 +264,8 @@ mod tests {
 
     #[test]
     fn descendant_scope_down() {
-        let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].into();
-        let scope_child = vec!["a:test1", "b:test2", "c:test3", "d:test4"].into();
+        let scope_root: AbsoluteMoniker = vec!["a:test1", "b:test2"].try_into().unwrap();
+        let scope_child = vec!["a:test1", "b:test2", "c:test3", "d:test4"].try_into().unwrap();
 
         let relative =
             RelativeMoniker::scope_down::<AbsoluteMoniker>(&scope_root, &scope_child).unwrap();

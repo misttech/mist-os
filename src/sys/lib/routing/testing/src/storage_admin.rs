@@ -8,6 +8,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     std::{
         convert::{TryFrom, TryInto},
         marker::PhantomData,
@@ -97,7 +98,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].into(),
+                vec!["c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -181,7 +182,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b", "c"].into(),
+                vec!["b", "c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -279,7 +280,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         ];
         let test = T::new("a", components).build().await;
         test.check_use(
-            vec!["b"].into(),
+            vec!["b"].try_into().unwrap(),
             CheckUse::StorageAdmin {
                 storage_relation: InstancedRelativeMoniker::try_from(vec!["d:0"]).unwrap(),
                 from_cm_namespace: false,
@@ -348,7 +349,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec![].into(),
+                AbsoluteMoniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -419,7 +420,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec![].into(),
+                AbsoluteMoniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -485,7 +486,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -586,7 +587,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["d:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -656,7 +657,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec![].into(),
+                AbsoluteMoniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -720,7 +721,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["b:0"]).unwrap(),
                     from_cm_namespace: false,
@@ -819,7 +820,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].into(),
+                vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: InstancedRelativeMoniker::try_from(vec!["d:0"]).unwrap(),
                     from_cm_namespace: false,

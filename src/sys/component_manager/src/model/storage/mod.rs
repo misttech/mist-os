@@ -493,8 +493,11 @@ mod tests {
             ),
         ];
         let test = RoutingTest::new("a", components).await;
-        let b_component =
-            test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
+        let b_component = test
+            .model
+            .look_up(&vec!["b"].try_into().unwrap())
+            .await
+            .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
@@ -577,8 +580,11 @@ mod tests {
             ),
         ];
         let test = RoutingTest::new("a", components).await;
-        let b_component =
-            test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
+        let b_component = test
+            .model
+            .look_up(&vec!["b"].try_into().unwrap())
+            .await
+            .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
@@ -696,8 +702,11 @@ mod tests {
             ),
         ];
         let test = RoutingTest::new("a", components).await;
-        let b_component =
-            test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
+        let b_component = test
+            .model
+            .look_up(&vec!["b"].try_into().unwrap())
+            .await
+            .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
         let parent_moniker = InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
@@ -821,8 +830,11 @@ mod tests {
             ),
         ];
         let test = RoutingTest::new("a", components).await;
-        let b_component =
-            test.model.look_up(&vec!["b"].into()).await.expect("failed to find component for b:0");
+        let b_component = test
+            .model
+            .look_up(&vec!["b"].try_into().unwrap())
+            .await
+            .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));

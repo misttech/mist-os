@@ -195,7 +195,7 @@ mod tests {
         fidl::{client::Client, handle::AsyncChannel},
         fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
-        moniker::AbsoluteMoniker,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         std::path::PathBuf,
     };
 
@@ -260,11 +260,11 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let (_client_end, mut server_end) = zx::Channel::create();
-        let moniker: AbsoluteMoniker = vec!["source"].into();
+        let moniker: AbsoluteMoniker = vec!["source"].try_into().unwrap();
 
         let task_scope = TaskScope::new();
         fixture
-            .provider(moniker.clone(), vec!["target"].into())
+            .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
             .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server_end)
             .await
@@ -288,11 +288,11 @@ mod tests {
         )])
         .await;
         let (client_end, mut server_end) = zx::Channel::create();
-        let moniker: AbsoluteMoniker = vec!["foo"].into();
+        let moniker: AbsoluteMoniker = vec!["foo"].try_into().unwrap();
 
         let task_scope = TaskScope::new();
         fixture
-            .provider(moniker, vec![].into())
+            .provider(moniker, AbsoluteMoniker::root())
             .await
             .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server_end)
             .await
