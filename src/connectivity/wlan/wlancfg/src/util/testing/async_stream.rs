@@ -65,7 +65,7 @@ mod tests {
         // You can pass in a reference to the future
         let result_fut = future::ready(1);
         pin_mut!(result_fut);
-        let result = run_while(&mut exec, &mut neverending_background_fut, &mut result_fut);
+        let result = run_while(&mut exec, &mut neverending_background_fut, result_fut);
         assert_eq!(result, 1);
     }
 }

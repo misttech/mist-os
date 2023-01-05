@@ -890,7 +890,7 @@ mod tests {
             .unwrap();
 
         // set it to write a manifest, with file-relative paths.
-        builder.manifest_path(&manifest_path);
+        builder.manifest_path(manifest_path);
         builder.manifest_blobs_relative_to(RelativeTo::File);
 
         // Build the package

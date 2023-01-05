@@ -112,7 +112,7 @@ pub fn construct_zbi(
     });
 
     // Create an output manifest that describes the contents of the built ZBI.
-    zbi_builder.set_output_manifest(&gendir.as_ref().join("zbi.json"));
+    zbi_builder.set_output_manifest(gendir.as_ref().join("zbi.json"));
 
     // Build and return the ZBI.
     let zbi_path = outdir.as_ref().join(format!("{}.zbi", zbi_config.name));
