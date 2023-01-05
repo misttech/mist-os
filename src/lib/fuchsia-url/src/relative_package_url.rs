@@ -38,7 +38,9 @@ impl RelativePackageUrl {
     /// Parse a relative package URL.
     pub fn parse(url: &str) -> Result<Self, ParseError> {
         let parts = UrlParts::parse(url)?;
-        Ok(Self::from_parts(parts)?)
+        let relative_package_url = Self::from_parts(parts)?;
+        let () = crate::validate_inverse_relative_url(url)?;
+        Ok(relative_package_url)
     }
 }
 
@@ -110,11 +112,18 @@ mod tests {
             ("fuchsia-pkg://name", ParseError::CannotContainScheme),
             ("fuchsia-pkg:///name", ParseError::CannotContainScheme),
             ("//example.org/name", ParseError::HostMustBeEmpty),
-            ("///name", ParseError::HostMustBeEmpty),
+            (
+                "///name",
+                ParseError::InvalidRelativePath("///name".to_string(), Some("name".to_string())),
+            ),
             ("example.org/name", ParseError::RelativePathCannotSpecifyVariant),
             ("fuchsia-pkg://example.org/name", ParseError::CannotContainScheme),
             ("name/variant", ParseError::RelativePathCannotSpecifyVariant),
             ("name#resource", ParseError::CannotContainResource),
+            (
+                "/name",
+                ParseError::InvalidRelativePath("/name".to_string(), Some("name".to_string())),
+            ),
             (".", ParseError::MissingName),
             ("..", ParseError::MissingName),
             (
@@ -125,17 +134,17 @@ mod tests {
             assert_matches!(
                 RelativePackageUrl::parse(url),
                 Err(e) if e == err,
-                "the url {:?}", url
+                "the url {:?}, expected: {:?}", url, err
             );
             assert_matches!(
                 url.parse::<RelativePackageUrl>(),
                 Err(e) if e == err,
-                "the url {:?}", url
+                "the url {:?}, expected: {:?}", url, err
             );
             assert_matches!(
                 RelativePackageUrl::try_from(url),
                 Err(e) if e == err,
-                "the url {:?}", url
+                "the url {:?}, expected: {:?}", url, err
             );
             assert_matches!(
                 serde_json::from_str::<RelativePackageUrl>(url),
@@ -148,7 +157,7 @@ mod tests {
 
     #[test]
     fn parse_ok() {
-        for url in ["name", "other3-name", "/name"] {
+        for url in ["name", "other3-name"] {
             let normalized_url = url.trim_start_matches('/');
             let json_url = format!("\"{url}\"");
             let normalized_json_url = format!("\"{normalized_url}\"");

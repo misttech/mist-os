@@ -5951,11 +5951,22 @@ mod tests {
                 "children": [
                     {
                         "name": "logger",
-                        "url": "my+awesome-scheme.2://abc123!@#$%.com",
+                        "url": "my+awesome-scheme.2://abc123!@$%.com",
                     },
                 ]
             }),
             Ok(())
+        ),
+        test_cml_url_host_pound_invalid(
+            json!({
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "my+awesome-scheme.2://abc123!@#$%.com",
+                    },
+                ]
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"my+awesome-scheme.2://abc123!@#$%.com\", expected a valid URL"
         ),
         test_cml_url_invalid(
             json!({

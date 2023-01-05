@@ -96,6 +96,9 @@ pub enum ParseError {
     #[error("relative path URL cannot specify a variant")]
     RelativePathCannotSpecifyVariant,
 
+    #[error("relative URL could not be parsed into a relative package path, Some({0:?}) != {1:?}")]
+    InvalidRelativePath(String, Option<String>),
+
     #[error(
         "relative URL with absolute path is not supported (relative path cannot start with `/`)"
     )]

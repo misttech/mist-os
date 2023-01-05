@@ -62,7 +62,7 @@ fn construct_codesearch_url(component_url: &str) -> String {
     let mut code_search_url = Url::parse("https://cs.opensource.google/search").unwrap();
     code_search_url.query_pairs_mut().append_pair("q", &query).append_pair("ss", "fuchsia/fuchsia");
 
-    code_search_url.into_string()
+    code_search_url.into()
 }
 
 async fn graph_impl<W: std::io::Write>(

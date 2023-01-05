@@ -427,7 +427,10 @@ impl Url {
             }
         }) {
             Ok((url, is_relative)) => {
-                let path = &url.path()[1..]; // skip leading "/"
+                let mut path = url.path();
+                if path.starts_with('/') {
+                    path = &path[1..];
+                }
                 if is_relative && path.contains("://") {
                     return Err(ParseError::InvalidComponentUrl {
                         details: "Invalid scheme".to_string(),

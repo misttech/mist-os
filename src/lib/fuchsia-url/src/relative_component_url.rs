@@ -26,7 +26,9 @@ impl RelativeComponentUrl {
 
     /// Parse a relative component URL.
     pub fn parse(url: &str) -> Result<Self, ParseError> {
-        Self::from_parts(UrlParts::parse(url)?)
+        let relative_component_url = Self::from_parts(UrlParts::parse(url)?)?;
+        let () = crate::validate_inverse_relative_url(url)?;
+        Ok(relative_component_url)
     }
 
     /// The package URL of this URL (this URL without the resource path).
@@ -104,7 +106,13 @@ mod tests {
             ("fuchsia-pkg:///name#resource", ParseError::CannotContainScheme),
             ("fuchsia-pkg://name#resource", ParseError::CannotContainScheme),
             ("//example.org/name#resource", ParseError::HostMustBeEmpty),
-            ("///name#resource", ParseError::HostMustBeEmpty),
+            (
+                "///name#resource",
+                ParseError::InvalidRelativePath(
+                    "///name#resource".to_string(),
+                    Some("name#resource".to_string()),
+                ),
+            ),
             (
                 "nAme#resource",
                 ParseError::InvalidPathSegment(PackagePathSegmentError::InvalidCharacter {
@@ -120,6 +128,13 @@ mod tests {
                 "name#resource/",
                 ParseError::InvalidResourcePath(ResourcePathError::PathEndsWithSlash),
             ),
+            (
+                "/name#resource",
+                ParseError::InvalidRelativePath(
+                    "/name#resource".to_string(),
+                    Some("name#resource".to_string()),
+                ),
+            ),
             ("name#..", ParseError::InvalidResourcePath(ResourcePathError::NameIsDotDot)),
             (
                 "name#resource%00",
@@ -131,20 +146,20 @@ mod tests {
             assert_matches!(
                 RelativeComponentUrl::parse(url),
                 Err(e) if e == err,
-                "the url {:?}",
-                url
+                "the url {:?}; expected = {:?}",
+                url, err
             );
             assert_matches!(
                 url.parse::<RelativeComponentUrl>(),
                 Err(e) if e == err,
-                "the url {:?}",
-                url
+                "the url {:?}; expected = {:?}",
+                url, err
             );
             assert_matches!(
                 RelativeComponentUrl::try_from(url),
                 Err(e) if e == err,
-                "the url {:?}",
-                url
+                "the url {:?}; expected = {:?}",
+                url, err
             );
             assert_matches!(
                 serde_json::from_str::<RelativeComponentUrl>(url),
@@ -157,11 +172,9 @@ mod tests {
 
     #[test]
     fn parse_ok() {
-        for (url, package, resource) in [
-            ("name#resource", "name", "resource"),
-            ("name#reso%09urce", "name", "reso\turce"),
-            ("/name#resource", "name", "resource"),
-        ] {
+        for (url, package, resource) in
+            [("name#resource", "name", "resource"), ("name#reso%09urce", "name", "reso\turce")]
+        {
             let normalized_url = url.trim_start_matches('/');
             let json_url = format!("\"{url}\"");
             let normalized_json_url = format!("\"{normalized_url}\"");

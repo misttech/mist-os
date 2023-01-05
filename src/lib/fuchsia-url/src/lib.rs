@@ -35,11 +35,20 @@ pub use crate::{
 
 use {
     crate::host::Host,
+    lazy_static::lazy_static,
     percent_encoding::{AsciiSet, CONTROLS},
 };
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+
+const RELATIVE_SCHEME: &'static str = "relative";
+
+lazy_static! {
+    /// A default base URL from which to parse relative component URL
+    /// components.
+    static ref RELATIVE_BASE: url::Url = url::Url::parse(&format!("{RELATIVE_SCHEME}:///")).unwrap();
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Scheme {
@@ -69,9 +78,7 @@ impl UrlParts {
                 }),
                 url,
             ),
-            Err(url::ParseError::RelativeUrlWithoutBase) => {
-                (None, url::Url::parse("relative://")?.join(input)?)
-            }
+            Err(url::ParseError::RelativeUrlWithoutBase) => (None, RELATIVE_BASE.join(input)?),
             Err(e) => Err(e)?,
         };
 
@@ -93,8 +100,8 @@ impl UrlParts {
             .map(|s| Host::parse(s.to_string()))
             .transpose()?;
 
-        let () = validate_path(url.path())?;
-        let path = url.path().to_string();
+        let path = String::from(if url.path().is_empty() { "/" } else { url.path() });
+        let () = validate_path(&path)?;
 
         let hash = parse_query_pairs(url.query_pairs())?;
 
@@ -115,6 +122,18 @@ impl UrlParts {
         };
 
         Ok(Self { scheme, host, path, hash, resource })
+    }
+}
+
+/// After all other checks, ensure the input string does not change when joined
+/// with the `RELATIVE_BASE` URL, and then removing the base (inverse-join()).
+fn validate_inverse_relative_url(input: &str) -> Result<(), ParseError> {
+    let relative_url = RELATIVE_BASE.join(input)?;
+    let unbased = RELATIVE_BASE.make_relative(&relative_url);
+    if Some(input) == unbased.as_deref() {
+        Ok(())
+    } else {
+        Err(ParseError::InvalidRelativePath(input.to_string(), unbased))?
     }
 }
 
@@ -226,6 +245,76 @@ mod test_validate_path {
     fn success() {
         for path in ["/", "/name", "/name/other", "/name/other/more"] {
             let () = validate_path(path).unwrap();
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_validate_inverse_relative_url {
+    use {super::*, assert_matches::assert_matches};
+
+    macro_rules! test_err {
+        (
+            $(
+                $test_name:ident => {
+                    path = $path:expr,
+                    some_unbased = $some_unbased:expr,
+                }
+            )+
+        ) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    let err = ParseError::InvalidRelativePath(
+                        $path.to_string(),
+                        $some_unbased.map(|s: &str| s.to_string()),
+                    );
+                    assert_matches!(
+                        validate_inverse_relative_url($path),
+                        Err(e) if e == err,
+                        "the url {:?}; expected = {:?}",
+                        $path, err
+                    );
+                }
+            )+
+        }
+    }
+
+    test_err! {
+        err_slash_prefix => {
+            path = "/name",
+            some_unbased = Some("name"),
+        }
+        err_three_slashes_prefix => {
+            path = "///name",
+            some_unbased = Some("name"),
+        }
+        err_slash_prefix_with_resource => {
+            path = "/name#resource",
+            some_unbased = Some("name#resource"),
+        }
+        err_three_slashes_prefix_and_resource => {
+            path = "///name#resource",
+            some_unbased = Some("name#resource"),
+        }
+        err_masks_host_must_be_empty_err => {
+            path = "//example.org/name",
+            some_unbased = None,
+        }
+        err_dot_masks_missing_name_err => {
+            path = ".",
+            some_unbased = Some(""),
+        }
+        err_dot_dot_masks_missing_name_err => {
+            path = "..",
+            some_unbased = Some(""),
+        }
+    }
+
+    #[test]
+    fn success() {
+        for path in ["name", "other3-name", "name#resource", "name#reso%09urce"] {
+            let () = validate_inverse_relative_url(path).unwrap();
         }
     }
 }
@@ -400,6 +489,10 @@ mod test_url_parts {
             url = "fuchsia-pkg://example.org/name#resource%00",
             err = ParseError::InvalidResourcePath(ResourcePathError::NameContainsNull),
         }
+        err_resource_unencoded_null => {
+            url =  "fuchsia-pkg://example.org/name#reso\x00urce",
+            err = ParseError::InvalidResourcePath(ResourcePathError::NameContainsNull),
+        }
     }
 
     macro_rules! test_parse_ok {
@@ -499,14 +592,6 @@ mod test_url_parts {
             path = "/",
             hash = None,
             resource = Some("resource/again/third".into()),
-        }
-        ok_resource_ignores_null => {
-            url =  "fuchsia-pkg://#reso\x00urce",
-            scheme = Some(Scheme::FuchsiaPkg),
-            host = None,
-            path = "/",
-            hash = None,
-            resource = Some("resource".into()),
         }
         ok_resource_encoded_control_character => {
             url =  "fuchsia-pkg://#reso%09urce",

@@ -73,7 +73,10 @@ mod tests {
             );
         }
 
-        assert_eq!(Host::parse("".into()), Err(ParseError::EmptyHost));
+        assert_eq!(
+            Host::parse("".into()),
+            Err(ParseError::UrlParseError(url::ParseError::EmptyHost))
+        );
     }
 
     #[test]

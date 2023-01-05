@@ -351,7 +351,7 @@ impl ComponentAddress {
             mod_url.set_query(None);
             mod_url.set_fragment(None);
             let mod_url_str = &mod_url.to_string();
-            Some(mod_url_str[mod_url.scheme().len() + 3..mod_url_str.len() - 1].to_owned())
+            Some(mod_url_str[mod_url.scheme().len() + 3..mod_url_str.len()].to_owned())
         } else {
             None
         };
@@ -924,7 +924,7 @@ mod tests {
         assert_eq!(address.authority(), Some("b"));
         assert_eq!(address.authority_or_empty_str(), "b");
         assert_eq!(address.scheme(), "base");
-        assert_eq!(address.path(), "/");
+        assert_eq!(address.path(), "");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), None);
         assert_eq!(address.original_url(), Some("base://b"));

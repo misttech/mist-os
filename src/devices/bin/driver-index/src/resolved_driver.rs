@@ -51,7 +51,7 @@ impl ResolvedDriver {
     pub fn get_libname(&self) -> String {
         let mut libname = self.component_url.clone();
         libname.set_fragment(self.v1_driver_path.as_deref());
-        libname.into_string()
+        libname.into()
     }
 
     pub async fn resolve(
@@ -80,7 +80,7 @@ impl ResolvedDriver {
             map_resolve_err_to_zx_status(e)
         })?;
         let package_hash = resolver
-            .get_hash(&mut fpkg::PackageUrl { url: base_url.into_string() })
+            .get_hash(&mut fpkg::PackageUrl { url: base_url.into() })
             .map_err(|e| {
                 log::warn!("Failed to send GetHash request: {}", e);
                 fuchsia_zircon::Status::INTERNAL

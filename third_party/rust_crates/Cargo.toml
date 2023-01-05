@@ -225,7 +225,7 @@ type_hash_macros = "0.3.0"
 type_hash = "0.3.0"
 unicase = "2.2.0"
 untrusted = "0.7.1"
-url = "2.1"
+url = "2.3"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = { path = "forks/valico" }
 vte = "0.3"

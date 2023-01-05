@@ -447,7 +447,7 @@ mod tests {
         // url
         test_identifier_url_valid => {
             check_fn = check_url,
-            input = "my+awesome-scheme.2://abc123!@#$%.com",
+            input = "my+awesome-scheme.2://abc123!@$%.com",
             result = Ok(()),
         },
         test_host_path_url_valid => {
@@ -474,6 +474,11 @@ mod tests {
             check_fn = check_url,
             input = "path/segments#meta/comp.cm",
             result = Ok(()),
+        },
+        test_identifier_url_host_pound_invalid => {
+            check_fn = check_url,
+            input = "my+awesome-scheme.2://abc123!@#$%.com",
+            result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo", "\"my+awesome-scheme.2://abc123!@#$%.com\": Malformed URL: EmptyHost.")])),
         },
         test_relative_path_url_without_resource_invalid => {
             check_fn = check_url,

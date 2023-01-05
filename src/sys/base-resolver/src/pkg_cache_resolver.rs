@@ -155,10 +155,10 @@ async fn resolve_pkg_cache(
     };
 
     Ok(fresolution::Component {
-        url: Some(fuchsia_pkg_cache_component_url().clone().into_string()),
+        url: Some(fuchsia_pkg_cache_component_url().clone().into()),
         decl: Some(data),
         package: Some(fresolution::Package {
-            url: Some(fuchsia_pkg_cache_package_url().clone().into_string()),
+            url: Some(fuchsia_pkg_cache_package_url().clone().into()),
             directory: Some(ClientEnd::new(
                 proxy
                     .into_channel()

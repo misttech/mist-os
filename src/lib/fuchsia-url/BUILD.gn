@@ -12,6 +12,7 @@ rustc_library("fuchsia-url") {
 
   deps = [
     "//src/sys/pkg/lib/fuchsia-hash",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:percent-encoding",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:serde",

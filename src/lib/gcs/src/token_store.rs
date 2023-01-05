@@ -127,7 +127,7 @@ impl TokenStore {
     /// desired (e.g. follow redirects).
     async fn send_request(&self, https_client: &HttpsClient, url: Url) -> Result<Response<Body>> {
         tracing::debug!("https_client.request {:?}", url);
-        let req = Request::builder().method(Method::GET).uri(url.into_string());
+        let req = Request::builder().method(Method::GET).uri::<String>(url.into());
         let req = self.maybe_authorize(req).await.context("authorizing in send_request")?;
         let req = req.body(Body::empty()).context("creating request body")?;
         let auth_used = req.headers().contains_key("Authorization");

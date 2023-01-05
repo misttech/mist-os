@@ -1342,14 +1342,14 @@ mod tests {
     #[fuchsia::test]
     async fn check_resolver_from_builtin_environment_not_found() {
         let a_url = make_test_url("a");
-        let b_url = format!("{}://b/", BOOT_SCHEME);
+        let b_url = format!("{}:///b", BOOT_SCHEME);
 
         let components = vec![
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
                     .add_child(
-                        ChildDeclBuilder::new().name("b").url(&format!("{}://b", BOOT_SCHEME)),
+                        ChildDeclBuilder::new().name("b").url(&format!("{}:///b", BOOT_SCHEME)),
                     )
                     .build(),
             ),

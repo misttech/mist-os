@@ -1095,7 +1095,7 @@ group("untrusted") {
 }
 
 group("url") {
-  public_deps = [ ":url-v2_1_0" ]
+  public_deps = [ ":url-v2_3_1" ]
 }
 
 group("utf8parse") {
@@ -4201,6 +4201,28 @@ rust_library("fnv-v1_0_7") {
   visibility = [ ":*" ]
 }
 
+rust_library("form_urlencoded-v1_1_0") {
+  crate_name = "form_urlencoded"
+  crate_root =
+      "//third_party/rust_crates/vendor/form_urlencoded-1.1.0/src/lib.rs"
+  output_name = "form_urlencoded-936a3ec4100fa350"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":percent-encoding-v2_2_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=936a3ec4100fa350",
+    "-Cextra-filename=-936a3ec4100fa350",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("fragile-v1_0_0") {
   crate_name = "fragile"
   crate_root = "//third_party/rust_crates/vendor/fragile-1.0.0/src/lib.rs"
@@ -5272,6 +5294,28 @@ rust_library("idna-v0_2_3") {
     "--edition=2018",
     "-Cmetadata=22cfd0b478d3e8bd",
     "-Cextra-filename=-22cfd0b478d3e8bd",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("idna-v0_3_0") {
+  crate_name = "idna"
+  crate_root = "//third_party/rust_crates/vendor/idna-0.3.0/src/lib.rs"
+  output_name = "idna-682e58f626eba0bb"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":unicode-bidi-v0_3_4" ]
+  deps += [ ":unicode-normalization-v0_1_19" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=682e58f626eba0bb",
+    "-Cextra-filename=-682e58f626eba0bb",
   ]
 
   visibility = [ ":*" ]
@@ -8011,7 +8055,7 @@ rust_library("publicsuffix-v1_5_4") {
   deps += [ ":idna-v0_2_3" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":regex-v1_5_6" ]
-  deps += [ ":url-v2_1_0" ]
+  deps += [ ":url-v2_3_1" ]
 
   rustenv = []
 
@@ -11385,7 +11429,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   deps += [ ":thiserror-v1_0_23" ]
   deps += [ ":tinyvec-v1_3_1" ]
   deps += [ ":tracing-v0_1_34" ]
-  deps += [ ":url-v2_1_0" ]
+  deps += [ ":url-v2_3_1" ]
 
   rustenv = []
 
@@ -11498,7 +11542,7 @@ rust_library("tuf-v0_3_0-beta11") {
   deps += [ ":tempfile-v3_2_0" ]
   deps += [ ":thiserror-v1_0_23" ]
   deps += [ ":untrusted-v0_7_1" ]
-  deps += [ ":url-v2_1_0" ]
+  deps += [ ":url-v2_3_1" ]
 
   rustenv = []
 
@@ -12093,24 +12137,25 @@ rust_library("url-v1_7_2") {
   visibility += [ "//build/sdk/meta:*" ]
 }
 
-rust_library("url-v2_1_0") {
+rust_library("url-v2_3_1") {
   crate_name = "url"
-  crate_root = "//third_party/rust_crates/vendor/url-2.1.0/src/lib.rs"
-  output_name = "url-10398e48bf00aca4"
+  crate_root = "//third_party/rust_crates/vendor/url-2.3.1/src/lib.rs"
+  output_name = "url-e3e32e41f41a4ac0"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":idna-v0_2_3" ]
-  deps += [ ":matches-v0_1_9" ]
+  deps += [ ":form_urlencoded-v1_1_0" ]
+  deps += [ ":idna-v0_3_0" ]
   deps += [ ":percent-encoding-v2_2_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=10398e48bf00aca4",
-    "-Cextra-filename=-10398e48bf00aca4",
+    "--edition=2018",
+    "-Cmetadata=e3e32e41f41a4ac0",
+    "-Cextra-filename=-e3e32e41f41a4ac0",
+    "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
