@@ -161,11 +161,11 @@ impl TaskGroup {
             match state {
                 TaskGroupState::Cancelled => Err(TaskGroupError::AlreadyCancelled),
                 TaskGroupState::Active { cancel_sender, tasks, children } => {
-                    children.iter().for_each(|child| {
-                        #[allow(unknown_lints)]
-                        #[allow(clippy::let_underscore_future)]
-                        // TODO(fxbug.dev/117901)
-                        let _ = child.cancel_no_wait();
+                    children.into_iter().for_each(|child| {
+                        fasync::Task::spawn(async move {
+                            let _ = child.cancel_no_wait().await;
+                        })
+                        .detach();
                     });
                     let _ = cancel_sender.send(());
                     // Forget the remote handle, allowing the tasks to continue running after
