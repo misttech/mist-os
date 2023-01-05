@@ -5,22 +5,24 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMAR_LOADER_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMAR_LOADER_H_
 
-#include <lib/stdcompat/bit.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 
-#include "diagnostics.h"
 #include "memory.h"
 #include "zircon.h"
 
 namespace elfldltl {
 
-/// This object encapsulates the work needed to load an object into a VMAR.
-/// The Load function initializes the object state, and no functions should be called
-/// unless Load returns successfully.
+/// This object encapsulates the work needed to load an object into a VMAR
+/// based on an elfldltl::LoadInfo struct (see load.h) previously populated
+/// from program headers.  The Load method does the loading and initializes
+/// the VmarLoader object's state.  If Load fails, then the object should be
+/// destroyed without calling other methods.
 class VmarLoader {
  public:
-  // TODO(91206): Enable root VMAR being specified out of process.
+  // TODO(fxbug.dev/91206): Enable root VMAR being specified out of process.
   explicit VmarLoader(const zx::vmar& vmar = *zx::vmar::root_self()) : vmar_(vmar.borrow()) {}
 
   ~VmarLoader() {
@@ -43,8 +45,8 @@ class VmarLoader {
   // mapping.
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
-    auto base_name_array = VmarLoader::GetVmoName(vmo->borrow());
-    std::string_view base_name = std::string_view(base_name_array.data());
+    VmoName base_name_storage = VmarLoader::GetVmoName(vmo->borrow());
+    std::string_view base_name = std::string_view(base_name_storage.data());
 
     // Allocate the child VMAR from the root VMAR and instantiate the direct memory.
     zx_status_t status = AllocateVmar(load_info.vaddr_size(), load_info.vaddr_start());
@@ -67,7 +69,7 @@ class VmarLoader {
     //    * Mapping file pages up to the last full page of file data.
     //    * Mapping anonymous pages, including the intersecting page, to the end of the segment.
     //
-    // TODO(91206): Support mapping objects into VMAR from out of process.
+    // TODO(fxbug.dev/91206): Support mapping objects into VMAR from out of process.
     //
     // After the second mapping, the VmarLoader then reads in the partial file data into the
     // intersecting page.
@@ -140,7 +142,7 @@ class VmarLoader {
   // destruction or after Commit(). If Commit() has been called before destruction then the
   // address range will continue to be usable, in which case one should save the object's
   // image() before Commit().
-  // TODO(91206): This API will not make sense once we support out of process loading.
+  // TODO(fxbug.dev/91206): This API will not make sense once we support out of process loading.
   DirectMemory& memory() { return memory_; }
 
   // Commit is used to keep the mapping created by Load around even after the VmarLoader object is
@@ -152,10 +154,8 @@ class VmarLoader {
   }
 
  private:
-  static constexpr std::string_view kVmoNamePrefixData = "data";
-  static constexpr std::string_view kVmoNamePrefixBss = "bss";
-
   using VmoName = std::array<char, ZX_MAX_NAME_LEN>;
+
   static VmoName GetVmoName(zx::unowned_vmo vmo);
 
   template <typename SegmentType>
@@ -188,9 +188,6 @@ class VmarLoader {
 
   zx_status_t MapAnonymousData(zx_vm_option_t options, size_t zero_size, std::string_view base_name,
                                size_t vmar_offset, size_t& num_mapped_anonymous_regions);
-
-  template <const std::string_view& Prefix>
-  static void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n);
 
   cpp20::span<std::byte> image() { return memory_.image(); }
 
