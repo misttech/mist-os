@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/timerfd_test",
-        args: [ "--gunit_filter=-AllTimerTypes/TimerfdTest.BlockingPoll_*" ],
     },
 }

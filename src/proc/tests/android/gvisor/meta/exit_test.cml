@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/exit_test",
-        args: [ "--gunit_filter=-ExitTest.SigkillZombieGroup:ExitTest.SigkillZombieThread" ],
     },
 }

@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/socket_abstract_test",
-        args: [ "--gunit_filter=-AbstractUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*:AbstractUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*:AbstractUnixSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*:AbstractUnixSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*:AbstractUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*:AbstractUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*" ],
     },
 }

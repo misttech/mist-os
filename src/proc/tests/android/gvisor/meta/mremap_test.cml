@@ -5,8 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/mremap_test",
-
-        // Skip the only death test since Starnix doesn't support handling SIGBUS for processes.
-        args: [ "--gunit_filter=-*SharedAnon*" ],
     },
 }

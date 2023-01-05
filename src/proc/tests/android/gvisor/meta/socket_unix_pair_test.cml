@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/socket_unix_pair_test",
-        args: [ "--gunit_filter=-AllUnixDomainSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed*:AllUnixDomainSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEnd:AllUnixDomainSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd*:AllUnixDomainSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd*" ],
     },
 }

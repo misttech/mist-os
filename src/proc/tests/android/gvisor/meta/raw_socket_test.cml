@@ -5,11 +5,6 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/raw_socket_test",
-
-        // recv() causes MultipleSocketReceive, PollNotReadableInitially, SendAndReceive,
-        // SendAndReceiveViaConnect, RecvBufLimitsEmptyRecvBuffer, BindSendAndReceive
-        // BindConnectSendAndReceive to be flaky.
-        args: [ "--gunit_filter=-*.ReceiveIPPacketInfo:*.ReceiveIPv6PacketInfo:*.ReceiveTOS:*.ReceiveTClass:*.ReceiveTTL:*.ReceiveHopLimit:*.PollWritableImmediately/*:*.SetSocketDetachFilterNoInstalledFilter/*:*.MultipleSocketReceive/*:*.PollNotReadableInitially/*:*.SendAndReceive/*:*.SendAndReceiveViaConnect/*:*.RecvBufLimitsEmptyRecvBuffer/*:*.BindSendAndReceive/*:*.BindConnectSendAndReceive/*" ],
         user: "fuchsia:x:0:0",
     },
 }

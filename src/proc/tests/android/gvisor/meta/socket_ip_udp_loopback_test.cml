@@ -5,6 +5,5 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/socket_ip_udp_loopback_test",
-        args: [ "--gunit_filter=-*.SetSocketRecvBufForceAboveMax/*:*.PayloadTooBig/*:*.SetAndGetReceiveOrigDstAddr/*:*.GetSetSocketRcvlowatOption/*:*.SetAndGetBooleanSocketOptions/*:*.RecvmsgMsghdrFlagMsgTrunc/*:*.ReceiveOrigDstAddrDefault/*:*.SendMsgTooLarge/*" ],
     },
 }

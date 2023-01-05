@@ -5,7 +5,6 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor.shard.cml" ],
     program: {
         binary: "data/tests/raw_socket_icmp_test",
-        args: [ "--gunit_filter=-*.IPv6ChecksumNotSupported:*.ICMPv6FilterNotSupported:*.SendAndReceiveBadChecksum:*.SendAndReceive:*.MultipleSocketReceive:*.RawAndPingSockets:*.SendAndReceiveViaConnect:*.BindSendAndReceive:*.BindConnectSendAndReceive" ],
         user: "fuchsia:x:0:0",
     },
 }
