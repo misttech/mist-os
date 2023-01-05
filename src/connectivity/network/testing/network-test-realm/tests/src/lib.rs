@@ -194,23 +194,6 @@ async fn has_stub(realm: &netemul::TestRealm<'_>) -> bool {
     network_test_realm::has_stub(&realm_proxy).await.expect("failed to check for stub")
 }
 
-/// Adds an enabled interface with `mac_address` and `name` to the provided
-/// `realm`.
-///
-/// The interface is added to devfs and the realm's Netstack. Note that the
-/// Network Test Realm requires the interface to be present in both locations in
-/// order for it to be considered "fully installed".
-async fn add_interface_to_netstack_and_devfs<'a>(
-    mac_address: fnet::MacAddress,
-    name: &'a str,
-    sandbox: &'a netemul::TestSandbox,
-    realm: &'a netemul::TestRealm<'a>,
-) -> netemul::TestInterface<'a> {
-    let interface = add_interface_to_netstack(mac_address, name, sandbox, realm).await;
-    add_interface_to_devfs(name, interface.endpoint(), realm).await;
-    interface
-}
-
 /// Adds an enabled interface to the realm's Netstack with the provided
 /// `mac_address` and `name`.
 ///
@@ -237,23 +220,6 @@ async fn add_interface_to_netstack<'a>(
         )
         .await
         .expect("failed to install endpoint")
-}
-
-/// Adds an interface to devfs with the provided `name`.
-///
-/// Note that the Network Test Realm will only consider the interface to be
-/// valid if it is also present in realm's Netstack.
-async fn add_interface_to_devfs<'a>(
-    name: &'a str,
-    endpoint: &'a netemul::TestEndpoint<'a>,
-    realm: &'a netemul::TestRealm<'a>,
-) {
-    let endpoint_mount_path = netemul::devfs_device_path(name);
-    let endpoint_mount_path = endpoint_mount_path.as_path();
-    realm
-        .add_virtual_device(endpoint, endpoint_mount_path)
-        .await
-        .expect("failed to add interface to devfs");
 }
 
 /// Adds the address from the specified `subnet` to the hermetic Netstack
@@ -326,7 +292,6 @@ async fn join_network_with_hermetic_netstack<'a>(
         )
         .await
         .expect("join_network failed");
-    add_interface_to_devfs(interface_name, interface.endpoint(), &realm).await;
 
     network_test_realm
         .add_interface(
@@ -376,13 +341,8 @@ async fn start_hermetic_network_realm_replaces_existing_realm(name: &str) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let _interface: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE1_MAC_ADDRESS,
-        INTERFACE1_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE1_MAC_ADDRESS, INTERFACE1_NAME, &sandbox, &realm).await;
 
     network_test_realm
         .add_interface(
@@ -441,21 +401,11 @@ async fn add_interface(name: &str, sub_name: &str, wait_any_ip_address: bool) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let _interface: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE1_MAC_ADDRESS,
-        INTERFACE1_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE1_MAC_ADDRESS, INTERFACE1_NAME, &sandbox, &realm).await;
 
-    let _interface: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE2_MAC_ADDRESS,
-        INTERFACE2_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE2_MAC_ADDRESS, INTERFACE2_NAME, &sandbox, &realm).await;
 
     let hermetic_network_state_proxy =
         connect_to_hermetic_network_realm_protocol::<fnet_interfaces::StateMarker>(&realm).await;
@@ -530,21 +480,11 @@ async fn add_interface_already_exists(name: &str) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let _interface1: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE1_MAC_ADDRESS,
-        INTERFACE1_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface1: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE1_MAC_ADDRESS, INTERFACE1_NAME, &sandbox, &realm).await;
 
-    let _interface2: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE2_MAC_ADDRESS,
-        INTERFACE2_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface2: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE2_MAC_ADDRESS, INTERFACE2_NAME, &sandbox, &realm).await;
 
     network_test_realm
         .add_interface(
@@ -586,13 +526,8 @@ async fn add_interface_with_no_matching_interface(name: &str) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let _interface: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE1_MAC_ADDRESS,
-        INTERFACE1_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE1_MAC_ADDRESS, INTERFACE1_NAME, &sandbox, &realm).await;
 
     // `non_matching_mac_address` doesn't match any of the MAC addresses for
     // interfaces owned by the system's Netstack.
@@ -627,15 +562,6 @@ async fn add_interface_with_no_matching_interface_in_netstack(name: &str) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let endpoint = sandbox
-        .create_endpoint_with(
-            INTERFACE1_NAME,
-            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(INTERFACE1_MAC_ADDRESS)),
-        )
-        .await
-        .expect("failed to create endpoint");
-    add_interface_to_devfs(INTERFACE1_NAME, &endpoint, &realm).await;
-
     // The Network Test Realm requires that the matching interface be present in
     // both the system's Netstack and devfs. In this case, it is only present in
     // devfs.
@@ -667,13 +593,8 @@ async fn stop_hermetic_network_realm(name: &str) {
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    let _interface: netemul::TestInterface<'_> = add_interface_to_netstack_and_devfs(
-        INTERFACE1_MAC_ADDRESS,
-        INTERFACE1_NAME,
-        &sandbox,
-        &realm,
-    )
-    .await;
+    let _interface: netemul::TestInterface<'_> =
+        add_interface_to_netstack(INTERFACE1_MAC_ADDRESS, INTERFACE1_NAME, &sandbox, &realm).await;
 
     network_test_realm
         .add_interface(
@@ -1240,7 +1161,7 @@ async fn ping(
         .await;
     }
 
-    let system_ep = realm
+    let _system_ep = realm
         .join_network_with(
             &network,
             INTERFACE1_NAME,
@@ -1249,8 +1170,6 @@ async fn ping(
         )
         .await
         .expect("join_network failed for base realm");
-
-    add_interface_to_devfs(INTERFACE1_NAME, system_ep.endpoint(), &realm).await;
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()

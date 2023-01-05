@@ -28,11 +28,6 @@
                 "fuchsia.net.interfaces.State",
             ],
         },
-        {
-            directory: "dev-class-ethernet",
-            rights: [ "r*" ],
-            path: "/dev/class/ethernet",
-        },
     ],
     offer: [
         {

@@ -7,7 +7,6 @@ use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_hardware_ethernet as fethernet;
 use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
@@ -19,7 +18,6 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_test_realm as fntr;
-use fidl_fuchsia_netstack as fnetstack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
@@ -28,7 +26,6 @@ use futures_lite::FutureExt as _;
 use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
-use std::path;
 
 /// URL for the realm that contains the hermetic network components with a
 /// Netstack2 instance.
@@ -40,8 +37,6 @@ const HERMETIC_NETWORK_V2_URL: &'static str = "#meta/hermetic_network_v2.cm";
 /// underlying Netstack. Consequently, fake values are defined here. Similarly,
 /// the metric only needs to be a sensible value.
 const DEFAULT_METRIC: u32 = 100;
-const DEFAULT_INTERFACE_TOPOLOGICAL_PATH: &'static str = "/dev/fake/topological/path";
-const DEFAULT_INTERFACE_FILE_PATH: &'static str = "/dev/fake/file/path";
 
 trait ResultExt<T> {
     /// Converts from `Result<T, E>` to `Option<T>`.
@@ -62,50 +57,6 @@ impl<T, E: std::fmt::Debug> ResultExt<T> for Result<T, E> {
             }
         }
     }
-}
-
-/// Returns a stream that contains a `P::Proxy` for each file in the provided
-/// `directory`.
-async fn file_proxies<P: fidl::endpoints::ProtocolMarker>(
-    directory: &str,
-) -> Result<impl futures::Stream<Item = P::Proxy> + '_, fntr::Error> {
-    let (directory_proxy, directory_server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(|e| {
-            error!("create_proxy failed: {:?}", e);
-            fntr::Error::Internal
-        })?;
-    fdio::service_connect(directory, directory_server_end.into_channel().into()).map_err(|e| {
-        error!("service_connect failed to connect at {} with error: {:?}", directory, e);
-        fntr::Error::Internal
-    })?;
-
-    let proxies: Result<Vec<P::Proxy>, fntr::Error> =
-        fuchsia_fs::directory::readdir(&directory_proxy)
-            .await
-            .map_err(|e| {
-                error!("failed to read files in {} with error {:?}", directory, e);
-                fntr::Error::Internal
-            })?
-            .iter()
-            .map(|file| {
-                let filepath = path::Path::new(directory).join(&file.name);
-                let filepath = filepath.to_str().ok_or_else(|| {
-                    error!("failed to convert file path to string");
-                    fntr::Error::Internal
-                })?;
-                let (proxy, server_end) = fidl::endpoints::create_proxy::<P>().map_err(|e| {
-                    error!("create_proxy failed: {:?}", e);
-                    fntr::Error::Internal
-                })?;
-                fdio::service_connect(filepath, server_end.into_channel().into()).map_err(|e| {
-                    error!("service_connect failed to connect at {} with error: {:?}", filepath, e);
-                    fntr::Error::Internal
-                })?;
-                Ok(proxy)
-            })
-            .collect();
-
-    Ok(futures::stream::iter(proxies?))
 }
 
 /// Installs a netdevice with the provided `name` on the hermetic Netstack.
@@ -216,16 +167,17 @@ async fn install_netdevice(
     })
 }
 
-/// Attempts to install a netdevice on the hermetic Netstack.
+/// Adds an interface with the provided `name` to the hermetic Netstack.
 ///
-/// If a device was installed, then true is returned. An error may be returned
-/// if installation of the device on the hermetic Netstack failed.
-async fn try_install_netdevice(
+/// If an interface with `interface_id` cannot be found in the system Netstack,
+/// then an `fntr::Error::InterfaceNotFound` error is returned. Errors
+/// installing the interface may also be propagated.
+async fn install_interface(
     name: &str,
     interface_id: u64,
     wait_any_ip_address: bool,
     connector: &HermeticNetworkConnector,
-) -> Result<bool, fntr::Error> {
+) -> Result<(), fntr::Error> {
     let debug_interfaces_proxy =
         SystemConnector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
     let (port_proxy, port_server_end) = fidl::endpoints::create_proxy::<fhwnet::PortMarker>()
@@ -267,101 +219,7 @@ async fn try_install_netdevice(
         error!("port info missing port id");
         fntr::Error::Internal
     })?;
-    install_netdevice(name, port_id, device_proxy, wait_any_ip_address, connector).await?;
-    Ok(true)
-}
-
-/// Installs an ethernet device with the provided `name` on the hermetic
-/// Netstack.
-async fn install_eth_device(
-    name: &str,
-    device_proxy: fethernet::DeviceProxy,
-    wait_any_ip_address: bool,
-    connector: &HermeticNetworkConnector,
-) -> Result<(), fntr::Error> {
-    let device_client_end = fidl::endpoints::ClientEnd::<fethernet::DeviceMarker>::new(
-        device_proxy
-            .into_channel()
-            .map_err(|e| {
-                error!("into_channel failed: {:?}", e);
-                fntr::Error::Internal
-            })?
-            .into_zx_channel(),
-    );
-
-    // TODO(https://fxbug.dev/89651): Support Netstack3. Currently, an
-    // interface name cannot be specified when adding an interface via
-    // fuchsia.net.stack.Stack. As a result, the Network Test Realm
-    // currently does not support Netstack3.
-    let id: u32 = connector
-        .connect_to_protocol::<fnetstack::NetstackMarker>()?
-        .add_ethernet_device(
-            DEFAULT_INTERFACE_TOPOLOGICAL_PATH,
-            &mut fnetstack::InterfaceConfig {
-                name: name.to_string(),
-                filepath: DEFAULT_INTERFACE_FILE_PATH.to_string(),
-                metric: DEFAULT_METRIC,
-            },
-            device_client_end,
-        )
-        .await
-        .map_err(|e| {
-            error!("add_ethernet_device failed: {:?}", e);
-            fntr::Error::Internal
-        })?
-        .map_err(|e| match zx::Status::from_raw(e) {
-            zx::Status::ALREADY_EXISTS => fntr::Error::AlreadyExists,
-            status => {
-                error!("add_ethernet_device error: {:?}", status);
-                fntr::Error::Internal
-            }
-        })?;
-
-    // Enable the interface that was newly added to the hermetic Netstack.
-    // It is not enabled by default.
-    enable_interface(id.into(), connector).await?;
-
-    if wait_any_ip_address {
-        wait_for_any_ip_address(id.into(), connector).await?;
-    }
-    Ok(())
-}
-
-/// Attempts to install an ethernet device on the hermetic Netstack.
-///
-/// If a device was installed, then true is returned. An error may be returned
-/// if the `expected_mac_address` matches an ethernet device, but installation
-/// of the device on the hermetic Netstack failed.
-async fn try_install_eth_device(
-    name: &str,
-    expected_mac_address: fnet_ext::MacAddress,
-    wait_any_ip_address: bool,
-    connector: &HermeticNetworkConnector,
-) -> Result<bool, fntr::Error> {
-    const ETHERNET_DIRECTORY_PATH: &'static str = "/dev/class/ethernet";
-
-    let results = file_proxies::<fethernet::ControllerMarker>(ETHERNET_DIRECTORY_PATH)
-        .await?
-        .filter_map(|controller| async move {
-            // Note that errors are logged, but not propagated. In the event of
-            // an error, this ensures that other devices can be searched for the
-            // `expected_mac_address`.
-
-            let (device, server_end) =
-                fidl::endpoints::create_proxy().ok_or_log_err("create_proxy failed")?;
-            let () = controller.open_session(server_end).ok_or_log_err("open_session failed")?;
-            let info = device.get_info().await.ok_or_log_err("get_info failed")?;
-            (info.mac.octets == expected_mac_address.octets).then(|| device)
-        });
-    futures::pin_mut!(results);
-
-    match results.next().await {
-        Some(device_proxy) => {
-            install_eth_device(name, device_proxy, wait_any_ip_address, connector).await?;
-            Ok(true)
-        }
-        None => Ok(false),
-    }
+    install_netdevice(name, port_id, device_proxy, wait_any_ip_address, connector).await
 }
 
 async fn wait_for_any_ip_address(
@@ -385,24 +243,6 @@ async fn wait_for_any_ip_address(
     })?;
     info!("finished waiting for autoconf IP address once we saw {:?}", addr);
     Ok(())
-}
-
-/// Adds an interface with the provided `name` to the hermetic Netstack.
-///
-/// If a matching interface cannot be found in devfs, then an
-/// `fntr::Error::InterfaceNotFound` error is returned. Errors installing the
-/// interface may also be propagated.
-async fn install_interface(
-    name: &str,
-    interface_id: u64,
-    mac_address: fnet_ext::MacAddress,
-    wait_any_ip_address: bool,
-    connector: &HermeticNetworkConnector,
-) -> Result<(), fntr::Error> {
-    (try_install_eth_device(name, mac_address, wait_any_ip_address, connector).await?
-        || try_install_netdevice(name, interface_id, wait_any_ip_address, connector).await?)
-        .then(|| ())
-        .ok_or(fntr::Error::InterfaceNotFound)
 }
 
 /// Returns the id and the enabled/disabled status for the interface that
@@ -1439,14 +1279,8 @@ impl Controller {
             .ok_or(fntr::Error::HermeticNetworkRealmNotRunning)?;
 
         let (interface_id, enabled) = find_interface_id_and_status(mac_address).await?;
-        install_interface(
-            name,
-            interface_id,
-            mac_address,
-            wait_any_ip_address,
-            hermetic_network_connector,
-        )
-        .await?;
+        install_interface(name, interface_id, wait_any_ip_address, hermetic_network_connector)
+            .await?;
 
         if enabled {
             // Disable the matching interface on the system's Netstack.
