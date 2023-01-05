@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.fs/cpp/wire.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -193,7 +194,14 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
         // Runtime protocols are only supported in-process.
         return ZX_ERR_INVALID_ARGS;
       }
-      dev->set_runtime_outgoing_dir(std::move(outgoing_dir));
+
+      // Clone `outgoing_dir` so that we still have a valid copy to pass to `DeviceAdd` below.
+      zx::result<fidl::ClientEnd<fuchsia_io::Directory>> clone_result =
+          component::Clone(outgoing_dir);
+      if (clone_result.is_error()) {
+        return clone_result.status_value();
+      }
+      dev->set_runtime_outgoing_dir(std::move(clone_result.value()));
     }
   }
 
@@ -204,14 +212,12 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   if (out) {
     *out = dev.get();
   }
-  if (args->flags & DEVICE_ADD_MUST_ISOLATE) {
-    r = api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect), std::move(outgoing_dir));
-  } else {
+  if (!(args->flags & DEVICE_ADD_MUST_ISOLATE)) {
     args->proxy_args = nullptr;
-    r = api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect),
-                           fidl::ClientEnd<fio::Directory>());
   }
-  if (r != ZX_OK) {
+  if (zx_status_t status =
+          api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect), std::move(outgoing_dir));
+      status != ZX_OK) {
     if (out) {
       *out = nullptr;
     }
