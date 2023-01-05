@@ -6,7 +6,7 @@ pub mod args;
 
 use {
     crate::common::{node_property_key_to_string, node_property_value_to_string},
-    anyhow::Result,
+    anyhow::{anyhow, Result},
     args::ListDevicesCommand,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_device_manager as fdm,
     fidl_fuchsia_driver_development as fdd,
@@ -196,7 +196,11 @@ pub async fn list_devices(
             }
         }
     } else {
-        println!("No devices found.");
+        if cmd.fail_on_missing {
+            return Err(anyhow!("No devices found."));
+        } else {
+            println!("No devices found.");
+        }
     }
     Ok(())
 }
