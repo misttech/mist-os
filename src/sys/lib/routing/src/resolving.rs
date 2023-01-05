@@ -12,7 +12,6 @@ use {
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx,
     lazy_static::lazy_static,
-    once_cell::sync::OnceCell,
     std::convert::TryFrom,
     std::sync::Arc,
     thiserror::Error,
@@ -23,7 +22,7 @@ use {
 lazy_static! {
     /// A default base URL from which to parse relative component URL
     /// components.
-    static ref A_BASE_URL: Url = Url::parse("relative:///").unwrap();
+    static ref INTERNAL_URL_RELATIVE_PREFIX: Url = Url::parse("relative:///").unwrap();
 }
 
 /// The response returned from a Resolver. This struct is derived from the FIDL
@@ -218,121 +217,71 @@ async fn get_parent<C: ComponentInstanceInterface>(
 /// `ComponentAddressKind`s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComponentAddressKind {
-    /// A fully-qualified component URL, including scheme and optional authority
-    /// (which may be `Some("")`); for example,
-    /// "fuchsia-pkg://fuchsia.com/some_package#meta/my_component.cm". If
-    /// authority is `None`, the string representation of the component URL will
-    /// start with `scheme:` without two slashes. If authority is `Some`, the
-    /// string representation will start with `scheme://authority`.
-    ///
-    /// The query string (excluding the question mark (`?`) prefix) is optional,
-    /// _Only an absolute component URL may include a query._ This is a
-    /// restriction enforced for component manager. Component manager currently
-    /// supports only `hash` query string properties, and subpackage-relative
-    /// components get their package hash from the parent package's subpackage
-    /// manifest.
-    ///
-    /// `ComponentAddress` does not constrain the value of the query string.
-    /// They may be invalid for some resolvers. Some resolvers may support a
-    /// query string of the form `hash=<hex-package-merkle>`.
-    Absolute { some_authority: Option<String>, some_query: Option<String> },
+    /// A fully-qualified component URL.
+    Absolute,
 
     /// A relative Component URL, starting with the package path; for example a
     /// subpackage relative URL such as "needed_package#meta/dep_component.cm".
     RelativePath {
+        /// The scheme of an ancestor component's URL, used to identify the
+        /// `Resolver` in a `ResolverRegistry`.
+        scheme: String,
+
         /// An opaque value (from the perspective of component resolution)
         /// required by the resolver when resolving a relative package path.
         /// For a given child component, this property is populated from a
         /// parent component's `resolution_context`, as returned by the parent
         /// component's resolver.
         context: ComponentResolutionContext,
+
+        /// The string representation of a the relative URL, from the `url::Url`
+        /// function `INTERNAL_URL_RELATIVE_PREFIX.make_relative(internal_url)`.
+        relative_url: String,
     },
 }
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentAddress {
     /// The kind of `ComponentAddress` (`Absolute` or `RelativePath`) with
     /// kind-specific additional properties.
     kind: ComponentAddressKind,
 
-    /// The scheme of an ancestor component's URL, used to identify the
-    /// `Resolver` in a `ResolverRegistry`.
-    scheme: String,
-
-    /// The path part of the component URL. For `RelativePath`, this path MUST
-    /// NOT start with a slash (`/`). For subpackages, the path MUST contain
-    /// exactly one path segment (no slashes).
-    path: String,
-
-    /// The URI fragment used to identify a resource in a package. For
-    /// components, this is the component manifest path. For component URLs, the
-    /// path MUST NOT start with a pound sign (`#`) or slash (`/`).
-    some_resource: Option<String>,
-
-    /// The given URL used to compute the ComponentAddress, which may have
-    /// required additional information from its parent component.
-    some_original_url: Option<String>,
-
-    /// Holds a resolver-ready computed URL string.
-    url: OnceCell<String>,
-}
-
-/// Ignore `some_original_url` and `url` when comparing `ComponentAddress`
-/// instances.
-impl PartialEq for ComponentAddress {
-    fn eq(&self, other: &Self) -> bool {
-        let ComponentAddress { kind, scheme, path, some_resource, some_original_url: _, url: _ } =
-            other;
-        &self.kind == kind
-            && &self.scheme == scheme
-            && &self.path == path
-            && &self.some_resource == some_resource
-    }
+    /// A url::Url representation of an absolute URL, or a url::Url prefixed by
+    /// `INTERNAL_URL_RELATIVE_PREFIX`, such that Url::make_relative() will
+    /// return the relative part.
+    internal_url: Url,
 }
 
 impl ComponentAddress {
-    /// Creates a new `ComponentAddress` of the `Absolute` kind. This function
-    /// is private, to ensure it is only called from `ComponentAddress methods
-    /// using validated fields of the `url::Url` struct (extracted via
-    /// url::Url::parse()).
-    fn new_absolute(
-        scheme: &str,
-        some_authority: Option<&str>,
-        path: &str,
-        some_query: Option<&str>,
-        some_resource: Option<&str>,
-    ) -> Self {
-        Self {
-            kind: ComponentAddressKind::Absolute {
-                some_authority: some_authority.map(str::to_string),
-                some_query: some_query.map(str::to_string),
-            },
-            scheme: scheme.to_owned(),
-            path: path.to_owned(),
-            some_resource: some_resource.map(str::to_string),
-            some_original_url: None,
-            url: OnceCell::new(),
-        }
+    /// Creates a new `ComponentAddress` of the `Absolute` kind.
+    fn new_absolute(url: Url) -> Self {
+        Self { kind: ComponentAddressKind::Absolute, internal_url: url }
     }
 
-    /// Creates a new `ComponentAddress` of the `RelativePath` kind. This
-    /// function is private, to ensure it is only called from `ComponentAddress
-    /// methods using validated fields of the `url::Url` struct (extracted via
-    /// url::Url::parse()).
+    /// Creates a new `ComponentAddress` of the `RelativePath` kind.
     fn new_relative_path(
         path: &str,
         some_resource: Option<&str>,
         scheme: &str,
         context: ComponentResolutionContext,
-    ) -> Self {
-        Self {
-            kind: ComponentAddressKind::RelativePath { context },
-            scheme: scheme.to_owned(),
-            path: path.to_owned(),
-            some_resource: some_resource.map(str::to_string),
-            some_original_url: None,
-            url: OnceCell::new(),
-        }
+    ) -> Result<Self, ResolverError> {
+        let mut internal_url = INTERNAL_URL_RELATIVE_PREFIX.clone();
+        internal_url.set_path(path);
+        internal_url.set_fragment(some_resource);
+        let relative_url = INTERNAL_URL_RELATIVE_PREFIX.make_relative(&internal_url).ok_or(
+            ResolverError::malformed_url(anyhow::format_err!(
+                "bug extracting relative component URL from {internal_url} using base URL {}",
+                *INTERNAL_URL_RELATIVE_PREFIX
+            )),
+        )?;
+        Ok(Self {
+            kind: ComponentAddressKind::RelativePath {
+                scheme: scheme.to_owned(),
+                context,
+                relative_url,
+            },
+            internal_url,
+        })
     }
 
     /// Parse the given absolute `component_url` and create a `ComponentAddress`
@@ -345,25 +294,7 @@ impl ComponentAddress {
             }
             Err(err) => return Err(ResolverError::malformed_url(err)),
         };
-        let some_authority = if url.has_authority() {
-            let mut mod_url = url.clone();
-            mod_url.set_path("");
-            mod_url.set_query(None);
-            mod_url.set_fragment(None);
-            let mod_url_str = &mod_url.to_string();
-            Some(mod_url_str[mod_url.scheme().len() + 3..mod_url_str.len()].to_owned())
-        } else {
-            None
-        };
-        let mut address = Self::new_absolute(
-            url.scheme(),
-            some_authority.as_deref(),
-            url.path(),
-            url.query(),
-            url.fragment(),
-        );
-        address.some_original_url = Some(component_url.to_owned());
-        Ok(address)
+        Ok(Self::new_absolute(url))
     }
 
     /// Parse the given `component_url` to determine if it is an absolute URL,
@@ -380,7 +311,8 @@ impl ComponentAddress {
             return result;
         }
         let relative_url = parse_relative_url(component_url)?;
-        if relative_url.fragment().is_none() && relative_url.path().is_empty() {
+        let relative_path = relative_path(&relative_url);
+        if relative_url.fragment().is_none() && relative_path.is_empty() {
             return Err(ResolverError::malformed_url(anyhow::format_err!("{}", component_url)));
         }
         if relative_url.query().is_some() {
@@ -389,7 +321,7 @@ impl ComponentAddress {
                 component_url
             )));
         }
-        let mut address = if relative_url.path().is_empty() {
+        if relative_path.is_empty() {
             // The `component_url` had only a fragment, so the new address will
             // be the same as its parent (for example, the same package), except
             // for its resource.
@@ -415,23 +347,28 @@ impl ComponentAddress {
                          component_url, resolved_ancestor.address
                     ))
                 })?;
-            Self::new_relative_path(relative_url.path(), relative_url.fragment(), scheme, context)
-        };
-        address.some_original_url = Some(component_url.to_owned());
-        Ok(address)
+            Self::new_relative_path(relative_path, relative_url.fragment(), scheme, context)
+        }
     }
 
     /// Creates a new `ComponentAddress` from `self` by replacing only the
     /// component URL resource.
-    pub fn clone_with_new_resource(&self, some_resource: Option<&str>) -> Self {
-        Self {
-            kind: self.kind.clone(),
-            scheme: self.scheme.clone(),
-            path: self.path.clone(),
-            some_resource: some_resource.map(str::to_string),
-            some_original_url: None,
-            url: OnceCell::new(),
+    pub fn clone_with_new_resource(
+        &self,
+        some_resource: Option<&str>,
+    ) -> Result<Self, ResolverError> {
+        let mut internal_url = self.internal_url.clone();
+        internal_url.set_fragment(some_resource);
+        let mut kind = self.kind.clone();
+        if let ComponentAddressKind::RelativePath { relative_url, .. } = &mut kind {
+            *relative_url = INTERNAL_URL_RELATIVE_PREFIX.make_relative(&internal_url).ok_or(
+                ResolverError::malformed_url(anyhow::format_err!(
+                    "bug extracting relative component URL from {internal_url} using base URL {}",
+                    *INTERNAL_URL_RELATIVE_PREFIX
+                )),
+            )?;
         }
+        Ok(Self { kind, internal_url })
     }
 
     /// Returns the variant, which is `Absolute` or `RelativePath`.
@@ -441,7 +378,7 @@ impl ComponentAddress {
 
     /// True if the `kind()` is `Absolute`.
     pub fn is_absolute(&self) -> bool {
-        matches!(self.kind, ComponentAddressKind::Absolute { .. })
+        matches!(self.kind, ComponentAddressKind::Absolute)
     }
 
     /// True if the `kind()` is `RelativePath`.
@@ -449,33 +386,17 @@ impl ComponentAddress {
         matches!(self.kind, ComponentAddressKind::RelativePath { .. })
     }
 
-    /// Returns the optional authority value for an `Absolute` component URL, or
-    /// `None` if the `Absolute` component URL excluded an authority (if the
-    /// scheme was followed by only `:` and not `://`). (Note that this function
-    /// will also return `None` for a `RelativePath` component URL, which by
-    /// definition has no `authority`.)
+    /// Returns true if the component URL is `Absolute` and its `Url` has an
+    /// authority.
     ///
     /// The `authority`, if present, is most commonly only a `host` (such as
-    /// "fuchsia.com"), but any spec-legal URI authority it valid in a component
-    /// URL. The resolver (as determined by the `scheme`) is responsible for
-    /// interpreting the authority and may apply its own constraints.
-    pub fn authority(&self) -> Option<&str> {
-        if let ComponentAddressKind::Absolute { some_authority, .. } = &self.kind {
-            some_authority.as_ref().map(|authority| &**authority)
-        } else {
-            None
-        }
-    }
-
-    // Returns the `authority`, if any, or an empty string, if none. Note that
-    // this function result will not distinguish between a URL with an empty
-    // authority (such as, "file:///") and a URL with no authority (such as
-    // "mailto:you@domain.com").
-    pub fn authority_or_empty_str(&self) -> &str {
-        if let ComponentAddressKind::Absolute { some_authority: Some(authority), .. } = &self.kind {
-            authority
-        } else {
-            ""
+    /// "fuchsia.com"), but a component URL is not required to have an
+    /// authority. The resolver (as determined by the `scheme`) is responsible
+    /// for interpreting the URI, and may or may not require an authority.
+    pub fn has_authority(&self) -> bool {
+        match self.kind {
+            ComponentAddressKind::Absolute => self.internal_url.has_authority(),
+            ComponentAddressKind::RelativePath { .. } => false,
         }
     }
 
@@ -484,7 +405,7 @@ impl ComponentAddress {
     ///
     /// Panics if called for an `Absolute` component address.
     pub fn context(&self) -> &ComponentResolutionContext {
-        if let ComponentAddressKind::RelativePath { context } = &self.kind {
+        if let ComponentAddressKind::RelativePath { context, .. } = &self.kind {
             &context
         } else {
             panic!("context() is only valid for `ComponentAddressKind::RelativePath");
@@ -495,134 +416,68 @@ impl ComponentAddress {
     /// from the component's parent. The scheme is used to look up a registered
     /// resolver, when resolving the component.
     pub fn scheme(&self) -> &str {
-        &self.scheme
+        match &self.kind {
+            ComponentAddressKind::Absolute => self.internal_url.scheme(),
+            ComponentAddressKind::RelativePath { scheme, .. } => scheme,
+        }
     }
 
     /// Returns the URL path.
     pub fn path(&self) -> &str {
-        &self.path
+        match self.kind {
+            ComponentAddressKind::Absolute => self.internal_url.path(),
+            ComponentAddressKind::RelativePath { .. } => relative_path(&self.internal_url),
+        }
     }
 
     /// Returns the optional query value for an `Absolute` component URL.
     /// Always returns `None` for `Relative` component URLs.
     pub fn query(&self) -> Option<&str> {
-        if let ComponentAddressKind::Absolute { some_query, .. } = &self.kind {
-            some_query.as_deref()
-        } else {
-            None
-        }
+        self.internal_url.query()
     }
 
     /// Returns the optional component resource, from the URL fragment.
     pub fn resource(&self) -> Option<&str> {
-        self.some_resource.as_deref()
-    }
-
-    /// Returns the original URL, if this `ComponentAddress` was created by
-    /// calling `ComponentAddress::from(<original_url>, ...)`.
-    pub fn original_url(&self) -> Option<&str> {
-        self.some_original_url.as_deref()
+        self.internal_url.fragment()
     }
 
     /// Returns the resolver-ready URL string and, if it is a `RelativePath`,
-    /// `Some(context)`, or `None` for an `Absolute` address. Note that, if
-    /// the URL has an authority and an empty path, the path root slash (/)
-    /// is omitted, by convention.
+    /// `Some(context)`, or `None` for an `Absolute` address.
     pub fn url(&self) -> &str {
-        let url = self.url.get_or_init(|| match &self.kind {
-            ComponentAddressKind::Absolute { some_authority, some_query } => {
-                format!(
-                    "{}:{}{}{}{}",
-                    self.scheme,
-                    if let Some(authority) = some_authority {
-                        format!("//{}", authority)
-                    } else {
-                        "".to_string()
-                    },
-                    if self.path == "/" && some_authority.iter().any(|a| a.len() > 0) {
-                        ""
-                    } else {
-                        &self.path
-                    },
-                    if let Some(query) = some_query {
-                        format!("?{}", query)
-                    } else {
-                        "".to_string()
-                    },
-                    if let Some(resource) = &self.some_resource {
-                        format!("#{}", resource)
-                    } else {
-                        "".to_string()
-                    },
-                )
-            }
-            ComponentAddressKind::RelativePath { .. } => {
-                if let Some(resource) = &self.some_resource {
-                    format!("{}#{}", self.path, resource)
-                } else {
-                    format!("{}", self.path)
-                }
-            }
-        });
-        url
+        match &self.kind {
+            ComponentAddressKind::Absolute => self.internal_url.as_str(),
+            ComponentAddressKind::RelativePath { relative_url, .. } => relative_url,
+        }
     }
 
     /// Returns the `url()` and `Some(context)` for resolving the URL,
     /// if the kind is `RelativePath` (or `None` if `Absolute`).
     pub fn to_url_and_context(&self) -> (&str, Option<&ComponentResolutionContext>) {
-        let some_context = match &self.kind {
-            ComponentAddressKind::Absolute { .. } => None,
-            ComponentAddressKind::RelativePath { context } => Some(context),
-        };
-        (self.url(), some_context)
+        match &self.kind {
+            ComponentAddressKind::Absolute => (self.internal_url.as_str(), None),
+            ComponentAddressKind::RelativePath { context, relative_url, .. } => {
+                (relative_url, Some(context))
+            }
+        }
     }
 }
 
-#[derive(Debug)]
-struct RelativeUrl {
-    path: String,
-    query: Option<String>,
-    fragment: Option<String>,
-}
-
-impl RelativeUrl {
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    pub fn query(&self) -> Option<&str> {
-        self.query.as_deref()
-    }
-
-    pub fn fragment(&self) -> Option<&str> {
-        self.fragment.as_deref()
-    }
-}
-
-fn parse_relative_url(component_url: &str) -> Result<RelativeUrl, ResolverError> {
+/// Assumes the given string is a relative URL, and converts this string into
+/// a `url::Url` by attaching a known, internal absolute URL prefix.
+fn parse_relative_url(component_url: &str) -> Result<Url, ResolverError> {
     match Url::parse(component_url) {
         Ok(_) => Err(ResolverError::malformed_url(anyhow::format_err!(
             "Error parsing a relative URL given absolute URL '{}'.",
             component_url,
         ))),
         Err(url::ParseError::RelativeUrlWithoutBase) => {
-            A_BASE_URL
-                .join(component_url)
-                .map_err(|err| {
-                    ResolverError::malformed_url(anyhow::format_err!(
-                        "Error parsing a relative component URL '{}': {:?}.",
-                        component_url,
-                        err
-                    ))
-                })
-                .map(|url| {
-                    // strip the leading slash of relative URL paths
-                    RelativeUrl {
-                        path: url.path()[1..].to_owned(),
-                        query: url.query().map(str::to_string),
-                        fragment: url.fragment().map(str::to_string),
-                    }
-                })
+            INTERNAL_URL_RELATIVE_PREFIX.join(component_url).map_err(|err| {
+                ResolverError::malformed_url(anyhow::format_err!(
+                    "Error parsing a relative component URL '{}': {:?}.",
+                    component_url,
+                    err
+                ))
+            })
         }
         Err(err) => Err(ResolverError::malformed_url(anyhow::format_err!(
             "Unexpected error while parsing a component URL '{}': {:?}.",
@@ -630,6 +485,15 @@ fn parse_relative_url(component_url: &str) -> Result<RelativeUrl, ResolverError>
             err,
         ))),
     }
+}
+
+/// For `Url`s constructed from `parse_relative_url()`, the `path()` is expected
+/// to include a slash prefix, but a String representation of a relative path
+/// URL should not include the slash prefix. This convenience API assumes the
+/// given `Url` is a relative URL, and strips the slash prefix, if present.
+fn relative_path(relative_url: &Url) -> &str {
+    let path = relative_url.path();
+    path.strip_prefix('/').unwrap_or(path)
 }
 
 /// Errors produced by built-in `Resolver`s and `resolving` APIs.
@@ -797,7 +661,7 @@ mod tests {
     use {super::*, assert_matches::assert_matches, fidl::endpoints::create_endpoints};
 
     #[test]
-    fn test_resolved_package() -> anyhow::Result<()> {
+    fn test_resolved_package() {
         let url = "some_url".to_string();
         let (dir_client, _) =
             create_endpoints::<fio::DirectoryMarker>().expect("failed to create Directory proxy");
@@ -806,27 +670,20 @@ mod tests {
             directory: Some(dir_client),
             ..fresolution::Package::EMPTY
         };
-        let resolved_package = ResolvedPackage::try_from(fidl_package)?;
+        let resolved_package = ResolvedPackage::try_from(fidl_package).unwrap();
         assert_eq!(resolved_package.url, url);
-        Ok(())
     }
 
     #[test]
-    fn test_component_address() -> anyhow::Result<()> {
+    fn test_component_address() {
         let address =
-            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")?;
-        if let ComponentAddressKind::Absolute { some_authority, some_query } = address.kind() {
-            assert_eq!(some_authority.as_deref(), Some("fuchsia.com"));
-            assert_eq!(some_query, &None);
-        }
+            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")
+                .unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), Some("fuchsia.com"));
-        assert_eq!(address.authority_or_empty_str(), "fuchsia.com");
         assert_eq!(address.scheme(), "some-scheme");
         assert_eq!(address.path(), "/package");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/comp.cm"));
-        assert_eq!(address.original_url(), Some("some-scheme://fuchsia.com/package#meta/comp.cm"));
         assert_eq!(address.url(), "some-scheme://fuchsia.com/package#meta/comp.cm");
         assert_matches!(
             address.to_url_and_context(),
@@ -834,24 +691,12 @@ mod tests {
         );
 
         let abs_address = ComponentAddress::new_absolute(
-            "some-scheme",
-            Some("fuchsia.com"),
-            "/package",
-            None,
-            Some("meta/comp.cm"),
+            Url::parse("some-scheme://fuchsia.com/package#meta/comp.cm").unwrap(),
         );
-        // Note that `url()` has been called on `address` but not on
-        // `abs_address`, and `original_url()` differences should be ignored
-        // when comparing.
         assert_eq!(abs_address, address);
 
         assert_eq!(abs_address, address);
-        if let ComponentAddressKind::Absolute { some_authority, .. } = abs_address.kind() {
-            assert_eq!(some_authority.as_deref(), Some("fuchsia.com"));
-        }
         assert!(abs_address.is_absolute());
-        assert_eq!(abs_address.authority(), Some("fuchsia.com"));
-        assert_eq!(abs_address.authority_or_empty_str(), "fuchsia.com");
         assert_eq!(abs_address.scheme(), "some-scheme");
         assert_eq!(abs_address.path(), "/package");
         assert_eq!(abs_address.query(), None);
@@ -865,13 +710,11 @@ mod tests {
         let cloned_address = abs_address.clone();
         assert_eq!(abs_address, cloned_address);
 
-        let address2 = abs_address.clone_with_new_resource(Some("meta/other_comp.cm"));
+        let address2 = abs_address.clone_with_new_resource(Some("meta/other_comp.cm")).unwrap();
         assert_ne!(address2, abs_address);
         assert!(address2.is_absolute());
         assert_eq!(address2.resource(), Some("meta/other_comp.cm"));
         assert_eq!(address2.scheme(), "some-scheme");
-        assert_eq!(address2.authority(), Some("fuchsia.com"));
-        assert_eq!(address2.authority_or_empty_str(), "fuchsia.com");
         assert_eq!(address2.path(), "/package");
         assert_eq!(address2.query(), None);
 
@@ -880,8 +723,9 @@ mod tests {
             Some("meta/subcomp.cm"),
             "some-scheme",
             ComponentResolutionContext::new(vec![b'4', b'5', b'6']),
-        );
-        if let ComponentAddressKind::RelativePath { context } = rel_address.kind() {
+        )
+        .unwrap();
+        if let ComponentAddressKind::RelativePath { context, .. } = rel_address.kind() {
             assert_eq!(&context.bytes, &vec![b'4', b'5', b'6']);
         }
         assert!(rel_address.is_relative_path());
@@ -889,7 +733,6 @@ mod tests {
         assert_eq!(rel_address.query(), None);
         assert_eq!(rel_address.resource(), Some("meta/subcomp.cm"));
         assert_eq!(&rel_address.context().bytes, &vec![b'4', b'5', b'6']);
-        assert_eq!(rel_address.original_url(), None);
         assert_eq!(rel_address.url(), "subpackage#meta/subcomp.cm");
         assert_eq!(
             rel_address.to_url_and_context(),
@@ -899,14 +742,14 @@ mod tests {
             )
         );
 
-        let rel_address2 = rel_address.clone_with_new_resource(Some("meta/other_subcomp.cm"));
+        let rel_address2 =
+            rel_address.clone_with_new_resource(Some("meta/other_subcomp.cm")).unwrap();
         assert_ne!(rel_address2, rel_address);
         assert!(rel_address2.is_relative_path());
         assert_eq!(rel_address2.path(), "subpackage");
         assert_eq!(rel_address2.query(), None);
         assert_eq!(rel_address2.resource(), Some("meta/other_subcomp.cm"));
         assert_eq!(&rel_address2.context().bytes, &vec![b'4', b'5', b'6']);
-        assert_eq!(rel_address2.original_url(), None);
         assert_eq!(rel_address2.url(), "subpackage#meta/other_subcomp.cm");
         assert_eq!(
             rel_address2.to_url_and_context(),
@@ -916,149 +759,189 @@ mod tests {
             )
         );
 
-        let address = ComponentAddress::from_absolute_url("base://b")?;
-        if let ComponentAddressKind::Absolute { some_authority, .. } = address.kind() {
-            assert_eq!(some_authority.as_deref(), Some("b"));
-        }
+        let address = ComponentAddress::from_absolute_url("base://b").unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), Some("b"));
-        assert_eq!(address.authority_or_empty_str(), "b");
         assert_eq!(address.scheme(), "base");
         assert_eq!(address.path(), "");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), None);
-        assert_eq!(address.original_url(), Some("base://b"));
         assert_eq!(address.url(), "base://b");
         assert_matches!(address.to_url_and_context(), ("base://b", None));
 
-        let address = ComponentAddress::from_absolute_url("fuchsia-boot:///#meta/root.cm")?;
-        if let ComponentAddressKind::Absolute { some_authority, .. } = address.kind() {
-            assert_eq!(some_authority.as_deref(), Some(""));
-        }
+        let address = ComponentAddress::from_absolute_url("fuchsia-boot:///#meta/root.cm").unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), Some(""));
-        assert_eq!(address.authority_or_empty_str(), "");
         assert_eq!(address.scheme(), "fuchsia-boot");
         assert_eq!(address.path(), "/");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/root.cm"));
-        assert_eq!(address.original_url(), Some("fuchsia-boot:///#meta/root.cm"));
         assert_eq!(address.url(), "fuchsia-boot:///#meta/root.cm");
         assert_matches!(address.to_url_and_context(), ("fuchsia-boot:///#meta/root.cm", None));
 
         let address =
-            ComponentAddress::from_absolute_url("custom-resolver:my:special:path#meta/root.cm")?;
-        if let ComponentAddressKind::Absolute { some_authority, .. } = address.kind() {
-            assert_eq!(some_authority, &None);
-        }
+            ComponentAddress::from_absolute_url("custom-resolver:my:special:path#meta/root.cm")
+                .unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), None);
-        assert_eq!(address.authority_or_empty_str(), "");
         assert_eq!(address.scheme(), "custom-resolver");
         assert_eq!(address.path(), "my:special:path");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/root.cm"));
-        assert_eq!(address.original_url(), Some("custom-resolver:my:special:path#meta/root.cm"));
         assert_eq!(address.url(), "custom-resolver:my:special:path#meta/root.cm");
         assert_matches!(
             address.to_url_and_context(),
             ("custom-resolver:my:special:path#meta/root.cm", None)
         );
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000")?;
-        if let ComponentAddressKind::Absolute { some_authority, .. } = address.kind() {
-            assert_eq!(some_authority, &None);
-        }
+        let address = ComponentAddress::from_absolute_url("cast:00000000").unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), None);
-        assert_eq!(address.authority_or_empty_str(), "");
         assert_eq!(address.scheme(), "cast");
         assert_eq!(address.path(), "00000000");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), None);
-        assert_eq!(address.original_url(), Some("cast:00000000"));
         assert_eq!(address.url(), "cast:00000000");
         assert_matches!(address.to_url_and_context(), ("cast:00000000", None));
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000#meta/root.cm")?;
-        if let ComponentAddressKind::Absolute { some_authority, .. } = address.kind() {
-            assert_eq!(some_authority, &None);
-        }
+        let address = ComponentAddress::from_absolute_url("cast:00000000#meta/root.cm").unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), None);
-        assert_eq!(address.authority_or_empty_str(), "");
         assert_eq!(address.scheme(), "cast");
         assert_eq!(address.path(), "00000000");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/root.cm"));
-        assert_eq!(address.original_url(), Some("cast:00000000#meta/root.cm"));
         assert_eq!(address.url(), "cast:00000000#meta/root.cm");
         assert_matches!(address.to_url_and_context(), ("cast:00000000#meta/root.cm", None));
 
         let address = ComponentAddress::from_absolute_url(
             "fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm",
-        )?;
-        if let ComponentAddressKind::Absolute { some_authority, some_query } = address.kind() {
-            assert_eq!(some_authority.as_deref(), Some("fuchsia.com"));
-            assert_eq!(some_query.as_deref(), Some("hash=cafe0123"));
-        }
+        )
+        .unwrap();
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), Some("fuchsia.com"));
-        assert_eq!(address.authority_or_empty_str(), "fuchsia.com");
         assert_eq!(address.scheme(), "fuchsia-pkg");
         assert_eq!(address.path(), "/package");
         assert_eq!(address.resource(), Some("meta/comp.cm"));
         assert_eq!(address.query(), Some("hash=cafe0123"));
-        assert_eq!(
-            address.original_url(),
-            Some("fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm")
-        );
         assert_eq!(address.url(), "fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm");
         assert_matches!(
             address.to_url_and_context(),
             ("fuchsia-pkg://fuchsia.com/package?hash=cafe0123#meta/comp.cm", None)
         );
-
-        Ok(())
     }
 
     #[test]
-    fn test_parse_relative_url() -> anyhow::Result<()> {
-        let relative_url = parse_relative_url("subpackage#meta/subcomp.cm")?;
-        assert_eq!(relative_url.path(), "subpackage");
+    fn test_relative_path() {
+        let url = Url::parse("relative:///package#fragment").unwrap();
+        assert_eq!(url.path(), "/package");
+        assert_eq!(relative_path(&url), "package");
+
+        let url = Url::parse("cast:00000000#fragment").unwrap();
+        assert_eq!(url.path(), "00000000");
+        assert_eq!(relative_path(&url), "00000000");
+    }
+
+    #[test]
+    fn test_parse_relative_url() {
+        let relative_prefix_with_one_less_slash = Url::parse("relative://").unwrap();
+        assert_eq!(relative_prefix_with_one_less_slash.scheme(), "relative");
+        assert_eq!(relative_prefix_with_one_less_slash.host(), None);
+        assert_eq!(relative_prefix_with_one_less_slash.path(), "");
+
+        assert_eq!(INTERNAL_URL_RELATIVE_PREFIX.scheme(), "relative");
+        assert_eq!(INTERNAL_URL_RELATIVE_PREFIX.host(), None);
+        assert_eq!(INTERNAL_URL_RELATIVE_PREFIX.path(), "/");
+
+        let mut clone_relative_base = INTERNAL_URL_RELATIVE_PREFIX.clone();
+        assert_eq!(clone_relative_base.path(), "/");
+        clone_relative_base.set_path("");
+        assert_eq!(clone_relative_base.path(), "");
+
+        let mut clone_relative_base = INTERNAL_URL_RELATIVE_PREFIX.clone();
+        assert_eq!(clone_relative_base.path(), "/");
+        clone_relative_base.set_path("some_path_no_initial_slash");
+        assert_eq!(clone_relative_base.path(), "/some_path_no_initial_slash");
+
+        let clone_relative_base = INTERNAL_URL_RELATIVE_PREFIX.clone();
+        let joined = clone_relative_base.join("some_path_no_initial_slash").unwrap();
+        assert_eq!(joined.path(), "/some_path_no_initial_slash");
+
+        let clone_relative_base = relative_prefix_with_one_less_slash.clone();
+        let joined = clone_relative_base.join("some_path_no_initial_slash").unwrap();
+        // Same result as with three slashes
+        assert_eq!(joined.path(), "/some_path_no_initial_slash");
+
+        let relative_url = parse_relative_url("subpackage#meta/subcomp.cm").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
         assert_eq!(relative_url.query(), None);
         assert_eq!(relative_url.fragment(), Some("meta/subcomp.cm"));
 
-        let relative_url = parse_relative_url("#meta/peercomp.cm")?;
+        let relative_url = parse_relative_url("subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("/subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("//subpackage").unwrap();
         assert_eq!(relative_url.path(), "");
+        assert_eq!(relative_url.host_str(), Some("subpackage"));
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("///subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
+        assert_eq!(relative_url.host_str(), None);
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("fuchsia.com/subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/fuchsia.com/subpackage");
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("//fuchsia.com/subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
+        assert_eq!(relative_url.host_str(), Some("fuchsia.com"));
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        assert_matches!(
+            parse_relative_url("fuchsia-pkg://fuchsia.com/subpackage"),
+            Err(ResolverError::MalformedUrl(..))
+        );
+
+        let relative_url = parse_relative_url("//fuchsia.com/subpackage").unwrap();
+        assert_eq!(relative_url.path(), "/subpackage");
+        assert_eq!(relative_url.query(), None);
+        assert_eq!(relative_url.fragment(), None);
+
+        let relative_url = parse_relative_url("#meta/peercomp.cm").unwrap();
+        assert_eq!(relative_url.path(), "/");
         assert_eq!(relative_url.query(), None);
         assert_eq!(relative_url.fragment(), Some("meta/peercomp.cm"));
 
         let address =
-            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")?
-                .clone_with_new_resource(relative_url.fragment());
+            ComponentAddress::from_absolute_url("some-scheme://fuchsia.com/package#meta/comp.cm")
+                .unwrap()
+                .clone_with_new_resource(relative_url.fragment())
+                .unwrap();
 
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), Some("fuchsia.com"));
-        assert_eq!(address.authority_or_empty_str(), "fuchsia.com");
         assert_eq!(address.scheme(), "some-scheme");
         assert_eq!(address.path(), "/package");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/peercomp.cm"));
         assert_eq!(address.url(), "some-scheme://fuchsia.com/package#meta/peercomp.cm");
 
-        let address = ComponentAddress::from_absolute_url("cast:00000000")?
-            .clone_with_new_resource(relative_url.fragment());
+        let address = ComponentAddress::from_absolute_url("cast:00000000")
+            .unwrap()
+            .clone_with_new_resource(relative_url.fragment())
+            .unwrap();
 
         assert!(address.is_absolute());
-        assert_eq!(address.authority(), None);
-        assert_eq!(address.authority_or_empty_str(), "");
         assert_eq!(address.scheme(), "cast");
         assert_eq!(address.path(), "00000000");
         assert_eq!(address.query(), None);
         assert_eq!(address.resource(), Some("meta/peercomp.cm"));
         assert_eq!(address.url(), "cast:00000000#meta/peercomp.cm");
-
-        Ok(())
     }
 }
