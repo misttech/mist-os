@@ -43,6 +43,7 @@ impl Screens {
             State::FactoryResetConfirm => self.factory_reset_confirm(),
             State::Failed(operation, error) => self.failed(operation, error),
             State::Reinstall => self.reinstall(),
+            State::Rebooting(_) => self.rebooting(),
             State::GetWiFiNetworks => self.select_wifi(&Vec::new()),
             State::SelectWiFi(networks) => self.select_wifi(networks),
             State::EnterWiFi => {
@@ -199,6 +200,26 @@ impl Screens {
         view_assistant_ptr
     }
 
+    fn rebooting(&self) -> ViewAssistantPtr {
+        let view_assistant_ptr = Box::new(
+            GenericSplitViewAssistant::new(
+                self.app_sender.clone(),
+                self.view_key,
+                ScreenSplit::Even,
+                Some("Rebooting...".to_string()),
+                Some("Your device will now reboot.".to_string()),
+                None,
+                None,
+                None,
+                None,
+                Some(IMAGE_DEVICE_UPDATING),
+                None,
+            )
+            .unwrap(),
+        );
+        view_assistant_ptr
+    }
+
     fn reinstall(&self) -> ViewAssistantPtr {
         let view_assistant_ptr = Box::new(
             GenericSplitViewAssistant::new(
@@ -223,7 +244,7 @@ impl Screens {
                         Event::Reinstall,
                     ),
                 ]),
-                Some(vec![ButtonInfo::new("Reboot", None, true, true, Event::Cancel)]),
+                Some(vec![ButtonInfo::new("Reboot", None, true, true, Event::Reboot)]),
                 None,
                 None,
                 None,

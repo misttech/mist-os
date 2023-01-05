@@ -7,6 +7,7 @@ use crate::ota::actions::factory_reset::FactoryResetAction;
 use crate::ota::actions::finalize_reinstall::FinalizeReinstallAction;
 use crate::ota::actions::get_wifi_networks::GetWifiNetworksAction;
 use crate::ota::actions::ota_reinstall::OtaReinstallAction;
+use crate::ota::actions::reboot_device::RebootAction;
 use crate::ota::actions::set_sharing_consent::SetSharingConsentAction;
 use crate::ota::actions::wifi_connect::WifiConnectAction;
 use crate::ota::controller::EventSender;
@@ -43,6 +44,7 @@ impl StateHandler for Action {
             State::Connecting(network, password) => {
                 WifiConnectAction::run(event_sender, network, password, self.crash_reporter.clone())
             }
+            State::Rebooting(delay) => RebootAction::run(event_sender, delay),
             State::ReinstallConfirm { desired: user_data_sharing_consent, reported } => {
                 SetSharingConsentAction::run(event_sender, user_data_sharing_consent, reported)
             }

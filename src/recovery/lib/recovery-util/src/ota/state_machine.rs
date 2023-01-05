@@ -1,7 +1,6 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use crate::ota::state_machine::DataSharingConsent::Unknown;
 use crate::wlan::NetworkInfo;
 use mockall::automock;
@@ -18,10 +17,13 @@ pub enum Operation {
     Reinstall,
 }
 
+pub const REBOOT_DELAY_SECONDS: Option<u64> = Some(3);
+
 pub(crate) type Network = String;
 pub(crate) type NetworkInfos = Vec<NetworkInfo>;
 pub(crate) type Password = String;
 pub(crate) type PercentProgress = u8;
+pub(crate) type RebootDelay = Option<u64>;
 
 type Text = String;
 type ErrorMessage = String;
@@ -55,6 +57,7 @@ pub enum State {
     FinalizeReinstall(OtaStatus),
     Failed(Operation, Option<ErrorMessage>),
     Home,
+    Rebooting(RebootDelay),
     Reinstall,
     ReinstallConfirm {
         desired: DataSharingConsent,
@@ -89,6 +92,8 @@ pub enum Event {
     Progress(PercentProgress),
     //TODO(b/253084947): remove this event when switching to correct update status fidl
     ProgressComplete(OtaStatus),
+    Reboot,
+    Rebooting,
     Reinstall,
     SystemPrivacySetting(DataSharingConsent),
     SendReports(DataSharingConsent),
@@ -148,6 +153,7 @@ impl StateMachine {
             },
 
             (State::Reinstall, Event::Reinstall) => Some(State::GetWiFiNetworks),
+            (State::Reinstall, Event::Reboot) => Some(State::Rebooting(REBOOT_DELAY_SECONDS)),
 
             (State::GetWiFiNetworks, Event::AddNetwork) => Some(State::EnterWiFi),
             (State::GetWiFiNetworks, Event::Networks(networks)) => {
@@ -199,6 +205,7 @@ impl StateMachine {
                 reported: reported.clone(),
             }),
             (State::ReinstallConfirm { .. }, Event::Reinstall) => Some(State::ExecuteReinstall),
+
             (State::ExecuteReinstall, Event::Reinstall) => {
                 Some(State::ReinstallRunning { status: None, progress: 0 })
             }
