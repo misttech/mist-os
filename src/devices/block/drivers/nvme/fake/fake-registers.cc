@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/block/drivers/nvme-cpp/fake/fake-nvme-registers.h"
+#include "src/devices/block/drivers/nvme/fake/fake-registers.h"
 
 #include <zircon/syscalls.h>
 
-#include "src/devices/block/drivers/nvme-cpp/registers.h"
+#include "src/devices/block/drivers/nvme/registers.h"
 
 namespace fake_nvme {
 
-FakeNvmeRegisters::FakeNvmeRegisters() {
+FakeRegisters::FakeRegisters() {
   // Pretend to be version 1.4.0.
   vers_.set_major(1).set_minor(4).set_tertiary(0);
   // We emulate a very minimal set of capabilities.
@@ -33,9 +33,12 @@ FakeNvmeRegisters::FakeNvmeRegisters() {
       .set_weighted_round_robin_arbitration_supported(false)
       .set_contiguous_queues_required(true)
       .set_max_queue_entries_raw(65535);
+  // Admin queue doorbells.
+  completion_doorbells_.emplace(0, nvme::DoorbellReg{});
+  submission_doorbells_.emplace(0, nvme::DoorbellReg{});
 }
 
-uint64_t FakeNvmeRegisters::Read64(zx_off_t offs) {
+uint64_t FakeRegisters::Read64(zx_off_t offs) {
   switch (offs) {
     case nvme::NVME_REG_CAP:
       return caps_.reg_value();
@@ -48,7 +51,7 @@ uint64_t FakeNvmeRegisters::Read64(zx_off_t offs) {
   ZX_ASSERT_MSG(false, "64-bit reads from 0x%lx are not supported", offs);
 }
 
-void FakeNvmeRegisters::Write64(uint64_t val, zx_off_t offs) {
+void FakeRegisters::Write64(uint64_t val, zx_off_t offs) {
   switch (offs) {
     case nvme::NVME_REG_CAP:
       ZX_ASSERT_MSG(false, "CAP register is read-only.");
@@ -70,7 +73,7 @@ void FakeNvmeRegisters::Write64(uint64_t val, zx_off_t offs) {
   ZX_ASSERT_MSG(false, "64-bit writes to 0x%lx are not supported", offs);
 }
 
-uint32_t FakeNvmeRegisters::Read32(zx_off_t offs) {
+uint32_t FakeRegisters::Read32(zx_off_t offs) {
   switch (offs) {
     case nvme::NVME_REG_VS:
       return vers_.reg_value();
@@ -88,24 +91,19 @@ uint32_t FakeNvmeRegisters::Read32(zx_off_t offs) {
   ZX_ASSERT_MSG(false, "32-bit reads from 0x%lx are not supported", offs);
 }
 
-void FakeNvmeRegisters::Write32(uint32_t val, zx_off_t offs) {
+void FakeRegisters::Write32(uint32_t val, zx_off_t offs) {
   if (offs >= nvme::NVME_REG_DOORBELL_BASE) {
     offs -= nvme::NVME_REG_DOORBELL_BASE;
     offs /= (4 << caps_.doorbell_stride());
     bool is_completion = offs & 1;
+    auto& doorbells = is_completion ? completion_doorbells_ : submission_doorbells_;
     offs /= 2;
-    if (!is_completion) {
-      ZX_ASSERT(offs < submission_doorbells_.size());
-      submission_doorbells_[offs].set_reg_value(val);
-      if (callbacks_) {
-        callbacks_->doorbell_ring(true, offs, submission_doorbells_[offs]);
-      }
-    } else {
-      ZX_ASSERT(offs < completion_doorbells_.size());
-      completion_doorbells_[offs].set_reg_value(val);
-      if (callbacks_) {
-        callbacks_->doorbell_ring(false, offs, completion_doorbells_[offs]);
-      }
+    auto iter = doorbells.find(offs);
+    ZX_ASSERT(iter != doorbells.end());
+    nvme::DoorbellReg& doorbell = iter->second;
+    doorbell.set_reg_value(val);
+    if (callbacks_) {
+      callbacks_->doorbell_ring(!is_completion, offs, doorbell);
     }
     return;
   }

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_CONTROLLER_H_
-#define SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_CONTROLLER_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_CONTROLLER_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_CONTROLLER_H_
 
 #include <lib/fit/function.h>
 #include <lib/zx/clock.h>
@@ -13,22 +13,22 @@
 #include <unordered_map>
 #include <vector>
 
-#include "src/devices/block/drivers/nvme-cpp/commands.h"
-#include "src/devices/block/drivers/nvme-cpp/fake/fake-nvme-namespace.h"
-#include "src/devices/block/drivers/nvme-cpp/fake/fake-nvme-registers.h"
-#include "src/devices/block/drivers/nvme-cpp/nvme.h"
-#include "src/devices/block/drivers/nvme-cpp/queue-pair.h"
-#include "src/devices/block/drivers/nvme-cpp/queue.h"
+#include "src/devices/block/drivers/nvme/commands.h"
+#include "src/devices/block/drivers/nvme/fake/fake-namespace.h"
+#include "src/devices/block/drivers/nvme/fake/fake-registers.h"
+#include "src/devices/block/drivers/nvme/nvme.h"
+#include "src/devices/block/drivers/nvme/queue-pair.h"
+#include "src/devices/block/drivers/nvme/queue.h"
 
 namespace fake_nvme {
 
 constexpr size_t kAdminQueueId = 0;
 
-class FakeNvmeController {
+class FakeController {
  public:
   using CommandHandler = std::function<void(
       nvme::Submission& submission, const nvme::TransactionData& data, nvme::Completion& status)>;
-  FakeNvmeController();
+  FakeController();
   // Called when a write to the submission queue doorbell register occurs.
   // queue_id - queue this submission is from
   // index - index of this submission in the queue
@@ -50,31 +50,36 @@ class FakeNvmeController {
   void UpdateAdminQueue();
 
   // Add a namespace to this controller.
-  void AddNamespace(uint32_t nsid, FakeNvmeNamespace& ns) { namespaces_.emplace(nsid, ns); }
+  void AddNamespace(uint32_t nsid, FakeNamespace& ns) { namespaces_.emplace(nsid, ns); }
 
   // Called by the test fixture to give us a pointer to the driver instance.
   // We use the driver instance to access data buffers and queues since the values written to the
   // register are fake values from fake_bti.
   void SetNvme(nvme::Nvme* nvme) { nvme_ = nvme; }
 
-  void AddQueuePair(size_t queue_id, nvme::Queue* completion_queue, nvme::Queue* submission_queue) {
-    completion_queues_.emplace(
-        queue_id,
-        QueueState{
-            .queue = completion_queue,
-            .consumer_location = static_cast<uint16_t>(completion_queue->entry_count() - 1),
-            .producer_location = 0,
-        });
-
-    submission_queues_.emplace(queue_id, QueueState{
-                                             .queue = submission_queue,
-                                             .consumer_location = 0,
-                                             .producer_location = 0,
-                                         });
+  void AddQueuePair(size_t queue_id, const nvme::Queue* completion_queue,
+                    const nvme::Queue* submission_queue) {
+    if (completion_queue) {
+      completion_queues_.emplace(
+          queue_id,
+          QueueState{
+              .queue = completion_queue,
+              .consumer_location = static_cast<uint16_t>(completion_queue->entry_count() - 1),
+              .producer_location = 0,
+          });
+    }
+    if (submission_queue) {
+      submission_queues_.emplace(queue_id, QueueState{
+                                               .queue = submission_queue,
+                                               .consumer_location = 0,
+                                               .producer_location = 0,
+                                           });
+    }
   }
 
-  FakeNvmeRegisters& registers() { return regs_; }
-  const std::map<uint32_t, FakeNvmeNamespace&>& namespaces() const { return namespaces_; }
+  FakeRegisters& registers() { return regs_; }
+  nvme::Nvme* nvme() { return nvme_; }
+  const std::map<uint32_t, FakeNamespace&>& namespaces() const { return namespaces_; }
 
   // Returns IRQ number |index|, and creates it if it doesn't yet exist.
   zx::result<zx::interrupt> GetOrCreateInterrupt(size_t index);
@@ -82,7 +87,7 @@ class FakeNvmeController {
  private:
   // Controller-side information about a queue.
   struct QueueState {
-    nvme::Queue* queue;
+    const nvme::Queue* queue;
     // Maximum available slot to fill
     // For completions, this is the value written to completion doorbell.
     // For submissions, this is the index of the last submission we handled.
@@ -138,18 +143,18 @@ class FakeNvmeController {
   std::unordered_map<uint8_t, CommandHandler> admin_commands_;
   std::unordered_map<uint8_t, CommandHandler> io_commands_;
   // This is ordered because "Get Active Namespaces" returns an ordered list of namespaces.
-  std::map<uint32_t, FakeNvmeNamespace&> namespaces_;
+  std::map<uint32_t, FakeNamespace&> namespaces_;
   nvme::Nvme* nvme_ = nullptr;
 
-  FakeNvmeRegisters regs_;
+  FakeRegisters regs_;
   NvmeRegisterCallbacks callbacks_{
-      .set_config = fit::bind_member(this, &FakeNvmeController::SetConfig),
-      .interrupt_mask_update = fit::bind_member(this, &FakeNvmeController::UpdateIrqMask),
-      .doorbell_ring = fit::bind_member(this, &FakeNvmeController::RingDoorbell),
-      .admin_queue_update = fit::bind_member(this, &FakeNvmeController::UpdateAdminQueue),
+      .set_config = fit::bind_member(this, &FakeController::SetConfig),
+      .interrupt_mask_update = fit::bind_member(this, &FakeController::UpdateIrqMask),
+      .doorbell_ring = fit::bind_member(this, &FakeController::RingDoorbell),
+      .admin_queue_update = fit::bind_member(this, &FakeController::UpdateAdminQueue),
   };
 };
 
 }  // namespace fake_nvme
 
-#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_CONTROLLER_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_CONTROLLER_H_

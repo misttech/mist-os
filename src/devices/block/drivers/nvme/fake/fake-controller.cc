@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/block/drivers/nvme-cpp/fake/fake-nvme-controller.h"
+#include "src/devices/block/drivers/nvme/fake/fake-controller.h"
 
 #include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/clock.h>
 
-#include "src/devices/block/drivers/nvme-cpp/commands.h"
-#include "src/devices/block/drivers/nvme-cpp/registers.h"
+#include "src/devices/block/drivers/nvme/commands.h"
+#include "src/devices/block/drivers/nvme/registers.h"
 
 namespace fake_nvme {
 
-FakeNvmeController::FakeNvmeController() { regs_.SetCallbacks(&callbacks_); }
+FakeController::FakeController() { regs_.SetCallbacks(&callbacks_); }
 
-void FakeNvmeController::HandleSubmission(size_t queue_id, size_t index,
-                                          nvme::Submission& submission) {
+void FakeController::HandleSubmission(size_t queue_id, size_t index, nvme::Submission& submission) {
   // Fill in the completion with data we know will be returned.
   nvme::Completion completion{};
   completion.set_command_id(static_cast<uint16_t>(submission.cid()));
@@ -39,7 +38,7 @@ void FakeNvmeController::HandleSubmission(size_t queue_id, size_t index,
   SubmitCompletion(completion);
 }
 
-void FakeNvmeController::SubmitCompletion(nvme::Completion& completion) {
+void FakeController::SubmitCompletion(nvme::Completion& completion) {
   // Find queue.
   size_t queue_id = completion.sq_id();
   auto iter = completion_queues_.find(queue_id);
@@ -65,7 +64,7 @@ void FakeNvmeController::SubmitCompletion(nvme::Completion& completion) {
   irqs_.find(0)->second.Trigger();
 }
 
-zx::result<zx::interrupt> FakeNvmeController::GetOrCreateInterrupt(size_t index) {
+zx::result<zx::interrupt> FakeController::GetOrCreateInterrupt(size_t index) {
   auto value = irqs_.find(index);
   zx::unowned_interrupt to_clone;
   if (value != irqs_.end()) {
@@ -87,7 +86,7 @@ zx::result<zx::interrupt> FakeNvmeController::GetOrCreateInterrupt(size_t index)
   return zx::ok(std::move(out));
 }
 
-void FakeNvmeController::SetConfig(nvme::ControllerConfigReg& cfg) {
+void FakeController::SetConfig(nvme::ControllerConfigReg& cfg) {
   if (cfg.enabled()) {
     regs_.csts().set_ready(true);
   } else {
@@ -95,7 +94,7 @@ void FakeNvmeController::SetConfig(nvme::ControllerConfigReg& cfg) {
   }
 }
 
-void FakeNvmeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
+void FakeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
   uint32_t val = state.reg_value();
   for (size_t i = 0; i < 32; i++) {
     if ((val >> i) & 1) {
@@ -110,7 +109,7 @@ void FakeNvmeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
   }
 }
 
-void FakeNvmeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::DoorbellReg& reg) {
+void FakeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::DoorbellReg& reg) {
   if (!is_submit) {
     // Completion is easy, just note the new location.
     completion_queues_[queue_id].consumer_location = static_cast<uint16_t>(reg.value());
@@ -120,7 +119,7 @@ void FakeNvmeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::Doo
   // Submission is a little more complex. For each new submission (between the old and new values of
   // the doorbell), we call HandleSubmission().
   uint16_t old = submission_queues_[queue_id].consumer_location;
-  nvme::Queue* queue = submission_queues_[queue_id].queue;
+  const nvme::Queue* queue = submission_queues_[queue_id].queue;
 
   cpp20::span<nvme::Submission> submissions(static_cast<nvme::Submission*>(queue->head()),
                                             queue->entry_count());
@@ -140,7 +139,7 @@ void FakeNvmeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::Doo
   submission_queues_[queue_id].consumer_location = static_cast<uint16_t>(i);
 }
 
-void FakeNvmeController::UpdateAdminQueue() {
+void FakeController::UpdateAdminQueue() {
   AddQueuePair(0, const_cast<nvme::Queue*>(&nvme_->admin_queue_->completion()),
                const_cast<nvme::Queue*>(&nvme_->admin_queue_->submission()));
 }

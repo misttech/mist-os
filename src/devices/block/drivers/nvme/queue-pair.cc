@@ -125,6 +125,7 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
   }
   txn_data.ClearExceptPrp();
   txn_data.io_cmd = io_cmd;
+  txn_data.data_vmo = data_vmo;
 
   // We only peek here so that if the transaction setup fails somewhere we can easily roll-back
   auto submission = static_cast<Submission*>(submission_.Peek());

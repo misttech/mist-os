@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_NAMESPACE_H_
-#define SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_NAMESPACE_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_NAMESPACE_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_NAMESPACE_H_
 
 #include <lib/zx/vmo.h>
 #include <stdint.h>
 
 #include <vector>
 
-#include "src/devices/block/drivers/nvme-cpp/commands/identify.h"
+#include "src/devices/block/drivers/nvme/commands/identify.h"
 
 namespace fake_nvme {
 
@@ -29,10 +29,10 @@ struct NamespaceConfig {
   uint64_t block_count = 1024;
 };
 
-class FakeNvmeNamespace {
+class FakeNamespace {
  public:
-  explicit FakeNvmeNamespace() : FakeNvmeNamespace(NamespaceConfig()) {}
-  explicit FakeNvmeNamespace(NamespaceConfig config) : config_(std::move(config)) {}
+  explicit FakeNamespace() : FakeNamespace(NamespaceConfig()) {}
+  explicit FakeNamespace(NamespaceConfig config) : config_(std::move(config)) {}
 
   // Fill in |out| with appropriate values for this namespace.
   void Identify(nvme::IdentifyNvmeNamespace* out);
@@ -42,4 +42,4 @@ class FakeNvmeNamespace {
 };
 }  // namespace fake_nvme
 
-#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_NAMESPACE_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_NAMESPACE_H_

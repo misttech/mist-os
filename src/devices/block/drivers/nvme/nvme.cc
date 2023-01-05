@@ -41,15 +41,19 @@ constexpr size_t kAdminQueueMaxEntries = 4096;
 
 int Nvme::IrqLoop() {
   while (true) {
-    zx_status_t status = zx_interrupt_wait(irqh_, nullptr);
+    zx_status_t status = irq_.wait(nullptr);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
+      if (status == ZX_ERR_CANCELED) {
+        zxlogf(DEBUG, "Interrupt cancelled. Exiting IRQ loop.");
+      } else {
+        zxlogf(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
+      }
       break;
     }
 
     // The interrupt mask register should only be used when not using MSI-X.
     if (irq_mode_ != PCI_INTERRUPT_MODE_MSI_X) {
-      InterruptReg::MaskSet().FromValue(1).WriteTo(&*mmio_);
+      InterruptReg::MaskSet().FromValue(1).WriteTo(&mmio_);
     }
 
     Completion* admin_completion;
@@ -67,7 +71,7 @@ int Nvme::IrqLoop() {
 
     if (irq_mode_ != PCI_INTERRUPT_MODE_MSI_X) {
       // Unmask the interrupt.
-      InterruptReg::MaskClear().FromValue(1).WriteTo(&*mmio_);
+      InterruptReg::MaskClear().FromValue(1).WriteTo(&mmio_);
     }
 
     if (irq_mode_ == PCI_INTERRUPT_MODE_LEGACY) {
@@ -120,18 +124,14 @@ zx_status_t Nvme::DoAdminCommandSync(Submission& submission,
 
 void Nvme::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
-  if (mmio_->get_vmo() != ZX_HANDLE_INVALID) {
+  if (mmio_.get_vmo() != ZX_HANDLE_INVALID) {
     pci_set_bus_mastering(&pci_, false);
-    zx_handle_close(bti_.get());
-    // TODO: risks a handle use-after-close, will be resolved by IRQ api
-    // changes coming soon
-    zx_handle_close(irqh_);
   }
+  irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
   if (irq_thread_started_) {
     int unused;
     thrd_join(irq_thread_, &unused);
   }
-
   delete this;
 }
 
@@ -272,8 +272,8 @@ static void PopulateControllerInspect(const IdentifyController& identify,
 }
 
 zx_status_t Nvme::Init() {
-  VersionReg version_reg = VersionReg::Get().ReadFrom(mmio_.get());
-  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(mmio_.get());
+  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio_);
+  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio_);
 
   PopulateVersionInspect(version_reg, &inspect_);
   PopulateCapabilitiesInspect(caps_reg, version_reg, &inspect_);
@@ -286,18 +286,19 @@ zx_status_t Nvme::Init() {
     return status;
   }
 
-  if (ControllerStatusReg::Get().ReadFrom(&*mmio_).ready()) {
+  if (ControllerStatusReg::Get().ReadFrom(&mmio_).ready()) {
     zxlogf(DEBUG, "Controller is already enabled. Resetting it.");
-    ControllerConfigReg::Get().ReadFrom(&*mmio_).set_enabled(0).WriteTo(&*mmio_);
-    status = WaitForReset(/*desired_ready_state=*/false, &*mmio_);
+    ControllerConfigReg::Get().ReadFrom(&mmio_).set_enabled(0).WriteTo(&mmio_);
+    status = WaitForReset(/*desired_ready_state=*/false, &mmio_);
     if (status != ZX_OK) {
       return status;
     }
   }
 
   // Set up admin submission and completion queues.
-  auto admin_queue = QueuePair::Create(bti_.borrow(), 0, kAdminQueueMaxEntries, caps_reg, *mmio_,
-                                       /*prealloc_prp=*/false);
+  zx::result admin_queue =
+      QueuePair::Create(bti_.borrow(), 0, kAdminQueueMaxEntries, caps_reg, mmio_,
+                        /*prealloc_prp=*/false);
   if (admin_queue.is_error()) {
     zxlogf(ERROR, "Failed to set up admin queue: %s", admin_queue.status_string());
     return admin_queue.status_value();
@@ -306,23 +307,23 @@ zx_status_t Nvme::Init() {
 
   // Configure the admin queue.
   AdminQueueAttributesReg::Get()
-      .ReadFrom(&*mmio_)
+      .ReadFrom(&mmio_)
       .set_completion_queue_size(admin_queue_->completion().entry_count() - 1)
       .set_submission_queue_size(admin_queue_->submission().entry_count() - 1)
-      .WriteTo(&*mmio_);
+      .WriteTo(&mmio_);
 
   AdminQueueAddressReg::CompletionQueue()
-      .ReadFrom(&*mmio_)
+      .ReadFrom(&mmio_)
       .set_addr(admin_queue_->completion().GetDeviceAddress())
-      .WriteTo(&*mmio_);
+      .WriteTo(&mmio_);
   AdminQueueAddressReg::SubmissionQueue()
-      .ReadFrom(&*mmio_)
+      .ReadFrom(&mmio_)
       .set_addr(admin_queue_->submission().GetDeviceAddress())
-      .WriteTo(&*mmio_);
+      .WriteTo(&mmio_);
 
   zxlogf(DEBUG, "Enabling controller.");
   ControllerConfigReg::Get()
-      .ReadFrom(&*mmio_)
+      .ReadFrom(&mmio_)
       .set_controller_ready_independent_of_media(0)
       // Queue entry sizes are powers of two.
       .set_io_completion_queue_entry_size(__builtin_ctzl(sizeof(Completion)))
@@ -333,19 +334,19 @@ zx_status_t Nvme::Init() {
       .set_memory_page_size(__builtin_ctzl(kPageSize) - 12)
       .set_io_command_set(ControllerConfigReg::CommandSet::kNvm)
       .set_enabled(1)
-      .WriteTo(&*mmio_);
+      .WriteTo(&mmio_);
 
-  status = WaitForReset(/*desired_ready_state=*/true, &*mmio_);
+  status = WaitForReset(/*desired_ready_state=*/true, &mmio_);
   if (status != ZX_OK) {
     return status;
   }
 
   // Timeout may have changed, so double check it.
-  caps_reg.ReadFrom(&*mmio_);
+  caps_reg.ReadFrom(&mmio_);
 
   // Set up IO submission and completion queues.
-  auto io_queue =
-      QueuePair::Create(bti_.borrow(), 1, caps_reg.max_queue_entries(), caps_reg, *mmio_,
+  zx::result io_queue =
+      QueuePair::Create(bti_.borrow(), 1, caps_reg.max_queue_entries(), caps_reg, mmio_,
                         /*prealloc_prp=*/true);
   if (io_queue.is_error()) {
     zxlogf(ERROR, "Failed to set up io queue: %s", io_queue.status_string());
@@ -496,7 +497,7 @@ zx_status_t Nvme::Init() {
       zxlogf(WARNING, "Skipping additional namespaces after adding %zu.", namespaces_.size());
       break;
     }
-    auto result = Namespace::Bind(this, ns_list->nsid[i]);
+    zx::result result = Namespace::Bind(this, ns_list->nsid[i]);
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to add namespace %u: %s", ns_list->nsid[i], result.status_string());
       return result.status_value();
@@ -507,54 +508,13 @@ zx_status_t Nvme::Init() {
   return ZX_OK;
 }
 
-zx_status_t Nvme::AddDevice(zx_device_t* dev) {
+zx_status_t Nvme::AddDevice() {
   auto cleanup = fit::defer([&] { DdkRelease(); });
 
-  zx_status_t status = device_get_fragment_protocol(dev, "pci", ZX_PROTOCOL_PCI, &pci_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to find PCI fragment: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  mmio_buffer_t mmio_buffer;
-  status = pci_map_bar_buffer(&pci_, 0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_buffer);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot map registers: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  mmio_ = std::make_unique<fdf::MmioBuffer>(mmio_buffer);
-
-  status = pci_configure_interrupt_mode(&pci_, 1, &irq_mode_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not configure irqs: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zxlogf(DEBUG, "Interrupt mode: %u", irq_mode_);
-
-  status = pci_map_interrupt(&pci_, 0, &irqh_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not map irq: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  status = pci_set_bus_mastering(&pci_, true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot enable bus mastering: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_handle_t bti_handle;
-  status = pci_get_bti(&pci_, 0, &bti_handle);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot obtain bti handle: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  bti_ = zx::bti(bti_handle);
-
-  status = DdkAdd(ddk::DeviceAddArgs("nvme").set_inspect_vmo(inspect_.DuplicateVmo()));
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("nvme").set_inspect_vmo(inspect_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed DdkAdd: %s", zx_status_get_string(status));
-    return ZX_ERR_NOT_SUPPORTED;
+    return status;
   }
 
   cleanup.cancel();
@@ -562,8 +522,55 @@ zx_status_t Nvme::AddDevice(zx_device_t* dev) {
 }
 
 zx_status_t Nvme::Bind(void* ctx, zx_device_t* dev) {
-  auto driver = std::make_unique<nvme::Nvme>(dev);
-  if (zx_status_t status = driver->AddDevice(dev); status != ZX_OK) {
+  pci_protocol_t pci;
+  zx_status_t status = device_get_fragment_protocol(dev, "pci", ZX_PROTOCOL_PCI, &pci);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to find PCI fragment: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  mmio_buffer_t mmio_buffer;
+  status = pci_map_bar_buffer(&pci, 0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_buffer);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map registers: %s", zx_status_get_string(status));
+    return status;
+  }
+  auto mmio = fdf::MmioBuffer(mmio_buffer);
+
+  pci_interrupt_mode_t irq_mode;
+  status = pci_configure_interrupt_mode(&pci, 1, &irq_mode);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to configure interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+  zxlogf(DEBUG, "Interrupt mode: %u", irq_mode);
+
+  zx_handle_t irq_handle;
+  status = pci_map_interrupt(&pci, 0, &irq_handle);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map interrupt: %s", zx_status_get_string(status));
+    return status;
+  }
+  auto irq = zx::interrupt(irq_handle);
+
+  status = pci_set_bus_mastering(&pci, true);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to enable bus mastering: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  zx_handle_t bti_handle;
+  status = pci_get_bti(&pci, 0, &bti_handle);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
+    return status;
+  }
+  auto bti = zx::bti(bti_handle);
+
+  auto driver = std::make_unique<nvme::Nvme>(dev, pci, std::move(mmio), irq_mode, std::move(irq),
+                                             std::move(bti));
+  status = driver->AddDevice();
+  if (status != ZX_OK) {
     return status;
   }
 

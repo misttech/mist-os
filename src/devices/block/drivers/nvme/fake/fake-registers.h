@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_REGISTERS_H_
-#define SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_REGISTERS_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_REGISTERS_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_REGISTERS_H_
 
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -11,7 +11,7 @@
 #include <functional>
 #include <vector>
 
-#include "src/devices/block/drivers/nvme-cpp/registers.h"
+#include "src/devices/block/drivers/nvme/registers.h"
 
 namespace fake_nvme {
 
@@ -23,9 +23,10 @@ struct NvmeRegisterCallbacks {
 };
 
 // Implements fake MMIO support for the NVMe controller registers.
-class FakeNvmeRegisters {
+class FakeRegisters {
  public:
-  FakeNvmeRegisters();
+  FakeRegisters();
+
   fdf::MmioBuffer GetBuffer() {
     return fdf::MmioBuffer{
         mmio_buffer_t{
@@ -40,13 +41,13 @@ class FakeNvmeRegisters {
   }
 
   void SetCallbacks(NvmeRegisterCallbacks* callbacks) { callbacks_ = callbacks; }
-  void SetUpDoorbells(size_t index) {
-    if (completion_doorbells_.size() - 1 < index) {
-      completion_doorbells_.resize(index + 1);
-    }
-    if (submission_doorbells_.size() - 1 < index) {
-      submission_doorbells_.resize(index + 1);
-    }
+
+  void SetUpCompletionDoorbell(size_t index) {
+    completion_doorbells_.emplace(index, nvme::DoorbellReg{});
+  }
+
+  void SetUpSubmissionDoorbell(size_t index) {
+    submission_doorbells_.emplace(index, nvme::DoorbellReg{});
   }
 
   nvme::ControllerStatusReg& csts() { return csts_; }
@@ -61,9 +62,8 @@ class FakeNvmeRegisters {
   nvme::AdminQueueAttributesReg admin_queue_attrs_;
   nvme::AdminQueueAddressReg admin_submission_queue_;
   nvme::AdminQueueAddressReg admin_completion_queue_;
-
-  std::vector<nvme::DoorbellReg> completion_doorbells_{1};
-  std::vector<nvme::DoorbellReg> submission_doorbells_{1};
+  std::unordered_map<size_t, nvme::DoorbellReg> completion_doorbells_;
+  std::unordered_map<size_t, nvme::DoorbellReg> submission_doorbells_;
 
   // Define read/write for |bits| that just crashes.
 #define STUB_IO_OP(bits)                                                                        \
@@ -80,19 +80,19 @@ class FakeNvmeRegisters {
 #undef STUB_IO_OP
 
   static void Write64(const void* ctx, const mmio_buffer_t& mmio, uint64_t val, zx_off_t offs) {
-    const_cast<FakeNvmeRegisters*>(static_cast<const FakeNvmeRegisters*>(ctx))->Write64(val, offs);
+    const_cast<FakeRegisters*>(static_cast<const FakeRegisters*>(ctx))->Write64(val, offs);
   }
   static uint64_t Read64(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    return const_cast<FakeNvmeRegisters*>(static_cast<const FakeNvmeRegisters*>(ctx))->Read64(offs);
+    return const_cast<FakeRegisters*>(static_cast<const FakeRegisters*>(ctx))->Read64(offs);
   }
   void Write64(uint64_t val, zx_off_t offs);
   uint64_t Read64(zx_off_t offs);
 
   static void Write32(const void* ctx, const mmio_buffer_t& mmio, uint32_t val, zx_off_t offs) {
-    const_cast<FakeNvmeRegisters*>(static_cast<const FakeNvmeRegisters*>(ctx))->Write32(val, offs);
+    const_cast<FakeRegisters*>(static_cast<const FakeRegisters*>(ctx))->Write32(val, offs);
   }
   static uint32_t Read32(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    return const_cast<FakeNvmeRegisters*>(static_cast<const FakeNvmeRegisters*>(ctx))->Read32(offs);
+    return const_cast<FakeRegisters*>(static_cast<const FakeRegisters*>(ctx))->Read32(offs);
   }
   void Write32(uint32_t val, zx_off_t offs);
   uint32_t Read32(zx_off_t offs);
@@ -112,4 +112,4 @@ class FakeNvmeRegisters {
 
 }  // namespace fake_nvme
 
-#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_CPP_FAKE_FAKE_NVME_REGISTERS_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_REGISTERS_H_

@@ -19,6 +19,10 @@
 #include "src/devices/block/drivers/nvme/queue-pair.h"
 #include "src/devices/block/drivers/nvme/registers.h"
 
+namespace fake_nvme {
+class FakeController;
+}
+
 namespace nvme {
 
 class Namespace;
@@ -27,11 +31,18 @@ class Nvme;
 using DeviceType = ddk::Device<Nvme, ddk::Initializable>;
 class Nvme : public DeviceType {
  public:
-  explicit Nvme(zx_device_t* parent) : DeviceType(parent) {}
+  explicit Nvme(zx_device_t* parent, pci_protocol_t pci, fdf::MmioBuffer mmio,
+                pci_interrupt_mode_t irq_mode, zx::interrupt irq, zx::bti bti)
+      : DeviceType(parent),
+        pci_(pci),
+        mmio_(std::move(mmio)),
+        irq_mode_(irq_mode),
+        irq_(std::move(irq)),
+        bti_(std::move(bti)) {}
   ~Nvme() = default;
 
   static zx_status_t Bind(void* ctx, zx_device_t* dev);
-  zx_status_t AddDevice(zx_device_t* dev);
+  zx_status_t AddDevice();
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
@@ -49,6 +60,8 @@ class Nvme : public DeviceType {
   uint16_t atomic_write_unit_power_fail() const { return atomic_write_unit_power_fail_; }
 
  private:
+  friend class fake_nvme::FakeController;
+
   static int IrqThread(void* arg) { return static_cast<Nvme*>(arg)->IrqLoop(); }
   int IrqLoop();
 
@@ -56,9 +69,9 @@ class Nvme : public DeviceType {
   zx_status_t Init();
 
   pci_protocol_t pci_;
-  std::unique_ptr<fdf::MmioBuffer> mmio_;
+  fdf::MmioBuffer mmio_;
   pci_interrupt_mode_t irq_mode_;
-  zx_handle_t irqh_;
+  zx::interrupt irq_;
   zx::bti bti_;
   inspect::Inspector inspect_;
 

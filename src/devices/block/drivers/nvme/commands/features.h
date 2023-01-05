@@ -111,12 +111,11 @@ class SetIoQueueCountCompletion : public Completion {
 
 // |GetFeaturesSubmission| is the base class for all "get feature" submissions.
 class GetFeaturesSubmission : public Submission {
- private:
+ public:
   DEF_SUBFIELD(dword10, 10, 8, select);
   DEF_ENUM_SUBFIELD(dword10, Feature, 7, 0, feature_id);
   DEF_SUBFIELD(dword14, 6, 0, uuid_index);
 
- public:
   explicit GetFeaturesSubmission(Feature feature) : Submission(AdminCommandOpcode::kGetFeatures) {
     set_feature_id(feature);
   }
@@ -134,6 +133,11 @@ class GetVolatileWriteCacheCompletion : public Completion {
   DEF_SUBBIT(command[0], 0, volatile_write_cache_enable);
 
  public:
+  GetVolatileWriteCacheCompletion& set_volatile_write_cache_enabled(bool enabled) {
+    set_volatile_write_cache_enable(enabled);
+    return *this;
+  }
+
   bool get_volatile_write_cache_enabled() const { return volatile_write_cache_enable(); }
 };
 

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/block/drivers/nvme-cpp/fake/fake-nvme-namespace.h"
+#include "src/devices/block/drivers/nvme/fake/fake-namespace.h"
 
 namespace fake_nvme {
 
-void FakeNvmeNamespace::Identify(nvme::IdentifyNvmeNamespace *out) {
+void FakeNamespace::Identify(nvme::IdentifyNvmeNamespace *out) {
   out->n_lba_f = static_cast<uint8_t>(config_.lba_format.size());
   for (uint8_t i = 0; i < out->n_lba_f; i++) {
     out->lba_formats[i] = config_.lba_format[i];

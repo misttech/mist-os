@@ -28,6 +28,7 @@ struct TransactionData {
     io_cmd = nullptr;
     pmt.reset();
     active = false;
+    data_vmo = std::nullopt;
   }
 
   // The IoCommand consists of one or more transactions.
@@ -39,6 +40,8 @@ struct TransactionData {
   ddk::IoBuffer prp_buffer;
   // Set to true when a transaction is submitted, and set to false when it is completed.
   bool active = false;
+  // VMO for the data that is read from or written to the device.
+  std::optional<zx::unowned_vmo> data_vmo;
 };
 
 // A QueuePair represents a completion and submission queue that are paired together.
