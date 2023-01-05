@@ -77,17 +77,6 @@ group("bootstrap-dev") {
   ]
 }
 
-# This target contains executables that are present on the boot partition of all
-# products.
-group("bootstrap-bin") {
-  deps = [
-    "//src/devices/bin/devfs:bootfs",
-    "//src/devices/bin/driver-index:bootfs",
-    "//src/devices/bin/driver_host",
-    "//src/devices/bin/driver_manager:bootfs",
-  ]
-}
-
 group("usb-host-stack") {
   deps = [
     "//src/devices/block/drivers/usb-mass-storage",

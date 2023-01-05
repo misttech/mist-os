@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -22,6 +23,10 @@ executable("driver_host") {
     ":driver",
     "//sdk/lib/syslog/cpp:backend_fuchsia_compat",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":driver_host" ]
 }
 
 source_set("simple_binding") {

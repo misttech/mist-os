@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
 import("//build/fuzzing/fuzzer_package.gni")
@@ -302,6 +303,9 @@ fuchsia_component("driver_manager_component") {
   deps = [ ":driver_manager" ]
 }
 
-group("bootfs") {
-  deps = [ ":driver_manager_component" ]
+bootfs_files_for_assembly("bootfs") {
+  deps = [
+    ":driver_manager_component",
+    "//src/storage/memfs",
+  ]
 }
