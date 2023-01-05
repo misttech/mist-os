@@ -64,12 +64,8 @@ pub async fn run_tool(
         .await
         .with_context(|| format!("Error calling RunTool"))?;
 
-    match run_result {
-        Ok(_) => {}
-        Err(e) => {
-            writeln!(writer, "Failed to run tool, error: {}.", e)?;
-            return Ok(());
-        }
+    if let Err(e) = run_result {
+        return Err(anyhow!("Failed to run tool, error: {}.", e));
     }
 
     let mut out_done = false;
@@ -109,7 +105,7 @@ pub async fn run_tool(
 
     if let Some(code) = exit_code {
         if code != 0 {
-            writeln!(writer, "Exited with {}", code)?;
+            return Err(anyhow!("Tool exited with non-zero exit code ({})", code));
         }
     }
 
