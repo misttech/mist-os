@@ -193,8 +193,9 @@ Config Config::TakeFromStartupHandle() noexcept {
   // Get the VMO containing FIDL config
   zx_handle_t config_vmo_handle =
       zx_take_startup_handle(PA_VMO_COMPONENT_CONFIG);
-  ZX_ASSERT_MSG(config_vmo_handle != ZX_HANDLE_INVALID,
-                "Could not obtain Config VMO Handle");
+  ZX_ASSERT_MSG(
+      config_vmo_handle != ZX_HANDLE_INVALID,
+      "Config VMO handle must be provided and cannot already have been taken.");
   zx::vmo config_vmo(config_vmo_handle);
 
   // Get the size of the VMO
