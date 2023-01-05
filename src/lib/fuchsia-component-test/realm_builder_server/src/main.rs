@@ -1208,7 +1208,7 @@ impl RealmNode2 {
                 .validate_and_register(
                     &decl,
                     name.clone(),
-                    Some(Clone::clone(&package_dir)),
+                    Clone::clone(&package_dir),
                     config_value_replacements,
                     state_guard.config_override_policy,
                 )

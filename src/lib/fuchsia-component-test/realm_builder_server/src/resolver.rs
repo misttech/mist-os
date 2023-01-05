@@ -28,8 +28,8 @@ struct ResolveableComponent {
     /// The component's declaration/manifest.
     decl: fcdecl::Component,
 
-    /// The component's package directory, if available.
-    package_dir: Option<fio::DirectoryProxy>,
+    /// The component's package directory.
+    package_dir: fio::DirectoryProxy,
 
     /// Whether to rely on the `value_source` field in the component manifest or to only use
     /// values provided as replacements.
@@ -68,7 +68,7 @@ impl Registry {
         self: &Arc<Self>,
         decl: &fcdecl::Component,
         name: String,
-        package_dir: Option<fio::DirectoryProxy>,
+        package_dir: fio::DirectoryProxy,
         config_value_replacements: HashMap<usize, cm_rust::ValueSpec>,
         config_override_policy: ConfigOverridePolicy,
     ) -> Result<String, cm_fidl_validator::error::ErrorList> {
@@ -225,17 +225,15 @@ impl Registry {
             config_value_replacements,
             config_override_policy,
         } = resolveable_component;
-        let package = if let Some(p) = &package_dir {
-            let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
-            p.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
-            Some(fresolution::Package {
-                url: Some(component_url.to_string()),
-                directory: Some(client_end),
-                ..fresolution::Package::EMPTY
-            })
-        } else {
-            None
-        };
+
+        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
+        package_dir
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
+        let package = Some(fresolution::Package {
+            url: Some(component_url.to_string()),
+            directory: Some(client_end),
+            ..fresolution::Package::EMPTY
+        });
 
         let package_dir_for_config = match config_override_policy {
             ConfigOverridePolicy::DisallowValuesFromBuilder => {
@@ -243,9 +241,9 @@ impl Registry {
                     config_value_replacements.is_empty(),
                     "cannot have received overrides if disallowed"
                 );
-                package_dir.as_ref()
+                Some(&package_dir)
             }
-            ConfigOverridePolicy::LoadPackagedValuesFirst => package_dir.as_ref(),
+            ConfigOverridePolicy::LoadPackagedValuesFirst => Some(&package_dir),
             ConfigOverridePolicy::RequireAllValuesFromBuilder => None,
         };
         let config_values = Self::resolve_structured_config(
@@ -286,10 +284,8 @@ impl Registry {
         let component = component_decls_guard
             .get(&parsed_url)
             .ok_or(fresolution::ResolverError::ManifestNotFound)?;
-        let package_dir =
-            component.package_dir.clone().ok_or(fresolution::ResolverError::PackageNotFound)?;
         let manifest_file = fuchsia_fs::open_file(
-            &package_dir,
+            &component.package_dir,
             Path::new(&fragment),
             fio::OpenFlags::RIGHT_READABLE,
         )
@@ -301,7 +297,8 @@ impl Registry {
             .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()
             .map_err(|_| fresolution::ResolverError::Internal)?;
-        package_dir
+        component
+            .package_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))
             .map_err(|_| fresolution::ResolverError::Io)?;
         let package_dir_for_config = match component.config_override_policy {
@@ -310,9 +307,9 @@ impl Registry {
                     component.config_value_replacements.is_empty(),
                     "cannot have received config overrides if disallowed"
                 );
-                Some(&package_dir)
+                Some(&component.package_dir)
             }
-            ConfigOverridePolicy::LoadPackagedValuesFirst => Some(&package_dir),
+            ConfigOverridePolicy::LoadPackagedValuesFirst => Some(&component.package_dir),
             ConfigOverridePolicy::RequireAllValuesFromBuilder => None,
         };
         let config_values = Self::resolve_structured_config(
