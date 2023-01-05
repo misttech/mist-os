@@ -25,7 +25,6 @@ const NAME_PROVIDER_NAME: &str = "device-name-provider";
 
 const MOCK_SERVICES_NAME: &str = "mock";
 
-const DEV_ETHERNET_DIRECTORY: &str = "dev-class-ethernet";
 const DEV_NETWORK_DIRECTORY: &str = "dev-class-network";
 
 const BUFFER_SIZE: usize = 2048;
@@ -297,15 +296,6 @@ where
                     name: Some(NETSVC_NAME.to_string()),
                     program_args: Some(args.into_iter().map(Into::into).collect()),
                     uses: Some(fidl_fuchsia_netemul::ChildUses::Capabilities(vec![
-                        // TODO(https://fxbug.dev/109169): Remove when netsvc no
-                        // longer enumerates Ethernet devices.
-                        fidl_fuchsia_netemul::Capability::NetemulDevfs(
-                            fidl_fuchsia_netemul::DevfsDep {
-                                name: Some(DEV_ETHERNET_DIRECTORY.to_string()),
-                                subdir: Some(netemul::ETHERNET_DEVFS_PATH.to_string()),
-                                ..fidl_fuchsia_netemul::DevfsDep::EMPTY
-                            },
-                        ),
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
@@ -370,15 +360,6 @@ where
                     )),
                     name: Some(NAME_PROVIDER_NAME.to_string()),
                     uses: Some(fidl_fuchsia_netemul::ChildUses::Capabilities(vec![
-                        // TODO(https://fxbug.dev/109169): Remove when netsvc no
-                        // longer enumerates Ethernet devices.
-                        fidl_fuchsia_netemul::Capability::NetemulDevfs(
-                            fidl_fuchsia_netemul::DevfsDep {
-                                name: Some(DEV_ETHERNET_DIRECTORY.to_string()),
-                                subdir: Some(netemul::ETHERNET_DEVFS_PATH.to_string()),
-                                ..fidl_fuchsia_netemul::DevfsDep::EMPTY
-                            },
-                        ),
                         fidl_fuchsia_netemul::Capability::NetemulDevfs(
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
