@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![warn(clippy::await_holding_refcell_ref)]
+
 use {
     crate::input_device,
     crate::input_handler::InputHandler,
@@ -21,7 +23,12 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt, SinkExt},
     std::iter::FromIterator,
-    std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
+    std::{
+        cell::{Ref, RefCell, RefMut},
+        collections::HashMap,
+        option::Option,
+        rc::Rc,
+    },
 };
 
 /// A [`MouseInjectorHandler`] parses mouse events and forwards them to Scenic through the
@@ -94,7 +101,7 @@ impl InputHandler for MouseInjectorHandler {
                 {
                     fx_log_err!("update_cursor_renderer failed: {}", e);
                 }
-                let immersive_mode = self.mutable_state.borrow().immersive_mode;
+                let immersive_mode = self.inner().immersive_mode;
                 if let Err(e) = self.update_cursor_visibility(!immersive_mode).await {
                     fx_log_err!("update_cursor_visibility failed: {}", e);
                 }
@@ -229,6 +236,14 @@ impl MouseInjectorHandler {
         .await
     }
 
+    fn inner(&self) -> Ref<'_, MutableState> {
+        self.mutable_state.borrow()
+    }
+
+    fn inner_mut(&self) -> RefMut<'_, MutableState> {
+        self.mutable_state.borrow_mut()
+    }
+
     /// Creates a new mouse handler that holds mouse pointer injectors.
     /// The caller is expected to spawn a task to continually watch for updates to the viewport.
     /// Example:
@@ -291,8 +306,7 @@ impl MouseInjectorHandler {
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
         event_time: zx::Time,
     ) -> Result<(), anyhow::Error> {
-        let mut inner = self.mutable_state.borrow_mut();
-        if inner.injectors.contains_key(&mouse_descriptor.device_id) {
+        if self.inner().injectors.contains_key(&mouse_descriptor.device_id) {
             return Ok(());
         }
 
@@ -304,7 +318,7 @@ impl MouseInjectorHandler {
         let target = fuchsia_scenic::duplicate_view_ref(&self.target_view_ref)
             .context("Failed to duplicate target view ref.")?;
 
-        let viewport = inner.viewport.clone();
+        let viewport = self.inner().viewport.clone();
         let config = pointerinjector::Config {
             device_id: Some(mouse_descriptor.device_id),
             device_type: Some(pointerinjector::DeviceType::Mouse),
@@ -326,14 +340,14 @@ impl MouseInjectorHandler {
         fx_log_info!("Registered injector with device id {:?}", mouse_descriptor.device_id);
 
         // Keep track of the injector.
-        inner.injectors.insert(mouse_descriptor.device_id, device_proxy.clone());
+        self.inner_mut().injectors.insert(mouse_descriptor.device_id, device_proxy.clone());
 
         // Inject ADD event the first time a MouseDevice is seen.
         let events_to_send = vec![self.create_pointer_sample_event(
             mouse_event,
             event_time,
             pointerinjector::EventPhase::Add,
-            inner.current_position,
+            self.inner().current_position,
             None,
         )];
         device_proxy
@@ -359,7 +373,6 @@ impl MouseInjectorHandler {
         mouse_event: &mouse_binding::MouseEvent,
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
     ) -> Result<(), anyhow::Error> {
-        let mut inner = self.mutable_state.borrow_mut();
         let new_position = match (mouse_event.location, mouse_descriptor) {
             (
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
@@ -367,7 +380,10 @@ impl MouseInjectorHandler {
                     millimeters: offset,
                 }),
                 mouse_binding::MouseDeviceDescriptor { counts_per_mm, .. },
-            ) => inner.current_position + self.position_in_counts(offset, *counts_per_mm as f32),
+            ) => {
+                self.inner().current_position
+                    + self.position_in_counts(offset, *counts_per_mm as f32)
+            }
             (
                 mouse_binding::MouseLocation::Absolute(position),
                 mouse_binding::MouseDeviceDescriptor {
@@ -382,15 +398,28 @@ impl MouseInjectorHandler {
                 ))
             }
         };
-        inner.current_position = new_position;
-        Position::clamp(&mut inner.current_position, Position::zero(), self.max_position);
+        {
+            let mut inner = self.inner_mut();
+            inner.current_position = new_position;
+            Position::clamp(&mut inner.current_position, Position::zero(), self.max_position);
+        }
 
-        // Only send a position-update message if the cursor is visible.  If it isn't, then when it
-        // eventually becomes visible, the position will be updated first.
-        if inner.is_cursor_visible {
-            let msg = CursorMessage::SetPosition(inner.current_position);
-            inner
-                .cursor_message_sender
+        // Some scope gymnastics to convince Clippy that no `Ref` is being held across an await
+        // point.
+        if let Some((msg, mut cursor_message_sender)) = {
+            let inner = self.inner();
+            if inner.is_cursor_visible {
+                Some((
+                    CursorMessage::SetPosition(inner.current_position),
+                    inner.cursor_message_sender.clone(),
+                ))
+            } else {
+                None
+            }
+        } {
+            // Only send a position-update message if the cursor is visible.  If it isn't, then when
+            // it eventually becomes visible, the position will be updated first.
+            cursor_message_sender
                 .send(msg)
                 .await
                 .context("Failed to send current mouse position to cursor renderer")?;
@@ -407,29 +436,29 @@ impl MouseInjectorHandler {
     /// # Parameters
     /// - `visible`: The new visibility of the cursor.
     async fn update_cursor_visibility(&self, visible: bool) -> Result<(), anyhow::Error> {
-        let mut inner = self.mutable_state.borrow_mut();
+        {
+            let mut inner = self.inner_mut();
 
-        // No change to visibility needed.
-        if visible == inner.is_cursor_visible {
-            return Ok(());
+            // No change to visibility needed.
+            if visible == inner.is_cursor_visible {
+                return Ok(());
+            }
+            inner.is_cursor_visible = visible;
         }
-        inner.is_cursor_visible = visible;
 
         // If we just became visible, update the cursor position.  We update the position before
         // making it visible, because doing it the other order can result in the cursor briefly
         // appearing in the wrong position before jumping to the correct position.
-        if inner.is_cursor_visible {
-            let pos = inner.current_position;
-
-            inner
-                .cursor_message_sender
+        let mut cursor_message_sender = self.inner().cursor_message_sender.clone();
+        if visible {
+            let pos = self.inner().current_position;
+            cursor_message_sender
                 .send(CursorMessage::SetPosition(pos))
                 .await
                 .context("Failed to send current mouse position to cursor renderer")?;
         }
 
-        inner
-            .cursor_message_sender
+        cursor_message_sender
             .send(CursorMessage::SetVisibility(visible))
             .await
             .context("Failed to send current visibility to cursor renderer")
@@ -441,7 +470,7 @@ impl MouseInjectorHandler {
     /// the handler is now in immersive mode.
     async fn toggle_immersive_mode(&self) -> Result<bool, anyhow::Error> {
         let immersive_mode = {
-            let mut inner = self.mutable_state.borrow_mut();
+            let mut inner = self.inner_mut();
             inner.immersive_mode = !inner.immersive_mode;
             fx_log_info!("Toggled immersive mode: {}", inner.immersive_mode);
             inner.immersive_mode
@@ -483,8 +512,8 @@ impl MouseInjectorHandler {
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
         event_time: zx::Time,
     ) -> Result<(), anyhow::Error> {
-        let inner = self.mutable_state.borrow();
-        if let Some(injector) = inner.injectors.get(&mouse_descriptor.device_id) {
+        let injector = self.inner().injectors.get(&mouse_descriptor.device_id).cloned();
+        if let Some(injector) = injector {
             let relative_motion = match mouse_event.location {
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                     counts: _,
@@ -500,7 +529,7 @@ impl MouseInjectorHandler {
                 mouse_event,
                 event_time,
                 pointerinjector::EventPhase::Change,
-                inner.current_position,
+                self.inner().current_position,
                 relative_motion,
             )];
             let _ = injector.inject(&mut events_to_send.into_iter()).await;
@@ -601,11 +630,11 @@ impl MouseInjectorHandler {
             match viewport_stream.next().await {
                 Some(Ok(new_viewport)) => {
                     // Update the viewport tracked by this handler.
-                    let mut inner = self.mutable_state.borrow_mut();
-                    inner.viewport = Some(new_viewport.clone());
+                    self.inner_mut().viewport = Some(new_viewport.clone());
 
                     // Update Scenic with the latest viewport.
-                    for (_device_id, injector) in inner.injectors.iter() {
+                    let injectors = self.inner().injectors.values().cloned().collect::<Vec<_>>();
+                    for injector in injectors {
                         let events = &mut vec![pointerinjector::Event {
                             timestamp: Some(fuchsia_async::Time::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
@@ -936,7 +965,7 @@ mod tests {
         let (injector_device_proxy, mut injector_device_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<pointerinjector::DeviceMarker>()
                 .expect("Failed to create pointerinjector Registry proxy and stream.");
-        mouse_handler.mutable_state.borrow_mut().injectors.insert(1, injector_device_proxy);
+        mouse_handler.inner_mut().injectors.insert(1, injector_device_proxy);
 
         // This nested block is used to bound the lifetime of `watch_viewport_fut`.
         {
@@ -1009,7 +1038,7 @@ mod tests {
 
         // Check the viewport on the handler is accurate.
         let expected_viewport = create_viewport(100.0, 200.0);
-        assert_eq!(mouse_handler.mutable_state.borrow().viewport, Some(expected_viewport));
+        assert_eq!(mouse_handler.inner().viewport, Some(expected_viewport));
     }
 
     fn wheel_delta_ticks(
