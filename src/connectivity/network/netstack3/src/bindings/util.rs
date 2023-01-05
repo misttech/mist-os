@@ -126,14 +126,14 @@ impl FusedStream for NeedsDataWatcher {
 
 /// A core type which can be fallibly converted from the FIDL type `F`.
 ///
-/// For all `C: TryFromFidl<F>`, we provide a blanket impl of [`F:
-/// TryIntoCore<C>`].
+/// For all `C: TryFromFidl<F>`, we provide a blanket impl of
+/// [`F: TryIntoCore<C>`].
 ///
-/// [`F: TryIntoCore<C>`]: crate::bindings::util::TryIntoCore
+/// [`F: TryIntoCore<C>`]: TryIntoCore
 pub(crate) trait TryFromFidl<F>: Sized {
     /// The type of error returned from [`try_from_fidl`].
     ///
-    /// [`try_from_fidl`]: crate::bindings::util::TryFromFidl::try_from_fidl
+    /// [`try_from_fidl`]: TryFromFidl::try_from_fidl
     type Error;
 
     /// Attempt to convert from `fidl` into an instance of `Self`.
@@ -142,14 +142,14 @@ pub(crate) trait TryFromFidl<F>: Sized {
 
 /// A core type which can be fallibly converted to the FIDL type `F`.
 ///
-/// For all `C: TryIntoFidl<F>`, we provide a blanket impl of [`F:
-/// TryFromCore<C>`].
+/// For all `C: TryIntoFidl<F>`, we provide a blanket impl of
+/// [`F: TryFromCore<C>`].
 ///
-/// [`F: TryFromCore<C>`]: crate::bindings::util::TryFromCore
+/// [`F: TryFromCore<C>`]: TryFromCore
 pub(crate) trait TryIntoFidl<F>: Sized {
     /// The type of error returned from [`try_into_fidl`].
     ///
-    /// [`try_into_fidl`]: crate::bindings::util::TryIntoFidl::try_into_fidl
+    /// [`try_into_fidl`]: TryIntoFidl::try_into_fidl
     type Error;
 
     /// Attempt to convert `self` into an instance of `F`.
@@ -161,8 +161,8 @@ pub(crate) trait TryIntoFidl<F>: Sized {
 /// `IntoFidl<F>` extends [`TryIntoFidl<F, Error = Never>`], and provides the
 /// infallible conversion method [`into_fidl`].
 ///
-/// [`TryIntoFidl<F, Error = Never>`]: crate::bindings::util::TryIntoFidl
-/// [`into_fidl`]: crate::bindings::util::IntoFidl::into_fidl
+/// [`TryIntoFidl<F, Error = Never>`]: TryIntoFidl
+/// [`into_fidl`]: IntoFidl::into_fidl
 pub(crate) trait IntoFidl<F> {
     /// Infallibly convert `self` into an instance of `F`.
     fn into_fidl(self) -> F;
@@ -179,10 +179,10 @@ impl<C: TryIntoFidl<F, Error = Never>, F> IntoFidl<F> for C {
 
 /// A FIDL type which can be fallibly converted from the core type `C`.
 ///
-/// `TryFromCore<C>` is automatically implemented for all `F` where [`C:
-/// TryIntoFidl<F>`].
+/// `TryFromCore<C>` is automatically implemented for all `F` where
+/// [`C: TryIntoFidl<F>`].
 ///
-/// [`C: TryIntoFidl<F>`]: crate::bindings::util::TryIntoFidl
+/// [`C: TryIntoFidl<F>`]: TryIntoFidl
 pub(crate) trait TryFromCore<C>: Sized {
     /// The error type on conversion failure.
     type Error;
@@ -200,10 +200,10 @@ impl<F, C: TryIntoFidl<F>> TryFromCore<C> for F {
 
 /// A FIDL type which can be fallibly converted into the core type `C`.
 ///
-/// `TryIntoCore<C>` is automatically implemented for all `F` where [`C:
-/// TryFromFidl<F>`].
+/// `TryIntoCore<C>` is automatically implemented for all `F` where
+/// [`C: TryFromFidl<F>`].
 ///
-/// [`C: TryFromFidl<F>`]: crate::bindings::util::TryFromFidl
+/// [`C: TryFromFidl<F>`]: TryFromFidl
 pub(crate) trait TryIntoCore<C>: Sized {
     /// The error returned on conversion failure.
     type Error;
@@ -212,7 +212,7 @@ pub(crate) trait TryIntoCore<C>: Sized {
     ///
     /// This is equivalent to [`C::try_from_fidl(self)`].
     ///
-    /// [`C::try_from_fidl(self)`]: crate::bindings::util::TryFromFidl::try_from_fidl
+    /// [`C::try_from_fidl(self)`]: TryFromFidl::try_from_fidl
     fn try_into_core(self) -> Result<C, Self::Error>;
 }
 
@@ -228,8 +228,8 @@ impl<F, C: TryFromFidl<F>> TryIntoCore<C> for F {
 /// `IntoCore<C>` extends [`TryIntoCore<C>`] where `<C as TryFromFidl<_>>::Error
 /// = Never`, and provides the infallible conversion method [`into_core`].
 ///
-/// [`TryIntoCore<C>`]: crate::bindings::util::TryIntoCore
-/// [`into_fidl`]: crate::bindings::util::IntoCore::into_core
+/// [`TryIntoCore<C>`]: TryIntoCore
+/// [`into_core`]: IntoCore::into_core
 pub(crate) trait IntoCore<C> {
     /// Infallibly convert `self` into an instance of `C`.
     fn into_core(self) -> C;
@@ -582,14 +582,14 @@ pub(crate) trait ConversionContext {
 /// A core type which can be fallibly converted from the FIDL type `F` given a
 /// context that implements [`ConversionContext`].
 ///
-/// For all `C: TryFromFidlWithContext<F>`, we provide a blanket impl of [`F:
-/// TryIntoCoreWithContext<C>`].
+/// For all `C: TryFromFidlWithContext<F>`, we provide a blanket impl of
+/// [`F: TryIntoCoreWithContext<C>`].
 ///
-/// [`F: TryIntoCoreWithContext<C>`]: crate::bindings::util::TryIntoCoreWithContext
+/// [`F: TryIntoCoreWithContext<C>`]: TryIntoCoreWithContext
 pub(crate) trait TryFromFidlWithContext<F>: Sized {
     /// The type of error returned from [`try_from_fidl_with_ctx`].
     ///
-    /// [`try_from_fidl_with_ctx`]: crate::bindings::util::TryFromFidlWithContext::try_from_fidl_with_ctx
+    /// [`try_from_fidl_with_ctx`]: TryFromFidlWithContext::try_from_fidl_with_ctx
     type Error;
 
     /// Attempt to convert from `fidl` into an instance of `Self`.
@@ -599,14 +599,14 @@ pub(crate) trait TryFromFidlWithContext<F>: Sized {
 /// A core type which can be fallibly converted to the FIDL type `F` given a
 /// context that implements [`ConversionContext`].
 ///
-/// For all `C: TryIntoFidlWithContext<F>`, we provide a blanket impl of [`F:
-/// TryFromCoreWithContext<C>`].
+/// For all `C: TryIntoFidlWithContext<F>`, we provide a blanket impl of
+/// [`F: TryFromCoreWithContext<C>`].
 ///
-/// [`F: TryFromCoreWithContext<C>`]: crate::bindings::util::TryFromCoreWithContext
+/// [`F: TryFromCoreWithContext<C>`]: TryFromCoreWithContext
 pub(crate) trait TryIntoFidlWithContext<F>: Sized {
     /// The type of error returned from [`try_into_fidl_with_ctx`].
     ///
-    /// [`try_into_fidl_with_ctx`]: crate::bindings::util::TryIntoFidlWithContext::try_from_fidl_with_ctx
+    /// [`try_into_fidl_with_ctx`]: TryIntoFidlWithContext::try_into_fidl_with_ctx
     type Error;
 
     /// Attempt to convert from `self` into an instance of `F`.
@@ -619,7 +619,7 @@ pub(crate) trait TryIntoFidlWithContext<F>: Sized {
 /// `TryFromCoreWithContext<C>` is automatically implemented for all `F` where
 /// [`C: TryIntoFidlWithContext<F>`].
 ///
-/// [`C: TryIntoFidlWithContext<F>`]: crate::bindings::util::TryIntoFidlWithContext
+/// [`C: TryIntoFidlWithContext<F>`]: TryIntoFidlWithContext
 pub(crate) trait TryFromCoreWithContext<C>: Sized
 where
     C: TryIntoFidlWithContext<Self>,
@@ -638,7 +638,7 @@ impl<F, C: TryIntoFidlWithContext<F>> TryFromCoreWithContext<C> for F {}
 /// `TryIntoCoreWithContext<C>` is automatically implemented for all `F` where
 /// [`C: TryFromFidlWithContext<F>`].
 ///
-/// [`C: TryFromFidlWithContext<F>`]: crate::bindings::util::TryFromFidlWithContext
+/// [`C: TryFromFidlWithContext<F>`]: TryFromFidlWithContext
 pub(crate) trait TryIntoCoreWithContext<C>: Sized
 where
     C: TryFromFidlWithContext<Self>,
