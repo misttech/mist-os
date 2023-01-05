@@ -32,9 +32,23 @@ impl FromExt<ip::Ipv4Addr> for fidl::Ipv4Address {
     }
 }
 
+impl FromExt<fidl::Ipv4Address> for ip::Ipv4Addr {
+    fn from_ext(f: fidl::Ipv4Address) -> ip::Ipv4Addr {
+        let fidl::Ipv4Address { addr } = f;
+        ip::Ipv4Addr::new(addr)
+    }
+}
+
 impl FromExt<ip::Ipv6Addr> for fidl::Ipv6Address {
     fn from_ext(f: ip::Ipv6Addr) -> fidl::Ipv6Address {
         fidl::Ipv6Address { addr: f.ipv6_bytes() }
+    }
+}
+
+impl FromExt<fidl::Ipv6Address> for ip::Ipv6Addr {
+    fn from_ext(f: fidl::Ipv6Address) -> ip::Ipv6Addr {
+        let fidl::Ipv6Address { addr } = f;
+        ip::Ipv6Addr::from_bytes(addr)
     }
 }
 
@@ -48,6 +62,24 @@ impl FromExt<ip::IpAddr> for fidl::IpAddress {
                 <ip::Ipv6Addr as IntoExt<fidl::Ipv6Address>>::into_ext(v6).into_ext()
             }
         }
+    }
+}
+
+impl TryFromExt<fidl::Ipv4AddressWithPrefix> for ip::Subnet<ip::Ipv4Addr> {
+    type Error = ip::SubnetError;
+    fn try_from_ext(
+        fidl::Ipv4AddressWithPrefix { addr, prefix_len }: fidl::Ipv4AddressWithPrefix,
+    ) -> Result<ip::Subnet<ip::Ipv4Addr>, Self::Error> {
+        ip::Subnet::new(addr.into_ext(), prefix_len)
+    }
+}
+
+impl TryFromExt<fidl::Ipv6AddressWithPrefix> for ip::Subnet<ip::Ipv6Addr> {
+    type Error = ip::SubnetError;
+    fn try_from_ext(
+        fidl::Ipv6AddressWithPrefix { addr, prefix_len }: fidl::Ipv6AddressWithPrefix,
+    ) -> Result<ip::Subnet<ip::Ipv6Addr>, Self::Error> {
+        ip::Subnet::new(addr.into_ext(), prefix_len)
     }
 }
 
@@ -91,6 +123,32 @@ where
 {
     fn into_ext(self) -> U {
         U::from_ext(self)
+    }
+}
+
+/// A manual implementation of `TryFrom`.
+pub trait TryFromExt<T>: Sized {
+    type Error;
+    /// Tries to perform the conversion.
+    fn try_from_ext(f: T) -> Result<Self, Self::Error>;
+}
+
+/// A manual implementation of `TryInto`.
+///
+/// A blanket implementation is provided for implementers of `TryFromExt<T>`.
+pub trait TryIntoExt<T>: Sized {
+    type Error;
+    /// Tries to perform the conversion.
+    fn try_into_ext(self) -> Result<T, Self::Error>;
+}
+
+impl<T, U> TryIntoExt<U> for T
+where
+    U: TryFromExt<T>,
+{
+    type Error = U::Error;
+    fn try_into_ext(self) -> Result<U, Self::Error> {
+        U::try_from_ext(self)
     }
 }
 
@@ -421,6 +479,10 @@ impl Into<fidl::SocketAddress> for SocketAddress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+    use net_declare::{
+        fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, net_subnet_v4, net_subnet_v6,
+    };
     use std::collections::HashMap;
     use std::str::FromStr;
 
@@ -429,8 +491,14 @@ mod tests {
         let a = fidl::Ipv4Address { addr: [0; 4] };
         assert_eq!(fidl::IpAddress::Ipv4(a), a.into_ext());
 
+        let a = fidl::Ipv4Address { addr: [0; 4] };
+        assert_eq!(net_types::ip::Ipv4Addr::new([0; 4]), a.into_ext());
+
         let a = fidl::Ipv6Address { addr: [0; 16] };
         assert_eq!(fidl::IpAddress::Ipv6(a), a.into_ext());
+
+        let a = fidl::Ipv6Address { addr: [0; 16] };
+        assert_eq!(net_types::ip::Ipv6Addr::from_bytes([0; 16]), a.into_ext());
 
         let a = fidl::Ipv4SocketAddress { address: fidl::Ipv4Address { addr: [0; 4] }, port: 1 };
         assert_eq!(fidl::SocketAddress::Ipv4(a), a.into_ext());
@@ -497,6 +565,29 @@ mod tests {
         assert_eq!(want_fidl, got_fidl);
         assert_eq!(got_ext, got_ext_back);
         assert_eq!(want_str, got_str);
+    }
+
+    #[test]
+    fn test_subnet_try_from_ipaddress_with_prefix() {
+        // Test Success
+        assert_eq!(
+            Ok(net_subnet_v4!("192.168.0.0/24")),
+            fidl_ip_v4_with_prefix!("192.168.0.0/24").try_into_ext()
+        );
+        assert_eq!(
+            Ok(net_subnet_v6!("fe80::/64")),
+            fidl_ip_v6_with_prefix!("fe80::/64").try_into_ext()
+        );
+
+        // Test Failure (Host Bits Set)
+        assert_matches!(
+            ip::Subnet::<ip::Ipv4Addr>::try_from_ext(fidl_ip_v4_with_prefix!("192.168.0.1/24")),
+            Err(ip::SubnetError::HostBitsSet)
+        );
+        assert_matches!(
+            ip::Subnet::<ip::Ipv6Addr>::try_from_ext(fidl_ip_v6_with_prefix!("fe80::1/64")),
+            Err(ip::SubnetError::HostBitsSet)
+        );
     }
 
     #[test]
