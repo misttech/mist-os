@@ -7,6 +7,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <bind/fuchsia/examples/gizmo/cpp/bind.h>
 
@@ -37,7 +38,8 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
  public:
   ParentZirconTransportDriver(fdf::DriverStartArgs start_args,
                               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("transport-parent", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("transport-parent", std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&ParentZirconTransportDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
     node_.Bind(std::move(node()));
@@ -133,12 +135,9 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
   // Publish offered services for client components.
   zx::result<> ExportService(std::string_view node_name) {
     // Publish `fuchsia.gizmo.protocol.Service` to the outgoing directory.
-    auto protocol_handler =
-        [this](fidl::ServerEnd<fuchsia_gizmo_protocol::TestingProtocol> request) -> void {
-      auto server_impl = std::make_unique<TestProtocolServer>();
-      fidl::BindServer(dispatcher(), std::move(request), std::move(server_impl));
-    };
-    fuchsia_gizmo_protocol::Service::InstanceHandler handler({.testing = protocol_handler});
+    fuchsia_gizmo_protocol::Service::InstanceHandler handler({
+        .testing = fit::bind_member<&ParentZirconTransportDriver::Serve>(this),
+    });
 
     auto result =
         context().outgoing()->AddService<fuchsia_gizmo_protocol::Service>(std::move(handler));
@@ -156,22 +155,46 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
       return zx::error(status);
     }
 
-    // Export `fuchsia.gizmo.protocol.Service` to devfs.
-    auto service_path = std::string(fuchsia_gizmo_protocol::Service::Name) + "/" +
-                        component::kDefaultInstance + "/" +
-                        fuchsia_gizmo_protocol::Service::Testing::Name;
-    status = compat_context_->devfs_exporter().ExportSync(service_path, child_->topological_path(),
-                                                          fuchsia_device_fs::ExportOptions());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to export to devfs: %s", zx_status_get_string(status));
-      return zx::error(status);
+    // Export to devfs.
+    if (zx::result status = ExportToDevfs(child_->topological_path()); status.is_error()) {
+      FDF_LOG(ERROR, "Failed to export to devfs: %s", status.status_string());
+      return status.take_error();
     }
-
     return zx::ok();
   }
 
  private:
+  // Start serving fuchsia.gizmo.protocol.TestingProtocol.
+  void Serve(fidl::ServerEnd<fuchsia_gizmo_protocol::TestingProtocol> server) {
+    auto server_impl = std::make_unique<TestProtocolServer>();
+    fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
+  }
+
+  // Export fuchsia.gizmo.protocol.TestingProtocol to devfs.
+  zx::result<> ExportToDevfs(std::string_view devfs_path) {
+    zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+    if (connection.is_error()) {
+      return connection.take_error();
+    }
+    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
+
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+    fidl::WireResult result = devfs_exporter->ExportV2(
+        std::move(connector.value()), fidl::StringView::FromExternal(devfs_path),
+        fidl::StringView(), fuchsia_device_fs::ExportOptions());
+    if (!result.ok()) {
+      return zx::error(result.status());
+    }
+    if (result.value().is_error()) {
+      return result.value().take_error();
+    }
+    return zx::ok();
+  }
   std::optional<compat::DeviceServer> child_;
+  driver_devfs::Connector<fuchsia_gizmo_protocol::TestingProtocol> devfs_connector_;
   std::shared_ptr<compat::Context> compat_context_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
