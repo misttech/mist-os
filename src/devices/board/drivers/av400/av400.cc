@@ -67,11 +67,6 @@ int Av400::Thread() {
 
   zxlogf(INFO, "Initializing AV400 board!!!");
 
-  if ((status = GpioInit()) != ZX_OK) {
-    zxlogf(ERROR, "GpioInit() failed: %s", zx_status_get_string(status));
-    init_txn_->Reply(status);
-    return status;
-  }
   if ((status = PwmInit()) != ZX_OK) {
     zxlogf(ERROR, "PwmInit() failed: %s", zx_status_get_string(status));
     init_txn_->Reply(status);
@@ -124,6 +119,11 @@ int Av400::Thread() {
   }
   if ((status = UsbInit()) != ZX_OK) {
     zxlogf(ERROR, "UsbInit() failed: %s", zx_status_get_string(status));
+    init_txn_->Reply(status);
+    return status;
+  }
+  if ((status = GpioInit()) != ZX_OK) {
+    zxlogf(ERROR, "GpioInit() failed: %s", zx_status_get_string(status));
     init_txn_->Reply(status);
     return status;
   }

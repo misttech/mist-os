@@ -129,9 +129,21 @@ zx_status_t Av400::I2cInit() {
   i2c_dev.mmio() = i2c_mmios;
   i2c_dev.irq() = i2c_irqs;
 
+  auto i2c_gpio = [&arena = gpio_init_arena_](
+                      uint64_t alt_function) -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .Build();
+  };
+
+  gpio_init_steps_.push_back({A5_GPIOD(15), i2c_gpio(A5_GPIOD_15_I2C2_SCL_FN)});
+  gpio_init_steps_.push_back({A5_GPIOD(14), i2c_gpio(A5_GPIOD_14_I2C2_SDA_FN)});
+  gpio_init_steps_.push_back({A5_GPIOD(13), i2c_gpio(A5_GPIOD_13_I2C3_SCL_FN)});
+  gpio_init_steps_.push_back({A5_GPIOD(12), i2c_gpio(A5_GPIOD_12_I2C3_SDA_FN)});
+
   auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(i2c_channels);
   if (i2c_status.is_error()) {
-    zxlogf(ERROR, "I2cInit: Failed to fidl encode i2c channels: %d", i2c_status.error_value());
+    zxlogf(ERROR, "I2cInit: Failed to fidl encode i2c channels: %s", i2c_status.status_string());
     return i2c_status.error_value();
   }
 
@@ -145,25 +157,15 @@ zx_status_t Av400::I2cInit() {
   };
   i2c_dev.metadata() = std::move(i2c_metadata);
 
-  // I2C_C
-  gpio_impl_.SetAltFunction(A5_GPIOD(15), A5_GPIOD_15_I2C2_SCL_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOD(14), A5_GPIOD_14_I2C2_SDA_FN);
-
-  // I2C_D
-  gpio_impl_.SetAltFunction(A5_GPIOD(13), A5_GPIOD_13_I2C3_SCL_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOD(12), A5_GPIOD_12_I2C3_SDA_FN);
-
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd I2c(i2c_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd I2c(i2c_dev) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd I2c(i2c_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "NodeAdd I2c(i2c_dev) failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 

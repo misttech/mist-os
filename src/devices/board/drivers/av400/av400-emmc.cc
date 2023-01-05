@@ -78,18 +78,24 @@ zx_status_t Av400::EmmcInit() {
   emmc_dev.metadata() = emmc_metadata;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
 
-  // set alternate functions to enable EMMC
-  gpio_impl_.SetAltFunction(A5_GPIOB(0), A5_GPIOB_0_EMMC_D0_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(1), A5_GPIOB_1_EMMC_D1_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(2), A5_GPIOB_2_EMMC_D2_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(3), A5_GPIOB_3_EMMC_D3_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(4), A5_GPIOB_4_EMMC_D4_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(5), A5_GPIOB_5_EMMC_D5_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(6), A5_GPIOB_6_EMMC_D6_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(7), A5_GPIOB_7_EMMC_D7_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(8), A5_GPIOB_8_EMMC_CLK_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(10), A5_GPIOB_10_EMMC_CMD_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOB(11), A5_GPIOB_11_EMMC_DS_FN);
+  auto emmc_gpio = [&arena = gpio_init_arena_](
+                       uint64_t alt_function) -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .Build();
+  };
+
+  gpio_init_steps_.push_back({A5_GPIOB(0), emmc_gpio(A5_GPIOB_0_EMMC_D0_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(1), emmc_gpio(A5_GPIOB_1_EMMC_D1_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(2), emmc_gpio(A5_GPIOB_2_EMMC_D2_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(3), emmc_gpio(A5_GPIOB_3_EMMC_D3_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(4), emmc_gpio(A5_GPIOB_4_EMMC_D4_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(5), emmc_gpio(A5_GPIOB_5_EMMC_D5_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(6), emmc_gpio(A5_GPIOB_6_EMMC_D6_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(7), emmc_gpio(A5_GPIOB_7_EMMC_D7_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(8), emmc_gpio(A5_GPIOB_8_EMMC_CLK_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(10), emmc_gpio(A5_GPIOB_10_EMMC_CMD_FN)});
+  gpio_init_steps_.push_back({A5_GPIOB(11), emmc_gpio(A5_GPIOB_11_EMMC_DS_FN)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('EMMC');
@@ -99,12 +105,12 @@ zx_status_t Av400::EmmcInit() {
                                                std::size(av400_emmc_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Emmc(emmc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Emmc(emmc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

@@ -25,10 +25,12 @@
 #include "src/devices/board/drivers/av400/tdm-i2s-in-dsp-bind.h"
 #include "src/devices/board/drivers/av400/tdm-i2s-out-dsp-bind.h"
 #else
+#include "src/devices/board/drivers/av400/tdm-i2s-in-bind.h"
 #include "src/devices/board/drivers/av400/tdm-i2s-test-codec-bind.h"
 #endif
 #else
 #include "src/devices/board/drivers/av400/tdm-i2s-bind.h"
+#include "src/devices/board/drivers/av400/tdm-i2s-in-bind.h"
 #endif
 
 #ifdef PDM_USE_DSP
@@ -194,48 +196,50 @@ zx_status_t Av400::AudioInit() {
   if (status != ZX_OK)
     return status;
 
+  auto audio_gpio = [&arena = gpio_init_arena_](uint64_t alt_function, uint64_t drive_strength_ua)
+      -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .drive_strength_ua(drive_strength_ua)
+        .Build();
+  };
+
   // Av400 - tas5707 amplifier
   // There has a GPIOD_9 connected tas5707's RESET pin
   // RESET = 1, wait at least 13.5ms.
-  gpio_impl_.SetAltFunction(A5_GPIOD(9), 0);  // RESET
-  gpio_impl_.ConfigOut(A5_GPIOD(9), 0);
-  zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  gpio_impl_.ConfigOut(A5_GPIOD(9), 1);
-  zx::nanosleep(zx::deadline_after(zx::msec(15)));
-  gpio_impl_.SetDriveStrength(A5_GPIOD(9), 2500, nullptr);
+  gpio_init_steps_.push_back(
+      {A5_GPIOD(9), fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(gpio_init_arena_)
+                        .alt_function(0)
+                        .output_value(1)
+                        .drive_strength_ua(2500)
+                        .Build()});
 
   // Av400 - tdmb - I2s
   // D613 SPK Board has 2x Tas5707 Codecs. (4 channels)
   // We use 1 codec for test here.
-  constexpr uint64_t ua = 3000;
   // setup pinmux for tdmb arbiter.
-  gpio_impl_.SetAltFunction(A5_GPIOC(2), A5_GPIOC_2_TDMB_FS_1_FN);  // LRCLK
-  gpio_impl_.SetDriveStrength(A5_GPIOC(2), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOC(3), A5_GPIOC_3_TDMB_SCLK_1_FN);  // SCLK
-  gpio_impl_.SetDriveStrength(A5_GPIOC(3), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOC(4), A5_GPIOC_4_MCLK_1_FN);  // MCLK
-  gpio_impl_.SetDriveStrength(A5_GPIOC(4), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOC(5),
-                            A5_GPIOC_5_TDMB_D4_FN);  // OUT2 (D613 SPK Board - SPK_CH_01)
-  gpio_impl_.SetDriveStrength(A5_GPIOC(5), ua, nullptr);
+  //
+  // GPIOC_2 - LRCLK
+  // GPIOC_3 - SCLK
+  // GPIOC_4 - MCLK
+  // GPIOC_5 - DATA0 Out
+  gpio_init_steps_.push_back({A5_GPIOC(2), audio_gpio(A5_GPIOC_2_TDMB_FS_1_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOC(3), audio_gpio(A5_GPIOC_3_TDMB_SCLK_1_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOC(4), audio_gpio(A5_GPIOC_4_MCLK_1_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOC(5), audio_gpio(A5_GPIOC_5_TDMB_D4_FN, 3000)});
 
   // Av400 - tdma - I2S
   // Reference board has line-in interface. (ES7241 chip)
   // Support 1x I2S in
-  gpio_impl_.SetAltFunction(A5_GPIOT(0), A5_GPIOT_0_TDMC_FS_2_FN);  // LRCLK2
-  gpio_impl_.SetDriveStrength(A5_GPIOT(0), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOT(1), A5_GPIOT_1_TDMC_SCLK_2_FN);  // SCLK2
-  gpio_impl_.SetDriveStrength(A5_GPIOT(1), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOT(2), A5_GPIOT_2_TDMC_D8_FN);  // IN0 - TDM_D8
-  gpio_impl_.SetDriveStrength(A5_GPIOT(2), ua, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOT(6), A5_GPIOT_6_MCLK_2_FN);  // MCLK
-  gpio_impl_.SetDriveStrength(A5_GPIOT(6), ua, nullptr);
+  //
+  // GPIOT_0 - LRCLK
+  // GPIOT_1 - SCLK
+  // GPIOT_6 - MCLK
+  // GPIOT_2 - DATA0 In
+  gpio_init_steps_.push_back({A5_GPIOT(0), audio_gpio(A5_GPIOT_0_TDMC_FS_2_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOT(1), audio_gpio(A5_GPIOT_1_TDMC_SCLK_2_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOT(6), audio_gpio(A5_GPIOT_6_MCLK_2_FN, 3000)});
+  gpio_init_steps_.push_back({A5_GPIOT(2), audio_gpio(A5_GPIOT_2_TDMC_D8_FN, 3000)});
 
 #ifdef TEST_CODEC
   // Config I2S Codec
@@ -359,12 +363,12 @@ zx_status_t Av400::AudioInit() {
                                                std::size(tdm_i2s_fragments)),
       {});
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -459,15 +463,18 @@ zx_status_t Av400::AudioInit() {
 
 #else
     auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, tdm_dev), {}, {});
+        fidl::ToWire(fidl_arena, tdm_dev),
+        platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_i2s_in_fragments,
+                                                 std::size(tdm_i2s_in_fragments)),
+        {});
 
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-             __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
+      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
@@ -481,9 +488,9 @@ zx_status_t Av400::AudioInit() {
     // DIN_3 connect 1x mic (AMIC7)
     // DIN_2 connect 2x mic (AMIC5,6)
     // For test, we use 2 channels here.
-    gpio_impl_.SetAltFunction(A5_GPIOH(0), A5_GPIOH_0_PDMA_DIN_1_FN);
-    gpio_impl_.SetAltFunction(A5_GPIOH(1), A5_GPIOH_1_PDMA_DIN_0_FN);
-    gpio_impl_.SetAltFunction(A5_GPIOH(2), A5_GPIOH_2_PDMA_DCLK_FN);
+    gpio_init_steps_.push_back({A5_GPIOH(0), audio_gpio(A5_GPIOH_0_PDMA_DIN_1_FN, 3000)});
+    gpio_init_steps_.push_back({A5_GPIOH(1), audio_gpio(A5_GPIOH_1_PDMA_DIN_0_FN, 3000)});
+    gpio_init_steps_.push_back({A5_GPIOH(2), audio_gpio(A5_GPIOH_2_PDMA_DCLK_FN, 3000)});
 
     metadata::AmlPdmConfig metadata = {};
     snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "Amlogic");
@@ -537,12 +544,11 @@ zx_status_t Av400::AudioInit() {
 #else
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pdm_dev));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Audio(pdm_dev) request failed: %s", __func__,
-             result.FormatDescription().data());
+      zxlogf(ERROR, "NodeAdd Audio(pdm_dev) request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Audio(pdm_dev) failed: %s", __func__,
+      zxlogf(ERROR, "NodeAdd Audio(pdm_dev) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }

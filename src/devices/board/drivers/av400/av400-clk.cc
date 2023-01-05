@@ -76,12 +76,12 @@ zx_status_t Av400::ClkInit() {
   auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_CLOCK_IMPL,
                                                      fidl::ToWire(fidl_arena, clk_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Clk(clk_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "ProtocolNodeAdd Clk(clk_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Clk(clk_dev) failed: %s", __func__,
+    zxlogf(ERROR, "ProtocolNodeAdd Clk(clk_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

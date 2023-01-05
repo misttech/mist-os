@@ -28,3 +28,7 @@ node "clk-emmc-sel" {
   fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.A5_CLK_ID.CLK_NAND_SEL;
 }
+
+node "gpio-init-step" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

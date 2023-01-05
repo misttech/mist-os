@@ -54,13 +54,11 @@ zx_status_t Av400::DmcInit() {
   fdf::Arena arena('DMC_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dmc_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Dmc(dmc_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd Dmc(dmc_dev) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Dmc(dmc_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "NodeAdd Dmc(dmc_dev) failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;

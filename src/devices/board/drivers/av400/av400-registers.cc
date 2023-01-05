@@ -97,7 +97,7 @@ zx_status_t Av400::RegistersInit() {
 
   fit::result metadata_bytes = fidl::Persist(metadata);
   if (!metadata_bytes.is_ok()) {
-    zxlogf(ERROR, "%s: Could not build metadata %s\n", __func__,
+    zxlogf(ERROR, "Could not build metadata %s\n",
            metadata_bytes.error_value().FormatDescription().c_str());
     return metadata_bytes.error_value().status();
   }
@@ -121,12 +121,12 @@ zx_status_t Av400::RegistersInit() {
   fdf::Arena arena('REGI');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, registers_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Registers(registers_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Registers(registers_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Registers(registers_dev) failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Registers(registers_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

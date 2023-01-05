@@ -77,13 +77,11 @@ zx_status_t Av400::PwmInit() {
   fdf::Arena arena('PWM_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pwm_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Pwm(pwm_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd Pwm(pwm_dev) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Pwm(pwm_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "NodeAdd Pwm(pwm_dev) failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -107,7 +105,7 @@ zx_status_t Av400::PwmInit() {
 
   zx_status_t status = DdkAddComposite("pwm-init", &comp_desc);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
+    zxlogf(ERROR, "DdkAddComposite failed: %d", status);
     return status;
   }
 

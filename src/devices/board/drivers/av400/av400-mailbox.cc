@@ -68,12 +68,12 @@ zx_status_t Av400::MailboxInit() {
   fdf::Arena arena('MAIL');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, mailbox_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Mailbox(mailbox_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Mailbox(mailbox_dev) failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

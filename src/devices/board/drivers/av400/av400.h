@@ -5,10 +5,10 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_AV400_AV400_H_
 #define SRC_DEVICES_BOARD_DRIVERS_AV400_AV400_H_
 
+#include <fidl/fuchsia.hardware.gpio.init/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <threads.h>
@@ -106,8 +106,10 @@ class Av400 : public Av400Type {
   std::optional<ddk::InitTxn> init_txn_;
   ddk::IommuProtocolClient iommu_;
   thrd_t thread_;
-  ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
+
+  fidl::Arena<> gpio_init_arena_;
+  std::vector<fuchsia_hardware_gpio_init::wire::GpioInitStep> gpio_init_steps_;
 };
 
 }  // namespace av400

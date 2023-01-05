@@ -93,47 +93,53 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(A5_GPIOD(3)),
 };
 
-static const std::vector<fpbus::Metadata> gpio_metadata{
-    {{
-        .type = DEVICE_METADATA_GPIO_PINS,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&gpio_pins),
-                                 reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
-    }},
-};
-
-static const fpbus::Node gpio_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A5;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.mmio() = gpio_mmios;
-  dev.irq() = gpio_irqs;
-  dev.metadata() = gpio_metadata;
-  return dev;
-}();
-
 zx_status_t Av400::GpioInit() {
+  fuchsia_hardware_gpio_init::wire::GpioInitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio_init::wire::GpioInitStep>::FromExternal(
+      gpio_init_steps_.data(), gpio_init_steps_.size());
+
+  fit::result encoded = fidl::Persist(metadata);
+  if (!encoded.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded.error_value().FormatDescription().c_str());
+    return encoded.error_value().status();
+  }
+
+  static const std::vector<fpbus::Metadata> gpio_metadata{
+      {{
+          .type = DEVICE_METADATA_GPIO_PINS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&gpio_pins),
+              reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPIO_INIT_STEPS,
+          .data = std::move(encoded.value()),
+      }},
+  };
+
+  static const fpbus::Node gpio_dev = []() {
+    fpbus::Node dev = {};
+    dev.name() = "gpio";
+    dev.vid() = PDEV_VID_AMLOGIC;
+    dev.pid() = PDEV_PID_AMLOGIC_A5;
+    dev.did() = PDEV_DID_AMLOGIC_GPIO;
+    dev.mmio() = gpio_mmios;
+    dev.irq() = gpio_irqs;
+    dev.metadata() = gpio_metadata;
+    return dev;
+  }();
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
-                                                     fidl::ToWire(fidl_arena, gpio_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd Gpio(gpio_dev) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "NodeAdd Gpio(gpio_dev) failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
-  }
-
-  gpio_impl_ = ddk::GpioImplProtocolClient(parent());
-  if (!gpio_impl_.is_valid()) {
-    zxlogf(ERROR, "%s: device_get_protocol failed", __func__);
-    return ZX_ERR_INTERNAL;
   }
 
   return ZX_OK;

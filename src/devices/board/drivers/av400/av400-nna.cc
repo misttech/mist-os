@@ -99,13 +99,11 @@ zx_status_t Av400::NnaInit() {
       platform_bus_composite::MakeFidlFragment(fidl_arena, nna_fragments, std::size(nna_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: DeviceAdd Nna request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "DeviceAdd Nna request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: DeviceAdd Nna failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "DeviceAdd Nna failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 

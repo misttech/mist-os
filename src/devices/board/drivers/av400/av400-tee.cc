@@ -64,12 +64,12 @@ zx_status_t Av400::TeeInit() {
       platform_bus_composite::MakeFidlFragment(fidl_arena, tee_fragments, std::size(tee_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Tee(tee_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Tee(tee_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

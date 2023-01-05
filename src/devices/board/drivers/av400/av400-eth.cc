@@ -117,38 +117,28 @@ static const fpbus::Node dwmac_dev = []() {
 }();
 
 zx_status_t Av400::EthInit() {
-  // setup pinmux for RGMII connections
-  gpio_impl_.SetAltFunction(A5_GPIOZ(0), A5_GPIOZ_0_ETH_MDIO_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(1), A5_GPIOZ_1_ETH_MDC_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(2), A5_GPIOZ_2_ETH_RX_CLK_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(3), A5_GPIOZ_3_ETH_RX_DV_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(4), A5_GPIOZ_4_ETH_RXD0_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(5), A5_GPIOZ_5_ETH_RXD1_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(6), A5_GPIOZ_6_ETH_RXD2_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(7), A5_GPIOZ_7_ETH_RXD3_FN);
+  auto eth_gpio = [&arena = gpio_init_arena_](uint64_t alt_function, uint64_t drive_strength_ua)
+      -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .drive_strength_ua(drive_strength_ua)
+        .Build();
+  };
 
-  gpio_impl_.SetAltFunction(A5_GPIOZ(8), A5_GPIOZ_8_ETH_TX_CLK_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(9), A5_GPIOZ_9_ETH_TX_EN_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(10), A5_GPIOZ_10_ETH_TXD0_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(11), A5_GPIOZ_11_ETH_TXD1_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(12), A5_GPIOZ_12_ETH_TXD2_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOZ(13), A5_GPIOZ_13_ETH_TXD3_FN);
-
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(0), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(1), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(2), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(3), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(4), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(5), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(6), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(7), 4000, nullptr);
-
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(8), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(9), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(10), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(11), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(12), 4000, nullptr);
-  gpio_impl_.SetDriveStrength(A5_GPIOZ(13), 4000, nullptr);
+  gpio_init_steps_.push_back({A5_GPIOZ(0), eth_gpio(A5_GPIOZ_0_ETH_MDIO_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(1), eth_gpio(A5_GPIOZ_1_ETH_MDC_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(2), eth_gpio(A5_GPIOZ_2_ETH_RX_CLK_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(3), eth_gpio(A5_GPIOZ_3_ETH_RX_DV_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(4), eth_gpio(A5_GPIOZ_4_ETH_RXD0_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(5), eth_gpio(A5_GPIOZ_5_ETH_RXD1_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(6), eth_gpio(A5_GPIOZ_6_ETH_RXD2_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(7), eth_gpio(A5_GPIOZ_7_ETH_RXD3_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(8), eth_gpio(A5_GPIOZ_8_ETH_TX_CLK_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(9), eth_gpio(A5_GPIOZ_9_ETH_TX_EN_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(10), eth_gpio(A5_GPIOZ_10_ETH_TXD0_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(11), eth_gpio(A5_GPIOZ_11_ETH_TXD1_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(12), eth_gpio(A5_GPIOZ_12_ETH_TXD2_FN, 4000)});
+  gpio_init_steps_.push_back({A5_GPIOZ(13), eth_gpio(A5_GPIOZ_13_ETH_TXD3_FN, 4000)});
 
   // Add a composite device for ethernet board in a new devhost.
   fidl::Arena<> fidl_arena;
@@ -158,12 +148,12 @@ zx_status_t Av400::EthInit() {
       platform_bus_composite::MakeFidlFragment(fidl_arena, eth_fragments, std::size(eth_fragments)),
       {});
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(eth_board_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Eth(eth_board_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(eth_board_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Eth(eth_board_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -175,12 +165,12 @@ zx_status_t Av400::EthInit() {
                                                std::size(dwmac_fragments)),
       "eth-board");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(dwmac_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Eth(dwmac_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(dwmac_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Eth(dwmac_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

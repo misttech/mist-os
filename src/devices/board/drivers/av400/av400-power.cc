@@ -102,12 +102,12 @@ zx_status_t Av400::PowerInit() {
                                                std::size(power_regulator_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Power(power_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Power(power_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Power(power_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Power(power_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

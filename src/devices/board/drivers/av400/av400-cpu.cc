@@ -168,13 +168,11 @@ zx_status_t Av400::CpuInit() {
       fidl::StringView::FromExternal("power-01"));
 
   if (!composite_result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite request failed: %s", __func__,
-           composite_result.FormatDescription().data());
+    zxlogf(ERROR, "AddComposite request failed: %s", composite_result.FormatDescription().data());
     return composite_result.status();
   }
   if (composite_result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite failed: %s", __func__,
-           zx_status_get_string(composite_result->error_value()));
+    zxlogf(ERROR, "AddComposite failed: %s", zx_status_get_string(composite_result->error_value()));
     return composite_result->error_value();
   }
 

@@ -95,12 +95,12 @@ zx_status_t Av400::ThermalInit() {
   fdf::Arena arena('THER');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermal_pll_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_pll_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Thermal(thermal_pll_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Thermal(thermal_pll_dev) failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Thermal(thermal_pll_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

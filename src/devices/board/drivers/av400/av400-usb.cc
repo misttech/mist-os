@@ -179,8 +179,10 @@ static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
 zx_status_t Av400::UsbInit() {
   // Power on USB.
   // Force to device mode, use external power
-  gpio_impl_.ConfigOut(A5_GPIOD(10), 0);
-
+  gpio_init_steps_.push_back(
+      {A5_GPIOD(10), fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(gpio_init_arena_)
+                         .output_value(0)
+                         .Build()});
   // Create USB Phy Device
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
@@ -190,12 +192,12 @@ zx_status_t Av400::UsbInit() {
                                                std::size(usb_phy_fragments)),
       {});
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(usb_phy_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(usb_phy_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(usb_phy_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(usb_phy_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -207,12 +209,12 @@ zx_status_t Av400::UsbInit() {
                                                std::size(xhci_fragments)),
       "xhci-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -245,12 +247,12 @@ zx_status_t Av400::UsbInit() {
       platform_bus_composite::MakeFidlFragment(fidl_arena, udc_fragments, std::size(udc_fragments)),
       "udc-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(udc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(udc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(udc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(udc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

@@ -77,7 +77,10 @@ driver_bind_rules("dwmac-bind") {
   rules = "bind/dwmac.bind"
   header_output = "dwmac-bind.h"
   bind_output = "dwmac-bind.bc"
-  deps = [ "//src/devices/bind/fuchsia.designware.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.designware.platform",
+    "//src/devices/bind/fuchsia.gpio",
+  ]
 }
 
 driver_bind_rules("usb-phy-bind") {
@@ -106,6 +109,7 @@ driver_bind_rules("udc-phy-bind") {
   bind_output = "udc-phy-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.usb.phy",
   ]
@@ -158,6 +162,12 @@ driver_bind_rules("tdm-i2s-bind") {
   ]
 }
 
+driver_bind_rules("tdm-i2s-in-bind") {
+  rules = "bind/tdm-i2s-in.bind"
+  header_output = "tdm-i2s-in-bind.h"
+  deps = [ "//src/devices/bind/fuchsia.gpio" ]
+}
+
 driver_bind_rules("pdm-i2s-dsp-bind") {
   rules = "bind/pdm-i2s-dsp.bind"
   header_output = "pdm-i2s-dsp-bind.h"
@@ -187,7 +197,10 @@ driver_bind_rules("tdm-i2s-in-dsp-bind") {
 driver_bind_rules("audio-tas5707-stereo-bind") {
   rules = "bind/audio-tas5707-stereo.bind"
   header_output = "audio-tas5707-stereo-bind.h"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
+  deps = [
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.i2c",
+  ]
 }
 
 driver_bind_rules("av400-tee-bind") {
@@ -311,19 +324,20 @@ fuchsia_driver("av400-driver") {
     ":pwm_init_bind_header",
     ":spi_1_bind_header",
     ":tdm-i2s-bind_header",
+    ":tdm-i2s-in-bind_header",
     ":udc-phy-bind_header",
     ":usb-phy-bind_header",
     ":xhci-bind_header",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.modeswitch:fuchsia.hardware.usb.modeswitch_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.gpio.init:fuchsia.hardware.gpio.init_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
@@ -356,6 +370,7 @@ fuchsia_driver("av400-driver") {
     deps -= [ ":tdm-i2s-bind_header" ]
     if (av400_tdm_use_dsp) {
       defines += [ "TDM_USE_DSP" ]
+      deps -= [ ":tdm-i2s-in-bind_header" ]
       deps += [ ":tdm-i2s-in-dsp-bind_header" ]
       deps += [ ":tdm-i2s-out-dsp-bind_header" ]
     } else {

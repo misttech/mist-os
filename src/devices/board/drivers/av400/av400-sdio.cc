@@ -68,12 +68,19 @@ zx_status_t Av400::SdioInit() {
   sdio_dev.bti() = sdio_btis;
   sdio_dev.metadata() = sdio_metadata;
 
-  gpio_impl_.SetAltFunction(A5_GPIOX(0), A5_GPIOX_0_SDIO_D0_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOX(1), A5_GPIOX_1_SDIO_D1_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOX(2), A5_GPIOX_2_SDIO_D2_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOX(3), A5_GPIOX_3_SDIO_D3_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOX(4), A5_GPIOX_4_SDIO_CLK_FN);
-  gpio_impl_.SetAltFunction(A5_GPIOX(5), A5_GPIOX_5_SDIO_CMD_FN);
+  auto sdio_gpio = [&arena = gpio_init_arena_](
+                       uint64_t alt_function) -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .Build();
+  };
+
+  gpio_init_steps_.push_back({A5_GPIOX(0), sdio_gpio(A5_GPIOX_0_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({A5_GPIOX(1), sdio_gpio(A5_GPIOX_1_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({A5_GPIOX(2), sdio_gpio(A5_GPIOX_2_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({A5_GPIOX(3), sdio_gpio(A5_GPIOX_3_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({A5_GPIOX(4), sdio_gpio(A5_GPIOX_4_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({A5_GPIOX(5), sdio_gpio(A5_GPIOX_5_SDIO_CMD_FN)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SDIO');
@@ -83,12 +90,12 @@ zx_status_t Av400::SdioInit() {
                                                std::size(av400_sdio_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sdio_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Sdio(sdio_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sdio_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Sdio(sdio_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

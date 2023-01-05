@@ -69,7 +69,6 @@ static constexpr amlogic_spi::amlspi_config_t spi_1_config = {
                                                    // false - div_reg = log2(div) - 2;
 };
 
-
 zx_status_t Av400::SpiInit() {
   zx_status_t status;
   constexpr uint32_t kSpiccClkValue =
@@ -85,62 +84,64 @@ zx_status_t Av400::SpiInit() {
     status = fdf::MmioBuffer::Create(A5_CLK_BASE, A5_CLK_LENGTH, *resource,
                                      ZX_CACHE_POLICY_UNCACHED_DEVICE, &buf);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: MmioBuffer::Create failed %s", __func__, zx_status_get_string(status));
+      zxlogf(ERROR, "MmioBuffer::Create failed %s", zx_status_get_string(status));
       return status;
     }
 
     buf->Write32(kSpiccClkValue, CLKCTRL_SPICC_CLK_CNTL);
   }
 
-  fpbus::Node spi_1_dev;
-  spi_1_dev.name() = "spi-1";
-  spi_1_dev.vid() = PDEV_VID_AMLOGIC;
-  spi_1_dev.pid() = PDEV_PID_GENERIC;
-  spi_1_dev.did() = PDEV_DID_AMLOGIC_SPI;
-  spi_1_dev.instance_id() = 0;
-  spi_1_dev.mmio() = spi_1_mmios;
-  spi_1_dev.irq() = spi_1_irqs;
-  spi_1_dev.bti() = spi_1_btis;
+  auto spi_gpio = [&arena = gpio_init_arena_](uint64_t alt_function, uint64_t drive_strength_ua)
+      -> fuchsia_hardware_gpio_init::wire::GpioInitOptions {
+    return fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(arena)
+        .alt_function(alt_function)
+        .drive_strength_ua(drive_strength_ua)
+        .Build();
+  };
 
-  // setup pinmux for SPICC1 bus arbiter.
-  gpio_impl_.SetAltFunction(A5_GPIOT(10), A5_GPIOT_10_SPI_B_SS0_FN);  // SS0
-  gpio_impl_.ConfigOut(A5_GPIOT(10), 1);
+  gpio_init_steps_.push_back({A5_GPIOT(11), spi_gpio(A5_GPIOT_11_SPI_B_SCLK_FN, 2500)});
+  gpio_init_steps_.push_back({A5_GPIOT(12), spi_gpio(A5_GPIOT_12_SPI_B_MOSI_FN, 2500)});
+  gpio_init_steps_.push_back({A5_GPIOT(13), spi_gpio(A5_GPIOT_13_SPI_B_MISO_FN, 2500)});
 
-  gpio_impl_.SetAltFunction(A5_GPIOT(11), A5_GPIOT_11_SPI_B_SCLK_FN);  // SCLK
-  gpio_impl_.SetDriveStrength(A5_GPIOT(11), 2500, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOT(12), A5_GPIOT_12_SPI_B_MOSI_FN);  // MOSI
-  gpio_impl_.SetDriveStrength(A5_GPIOT(12), 2500, nullptr);
-
-  gpio_impl_.SetAltFunction(A5_GPIOT(13), A5_GPIOT_13_SPI_B_MISO_FN);  // MISO
-  gpio_impl_.SetDriveStrength(A5_GPIOT(13), 2500, nullptr);
-
-  std::vector<fpbus::Metadata> spi_1_metadata;
-  spi_1_metadata.emplace_back([]() {
-    fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_AMLSPI_CONFIG,
-    ret.data() = std::vector<uint8_t>(
-        reinterpret_cast<const uint8_t*>(&spi_1_config),
-        reinterpret_cast<const uint8_t*>(&spi_1_config) + sizeof(spi_1_config));
-    return ret;
-  }());
+  gpio_init_steps_.push_back(
+      {A5_GPIOT(10), fuchsia_hardware_gpio_init::wire::GpioInitOptions::Builder(gpio_init_arena_)
+                         .alt_function(0)  // use gpio chip select here.
+                         .output_value(1)
+                         .Build()});
 
   auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(spi_1_channels);
   if (spi_status.is_error()) {
-    zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
-           spi_status.error_value());
+    zxlogf(ERROR, "failed to encode spi channels to fidl: %d", spi_status.error_value());
     return spi_status.error_value();
   }
   auto& data = spi_status.value();
 
-  spi_1_metadata.emplace_back([&]() {
-    fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_SPI_CHANNELS;
-    ret.data() = std::move(data);
-    return ret;
-  }());
+  static const std::vector<fpbus::Metadata> spi_1_metadata{
+      {{
+          .type = DEVICE_METADATA_AMLSPI_CONFIG,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&spi_1_config),
+              reinterpret_cast<const uint8_t*>(&spi_1_config) + sizeof(spi_1_config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SPI_CHANNELS,
+          .data = std::vector<uint8_t>(data.data(), data.data() + data.size()),
+      }},
+  };
 
-  spi_1_dev.metadata() = std::move(spi_1_metadata);
+  static const fpbus::Node spi_1_dev = []() {
+    fpbus::Node dev = {};
+    dev.name() = "spi-1";
+    dev.vid() = PDEV_VID_AMLOGIC;
+    dev.pid() = PDEV_PID_GENERIC;
+    dev.did() = PDEV_DID_AMLOGIC_SPI;
+    dev.instance_id() = 0;
+    dev.mmio() = spi_1_mmios;
+    dev.irq() = spi_1_irqs;
+    dev.bti() = spi_1_btis;
+    dev.metadata() = spi_1_metadata;
+    return dev;
+  }();
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SPI_');
@@ -150,16 +151,15 @@ zx_status_t Av400::SpiInit() {
                                                std::size(spi_1_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Spi(spi_1_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Spi(spi_0_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Spi(spi_1_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddComposite Spi(spi_0_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
-
   return ZX_OK;
 }
 

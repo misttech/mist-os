@@ -43,12 +43,11 @@ zx_status_t Av400::RtcInit() {
   fdf::Arena arena('RTC_');
   auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, amlrtc_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Rtc(amlrtc_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd Rtc(amlrtc_dev) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Rtc(amlrtc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "NodeAdd Rtc(amlrtc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
