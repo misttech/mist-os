@@ -264,14 +264,13 @@ type ServiceMember struct {
 }
 
 type Root struct {
-	Experiments     fidlgen.Experiments
-	ExternCrates    []string
-	Bits            []Bits
-	Consts          []Const
-	Enums           []Enum
-	Structs         []Struct
-	ExternalStructs []Struct
-	Unions          []Union
+	Experiments  fidlgen.Experiments
+	ExternCrates []string
+	Bits         []Bits
+	Consts       []Const
+	Enums        []Enum
+	Structs      []Struct
+	Unions       []Union
 	// Result types for methods with error syntax.
 	Results                []Result
 	Tables                 []Table
@@ -289,17 +288,10 @@ func (r *Root) findProtocol(eci EncodedCompoundIdentifier) *Protocol {
 	return nil
 }
 
-func (r *Root) findStruct(eci EncodedCompoundIdentifier, canBeExternal bool) *Struct {
+func (r *Root) findStruct(eci EncodedCompoundIdentifier) *Struct {
 	for i := range r.Structs {
 		if r.Structs[i].ECI == eci {
 			return &r.Structs[i]
-		}
-	}
-	if canBeExternal {
-		for i := range r.ExternalStructs {
-			if r.ExternalStructs[i].ECI == eci {
-				return &r.ExternalStructs[i]
-			}
 		}
 	}
 	return nil
@@ -562,16 +554,10 @@ type compiler struct {
 	experiments  fidlgen.Experiments
 	library      fidlgen.LibraryIdentifier
 	externCrates map[string]struct{}
-	// Identifies which types are used as payload types, message body types, or
-	// both.
-	methodTypeUses fidlgen.MethodTypeUsageMap
-	// Collection of structs used as a method payload, wire result, or both, as
-	// described in the docs for fidlgen.MethodTypeUsage. This holds the
-	// compiled fidlgen.Struct because compileResultFromUnion needs to access
-	// the members from the compiled struct, and if the type is anonymous it
-	// will not appear Root.Structs.
-	methodTypeStructs      map[fidlgen.EncodedCompoundIdentifier]Struct
-	structs                map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	// Raw structs (including ExternalStructs), needed for computeUseFidlStructCopy.
+	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	// Compiled structs (including ExternalStructs), needed for flattening parameters.
+	compiledStructs        map[fidlgen.EncodedCompoundIdentifier]Struct
 	results                map[fidlgen.EncodedCompoundIdentifier]Result
 	handleMetadataWrappers map[string]HandleMetadataWrapper
 }
@@ -1064,14 +1050,14 @@ func (c *compiler) compileParameterArray(payload fidlgen.Struct) []Parameter {
 // "payload"). Unlike compileParameterArray, this does not result in the payload
 // layout being "flattened" into its constituent members.
 func (c *compiler) compileParameterSingleton(val *fidlgen.Type) []Parameter {
-	wrapperName, hasHandleMetadata := c.compileHandleMetadataWrapper(val)
+	if _, ok := c.compileHandleMetadataWrapper(val); ok {
+		panic("table/union should not require handle metadata wrapper")
+	}
 	return []Parameter{{
-		OGType:            *val,
-		Type:              c.compileType(*val),
-		BorrowedType:      c.compileBorrowedType(*val),
-		Name:              "payload",
-		HandleWrapperName: wrapperName,
-		HasHandleMetadata: hasHandleMetadata,
+		OGType:       *val,
+		Type:         c.compileType(*val),
+		BorrowedType: c.compileBorrowedType(*val),
+		Name:         "payload",
 	}}
 }
 
@@ -1088,13 +1074,10 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	}
 
 	getParametersFromType := func(t *fidlgen.Type) []Parameter {
-		if _, ok := c.methodTypeUses[t.Identifier]; ok {
-			if val, ok := c.methodTypeStructs[t.Identifier]; ok {
-				return c.compileParameterArray(val.Struct)
-			}
-			return c.compileParameterSingleton(t)
+		if val, ok := c.compiledStructs[t.Identifier]; ok {
+			return c.compileParameterArray(val.Struct)
 		}
-		panic(fmt.Sprintf("unknown request/response layout: %v", t.Identifier))
+		return c.compileParameterSingleton(t)
 	}
 
 	for _, v := range val.Methods {
@@ -1378,7 +1361,7 @@ func (c *compiler) compileResultFromUnion(m fidlgen.Method, root Root) Result {
 
 	switch declInfo.Type {
 	case fidlgen.StructDeclType:
-		for _, m := range c.methodTypeStructs[m.ValueType.Identifier].Members {
+		for _, m := range c.compiledStructs[m.ValueType.Identifier].Members {
 			wrapperName, hasHandleMetadata := c.compileHandleMetadataWrapper(&m.OGType)
 			r.Ok = append(r.Ok, ResultOkEntry{
 				OGType:            m.OGType,
@@ -1540,9 +1523,6 @@ func (c *compiler) fillDerives(ir *Root) {
 	for _, v := range ir.Structs {
 		dc.fillDerivesForECI(v.ECI)
 	}
-	for _, v := range ir.ExternalStructs {
-		dc.fillDerivesForECI(v.ECI)
-	}
 	for _, v := range ir.Unions {
 		dc.fillDerivesForECI(v.ECI)
 	}
@@ -1608,7 +1588,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 typeSwitch:
 	switch declInfo.Type {
 	case fidlgen.StructDeclType:
-		st := dc.root.findStruct(eci, false)
+		st := dc.root.findStruct(eci)
 		if st == nil {
 			panic(fmt.Sprintf("struct not found: %v", eci))
 		}
@@ -1766,12 +1746,12 @@ func Compile(r fidlgen.Root) Root {
 		experiments:            r.Experiments,
 		library:                thisLibParsed,
 		externCrates:           map[string]struct{}{},
-		methodTypeUses:         r.MethodTypeUsageMap(),
-		methodTypeStructs:      map[fidlgen.EncodedCompoundIdentifier]Struct{},
 		structs:                map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+		compiledStructs:        map[fidlgen.EncodedCompoundIdentifier]Struct{},
 		results:                map[fidlgen.EncodedCompoundIdentifier]Result{},
 		handleMetadataWrappers: map[string]HandleMetadataWrapper{},
 	}
+	methodTypeUses := r.MethodTypeUsageMap()
 
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
@@ -1799,8 +1779,8 @@ func Compile(r fidlgen.Root) Root {
 
 	for _, v := range r.Structs {
 		compiled := c.compileStruct(v)
-		if _, ok := c.methodTypeUses[v.Name]; ok {
-			c.methodTypeStructs[v.Name] = compiled
+		c.compiledStructs[v.Name] = compiled
+		if _, ok := methodTypeUses[v.Name]; ok {
 			if v.IsAnonymous() {
 				continue
 			}
@@ -1809,14 +1789,7 @@ func Compile(r fidlgen.Root) Root {
 	}
 
 	for _, v := range r.ExternalStructs {
-		compiled := c.compileStruct(v)
-		if _, ok := c.methodTypeUses[v.Name]; ok {
-			c.methodTypeStructs[v.Name] = compiled
-			if v.IsAnonymous() {
-				continue
-			}
-		}
-		root.ExternalStructs = append(root.ExternalStructs, compiled)
+		c.compiledStructs[v.Name] = c.compileStruct(v)
 	}
 
 	for _, v := range r.Tables {
