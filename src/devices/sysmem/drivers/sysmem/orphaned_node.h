@@ -41,8 +41,10 @@ class OrphanedNode : public Node {
   const char* node_type_string() const override;
 
  protected:
-  // OrphanedNode::Bind() will never happen; panics.
-  void BindInternal(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) override;
+  // OrphanedNode::BindV1() will never happen; panics.
+  void BindInternalV1(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) override;
+  // OrphanedNode::BindV2() will never happen; panics.
+  void BindInternalV2(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) override;
   // NOP
   void CloseServerBinding(zx_status_t epitaph) override;
 

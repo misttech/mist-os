@@ -12,7 +12,6 @@
 #include <zircon/types.h>
 
 #include "device.h"
-#include "koid_util.h"
 #include "node.h"
 #include "node_properties.h"
 
@@ -31,10 +30,14 @@ BufferCollectionToken::~BufferCollectionToken() {
 }
 
 void BufferCollectionToken::CloseServerBinding(zx_status_t epitaph) {
-  if (server_binding_.has_value()) {
-    server_binding_->Close(epitaph);
+  if (server_binding_v1_.has_value()) {
+    server_binding_v1_->Close(epitaph);
   }
-  server_binding_ = {};
+  if (server_binding_v2_.has_value()) {
+    server_binding_v2_->Close(epitaph);
+  }
+  server_binding_v1_ = {};
+  server_binding_v2_ = {};
   parent_device()->UntrackToken(this);
 }
 
@@ -49,90 +52,201 @@ BufferCollectionToken& BufferCollectionToken::EmplaceInTree(
   return *token_ptr;
 }
 
-void BufferCollectionToken::BindInternal(zx::channel token_request,
-                                         ErrorHandlerWrapper error_handler_wrapper) {
-  server_binding_ = fidl::BindServer<fuchsia_sysmem::BufferCollectionToken>(
-      parent_device()->dispatcher(), std::move(token_request), this,
+void BufferCollectionToken::BindInternalV1(zx::channel token_request,
+                                           ErrorHandlerWrapper error_handler_wrapper) {
+  v1_server_.emplace(*this);
+  server_binding_v1_ = fidl::BindServer(
+      parent_device()->dispatcher(),
+      fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(token_request)),
+      &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollectionToken* token, fidl::UnbindInfo info,
+          BufferCollectionToken::V1* token, fidl::UnbindInfo info,
           fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> channel) {
         error_handler_wrapper(info);
       });
 }
 
-void BufferCollectionToken::DuplicateSync(DuplicateSyncRequestView request,
-                                          DuplicateSyncCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollectionToken::DuplicateSync", "this", this,
-                 "logical_buffer_collection", &logical_buffer_collection());
-  if (is_done_) {
+void BufferCollectionToken::BindInternalV2(zx::channel token_request,
+                                           ErrorHandlerWrapper error_handler_wrapper) {
+  v2_server_.emplace(*this);
+  server_binding_v2_ = fidl::BindServer(
+      parent_device()->dispatcher(),
+      fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(token_request)),
+      &v2_server_.value(),
+      [error_handler_wrapper = std::move(error_handler_wrapper)](
+          BufferCollectionToken::V2* token, fidl::UnbindInfo info,
+          fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> channel) {
+        error_handler_wrapper(info);
+      });
+}
+
+void BufferCollectionToken::V1::DuplicateSync(DuplicateSyncRequest& request,
+                                              DuplicateSyncCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionToken::V1::DuplicateSync", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  if (parent_.is_done_) {
     // Probably a Close() followed by DuplicateSync(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "BufferCollectionToken::DuplicateSync() attempted when is_done_");
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "BufferCollectionToken::DuplicateSync() attempted when is_done_");
     return;
   }
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>> new_tokens;
 
-  for (auto& rights_attenuation_mask : request->rights_attenuation_masks) {
+  for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
     if (!token_endpoints.is_ok()) {
-      FailSync(FROM_HERE, completer, token_endpoints.status_value(),
-               "BufferCollectionToken::DuplicateSync() failed to create token channel.");
+      parent_.FailSync(FROM_HERE, completer, token_endpoints.status_value(),
+                       "BufferCollectionToken::DuplicateSync() failed to create token channel.");
       return;
     }
 
-    NodeProperties* new_node_properties = node_properties().NewChild(&logical_buffer_collection());
+    NodeProperties* new_node_properties =
+        parent_.node_properties().NewChild(&parent_.logical_buffer_collection());
     if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
       new_node_properties->rights_attenuation_mask() &=
           safe_cast<uint32_t>(rights_attenuation_mask);
     }
-    logical_buffer_collection().CreateBufferCollectionToken(shared_logical_buffer_collection(),
-                                                            new_node_properties,
-                                                            std::move(token_endpoints->server));
+    parent_.logical_buffer_collection().CreateBufferCollectionTokenV1(
+        parent_.shared_logical_buffer_collection(), new_node_properties,
+        std::move(token_endpoints->server));
     new_tokens.push_back(std::move(token_endpoints->client));
   }
 
-  completer.Reply(
-      fidl::VectorView<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>::FromExternal(
-          new_tokens));
+  fuchsia_sysmem::BufferCollectionTokenDuplicateSyncResponse response;
+  response.tokens() = std::move(new_tokens);
+  completer.Reply(std::move(response));
 }
 
-void BufferCollectionToken::Duplicate(DuplicateRequestView request,
-                                      DuplicateCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollectionToken::Duplicate", "this", this,
-                 "logical_buffer_collection", &logical_buffer_collection());
+void BufferCollectionToken::V2::DuplicateSync(DuplicateSyncRequest& request,
+                                              DuplicateSyncCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionToken::V2::DuplicateSync", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  if (parent_.is_done_) {
+    // Probably a Close() followed by DuplicateSync(), which is illegal and
+    // causes the whole LogicalBufferCollection to fail.
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "DuplicateSync() attempted when is_done_");
+    return;
+  }
+  if (!request.rights_attenuation_masks().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "DuplicateSync() requires rights_attenuation_masks set");
+    return;
+  }
+
+  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>> new_tokens;
+  for (auto& rights_attenuation_mask : request.rights_attenuation_masks().value()) {
+    auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
+    if (!token_endpoints.is_ok()) {
+      parent_.FailSync(FROM_HERE, completer, token_endpoints.status_value(),
+                       "BufferCollectionToken::DuplicateSync() failed to create token channel.");
+      return;
+    }
+
+    NodeProperties* new_node_properties =
+        parent_.node_properties().NewChild(&parent_.logical_buffer_collection());
+    if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
+      new_node_properties->rights_attenuation_mask() &=
+          safe_cast<uint32_t>(rights_attenuation_mask);
+    }
+    parent_.logical_buffer_collection().CreateBufferCollectionTokenV2(
+        parent_.shared_logical_buffer_collection(), new_node_properties,
+        std::move(token_endpoints->server));
+    new_tokens.push_back(std::move(token_endpoints->client));
+  }
+
+  fuchsia_sysmem2::BufferCollectionTokenDuplicateSyncResponse response;
+  response.tokens() = std::move(new_tokens);
+  completer.Reply(std::move(response));
+}
+
+template <typename Completer>
+bool BufferCollectionToken::CommonDuplicateStage1(uint32_t rights_attenuation_mask,
+                                                  Completer& completer,
+                                                  NodeProperties** out_node_properties) {
   if (is_done_) {
     // Probably a Close() followed by Duplicate(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollectionToken::Duplicate() attempted when is_done_");
-    return;
+    return false;
   }
   NodeProperties* new_node_properties = node_properties().NewChild(&logical_buffer_collection());
-  if (request->rights_attenuation_mask == 0) {
+  if (rights_attenuation_mask == 0) {
     logical_buffer_collection().LogClientError(
         FROM_HERE, &node_properties(),
         "rights_attenuation_mask of 0 is DEPRECATED - use ZX_RIGHT_SAME_RIGHTS instead.");
-    request->rights_attenuation_mask = ZX_RIGHT_SAME_RIGHTS;
+    rights_attenuation_mask = ZX_RIGHT_SAME_RIGHTS;
   }
-  if (request->rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
-    new_node_properties->rights_attenuation_mask() &= request->rights_attenuation_mask;
+  if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
+    new_node_properties->rights_attenuation_mask() &= rights_attenuation_mask;
   }
-  logical_buffer_collection().CreateBufferCollectionToken(
-      shared_logical_buffer_collection(), new_node_properties, std::move(request->token_request));
+  *out_node_properties = new_node_properties;
+  return true;
 }
 
-void BufferCollectionToken::Sync(SyncCompleter::Sync& completer) { SyncImplV1(completer); }
+void BufferCollectionToken::V1::Duplicate(DuplicateRequest& request,
+                                          DuplicateCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionToken::Duplicate", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask(), completer,
+                                     &new_node_properties)) {
+    return;
+  }
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenV1(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.token_request()));
+}
 
-void BufferCollectionToken::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
-  SyncImplV1(completer);
+void BufferCollectionToken::V2::Duplicate(DuplicateRequest& request,
+                                          DuplicateCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionToken::Duplicate", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  if (!request.rights_attenuation_mask().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "Duplicate() requires rights_attenuation_mask set");
+    return;
+  }
+  if (!request.token_request().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "Duplicate() requires token_request set");
+    return;
+  }
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask().value(), completer,
+                                     &new_node_properties)) {
+    return;
+  }
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenV2(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.token_request().value()));
+}
+
+void BufferCollectionToken::V1::Sync(SyncCompleter::Sync& completer) {
+  parent_.SyncImpl(completer);
+}
+
+void BufferCollectionToken::V2::Sync(SyncCompleter::Sync& completer) {
+  parent_.SyncImpl(completer);
+}
+
+void BufferCollectionToken::V1::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
+  parent_.SyncImpl(completer);
 }
 
 // Clean token close without causing LogicalBufferCollection failure.
-void BufferCollectionToken::Close(CloseCompleter::Sync& completer) { TokenCloseImplV1(completer); }
+void BufferCollectionToken::V1::Close(CloseCompleter::Sync& completer) {
+  parent_.TokenCloseImpl(completer);
+}
 
-void BufferCollectionToken::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
-  TokenCloseImplV1(completer);
+void BufferCollectionToken::V2::Close(CloseCompleter::Sync& completer) {
+  parent_.TokenCloseImpl(completer);
+}
+
+void BufferCollectionToken::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
+  parent_.TokenCloseImpl(completer);
 }
 
 void BufferCollectionToken::OnServerKoid() {
@@ -161,40 +275,61 @@ zx::channel BufferCollectionToken::TakeBufferCollectionRequest() {
   return std::move(buffer_collection_request_);
 }
 
-void BufferCollectionToken::SetName(SetNameRequestView request, SetNameCompleter::Sync& completer) {
-  SetNameImplV1(request, completer);
+void BufferCollectionToken::V1::SetName(SetNameRequest& request,
+                                        SetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV1(request, completer);
 }
 
-void BufferCollectionToken::DeprecatedSetName(DeprecatedSetNameRequestView request,
-                                              DeprecatedSetNameCompleter::Sync& completer) {
-  SetNameImplV1(request, completer);
+void BufferCollectionToken::V2::SetName(SetNameRequest& request,
+                                        SetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV2(request, completer);
 }
 
-void BufferCollectionToken::SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                                               SetDebugClientInfoCompleter::Sync& completer) {
-  SetDebugClientInfoImplV1(request, completer);
+void BufferCollectionToken::V1::DeprecatedSetName(DeprecatedSetNameRequest& request,
+                                                  DeprecatedSetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV1(request, completer);
 }
 
-void BufferCollectionToken::DeprecatedSetDebugClientInfo(
-    DeprecatedSetDebugClientInfoRequestView request,
+void BufferCollectionToken::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                                   SetDebugClientInfoCompleter::Sync& completer) {
+  parent_.SetDebugClientInfoImplV1(request, completer);
+}
+
+void BufferCollectionToken::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                                   SetDebugClientInfoCompleter::Sync& completer) {
+  parent_.SetDebugClientInfoImplV2(request, completer);
+}
+
+void BufferCollectionToken::V1::DeprecatedSetDebugClientInfo(
+    DeprecatedSetDebugClientInfoRequest& request,
     DeprecatedSetDebugClientInfoCompleter::Sync& completer) {
-  SetDebugClientInfoImplV1(request, completer);
+  parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
-void BufferCollectionToken::SetDebugTimeoutLogDeadline(
-    SetDebugTimeoutLogDeadlineRequestView request,
+void BufferCollectionToken::V1::SetDebugTimeoutLogDeadline(
+    SetDebugTimeoutLogDeadlineRequest& request,
     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) {
-  SetDebugTimeoutLogDeadlineImplV1(request, completer);
+  parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
 }
 
-void BufferCollectionToken::DeprecatedSetDebugTimeoutLogDeadline(
-    DeprecatedSetDebugTimeoutLogDeadlineRequestView request,
+void BufferCollectionToken::V2::SetDebugTimeoutLogDeadline(
+    SetDebugTimeoutLogDeadlineRequest& request,
+    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) {
+  parent_.SetDebugTimeoutLogDeadlineImplV2(request, completer);
+}
+
+void BufferCollectionToken::V1::DeprecatedSetDebugTimeoutLogDeadline(
+    DeprecatedSetDebugTimeoutLogDeadlineRequest& request,
     DeprecatedSetDebugTimeoutLogDeadlineCompleter::Sync& completer) {
-  SetDebugTimeoutLogDeadlineImplV1(request, completer);
+  parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
 }
 
-void BufferCollectionToken::SetDispensable(SetDispensableCompleter::Sync& completer) {
-  SetDispensableInternal();
+void BufferCollectionToken::V1::SetDispensable(SetDispensableCompleter::Sync& completer) {
+  parent_.SetDispensableInternal();
+}
+
+void BufferCollectionToken::V2::SetDispensable(SetDispensableCompleter::Sync& completer) {
+  parent_.SetDispensableInternal();
 }
 
 void BufferCollectionToken::SetDispensableInternal() {
@@ -204,34 +339,78 @@ void BufferCollectionToken::SetDispensableInternal() {
   }
 }
 
-void BufferCollectionToken::CreateBufferCollectionTokenGroup(
-    CreateBufferCollectionTokenGroupRequestView request,
-    CreateBufferCollectionTokenGroupCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollectionTokenGroup::CreateBufferCollectionTokenGroup", "this",
-                 this, "logical_buffer_collection", &logical_buffer_collection());
+template <typename Completer>
+bool BufferCollectionToken::CommonCreateBufferCollectionTokenGroupStage1(
+    Completer& completer, NodeProperties** out_node_properties) {
   if (is_done_) {
     // Probably a Close() followed by Duplicate(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollectionToken::CreateBufferCollectionTokenGroup() attempted when is_done_");
-    return;
+    return false;
   }
   NodeProperties* new_node_properties = node_properties().NewChild(&logical_buffer_collection());
-  logical_buffer_collection().CreateBufferCollectionTokenGroup(
-      shared_logical_buffer_collection(), new_node_properties, std::move(request->group_request));
+  *out_node_properties = new_node_properties;
+  return true;
 }
 
-void BufferCollectionToken::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
-  SetVerboseLoggingImplV1(completer);
+void BufferCollectionToken::V1::CreateBufferCollectionTokenGroup(
+    CreateBufferCollectionTokenGroupRequest& request,
+    CreateBufferCollectionTokenGroupCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionTokenGroup::CreateBufferCollectionTokenGroup", "this",
+                 this, "logical_buffer_collection", &parent_.logical_buffer_collection());
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(completer, &new_node_properties)) {
+    return;
+  }
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenGroupV1(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.group_request()));
 }
 
-void BufferCollectionToken::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
-  GetNodeRefImplV1(completer);
+void BufferCollectionToken::V2::CreateBufferCollectionTokenGroup(
+    CreateBufferCollectionTokenGroupRequest& request,
+    CreateBufferCollectionTokenGroupCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollectionTokenGroup::CreateBufferCollectionTokenGroup", "this",
+                 this, "logical_buffer_collection", &parent_.logical_buffer_collection());
+  if (!request.group_request().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "CreateBufferCollectionTokenGroup() requires group_request set");
+    return;
+  }
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(completer, &new_node_properties)) {
+    return;
+  }
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenGroupV2(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.group_request().value()));
 }
 
-void BufferCollectionToken::IsAlternateFor(IsAlternateForRequestView request,
-                                           IsAlternateForCompleter::Sync& completer) {
-  IsAlternateForImplV1(request, completer);
+void BufferCollectionToken::V1::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
+  parent_.SetVerboseLoggingImpl(completer);
+}
+
+void BufferCollectionToken::V2::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
+  parent_.SetVerboseLoggingImpl(completer);
+}
+
+void BufferCollectionToken::V1::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
+  parent_.GetNodeRefImplV1(completer);
+}
+
+void BufferCollectionToken::V2::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
+  parent_.GetNodeRefImplV2(completer);
+}
+
+void BufferCollectionToken::V1::IsAlternateFor(IsAlternateForRequest& request,
+                                               IsAlternateForCompleter::Sync& completer) {
+  parent_.IsAlternateForImplV1(request, completer);
+}
+
+void BufferCollectionToken::V2::IsAlternateFor(IsAlternateForRequest& request,
+                                               IsAlternateForCompleter::Sync& completer) {
+  parent_.IsAlternateForImplV2(request, completer);
 }
 
 BufferCollectionToken::BufferCollectionToken(
@@ -261,12 +440,21 @@ void BufferCollectionToken::FailAsync(Location location, zx_status_t status, con
   va_end(args);
 
   // Idempotent, so only close once.
-  if (!server_binding_.has_value())
+  if (!server_binding_v1_.has_value() && !server_binding_v2_.has_value()) {
     return;
+  }
+  ZX_DEBUG_ASSERT(!!server_binding_v1_.has_value() ^ !!server_binding_v2_.has_value());
 
   async_failure_result_ = status;
-  server_binding_->Close(status);
-  server_binding_ = {};
+
+  if (server_binding_v1_.has_value()) {
+    server_binding_v1_->Close(status);
+    server_binding_v1_ = {};
+  } else {
+    ZX_DEBUG_ASSERT(server_binding_v2_.has_value());
+    server_binding_v2_->Close(status);
+    server_binding_v2_ = {};
+  }
 }
 
 bool BufferCollectionToken::ReadyForAllocation() { return false; }
@@ -297,7 +485,9 @@ const OrphanedNode* BufferCollectionToken::orphaned_node() const { return nullpt
 
 bool BufferCollectionToken::is_connected_type() const { return true; }
 
-bool BufferCollectionToken::is_currently_connected() const { return server_binding_.has_value(); }
+bool BufferCollectionToken::is_currently_connected() const {
+  return server_binding_v1_.has_value() || server_binding_v2_.has_value();
+}
 
 const char* BufferCollectionToken::node_type_string() const { return "token"; }
 

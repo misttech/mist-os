@@ -32,6 +32,7 @@
 namespace sysmem_driver {
 
 class BufferCollectionToken;
+class BufferCollectionTokenGroup;
 class BufferCollection;
 class MemoryAllocator;
 class Node;
@@ -52,7 +53,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   ~LogicalBufferCollection();
 
-  static void Create(zx::channel buffer_collection_token_request, Device* parent_device);
+  static void CreateV1(zx::channel buffer_collection_token_request, Device* parent_device);
+  static void CreateV2(zx::channel buffer_collection_token_request, Device* parent_device);
 
   // |parent_device| the Device* that the calling allocator is part of.  The
   // tokens_by_koid_ for each Device is separate.  If somehow two clients were
@@ -81,15 +83,25 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // The |self| parameter exists only because LogicalBufferCollection can't
   // hold a std::weak_ptr<> to itself because that requires libc++ (the binary
   // not just the headers) which isn't available in Zircon so far.
-  void CreateBufferCollectionToken(
+  void CreateBufferCollectionTokenV1(
       fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
       fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> token_request);
+  void CreateBufferCollectionTokenV2(
+      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+      fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> token_request);
 
   // This is used by BufferCollectionToken to create a BufferCollectionTokenGroup during the
   // FIDL request of the same name.
-  void CreateBufferCollectionTokenGroup(
+  void CreateBufferCollectionTokenGroupV1(
       fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
       fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> group_request);
+  void CreateBufferCollectionTokenGroupV2(
+      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+      fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup> group_request);
+  bool CommonCreateBufferCollectionTokenGroupStage1(fbl::RefPtr<LogicalBufferCollection> self,
+                                                    NodeProperties* new_node_properties,
+                                                    zx::unowned_channel group_request,
+                                                    BufferCollectionTokenGroup** out_group);
 
   void AttachLifetimeTracking(zx::eventpair server_end, uint32_t buffers_remaining);
   void SweepLifetimeTracking();
@@ -571,6 +583,13 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // subtree must remain alive >= returned filter
   fit::function<NodeFilterResult(const NodeProperties&)> PrunedSubtreeFilter(
       NodeProperties& subtree, fit::function<bool(const NodeProperties&)> visit_keep) const;
+
+  static fbl::RefPtr<LogicalBufferCollection> CommonCreate(Device* parent_device);
+
+  bool CommonCreateBufferCollectionTokenStage1(fbl::RefPtr<LogicalBufferCollection> self,
+                                               NodeProperties* new_node_properties,
+                                               zx::unowned_channel token_request,
+                                               BufferCollectionToken** out_token);
 
   Device* parent_device_ = nullptr;
 

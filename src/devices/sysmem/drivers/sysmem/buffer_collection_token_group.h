@@ -18,36 +18,11 @@ namespace sysmem_driver {
 // For example a participant can create a first token that's preferred and a second token that's
 // fallback.  If aggregation using the preferred token fails, aggregation will be re-attempted using
 // the fallback token.
-class BufferCollectionTokenGroup
-    : public Node,
-      public fidl::WireServer<fuchsia_sysmem::BufferCollectionTokenGroup> {
+class BufferCollectionTokenGroup : public Node {
  public:
   static BufferCollectionTokenGroup& EmplaceInTree(
       fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
       NodeProperties* node_properties, zx::unowned_channel server_end);
-
-  // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
-  // BufferCollectionTokenGroup)
-  void Sync(SyncCompleter::Sync& completer) override;
-  void Close(CloseCompleter::Sync& completer) override;
-  void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
-  void IsAlternateFor(IsAlternateForRequestView request,
-                      IsAlternateForCompleter::Sync& completer) override;
-  void SetName(SetNameRequestView request, SetNameCompleter::Sync& completer) override;
-  void SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                          SetDebugClientInfoCompleter::Sync& completer) override;
-  void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequestView request,
-                                  SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
-  void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
-
-  //
-  // fuchsia.sysmem.BufferCollectionTokenGroup interface methods (see also "compose Node" methods
-  // above)
-  //
-  void CreateChild(CreateChildRequestView request, CreateChildCompleter::Sync& completer) override;
-  void CreateChildrenSync(CreateChildrenSyncRequestView request,
-                          CreateChildrenSyncCompleter::Sync& completer) override;
-  void AllChildrenPresent(AllChildrenPresentCompleter::Sync& completer) override;
 
   // Node interface
   bool ReadyForAllocation() override;
@@ -66,14 +41,90 @@ class BufferCollectionTokenGroup
   const char* node_type_string() const override;
 
  protected:
-  void BindInternal(zx::channel group_request, ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalV1(zx::channel group_request,
+                      ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalV2(zx::channel group_request,
+                      ErrorHandlerWrapper error_handler_wrapper) override;
+
   void CloseServerBinding(zx_status_t epitaph) override;
 
  private:
+  struct V1 : public fidl::Server<fuchsia_sysmem::BufferCollectionTokenGroup> {
+    explicit V1(BufferCollectionTokenGroup& parent) : parent_(parent) {}
+
+    // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
+    // BufferCollectionTokenGroup)
+    void Sync(SyncCompleter::Sync& completer) override;
+    void Close(CloseCompleter::Sync& completer) override;
+    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
+    void IsAlternateFor(IsAlternateForRequest& request,
+                        IsAlternateForCompleter::Sync& completer) override;
+    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
+                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
+    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
+
+    //
+    // fuchsia.sysmem.BufferCollectionTokenGroup interface methods (see also "compose Node" methods
+    // above)
+    //
+    void CreateChild(CreateChildRequest& request, CreateChildCompleter::Sync& completer) override;
+    void CreateChildrenSync(CreateChildrenSyncRequest& request,
+                            CreateChildrenSyncCompleter::Sync& completer) override;
+    void AllChildrenPresent(AllChildrenPresentCompleter::Sync& completer) override;
+
+    BufferCollectionTokenGroup& parent_;
+  };
+
+  struct V2 : public fidl::Server<fuchsia_sysmem2::BufferCollectionTokenGroup> {
+    explicit V2(BufferCollectionTokenGroup& parent) : parent_(parent) {}
+
+    // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
+    // BufferCollectionTokenGroup)
+    void Sync(SyncCompleter::Sync& completer) override;
+    void Close(CloseCompleter::Sync& completer) override;
+    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
+    void IsAlternateFor(IsAlternateForRequest& request,
+                        IsAlternateForCompleter::Sync& completer) override;
+    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
+                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
+    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
+
+    //
+    // fuchsia.sysmem.BufferCollectionTokenGroup interface methods (see also "compose Node" methods
+    // above)
+    //
+    void CreateChild(CreateChildRequest& request, CreateChildCompleter::Sync& completer) override;
+    void CreateChildrenSync(CreateChildrenSyncRequest& request,
+                            CreateChildrenSyncCompleter::Sync& completer) override;
+    void AllChildrenPresent(AllChildrenPresentCompleter::Sync& completer) override;
+
+    BufferCollectionTokenGroup& parent_;
+  };
+
   BufferCollectionTokenGroup(fbl::RefPtr<LogicalBufferCollection> parent,
                              NodeProperties* new_node_properties, zx::unowned_channel server_end);
 
-  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollectionTokenGroup>> server_binding_;
+  template <typename Completer>
+  bool CommonCreateChildStage1(Completer& completer,
+                               std::optional<uint32_t> input_rights_attenuation_mask,
+                               NodeProperties** out_node_properties);
+
+  template <typename Completer>
+  void CommonAllChildrenPresent(Completer& completer);
+
+  std::optional<V1> v1_server_;
+  std::optional<V2> v2_server_;
+
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollectionTokenGroup>>
+      server_binding_v1_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollectionTokenGroup>>
+      server_binding_v2_;
 
   bool is_all_children_present_ = false;
 };

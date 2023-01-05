@@ -122,7 +122,7 @@ type PixelFormatType = flexible enum : uint32 {
     /// The sysmem client is explicitly indicating that the sysmem client does
     /// not care which pixel format is chosen / used.  When setting this value,
     /// the sysmem client must not set format_modifier_value.
-    @available(added=10)
+    @available(added=HEAD)
     DO_NOT_CARE = 0xFFFFFFFE;
 };
 
@@ -186,6 +186,6 @@ type ColorSpaceType = flexible enum : uint32 {
 
     /// The sysmem client is explicitly indicating that the sysmem client does
     /// not care which color space is chosen / used.
-    @available(added=10)
+    @available(added=HEAD)
     DO_NOT_CARE = 0xFFFFFFFE;
 };

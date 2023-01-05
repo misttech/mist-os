@@ -5,12 +5,13 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_H_
 
-#include <fidl/fuchsia.sysmem/cpp/natural_types.h>
-#include <fidl/fuchsia.sysmem2/cpp/natural_types.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fidl/internal.h>
 
 #include <list>
 
+#include "lib/fidl/cpp/wire/wire_messaging_declarations.h"
 #include "lib/zx/channel.h"
 #include "logging.h"
 #include "logical_buffer_collection.h"
@@ -19,7 +20,12 @@
 
 namespace sysmem_driver {
 
-class BufferCollection : public Node, public fidl::WireServer<fuchsia_sysmem::BufferCollection> {
+// This class indirectly implements both V1 and V2 BufferCollection server.
+//
+// This class can't directly implement both servers because FIDL completers for one-way messages
+// from client to server end up using the same type, which makes the overrride(s) ambiguous for any
+// one-way message with no parameters.
+class BufferCollection : public Node {
  public:
   // Use EmplaceInTree() instead of Create() (until we switch to llcpp when we can have a new
   // Create() that does what EmplaceInTree() currently does).  The returned reference is valid while
@@ -28,41 +34,6 @@ class BufferCollection : public Node, public fidl::WireServer<fuchsia_sysmem::Bu
       fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection, BufferCollectionToken* token,
       zx::unowned_channel server_end);
   ~BufferCollection() override;
-
-  // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
-  // BufferCollectionTokenGroup)
-  void Sync(SyncCompleter::Sync& completer) override;
-  void DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) override;
-  void Close(CloseCompleter::Sync& completer) override;
-  void DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) override;
-  void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
-  void IsAlternateFor(IsAlternateForRequestView request,
-                      IsAlternateForCompleter::Sync& completer) override;
-  void SetName(SetNameRequestView request, SetNameCompleter::Sync& completer) override;
-  void DeprecatedSetName(DeprecatedSetNameRequestView request,
-                         DeprecatedSetNameCompleter::Sync& completer) override;
-  void SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                          SetDebugClientInfoCompleter::Sync& completer) override;
-  void DeprecatedSetDebugClientInfo(
-      DeprecatedSetDebugClientInfoRequestView request,
-      DeprecatedSetDebugClientInfoCompleter::Sync& completer) override;
-  void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequestView request,
-                                  SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
-  void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
-
-  //
-  // fuchsia.sysmem.BufferCollection interface methods (see also "compose Node" methods above)
-  //
-  void SetConstraints(SetConstraintsRequestView request,
-                      SetConstraintsCompleter::Sync& completer) override;
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override;
-  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override;
-  void SetConstraintsAuxBuffers(SetConstraintsAuxBuffersRequestView request,
-                                SetConstraintsAuxBuffersCompleter::Sync& completer) override;
-  void GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) override;
-  void AttachToken(AttachTokenRequestView request, AttachTokenCompleter::Sync& completer) override;
-  void AttachLifetimeTracking(AttachLifetimeTrackingRequestView request,
-                              AttachLifetimeTrackingCompleter::Sync& completer) override;
 
   //
   // LogicalBufferCollection uses these:
@@ -97,11 +68,93 @@ class BufferCollection : public Node, public fidl::WireServer<fuchsia_sysmem::Bu
   const char* node_type_string() const override;
 
  protected:
-  void BindInternal(zx::channel collection_request,
-                    ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalV1(zx::channel collection_request,
+                      ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalV2(zx::channel collection_request,
+                      ErrorHandlerWrapper error_handler_wrapper) override;
 
  private:
   friend class FidlServer;
+
+  struct V1 : public fidl::Server<fuchsia_sysmem::BufferCollection> {
+    explicit V1(BufferCollection& parent) : parent_(parent) {}
+
+    //
+    // V1:
+    //
+    // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
+    // BufferCollectionTokenGroup)
+    //
+    void Sync(SyncCompleter::Sync& completer) override;
+    void DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) override;
+    void Close(CloseCompleter::Sync& completer) override;
+    void DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) override;
+    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
+    void IsAlternateFor(IsAlternateForRequest& request,
+                        IsAlternateForCompleter::Sync& completer) override;
+    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
+    void DeprecatedSetName(DeprecatedSetNameRequest& request,
+                           DeprecatedSetNameCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+    void DeprecatedSetDebugClientInfo(
+        DeprecatedSetDebugClientInfoRequest& request,
+        DeprecatedSetDebugClientInfoCompleter::Sync& completer) override;
+    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
+                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
+    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
+
+    //
+    // V1:
+    //
+    // fuchsia.sysmem.BufferCollection interface methods (see also "compose Node" methods above)
+    //
+    void SetConstraints(SetConstraintsRequest& request,
+                        SetConstraintsCompleter::Sync& completer) override;
+    void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override;
+    void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override;
+    void SetConstraintsAuxBuffers(SetConstraintsAuxBuffersRequest& request,
+                                  SetConstraintsAuxBuffersCompleter::Sync& completer) override;
+    void GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) override;
+    void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
+    void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
+                                AttachLifetimeTrackingCompleter::Sync& completer) override;
+
+    BufferCollection& parent_;
+  };
+
+  struct V2 : public fidl::Server<fuchsia_sysmem2::BufferCollection>, public fbl::Recyclable<V2> {
+    explicit V2(BufferCollection& parent) : parent_(parent) {}
+
+    //
+    // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
+    // BufferCollectionTokenGroup)
+    //
+    void Sync(SyncCompleter::Sync& completer) override;
+    void Close(CloseCompleter::Sync& completer) override;
+    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
+    void IsAlternateFor(IsAlternateForRequest& request,
+                        IsAlternateForCompleter::Sync& completer) override;
+    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
+                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
+    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
+
+    //
+    // fuchsia.sysmem.BufferCollection interface methods (see also "compose Node" methods above)
+    //
+    void SetConstraints(SetConstraintsRequest& request,
+                        SetConstraintsCompleter::Sync& completer) override;
+    void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override;
+    void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override;
+    void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
+    void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
+                                AttachLifetimeTrackingCompleter::Sync& completer) override;
+
+    BufferCollection& parent_;
+  };
 
   explicit BufferCollection(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
                             const BufferCollectionToken& token, zx::unowned_channel server_end);
@@ -132,6 +185,26 @@ class BufferCollection : public Node, public fidl::WireServer<fuchsia_sysmem::Bu
   fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> CloneAuxBuffersResultForSendingV1(
       const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info);
 
+  template <typename Completer>
+  bool CommonSetConstraintsStage1(Completer& completer);
+
+  template <typename Completer>
+  bool CommonWaitForAllBuffersAllocatedStage1(Completer& completer, trace_async_id_t* out_event_id);
+
+  template <typename Completer>
+  bool CommonCheckAllBuffersAllocatedStage1(Completer& completer, zx_status_t* result);
+
+  template <typename Completer>
+  bool CommonAttachTokenStage1(uint32_t rights_attenuation_mask, Completer& completer,
+                               NodeProperties** out_node_properties);
+
+  template <typename Completer>
+  void CommonAttachLifetimeTracking(zx::eventpair server_end, uint32_t buffers_remaining,
+                                    Completer& completer);
+
+  std::optional<V1> v1_server_;
+  std::optional<V2> v2_server_;
+
   // Temporarily holds fuchsia.sysmem.BufferCollectionConstraintsAuxBuffers until SetConstraints()
   // arrives.
   std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers> constraints_aux_buffers_;
@@ -140,12 +213,15 @@ class BufferCollection : public Node, public fidl::WireServer<fuchsia_sysmem::Bu
   bool is_set_constraints_seen_ = false;
   bool is_set_constraints_aux_buffers_seen_ = false;
 
-  std::list<std::pair</*async_id*/ uint64_t, WaitForBuffersAllocatedCompleter::Async>>
-      pending_wait_for_buffers_allocated_;
+  std::list<std::pair</*async_id*/ uint64_t, V1::WaitForBuffersAllocatedCompleter::Async>>
+      pending_wait_for_buffers_allocated_v1_;
+  std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedCompleter::Async>>
+      pending_wait_for_buffers_allocated_v2_;
 
   bool is_done_ = false;
 
-  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollection>> server_binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollection>> server_binding_v1_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollection>> server_binding_v2_;
 
   // Becomes set when OnBuffersAllocated() is called, and stays set after that.
   std::optional<AllocationResult> logical_allocation_result_;

@@ -23,7 +23,6 @@
 
 #include "buffer_collection_token.h"
 #include "logical_buffer_collection.h"
-#include "macros.h"
 #include "node_properties.h"
 #include "utils.h"
 
@@ -76,107 +75,139 @@ BufferCollection::~BufferCollection() {
 }
 
 void BufferCollection::CloseServerBinding(zx_status_t epitaph) {
-  if (server_binding_.has_value()) {
-    server_binding_->Close(epitaph);
+  if (server_binding_v1_.has_value()) {
+    server_binding_v1_->Close(epitaph);
   }
-  server_binding_ = {};
+  if (server_binding_v2_.has_value()) {
+    server_binding_v2_->Close(epitaph);
+  }
+  server_binding_v1_ = {};
+  server_binding_v2_ = {};
 }
 
-void BufferCollection::BindInternal(zx::channel collection_request,
-                                    ErrorHandlerWrapper error_handler_wrapper) {
-  server_binding_ = fidl::BindServer<fuchsia_sysmem::BufferCollection>(
-      parent_device()->dispatcher(), std::move(collection_request), this,
+void BufferCollection::BindInternalV1(zx::channel collection_request,
+                                      ErrorHandlerWrapper error_handler_wrapper) {
+  v1_server_.emplace(*this);
+  server_binding_v1_ = fidl::BindServer(
+      parent_device()->dispatcher(),
+      fidl::ServerEnd<fuchsia_sysmem::BufferCollection>(std::move(collection_request)),
+      &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollection* collection, fidl::UnbindInfo info,
+          BufferCollection::V1* collection, fidl::UnbindInfo info,
           fidl::ServerEnd<fuchsia_sysmem::BufferCollection> channel) {
         error_handler_wrapper(info);
       });
 }
 
-void BufferCollection::Sync(SyncCompleter::Sync& completer) { SyncImplV1(completer); }
-
-void BufferCollection::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
-  SyncImplV1(completer);
+void BufferCollection::BindInternalV2(zx::channel collection_request,
+                                      ErrorHandlerWrapper error_handler_wrapper) {
+  v2_server_.emplace(*this);
+  server_binding_v2_ = fidl::BindServer(
+      parent_device()->dispatcher(),
+      fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>(std::move(collection_request)),
+      &v2_server_.value(),
+      [error_handler_wrapper = std::move(error_handler_wrapper)](
+          BufferCollection::V2* collection, fidl::UnbindInfo info,
+          fidl::ServerEnd<fuchsia_sysmem2::BufferCollection> channel) {
+        error_handler_wrapper(info);
+      });
 }
 
-void BufferCollection::SetConstraintsAuxBuffers(
-    SetConstraintsAuxBuffersRequestView request,
-    SetConstraintsAuxBuffersCompleter::Sync& completer) {
-  if (is_set_constraints_aux_buffers_seen_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-             "SetConstraintsAuxBuffers() can be called only once.");
+void BufferCollection::V1::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }
+
+void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }
+
+void BufferCollection::V1::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
+  parent_.SyncImpl(completer);
+}
+
+void BufferCollection::V1::SetConstraintsAuxBuffers(
+    SetConstraintsAuxBuffersRequest& request, SetConstraintsAuxBuffersCompleter::Sync& completer) {
+  if (parent_.is_set_constraints_aux_buffers_seen_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                     "SetConstraintsAuxBuffers() can be called only once.");
     return;
   }
-  is_set_constraints_aux_buffers_seen_ = true;
-  if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "BufferCollectionToken::SetConstraintsAuxBuffers() when already is_done_");
+  parent_.is_set_constraints_aux_buffers_seen_ = true;
+  if (parent_.is_done_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "BufferCollectionToken::SetConstraintsAuxBuffers() when already is_done_");
     return;
   }
-  if (is_set_constraints_seen_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-             "SetConstraintsAuxBuffers() after SetConstraints() causes failure.");
+  if (parent_.is_set_constraints_seen_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                     "SetConstraintsAuxBuffers() after SetConstraints() causes failure.");
     return;
   }
-  ZX_DEBUG_ASSERT(!constraints_aux_buffers_.has_value());
-  constraints_aux_buffers_.emplace(fidl::ToNatural(std::move(request->constraints)));
+  ZX_DEBUG_ASSERT(!parent_.constraints_aux_buffers_.has_value());
+  parent_.constraints_aux_buffers_.emplace(std::move(request.constraints()));
   // LogicalBufferCollection doesn't care about "clear aux buffers" constraints until the last
   // SetConstraints(), so done for now.
 }
 
-void BufferCollection::SetConstraints(SetConstraintsRequestView request,
-                                      SetConstraintsCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::SetConstraints", "this", this,
-                 "logical_buffer_collection", &logical_buffer_collection());
-  std::optional<fuchsia_sysmem::BufferCollectionConstraints> local_constraints(
-      fidl::ToNatural(std::move(request->constraints)));
+template <typename Completer>
+bool BufferCollection::CommonSetConstraintsStage1(Completer& completer) {
   if (is_set_constraints_seen_) {
     FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED, "2nd SetConstraints() causes failure.");
-    return;
+    return false;
   }
   is_set_constraints_seen_ = true;
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "BufferCollectionToken::SetConstraints() when already is_done_");
+    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetConstraints() when already is_done_");
     // We're failing async - no need to try to fail sync.
+    return false;
+  }
+  return true;
+}
+
+void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
+                                          SetConstraintsCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V1::SetConstraints", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  std::optional<fuchsia_sysmem::BufferCollectionConstraints> local_constraints(
+      std::move(request.constraints()));
+
+  if (!parent_.CommonSetConstraintsStage1(completer)) {
     return;
   }
-  if (!request->has_constraints) {
+
+  if (!request.has_constraints()) {
     // Not needed.
     local_constraints.reset();
-    if (is_set_constraints_aux_buffers_seen_) {
+    if (parent_.is_set_constraints_aux_buffers_seen_) {
       // No constraints are fine, just not aux buffers constraints without main constraints, because
       // I can't think of any reason why we'd need to support aux buffers constraints without main
       // constraints, so disallow at least for now.
-      FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-               "SetConstraintsAuxBuffers() && !has_constraints");
+      parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                       "SetConstraintsAuxBuffers() && !has_constraints");
       return;
     }
   }
 
-  ZX_DEBUG_ASSERT(!has_constraints());
+  ZX_DEBUG_ASSERT(!parent_.has_constraints());
   // enforced above
-  ZX_DEBUG_ASSERT(!constraints_aux_buffers_.has_value() || local_constraints.has_value());
-  ZX_DEBUG_ASSERT(request->has_constraints == local_constraints.has_value());
+  ZX_DEBUG_ASSERT(!parent_.constraints_aux_buffers_.has_value() || local_constraints.has_value());
+  ZX_DEBUG_ASSERT(request.has_constraints() == local_constraints.has_value());
 
   {  // scope result
     auto result = sysmem::V2CopyFromV1BufferCollectionConstraints(
         local_constraints.has_value() ? &local_constraints.value() : nullptr,
-        constraints_aux_buffers_.has_value() ? &(*constraints_aux_buffers_) : nullptr);
+        parent_.constraints_aux_buffers_.has_value() ? &(*parent_.constraints_aux_buffers_)
+                                                     : nullptr);
     if (!result.is_ok()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
-               "V2CopyFromV1BufferCollectionConstraints() failed");
+      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+                       "V2CopyFromV1BufferCollectionConstraints() failed");
       return;
     }
     ZX_DEBUG_ASSERT(!result.value().IsEmpty() || !local_constraints.has_value());
-    node_properties().SetBufferCollectionConstraints(result.take_value());
+    parent_.node_properties().SetBufferCollectionConstraints(result.take_value());
   }  // ~result
 
   // No longer needed.
-  constraints_aux_buffers_.reset();
+  parent_.constraints_aux_buffers_.reset();
 
-  node_properties().LogInfo(FROM_HERE, "BufferCollection::SetConstraints()");
-  node_properties().LogConstraints(FROM_HERE);
+  parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V1::SetConstraints()");
+  parent_.node_properties().LogConstraints(FROM_HERE);
 
   // LogicalBufferCollection will ask for constraints when it needs them,
   // possibly during this call if this is the last participant to report
@@ -184,89 +215,178 @@ void BufferCollection::SetConstraints(SetConstraintsRequestView request,
   //
   // The LogicalBufferCollection cares if this BufferCollection view has null
   // constraints, but only later when it asks for the specific constraints.
-  logical_buffer_collection().OnNodeReady();
+  parent_.logical_buffer_collection().OnNodeReady();
   // |this| may be gone at this point, if the allocation failed.  Regardless,
   // SetConstraints() worked, so ZX_OK.
 }
 
-void BufferCollection::WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::WaitForBuffersAllocated", "this", this,
-                 "logical_buffer_collection", &logical_buffer_collection());
+void BufferCollection::V2::SetConstraints(SetConstraintsRequest& request,
+                                          SetConstraintsCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V2::SetConstraints", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  if (!parent_.CommonSetConstraintsStage1(completer)) {
+    return;
+  }
+
+  ZX_DEBUG_ASSERT(!parent_.has_constraints());
+
+  // Normalize non-set constraints to constraints with every field non-set.  These are semantically
+  // equivalent.
+  fuchsia_sysmem2::BufferCollectionConstraints local_constraints;
+  if (request.constraints().has_value()) {
+    local_constraints = std::move(request.constraints().value());
+  }
+
+  parent_.node_properties().SetBufferCollectionConstraints(std::move(local_constraints));
+
+  parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V2::SetConstraints()");
+  parent_.node_properties().LogConstraints(FROM_HERE);
+
+  // LogicalBufferCollection will ask for constraints when it needs them,
+  // possibly during this call if this is the last participant to report
+  // having initial constraints.
+  //
+  // The LogicalBufferCollection cares if this BufferCollection view has null
+  // constraints, but only later when it asks for the specific constraints.
+  parent_.logical_buffer_collection().OnNodeReady();
+  // |this| may be gone at this point, if the allocation failed.  Regardless,
+  // SetConstraints() worked, so ZX_OK.
+}
+
+template <typename Completer>
+bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(Completer& completer,
+                                                              trace_async_id_t* out_event_id) {
   if (is_done_) {
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "BufferCollectionToken::WaitForBuffersAllocated() when already is_done_");
-    return;
+             "BufferCollection::WaitForAllBuffersAllocated() when already is_done_");
+    return false;
   }
   trace_async_id_t current_event_id = TRACE_NONCE();
-  TRACE_ASYNC_BEGIN("gfx", "BufferCollection::WaitForBuffersAllocated async", current_event_id,
+  TRACE_ASYNC_BEGIN("gfx", "BufferCollection::WaitForAllBuffersAllocated async", current_event_id,
                     "this", this, "logical_buffer_collection", &logical_buffer_collection());
-  pending_wait_for_buffers_allocated_.emplace_back(
-      std::make_pair(current_event_id, completer.ToAsync()));
-  // The allocation is a one-shot (once true, remains true) and may already be
-  // done, in which case this immediately completes txn.
-  MaybeCompleteWaitForBuffersAllocated();
+  *out_event_id = current_event_id;
+  return true;
 }
 
-void BufferCollection::CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) {
+void BufferCollection::V1::WaitForBuffersAllocated(
+    WaitForBuffersAllocatedCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V1::WaitForBuffersAllocated", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  trace_async_id_t current_event_id;
+  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(completer, &current_event_id)) {
+    return;
+  }
+
+  parent_.pending_wait_for_buffers_allocated_v1_.emplace_back(
+      std::make_pair(current_event_id, completer.ToAsync()));
+  // The allocation is a one-shot (once true, remains true) and may already be done, in which case
+  // this immediately completes txn.
+  parent_.MaybeCompleteWaitForBuffersAllocated();
+}
+
+void BufferCollection::V2::WaitForAllBuffersAllocated(
+    WaitForAllBuffersAllocatedCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V2::WaitForAllBuffersAllocated", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  trace_async_id_t current_event_id = TRACE_NONCE();
+  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(completer, &current_event_id)) {
+    return;
+  }
+
+  parent_.pending_wait_for_buffers_allocated_v2_.emplace_back(
+      std::make_pair(current_event_id, completer.ToAsync()));
+  // The allocation is a one-shot (once true, remains true) and may already be done, in which case
+  // this immediately completes txn.
+  parent_.MaybeCompleteWaitForBuffersAllocated();
+}
+
+template <typename Completer>
+bool BufferCollection::CommonCheckAllBuffersAllocatedStage1(Completer& completer,
+                                                            zx_status_t* result) {
   if (is_done_) {
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "BufferCollectionToken::CheckBuffersAllocated() when "
+             "BufferCollectionToken::V1::CheckBuffersAllocated() when "
              "already is_done_");
     // We're failing async - no need to try to fail sync.
-    return;
+    return false;
   }
   if (!logical_allocation_result_.has_value()) {
-    completer.Reply(ZX_ERR_UNAVAILABLE);
-    return;
+    *result = ZX_ERR_UNAVAILABLE;
+    return true;
   }
   // Buffer collection has either been allocated or failed.
-  completer.Reply(logical_allocation_result_->status);
+  *result = logical_allocation_result_->status;
+  return true;
 }
 
-void BufferCollection::GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::GetAuxBuffers", "this", this,
-                 "logical_buffer_collection", &logical_buffer_collection());
-  if (!logical_allocation_result_.has_value()) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "GetAuxBuffers() called before allocation complete.");
+void BufferCollection::V1::CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) {
+  zx_status_t result;
+  if (!parent_.CommonCheckAllBuffersAllocatedStage1(completer, &result)) {
     return;
   }
-  if (logical_allocation_result_->status != ZX_OK) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-             "GetAuxBuffers() called after allocation failure.");
+  completer.Reply(result);
+}
+
+void BufferCollection::V2::CheckAllBuffersAllocated(
+    CheckAllBuffersAllocatedCompleter::Sync& completer) {
+  zx_status_t result;
+  if (!parent_.CommonCheckAllBuffersAllocatedStage1(completer, &result)) {
+    return;
+  }
+  fuchsia_sysmem2::BufferCollectionCheckAllBuffersAllocatedResponse response;
+  response.status() = result;
+  completer.Reply(std::move(response));
+}
+
+void BufferCollection::V1::GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::GetAuxBuffers", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+  if (!parent_.logical_allocation_result_.has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "GetAuxBuffers() called before allocation complete.");
+    return;
+  }
+  if (parent_.logical_allocation_result_->status != ZX_OK) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "GetAuxBuffers() called after allocation failure.");
     // We're failing async - no need to fail sync.
     return;
   }
-  ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
-  auto v1_result =
-      CloneAuxBuffersResultForSendingV1(*logical_allocation_result_->buffer_collection_info);
+  ZX_DEBUG_ASSERT(parent_.logical_allocation_result_->buffer_collection_info);
+  auto v1_result = parent_.CloneAuxBuffersResultForSendingV1(
+      *parent_.logical_allocation_result_->buffer_collection_info);
   if (!v1_result.is_ok()) {
     // Close to avoid assert.
-    FailSync(FROM_HERE, completer, ZX_ERR_INTERNAL, "CloneAuxBuffersResultForSendingV1() failed.");
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INTERNAL,
+                     "CloneAuxBuffersResultForSendingV1() failed.");
     return;
   }
   auto v1 = v1_result.take_value();
-  fidl::Arena arena;
-  auto wire_v1 = fidl::ToWire(arena, std::move(v1));
-  completer.Reply(logical_allocation_result_->status, std::move(wire_v1));
+  fuchsia_sysmem::BufferCollectionGetAuxBuffersResponse response;
+  response.status() = parent_.logical_allocation_result_->status;
+  response.buffer_collection_info_aux_buffers() = std::move(v1);
+  completer.Reply(std::move(response));
 }
 
-void BufferCollection::AttachToken(AttachTokenRequestView request,
-                                   AttachTokenCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::AttachToken", "this", this, "logical_buffer_collection",
-                 &logical_buffer_collection());
+template <typename Completer>
+bool BufferCollection::CommonAttachTokenStage1(uint32_t rights_attenuation_mask,
+                                               Completer& completer,
+                                               NodeProperties** out_node_properties) {
   if (is_done_) {
     // This is Close() followed by AttachToken(), which is not permitted and causes the
     // BufferCollection to fail.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollection::AttachToken() attempted when is_done_");
-    return;
+    return false;
   }
 
-  if (request->rights_attenuation_mask == 0) {
+  if (rights_attenuation_mask == 0) {
     FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
              "rights_attenuation_mask of 0 is forbidden");
-    return;
+    return false;
   }
 
   NodeProperties* new_node_properties = node_properties().NewChild(&logical_buffer_collection());
@@ -282,18 +402,66 @@ void BufferCollection::AttachToken(AttachTokenRequestView request,
     new_node_properties->client_debug_info().name = "from AttachToken()";
   }
 
-  if (request->rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
-    new_node_properties->rights_attenuation_mask() &= request->rights_attenuation_mask;
+  if (rights_attenuation_mask != ZX_RIGHT_SAME_RIGHTS) {
+    new_node_properties->rights_attenuation_mask() &= rights_attenuation_mask;
   }
 
   // All AttachToken() tokesn are ErrorPropagationMode::kDoNotPropagate from the start.
   new_node_properties->error_propagation_mode() = ErrorPropagationMode::kDoNotPropagate;
-  logical_buffer_collection().CreateBufferCollectionToken(
-      shared_logical_buffer_collection(), new_node_properties, std::move(request->token_request));
+
+  *out_node_properties = new_node_properties;
+
+  return true;
 }
 
-void BufferCollection::AttachLifetimeTracking(AttachLifetimeTrackingRequestView request,
-                                              AttachLifetimeTrackingCompleter::Sync& completer) {
+void BufferCollection::V1::AttachToken(AttachTokenRequest& request,
+                                       AttachTokenCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V1::AttachToken", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonAttachTokenStage1(request.rights_attenuation_mask(), completer,
+                                       &new_node_properties)) {
+    return;
+  }
+
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenV1(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.token_request()));
+}
+
+void BufferCollection::V2::AttachToken(AttachTokenRequest& request,
+                                       AttachTokenCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V2::AttachToken", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  if (!request.rights_attenuation_mask().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+                     "V2::AttachToken() requires rights_attenuation_mask set");
+    return;
+  }
+
+  if (!request.token_request().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+                     "V2::AttachToken() requires token_request set");
+    return;
+  }
+
+  NodeProperties* new_node_properties;
+  if (!parent_.CommonAttachTokenStage1(request.rights_attenuation_mask().value(), completer,
+                                       &new_node_properties)) {
+    return;
+  }
+
+  parent_.logical_buffer_collection().CreateBufferCollectionTokenV2(
+      parent_.shared_logical_buffer_collection(), new_node_properties,
+      std::move(request.token_request().value()));
+}
+
+template <typename Completer>
+void BufferCollection::CommonAttachLifetimeTracking(zx::eventpair server_end,
+                                                    uint32_t buffers_remaining,
+                                                    Completer& completer) {
   TRACE_DURATION("gfx", "BufferCollection::AttachLifetimeTracking", "this", this,
                  "logical_buffer_collection", &logical_buffer_collection());
   if (is_done_) {
@@ -303,55 +471,106 @@ void BufferCollection::AttachLifetimeTracking(AttachLifetimeTrackingRequestView 
              "BufferCollection::AttachLifetimeTracking() attempted when is_done_");
     return;
   }
-  pending_lifetime_tracking_.emplace_back(
-      PendingLifetimeTracking{.server_end = std::move(request->server_end),
-                              .buffers_remaining = request->buffers_remaining});
+  pending_lifetime_tracking_.emplace_back(PendingLifetimeTracking{
+      .server_end = std::move(server_end), .buffers_remaining = buffers_remaining});
   MaybeFlushPendingLifetimeTracking();
 }
 
-void BufferCollection::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
-  SetVerboseLoggingImplV1(completer);
+void BufferCollection::V1::AttachLifetimeTracking(
+    AttachLifetimeTrackingRequest& request, AttachLifetimeTrackingCompleter::Sync& completer) {
+  parent_.CommonAttachLifetimeTracking(std::move(request.server_end()), request.buffers_remaining(),
+                                       completer);
 }
 
-void BufferCollection::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
-  GetNodeRefImplV1(completer);
+void BufferCollection::V2::AttachLifetimeTracking(
+    AttachLifetimeTrackingRequest& request, AttachLifetimeTrackingCompleter::Sync& completer) {
+  if (!request.server_end().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "AttachLifetimeTracking() requires server_end set");
+    return;
+  }
+  if (!request.buffers_remaining().has_value()) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "AttachLifetimeTracking() requires buffers_remaining set");
+    return;
+  }
+  parent_.CommonAttachLifetimeTracking(std::move(request.server_end().value()),
+                                       request.buffers_remaining().value(), completer);
 }
 
-void BufferCollection::IsAlternateFor(IsAlternateForRequestView request,
-                                      IsAlternateForCompleter::Sync& completer) {
-  IsAlternateForImplV1(request, completer);
+void BufferCollection::V1::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
+  parent_.SetVerboseLoggingImpl(completer);
 }
 
-void BufferCollection::Close(CloseCompleter::Sync& completer) { CloseImplV1(completer); }
-
-void BufferCollection::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
-  CloseImplV1(completer);
+void BufferCollection::V2::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
+  parent_.SetVerboseLoggingImpl(completer);
 }
 
-void BufferCollection::SetName(SetNameRequestView request, SetNameCompleter::Sync& completer) {
-  SetNameImplV1(request, completer);
+void BufferCollection::V1::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
+  parent_.GetNodeRefImplV1(completer);
 }
 
-void BufferCollection::DeprecatedSetName(DeprecatedSetNameRequestView request,
-                                         DeprecatedSetNameCompleter::Sync& completer) {
-  SetNameImplV1(request, completer);
+void BufferCollection::V2::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
+  parent_.GetNodeRefImplV2(completer);
 }
 
-void BufferCollection::SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                                          SetDebugClientInfoCompleter::Sync& completer) {
-  SetDebugClientInfoImplV1(request, completer);
+void BufferCollection::V1::IsAlternateFor(IsAlternateForRequest& request,
+                                          IsAlternateForCompleter::Sync& completer) {
+  parent_.IsAlternateForImplV1(request, completer);
 }
 
-void BufferCollection::DeprecatedSetDebugClientInfo(
-    DeprecatedSetDebugClientInfoRequestView request,
+void BufferCollection::V2::IsAlternateFor(IsAlternateForRequest& request,
+                                          IsAlternateForCompleter::Sync& completer) {
+  parent_.IsAlternateForImplV2(request, completer);
+}
+
+void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
+
+void BufferCollection::V2::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
+
+void BufferCollection::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
+  parent_.CloseImpl(completer);
+}
+
+void BufferCollection::V1::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV1(request, completer);
+}
+
+void BufferCollection::V2::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV2(request, completer);
+}
+
+void BufferCollection::V1::DeprecatedSetName(DeprecatedSetNameRequest& request,
+                                             DeprecatedSetNameCompleter::Sync& completer) {
+  parent_.SetNameImplV1(request, completer);
+}
+
+void BufferCollection::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                              SetDebugClientInfoCompleter::Sync& completer) {
+  parent_.SetDebugClientInfoImplV1(request, completer);
+}
+
+void BufferCollection::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                              SetDebugClientInfoCompleter::Sync& completer) {
+  parent_.SetDebugClientInfoImplV2(request, completer);
+}
+
+void BufferCollection::V1::DeprecatedSetDebugClientInfo(
+    DeprecatedSetDebugClientInfoRequest& request,
     DeprecatedSetDebugClientInfoCompleter::Sync& completer) {
-  SetDebugClientInfoImplV1(request, completer);
+  parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
-void BufferCollection::SetDebugTimeoutLogDeadline(
-    SetDebugTimeoutLogDeadlineRequestView request,
+void BufferCollection::V1::SetDebugTimeoutLogDeadline(
+    SetDebugTimeoutLogDeadlineRequest& request,
     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) {
-  SetDebugTimeoutLogDeadlineImplV1(request, completer);
+  parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
+}
+
+void BufferCollection::V2::SetDebugTimeoutLogDeadline(
+    SetDebugTimeoutLogDeadlineRequest& request,
+    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) {
+  parent_.SetDebugTimeoutLogDeadlineImplV2(request, completer);
 }
 
 void BufferCollection::FailAsync(Location location, zx_status_t status, const char* format, ...) {
@@ -361,12 +580,21 @@ void BufferCollection::FailAsync(Location location, zx_status_t status, const ch
   va_end(args);
 
   // Idempotent, so only close once.
-  if (!server_binding_.has_value())
+  if (!server_binding_v1_.has_value() && !server_binding_v2_.has_value()) {
     return;
+  }
+  ZX_DEBUG_ASSERT(!!server_binding_v1_.has_value() ^ !!server_binding_v2_.has_value());
 
   async_failure_result_ = status;
-  server_binding_->Close(status);
-  server_binding_ = {};
+
+  if (server_binding_v1_.has_value()) {
+    server_binding_v1_->Close(status);
+    server_binding_v1_ = {};
+  } else {
+    ZX_DEBUG_ASSERT(server_binding_v2_.has_value());
+    server_binding_v2_->Close(status);
+    server_binding_v2_ = {};
+  }
 }
 
 template <typename Completer>
@@ -528,9 +756,9 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     // Everything is ok so far, but allocation isn't done yet.
     return;
   }
-  while (!pending_wait_for_buffers_allocated_.empty()) {
-    auto [async_id, txn] = std::move(pending_wait_for_buffers_allocated_.front());
-    pending_wait_for_buffers_allocated_.pop_front();
+  while (!pending_wait_for_buffers_allocated_v1_.empty()) {
+    auto [async_id, txn] = std::move(pending_wait_for_buffers_allocated_v1_.front());
+    pending_wait_for_buffers_allocated_v1_.pop_front();
 
     fuchsia_sysmem::BufferCollectionInfo2 v1;
     if (logical_allocation_result_->status == ZX_OK) {
@@ -544,13 +772,46 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     }
     TRACE_ASYNC_END("gfx", "BufferCollection::WaitForBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
-    fidl::Arena arena;
-    auto wire_v1 = fidl::ToWire(arena, std::move(v1));
-    txn.Reply(logical_allocation_result_->status, std::move(wire_v1));
+
+    fuchsia_sysmem::BufferCollectionWaitForBuffersAllocatedResponse response;
+    response.status() = logical_allocation_result_->status;
+    response.buffer_collection_info() = std::move(v1);
+    txn.Reply(std::move(response));
+
     fidl::Status reply_status = txn.result_of_reply();
     if (!reply_status.ok()) {
       FailAsync(FROM_HERE, reply_status.status(),
                 "fuchsia_sysmem_BufferCollectionWaitForBuffersAllocated_"
+                "reply failed - status: %s",
+                reply_status.FormatDescription().c_str());
+      return;
+    }
+    // ~txn
+  }
+  while (!pending_wait_for_buffers_allocated_v2_.empty()) {
+    auto [async_id, txn] = std::move(pending_wait_for_buffers_allocated_v2_.front());
+    pending_wait_for_buffers_allocated_v2_.pop_front();
+
+    fuchsia_sysmem2::BufferCollectionInfo v2;
+    if (logical_allocation_result_->status == ZX_OK) {
+      ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
+      auto v2_result = CloneResultForSendingV2(*logical_allocation_result_->buffer_collection_info);
+      if (!v2_result.is_ok()) {
+        // FailAsync() already called.
+        return;
+      }
+      v2 = v2_result.take_value();
+    }
+    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForBuffersAllocated async", async_id, "this",
+                    this, "logical_buffer_collection", &logical_buffer_collection());
+    fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
+    response.status() = ZX_OK;
+    response.buffer_collection_info() = std::move(v2);
+    txn.Reply(std::move(response));
+    fidl::Status reply_status = txn.result_of_reply();
+    if (!reply_status.ok()) {
+      FailAsync(FROM_HERE, reply_status.status(),
+                "fuchsia_sysmem2::BufferCollectionWaitForBuffersAllocated "
                 "reply failed - status: %s",
                 reply_status.FormatDescription().c_str());
       return;
@@ -600,7 +861,9 @@ const OrphanedNode* BufferCollection::orphaned_node() const { return nullptr; }
 
 bool BufferCollection::is_connected_type() const { return true; }
 
-bool BufferCollection::is_currently_connected() const { return server_binding_.has_value(); }
+bool BufferCollection::is_currently_connected() const {
+  return server_binding_v1_.has_value() || server_binding_v2_.has_value();
+}
 
 const char* BufferCollection::node_type_string() const { return "collection"; }
 

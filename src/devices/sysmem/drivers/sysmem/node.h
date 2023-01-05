@@ -52,7 +52,8 @@ class Node : public fbl::RefCounted<Node> {
   zx_status_t create_status() const;
   virtual ~Node();
 
-  void Bind(zx::channel server_end);
+  void BindV1(zx::channel server_end);
+  void BindV2(zx::channel server_end);
 
   void SetErrorHandler(fit::function<void(zx_status_t)> error_handler);
 
@@ -132,7 +133,10 @@ class Node : public fbl::RefCounted<Node> {
  protected:
   // Called during Bind() to perform the sub-class protocol-specific bind itself.
   using ErrorHandlerWrapper = fit::function<void(fidl::UnbindInfo info)>;
-  virtual void BindInternal(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) = 0;
+  virtual void BindInternalV1(zx::channel server_end,
+                              ErrorHandlerWrapper error_handler_wrapper) = 0;
+  virtual void BindInternalV2(zx::channel server_end,
+                              ErrorHandlerWrapper error_handler_wrapper) = 0;
 
   template <typename Completer>
   void FailSync(Location location, Completer& completer, zx_status_t status, const char* format,
@@ -147,7 +151,7 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <class SyncCompleterSync>
-  void SyncImplV1(SyncCompleterSync& completer) {
+  void SyncImpl(SyncCompleterSync& completer) {
     TRACE_DURATION("gfx", "Node::SyncImpl", "this", this, "logical_buffer_collection",
                    &logical_buffer_collection());
     if (is_done_) {
@@ -161,7 +165,7 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <class CloseCompleterSync>
-  void CloseImplV1(CloseCompleterSync& completer) {
+  void CloseImpl(CloseCompleterSync& completer) {
     if (is_done_) {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() after Close()");
       return;
@@ -179,8 +183,27 @@ class Node : public fbl::RefCounted<Node> {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Close()");
       return;
     }
-    logical_buffer_collection().SetName(request->priority,
-                                        std::string(request->name.begin(), request->name.end()));
+    logical_buffer_collection().SetName(request.priority(),
+                                        std::string(request.name().begin(), request.name().end()));
+  }
+
+  template <class SetNameRequest, class SetNameCompleterSync>
+  void SetNameImplV2(SetNameRequest& request, SetNameCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Close()");
+      return;
+    }
+    if (!request.priority().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() requires priority set");
+      return;
+    }
+    if (!request.name().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() requires name set");
+      return;
+    }
+    logical_buffer_collection().SetName(
+        request.priority().value(),
+        std::string(request.name().value().begin(), request.name().value().end()));
   }
 
   template <class SetDebugClientInfoRequestView, class SetDebugClientInfoCompleterSync>
@@ -190,8 +213,28 @@ class Node : public fbl::RefCounted<Node> {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Close()");
       return;
     }
-    SetDebugClientInfoInternal(std::string(request->name.begin(), request->name.end()),
-                               request->id);
+    SetDebugClientInfoInternal(std::string(request.name().begin(), request.name().end()),
+                               request.id());
+  }
+
+  template <class SetDebugClientInfoRequest, class SetDebugClientInfoCompleterSync>
+  void SetDebugClientInfoImplV2(SetDebugClientInfoRequest& request,
+                                SetDebugClientInfoCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Close()");
+      return;
+    }
+    if (!request.name().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires name set");
+      return;
+    }
+    if (!request.id().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires id set");
+      return;
+    }
+    SetDebugClientInfoInternal(
+        std::string(request.name().value().begin(), request.name().value().end()),
+        request.id().value());
   }
 
   template <class SetDebugTimeoutLogDeadlineRequestView,
@@ -203,11 +246,27 @@ class Node : public fbl::RefCounted<Node> {
                "SetDebugTimeoutLogDeadline() after Close()");
       return;
     }
-    logical_buffer_collection().SetDebugTimeoutLogDeadline(request->deadline);
+    logical_buffer_collection().SetDebugTimeoutLogDeadline(request.deadline());
+  }
+
+  template <class SetDebugTimeoutLogDeadlineRequest, class SetDebugTimeoutLogDeadlineCompleterSync>
+  void SetDebugTimeoutLogDeadlineImplV2(SetDebugTimeoutLogDeadlineRequest& request,
+                                        SetDebugTimeoutLogDeadlineCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+               "SetDebugTimeoutLogDeadline() after Close()");
+      return;
+    }
+    if (!request.deadline().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+               "SetDebugTimeoutLogDeadline() requires deadline set");
+      return;
+    }
+    logical_buffer_collection().SetDebugTimeoutLogDeadline(request.deadline().value());
   }
 
   template <class SetVerboseLoggingCompleterSync>
-  void SetVerboseLoggingImplV1(SetVerboseLoggingCompleterSync& completer) {
+  void SetVerboseLoggingImpl(SetVerboseLoggingCompleterSync& completer) {
     if (is_done_) {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetVerboseLogging() after Close()");
       return;
@@ -215,44 +274,61 @@ class Node : public fbl::RefCounted<Node> {
     logical_buffer_collection_->SetVerboseLogging();
   }
 
-  template <class GetNodeRefCompleterSync>
-  void GetNodeRefImplV1(GetNodeRefCompleterSync& completer) {
+  template <typename GetNodeRefCompleterSync>
+  bool CommonGetNodeRefImplStage1(GetNodeRefCompleterSync& completer, zx::event* out_to_vend) {
     if (is_done_) {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetNodeRef() after Close()");
-      return;
+      return false;
     }
-    zx::event to_vend;
     // No process actually needs to wait on or signal this event.  It's just a generic handle that
     // needs get_info to work so we can check the koid.
     zx_status_t status =
-        node_properties_->node_ref()->duplicate(ZX_RIGHTS_BASIC & ~(ZX_RIGHT_WAIT), &to_vend);
+        node_properties_->node_ref()->duplicate(ZX_RIGHTS_BASIC & ~(ZX_RIGHT_WAIT), out_to_vend);
     if (status != ZX_OK) {
       // We treat this similarly to a code page-in that fails due to low memory.
       ZX_PANIC("node_ref_vend_.duplicate() failed - sysmem terminating");
     }
+    return true;
+  }
+
+  template <class GetNodeRefCompleterSync>
+  void GetNodeRefImplV1(GetNodeRefCompleterSync& completer) {
+    zx::event to_vend;
+    if (!CommonGetNodeRefImplStage1(completer, &to_vend)) {
+      return;
+    }
     completer.Reply(std::move(to_vend));
   }
 
-  template <class IsAlternateForRequestView, class IsAlternateForCompleterSync>
-  void IsAlternateForImplV1(IsAlternateForRequestView request,
-                            IsAlternateForCompleterSync& completer) {
-    if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Close()");
+  template <class GetNodeRefCompleterSync>
+  void GetNodeRefImplV2(GetNodeRefCompleterSync& completer) {
+    zx::event to_vend;
+    if (!CommonGetNodeRefImplStage1(completer, &to_vend)) {
       return;
     }
-    zx::event node_ref = std::move(request->node_ref);
+    fuchsia_sysmem2::NodeGetNodeRefResponse response;
+    response.node_ref().emplace(std::move(to_vend));
+    completer.Reply(std::move(response));
+  }
+
+  template <typename Completer>
+  bool CommonIsAlternateFor(zx::event node_ref, Completer& completer, bool* out_result) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Close()");
+      return false;
+    }
     zx_koid_t node_ref_koid;
     zx_koid_t not_used;
     zx_status_t status = get_handle_koids(node_ref, &node_ref_koid, &not_used, ZX_OBJ_TYPE_EVENT);
     if (status != ZX_OK) {
       completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
-      return;
+      return false;
     }
     auto maybe_other_node_properties =
         logical_buffer_collection_->FindNodePropertiesByNodeRefKoid(node_ref_koid);
     if (!maybe_other_node_properties.has_value()) {
       completer.Reply(fit::error(ZX_ERR_NOT_FOUND));
-      return;
+      return false;
     }
     auto* other_node_properties = maybe_other_node_properties.value();
 
@@ -280,7 +356,36 @@ class Node : public fbl::RefCounted<Node> {
     // BufferCollectionTokenGroup (even after the client has done a Close() + channel close on
     // common_parent).
     bool is_alternate_for = common_parent->is_token_group();
-    completer.ReplySuccess(is_alternate_for);
+    *out_result = is_alternate_for;
+    return true;
+  }
+
+  template <class IsAlternateForRequest, class IsAlternateForCompleterSync>
+  void IsAlternateForImplV1(IsAlternateForRequest& request,
+                            IsAlternateForCompleterSync& completer) {
+    bool is_alternate_for;
+    if (!CommonIsAlternateFor(std::move(request.node_ref()), completer, &is_alternate_for)) {
+      return;
+    }
+    fuchsia_sysmem::NodeIsAlternateForResponse response;
+    response.is_alternate() = is_alternate_for;
+    completer.Reply(fit::ok(std::move(response)));
+  }
+
+  template <class IsAlternateForRequest, class IsAlternateForCompleterSync>
+  void IsAlternateForImplV2(IsAlternateForRequest& request,
+                            IsAlternateForCompleterSync& completer) {
+    if (!request.node_ref().has_value()) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() requires node_ref set");
+      return;
+    }
+    bool is_alernate_for;
+    if (!CommonIsAlternateFor(std::move(request.node_ref().value()), completer, &is_alernate_for)) {
+      return;
+    }
+    fuchsia_sysmem2::NodeIsAlternateForResponse response;
+    response.is_alternate() = is_alernate_for;
+    completer.Reply(fit::ok(std::move(response)));
   }
 
   void CloseChannel(zx_status_t epitaph);

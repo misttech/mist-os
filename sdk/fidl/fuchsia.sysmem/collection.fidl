@@ -52,8 +52,7 @@ protocol Node {
     /// performance point of view, but requires client code to delay sending
     /// tokens duplicated from this token until after client code has converted
     /// the duplicating token to a BufferCollection and received successful
-    /// response from BufferCollection.Sync() (or received
-    /// OnDuplicatedTokensKnownByServer()).
+    /// response from BufferCollection.Sync().
     ///
     /// Prefer using BufferCollection.Sync() instead, when feasible (see above).
     /// When BufferCollection.Sync() isn't feasible, the caller must already

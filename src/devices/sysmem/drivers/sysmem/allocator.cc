@@ -68,7 +68,7 @@ void Allocator::AllocateNonSharedCollection(AllocateNonSharedCollectionRequestVi
   // The server end of the local token goes to Create(), and the client end
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
-  LogicalBufferCollection::Create(std::move(token_server), parent_device_);
+  LogicalBufferCollection::CreateV1(std::move(token_server), parent_device_);
   LogicalBufferCollection::BindSharedCollection(
       parent_device_, std::move(token_client), request->collection_request.TakeChannel(),
       client_debug_info_.has_value() ? &*client_debug_info_ : nullptr);
@@ -94,7 +94,7 @@ void Allocator::AllocateSharedCollection(AllocateSharedCollectionRequestView req
   // go ahead and allocate the LogicalBufferCollection here since the
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
-  LogicalBufferCollection::Create(request->token_request.TakeChannel(), parent_device_);
+  LogicalBufferCollection::CreateV1(request->token_request.TakeChannel(), parent_device_);
 }
 
 void Allocator::BindSharedCollection(BindSharedCollectionRequestView request,

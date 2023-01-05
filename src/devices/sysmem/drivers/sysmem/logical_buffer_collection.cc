@@ -397,15 +397,32 @@ void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_sysmem2::ColorSpace>
 }  // namespace
 
 // static
-void LogicalBufferCollection::Create(zx::channel buffer_collection_token_request,
-                                     Device* parent_device) {
+fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(Device* parent_device) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
       fbl::AdoptRef<LogicalBufferCollection>(new LogicalBufferCollection(parent_device));
   // The existence of a channel-owned BufferCollectionToken adds a
   // fbl::RefPtr<> ref to LogicalBufferCollection.
   logical_buffer_collection->LogInfo(FROM_HERE, "LogicalBufferCollection::Create()");
   logical_buffer_collection->root_ = NodeProperties::NewRoot(logical_buffer_collection.get());
-  logical_buffer_collection->CreateBufferCollectionToken(
+  return logical_buffer_collection;
+}
+
+// static
+void LogicalBufferCollection::CreateV1(zx::channel buffer_collection_token_request,
+                                       Device* parent_device) {
+  fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
+      LogicalBufferCollection::CommonCreate(parent_device);
+  logical_buffer_collection->CreateBufferCollectionTokenV1(
+      logical_buffer_collection, logical_buffer_collection->root_.get(),
+      std::move(buffer_collection_token_request));
+}
+
+// static
+void LogicalBufferCollection::CreateV2(zx::channel buffer_collection_token_request,
+                                       Device* parent_device) {
+  fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
+      LogicalBufferCollection::CommonCreate(parent_device);
+  logical_buffer_collection->CreateBufferCollectionTokenV2(
       logical_buffer_collection, logical_buffer_collection->root_.get(),
       std::move(buffer_collection_token_request));
 }
@@ -488,12 +505,11 @@ zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Device* paren
   return token ? ZX_OK : ZX_ERR_NOT_FOUND;
 }
 
-void LogicalBufferCollection::CreateBufferCollectionToken(
+bool LogicalBufferCollection::CommonCreateBufferCollectionTokenStage1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> token_request) {
-  ZX_DEBUG_ASSERT(token_request);
-  auto& token = BufferCollectionToken::EmplaceInTree(self, new_node_properties,
-                                                     zx::unowned_channel(token_request.channel()));
+    zx::unowned_channel token_request, BufferCollectionToken** out_token) {
+  auto& token =
+      BufferCollectionToken::EmplaceInTree(self, new_node_properties, std::move(token_request));
   token.SetErrorHandler([this, &token](zx_status_t status) {
     // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
     // and ZX_OK is never passed to the error handler.
@@ -581,7 +597,7 @@ void LogicalBufferCollection::CreateBufferCollectionToken(
   if (token.create_status() != ZX_OK) {
     LogAndFailNode(FROM_HERE, &token.node_properties(), token.create_status(),
                    "token.status() failed - create_status: %d", token.create_status());
-    return;
+    return false;
   }
 
   if (token.was_unfound_node()) {
@@ -594,15 +610,43 @@ void LogicalBufferCollection::CreateBufferCollectionToken(
                    token.server_koid());
   }
 
-  token.Bind(token_request.TakeChannel());
+  *out_token = &token;
+  return true;
 }
 
-void LogicalBufferCollection::CreateBufferCollectionTokenGroup(
+void LogicalBufferCollection::CreateBufferCollectionTokenV1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> group_request) {
-  ZX_DEBUG_ASSERT(group_request);
-  auto& group = BufferCollectionTokenGroup::EmplaceInTree(
-      self, new_node_properties, zx::unowned_channel(group_request.channel()));
+    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> token_request) {
+  ZX_DEBUG_ASSERT(token_request);
+
+  BufferCollectionToken* token;
+  if (!CommonCreateBufferCollectionTokenStage1(
+          self, new_node_properties, zx::unowned_channel(token_request.channel()), &token)) {
+    return;
+  }
+
+  token->BindV1(token_request.TakeChannel());
+}
+
+void LogicalBufferCollection::CreateBufferCollectionTokenV2(
+    fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+    fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> token_request) {
+  ZX_DEBUG_ASSERT(token_request);
+
+  BufferCollectionToken* token;
+  if (!CommonCreateBufferCollectionTokenStage1(
+          self, new_node_properties, zx::unowned_channel(token_request.channel()), &token)) {
+    return;
+  }
+
+  token->BindV2(token_request.TakeChannel());
+}
+
+bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
+    fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+    zx::unowned_channel group_request, BufferCollectionTokenGroup** out_group) {
+  auto& group = BufferCollectionTokenGroup::EmplaceInTree(self, new_node_properties,
+                                                          std::move(group_request));
   group.SetErrorHandler([this, &group](zx_status_t status) {
     // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
     // and ZX_OK is never passed to the error handler.
@@ -685,11 +729,37 @@ void LogicalBufferCollection::CreateBufferCollectionTokenGroup(
   if (group.create_status() != ZX_OK) {
     LogAndFailNode(FROM_HERE, new_node_properties, group.create_status(),
                    "get_handle_koids() failed - status: %d", group.create_status());
-    return;
+    return false;
   }
 
   LogInfo(FROM_HERE, "CreateBufferCollectionTokenGroup() - server_koid: %lu", group.server_koid());
-  group.Bind(group_request.TakeChannel());
+
+  *out_group = &group;
+  return true;
+}
+
+void LogicalBufferCollection::CreateBufferCollectionTokenGroupV1(
+    fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> group_request) {
+  ZX_DEBUG_ASSERT(group_request);
+  BufferCollectionTokenGroup* group;
+  if (!CommonCreateBufferCollectionTokenGroupStage1(
+          self, new_node_properties, zx::unowned_channel(group_request.channel()), &group)) {
+    return;
+  }
+  group->BindV1(group_request.TakeChannel());
+}
+
+void LogicalBufferCollection::CreateBufferCollectionTokenGroupV2(
+    fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
+    fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup> group_request) {
+  ZX_DEBUG_ASSERT(group_request);
+  BufferCollectionTokenGroup* group;
+  if (!CommonCreateBufferCollectionTokenGroupStage1(
+          self, new_node_properties, zx::unowned_channel(group_request.channel()), &group)) {
+    return;
+  }
+  group->BindV2(group_request.TakeChannel());
 }
 
 void LogicalBufferCollection::AttachLifetimeTracking(zx::eventpair server_end,
@@ -1848,7 +1918,7 @@ void LogicalBufferCollection::BindSharedCollectionInternal(BufferCollectionToken
     return;
   }
 
-  collection.Bind(std::move(buffer_collection_request));
+  collection.BindV1(std::move(buffer_collection_request));
   // ~self
 }
 
