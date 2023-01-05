@@ -293,6 +293,21 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/config/fire:fire_config_component_list",
     "//src/diagnostics/config/fire/projects:fire_config_projects",
   ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          rebase_path(
+              "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
+              root_build_dir),
+        ]
+      }
+    },
+  ]
 }
 
 # This is common across all eng-mode products, at the minimal or higher service

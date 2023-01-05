@@ -159,7 +159,24 @@ import("//build/python/python_action.gni")
 #  compiled_packages [optional]
 #     [list of GN scopes] List of GN scopes of `CompiledPackageDefinition`s
 #     that describe packages that are to be built dynamically by Assembly, for
-#     example, the `core` package.
+#     example, the `core` package. This is passed directly through to the AIB
+#     config so all paths should be rebased by the caller.
+#
+#     Example:
+#
+#     # Add a core shard
+#     compiled_packages = [
+#       {
+#         name = "core"
+#         component_shards = {
+#           core = [
+#             rebase_path(
+#                   "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
+#                   root_build_dir)
+#           ]
+#         }
+#       },
+#     ]
 #
 #  component_includes [optional]
 #     [list of FileEntry] List of source/destination pairs related to a compiled
