@@ -7,7 +7,7 @@ use {
         cfg::{cfg_to_gn_conditional, target_to_gn_conditional},
         target::GnTarget,
         types::*,
-        CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility,
+        BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility,
     },
     anyhow::{Context, Error},
     cargo_metadata::Package,
@@ -51,6 +51,7 @@ pub fn write_top_level_rule<'a, W: io::Write>(
     platform: Option<String>,
     pkg: &Package,
     group_visibility: Option<&GroupVisibility>,
+    has_tests: bool,
 ) -> Result<(), Error> {
     let target_name = if pkg.is_proc_macro() {
         format!("{}($host_toolchain)", pkg.gn_name())
@@ -72,7 +73,21 @@ pub fn write_top_level_rule<'a, W: io::Write>(
         group_name = pkg.name,
         dep_name = target_name,
         optional_visibility = optional_visibility,
+        optional_testonly = "",
     )?;
+
+    if has_tests {
+        let name = pkg.name.clone() + "-test";
+        writeln!(
+            output,
+            include_str!("../templates/top_level_gn_rule.template"),
+            group_name = name,
+            dep_name = target_name + "-test",
+            optional_visibility = optional_visibility,
+            optional_testonly = "testonly = true",
+        )?;
+    }
+
     if platform.is_some() {
         writeln!(output, "}}\n")?;
     }
@@ -83,8 +98,8 @@ pub fn write_top_level_rule<'a, W: io::Write>(
 pub fn write_binary_top_level_rule<'a, W: io::Write>(
     output: &mut W,
     platform: Option<String>,
-    rule_name: &str,
     target: &GnTarget<'a>,
+    options: &BinaryRenderOptions<'_>,
 ) -> Result<(), Error> {
     if let Some(ref platform) = platform {
         writeln!(
@@ -96,9 +111,23 @@ pub fn write_binary_top_level_rule<'a, W: io::Write>(
     writeln!(
         output,
         include_str!("../templates/top_level_binary_gn_rule.template"),
-        group_name = rule_name,
+        group_name = options.binary_name,
         dep_name = target.gn_target_name(),
+        optional_testonly = "",
     )?;
+
+    if options.tests_enabled {
+        let name = options.binary_name.to_owned() + "-test";
+        let dep_name = target.gn_target_name().to_owned() + "-test";
+        writeln!(
+            output,
+            include_str!("../templates/top_level_binary_gn_rule.template"),
+            group_name = name,
+            dep_name = dep_name,
+            optional_testonly = "testonly = true",
+        )?;
+    }
+
     if platform.is_some() {
         writeln!(output, "}}\n")?;
     }
@@ -217,6 +246,7 @@ pub fn write_rule<W: io::Write>(
     global_target_cfgs: Option<&GlobalTargetCfgs>,
     custom_build: Option<&CombinedTargetCfg<'_>>,
     output_name: Option<&str>,
+    is_test: bool,
 ) -> Result<(), Error> {
     // Generate a section for dependencies that is paramaterized on toolchain
     let mut dependencies = String::from("deps = []\n");
@@ -295,6 +325,9 @@ pub fn write_rule<W: io::Write>(
     rustflags.add_cfg(format!("--edition={}", target.edition));
     rustflags.add_cfg(format!("-Cmetadata={}", target.metadata_hash()));
     rustflags.add_cfg(format!("-Cextra-filename=-{}", target.metadata_hash()));
+    if is_test {
+        rustflags.add_cfg("--test");
+    }
 
     // Aggregate feature flags
     for feature in target.features {
@@ -370,15 +403,41 @@ pub fn write_rule<W: io::Write>(
             ))?
             .to_string()
     );
-    let output_name = output_name.map_or_else(
-        || Cow::Owned(format!("{}-{}", target.name().replace("-", "_"), target.metadata_hash())),
-        |n| Cow::Borrowed(n),
-    );
+    let output_name = if is_test {
+        output_name.map_or_else(
+            || {
+                Cow::Owned(format!(
+                    "{}-{}-test",
+                    target.name().replace("-", "_"),
+                    target.metadata_hash()
+                ))
+            },
+            |n| Cow::Owned(format!("{}-test", n)),
+        )
+    } else {
+        output_name.map_or_else(
+            || {
+                Cow::Owned(format!(
+                    "{}-{}",
+                    target.name().replace("-", "_"),
+                    target.metadata_hash()
+                ))
+            },
+            |n| Cow::Borrowed(n),
+        )
+    };
+    let mut target_name = target.gn_target_name();
+    if is_test {
+        target_name.push_str("-test");
+    }
+
+    let optional_testonly = if is_test { "testonly = true" } else { "" };
+
     writeln!(
         output,
         include_str!("../templates/gn_rule.template"),
-        gn_rule = target.gn_target_type(),
-        target_name = target.gn_target_name(),
+        gn_rule = if is_test { "executable".to_owned() } else { target.gn_target_type() },
+        target_name = target_name,
         crate_name = target.name().replace("-", "_"),
         output_name = output_name,
         root_path = root_relative_path,
@@ -388,6 +447,7 @@ pub fn write_rule<W: io::Write>(
         rustenv = rustenv.render_gn(),
         rustflags = rustflags.render_gn(),
         visibility = visibility,
+        optional_testonly = optional_testonly,
     )
     .map_err(Into::into)
 }
@@ -417,7 +477,8 @@ mod tests {
         );
 
         let mut output = vec![];
-        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, None).unwrap();
+        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, None, false)
+            .unwrap();
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
@@ -435,6 +496,7 @@ mod tests {
   
   visibility = [":*"]
 
+  
 }
 
 "#
@@ -459,7 +521,8 @@ mod tests {
 
         let outname = Some("rainbow_binary");
         let mut output = vec![];
-        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, outname).unwrap();
+        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, outname, false)
+            .unwrap();
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
@@ -477,6 +540,7 @@ mod tests {
   
   visibility = [":*"]
 
+  
 }
 
 "#

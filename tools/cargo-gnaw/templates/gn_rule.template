@@ -8,4 +8,5 @@
   {rustflags}
   {aliased_deps}
   {visibility}
+  {optional_testonly}
 }}

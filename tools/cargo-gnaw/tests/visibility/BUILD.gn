@@ -8,6 +8,7 @@ import("//example.gni")
 
 group("example_lib") {
   public_deps = [ ":example_lib-v1_0_0" ]
+
   visibility = example_visibility_var
 }
 

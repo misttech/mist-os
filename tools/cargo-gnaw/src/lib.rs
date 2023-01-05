@@ -143,6 +143,8 @@ pub struct PackageCfg {
     /// Visibility list to use for the forwarding group, for use with fixits which seek to remove
     /// the use of a specific crate from the tree.
     group_visibility: Option<GroupVisibility>,
+    /// Build tests for this target.
+    tests: bool,
 }
 
 /// Configs added to all GN targets in the BUILD.gn
@@ -204,6 +206,14 @@ pub struct CrateOutputMetadata {
 
 // Use BTreeMap so that iteration over platforms is stable.
 type CombinedTargetCfg<'a> = BTreeMap<Option<&'a Platform>, &'a TargetCfg>;
+
+/// Render options for binary.
+pub struct BinaryRenderOptions<'a> {
+    /// Name of the binary.
+    binary_name: &'a str,
+    /// If true, this binary target is a test target.
+    tests_enabled: bool,
+}
 
 macro_rules! define_combined_cfg {
     ($t:ty) => {
@@ -304,14 +314,17 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                                     imported_files.insert(visibility.import.clone());
                                 }
                             }
-                            gn::write_top_level_rule(&mut output, platform, package, visibility)
-                                .with_context(|| {
-                                    format!(
-                                        "while writing top level rule for package: {}",
-                                        &dep.pkg
-                                    )
-                                })
-                                .context("writing top level rule")?;
+                            gn::write_top_level_rule(
+                                &mut output,
+                                platform,
+                                package,
+                                visibility,
+                                cfg.map(|c| c.tests).unwrap_or(false),
+                            )
+                            .with_context(|| {
+                                format!("while writing top level rule for package: {}", &dep.pkg)
+                            })
+                            .context("writing top level rule")?;
                         }
                     }
                 }
@@ -331,8 +344,14 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     }
                 }
 
-                gn::write_top_level_rule(&mut output, None, package, visibility)
-                    .with_context(|| "writing top level rule")?;
+                gn::write_top_level_rule(
+                    &mut output,
+                    None,
+                    package,
+                    visibility,
+                    cfg.map(|c| c.tests).unwrap_or(false),
+                )
+                .with_context(|| "writing top level rule")?;
             }
         }
         None => anyhow::bail!("Failed to resolve a build graph for the package tree"),
@@ -360,7 +379,8 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     // Iterate through the target configs, verifying that the build graph contains the configured
     // targets, then save off a mapping of GnTarget to the target config.
     let mut target_cfgs = HashMap::<&GnTarget<'_>, CombinedTargetCfg<'_>>::new();
-    let mut binary_names = HashMap::<&GnTarget<'_>, &str>::new();
+    let mut target_binaries = HashMap::<&GnTarget<'_>, BinaryRenderOptions<'_>>::new();
+    let mut targets_with_tests = HashSet::<&GnTarget<'_>>::new();
     let mut reviewed_features_map = HashMap::<&GnTarget<'_>, Option<&[String]>>::new();
     let mut unused_configs = String::new();
     if let Some(gn_pkg_cfgs) = gn_pkg_cfgs {
@@ -378,6 +398,10 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                             .is_none(),
                         "Duplicate library config somehow specified"
                     );
+
+                    if pkg_cfg.tests {
+                        targets_with_tests.insert(target);
+                    }
                 } else {
                     unused_configs.push_str(&format!(
                         "library crate, package {} version {}\n",
@@ -391,7 +415,13 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     if let Some(target) =
                         build_graph.find_binary_target(pkg_name, pkg_version, bin_cargo_target)
                     {
-                        if let Some(old_name) = binary_names.insert(target, &bin_cfg.output_name) {
+                        if let Some(old_options) = target_binaries.insert(
+                            target,
+                            BinaryRenderOptions {
+                                binary_name: &bin_cfg.output_name,
+                                tests_enabled: pkg_cfg.tests,
+                            },
+                        ) {
                             anyhow::bail!(
                                 "A given binary target ({} in package {} version {}) can only be \
                                 used for a single GN target, but multiple exist, including {} \
@@ -400,13 +430,17 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                                 pkg_name,
                                 pkg_version,
                                 &bin_cfg.output_name,
-                                old_name
+                                old_options.binary_name,
                             );
                         }
                         assert!(
                             target_cfgs.insert(target, bin_cfg.combined_target_cfg()).is_none(),
                             "Should have bailed above"
                         );
+
+                        if pkg_cfg.tests {
+                            targets_with_tests.insert(target);
+                        }
                     } else {
                         unused_configs.push_str(&format!(
                             "binary crate {}, package {} version {}\n",
@@ -428,16 +462,16 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     // build failure will result.
     {
         let mut names = HashSet::new();
-        for (target, bin_name) in &binary_names {
-            if !names.insert(bin_name) {
+        for (target, options) in &target_binaries {
+            if !names.insert(options.binary_name) {
                 anyhow::bail!(
                     "Multiple targets are configured to generate executables named \"{}\"",
-                    bin_name
+                    options.binary_name
                 );
             }
 
             emitted_metadata.push(CrateOutputMetadata {
-                name: bin_name.to_string(),
+                name: options.binary_name.to_string(),
                 version: target.version(),
                 canonical_target: format!(
                     "//{}:{}",
@@ -447,11 +481,11 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 shortcut_target: Some(format!(
                     "//{}:{}",
                     path_from_root_to_generated.display(),
-                    bin_name
+                    options.binary_name
                 )),
                 path: target.package_root(&opt.project_root),
             });
-            gn::write_binary_top_level_rule(&mut output, None, bin_name, target)
+            gn::write_binary_top_level_rule(&mut output, None, target, &options)
                 .context(format!("writing binary top level rule: {}", target.name()))?;
         }
     }
@@ -460,7 +494,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     for target in graph_targets {
         // Check whether we should generate a target if this is a binary.
         let binary_name = if let GnRustType::Binary = target.target_type {
-            let name = binary_names.get(target).map(|s| *s);
+            let name = target_binaries.get(target).map(|opt| opt.binary_name);
             if name.is_none() {
                 continue;
             }
@@ -573,8 +607,26 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             global_config,
             target_cfg,
             binary_name,
+            false,
         )
         .context(format!("writing rule for: {} {}", target.name(), target.version()))?;
+
+        if targets_with_tests.contains(target) {
+            let _ = gn::write_rule(
+                &mut output,
+                &target,
+                &opt.project_root,
+                global_config,
+                target_cfg,
+                binary_name,
+                true,
+            )
+            .context(format!(
+                "writing rule for: {} {}",
+                target.name(),
+                target.version()
+            ))?;
+        }
     }
 
     if let Some(metadata_path) = &opt.emit_metadata {

@@ -112,6 +112,11 @@ fn main() {
             extra_args: vec![],
         },
         TestCase {
+            manifest_path: vec!["binary_with_tests", "Cargo.toml"],
+            golden_expected_filename: vec!["binary_with_tests", "BUILD.gn"],
+            extra_args: vec![],
+        },
+        TestCase {
             manifest_path: vec!["multiple_crate_types", "Cargo.toml"],
             golden_expected_filename: vec!["multiple_crate_types", "BUILD.gn"],
             extra_args: vec![],
