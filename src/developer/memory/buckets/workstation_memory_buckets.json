@@ -136,5 +136,11 @@
         "name": "SceneManager",
         "process": "scene_manager\\.cm",
         "vmo": ""
+    },
+    {
+        "event_code": 70,
+        "name": "Gazelle",
+        "process": "app_launcher\\.cm|element_router\\.cm|wm\\.cm",
+        "vmo": ""
     }
 ]
