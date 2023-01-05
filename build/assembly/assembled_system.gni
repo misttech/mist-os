@@ -410,6 +410,8 @@ template("assembled_system") {
     bazel_legacy_aib = "${namespace}.bazel_legacy_aib"
     partial_image_assembly_config_for_validations =
         "${namespace}.validation_image_assembly_config"
+    validation_legacy_aib =
+        "${namespace}.validation_legacy_assembly_input_bundle"
   }
 
   # Intermediate files produced for Image Assembly.
@@ -419,8 +421,7 @@ template("assembled_system") {
     } else {
       product_assembly_config = "//build/assembly/default_product_config.json"
     }
-    generated_config_for_legacy_bundle =
-        "$target_out_dir/${namespace}.legacy_image_assembly_config.json"
+
     image_assembly_inputs = "$target_out_dir/${namespace}.image_assembly_inputs"
 
     images_config_old = "$target_out_dir/${namespace}.images_config_old.json"
@@ -491,8 +492,6 @@ template("assembled_system") {
       platform_common_aibs +=
           [ "${_target_out_dir}/${_name}/assembly_config.json" ]
     }
-    partial_image_assembly_config_for_validations =
-        "${target_gen_dir}/testing/validation_image_assembly_config.json"
   }
 
   _base_packages = invoker.base_packages
@@ -620,7 +619,6 @@ template("assembled_system") {
                              "include_config_data",
                            ])
 
-    output_path = files.generated_config_for_legacy_bundle
     kernel_image = kernel_zbi
     kernel_image_name = kernel_name
 
@@ -810,15 +808,29 @@ template("assembled_system") {
                                "testonly",
                                "visibility",
                                "include_component_id_index",
-                               "include_config_data",
                              ])
-
+      include_config_data = true
       forward_variables_from(_must_exist, [ "base_packages" ])
-      output_path = files.partial_image_assembly_config_for_validations
       kernel_image = kernel_zbi
       kernel_image_name = kernel_name
       config_data_packages = _must_exist.base_packages + _universe_packages +
                              _must_exist.cache_packages
+    }
+
+    legacy_assembly_input_bundle(labels.validation_legacy_aib) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      image_assembly_label =
+          ":${labels.partial_image_assembly_config_for_validations}"
+      bundle_name = "must_exist"
+
+      bundles_dir = files.outdir
+      include_config_data = true
+      create_package = false
+      create_package_archive = false
     }
   }
 
@@ -867,7 +879,7 @@ template("assembled_system") {
                              "testonly",
                              "visibility",
                            ])
-    image_assembly_label = ":${namespace}"
+    image_assembly_label = ":${labels.generated_config_for_legacy_bundle}"
     bundles_dir = files.outdir
     include_config_data = generate_fvm
     create_package = defined(invoker.create_legacy_aib_package) &&
@@ -1398,8 +1410,10 @@ template("assembled_system") {
       public_deps += [ ":${labels.images_config_matches}" ]
     }
     if (defined(_must_exist)) {
-      public_deps +=
-          [ ":${labels.partial_image_assembly_config_for_validations}" ]
+      public_deps += [
+        ":${labels.partial_image_assembly_config_for_validations}",
+        ":${labels.validation_legacy_aib}",
+      ]
     }
 
     metadata = {

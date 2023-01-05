@@ -14,9 +14,6 @@ import("//build/zbi/kernel_cmdline.gni")
 # Generates an Image Assembly Config to be consumed by the Image Assembler.
 #
 # Arguments
-#   output_path (required)
-#     [path] Product config output location
-#
 #   kernel_image (required)
 #     [label] Kernel to add to the ZBI.
 #
@@ -62,8 +59,8 @@ template("generated_image_assembly_config") {
   assert(
       current_toolchain == default_toolchain,
       "The image assembly config can only be created in the default toolchain")
-  assert(defined(invoker.output_path), "Need to define output_path")
   assert(defined(invoker.kernel_image), "Need to define kernel_image")
+  output_path = "${target_out_dir}/${target_name}.json"
 
   # Set the defaults for several arguments.
   base_packages = []
@@ -103,7 +100,7 @@ template("generated_image_assembly_config") {
 
   _meta_packages = []
   if (defined(invoker.meta_packages)) {
-    _meta_packages = invoker.meta_packages
+    _meta_packages += invoker.meta_packages
   }
 
   kernel_image_name = invoker.kernel_image_name
@@ -327,7 +324,7 @@ template("generated_image_assembly_config") {
                            ])
     script = "//build/assembly/scripts/generated_image_assembly_config.py"
 
-    outputs = [ invoker.output_path ]
+    outputs = [ output_path ]
     inputs = [
       build_info_files.minimum_utc_stamp,
       files.base_package_list,
@@ -378,7 +375,7 @@ template("generated_image_assembly_config") {
       "--bootfs-packages-list",
       rebase_path(files.bootfs_package_list, root_build_dir),
       "--output",
-      rebase_path(invoker.output_path, root_build_dir),
+      rebase_path(output_path, root_build_dir),
     ]
 
     metadata = {

@@ -128,7 +128,6 @@ template("test_assembly_config") {
       testonly = true
 
       # NOTE: legacy_assembly_input_bundle assumes this file path
-      output_path = "$target_out_dir/image.legacy_image_assembly_config.json"
       kernel_image = "//zircon/kernel"
       kernel_image_name = "kernel"
       base_packages = base_packages_param
@@ -139,7 +138,7 @@ template("test_assembly_config") {
       testonly = true
 
       # NOTE: this internally generates the above target name and path
-      image_assembly_label = ":image"
+      image_assembly_label = ":image.legacy_image_assembly_config"
       bundles_dir = outdir
       include_config_data = false
       forward_variables_from(invoker, [ "core_realm_definition" ])

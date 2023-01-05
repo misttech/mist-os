@@ -16,9 +16,12 @@ import("//build/python/python_action.gni")
 #
 # Parameters:
 #
-#   image_assembly_label
+#   image_assembly_label [required]
 #     [label] GN label for the image assembly to use as a basis for the "legacy"
 #     assembly input bundle.
+#
+#   bundle_name [optional; default: legacy]
+#     [string] A different name for the bundle, if not the name of the target.
 #
 #   bundles_dir [optional; default: target_out_dir]
 #     [GN file path] path to a dir to use instead of $target_out_dir as the
@@ -43,10 +46,6 @@ import("//build/python/python_action.gni")
 #     [label] The GN label of a `core_realm_definition()` template
 #
 template("legacy_assembly_input_bundle") {
-  # TODO:  Switch this over to using the `assembly_input_bundle()` template when
-  #        that template supports all the categories that are needed by the
-  #        legacy AIB.
-
   assert(
       current_toolchain == default_toolchain,
       "The legacy assembly input bundle can only be created in the default toolchain")
@@ -55,6 +54,7 @@ template("legacy_assembly_input_bundle") {
                          [
                            "image_assembly_label",
                            "bundles_dir",
+                           "bundle_name",
                            "create_package",
                            "create_package_archive",
                          ])
@@ -66,7 +66,10 @@ template("legacy_assembly_input_bundle") {
   if (!defined(bundles_dir)) {
     bundles_dir = target_out_dir
   }
-  bundle_name = "legacy"
+
+  if (!defined(invoker.bundle_name)) {
+    bundle_name = "legacy"
+  }
 
   include_config_data = true
   if (defined(invoker.include_config_data)) {
@@ -91,12 +94,12 @@ template("legacy_assembly_input_bundle") {
   labels = {
     # Extract the assembly label's dir and name components:
     image_assembly_name = get_label_info(image_assembly_label, "name")
-    image_assembly_dir = get_label_info(image_assembly_label, "dir")
+    image_assembly_dir = get_label_info(image_assembly_label, "target_out_dir")
 
     # Compute the assembly config and config_data labels that are generated within
-    # assembled_system()
-    assemble_system_image_assembly_config = "${image_assembly_dir}:${image_assembly_name}.legacy_image_assembly_config"
-    assemble_system_config_data = "${image_assembly_dir}:${image_assembly_name}.legacy_image_assembly_config.config-data_config_package_entries"
+    # generated_image_assembly_config()
+    assemble_system_config_data =
+        "${image_assembly_label}.config-data_config_package_entries"
 
     # The AIB itself
     assembly_input_bundle = "$target_name.bundle"
@@ -116,14 +119,10 @@ template("legacy_assembly_input_bundle") {
   }
 
   files = {
-    # Locate the output files from the above labels, in their out dir:
-    image_assembly_config_dir =
-        get_label_info(labels.assemble_system_image_assembly_config,
-                       "target_out_dir")
-    image_assembly_config = "${image_assembly_config_dir}/${labels.image_assembly_name}.legacy_image_assembly_config.json"
-    assemble_system_config_data_dir =
-        get_label_info(labels.assemble_system_config_data, "target_out_dir")
-    assemble_system_config_data_entries = "${assemble_system_config_data_dir}/${labels.image_assembly_name}.legacy_image_assembly_config.config-data_config_package_entries"
+    image_assembly_config =
+        "${labels.image_assembly_dir}/${labels.image_assembly_name}.json"
+
+    assemble_system_config_data_entries = "${labels.image_assembly_dir}/${labels.image_assembly_name}.config-data_config_package_entries"
 
     # Outputs
 
@@ -358,7 +357,7 @@ template("legacy_assembly_input_bundle") {
     deps = [
       ":${labels.base_driver_package_list}",
       ":${labels.driver_package_component_files}",
-      labels.assemble_system_image_assembly_config,
+      image_assembly_label,
     ]
 
     if (_shell_command_packages != []) {
