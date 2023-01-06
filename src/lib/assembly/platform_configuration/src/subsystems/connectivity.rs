@@ -29,7 +29,6 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 let has_fullmac = board_info.provides_feature("fuchsia::wlan_fullmac");
                 let has_softmac = board_info.provides_feature("fuchsia::wlan_softmac");
                 if has_fullmac || has_softmac {
-                    builder.platform_bundle("wlan_phy");
                     if has_fullmac {
                         builder.platform_bundle("wlan_fullmac_support");
                     }

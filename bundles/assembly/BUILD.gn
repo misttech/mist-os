@@ -352,15 +352,6 @@ assembly_input_bundle("wlan_base") {
   ]
 }
 
-assembly_input_bundle("wlan_phy") {
-  base_driver_packages = [
-    {
-      package_target = "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2"
-      driver_components = [ "meta/wlanphy_dfv2.cm" ]
-    },
-  ]
-}
-
 assembly_input_bundle("wlan_legacy_privacy_support") {
   base_packages =
       [ "//src/connectivity/wlan/wlanstack:wlanstack-legacy-privacy" ]
