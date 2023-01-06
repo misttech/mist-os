@@ -4,12 +4,14 @@
 
 use {
     crate::fidl_server::{FidlServer, OutgoingService},
-    crate::virtual_machine::FuchsiaVirtualMachine,
+    crate::hypervisor::FuchsiaHypervisor,
     anyhow::Context,
     fuchsia_component::server,
 };
 
 mod fidl_server;
+mod hypervisor;
+mod memory;
 mod virtual_machine;
 
 #[fuchsia::main(logging = true, threads = 1)]
@@ -19,7 +21,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .add_fidl_service(OutgoingService::Guest)
         .add_fidl_service(OutgoingService::GuestLifecycle);
     fs.take_and_serve_directory_handle().context("Error starting server")?;
-    let mut server = FidlServer::<FuchsiaVirtualMachine>::new();
+    let hypervisor = FuchsiaHypervisor::new().await.map_err(|e| {
+        tracing::error!("Failed to create hypervisor: {}", e);
+        e
+    })?;
+    let mut server = FidlServer::new(hypervisor);
     server.run(fs).await;
     Ok(())
 }

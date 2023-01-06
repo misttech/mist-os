@@ -36,6 +36,22 @@ async fn build_test_realm(vmm_url: &'static str) -> Result<RealmInstance, Error>
     builder
         .add_route(
             Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.kernel.HypervisorResource"))
+                .from(Ref::parent())
+                .to(&vmm_launcher),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.kernel.VmexResource"))
+                .from(Ref::parent())
+                .to(&vmm_launcher),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.component.Realm"))
                 .from(&vmm_launcher)
                 .to(Ref::parent()),

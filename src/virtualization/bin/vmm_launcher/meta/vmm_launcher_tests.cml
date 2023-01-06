@@ -5,9 +5,20 @@
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
+        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/vmm_launcher_test_bin",
     },
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.VmexResource",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
 }

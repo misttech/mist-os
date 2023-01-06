@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use {
+    crate::hypervisor::Hypervisor,
     crate::virtual_machine::VirtualMachine,
     fidl::endpoints::{ControlHandle, RequestStream},
     fidl_fuchsia_virtualization::{
         GuestError, GuestLifecycleRequest, GuestLifecycleRequestStream, GuestLifecycleRunResponder,
         GuestRequest, GuestRequestStream,
     },
-    fuchsia_zircon_status as zx_status,
+    fuchsia_zircon as zx,
     futures::{future::Fuse, select, stream::SelectAll, FutureExt, Stream, StreamExt},
     tracing,
 };
@@ -31,16 +32,18 @@ impl From<GuestLifecycleRequestStream> for OutgoingService {
     }
 }
 
-pub struct FidlServer<Vm: VirtualMachine> {
+pub struct FidlServer<H: Hypervisor> {
+    hypervisor: H,
     lifecycle_fidl: Option<GuestLifecycleRequestStream>,
     guest_fidl: SelectAll<GuestRequestStream>,
-    virtual_machine: Option<Vm>,
+    virtual_machine: Option<VirtualMachine<H>>,
     run_responder: Option<GuestLifecycleRunResponder>,
 }
 
-impl<Vm: VirtualMachine> FidlServer<Vm> {
-    pub fn new() -> Self {
+impl<H: Hypervisor> FidlServer<H> {
+    pub fn new(hypervisor: H) -> Self {
         Self {
+            hypervisor,
             lifecycle_fidl: None,
             guest_fidl: SelectAll::new(),
             virtual_machine: None,
@@ -63,7 +66,7 @@ impl<Vm: VirtualMachine> FidlServer<Vm> {
                         if self.lifecycle_fidl.is_none() {
                             self.lifecycle_fidl = Some(guest_lifecycle);
                         } else {
-                            guest_lifecycle.control_handle().shutdown_with_epitaph(zx_status::Status::ALREADY_BOUND);
+                            guest_lifecycle.control_handle().shutdown_with_epitaph(zx::Status::ALREADY_BOUND);
                         }
                     }
                     Some(OutgoingService::Guest(guest)) => {
@@ -79,7 +82,7 @@ impl<Vm: VirtualMachine> FidlServer<Vm> {
                 lifecycle_request = lifecycle_fut => {
                     match lifecycle_request {
                         Some(Ok(request)) => {
-                            self.handle_lifecycle_request(request);
+                            self.handle_lifecycle_request(request).await;
                         }
                         result => {
                             if let Some(Err(e)) = result {
@@ -98,14 +101,14 @@ impl<Vm: VirtualMachine> FidlServer<Vm> {
         }
     }
 
-    fn handle_lifecycle_request(&mut self, request: GuestLifecycleRequest) {
+    async fn handle_lifecycle_request(&mut self, request: GuestLifecycleRequest) {
         match request {
             GuestLifecycleRequest::Create { guest_config, responder } => {
                 if self.run_responder.is_some() {
                     responder.send(&mut Err(GuestError::AlreadyRunning)).unwrap();
                     return;
                 }
-                match Vm::new(guest_config) {
+                match VirtualMachine::new(self.hypervisor.clone(), guest_config) {
                     Err(e) => {
                         responder.send(&mut Err(e)).unwrap();
                     }
@@ -180,31 +183,20 @@ impl<Vm: VirtualMachine> FidlServer<Vm> {
 mod tests {
     use {
         super::*,
+        crate::hypervisor::testing::MockHypervisor,
         fidl::endpoints::Proxy,
         fidl_fuchsia_virtualization::{GuestConfig, GuestLifecycleMarker, GuestMarker},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync,
         futures::{channel::mpsc, FutureExt},
     };
 
-    struct MockVirtualMachine;
-
-    impl VirtualMachine for MockVirtualMachine {
-        fn new(_config: GuestConfig) -> Result<Self, GuestError> {
-            Ok(Self)
-        }
-
-        fn start_primary_vcpu(&self) -> Result<(), GuestError> {
-            Ok(())
-        }
-    }
-
     fn build_valid_guest_config() -> GuestConfig {
-        GuestConfig::EMPTY
+        GuestConfig { guest_memory: Some(1 * 1024 * 1024 * 1024), ..GuestConfig::EMPTY }
     }
 
     fn setup_test() -> (mpsc::Sender<OutgoingService>, fasync::Task<()>) {
         let (sender, receiver) = mpsc::channel::<OutgoingService>(1);
-        let mut vmm = FidlServer::<MockVirtualMachine>::new();
+        let mut vmm = FidlServer::new(MockHypervisor::new());
         let run_task = fasync::Task::local(async move {
             vmm.run(receiver).await;
         });
@@ -344,7 +336,7 @@ mod tests {
         assert!(signals.contains(zx::Signals::CHANNEL_READABLE));
         match lifecycle2.take_event_stream().next().await {
             Some(Err(fidl::Error::ClientChannelClosed { status, protocol_name })) => {
-                assert_eq!(status, zx_status::Status::ALREADY_BOUND);
+                assert_eq!(status, zx::Status::ALREADY_BOUND);
                 assert_eq!(protocol_name, "fuchsia.virtualization.GuestLifecycle");
             }
             result => {

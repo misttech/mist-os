@@ -16,23 +16,26 @@ rustc_binary("vmm_rs") {
 
   sources = [
     "src/fidl_server.rs",
+    "src/hypervisor.rs",
     "src/main.rs",
+    "src/memory.rs",
     "src/virtual_machine.rs",
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:parking_lot",
   ]
 }
 
@@ -44,4 +47,9 @@ fuchsia_component("component") {
 
 fuchsia_unittest_package("vmm_rs_unittests") {
   deps = [ ":vmm_rs_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
