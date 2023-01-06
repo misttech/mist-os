@@ -206,12 +206,6 @@ void DriverLoader::AddNodeGroup(fuchsia_driver_framework::wire::NodeGroup group,
 
 const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
     const fbl::RefPtr<Device>& dev, const MatchDeviceConfig& config) {
-  return MatchDeviceDriverIndex(dev->props(), dev->str_props(), dev->protocol_id(), config);
-}
-
-const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
-    const fbl::Array<const zx_device_prop_t>& props, const fbl::Array<const StrProperty>& str_props,
-    uint32_t protocol_id, const MatchDeviceConfig& config) {
   if (!driver_index_.is_valid()) {
     return std::vector<MatchedDriver>();
   }
@@ -219,6 +213,8 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
   bool autobind = config.libname.empty();
 
   fidl::Arena allocator;
+  auto& props = dev->props();
+  auto& str_props = dev->str_props();
   size_t size = props.size() + str_props.size() + 2;
   if (!autobind) {
     size += 1;
@@ -226,7 +222,7 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
   fidl::VectorView<fdf::wire::NodeProperty> fidl_props(allocator, size);
 
   size_t index = 0;
-  fidl_props[index++] = fdf::MakeProperty(allocator, BIND_PROTOCOL, protocol_id);
+  fidl_props[index++] = fdf::MakeProperty(allocator, BIND_PROTOCOL, dev->protocol_id());
   fidl_props[index++] = fdf::MakeProperty(allocator, BIND_AUTOBIND, autobind);
   // If we are looking for a specific driver, we add a property to the device with the
   // name of the driver we are looking for. Drivers can then bind to this.

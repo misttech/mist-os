@@ -129,20 +129,24 @@ class DeviceState : public fidl::testing::WireTestBase<fdm::DeviceController> {
 
 class MultipleDeviceTestCase : public zxtest::Test {
  public:
-  MultipleDeviceTestCase() = default;
+  static CoordinatorConfig CreateConfig(async_dispatcher_t* bootargs_dispatcher,
+                                        mock_boot_arguments::Server* boot_args,
+                                        fidl::WireSyncClient<fuchsia_boot::Arguments>* client) {
+    auto config = DefaultConfig(bootargs_dispatcher, boot_args, client);
+    return config;
+  }
+
+  explicit MultipleDeviceTestCase()
+      : coordinator_for_test_(
+            CreateConfig(mock_server_loop_.dispatcher(), &boot_args_, &args_client_),
+            coordinator_loop_.dispatcher()) {}
 
   ~MultipleDeviceTestCase() override = default;
-
-  virtual CoordinatorConfig CreateConfig(async_dispatcher_t* bootargs_dispatcher,
-                                         mock_boot_arguments::Server* boot_args,
-                                         fidl::WireSyncClient<fuchsia_boot::Arguments>* client) {
-    return DefaultConfig(bootargs_dispatcher, boot_args, client);
-  }
 
   async::Loop* coordinator_loop() { return &coordinator_loop_; }
   bool coordinator_loop_thread_running() { return coordinator_loop_thread_running_; }
   void set_coordinator_loop_thread_running(bool value) { coordinator_loop_thread_running_ = value; }
-  Coordinator& coordinator() { return coordinator_for_test_->coordinator(); }
+  Coordinator& coordinator() { return coordinator_for_test_.coordinator(); }
 
   const fbl::RefPtr<DriverHost>& driver_host() { return driver_host_; }
   const fidl::ServerEnd<fdm::DriverHostController>& driver_host_server() {
@@ -205,7 +209,7 @@ class MultipleDeviceTestCase : public zxtest::Test {
   // for itself to respond to its requests.
   async::Loop mock_server_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
-  std::unique_ptr<CoordinatorForTest> coordinator_for_test_;
+  CoordinatorForTest coordinator_for_test_;
 
   // The fake driver_host that the platform bus is put into
   fbl::RefPtr<DriverHost> driver_host_;

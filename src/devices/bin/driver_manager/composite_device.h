@@ -62,10 +62,6 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // Bind the fragment with the given index to the specified device
   zx_status_t BindFragment(size_t index, const fbl::RefPtr<Device>& dev);
 
-  // Should only be called if |driver_| is nullopt. Sets |driver_| and tries
-  // to assemble the composite device.
-  void SetDriverAndAssemble(MatchedDriverInfo driver);
-
   // Mark the given fragment as unbound.  Note that since we don't expose
   // this device's fragments in the API, this method can only be invoked by
   // CompositeDeviceFragment.
@@ -84,8 +80,6 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   CompositeDeviceFragment* GetPrimaryFragment();
   const CompositeDeviceFragment* GetPrimaryFragment() const;
-
-  bool HasDriver() const { return driver_.has_value(); }
 
   const fbl::String& name() const { return name_; }
   const fbl::Array<const zx_device_prop_t>& properties() const { return properties_; }
@@ -120,10 +114,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   // Driver index variables. |driver_index_driver_| is set by CreateFromDriverIndex().
   const bool from_driver_index_;
-
-  // The driver that binds to actual device created by CompositeDevice. Only set by
-  // CreateFromDriverIndex(), SetDriver(), or TryAssemble().
-  std::optional<const MatchedDriverInfo> driver_;
+  MatchedDriverInfo driver_index_driver_;
 
   FragmentList fragments_;
 
