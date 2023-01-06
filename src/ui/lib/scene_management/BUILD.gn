@@ -34,7 +34,6 @@ rustc_library("scene_management") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:libm",
-    "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
@@ -48,6 +47,26 @@ rustc_library("scene_management") {
     "src/lib.rs",
     "src/pointerinjector_config.rs",
     "src/scene_manager.rs",
+  ]
+}
+
+rustc_library("scene_management_mocks") {
+  edition = "2021"
+  testonly = true
+  deps = [
+    ":scene_management",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/ui/lib/input_pipeline",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+  ]
+
+  source_root = "src/mocks/lib.rs"
+  sources = [
+    "src/mocks/lib.rs",
+    "src/mocks/mock_scene_manager.rs",
   ]
 }
 

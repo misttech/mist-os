@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use mockall::automock;
 use {
     crate::pointerinjector_config::{
         InjectorViewportChangeFn, InjectorViewportHangingGet, InjectorViewportSpec,
@@ -72,7 +71,6 @@ pub type PresentationReceiver = UnboundedReceiver<PresentationMessage>;
 ///
 /// ```
 #[async_trait]
-#[automock]
 pub trait SceneManager: Send {
     /// Sets the root view for the scene.
     ///

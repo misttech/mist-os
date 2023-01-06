@@ -261,7 +261,7 @@ mod tests {
         ConversionProperties, ConverterRequest, ConverterRequestStream,
     };
     use fidl_fuchsia_ui_policy::{DisplayBacklightMarker, DisplayBacklightProxy};
-    use scene_management::MockSceneManager;
+    use scene_management_mocks::MockSceneManager;
     use std::collections::VecDeque;
     use std::future;
 
@@ -369,9 +369,7 @@ mod tests {
             .detach();
         }
 
-        let mut scene_manager = MockSceneManager::new();
-        scene_manager.expect_present_root_view().return_const(());
-        let scene_manager = Arc::new(Mutex::new(scene_manager));
+        let scene_manager = Arc::new(Mutex::new(MockSceneManager::new()));
         let mock_scene_manager = Arc::clone(&scene_manager);
 
         (ColorTransformManager::new(client, scene_manager), converter, mock_scene_manager)
@@ -603,27 +601,19 @@ mod tests {
         let backlight_proxy = create_display_backlight_stream(manager);
 
         // Calling SetMinimumRgb should trigger a call to scene_manager.present_root_view.
-        {
-            let mut mock_scene_manager = mock_scene_manager.lock().await;
-            mock_scene_manager.checkpoint();
-            mock_scene_manager.expect_present_root_view().times(1).return_const(());
-        }
-
         backlight_proxy.set_minimum_rgb(20).await?;
         converter.expect_minimum_rgb().await;
 
+        mock_scene_manager.lock().await.assert_present_root_view_called();
+
         // Calling SetColorTransformConfiguration should also trigger a call to
         // scene_manager.present_root_view.
-        {
-            let mut mock_scene_manager = mock_scene_manager.lock().await;
-            mock_scene_manager.checkpoint();
-            mock_scene_manager.expect_present_root_view().times(1).return_const(());
-        }
-
         color_transform_proxy
             .set_color_transform_configuration(COLOR_TRANSFORM_CONFIGURATION)
             .await?;
         converter.expect_set_values().await;
+
+        mock_scene_manager.lock().await.assert_present_root_view_called();
 
         Ok(())
     }
