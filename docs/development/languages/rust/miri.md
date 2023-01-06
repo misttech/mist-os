@@ -35,7 +35,7 @@ Running `cargo miri` requires a `Cargo.toml` manifest for your crate.
 Configure your build to include the test you want to run and to generate Cargo.toml's:
 
 ```sh
-$ fx set PRODUCT.BOARD --with //src/sys/lib/cm_rust:tests —cargo-toml-gen
+$ fx set PRODUCT.BOARD --with //src/sys/lib/cm_rust:tests --cargo-toml-gen
 ```
 
 Run a build:
