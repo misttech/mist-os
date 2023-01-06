@@ -23,7 +23,7 @@
         },
         {
             name: "devfs",
-            url: "fuchsia-boot:///#meta/devfs.cm",
+            url: "fuchsia-boot:///devfs#meta/devfs.cm",
         },
         {
             name: "flashmap",

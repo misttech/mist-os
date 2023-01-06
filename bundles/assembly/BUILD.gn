@@ -80,7 +80,6 @@ assembly_input_bundle("common_bringup") {
     "//src/bringup/bin/ptysvc:bootfs",
     "//src/bringup/bin/pwrbtn-monitor:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-    "//src/devices/bin/devfs:bootfs",
     "//src/devices/bin/driver-index:bootfs",
     "//src/devices/bin/driver_host:bootfs",
     "//src/devices/bin/driver_manager:bootfs",
@@ -90,7 +89,10 @@ assembly_input_bundle("common_bringup") {
     "//src/sys/component_manager:bootfs",
     "//src/sys/live_usb:bootfs",
   ]
-  bootfs_packages = [ "//src/bringup/bin/svchost:pkg" ]
+  bootfs_packages = [
+    "//src/bringup/bin/svchost:pkg",
+    "//src/devices/bin/devfs:package",
+  ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
   bootfs_files = [
