@@ -69,6 +69,12 @@ class ComponentRunner final : public fs::PagedVfs {
 
   // These are only initialized by configure after a call to the startup service.
   std::unique_ptr<Blobfs> blobfs_;
+
+  std::mutex shutdown_lock_;
+  // The result of the attempted shutdown, to be presented to any late shutdown request arrivals.
+  std::optional<zx_status_t> shutdown_result_ __TA_GUARDED(shutdown_lock_);
+  // A queue of callbacks for shutdown requests that arrive while shutdown is running.
+  std::vector<fs::FuchsiaVfs::ShutdownCallback> shutdown_callbacks_ __TA_GUARDED(shutdown_lock_);
 };
 
 }  // namespace blobfs

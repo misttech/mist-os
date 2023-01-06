@@ -12,6 +12,7 @@
 
 #include <fbl/ref_ptr.h>
 
+#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/service/admin.h"
@@ -68,11 +69,36 @@ void ComponentRunner::RemoveSystemDrivers(fit::callback<void(zx_status_t)> callb
 }
 
 void ComponentRunner::Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) {
+  {
+    std::lock_guard l(shutdown_lock_);
+    // If the shutdown has already completed, just report it and be done.
+    if (shutdown_result_.has_value()) {
+      cb(shutdown_result_.value());
+      return;
+    }
+    // Queue up any callbacks to be run at the end.
+    shutdown_callbacks_.push_back(std::move(cb));
+    // Only if this is the first entry should it actually perform the shutdown.
+    if (shutdown_callbacks_.size() > 1) {
+      return;
+    }
+  }
+
+  fs::FuchsiaVfs::ShutdownCallback final_cb = [this](zx_status_t status) {
+    std::lock_guard l(this->shutdown_lock_);
+    this->shutdown_result_ = status;
+    for (auto& cb : this->shutdown_callbacks_) {
+      cb(status);
+    }
+  };
+
+  // Not including above book keeping to avoid tracing shutdown calls that don't actually do any
+  // work.
   TRACE_DURATION("blobfs", "ComponentRunner::Shutdown");
   // Before shutting down blobfs, we need to try to shut down any drivers that are running out of
   // it, because right now those drivers don't have an explicit dependency on blobfs in the
   // component hierarchy so they don't get shut down before us yet.
-  RemoveSystemDrivers([this, cb = std::move(cb)](zx_status_t status) mutable {
+  RemoveSystemDrivers([this, cb = std::move(final_cb)](zx_status_t status) mutable {
     // If we failed to notify the driver stack about the impending shutdown, log a warning, but
     // continue the shutdown.
     if (status != ZX_OK) {
@@ -109,7 +135,10 @@ zx::result<> ComponentRunner::ServeRoot(
     zx::resource vmex_resource) {
   LifecycleServer::Create(
       loop_.dispatcher(),
-      [this](fs::FuchsiaVfs::ShutdownCallback cb) { this->Shutdown(std::move(cb)); },
+      [this](fs::FuchsiaVfs::ShutdownCallback cb) {
+        FX_LOGS(INFO) << "Lifecycle stop request received.";
+        this->Shutdown(std::move(cb));
+      },
       std::move(lifecycle));
 
   fidl::WireSharedClient<fuchsia_device_manager::Administrator> driver_admin;
@@ -208,10 +237,11 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
                     fbl::MakeRefCounted<HealthCheckService>(loop_.dispatcher(), *blobfs_));
 
   svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_fs::Admin>,
-                    fbl::MakeRefCounted<AdminService>(blobfs_->dispatcher(),
-                                                      [this](fs::FuchsiaVfs::ShutdownCallback cb) {
-                                                        this->Shutdown(std::move(cb));
-                                                      }));
+                    fbl::MakeRefCounted<AdminService>(
+                        blobfs_->dispatcher(), [this](fs::FuchsiaVfs::ShutdownCallback cb) {
+                          FX_LOGS(INFO) << "fs_admin shutdown received.";
+                          this->Shutdown(std::move(cb));
+                        }));
   svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_blobfs::Blobfs>,
                     fbl::MakeRefCounted<BlobfsService>(loop_.dispatcher(), *blobfs_));
 

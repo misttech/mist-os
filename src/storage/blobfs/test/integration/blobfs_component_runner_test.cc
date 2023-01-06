@@ -197,5 +197,49 @@ TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter
   EXPECT_TRUE(driver_admin.UnregisterWasCalled());
 }
 
+TEST_F(BlobfsComponentRunnerTest, DoubleShutdown) {
+  FakeDriverManagerAdmin driver_admin;
+  auto admin_endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Administrator>();
+  ASSERT_TRUE(admin_endpoints.is_ok());
+  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints->server), &driver_admin);
+
+  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints->client)));
+
+  auto svc_dir = GetSvcDir();
+  auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());
+  ASSERT_EQ(client_end.status_value(), ZX_OK);
+
+  MountOptions options;
+  auto status = runner_->Configure(std::move(device_), options);
+  ASSERT_EQ(status.status_value(), ZX_OK);
+  ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
+
+  // It would be more accurate to call Lifecycle::Stop() somehow, to reproduce this but that isn't
+  // easily injected here. Calling fs_admin::Shutdown() doesn't have the same effect because it
+  // runs on the blobfs dispatcher instead of the loop dispatcher, which is shut down differently.
+  std::atomic<bool> callback_called = false;
+  async::PostTask(loop_.dispatcher(), [this, callback_called = &callback_called]() {
+    runner_->Shutdown([callback_called](zx_status_t status) {
+      EXPECT_EQ(status, ZX_OK);
+      *callback_called = true;
+    });
+  });
+  std::atomic<bool> callback2_called = false;
+  async::PostTask(loop_.dispatcher(), [this, callback_called = &callback2_called]() {
+    runner_->Shutdown([callback_called](zx_status_t status) {
+      EXPECT_EQ(status, ZX_OK);
+      *callback_called = true;
+    });
+  });
+
+  // Shutdown quits the loop, but not before it is able to run the
+  ASSERT_EQ(loop_.RunUntilIdle(), ZX_ERR_CANCELED);
+  // Both callbacks were completed.
+  ASSERT_TRUE(callback_called);
+  ASSERT_TRUE(callback2_called);
+
+  EXPECT_TRUE(driver_admin.UnregisterWasCalled());
+}
+
 }  // namespace
 }  // namespace blobfs
