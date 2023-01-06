@@ -58,7 +58,7 @@ impl LocalExecutor {
     /// Deprecated, will be deleted.
     #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
     pub fn try_new() -> Result<Self, zx::Status> {
-        let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ true)?);
+        let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ true));
         inner.clone().set_local(TimerHeap::default());
         let main_task =
             Arc::new(MainTask { executor: Arc::downgrade(&inner), notifier: Notifier::default() });
@@ -182,7 +182,7 @@ impl TestExecutor {
         let inner = Arc::new(Inner::new(
             ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
             /* is_local */ true,
-        )?);
+        ));
         inner.clone().set_local(TimerHeap::default());
         let main_task =
             Arc::new(MainTask { executor: Arc::downgrade(&inner), notifier: Notifier::default() });

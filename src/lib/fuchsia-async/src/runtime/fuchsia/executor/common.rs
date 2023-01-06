@@ -71,15 +71,8 @@ pub(super) struct Inner {
 }
 
 impl Inner {
-    #[allow(deprecated)]
     #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn new(time: ExecutorTime, is_local: bool) -> Result<Self, zx::Status> {
-        Self::try_new(time, is_local)
-    }
-
-    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-    #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn try_new(time: ExecutorTime, is_local: bool) -> Result<Self, zx::Status> {
+    pub fn new(time: ExecutorTime, is_local: bool) -> Self {
         #[cfg(trace_level_logging)]
         let source = Some(Location::caller());
         #[cfg(not(trace_level_logging))]
@@ -87,7 +80,7 @@ impl Inner {
 
         let collector = Collector::new();
         collector.task_created(MAIN_TASK_ID, source);
-        Ok(Inner {
+        Inner {
             port: zx::Port::create(),
             done: AtomicBool::new(false),
             is_local,
@@ -98,7 +91,7 @@ impl Inner {
             time,
             collector,
             source,
-        })
+        }
     }
 
     pub fn set_local(self: Arc<Self>, timers: TimerHeap) {
