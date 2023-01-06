@@ -44,18 +44,18 @@ pub fn bind_streams_to_syslog(
     ns: &ComponentNamespace,
     stdout_sink: StreamSink,
     stderr_sink: StreamSink,
-) -> Result<(Vec<fasync::Task<()>>, Vec<fproc::HandleInfo>), Error> {
+) -> (Vec<fasync::Task<()>>, Vec<fproc::HandleInfo>) {
     let mut tasks: Vec<fasync::Task<()>> = Vec::new();
     let mut handles: Vec<fproc::HandleInfo> = Vec::new();
 
     // connect to the namespace's logger if we'll need it, wrap in OnceCell so we only do it once
     // (can't use Lazy here because we need to capture `ns`)
     let logger = OnceCell::new();
-    let mut forward_stream = |sink, fd, level| -> Result<(), Error> {
+    let mut forward_stream = |sink, fd, level| {
         if matches!(sink, StreamSink::Log) {
             // create the handle before dealing with the logger so components still receive an inert
             // handle if connecting to LogSink fails
-            let (socket, handle_info) = new_socket_bound_to_fd(fd)?;
+            let (socket, handle_info) = new_socket_bound_to_fd(fd);
             handles.push(handle_info);
 
             if let Some(l) = logger.get_or_init(|| create_namespace_logger(ns).map(Arc::new)) {
@@ -64,13 +64,12 @@ pub fn bind_streams_to_syslog(
                 warn!("Tried forwarding file descriptor {fd} but didn't have a LogSink available.");
             }
         }
-        Ok(())
     };
 
-    forward_stream(stdout_sink, STDOUT_FD, OutputLevel::Info)?;
-    forward_stream(stderr_sink, STDERR_FD, OutputLevel::Warn)?;
+    forward_stream(stdout_sink, STDOUT_FD, OutputLevel::Info);
+    forward_stream(stderr_sink, STDERR_FD, OutputLevel::Warn);
 
-    Ok((tasks, handles))
+    (tasks, handles)
 }
 
 fn create_namespace_logger(ns: &ComponentNamespace) -> Option<ScopedLogger> {
@@ -95,17 +94,19 @@ fn forward_socket_to_syslog(
     task
 }
 
-fn new_socket_bound_to_fd(fd: i32) -> Result<(zx::Socket, fproc::HandleInfo), Error> {
-    let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM)
-        .map_err(|s| anyhow!("Failed to create socket: {}", s))?;
+fn new_socket_bound_to_fd(fd: i32) -> (zx::Socket, fproc::HandleInfo) {
+    // TODO(fxbug.dev/118832): Socket creation can only fail if bad arguments have
+    // been provided or the system is out of memory. For now, we unwrap and assume
+    // this function is infallible.
+    let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
 
-    Ok((
+    (
         rx,
         fproc::HandleInfo {
             handle: tx.into_handle(),
             id: HandleInfo::new(HandleType::FileDescriptor, fd as u16).as_raw(),
         },
-    ))
+    )
 }
 
 /// Drains all bytes from socket and writes messages to writer. Bytes read

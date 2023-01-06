@@ -82,9 +82,7 @@ impl ElfComponent {
     /// INSPECT).
     pub fn copy_job_for_diagnostics(&self) -> Result<Job, ElfRunnerError> {
         self.job.as_handle_ref().duplicate(zx::Rights::BASIC).map(|h| Job::from(h)).map_err(
-            |status| {
-                ElfRunnerError::component_job_duplication_error(self.component_url.clone(), status)
-            },
+            |status| ElfRunnerError::job_duplication_failed(self.component_url.clone(), status),
         )
     }
 }

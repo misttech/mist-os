@@ -24,10 +24,9 @@ use {
         builtin_environment::{get_direct_vdso_vmo, get_next_vdso_vmo},
     },
     ::routing::{config::RuntimeConfig, policy::ScopedPolicyChecker},
-    anyhow::{format_err, Context as _},
     async_trait::async_trait,
     chrono::{DateTime, NaiveDateTime, Utc},
-    cm_runner::{Runner, RunnerError},
+    cm_runner::Runner,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
@@ -108,10 +107,9 @@ impl ElfRunner {
         direct_vdso: Option<zx::Vmo>,
     ) -> Result<Option<ConfigureLauncherResult>, ElfRunnerError> {
         let bin_path = runner::get_program_binary(&start_info)
-            .map_err(|e| RunnerError::invalid_args(resolved_url.clone(), e))?;
+            .map_err(|err| ElfRunnerError::ProgramBinaryError { url: resolved_url.clone(), err })?;
 
-        let args = runner::get_program_args(&start_info)
-            .map_err(|e| RunnerError::invalid_args(resolved_url.clone(), e))?;
+        let args = runner::get_program_args(&start_info);
 
         let stdout_sink = elf_config.get_stdout_sink();
         let stderr_sink = elf_config.get_stderr_sink();
@@ -123,11 +121,9 @@ impl ElfRunner {
         } else {
             duplicate_utc_clock_handle(clock_rights)
         }
-        .map_err(|s| {
-            RunnerError::component_launch_error(
-                "failed to duplicate UTC clock",
-                ElfRunnerError::DuplicateUtcClockError { url: resolved_url.clone(), status: s },
-            )
+        .map_err(|s| ElfRunnerError::UtcClockDuplicateFailed {
+            url: resolved_url.clone(),
+            status: s,
         })?;
 
         // TODO(fxbug.dev/45586): runtime_dir may be unavailable in tests. We should fix tests so
@@ -149,21 +145,21 @@ impl ElfRunner {
 
         let name = Path::new(&resolved_url)
             .file_name()
-            .ok_or(format_err!("invalid url"))
-            .map_err(|e| RunnerError::invalid_args(resolved_url.clone(), e))?
+            .ok_or(ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?
             .to_str()
-            .ok_or(format_err!("invalid url"))
-            .map_err(|e| RunnerError::invalid_args(resolved_url.clone(), e))?;
+            .ok_or(ElfRunnerError::BadResolvedUrl(resolved_url.clone()))?;
 
         // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
         let ns = runner::component::ComponentNamespace::try_from(
             start_info.ns.unwrap_or_else(|| vec![]),
         )
-        .map_err(|e| RunnerError::invalid_args(resolved_url.clone(), e))?;
+        .map_err(|err| ElfRunnerError::ComponentNamespaceError {
+            url: resolved_url.clone(),
+            err,
+        })?;
 
         let (stdout_and_stderr_tasks, stdout_and_stderr_handles) =
-            bind_streams_to_syslog(&ns, stdout_sink, stderr_sink)
-                .map_err(|s| RunnerError::component_launch_error(resolved_url.clone(), s))?;
+            bind_streams_to_syslog(&ns, stdout_sink, stderr_sink);
 
         let mut handle_infos = vec![];
 
@@ -243,7 +239,10 @@ impl ElfRunner {
                 executable_vmo: None,
             })
             .await
-            .map_err(|e| RunnerError::component_load_error(resolved_url.clone(), e))?;
+            .map_err(|err| ElfRunnerError::ConfigureLauncherError {
+                url: resolved_url.clone(),
+                err,
+            })?;
 
         Ok(Some(ConfigureLauncherResult {
             utc_clock_xform,
@@ -259,7 +258,7 @@ impl ElfRunner {
         checker: &ScopedPolicyChecker,
     ) -> Result<Option<ElfComponent>, ElfRunnerError> {
         let resolved_url =
-            runner::get_resolved_url(&start_info).map_err(|e| RunnerError::invalid_args("", e))?;
+            runner::get_resolved_url(&start_info).ok_or(ElfRunnerError::MissingResolvedUrl)?;
 
         // This also checks relevant security policy for config that it wraps using the provided
         // PolicyChecker.
@@ -295,15 +294,16 @@ impl ElfRunner {
         resolved_url: String,
         program_config: ElfProgramConfig,
     ) -> Result<Option<ElfComponent>, ElfRunnerError> {
-        let launcher = self
-            .launcher_connector
-            .connect()
-            .context("failed to connect to launcher service")
-            .map_err(|e| RunnerError::component_load_error(resolved_url.clone(), e))?;
+        let launcher = self.launcher_connector.connect().map_err(|err| {
+            ElfRunnerError::ProcessLauncherConnectError {
+                url: resolved_url.clone(),
+                err: err.into(),
+            }
+        })?;
 
         let component_job = job_default()
             .create_child_job()
-            .map_err(|e| ElfRunnerError::component_job_creation_error(resolved_url.clone(), e))?;
+            .map_err(|e| ElfRunnerError::job_creation_failed(resolved_url.clone(), e))?;
 
         crash_handler::run_exceptions_server(
             &component_job,
@@ -311,9 +311,7 @@ impl ElfRunner {
             resolved_url.clone(),
             self.crash_records.clone(),
         )
-        .map_err(|e| {
-            ElfRunnerError::component_exception_registration_error(resolved_url.clone(), e)
-        })?;
+        .map_err(|e| ElfRunnerError::exception_registration_failed(resolved_url.clone(), e))?;
 
         // Set timer slack.
         //
@@ -325,7 +323,7 @@ impl ElfRunner {
                 TIMER_SLACK_DURATION,
                 zx::JobDefaultTimerMode::Late,
             ))
-            .map_err(|e| ElfRunnerError::component_job_policy_error(resolved_url.clone(), e))?;
+            .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
 
         // Prevent direct creation of processes.
         //
@@ -338,7 +336,7 @@ impl ElfRunner {
                     zx::JobPolicyOption::Absolute,
                     vec![(zx::JobCondition::NewProcess, zx::JobAction::Deny)],
                 ))
-                .map_err(|e| ElfRunnerError::component_job_policy_error(resolved_url.clone(), e))?;
+                .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
         }
 
         // Default deny the job policy which allows ambiently marking VMOs executable, i.e. calling
@@ -349,36 +347,36 @@ impl ElfRunner {
                     zx::JobPolicyOption::Absolute,
                     vec![(zx::JobCondition::AmbientMarkVmoExec, zx::JobAction::Deny)],
                 ))
-                .map_err(|e| ElfRunnerError::component_job_policy_error(resolved_url.clone(), e))?;
+                .map_err(|e| ElfRunnerError::job_policy_set_failed(resolved_url.clone(), e))?;
         }
 
         let mut custom_vdso = None;
         if program_config.should_use_next_vdso() {
             let next_vdso = get_next_vdso_vmo()
-                .map_err(|e| ElfRunnerError::component_next_vdso_error(resolved_url.clone(), e))?;
+                .map_err(|e| ElfRunnerError::next_vdso_error(resolved_url.clone(), e))?;
             custom_vdso = Some(next_vdso);
         }
 
         let mut direct_vdso = None;
         if program_config.should_use_direct_vdso() {
-            let vdso = get_direct_vdso_vmo().map_err(|e| {
-                ElfRunnerError::component_direct_vdso_error(resolved_url.clone(), e)
-            })?;
+            let vdso = get_direct_vdso_vmo()
+                .map_err(|e| ElfRunnerError::direct_vdso_error(resolved_url.clone(), e))?;
             direct_vdso = Some(vdso);
         }
 
         let (lifecycle_client, lifecycle_server) = match program_config.notify_when_stopped() {
             true => {
-                fidl::endpoints::create_proxy::<LifecycleMarker>().map(|(c, s)| (Some(c), Some(s)))
+                // Creating a channel is not expected to fail.
+                let (client, server) = fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+                (Some(client), Some(server))
             }
-            false => Ok((None, None)),
-        }
-        .map_err(|_| RunnerError::Unsupported)?;
+            false => (None, None),
+        };
         let lifecycle_server = lifecycle_server.map(|s| s.into_channel());
 
-        let job_dup = component_job.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|e| {
-            ElfRunnerError::component_job_duplication_error(resolved_url.clone(), e)
-        })?;
+        let job_dup = component_job
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(|e| ElfRunnerError::job_duplication_failed(resolved_url.clone(), e))?;
 
         let break_on_start = start_info.break_on_start.take();
 
@@ -406,7 +404,7 @@ impl ElfRunner {
 
         let job_koid = component_job
             .get_koid()
-            .map_err(|e| ElfRunnerError::component_job_id_error(resolved_url.clone(), e))?
+            .map_err(|e| ElfRunnerError::job_id_retrieve_failed(resolved_url.clone(), e))?
             .raw_koid();
 
         let runtime_dir = runtime_dir_builder.job_id(job_koid).serve();
@@ -421,42 +419,31 @@ impl ElfRunner {
         }
 
         // Launch the component
-        let (status, process) = launcher
-            .launch(&mut launch_info)
-            .await
-            .map_err(|e| RunnerError::component_launch_error(&*resolved_url, e))?;
-        zx::Status::ok(status).map_err(|s| {
-            RunnerError::component_launch_error(
-                resolved_url.clone(),
-                format_err!("failed to launch component: {}", s),
-            )
+        let (status, process) = launcher.launch(&mut launch_info).await.map_err(|err| {
+            ElfRunnerError::ProcessLauncherFidlError { url: resolved_url.clone(), err }
         })?;
-        let process = process.ok_or(RunnerError::component_launch_error(
-            resolved_url.clone(),
-            format_err!("failed to launch component, no process"),
-        ))?;
+        zx::Status::ok(status).map_err(|status| ElfRunnerError::CreateProcessFailed {
+            url: resolved_url.clone(),
+            status,
+        })?;
+        let process = process.ok_or(ElfRunnerError::NoProcess { url: resolved_url.clone() })?;
         if program_config.has_critical_main_process() {
             job_default()
                 .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &process)
-                .map_err(|s| {
-                    ElfRunnerError::component_critical_marking_error(
-                        resolved_url.clone(),
-                        format_err!("failed to mark process as critical: {}", s),
-                    )
-                })
+                .map_err(|s| ElfRunnerError::process_critical_mark_failed(resolved_url.clone(), s))
                 .expect("failed to set process as critical");
         }
 
         runtime_dir.add_process_id(
             process
                 .get_koid()
-                .map_err(|e| ElfRunnerError::component_process_id_error(resolved_url.clone(), e))?
+                .map_err(|e| ElfRunnerError::process_id_retrieve_failed(resolved_url.clone(), e))?
                 .raw_koid(),
         );
 
         let process_start_time = process
             .info()
-            .map_err(|e| ElfRunnerError::component_process_id_error(resolved_url.clone(), e))?
+            .map_err(|e| ElfRunnerError::process_id_retrieve_failed(resolved_url.clone(), e))?
             .start_time;
         runtime_dir.add_process_start_time(process_start_time);
 

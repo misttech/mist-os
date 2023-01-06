@@ -14,7 +14,7 @@ use {
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
     anyhow::format_err,
     async_trait::async_trait,
-    cm_runner::{Runner, RunnerError},
+    cm_runner::Runner,
     cm_rust::{ComponentDecl, ExposeDecl, UseDecl, ValuesData},
     fidl::prelude::*,
     fidl::{
@@ -409,11 +409,7 @@ impl Runner for MockRunner {
 
             // Trigger a failure if previously requested.
             if state.failing_urls.contains(&resolved_url) {
-                let status = RunnerError::component_launch_error(
-                    resolved_url.clone(),
-                    format_err!("launch error"),
-                )
-                .as_zx_status();
+                let status = zx::Status::UNAVAILABLE;
                 server_end.into_channel().close_with_epitaph(status).unwrap();
                 return;
             }

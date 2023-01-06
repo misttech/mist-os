@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
     fuchsia_async as fasync,
     fuchsia_zircon::sys as zx_sys,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -70,14 +69,14 @@ pub struct ExceptionsStream {
 }
 
 impl ExceptionsStream {
-    pub fn register_with_task<T>(task: &T) -> Result<Self, Error>
+    pub fn register_with_task<T>(task: &T) -> Result<Self, zx::Status>
     where
         T: zx::Task,
     {
         Self::from_channel(task.create_exception_channel()?)
     }
 
-    pub fn from_channel(chan: zx::Channel) -> Result<Self, Error> {
+    pub fn from_channel(chan: zx::Channel) -> Result<Self, zx::Status> {
         Ok(Self { inner: fasync::Channel::from_channel(chan)?, is_terminated: false })
     }
 }
@@ -133,7 +132,7 @@ impl futures::Stream for ExceptionsStream {
 mod tests {
     use {
         super::*,
-        anyhow::{format_err, Context},
+        anyhow::{format_err, Context, Error},
         fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
         fuchsia_component::client as fclient,
         fuchsia_fs, fuchsia_runtime as fruntime,

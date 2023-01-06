@@ -183,7 +183,7 @@ impl<C: Controllable> Controller<C> {
 }
 
 /// An error encountered trying convert Vec<fcrunner::ComponentNamespaceEntry>
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum ComponentNamespaceError {
     #[error("cannot convert directory handle to proxy: {}.", _0)]
     IntoProxy(fidl::Error),
@@ -272,7 +272,7 @@ impl ComponentNamespace {
 }
 
 /// An error encountered trying to launch a component.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum LaunchError {
     #[error("invalid binary path {}", _0)]
     InvalidBinaryPath(String),

@@ -62,49 +62,47 @@ impl ElfProgramConfig {
     ) -> Result<Self, ElfRunnerError> {
         let notify_lifecycle_stop =
             match runner::get_enum(program, STOP_EVENT_KEY, &STOP_EVENT_VARIANTS)
-                .map_err(|_err| ElfRunnerError::program_dictionary_error(STOP_EVENT_KEY, url))?
+                .map_err(|_err| ElfRunnerError::program_key_invalid(STOP_EVENT_KEY, url))?
             {
                 Some("notify") => true,
                 _ => false,
             };
 
         let ambient_mark_vmo_exec = runner::get_bool(program, VMEX_KEY)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(VMEX_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(VMEX_KEY, url))?;
         if ambient_mark_vmo_exec {
             checker.ambient_mark_vmo_exec_allowed()?;
         }
 
         let main_process_critical = runner::get_bool(program, CRITICAL_KEY)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(CRITICAL_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(CRITICAL_KEY, url))?;
         if main_process_critical {
             checker.main_process_critical_allowed()?;
         }
 
-        let create_raw_processes =
-            runner::get_bool(program, CREATE_RAW_PROCESSES_KEY).map_err(|_err| {
-                ElfRunnerError::program_dictionary_error(CREATE_RAW_PROCESSES_KEY, url)
-            })?;
+        let create_raw_processes = runner::get_bool(program, CREATE_RAW_PROCESSES_KEY)
+            .map_err(|_err| ElfRunnerError::program_key_invalid(CREATE_RAW_PROCESSES_KEY, url))?;
         if create_raw_processes {
             checker.create_raw_processes_allowed()?;
         }
 
         let is_shared_process = runner::get_bool(program, SHARED_PROCESS_KEY)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(SHARED_PROCESS_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(SHARED_PROCESS_KEY, url))?;
         if is_shared_process && !create_raw_processes {
-            return Err(ElfRunnerError::component_shared_process_error(url));
+            return Err(ElfRunnerError::shared_process_mark_failed(url));
         }
 
         let use_next_vdso = runner::get_bool(program, USE_NEXT_VDSO_KEY)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(USE_NEXT_VDSO_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(USE_NEXT_VDSO_KEY, url))?;
 
         let use_direct_vdso = runner::get_bool(program, USE_DIRECT_VDSO_KEY)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(USE_DIRECT_VDSO_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(USE_DIRECT_VDSO_KEY, url))?;
 
         let stdout_sink = get_stream_sink(&program, FORWARD_STDOUT_KEY, url)?;
         let stderr_sink = get_stream_sink(&program, FORWARD_STDERR_KEY, url)?;
 
         let environ = runner::get_environ(&program)
-            .map_err(|_err| ElfRunnerError::program_dictionary_error(ENVIRON_KEY, url))?;
+            .map_err(|_err| ElfRunnerError::program_key_invalid(ENVIRON_KEY, url))?;
 
         Ok(ElfProgramConfig {
             notify_lifecycle_stop,
@@ -174,7 +172,7 @@ fn get_stream_sink(
         Ok(Some("log")) => Ok(StreamSink::Log),
         Ok(Some("none")) => Ok(StreamSink::None),
         Ok(None) => Ok(StreamSink::Log),
-        _ => Err(ElfRunnerError::program_dictionary_error(key, url)),
+        _ => Err(ElfRunnerError::program_key_invalid(key, url)),
     }
 }
 
@@ -225,10 +223,10 @@ mod tests {
             Arc::new(RuntimeConfig::default());
     }
 
-    macro_rules! assert_is_program_dictionary_error {
+    macro_rules! assert_is_program_key_invalid {
         ($result:expr, $expected_key:expr) => {
             match $result {
-                Err(ElfRunnerError::ProgramDictionaryError { key, url }) => {
+                Err(ElfRunnerError::ProgramKeyInvalid { key, url }) => {
                     assert_eq!(
                         $expected_key, key,
                         "key for ElfRunnerError doesn't match. Expected {}, got {}",
@@ -241,7 +239,7 @@ mod tests {
                     );
                 }
                 Err(_) => {
-                    assert!(false, "expected error of type ElfRunnerError::ProgramDictionaryError")
+                    assert!(false, "expected error of type ElfRunnerError::ProgramKeyInvalid")
                 }
                 Ok(_) => assert!(false, "expected error value but got Ok(_)"),
             }
@@ -347,7 +345,7 @@ mod tests {
 
         let actual = ElfProgramConfig::parse_and_check(&program, &checker, TEST_URL);
 
-        assert_is_program_dictionary_error!(actual, key);
+        assert_is_program_key_invalid!(actual, key);
     }
 
     fn new_program_stanza(key: &str, value: fdata::DictionaryValue) -> fdata::Dictionary {

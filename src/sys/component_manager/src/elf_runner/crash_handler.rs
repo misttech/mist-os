@@ -21,7 +21,7 @@ pub fn run_exceptions_server(
     moniker: AbsoluteMoniker,
     resolved_url: String,
     crash_records: CrashRecords,
-) -> Result<(), Error> {
+) -> Result<(), zx::Status> {
     let mut task_exceptions_stream =
         task_exceptions::ExceptionsStream::register_with_task(component_job)?;
     fasync::Task::spawn(async move {

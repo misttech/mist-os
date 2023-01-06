@@ -5,10 +5,9 @@
 pub mod component_controller;
 
 use {
-    anyhow::Error, async_trait::async_trait, clonable_error::ClonableError,
-    fidl::endpoints::ServerEnd, fidl::prelude::*, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::stream::StreamExt, thiserror::Error, tracing::warn,
+    async_trait::async_trait, fidl::endpoints::ServerEnd, fidl::prelude::*,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
+    fuchsia_async as fasync, futures::stream::StreamExt, thiserror::Error, tracing::warn,
 };
 
 /// Executes a component instance.
@@ -25,87 +24,6 @@ pub trait Runner: Sync + Send {
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     );
-}
-
-/// Errors produced by `Runner`.
-#[derive(Debug, Error, Clone)]
-pub enum RunnerError {
-    #[error("invalid arguments provided for component with url \"{}\": {}", url, err)]
-    InvalidArgs {
-        url: String,
-        #[source]
-        err: ClonableError,
-    },
-    #[error("unable to load component with url \"{}\": {}", url, err)]
-    ComponentLoadError {
-        url: String,
-        #[source]
-        err: ClonableError,
-    },
-    #[error("runner failed to launch component with url \"{}\": {}", url, err)]
-    ComponentLaunchError {
-        url: String,
-        #[source]
-        err: ClonableError,
-    },
-    #[error("failed to populate the runtime directory: {}", err)]
-    ComponentRuntimeDirectoryError {
-        #[source]
-        err: ClonableError,
-    },
-    #[error("failed to connect to the runner: {}", err)]
-    RunnerConnectionError {
-        #[source]
-        err: ClonableError,
-    },
-    #[error("remote runners unsupported")]
-    Unsupported,
-}
-
-impl RunnerError {
-    pub fn invalid_args(url: impl Into<String>, err: impl Into<Error>) -> RunnerError {
-        RunnerError::InvalidArgs { url: url.into(), err: err.into().into() }
-    }
-
-    pub fn component_load_error(url: impl Into<String>, err: impl Into<Error>) -> RunnerError {
-        RunnerError::ComponentLoadError { url: url.into(), err: err.into().into() }
-    }
-
-    pub fn component_launch_error(url: impl Into<String>, err: impl Into<Error>) -> RunnerError {
-        RunnerError::ComponentLaunchError { url: url.into(), err: err.into().into() }
-    }
-
-    pub fn component_runtime_directory_error(err: impl Into<Error>) -> RunnerError {
-        RunnerError::ComponentRuntimeDirectoryError { err: err.into().into() }
-    }
-
-    pub fn runner_connection_error(err: impl Into<Error>) -> RunnerError {
-        RunnerError::RunnerConnectionError { err: err.into().into() }
-    }
-
-    /// Convert this error into its approximate `fuchsia.component.Error` equivalent.
-    pub fn as_fidl_error(&self) -> fcomponent::Error {
-        match self {
-            RunnerError::InvalidArgs { .. } => fcomponent::Error::InvalidArguments,
-            RunnerError::ComponentLoadError { .. } => fcomponent::Error::InstanceCannotStart,
-            RunnerError::ComponentLaunchError { .. } => fcomponent::Error::InstanceCannotStart,
-            RunnerError::ComponentRuntimeDirectoryError { .. } => fcomponent::Error::Internal,
-            RunnerError::RunnerConnectionError { .. } => fcomponent::Error::Internal,
-            RunnerError::Unsupported { .. } => fcomponent::Error::Unsupported,
-        }
-    }
-
-    /// Convert this error into its approximate `zx::Status` equivalent.
-    pub fn as_zx_status(&self) -> zx::Status {
-        match self {
-            RunnerError::InvalidArgs { .. } => zx::Status::INVALID_ARGS,
-            RunnerError::ComponentLoadError { .. } => zx::Status::UNAVAILABLE,
-            RunnerError::ComponentLaunchError { .. } => zx::Status::UNAVAILABLE,
-            RunnerError::ComponentRuntimeDirectoryError { .. } => zx::Status::INTERNAL,
-            RunnerError::RunnerConnectionError { .. } => zx::Status::INTERNAL,
-            RunnerError::Unsupported { .. } => zx::Status::NOT_SUPPORTED,
-        }
-    }
 }
 
 /// A null runner for components without a runtime environment.

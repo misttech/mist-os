@@ -13,7 +13,6 @@ rustc_library("task-exceptions") {
   deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
   test_deps = [
@@ -23,6 +22,7 @@ rustc_library("task-exceptions") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/sys/lib/library_loader",
+    "//third_party/rust_crates:anyhow",
   ]
 
   sources = [ "src/lib.rs" ]

@@ -38,7 +38,7 @@ impl LegacyComponent {
         // We get the args here because |start_info| is partially moved below,
         // and the rust compiler doesn't allow accessing the program section
         // by reference after that.
-        let args = runner::get_program_args(&start_info).map(|args| Some(args)).unwrap_or(None);
+        let args = runner::get_program_args(&start_info);
 
         // We are going to create a new v1 nested environment that holds the component's incoming
         // svc contents along with fuchsia.sys.Loader. This is because fuchsia.sys.Loader must be
@@ -214,7 +214,7 @@ impl LegacyComponent {
 
         let mut launch_info = fsysv1::LaunchInfo {
             url: legacy_url.clone(),
-            arguments: args,
+            arguments: Some(args),
             out: None,
             err: None,
             directory_request: Some(outgoing_svc_dir_server_end),

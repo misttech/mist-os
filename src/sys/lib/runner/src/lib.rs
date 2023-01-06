@@ -13,15 +13,8 @@ const ARGS_KEY: &str = "args";
 const BINARY_KEY: &str = "binary";
 const ENVIRON_KEY: &str = "environ";
 
-/// An error encountered operating on `ComponentStartInfo`.
-#[derive(Debug, PartialEq, Eq, Error)]
-pub enum StartInfoError {
-    #[error("missing url")]
-    MissingUrl,
-}
-
 /// An error encountered trying to get entry out of `ComponentStartInfo->program`.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum StartInfoProgramError {
     #[error("\"program.binary\" must be specified")]
     MissingBinary,
@@ -49,13 +42,8 @@ pub enum StartInfoProgramError {
 }
 
 /// Retrieves component URL from start_info or errors out if not found.
-pub fn get_resolved_url(
-    start_info: &fcrunner::ComponentStartInfo,
-) -> Result<String, StartInfoError> {
-    match &start_info.resolved_url {
-        Some(url) => Ok(url.to_string()),
-        _ => Err(StartInfoError::MissingUrl),
-    }
+pub fn get_resolved_url(start_info: &fcrunner::ComponentStartInfo) -> Option<String> {
+    start_info.resolved_url.clone()
 }
 
 /// Returns a reference to the value corresponding to the key.
@@ -159,13 +147,12 @@ pub fn get_program_binary(
 }
 
 /// Retrieves program.args from ComponentStartInfo and validates them.
-pub fn get_program_args(
-    start_info: &fcrunner::ComponentStartInfo,
-) -> Result<Vec<String>, StartInfoProgramError> {
+pub fn get_program_args(start_info: &fcrunner::ComponentStartInfo) -> Vec<String> {
+    // TODO(https://fxbug.dev/118831): Do not silently ignore bad types for "args" key
     if let Some(vec) = get_program_strvec(start_info, ARGS_KEY) {
-        Ok(vec.iter().map(|v| v.clone()).collect())
+        vec.iter().map(|v| v.clone()).collect()
     } else {
-        Ok(vec![])
+        vec![]
     }
 }
 
@@ -210,9 +197,9 @@ pub fn get_environ(dict: &fdata::Dictionary) -> Result<Option<Vec<String>>, Star
 mod tests {
     use {super::*, test_case::test_case};
 
-    #[test_case(Some("some_url"), Ok("some_url".to_owned()) ; "when url is valid")]
-    #[test_case(None, Err(StartInfoError::MissingUrl) ; "when url is missing")]
-    fn get_resolved_url_test(maybe_url: Option<&str>, expected: Result<String, StartInfoError>) {
+    #[test_case(Some("some_url"), Some("some_url".to_owned()) ; "when url is valid")]
+    #[test_case(None, None ; "when url is missing")]
+    fn get_resolved_url_test(maybe_url: Option<&str>, expected: Option<String>) {
         let start_info = fcrunner::ComponentStartInfo {
             resolved_url: maybe_url.map(str::to_owned),
             program: None,
@@ -244,13 +231,10 @@ mod tests {
         assert_eq!(get_program_binary(&start_info), Err(StartInfoProgramError::MissingBinary));
     }
 
-    #[test_case(&[], Ok(vec![]) ; "when args is empty")]
-    #[test_case(&["a".to_owned()], Ok(vec!["a".to_owned()]) ; "when args is a")]
-    #[test_case(&["a".to_owned(), "b".to_owned()], Ok(vec!["a".to_owned(), "b".to_owned()]) ; "when args a and b")]
-    fn get_program_args_test(
-        args: &[String],
-        expected: Result<Vec<String>, StartInfoProgramError>,
-    ) {
+    #[test_case(&[], vec![] ; "when args is empty")]
+    #[test_case(&["a".to_owned()], vec!["a".to_owned()] ; "when args is a")]
+    #[test_case(&["a".to_owned(), "b".to_owned()], vec!["a".to_owned(), "b".to_owned()] ; "when args a and b")]
+    fn get_program_args_test(args: &[String], expected: Vec<String>) {
         let start_info = new_start_info(Some(new_program_stanza_with_vec("args", Vec::from(args))));
         assert_eq!(get_program_args(&start_info), expected);
     }

@@ -50,8 +50,8 @@ const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
 /// Error encountered running test component
 #[derive(Debug, Error)]
 pub enum ComponentError {
-    #[error("invalid start info: {:?}", _0)]
-    InvalidStartInfo(runner::StartInfoError),
+    #[error("start info is missing resolved url")]
+    MissingResolvedUrl,
 
     #[error("error for test {}: {:?}", _0, _1)]
     InvalidArgs(String, anyhow::Error),
@@ -103,7 +103,7 @@ impl ComponentError {
     /// Convert this error into its approximate `fuchsia.component.Error` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         let status = match self {
-            Self::InvalidStartInfo(_) => fcomponent::Error::InvalidArguments,
+            Self::MissingResolvedUrl => fcomponent::Error::InvalidArguments,
             Self::InvalidArgs(_, _) => fcomponent::Error::InvalidArguments,
             Self::MissingNamespace(_) => fcomponent::Error::InvalidArguments,
             Self::MissingOutDir(_) => fcomponent::Error::InvalidArguments,
@@ -201,7 +201,7 @@ impl Component {
         F: 'static + Fn(&Vec<String>) -> Result<(), ArgumentError>,
     {
         let url =
-            runner::get_resolved_url(&start_info).map_err(ComponentError::InvalidStartInfo)?;
+            runner::get_resolved_url(&start_info).ok_or(ComponentError::MissingResolvedUrl)?;
         let name = Path::new(&url)
             .file_name()
             .ok_or_else(|| ComponentError::InvalidUrl)?
@@ -209,8 +209,7 @@ impl Component {
             .ok_or_else(|| ComponentError::InvalidUrl)?
             .to_string();
 
-        let args = runner::get_program_args(&start_info)
-            .map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
+        let args = runner::get_program_args(&start_info);
         validate_args(&args).map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
 
         let binary = runner::get_program_binary(&start_info)
@@ -696,7 +695,7 @@ mod tests {
         let (client_controller, server_controller) = endpoints::create_proxy().unwrap();
         let get_test_server = || DummyServer {};
         let err = start_component(start_info, server_controller, get_test_server, |_| Ok(())).await;
-        assert_matches!(err, Err(ComponentError::InvalidStartInfo(_)));
+        assert_matches!(err, Err(ComponentError::MissingResolvedUrl));
         let expected_status = zx::Status::from_raw(
             fcomponent::Error::InvalidArguments.into_primitive().try_into().unwrap(),
         );
