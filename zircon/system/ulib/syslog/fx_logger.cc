@@ -183,8 +183,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
       snprintf(fmt_string + kFormatStringLength - 1 - kEllipsisSize, kEllipsisSize, kEllipsis);
     }
 
-    // TODO(fxbug.dev/72675): Pass file/line info regardless of severity in all cases.
-    // This is currently only enabled for drivers.
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
@@ -233,8 +231,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
       snprintf(fmt_string + kFormatStringLength - 1 - kEllipsisSize, kEllipsisSize, kEllipsis);
     }
 
-    // TODO(fxbug.dev/72675): Pass file/line info regardless of severity in all cases.
-    // This is currently only enabled for drivers.
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
