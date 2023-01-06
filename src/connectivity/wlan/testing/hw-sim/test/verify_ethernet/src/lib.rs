@@ -17,7 +17,7 @@ async fn verify_ethernet() {
     init_syslog();
 
     // Make sure there is no existing ethernet device.
-    let client = netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+    let client = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
         octets: CLIENT_MAC_ADDR.clone(),
     })
     .await;
@@ -29,11 +29,10 @@ async fn verify_ethernet() {
 
     let mut retry = test_utils::RetryWithBackoff::infinite_with_max_interval(5.seconds());
     loop {
-        let client =
-            netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
-                octets: CLIENT_MAC_ADDR.clone(),
-            })
-            .await;
+        let client = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
+            octets: CLIENT_MAC_ADDR.clone(),
+        })
+        .await;
         if client.is_some() {
             break;
         }

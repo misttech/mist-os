@@ -117,12 +117,11 @@ async fn ethernet_tx_rx() {
     )
     .await;
 
-    let (client, mut port) =
-        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
-            octets: CLIENT_MAC_ADDR.clone(),
-        })
-        .await
-        .expect("failed to create netdevice client");
+    let (client, mut port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
+        octets: CLIENT_MAC_ADDR.clone(),
+    })
+    .await
+    .expect("failed to create netdevice client");
     let (mut session, _task) = netdevice_helper::start_session(client, port).await;
     verify_tx_and_rx(&mut session, &mut port, &mut helper).await;
 

@@ -258,17 +258,16 @@ async fn verify_ethernet_in_both_directions(
     ap_helper: &mut test_utils::TestHelper,
 ) {
     let (client_netdevice, client_port) =
-        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
+        netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
             octets: CLIENT_MAC_ADDR.clone(),
         })
         .await
         .expect("failed to create netdevice client for client");
-    let (ap_netdevice, ap_port) =
-        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
-            octets: AP_MAC_ADDR.0.clone(),
-        })
-        .await
-        .expect("failed to create netdevice client for AP");
+    let (ap_netdevice, ap_port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
+        octets: AP_MAC_ADDR.0.clone(),
+    })
+    .await
+    .expect("failed to create netdevice client for AP");
 
     let (client_session, _client_task) =
         netdevice_helper::start_session(client_netdevice, client_port).await;

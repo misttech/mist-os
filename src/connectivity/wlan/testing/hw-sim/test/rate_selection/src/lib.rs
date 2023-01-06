@@ -98,12 +98,11 @@ async fn eth_and_beacon_sender<'a>(
     receiver: &'a mut mpsc::Receiver<bool>,
     phy: &'a WlantapPhyProxy,
 ) -> Result<(), Error> {
-    let (client, port) =
-        netdevice_helper::create_client(fidl_fuchsia_hardware_ethernet_ext::MacAddress {
-            octets: CLIENT_MAC_ADDR.clone(),
-        })
-        .await
-        .expect("failed to create netdevice client");
+    let (client, port) = netdevice_helper::create_client(fidl_fuchsia_net::MacAddress {
+        octets: CLIENT_MAC_ADDR.clone(),
+    })
+    .await
+    .expect("failed to create netdevice client");
     let (session, _task) = netdevice_helper::start_session(client, port).await;
 
     let mut buf: Vec<u8> = vec![];

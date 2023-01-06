@@ -14,7 +14,7 @@ const NETDEV_DIRECTORY: &str = "/dev/class/network";
 
 /// Returns a Netdevice client with the specified MAC address, or None if none is found.
 pub async fn create_client(
-    mac: fidl_fuchsia_hardware_ethernet_ext::MacAddress,
+    mac: fidl_fuchsia_net::MacAddress,
 ) -> Option<(netdevice_client::Client, netdevice_client::Port)> {
     let (directory, directory_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_io::DirectoryMarker>().expect("create proxy");
