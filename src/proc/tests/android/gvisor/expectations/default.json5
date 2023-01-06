@@ -12,6 +12,34 @@
         {
             type: "expect_failure",
             matchers: [
+                // affinity_test
+                "AffinityTest.SchedSetAffinityInvalidPID",
+                "AffinityTest.SchedSetAffinityZeroMask",
+                "AffinityTest.SchedSetAffinityNonexistentCPUDropped",
+                "AffinityTest.LargeCpuMask",
+                "AffinityTest.NewThread",
+                "AffinityTest.SchedGetAffinityInvalidPID",
+                "AffinityTest.ConsistentWithProcCpuInfo",
+                "AffinityTest.ConsistentWithProcStat",
+                "AffinityTest.Sanity",
+                "AffinityTest.SchedSetAffinityInvalidSize",
+
+                // aio_test
+                "AIOTest.BasicWrite",
+                "AIOTest.MremapExpansion",
+                "AIOTest.BadWrite",
+                "BadOffset/AIOReadWriteParamTest.BadOffset/3",
+                "AIOTest.ExitWithPendingIo",
+                "AIOTest.Mprotect",
+                "AIOTest.Mremap",
+                "AIOTest.Timeout",
+                "AIOTest.CloneVm",
+                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/0",
+                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/1",
+                "BadOffset/AIOReadWriteParamTest.BadOffset/1",
+                "BadOffset/AIOReadWriteParamTest.BadOffset/0",
+                "BadOffset/AIOReadWriteParamTest.BadOffset/2",
+
                 // chroot_test
                 "ChrootTest.PermissionDenied",
                 "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
@@ -23,6 +51,21 @@
                 "Sleepers/WallClockNanosleepTest.InterruptedNanosleep/*",
                 "Sleepers/WallClockNanosleepTest.UninterruptedNanosleep/0",
                 "Sleepers/WallClockNanosleepTest.SleepUntil/0",
+
+                // close_range_test
+                "CloseRangeTest.RangeWithHoles",
+                "CloseRangeTest.CloexecFlagTest",
+                "CloseRangeTest.RangeInMiddleOfOpenFiles",
+                "CloseRangeTest.InvalidFlags",
+                "CloseRangeTest.SingleFile",
+                "CloseRangeTest.UnshareFlagAndCloseRangeAtStart",
+                "CloseRangeTest.CloexecAndUnshareFlagTest",
+                "CloseRangeTest.RangeFirstGreaterThanLast",
+                "CloseRangeTest.UnshareFlagAndCloseRangeAtEnd",
+                "CloseRangeTest.CallCloseRangeTwice",
+                "CloseRangeTest.UnshareFlagTest",
+                "CloseRangeTest.ContiguousRange",
+                "CloseRangeTest.ConcurrentCalls",
 
                 // dev_test
                 "DevTest.OpenDevFuse",
@@ -70,9 +113,40 @@
                 "ExecveatTest.InvalidFlags",
                 "GetpriorityTest.ExecveMaintainsPriority",
 
+                // exec_binary_test
+                "InterpreterScriptTest.UncleanPath",
+                "ElfTest.MissingHeader",
+                "ElfTest.OutOfBoundsPhdrs",
+                "InterpreterScriptTest.Execute",
+                "InterpreterScriptTest.InterpreterScriptNoExecute",
+                "InterpreterScriptTest.Whitespace",
+                "InterpreterScriptTest.BinaryNoExecute",
+                "InterpreterScriptTest.MaxRecursion",
+                "InterpreterScriptTest.RelativePath",
+                "InterpreterScriptTest.Symlink",
+                "ExecveTest.SymlinkLoop",
+                "InterpreterScriptTest.SymlinkLoop",
+                "ExecveTest.Directory",
+
                 // exit_test
                 "ExitTest.SigkillZombieGroup",
                 "ExitTest.SigkillZombieThread",
+
+                // fadvise64_test
+                "FAdvise64Test.FAdvise64WithOpath",
+                "FAdvise64Test.Basic",
+                "FAdvise64Test.InvalidArgs",
+                "FAdvise64Test.NoPipes",
+
+                // fallocate_test
+                "AllocateTest.FallocateWithOpath",
+                "AllocateTest.Fallocate",
+                "AllocateTest.FallocateInvalid",
+                "AllocateTest.FallocateReadonly",
+                "AllocateTest.FallocatePipe",
+                "AllocateTest.FallocateChar",
+                "AllocateTest.FallocateRlimit",
+                "AllocateTest.FallocateOtherFDs",
 
                 // fcntl_test
                 "FcntlTest.SetFileStatusFlagWithOpath",
@@ -127,6 +201,13 @@
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
 
+                // fpsig_fork_test
+                "FPSigTest.ForkWithZeroMxcsr",
+                "FPSigTest.Fork",
+
+                // fpsig_nested_test
+                "FPSigTest.NestedSignals",
+
                 // futex_test
                 "PrivateFutexTest.WakeOp0Set",
                 "PrivateFutexTest.WakeOp0Add",
@@ -138,8 +219,113 @@
                 "SharedPrivate/PrivateAndSharedFutexTest.PIWaiters/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.PITryLock/*",
 
+                // getcpu_host_test and getcpu_test
+                "GetcpuTest.IsValidCpuStress",
+
                 // getdents_test
                 "ReaddirTest.RootContainsBasicDirectories",
+
+                // getrusage_test
+                "GetrusageTest.Grandchild",
+                "GetrusageTest.BasicFork",
+                "GetrusageTest.Wait4",
+                "GetrusageTest.IgnoreSIGCHLD",
+                "GetrusageTest.IgnoreZombie",
+
+                // inotify_test
+                "Inotify.AddWatchOnInvalidPathFails",
+                "Inotify.ReadingFileGeneratesAccessEvent",
+                "Inotify.IllegalPwrite",
+                "Inotify.MultipleInotifyInstancesAndWatchesAllGetEvents",
+                "Inotify.RemovingWatchGeneratesEvent",
+                "Inotify.AddWatchOnInvalidFdFails",
+                "Inotify.RemoveWatchAfterDeletingFileFails",
+                "Inotify.DuplicateWatchRemovalFails",
+                "Inotify.CreatingFileGeneratesEvents",
+                "Inotify.DeletingChildGeneratesEvents",
+                "Inotify.InOnlyDirFlagRespected",
+                "Inotify.WritingFileGeneratesModifyEvent",
+                "Inotify.SizeZeroReadWriteGeneratesNothing",
+                "Inotify.FailedFileCreationGeneratesNoEvents",
+                "Inotify.MaskAddMergesWithExistingEventMask",
+                "Inotify.MoveWatchedTargetGeneratesEvents",
+                "Inotify.RmdirOnWatchedTargetGeneratesEvent",
+                "Inotify.ChildrenDeletionInWatchedDirGeneratesEvent",
+                "Inotify.CoalesceEvents",
+                "Inotify.DupFD",
+                "Inotify.NestedWatches",
+                "Inotify.ZeroLengthReadWriteDoesNotGenerateEvent",
+                "Inotify.ConcurrentThreadsGeneratingEvents",
+                "Inotify.ChmodGeneratesAttribEvent",
+                "Inotify.TruncateGeneratesModifyEvent",
+                "Inotify.GetdentsGeneratesAccessEvent",
+                "Inotify.SymlinkGeneratesCreateEvent",
+                "Inotify.SymlinkFollow",
+                "Inotify.UtimesGeneratesAttribEvent",
+                "Inotify.HardlinksReuseSameWatch",
+                "Inotify.MkdirGeneratesCreateEventWithDirFlag",
+                "Inotify.EventsGoUpAtMostOneLevel",
+                "Inotify.DuplicateWatchReturnsSameWatchDescriptor",
+                "Inotify.UnmatchedEventsAreDiscarded",
+                "Inotify.WatchSetAfterOpenReportsCloseFdEvent",
+                "Inotify.WatchOnRelativePath",
+                "Inotify.LinkGeneratesAttribAndCreateEvents",
+                "Inotify.MoveGeneratesEvents",
+                "Inotify.MknodGeneratesCreateEvent",
+                "Inotify.AddWatchWithInvalidEventMaskFails",
+                "Inotify.ControlEvents",
+                "Inotify.KernfsBasic",
+                "Inotify.OneShot",
+                "Inotify.ExcludeUnlinkInodeEvents",
+                "Inotify.ExcludeUnlinkDirectory",
+                "Inotify.LinkOnOtherParent",
+                "Inotify.ExcludeUnlink",
+                "Inotify.Fallocate",
+                "Inotify.IncludeUnlinkedFile",
+                "Inotify.SpliceOnWatchTarget",
+                "Inotify.ExcludeUnlinkMultipleChildren",
+                "Inotify.Sendfile",
+                "Inotify.Utimensat",
+                "Inotify.Exec",
+
+                // ioctl_test
+                "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoArrayGetsLength/*",
+                "IoctlTest.FIONBIOFails",
+                "IoctlTest.IoctlWithOpath",
+                "IoctlTest.FIOCLEXSucceeds",
+                "IoctlTest.FIONCLEXSucceeds",
+                "IoctlTest.FIOASYNCFails",
+                "IoctlTest.FIOASYNCSucceeds",
+                "IoctlTest.FIOASYNCNoTarget",
+                "IoctlTest.FIOASYNCSelfTarget",
+                "IoctlTest.FIOASYNCSelfTarget2",
+                "IoctlTest.FIOASYNCSelfTargetClose",
+                "IoctlTest.FIOASYNCInvalidPID",
+                "IoctlTest.FIOASYNCUnsetTarget",
+                "IoctlTest.FIOGETOWNSucceeds",
+                "IoctlTest.SIOCGPGRPSucceeds",
+                "IoctlTest.FIONBIOSucceeds",
+                "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoPartialIfrsReturned/*",
+                "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNestedPointerCheck/*",
+                "IoctlTest/IoctlTestSIOCGIFCONF.ValidateLoopbackIsPresent/*",
+                "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoArrayGetsLength/*",
+
+                // iptables_test
+                "IPTablesBasic.GetRevision",
+                "IPTablesBasic.GetInfoErrorPrecedence",
+                "IPTablesTest.InitialState",
+                "IPTablesBasic.OriginalDstErrors",
+                "IPTablesBasic.GetEntriesErrorPrecedence",
+
+                // ip6tables_test
+                "IP6TablesBasic.GetRevision",
+                "IP6TablesBasic.GetEntriesErrorPrecedence",
+                "IP6TablesBasic.GetInfoErrorPrecedence",
+                "IP6TablesTest.InitialInfo",
+
+                // itimer_test
+                "ItimerTest.ItimervalUpdatedBeforeExpiration",
+                "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
 
                 // lseek_test
                 "LseekTest.ProcFile",
@@ -170,8 +356,51 @@
                 "MemfdTest.TmpfsFilesHaveSealSeal",
                 "MemfdTest.MemfdMustBeWritableToModifySeals",
 
+                // memory_accounting_test
+                "MemoryAccounting.AnonAccountingPreservedOnSaveRestore",
+
+                // mempolicy_test
+                "MempolicyTest.CheckDefaultPolicy",
+                "MempolicyTest.PolicyPreservedAfterSetMempolicy",
+                "MempolicyTest.EmptyNodemaskOnSet",
+                "MempolicyTest.QueryAvailableNodes",
+                "MempolicyTest.GetMempolicyQueryNodeForAddress",
+                "MempolicyTest.GetMempolicyCanOmitPointers",
+                "MempolicyTest.SetMempolicyRejectsInvalidInputs",
+                "MempolicyTest.Mbind",
+                "MempolicyTest.GetMempolicyNextInterleaveNode",
+
+                // mincore_test
+                "MincoreTest.DirtyAnonPagesAreResident",
+                "MincoreTest.UnalignedAddressFails",
+                "MincoreTest.UnalignedLengthSucceedsAndIsRoundedUp",
+                "MincoreTest.ZeroLengthSucceedsAndAllowsAnyVecBelowTaskSize",
+                "MincoreTest.InvalidLengthFails",
+
                 // mkdir_test - https://fxbug.dev/79298
                 "MkdirTest.DirAlreadyExists",
+
+                // mlock_test
+                "MlockTest.Basic",
+                "MapLockedTest.Basic",
+                "MapLockedTest.RlimitMemlockZero",
+                "MlockTest.MsyncInvalidate",
+                "MlockTest.ProtNone",
+                "MlockTest.Fork",
+                "MlockTest.RlimitMemlockZero",
+                "MunlockTest.Basic",
+                "MlockTest.RlimitMemlockInsufficient",
+                "MunlockTest.NotLocked",
+                "MlockallTest.Future",
+                "MunlockallTest.Basic",
+                "Mlock2Test.NoFlags",
+                "MapLockedTest.RlimitMemlockInsufficient",
+                "MremapLockedTest.Basic",
+                "Mlock2Test.UnknownFlags",
+                "MremapLockedTest.RlimitMemlockZero",
+                "Mlock2Test.MlockOnfault",
+                "MremapLockedTest.RlimitMemlockInsufficient",
+                "MlockTest.MadviseDontneed",
 
                 // mmap_test
                 "MMapDeathTest.TruncateAfterCOWBreak",
@@ -247,6 +476,79 @@
                 // for processes.
                 "MremapDeathTest.SharedAnon",
 
+                // msgqueue_test
+                "MsgqueueTest.MsgCtlIpcSet",
+                "MsgqueueTest.MsgOpTruncate",
+                "MsgqueueTest.MsgCtlIpcStatWriteOnly",
+                "MsgqueueTest.MsgOpInvalidArgs",
+                "MsgqueueTest.MsgGetFail",
+                "MsgqueueTest.MsgOpNoMsg",
+                "MsgqueueTest.MsgGetIpcPrivate",
+                "MsgqueueTest.MsgOpNoMsgType",
+                "MsgqueueTest.MsgOpTooBig",
+                "MsgqueueTest.MsgOpSimple",
+                "MsgqueueTest.MsgExcept",
+                "MsgqueueTest.MsgRcvType",
+                "MsgqueueTest.MsgRcvTypeNegative",
+                "MsgqueueTest.MsgOpLimits",
+                "MsgqueueTest.MsgOpPermissions",
+                "MsgqueueTest.MsgRcvTypeBlocking",
+                "MsgqueueTest.MsgRcvBlocking",
+                "MsgqueueTest.MsgSndRmWhileBlocking",
+                "MsgqueueTest.MsgSndBlocking",
+                "MsgqueueTest.InterruptRecv",
+                "MsgqueueTest.MsgRcvRmWhileBlocking",
+                "MsgqueueTest.InterruptSend",
+                "MsgqueueTest.MsgCtlIpcSetMaxBytes",
+                "MsgqueueTest.MsgCtlMsgInfo",
+                "MsgqueueTest.MsgOpEmpty",
+                "MsgqueueTest.MsgGet",
+                "MsgqueueTest.MsgOpGeneral",
+                "MsgqueueTest.MsgCtlIpcInfo",
+                "MsgqueueTest.MsgCtlIpcStat",
+
+                // msync_test
+                "All/MsyncNoFlagsTest.BothSyncAndAsyncFails/*",
+
+                // network_namespace_test
+                "NetworkNamespaceTest.LoopbackExists",
+
+                // packet_socket_dgram_test
+                "BasicCookedPacketTest.WrongType",
+                "AllInetTests/CookedPacketTest.Receive/*",
+                "AllInetTests/CookedPacketTest.Send/*",
+                "AllInetTests/CookedPacketTest.BindReceive/*",
+                "AllInetTests/CookedPacketTest.DoubleBindSucceeds/*",
+                "AllInetTests/CookedPacketTest.BindDrop/*",
+                "AllInetTests/CookedPacketTest.BindFail/*",
+                "AllInetTests/CookedPacketTest.ReceiveOutbound/*",
+
+                // packet_socket_raw_test
+                "AllInetTests/RawPacketTest.SetAndGetSocketLinger/*",
+                "AllInetTests/RawPacketTest.SetSocketRecvBufBelowMin/*",
+                "AllInetTests/RawPacketTest.Send/*",
+                "AllInetTests/RawPacketTest.SetSocketRecvBufAboveMax/*",
+                "AllInetTests/RawPacketTest.SetSocketSendBufBelowMin/*",
+                "AllInetTests/RawPacketTest.SetSocketSendBufAboveMax/*",
+                "AllInetTests/RawPacketTest.SetSocketSendBuf/*",
+                "AllInetTests/RawPacketTest.GetSocketError/*",
+                "AllInetTests/RawPacketTest.GetSocketErrorBind/*",
+                "AllInetTests/RawPacketTest.SetSocketRecvBuf/*",
+                "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
+                "AllInetTests/RawPacketTest.GetSocketDetachFilter/*",
+                "AllInetTests/RawPacketTest.GetSocketAcceptConn/*",
+                "AllInetTests/RawPacketTest.Receive/*",
+                "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SendTooLong/*",
+                "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SpliceTooLong/*",
+
+                // packet_socket_test
+                "AllPacketSocketTests/PacketSocketCreationTest.Create/*",
+                "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
+                "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
+
+                // pause_test
+                "PauseTest.OnlyReturnsWhenSignalHandled",
+
                 // ping_socket_test
                 "PingSocket.PayloadTooLarge",
                 "PingSocket.ReceiveTOS",
@@ -267,6 +569,24 @@
                 "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllRouters",
                 "PingSockets/Fixture.Bind/ICMP_socket_IPv6UnknownUnicast",
 
+                // pivot_root_test
+                "PivotRootTest.WithoutCapability",
+                "PivotRootTest.OnSharedPutOldMountpoint",
+                "PivotRootTest.NotDir",
+                "PivotRootTest.NewRootNotAMountpoint",
+                "PivotRootTest.OnSharedNewRoot",
+                "PivotRootTest.Success",
+                "PivotRootTest.OnSharedNewRootParent",
+                "PivotRootTest.PutOldNotUnderNewRoot",
+                "PivotRootTest.CurrentRootNotAMountPoint",
+                "PivotRootTest.NotExist",
+                "PivotRootTest.NewRootOnRootMount",
+                "PivotRootTest.DotDot",
+                "PivotRootTest.CreatesNewRoot",
+                "PivotRootTest.OnRootFS",
+                "PivotRootTest.ChangesCwdForAllProcesses",
+                "PivotRootTest.MovesOldRoot",
+
                 // poll_test - https://fxbug.dev/79315
                 "PollTest.NonBlockingEventPOLLRDNORM",
                 "PollTest.NonBlockingEventPOLLRDNORM_POLLIN",
@@ -283,6 +603,24 @@
 
                 // SignalMask[Blocks/Allows]Signal require timers to send signals.
                 "PpollTest.SignalMaskBlocksSignal",
+
+                // prctl_setuid_test
+                "PrctlKeepCapsSetuidTest.PrctlBadArgsToKeepCaps",
+                "PrctlKeepCapsSetuidTest.SetUidNoKeepCaps",
+                "PrctlKeepCapsSetuidTest.NoKeepCapsAfterExec",
+                "PrctlKeepCapsSetuidTest.SetUidKeepCaps",
+                "PrctlKeepCapsSetuidTest.NoKeepCapsAfterNewUserNamespace",
+                "PrctlKeepCapsSetuidTest.PrGetKeepCaps",
+
+                // prctl_test
+                "PrctlTest.InvalidPrSetMM",
+                "PrctlTest.NoNewPrivsPreservedAcrossCloneForkAndExecve",
+                "PrctlTest.PDeathSig",
+                "PrctlTest.RootDumpability",
+
+                // processes_test
+                "Processes.ExecSwapThreadGroupLeader",
+                "Processes.SetPGIDOfZombie",
 
                 // proc_test
                 "ProcSelfAuxv.EntryPresence",
@@ -349,8 +687,102 @@
                 "SelfAndNumericPid/ProcPidStatTest.HasBasicFields/*",
                 "SelfAndNumericPid/ProcPidStatmTest.HasBasicFields/*",
 
+                // proc_isolated_test
+                "ProcDefaults.PresenceOfSem",
+                "ProcDefaults.PresenceOfShmMaxMniAll",
+                "ProcDefaults.PresenceOfMsgMniMaxMnb",
+
+                // proc_net_tcp_test
+                "ProcNetTCP.Exists",
+                "ProcNetTCP6.Exists",
+                "ProcNetTCP6.State",
+                "ProcNetTCP.State",
+                "ProcNetTCP.EntryUID",
+                "ProcNetTCP6.EntryUID",
+                "ProcNetTCP.InodeReasonable",
+                "ProcNetTCP6.BindAcceptConnect",
+                "ProcNetTCP.BindAcceptConnect",
+                "ProcNetTCP6.InodeReasonable",
+
+                // proc_net_test
+                "ProcNetSymlink.FileMode",
+                "ProcNetIfInet6.Format",
+                "ProcNetSymlinkTarget.FileMode",
+                "ProcNetSymlink.Contents",
+                "ProcSysNetIpv4Sack.Exists",
+                "ProcNetDev.Format",
+                "ProcNetSnmp.TcpReset",
+                "ProcNetSnmp.TcpEstab",
+                "ProcNetSnmp.UdpNoPorts",
+                "ProcNetSnmp.UdpIn",
+                "ProcNetSnmp.Stat",
+                "ProcSysNetIpv4Recovery.Exists",
+                "ProcSysNetIpv4IpForward.Exists",
+                "ProcSysNetIpv4IpForward.DefaultValueEqZero",
+                "ProcSysNetPortRange.CanReadAndWrite",
+                "ProcSysNetIpv4IpForward.CanReadAndWrite",
+                "ProcSysNetIpv4Sack.CanReadAndWrite",
+                "ProcSysNetIpv4Recovery.CanReadAndWrite",
+
+                // proc_net_udp_test
+                "ProcNetUDP.Exists",
+                "ProcNetUDP.BoundSocketStateClosed",
+                "ProcNetUDP.BoundEntry",
+                "ProcNetUDP.FindMutualEntries",
+                "ProcNetUDP.EntryUID",
+                "ProcNetUDP.ConnectedSocketStateEstablished",
+                "ProcNetUDP.EntriesRemovedOnClose",
+
+                // proc_net_unix_test
+                "ProcNetUnix.Exists",
+                "ProcNetUnix.DgramSocketStateDisconnectingOnBind",
+                "ProcNetUnix.AbstractBindAcceptConnect",
+                "ProcNetUnix.SocketPair",
+                "ProcNetUnix.StreamSocketStateStateConnectedOnAccept",
+                "ProcNetUnix.StreamSocketStateUnconnectedOnBind",
+                "ProcNetUnix.StreamSocketStateStateUnconnectedOnListen",
+                "ProcNetUnix.FilesystemBindAcceptConnect",
+                "ProcNetUnix.DgramSocketStateConnectingOnConnect",
+
+                // proc_pid_oomscore_test
+                "ProcPidOomscoreTest.BasicRead",
+                "ProcPidOomscoreAdjTest.BasicWrite",
+                "ProcPidOomscoreAdjTest.BasicRead",
+
+                // proc_pid_smaps_test
+                "ProcPidSmapsTest.PrivateAnon",
+                "ProcPidSmapsTest.SharedAnon",
+                "ProcPidSmapsTest.SharedReadOnlyFile",
+                "ProcPidSmapsTest.GvisorFields",
+
+                // proc_pid_uid_gid_map_test
+                "All/ProcSelfUidGidMapTest.TrailingNewlineAndNULIgnored/UID",
+                "All/ProcSelfUidGidMapTest.IsInitiallyEmpty/UID",
+                "All/ProcSelfUidGidMapTest.MapOtherID/UID",
+                "All/ProcPidUidGidMapTest.MapOtherIDPrivileged/GID",
+                "All/ProcSelfUidGidMapTest.IsInitiallyEmpty/GID",
+                "All/ProcSelfUidGidMapTest.NonIdentityMapOwnID/UID",
+                "All/ProcSelfUidGidMapTest.TrailingNewlineAndNULIgnored/GID",
+                "All/ProcSelfUidGidMapTest.NonIdentityMapOwnID/GID",
+                "All/ProcSelfUidGidMapTest.IdentityMapOwnID/UID",
+                "All/ProcSelfUidGidMapTest.MapOtherID/GID",
+                "All/ProcPidUidGidMapTest.MapOtherIDPrivileged/UID",
+                "All/ProcPidUidGidMapTest.MapAnyIDsPrivileged/GID",
+                "All/ProcPidUidGidMapTest.MapAnyIDsPrivileged/UID",
+                "All/ProcSelfUidGidMapTest.IdentityMapOwnID/GID",
+
                 // pselect_test
                 "PselectTest.SignalMaskBlocksSignal", // maybe flaky
+
+                // readahead_test
+                "ReadaheadTest.WriteOnly",
+                "ReadaheadTest.UnsupportedFile",
+                "ReadaheadTest.ValidOffset",
+                "ReadaheadTest.PastEnd",
+                "ReadaheadTest.InvalidOffset",
+                "ReadaheadTest.InvalidFD",
+                "ReadaheadTest.InvalidSize",
+                "ReadaheadTest.CrossesEnd",
 
                 // readv_test
                 "ReadvTestNoFixture.TruncatedAtMax",
@@ -361,8 +793,38 @@
                 "RenameTest.FailsWhenNewParentNotWritable",
                 "RenameTest.OverwriteFailsWhenNewParentNotWritable",
 
+                // rlimits_test
+                "RlimitTest.UnprivilegedSetRlimit",
+                "RlimitTest.SetRlimitHigher",
+                "RlimitTest.SetSoftRlimitAboveHard",
+                "RlimitTest.RlimitNProc",
+
+                // rtsignal_test
+                "RtSignalTest.InvalidCodes",
+                "RtSignalTest.SignoMatch",
+                "RtSignalTest.ValueDelivered",
+
+                // sched_test
+                "SchedGetparamTest.InvalidPIDReturnsEINVAL",
+                "SchedGetparamTest.ImpossiblePIDReturnsESRCH",
+                "SchedGetschedulerTest.ReturnsESRCH",
+                "SchedGetparamTest.NullParamReturnsEINVAL",
+                "SchedGetschedulerTest.ReturnsEINVAL",
+
+                // seccomp_test
+                "SeccompTest.SeccompRejectsUnknownFlags",
+                "SeccompTest.RetErrnoReturnsErrno",
+                "SeccompTest.TsyncAppliesToAllThreads",
+                "SeccompTest.LeastPermissiveFilterReturnValueApplies",
+                "SeccompTest.RetTrapCausesSIGSYS",
+                "SeccompTest.RetKillCausesDeathBySIGSYS",
+                "SeccompTest.FiltersPreservedAcrossForkAndExecve",
+
                 // select_test
                 "SelectTest.SetrlimitCallNOFILE",
+
+                // sendfile_socket_test
+                "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/*",
 
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
@@ -381,6 +843,35 @@
                 "AbstractUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "AbstractUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
+                // socket_bind_to_device_sequence_test
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindTwiceWithDeviceFails/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindWithDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindToDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.MixingReuseAndNotReuseByBindingToDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.CannotBindTo0AfterMixingReuseAndNotReuse/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindToDeviceAndThenWithoutDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindingWithReuseAndDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindWithoutDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindAndRelease/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindWithReuseAddr/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindTwiceWithReuseOnce/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindWithReuse/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.BindAndReleaseDifferentDevice/*",
+                "BindToDeviceTest/BindToDeviceSequenceTest.CannotBindTo0AfterMixingReuseAddrAndNotReuseAddr/*",
+
+                // socket_bind_to_device_test
+                "BindToDeviceTest/BindToDeviceTest.GetsockoptDefault/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptInvalidDeviceName/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptValidDeviceNameWithoutNullTermination/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptValidThenClear/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptValidThenClearWithNull/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptValidDeviceNameWithNullTermination/*",
+                "BindToDeviceTest/BindToDeviceTest.GetsockoptDevice/*",
+                "BindToDeviceTest/BindToDeviceTest.SetsockoptValidThenInvalid/*",
+
+                // socket_capability_test
+                "SocketTest.UnixConnectNeedsWritePerm",
+
                 // socket_domain_test
                 // TODO: same name of test in socket_ip_tcp_loopback_test that passes
 
@@ -391,6 +882,21 @@
                 "FilesystemUnixSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*",
                 "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
+
+                // socket_inet_loopback_isolated_test
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/TCP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/TCP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/TCP",
+
+                // socket_inet_loopback_nogotsan_test
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.UDPBindMayBindOtherBoundPortsReuseAddr/UDP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.TCPBindAvoidsOtherBoundPortsReuseAddr/TCP",
 
                 // socket_ip_tcp_loopback_test
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
@@ -407,11 +913,35 @@
                 "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
 
+                // socket_ip_unbound_netlink_test
+                "IPUnboundSockets/IPv4UnboundSocketTest.ConnectToBadLocalAddress/*",
+                "IPUnboundSockets/IPv6UnboundSocketTest.ConnectToBadLocalAddress/*",
+
                 // socket_ipv4_datagram_based_socket_unbound_loopback_test
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetShort/*",
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNicGetReqn/*",
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNic/*",
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.TestMultipleJoinsOnSingleSocket/*",
+
+                // socket_ipv4_udp_unbound_loopback_nogotsan_test
+                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
+
+                // socket_ipv6_udp_unbound_external_networking_test
+                "IPv6UDPUnboundSockets/IPv6UDPUnboundExternalNetworkingSocketTest.TestJoinLeaveMulticast/*",
+
+                // socket_ipv6_udp_unbound_loopback_test
+                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
+                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.IPv6PacketInfo/*",
+
+                // socket_netdevice_test
+                "NetdeviceTest.InterfaceName",
+                "NetdeviceTest.InterfaceQLEN",
+                "NetdeviceTest.Netmask",
+                "NetdeviceTest.InterfaceMTU",
+                "NetdeviceTest.EthtoolGetTSInfo",
+                "NetdeviceTest.Loopback",
+                "NetdeviceTest.InterfaceFlags",
 
                 // socket_netlink_route_test
                 "NetlinkRouteTest.GetLinkDump",
@@ -432,6 +962,17 @@
                 "NetlinkRouteTest.RecvmsgTrunc",
                 "NetlinkRouteTest.RecvmsgTruncPeek",
                 "NetlinkRouteTest.PasscredCreds",
+
+                // socket_netlink_uevent
+                "NetlinkUeventTest.AttachFilter",
+                "NetlinkUeventTest.DetachNoFilter",
+
+                // socket_stress_test
+                "AllConnectedSockets/ConnectStressTest.TooManyOpen/*",
+                "AllConnectedSockets/PersistentListenerConnectStressTest.Close/*",
+                "AllConnectedSockets/ConnectStressTest.Reset/*",
+                "AllConnectedSockets/PersistentListenerConnectStressTest.ShutdownCloseFirst/*",
+                "AllConnectedSockets/PersistentListenerConnectStressTest.ShutdownCloseSecond/*",
 
                 // socket_unix_pair_test - https://fxbug.dev/79408
                 "AllUnixDomainSockets/UnixSocketPairTest.NetdeviceIoctlsSucceed/*",
@@ -463,6 +1004,29 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
                 "AllUnixDomainSockets/UnboundUnixStreamSocketPairTest.SendtoWithoutConnect/*",
 
+                // splice_test
+                "SpliceTest.TwoRegularFiles",
+                "SpliceTest.FromPipeMaxFileSize",
+                "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
+                "SpliceTest.PipeOffsets",
+                "SpliceTest.SamePipe",
+                "SpliceTest.ToPipeEOF",
+                "SpliceTest.NegativeOffset",
+                "SpliceTest.FromPipeMultiple",
+                "SpliceTest.FromPipe",
+                "SpliceTest.TwoPipesPartialRead",
+                "SpliceTest.TwoPipesPartialWrite",
+                "SpliceTest.FromPipeOffset",
+                "SpliceTest.NonBlocking",
+                "SpliceTest.TwoPipesCircular",
+                "SpliceTest.FromPipeWithConcurrentIo",
+                "TeeTest.SamePipe",
+                "TeeTest.TwoPipesPartialRead",
+                "TeeTest.RegularFile",
+                "TeeTest.NonBlocking",
+                "TeeTest.TwoPipesPartialWrite",
+                "SpliceTest.WriteOverflow",
+
                 // stat_test
                 "StatTest.StatxAbsPath",
                 "StatTest.StatxRelPathDirFD",
@@ -476,19 +1040,171 @@
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
+                // stat_times_test
+                "StatTimesTest.FileRenameOpenFD",
+                "StatTimesTest.FileUtimes",
+                "StatTimesTest.DirRemoveFile",
+                "StatTimesTest.FileChmod",
+                "StatTimesTest.FileTruncate",
+                "StatTimesTest.FileRename",
+                "StatTimesTest.FileWrite",
+                "StatTimesTest.DirCreateFile",
+                "StatTimesTest.DirList",
+                "StatTimesTest.DirCreateDir",
+
+                // sticky_test
+                "StickyTest.StickyBitPermDenied",
+
+                // tuntap_test
+                "TuntapStaticTest.NetTunExists",
+                "TuntapTest.CreateInterfaceNoCap",
+                "TuntapTest.PingKernel",
+                "TuntapTest.CreateFixedNameInterface",
+                "TuntapTest.CreateInterface",
+                "TuntapTest.LargeWritesFailWithEMSGSIZE",
+                "TuntapTest.InvalidReadWrite",
+                "TuntapTest.ZeroWrite",
+                "TuntapTest.SendUdpTriggersArpResolution",
+                "TuntapTest.TUNNoPacketInfo",
+                "TuntapTest.WriteHangBug155928773",
+                "TuntapTest.TCPNonBlockingConnectFailsArpResolution",
+                "TuntapTest.TCPBlockingConnectFailsArpResolution",
+                "TuntapTest.RawPacketSocket",
+
+                // sync_file_range_test
+                "SyncFileRangeTest.TempFileSucceeds",
+                "SyncFileRangeTest.BadArgs",
+                "SyncFileRangeTest.CannotSyncFileRangeOnUnopenedFd",
+
+                // sysinfo_test
+                "SysinfoTest.SysinfoIsCallable",
+                "SysinfoTest.TotalRamSaneValue",
+                "SysinfoTest.EfaultProducedOnBadAddress",
+                "SysinfoTest.FreeRamSaneValue",
+                "SysinfoTest.MemunitSet",
+                "SysinfoTest.UptimeSaneValue",
+                "SysinfoTest.NumProcsSaneValue",
+                "SysinfoTest.UptimeIncreasingValue",
+
+                // syslog_test
+                "Syslog.Size",
+                "Syslog.ReadAll",
+
+                // sysret_test
+                "SysretTest.JustDetach",
+                "SysretTest.BadRip",
+                "SysretTest.BadRsp",
+
+                // tcp_socket_test
+                "AllInetTests/TcpSocketTest.PollWithFullBufferBlocks/*",
+                "AllInetTests/TcpSocketTest.ConnectedAcceptedPeerAndLocalAreReciprocals/*",
+                "AllInetTests/TcpSocketTest.NonblockingLargeSend/*",
+                "AllInetTests/TcpSocketTest.DataCoalesced/*",
+                "AllInetTests/TcpSocketTest.ShutdownWriteInTimeWait/*",
+                "AllInetTests/TcpSocketTest.ShutdownWriteInFinWait1/*",
+                "AllInetTests/TcpSocketTest.SenderAddressIgnored/*",
+                "AllInetTests/TcpSocketTest.SendtoAddressIgnored/*",
+                "AllInetTests/TcpSocketTest.ConnectOnEstablishedConnection/*",
+                "AllInetTests/TcpSocketTest.ClosedWriteBlockingSocket/*",
+                "AllInetTests/TcpSocketTest.ClosedReadBlockingSocket/*",
+                "AllInetTests/TcpSocketTest.WritevZeroIovec/*",
+                "AllInetTests/TcpSocketTest.MsgTrunc/*",
+                "AllInetTests/TcpSocketTest.BlockingLargeSend/*",
+                "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
+                "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
+                "AllInetTests/TcpSocketTest.ZeroWriteAllowed/*",
+                "AllInetTests/TcpSocketTest.LargeSendDontWait/*",
+                "AllInetTests/TcpSocketTest.NonblockingLargeWrite/*",
+                "AllInetTests/TcpSocketTest.BlockingLargeWrite/*",
+                "AllInetTests/TcpSocketTest.SetNoDelay/*",
+                "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
+                "AllInetTests/TcpSocketTest.SenderAddressIgnoredOnPeek/*",
+                "AllInetTests/TcpSocketTest.NoDelayDefault/*",
+                "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
+                "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
+                "AllInetTests/SimpleTcpSocketTest.SelfConnectSend/*",
+                "AllInetTests/SimpleTcpSocketTest.SelfConnectRecvShutdownRead/*",
+                "AllInetTests/TcpSocketTest.PollAfterShutdown/*",
+                "AllInetTests/SimpleTcpSocketTest.SelfConnectSendShutdownWrite/*",
+                "AllInetTests/SimpleTcpSocketTest.SelfConnectSendRecv/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectRetry/*",
+                "AllInetTests/TcpSocketTest.SendUnblocksOnSendBufferIncrease/*",
+                "AllInetTests/TcpSocketTest.GetSocketAcceptConnListener/*",
+                "AllInetTests/TcpSocketTest.FullBuffer/*",
+                "AllInetTests/TcpSocketTest.GetSocketAcceptConnNonListener/*",
+                "AllInetTests/TcpSocketTest.TimeWaitPollHUP/*",
+                "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
+                "AllInetTests/TcpSocketTest.Tiocinq/*",
+                "AllInetTests/TcpSocketTest.TcpInq/*",
+                "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollOut/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectRefused/*",
+                "AllInetTests/SimpleTcpSocketTest.CleanupOnConnectionRefused/*",
+                "AllInetTests/SimpleTcpSocketTest.BlockingConnectRefused/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm_PollOut/*",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectRemoteClose/*",
+                "AllInetTests/SimpleTcpSocketTest.SetSocketAttachDetachFilter/*",
+                "AllInetTests/SimpleTcpSocketTest.ConnectUnspecifiedAddress/*",
+                "AllInetTests/SimpleTcpSocketTest.ShutdownReadWriteConnectingSocket/*",
+                "AllInetTests/SimpleTcpSocketTest.ShutdownWriteConnectingSocket/*",
+                "AllInetTests/SimpleTcpSocketTest.OnlyAcknowledgeBacklogConnections/*",
+                "AllInetTests/SimpleTcpSocketTest.ShutdownReadConnectingSocket/*",
+                "AllInetTests/SimpleTcpSocketTest.SynRcvdOnListenerShutdown/*",
+
                 // timerfd_test - https://fxbug.dev/79430
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_MONOTONIC",
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
+                // timers_test
+                "IntervalTimerTest.AlreadyPendingSignal",
+                "IntervalTimerTest.MultipleTimers",
+                "IntervalTimerTest.SingleShotSilent",
+                "IntervalTimerTest.PeriodicGroupDirectedSignal",
+                "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
+                "TimerTest.ProcessKilledOnCPUHardLimit",
+                "IntervalTimerTest.OtherThreadGroup",
+                "IntervalTimerTest.PeriodicSilent",
+                "IntervalTimerTest.IsInitiallyStopped",
+                "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
+                "IntervalTimerTest.PeriodicThreadDirectedSignal",
+                "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
+                "TimerTest.ProcessKilledOnCPUSoftLimit",
+
                 // time_test
                 "TimeTest.VsyscallTime_InvalidAddressSIGSEGV",
+
+                // tkill_test
+                "TkillTest.ValidTIDAndRealSignal",
+
+                // truncate_test
+                "FixtureTruncateTest.Truncate",
+                "FixtureTruncateTest.Ftruncate",
+                "TruncateTest.TruncateDir",
+                "TruncateTest.FtruncateNonWriteable",
+                "TruncateTest.FtruncateWithoutWritePermission",
+                "TruncateTest.FtruncateVirtualTmp",
+                "TruncateTest.FtruncateWithOpath",
 
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 
+                // uname_test
+                "UnameTest.UnprivilegedSetNames",
+                "UnameTest.SetNames",
+                "UnameTest.UnshareUTS",
+
                 // unlink_test
                 "UnlinkTest.ParentDegradedPermissions",
                 "RmdirTest.CanRemoveWithTrailingSlashes",
+
+                // vfork_test
+                "VforkTest.ParentStopsUntilChildExits",
+                "VforkTest.ExecedChildExitDoesntUnstopParent",
+                "VforkTest.ParentStopsUntilChildExecves",
+
+                // vsyscall_test
+                "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
 
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
@@ -519,11 +1235,49 @@
             type: "skip",
             matchers: [
                 // These tests hang.
+                "Syscall32Bit.Sysenter",
+                "Syscall32Bit.Int80",
+                "Syscall32Bit.Syscall",
+                "Call32Bit.Disallowed",
                 "ChrootTest.ProcMemSelfMapsNoEscapeProcOpen",
                 "ConcurrencyTest.MultiProcessConcurrency",
+                "ExceptionTest.AlignmentCheck",
+                "ExceptionTest.AlignmentHalt",
+                "ExceptionTest.Halt",
+                "ExceptionTest.DivideByZero",
+                "ExceptionTest.X87DivideByZeroUnmasked",
+                "ExceptionTest.X87StatusClobber",
+                "ExceptionTest.SSEDivideByZeroUnmasked",
+                "ExceptionTest.IOAccessFault",
+                "ExceptionTest.Int3Normal",
+                "ExceptionTest.Int3Compact",
+                "ElfTest.Execute",
+                "ElfTest.MissingText",
+                "ElfTest.ExtraMemPages",
+                "ElfTest.DataSegment",
+                "ElfTest.AnonOnlySegment",
+                "ElfTest.UnalignedOffset",
+                "ElfTest.MissingPhdr",
+                "ElfTest.PIE",
+                "ElfTest.PIENonZeroStart",
+                "ElfTest.PIEOutOfOrderSegments",
+                "ElfTest.PIEOverflow",
+                "ElfTest.ELFInterpreter",
+                "ElfTest.ELFInterpreterRelative",
+                "ElfTest.ELFInterpreterWrongArch",
+                "ElfTest.NoExecute",
+                "ElfTest.ElfInterpreterNoExecute",
+                "ExecveTest.BrkAfterBinary",
+                "Cases/ElfInterpreterBadPathTest.Test/*",
+                "Cases/ElfInterpreterStaticTest.Test/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.Wake0/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondSuccess/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondFailure/*",
+                "Inotify.NonBlockingReadReturnsEagain",
+                "Inotify.ReadWithTooSmallBufferFails",
+                "Inotify.BlockingReadOnInotifyFd",
+                "Inotify.EpollNoDeadlock",
+                "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
                 "PingSocket.ICMPPortExhaustion",
                 "Pipes/PipeTest.ZeroSize/*",
                 "PollTest.BlockingEventPOLLRDNORM",
@@ -534,10 +1288,23 @@
                 "Signalfd/SignalfdTest.ThreadGroup/*",
                 "SigtimedwaitTest.AlarmReturnsAlarm",
                 "SigtimedwaitTest.NullTimeoutReturnsEINTR",
+                "AddressFamily/SendFileTest.SendMultiple/*",
+                "AddressFamily/SendFileTest.Shutdown/*",
                 "NetlinkRouteTest.LookupAll",
+                "BindToDeviceTest/BindToDeviceDistributionTest.Tcp/*",
+                "BindToDeviceTest/BindToDeviceDistributionTest.Udp/*",
                 "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
+                "AllConnectedSockets/DataTransferStressTest.BigDataTransfer/*",
                 "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.ZeroWriteAllowed/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.ZeroLengthMessageFDDiscarded/*",
+                "SpliceTest.ToPipe",
+                "SpliceTest.ToPipeOffset",
+                "SpliceTest.TwoPipes",
+                "TeeTest.BlockingWrite",
+                "SpliceTest.Blocking",
+                "TeeTest.MultiPage",
+                "TeeTest.Blocking",
+                "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
 
                 // TODO(fxbug.dev/105339): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
