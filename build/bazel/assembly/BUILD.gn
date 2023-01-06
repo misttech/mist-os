@@ -14,6 +14,7 @@ zbi_only = use_bringup_assembly
 if (use_bringup_assembly) {
   bazel_assembled_system("bringup") {
     testonly = true
+    allow_eng_platform_bundle_use = true
     gn_image_name = "bringup"
     bazel_assembly_target = "//build/bazel/assembly:bringup"
   }
@@ -22,16 +23,19 @@ if (use_bringup_assembly) {
 
   bazel_assembled_system("core") {
     testonly = true
+    allow_eng_platform_bundle_use = true
     bazel_assembly_target = "//build/bazel/assembly:core"
   }
 
   bazel_assembled_system("minimal") {
     testonly = true
+    allow_eng_platform_bundle_use = true
     bazel_assembly_target = "//build/bazel/assembly:minimal"
   }
 
   bazel_assembled_system("workstation_eng") {
     testonly = true
+    allow_eng_platform_bundle_use = true
     bazel_assembly_target = "//build/bazel/assembly:workstation_eng"
   }
 }

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
+import("//bundles/assembly/platform_aib_names.gni")
 
 # Parameters
 #
@@ -46,6 +47,13 @@ import("//build/bazel/bazel_action.gni")
 #    fastboot.
 #    Type: int|bool
 #
+#  allow_eng_platform_bundle_use (optional; default=false)
+#    If true, allow the 'eng' platform bundles to be used by the assembled
+#    system. (This is only a check made by GN, assembly itself may still access
+#    them)
+#    Type: bool
+#    Default: false
+#
 #  deps
 #  testonly
 #  visibility
@@ -75,6 +83,23 @@ template("bazel_assembled_system") {
     # TODO(jayzhuang): Investigate Bazel assembly hermeticity issues and remove
     # this arg.
     extra_bazel_args = [ "--spawn_strategy=local" ]
+
+    deps = []
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    _aibs = platform_aib_names
+    if (defined(invoker.allow_eng_platform_bundle_use) &&
+        invoker.allow_eng_platform_bundle_use) {
+      # Add the "eng" mode platform Assembly Input Bundles to the set of inputs.
+      _aibs += eng_platform_aib_names
+    }
+
+    # Make sure AIBs are built before Bazel assembly.
+    foreach(name, _aibs) {
+      deps += [ "//bundles/assembly:${name}" ]
+    }
 
     command = "build"
     bazel_targets = [ invoker.bazel_assembly_target ]

@@ -5,6 +5,7 @@
 load("@rules_fuchsia//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
 load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
 load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
+load("//:bundles/assembly/platform_aib_names.bzl", "ENG_PLATFORM_AIB_NAMES", "PLATFORM_AIB_NAMES")
 
 package(default_visibility = [
     "//build/bazel/assembly:__pkg__",
@@ -33,11 +34,19 @@ platform_aib(
 platform_aibs(
     name = "platform",
     aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/common_bringup",
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/common_minimal",
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/common_minimal_eng",
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/common_minimal_userdebug",
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/emulator_support",
+        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+        for aib in PLATFORM_AIB_NAMES
+    ],
+    # NOTE: Including `bazel_migration` has no real effect because it's not
+    # recognized by `ffx assembly`. It's here to help development and debugging.
+    aibs = [":bazel_migration"],
+)
+
+platform_aibs(
+    name = "platform_eng",
+    aib_dirs = [
+        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+        for aib in PLATFORM_AIB_NAMES + ENG_PLATFORM_AIB_NAMES
     ],
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
