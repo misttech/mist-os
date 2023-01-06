@@ -14,6 +14,7 @@
 #include <src/lib/fostr/fidl/fuchsia/ui/input/accessibility/formatting.h>
 #include <src/lib/fostr/fidl/fuchsia/ui/input/formatting.h>
 
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/input/constants.h"
 #include "src/ui/scenic/lib/input/internal_pointer_event.h"
 #include "src/ui/scenic/lib/input/touch_source.h"
@@ -138,7 +139,7 @@ TouchSystem::TouchSystem(sys::ComponentContext* context,
 
 zx_koid_t TouchSystem::FindViewRefKoidOfRelatedChannel(
     const fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource>& original) const {
-  const zx_koid_t related_koid = utils::ExtractRelatedKoid(original.channel());
+  const zx_koid_t related_koid = fsl::GetRelatedKoid(original.channel().get());
   const auto it = std::find_if(
       contenders_.begin(), contenders_.end(),
       [related_koid](const auto& kv) { return kv.second->channel_koid() == related_koid; });

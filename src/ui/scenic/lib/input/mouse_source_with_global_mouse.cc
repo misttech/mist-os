@@ -7,7 +7,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
-#include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/lib/fsl/handles/object_info.h"
 
 namespace scenic_impl::input {
 
@@ -17,7 +17,7 @@ using fuchsia::ui::pointer::augment::MouseEventWithGlobalMouse;
 MouseSourceWithGlobalMouse::MouseSourceWithGlobalMouse(
     fidl::InterfaceRequest<fuchsia::ui::pointer::augment::MouseSourceWithGlobalMouse> mouse_source,
     fit::function<void()> error_handler)
-    : MouseSourceBase(utils::ExtractKoid(mouse_source.channel()), /*close_channel=*/
+    : MouseSourceBase(fsl::GetKoid(mouse_source.channel().get()), /*close_channel=*/
                       [this](zx_status_t epitaph) {
                         binding_.Close(epitaph);
                         error_handler_();

@@ -4,13 +4,13 @@
 
 #include "src/ui/scenic/lib/input/mouse_source.h"
 
-#include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/lib/fsl/handles/object_info.h"
 
 namespace scenic_impl::input {
 
 MouseSource::MouseSource(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
                          fit::function<void()> error_handler)
-    : MouseSourceBase(utils::ExtractKoid(mouse_source.channel()), /*close_channel=*/
+    : MouseSourceBase(fsl::GetKoid(mouse_source.channel().get()), /*close_channel=*/
                       [this](zx_status_t epitaph) {
                         binding_.Close(epitaph);
                         error_handler_();

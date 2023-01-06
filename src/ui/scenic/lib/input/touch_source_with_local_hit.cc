@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/lib/fsl/handles/object_info.h"
+
 namespace scenic_impl::input {
 
 TouchSourceWithLocalHit::TouchSourceWithLocalHit(
@@ -17,7 +19,7 @@ TouchSourceWithLocalHit::TouchSourceWithLocalHit(
         get_local_hit,
     GestureContenderInspector& inspector)
     : TouchSourceBase(
-          utils::ExtractKoid(request.channel()), view_ref_koid, std::move(respond),
+          fsl::GetKoid(request.channel().get()), view_ref_koid, std::move(respond),
           [this](zx_status_t epitaph) { CloseChannel(epitaph); },
           /*augment*/
           [this](AugmentedTouchEvent& out_event, const InternalTouchEvent& in_event) {

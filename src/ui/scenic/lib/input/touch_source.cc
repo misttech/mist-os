@@ -6,6 +6,8 @@
 
 #include <lib/async/default.h>
 
+#include "src/lib/fsl/handles/object_info.h"
+
 namespace scenic_impl::input {
 
 TouchSource::TouchSource(zx_koid_t view_ref_koid,
@@ -13,7 +15,7 @@ TouchSource::TouchSource(zx_koid_t view_ref_koid,
                          fit::function<void(StreamId, const std::vector<GestureResponse>&)> respond,
                          fit::function<void()> error_handler, GestureContenderInspector& inspector)
     : TouchSourceBase(
-          utils::ExtractKoid(touch_source.channel()), view_ref_koid, std::move(respond),
+          fsl::GetKoid(touch_source.channel().get()), view_ref_koid, std::move(respond),
           [this](zx_status_t epitaph) { CloseChannel(epitaph); },
           /*augment*/ [](auto&...) {}, inspector),
       binding_(async_get_default_dispatcher(), std::move(touch_source), this,
