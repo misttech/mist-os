@@ -679,6 +679,17 @@ func (b *OmahaBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
 		return nil, err
 	}
 
+	fileInfo, err := os.Stat(flashManifest)
+	if err != nil {
+		return nil, err
+	}
+
+	if fileInfo.IsDir() {
+		// We are using Product Bundle instead of flash.json
+		os.Rename(destVbmetaPath, srcVbmetaPath)
+		return flasher.NewBuildFlasher(ffxToolPath, flashManifest, true, flasher.SSHPublicKey(b.GetSshPublicKey()))
+	}
+
 	content, err := os.ReadFile(flashManifest)
 	if err != nil {
 		return nil, err
