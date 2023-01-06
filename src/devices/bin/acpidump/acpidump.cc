@@ -6,7 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <lib/cmdline/args_parser.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
@@ -30,8 +30,8 @@
 
 namespace acpidump {
 
-using fuchsia_hardware_acpi::Acpi;
-using fuchsia_hardware_acpi::wire::TableInfo;
+using fuchsia_acpi_tables::Tables;
+using fuchsia_acpi_tables::wire::TableInfo;
 
 const char kAcpiDevicePath[] = "/dev/sys/platform/pt/acpi";
 
@@ -134,8 +134,8 @@ zx_status_t FetchTable(const zx::channel& channel, const TableInfo& table,
   }
 
   // Fetch the data.
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
   if (!result.ok()) {
     return result.status();
   }
@@ -237,8 +237,8 @@ zx_status_t AcpiDump(const Args& args) {
   fdio_cpp::FdioCaller dev(std::move(fd));
 
   // List ACPI entries.
-  fidl::WireResult<Acpi::ListTableEntries> result =
-      fidl::WireCall<Acpi>(dev.channel())->ListTableEntries();
+  fidl::WireResult<Tables::ListTableEntries> result =
+      fidl::WireCall<Tables>(dev.channel())->ListTableEntries();
   if (!result.ok()) {
     fprintf(stderr, "Could not list ACPI table entries: %s.\n",
             zx_status_get_string(result.status()));

@@ -8,7 +8,7 @@ import("//build/testing/bootfs_test.gni")
 test("x86-board") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp_wire",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//third_party/acpica",

@@ -29,8 +29,8 @@
 #include "src/devices/board/lib/acpi/manager-fuchsia.h"
 #include "src/devices/board/lib/smbios/smbios.h"
 
-using fuchsia_hardware_acpi::wire::kMaxAcpiTableEntries;
-using fuchsia_hardware_acpi::wire::TableInfo;
+using fuchsia_acpi_tables::wire::kMaxAcpiTableEntries;
+using fuchsia_acpi_tables::wire::TableInfo;
 
 zx_handle_t root_resource_handle;
 

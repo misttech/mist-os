@@ -6,7 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <lib/component/incoming/cpp/service_client.h>
 #include <lib/zx/channel.h>
 #include <string.h>
@@ -26,8 +26,8 @@ namespace device_enumeration {
 
 namespace {
 
-using fuchsia_hardware_acpi::Acpi;
-using fuchsia_hardware_acpi::wire::TableInfo;
+using fuchsia_acpi_tables::Tables;
+using fuchsia_acpi_tables::wire::TableInfo;
 
 const char* kAcpiDevicePath = "/dev/sys/platform/pt/acpi";
 const char* kAcpiDsdtTableName = "DSDT";
@@ -46,7 +46,7 @@ bool FindPattern(const fbl::Array<T>& haystack, const fbl::Array<T>& needle) {
 }
 
 // Fetch raw data for a table.
-zx_status_t FetchTable(const fidl::ClientEnd<Acpi>& channel, const TableInfo& table,
+zx_status_t FetchTable(const fidl::ClientEnd<Tables>& channel, const TableInfo& table,
                        fbl::Array<uint8_t>* data) {
   // Allocate a VMO for the read.
   zx::vmo vmo;
@@ -61,8 +61,8 @@ zx_status_t FetchTable(const fidl::ClientEnd<Acpi>& channel, const TableInfo& ta
   }
 
   // Fetch the data.
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(channel.borrow())->ReadNamedTable(table.name, 0, std::move(vmo_copy));
   if (!result.ok()) {
     return result.status();
   }
@@ -82,10 +82,10 @@ zx_status_t FetchTable(const fidl::ClientEnd<Acpi>& channel, const TableInfo& ta
 //
 // Returns false if it cannot access the ACPI data, or none of the ACPI
 // tables with name |table_name| has the keyword.
-bool AcpiTableHasKeyword(const fidl::ClientEnd<Acpi>& acpi_channel, std::string_view table_name,
+bool AcpiTableHasKeyword(const fidl::ClientEnd<Tables>& acpi_channel, std::string_view table_name,
                          const fbl::Array<uint8_t>& keyword) {
   // List ACPI entries.
-  fidl::WireResult<Acpi::ListTableEntries> result =
+  fidl::WireResult<Tables::ListTableEntries> result =
       fidl::WireCall(acpi_channel)->ListTableEntries();
   if (!result.ok()) {
     fprintf(stderr, "Could not list ACPI table entries: %s.\n",
@@ -132,7 +132,7 @@ bool AcpiTableHasKeyword(const fidl::ClientEnd<Acpi>& acpi_channel, std::string_
 // device can be found if and only if it's an AEMU board.
 bool IsAemuBoard() {
   // Open up channel to ACPI device.
-  zx::result channel = component::Connect<Acpi>(kAcpiDevicePath);
+  zx::result channel = component::Connect<Tables>(kAcpiDevicePath);
   if (channel.is_error()) {
     return false;
   }

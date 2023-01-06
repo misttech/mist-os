@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_X86_X86_H_
 #define SRC_DEVICES_BOARD_DRIVERS_X86_X86_H_
 
+#include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/ddk/debug.h>
@@ -31,7 +32,7 @@ class SysSuspender : public fdf::WireServer<fuchsia_hardware_platform_bus::SysSu
 
 class X86;
 using DeviceType =
-    ddk::Device<X86, ddk::Messageable<fuchsia_hardware_acpi::Acpi>::Mixin, ddk::Initializable>;
+    ddk::Device<X86, ddk::Messageable<fuchsia_acpi_tables::Tables>::Mixin, ddk::Initializable>;
 
 // This is the main class for the X86 platform bus driver.
 class X86 : public DeviceType {
@@ -49,7 +50,7 @@ class X86 : public DeviceType {
   void DdkRelease();
   void DdkInit(ddk::InitTxn txn);
 
-  // ACPI protocol FIDL interface implementation.
+  // ACPI tables protocol FIDL interface implementation.
   void ListTableEntries(ListTableEntriesCompleter::Sync& completer) override;
   void ReadNamedTable(ReadNamedTableRequestView request,
                       ReadNamedTableCompleter::Sync& completer) override;
@@ -62,7 +63,7 @@ class X86 : public DeviceType {
   // Add the list of ACPI entries present in the system to |entries|.
   //
   // Requires that ACPI has been initialised.
-  zx_status_t GetAcpiTableEntries(fbl::Vector<fuchsia_hardware_acpi::wire::TableInfo>* entries);
+  zx_status_t GetAcpiTableEntries(fbl::Vector<fuchsia_acpi_tables::wire::TableInfo>* entries);
 
   acpi::Acpi* acpi() { return acpi_.get(); }
 

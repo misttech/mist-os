@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.hardware.acpi;
+library fuchsia.acpi.tables;
 using zx;
 
 const MAX_ACPI_TABLE_ENTRIES uint32 = 512;
@@ -21,7 +21,7 @@ type TableInfo = struct {
 /// Defines access to raw system ACPI data.
 ///
 /// This interface is intended only for low-level debugging tools.
-protocol Acpi {
+protocol Tables {
     /// Return the list of ACPI tables present in the system.
     ListTableEntries() -> (struct {
         entries vector<TableInfo>:MAX_ACPI_TABLE_ENTRIES;

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -26,19 +26,19 @@ namespace {
 
 constexpr uint32_t kGiB = 1024 * 1024 * 1024;
 
-using fuchsia_hardware_acpi::Acpi;
-using fuchsia_hardware_acpi::wire::TableInfo;
+using fuchsia_acpi_tables::Tables;
+using fuchsia_acpi_tables::wire::TableInfo;
 
 const char kAcpiDevicePath[] = "/dev/sys/platform/pt/acpi";
 
 // Open up channel to ACPI device.
-zx::result<fidl::ClientEnd<Acpi>> OpenChannel() {
+zx::result<fidl::ClientEnd<Tables>> OpenChannel() {
   zx::result channel = device_watcher::RecursiveWaitForFile(kAcpiDevicePath);
   if (channel.is_error()) {
     return channel.take_error();
   }
 
-  return zx::ok(fidl::ClientEnd<Acpi>(std::move(channel.value())));
+  return zx::ok(fidl::ClientEnd<Tables>(std::move(channel.value())));
 }
 
 // Convert a fidl::Array<uint8_t, n> type to a std::string.
@@ -79,8 +79,8 @@ TEST(X86Board, ListTableEntries) {
   zx::result dev = OpenChannel();
   ASSERT_OK(dev.status_value());
 
-  fidl::WireResult<Acpi::ListTableEntries> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))->ListTableEntries();
+  fidl::WireResult<Tables::ListTableEntries> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))->ListTableEntries();
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_ok());
   const auto& response = *result->value();
@@ -104,8 +104,8 @@ TEST(X86Board, ReadNamedTable) {
 
   // Read the system's DSDT entry. Every system should have one of these.
   auto [vmo, vmo_copy] = CreateVmoPair();
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_ok());
@@ -126,8 +126,8 @@ TEST(X86Board, InvalidTableName) {
 
   // Read an invalid entry.
   auto [vmo, vmo_copy] = CreateVmoPair();
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("???\n"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -141,8 +141,8 @@ TEST(X86Board, InvalidIndexNumber) {
   // Read a large index of the DSDT table. We should have a DSDT table, but really only
   // have 1 of them.
   auto [vmo, vmo_copy] = CreateVmoPair();
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 1234, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -155,8 +155,8 @@ TEST(X86Board, VmoTooSmall) {
 
   // Only allocate a VMO with 3 bytes backing it.
   auto [vmo, vmo_copy] = CreateVmoPair(/*size=*/3);
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(vmo_copy));
   ASSERT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
@@ -171,8 +171,8 @@ TEST(X86Board, ReadOnlyVmoSent) {
   auto [vmo, vmo_copy] = CreateVmoPair();
   zx::vmo read_only_vmo;
   ZX_ASSERT(vmo_copy.replace(ZX_RIGHT_NONE, &read_only_vmo) == ZX_OK);
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, std::move(read_only_vmo));
   EXPECT_EQ(result.status(), ZX_ERR_ACCESS_DENIED);
 }
@@ -184,8 +184,8 @@ TEST(X86Board, InvalidObject) {
   // Send something that is not a VMO.
   zx::channel a, b;
   zx::channel::create(/*flags=*/0, &a, &b);
-  fidl::WireResult<Acpi::ReadNamedTable> result =
-      fidl::WireCall<Acpi>(std::move(dev.value()))
+  fidl::WireResult<Tables::ReadNamedTable> result =
+      fidl::WireCall<Tables>(std::move(dev.value()))
           ->ReadNamedTable(StringToSignature("DSDT"), 0, zx::vmo(a.release()));
   // FIDL detects that a channel is being sent as a VMO handle.
   ASSERT_FALSE(result.ok());

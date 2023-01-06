@@ -11,7 +11,7 @@ source_set("src") {
     "acpidump.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/cmdline",
     "//zircon/system/ulib/fbl",
