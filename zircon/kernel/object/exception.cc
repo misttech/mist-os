@@ -25,7 +25,6 @@
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
-#define TRACE_EXCEPTIONS 1
 
 static const char* excp_type_to_string(uint type) {
   switch (type) {
@@ -271,12 +270,6 @@ zx_status_t dispatch_user_exception(uint exception_type,
     return ZX_OK;
   }
 
-#if TRACE_EXCEPTIONS
-  constexpr bool kTraceExceptions = true;
-#else
-  constexpr bool kTraceExceptions = false;
-#endif
-
   // If the thread wasn't resumed or explicitly killed, kill the whole process.
   // If the process is critical to the root job, any fatal exception merits
   // logging all the details available whether the handler decided to kill the
@@ -290,7 +283,7 @@ zx_status_t dispatch_user_exception(uint exception_type,
   } else {
     auto pname = get_name(process);
 
-    if (!processed && (kTraceExceptions || process->CriticalToRootJob())) {
+    if (!processed) {
       // If no handlers even saw the exception, dump some info. Normally at
       // least crashsvc will handle the exception and make a smarter decision
       // about what to do with it, but in case it doesn't, dump some info to
