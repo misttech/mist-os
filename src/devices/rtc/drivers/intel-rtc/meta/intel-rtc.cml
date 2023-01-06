@@ -11,6 +11,7 @@
         runner: "driver",
         bind: "meta/bind/intel_rtc_bind.bindbc",
         compat: "driver/intel-rtc.so",
+        colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
