@@ -10,7 +10,10 @@
 #
 # Example usage with the Fuchsia emulator:
 # The -I can be any device name, this script creates br${INTERFACE}.
-# fx emu --headless -N -I qemu -u ./start-unsecure-internet.sh
+#
+# To use this script with `ffx emu`, configure this file to be
+# the upscript by running:
+# ffx config set emu.upscript $FUCHSIA_ROOT/scripts/start-unsecure-internet.sh
 #
 # This script is designed to be invoked from qemu with an interface argument.
 # It can also be run directly for testing as:
@@ -24,7 +27,7 @@ usage() {
   echo "  [--cleanup]"
   echo "    Remove previously created bridge device and stop"
   echo "  <interface>"
-  echo "    Interface name provided to fx emu -I, typically 'qemu'"
+  echo "    Interface name typically 'qemu'"
 }
 
 
