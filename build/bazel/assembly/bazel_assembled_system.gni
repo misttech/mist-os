@@ -75,13 +75,12 @@ template("bazel_assembled_system") {
                            [
                              "testonly",
                              "visibility",
-                             "deps",
                            ])
 
     no_output_dir_leaks = false
 
-    # TODO(jayzhuang): Investigate Bazel assembly hermeticity issues and remove
-    # this arg.
+    # TODO(https://fxbug.dev/115151): Remove this flag when Bazel assembly is
+    # hermetic.
     extra_bazel_args = [ "--spawn_strategy=local" ]
 
     deps = []

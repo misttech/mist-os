@@ -305,4 +305,7 @@ group("default-images") {
   if (build_usb_installer) {
     deps += [ "//build/images/installer" ]
   }
+
+  # Include Bazel assembly target if they are set.
+  deps += bazel_assembly_targets
 }

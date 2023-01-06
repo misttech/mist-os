@@ -43,3 +43,5 @@ fuchsia_product_assembly_config_file = "${root_build_dir}/obj/products/minimal/m
 
 fuchsia_structured_config_policy =
     "//products/minimal/minimal_user_structured_config_policy.json5"
+
+bazel_assembly_targets = [ "//build/bazel/assembly:minimal" ]

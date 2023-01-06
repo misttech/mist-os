@@ -171,6 +171,9 @@ declare_args() {
   # Include the shell commands package.  Used as a parameter to
   # assembled_system().  See documentation there.
   include_shell_commands_package = false
+
+  # When set, include the corresponding Bazel assembly targets in this build.
+  bazel_assembly_targets = []
 }
 
 recovery_is_zedboot =
