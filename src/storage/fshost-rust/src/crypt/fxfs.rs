@@ -5,7 +5,6 @@
 use {
     super::{format_sources, get_policy, unseal_sources, KeyConsumer},
     crate::service::SHRED_DATA_VOLUME_MARKER_FILE,
-    anyhow::bail,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::Proxy,
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
@@ -86,13 +85,19 @@ async fn unwrap_or_create_keys(
     Err(last_err)
 }
 
+pub enum UnlockResult<'a> {
+    Ok((CryptService, String, &'a mut ServingVolume)),
+    /// The volume contained a marker file indicated it needs to be reformatted.
+    Reset,
+}
+
 // Unwraps the data volume in `fs`.  Any failures should be treated as fatal and the filesystem
 // should be reformatted and re-initialized.
 // Returns the name of the data volume as well as a reference to it.
 pub async fn unlock_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+) -> Result<UnlockResult<'a>, Error> {
     unlock_or_init_data_volume(fs, config, false).await
 }
 
@@ -102,14 +107,17 @@ pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
-    unlock_or_init_data_volume(fs, config, true).await
+    unlock_or_init_data_volume(fs, config, true).await.map(|r| match r {
+        UnlockResult::Ok(r) => r,
+        UnlockResult::Reset => unreachable!(),
+    })
 }
 
 async fn unlock_or_init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
     create: bool,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+) -> Result<UnlockResult<'a>, Error> {
     let mut use_native_fxfs_crypto = config.use_native_fxfs_crypto;
     let has_native_layout = !fs.has_volume("default").await?;
     if !create && (has_native_layout != use_native_fxfs_crypto) {
@@ -183,15 +191,12 @@ async fn unlock_or_init_data_volume<'a>(
         if fuchsia_fs::directory::dir_contains(volume.root(), SHRED_DATA_VOLUME_MARKER_FILE).await?
         {
             // Return an error and it should cause the volume to be reformatted.
-            bail!(
-                "Found shred marker file (NB. this is not a bug; disregard any messages stating _
-                   otherwise)"
-            );
+            return Ok(UnlockResult::Reset);
         }
         volume
     };
 
-    Ok((crypt_service, data_volume_name, volume))
+    Ok(UnlockResult::Ok((crypt_service, data_volume_name, volume)))
 }
 
 static FXFS_CRYPT_COLLECTION_NAME: &str = "fxfs-crypt";

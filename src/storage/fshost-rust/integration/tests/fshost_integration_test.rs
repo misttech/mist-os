@@ -35,6 +35,7 @@ mod write_data_file;
 
 const FSHOST_COMPONENT_NAME: &'static str = std::env!("FSHOST_COMPONENT_NAME");
 const DATA_FILESYSTEM_FORMAT: &'static str = std::env!("DATA_FILESYSTEM_FORMAT");
+const DATA_FILESYSTEM_VARIANT: &'static str = std::env!("DATA_FILESYSTEM_VARIANT");
 
 fn new_builder() -> TestFixtureBuilder {
     TestFixtureBuilder::new(FSHOST_COMPONENT_NAME)
@@ -55,31 +56,31 @@ const DATA_MAX_BYTES: u64 = 109876543;
 
 fn data_fs_type() -> u32 {
     match DATA_FILESYSTEM_FORMAT {
-        "f2fs" | "f2fs-no-zxcrypt" => VFS_TYPE_F2FS,
-        "fxfs" | "fxfs-legacy-crypto" => VFS_TYPE_FXFS,
-        "minfs" | "minfs-no-zxcrypt" => VFS_TYPE_MINFS,
+        "f2fs" => VFS_TYPE_F2FS,
+        "fxfs" => VFS_TYPE_FXFS,
+        "minfs" => VFS_TYPE_MINFS,
         _ => panic!("invalid data filesystem format"),
     }
 }
 
 fn data_fs_name() -> &'static str {
     match DATA_FILESYSTEM_FORMAT {
-        "f2fs" | "f2fs-no-zxcrypt" => "f2fs",
-        "fxfs" | "fxfs-legacy-crypto" => "fxfs",
-        "minfs" | "minfs-no-zxcrypt" => "minfs",
+        "f2fs" => "f2fs",
+        "fxfs" => "fxfs",
+        "minfs" => "minfs",
         _ => panic!("invalid data filesystem format"),
     }
 }
 
 fn data_fs_zxcrypt() -> bool {
-    !DATA_FILESYSTEM_FORMAT.ends_with("no-zxcrypt")
+    !DATA_FILESYSTEM_VARIANT.ends_with("no-zxcrypt")
 }
 
 fn data_fs_spec() -> DataSpec {
     DataSpec {
         format: Some(data_fs_name()),
         zxcrypt: data_fs_zxcrypt(),
-        legacy_crypto_format: DATA_FILESYSTEM_FORMAT == "fxfs-legacy-crypto",
+        legacy_crypto_format: DATA_FILESYSTEM_VARIANT == "fxfs-legacy-crypto",
     }
 }
 

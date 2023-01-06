@@ -6,7 +6,7 @@ use {
     crate::{
         boot_args::BootArgs,
         crypt::{
-            fxfs::{self, CryptService},
+            fxfs::{self, CryptService, UnlockResult},
             zxcrypt,
         },
         device::{constants::DEFAULT_F2FS_MIN_BYTES, Device},
@@ -14,6 +14,7 @@ use {
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
+    either::Either,
     fidl::endpoints::{create_proxy, Proxy, ServerEnd},
     fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_hardware_block_partition::Guid,
@@ -385,15 +386,22 @@ impl FilesystemLauncher {
             match format {
                 DiskFormat::Fxfs => {
                     let mut serving_fs = fs.serve_multi_volume().await?;
-                    let (crypt_service, volume_name, _) =
-                        fxfs::unlock_data_volume(&mut serving_fs, &self.config).await?;
-                    Ok(Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name))
+                    match fxfs::unlock_data_volume(&mut serving_fs, &self.config).await? {
+                        UnlockResult::Ok((crypt_service, volume_name, _)) => Ok(Either::Left(
+                            Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name),
+                        )),
+                        UnlockResult::Reset => Ok(Either::Right(())),
+                    }
                 }
-                _ => Ok(Filesystem::Serving(fs.serve().await?)),
+                _ => Ok(Either::Left(Filesystem::Serving(fs.serve().await?))),
             }
         };
         match serve_fut.await {
-            Ok(fs) => Ok(fs),
+            Ok(Either::Left(fs)) => Ok(fs),
+            Ok(Either::Right(())) => {
+                tracing::info!("Detected marker file, shredding volume. Expect data loss...");
+                self.format_data(&mut fs, volume_proxy, inside_zxcrypt, copied_data).await
+            }
             Err(error) => {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {

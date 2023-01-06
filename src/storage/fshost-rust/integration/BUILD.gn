@@ -71,6 +71,9 @@ template("fshost_integration_test") {
   assert(defined(invoker.use_rust_port), "use rust port not specified")
   assert(defined(invoker.data_filesystem_format),
          "data filesystem format not specified")
+  if (!defined(invoker.data_filesystem_variant)) {
+    invoker.data_filesystem_variant = invoker.data_filesystem_format
+  }
 
   _fshost_target = "test-fshost-${target_name}"
   fshost_component_and_config(_fshost_target) {
@@ -94,6 +97,7 @@ template("fshost_integration_test") {
     rustenv = [
       "FSHOST_COMPONENT_NAME=${_fshost_component_name}",
       "DATA_FILESYSTEM_FORMAT=${invoker.data_filesystem_format}",
+      "DATA_FILESYSTEM_VARIANT=${invoker.data_filesystem_variant}",
     ]
     features = [ invoker.data_filesystem_format ]
     if (invoker.use_rust_port) {
@@ -187,7 +191,8 @@ template("fshost_integration_test_suite") {
   # In addition to the basic filesystem formats, there are some modifying options we want to test.
   fshost_integration_fxfs_legacy_label = "${target_name}_fxfs_legacy_crypto"
   fshost_integration_test(fshost_integration_fxfs_legacy_label) {
-    data_filesystem_format = "fxfs-legacy-crypto"
+    data_filesystem_format = "fxfs"
+    data_filesystem_variant = "fxfs-legacy-crypto"
     use_rust_port = invoker.use_rust_port
     options = default_integration_test_options
     options.use_native_fxfs_crypto = false
@@ -197,7 +202,8 @@ template("fshost_integration_test_suite") {
 
   fshost_integration_minfs_no_zxcrypt_label = "${target_name}_minfs_no_zxcrypt"
   fshost_integration_test(fshost_integration_minfs_no_zxcrypt_label) {
-    data_filesystem_format = "minfs-no-zxcrypt"
+    data_filesystem_format = "minfs"
+    data_filesystem_variant = "minfs-no-zxcrypt"
     use_rust_port = invoker.use_rust_port
     options = default_integration_test_options
     options.no_zxcrypt = true
@@ -207,7 +213,8 @@ template("fshost_integration_test_suite") {
 
   fshost_integration_f2fs_no_zxcrypt_label = "${target_name}_f2fs_no_zxcrypt"
   fshost_integration_test(fshost_integration_f2fs_no_zxcrypt_label) {
-    data_filesystem_format = "f2fs-no-zxcrypt"
+    data_filesystem_format = "f2fs"
+    data_filesystem_variant = "f2fs-no-zxcrypt"
     use_rust_port = invoker.use_rust_port
     options = default_integration_test_options
     options.no_zxcrypt = true
