@@ -243,12 +243,7 @@ fidl_testdata_info = [
   {
     name = "handles"
     target = "//tools/fidl/fidlc/testdata:test.handles"
-    build_denylist = [
-      "fidlgen_libfuzzer",
-
-      # TODO(fxbug.dev/62524): Fix Ord/Hash trait issue with fidl::Resource.
-      "fidlgen_rust",
-    ]
+    build_denylist = [ "fidlgen_libfuzzer" ]
   },
   {
     name = "handles_in_types"

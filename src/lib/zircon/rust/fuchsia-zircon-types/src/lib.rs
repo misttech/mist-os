@@ -350,6 +350,7 @@ multiconst!(zx_obj_type_t, [
     ZX_OBJ_TYPE_EXCEPTION           = 29;
     ZX_OBJ_TYPE_CLOCK               = 30;
     ZX_OBJ_TYPE_STREAM              = 31;
+    ZX_OBJ_TYPE_MSI                 = 32;
 ]);
 
 // System ABI commits to having no more than 64 object types.

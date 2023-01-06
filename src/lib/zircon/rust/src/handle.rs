@@ -393,7 +393,6 @@ assoc_values!(ObjectType, [
     PCI_DEVICE      = sys::ZX_OBJ_TYPE_PCI_DEVICE;
     DEBUGLOG        = sys::ZX_OBJ_TYPE_DEBUGLOG;
     SOCKET          = sys::ZX_OBJ_TYPE_SOCKET;
-    STREAM          = sys::ZX_OBJ_TYPE_STREAM;
     RESOURCE        = sys::ZX_OBJ_TYPE_RESOURCE;
     EVENTPAIR       = sys::ZX_OBJ_TYPE_EVENTPAIR;
     JOB             = sys::ZX_OBJ_TYPE_JOB;
@@ -410,6 +409,8 @@ assoc_values!(ObjectType, [
     PAGER           = sys::ZX_OBJ_TYPE_PAGER;
     EXCEPTION       = sys::ZX_OBJ_TYPE_EXCEPTION;
     CLOCK           = sys::ZX_OBJ_TYPE_CLOCK;
+    STREAM          = sys::ZX_OBJ_TYPE_STREAM;
+    MSI             = sys::ZX_OBJ_TYPE_MSI;
 ]);
 
 impl ObjectType {
