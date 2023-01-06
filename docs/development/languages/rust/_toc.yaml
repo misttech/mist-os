@@ -32,6 +32,8 @@ toc:
   path: /docs/development/languages/rust/external_crates/review.md
 - title: "Unsafe code in Rust"
   path: /docs/development/languages/rust/unsafe.md
+- title: "Running tests in miri"
+  path: /docs/development/languages/rust/miri.md
 - title: "Unstable Rust features"
   path: /docs/development/languages/rust/unstable.md
 - title: "Integrating C/C++ using bindgen"
