@@ -680,6 +680,8 @@ class VmCowPages final : public VmHierarchyBase,
     }
 
     bool source_is_suitable = page_source_->properties().is_preserving_page_content;
+    DEBUG_ASSERT(source_is_suitable == debug_is_user_pager_backed());
+
     // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
     // return false.  We could delete this bool without damaging correctness, but we want to
     // mitigate a call site that maybe fails to check its call-site-specific settings such as
@@ -704,15 +706,8 @@ class VmCowPages final : public VmHierarchyBase,
     // later.
     bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
 
-    bool result = source_is_suitable && borrowing_is_generally_acceptable &&
-                  !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
-
-    DEBUG_ASSERT(result == (debug_is_user_pager_backed() &&
-                            pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                            !is_latency_sensitive_ && !ever_pinned_ &&
-                            !page_source_->ShouldTrapDirtyTransitions()));
-
-    return result;
+    return source_is_suitable && borrowing_is_generally_acceptable &&
+           !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
   }
 
   bool direct_source_supplies_zero_pages() const {
