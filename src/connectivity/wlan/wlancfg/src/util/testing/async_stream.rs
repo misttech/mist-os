@@ -27,13 +27,17 @@ where
 {
     pin_mut!(result_fut);
     let mut select_fut = futures::future::select(background_fut, result_fut);
-    loop {
+
+    // Set a maximum loop count. After then, panic if the result_fut is still stalled (pending).
+    const MAX_LOOP_COUNT: i32 = 1000;
+    for _loop_count in 1..MAX_LOOP_COUNT {
         match exec.run_until_stalled(&mut select_fut) {
             Poll::Ready(Either::Left(_)) => panic!("Background future finished"),
             Poll::Ready(Either::Right((out, _background_fut))) => return out,
             Poll::Pending => {}
         }
     }
+    panic!("Future failed to produce a result in {} iterations", MAX_LOOP_COUNT);
 }
 
 #[track_caller]
