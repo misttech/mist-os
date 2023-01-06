@@ -29,24 +29,24 @@ template <RefType name_type>
 class Argument<ArgumentType::kNull, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name) : Argument{StringRef<name_type>{std::forward<T>(name)}} {}
+  constexpr Argument(T&& name) : Argument{StringRef<name_type>{std::forward<T>(name)}} {}
 
-  explicit Argument(StringRef<name_type> name) : name_(name) {}
+  constexpr explicit Argument(StringRef<name_type> name) : name_(name) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kNull)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
   }
@@ -69,17 +69,18 @@ template <RefType name_type>
 class Argument<ArgumentType::kBool, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, bool val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, bool val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, bool val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, bool val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return BoolArgumentFields::Value::Make(val_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kBool)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
@@ -87,7 +88,7 @@ class Argument<ArgumentType::kBool, name_type> {
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
   }
@@ -111,17 +112,18 @@ template <RefType name_type>
 class Argument<ArgumentType::kInt32, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, int32_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, int32_t val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, int32_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, int32_t val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return Int32ArgumentFields::Value::Make(val_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kInt32)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
@@ -129,7 +131,7 @@ class Argument<ArgumentType::kInt32, name_type> {
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
   }
@@ -153,17 +155,18 @@ template <RefType name_type>
 class Argument<ArgumentType::kUint32, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, uint32_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, uint32_t val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, uint32_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, uint32_t val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return Uint32ArgumentFields::Value::Make(val_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kUint32)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
@@ -171,7 +174,7 @@ class Argument<ArgumentType::kUint32, name_type> {
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
   }
@@ -195,24 +198,25 @@ template <RefType name_type>
 class Argument<ArgumentType::kInt64, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, int64_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, int64_t val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, int64_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, int64_t val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kInt64)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     res.WriteWord(val_);
@@ -237,24 +241,25 @@ template <RefType name_type>
 class Argument<ArgumentType::kUint64, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, uint64_t val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, uint64_t val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, uint64_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, uint64_t val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kUint64)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     res.WriteWord(val_);
@@ -279,24 +284,25 @@ template <RefType name_type>
 class Argument<ArgumentType::kDouble, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, double val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, double val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, double val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, double val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kDouble)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     res.WriteBytes(&val_, 8);
@@ -321,24 +327,25 @@ template <RefType name_type>
 class Argument<ArgumentType::kPointer, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, Pointer val) : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, Pointer val)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
 
-  Argument(StringRef<name_type> name, Pointer val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, Pointer val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kPointer)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     res.WriteWord(val_.ptr);
@@ -364,24 +371,24 @@ template <RefType name_type>
 class Argument<ArgumentType::kKoid, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  Argument(T&& name, Koid val) : name_{std::forward<T>(name)}, val_{val} {}
+  constexpr Argument(T&& name, Koid val) : name_{std::forward<T>(name)}, val_{val} {}
 
-  Argument(StringRef<name_type> name, Koid val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, Koid val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + WordSize(1);
   }
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kKoid)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     res.WriteWord(val_.koid);
@@ -407,18 +414,19 @@ class Argument<ArgumentType::kString, name_type, val_type> {
  public:
   template <typename T, typename U, EnableIfConvertibleToStringRef<T, name_type> = true,
             EnableIfConvertibleToStringRef<U, val_type> = true>
-  Argument(T&& name, U&& val) : name_{std::forward<T>(name)}, val_{std::forward<U>(val)} {}
+  constexpr Argument(T&& name, U&& val)
+      : name_{std::forward<T>(name)}, val_{std::forward<U>(val)} {}
 
-  Argument(StringRef<name_type> name, StringRef<val_type> val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, StringRef<val_type> val) : name_(name), val_(val) {}
 
-  Argument(const Argument&) = default;
-  Argument& operator=(const Argument&) = default;
+  constexpr Argument(const Argument&) = default;
+  constexpr Argument& operator=(const Argument&) = default;
 
-  WordSize PayloadSize() const {
+  constexpr WordSize PayloadSize() const {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + val_.PayloadSize();
   }
 
-  uint64_t Header() const {
+  constexpr uint64_t Header() const {
     return StringArgumentFields::Index::Make(val_.HeaderEntry()) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kString)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
@@ -426,7 +434,7 @@ class Argument<ArgumentType::kString, name_type, val_type> {
   }
 
   template <typename Reservation>
-  void Write(Reservation& res) const {
+  constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
     val_.Write(res);

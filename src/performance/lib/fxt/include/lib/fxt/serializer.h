@@ -48,7 +48,7 @@ template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteProviderInfoMetadataRecord(Writer* writer, uint32_t provider_id, const char* name,
                                             size_t name_length) {
   const WordSize record_size = WordSize(1) /* header*/ + WordSize::FromBytes(name_length);
-  uint64_t header =
+  const uint64_t header =
       MakeHeader(RecordType::kMetadata, record_size) |
       MetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::kProviderInfo)) |
       ProviderInfoMetadataRecordFields::Id::Make(provider_id) |
@@ -73,7 +73,7 @@ zx_status_t WriteProviderInfoMetadataRecord(Writer* writer, uint32_t provider_id
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteProviderSectionMetadataRecord(Writer* writer, uint32_t provider_id) {
   const WordSize record_size(1);
-  uint64_t header =
+  const uint64_t header =
       MakeHeader(RecordType::kMetadata, record_size) |
       MetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::kProviderSection)) |
       ProviderSectionMetadataRecordFields::Id::Make(provider_id);
@@ -97,7 +97,7 @@ template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteProviderEventMetadataRecord(Writer* writer, uint32_t provider_id,
                                              uint8_t event_id) {
   const WordSize record_size(1);
-  uint64_t header =
+  const uint64_t header =
       MakeHeader(RecordType::kMetadata, record_size) |
       MetadataRecordFields::MetadataType::Make(ToUnderlyingType(MetadataType::kProviderEvent)) |
       ProviderEventMetadataRecordFields::Id::Make(provider_id) |
@@ -116,7 +116,7 @@ zx_status_t WriteProviderEventMetadataRecord(Writer* writer, uint32_t provider_i
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#magic-number-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteMagicNumberRecord(Writer* writer) {
-  uint64_t header = 0x0016547846040010;
+  const uint64_t header = 0x0016547846040010;
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->Commit();
@@ -133,7 +133,7 @@ zx_status_t WriteMagicNumberRecord(Writer* writer) {
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteInitializationRecord(Writer* writer, zx_ticks_t ticks_per_second) {
   const WordSize record_size(2);
-  uint64_t header = MakeHeader(RecordType::kInitialization, record_size);
+  const uint64_t header = MakeHeader(RecordType::kInitialization, record_size);
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteWord(ticks_per_second);
@@ -151,9 +151,9 @@ template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteStringRecord(Writer* writer, uint16_t index, const char* string,
                               size_t string_length) {
   const WordSize record_size = WordSize(1) + WordSize::FromBytes(string_length);
-  uint64_t header = MakeHeader(RecordType::kString, record_size) |
-                    fxt::StringRecordFields::StringIndex::Make(index) |
-                    fxt::StringRecordFields::StringLength::Make(string_length);
+  const uint64_t header = MakeHeader(RecordType::kString, record_size) |
+                          StringRecordFields::StringIndex::Make(index) |
+                          StringRecordFields::StringLength::Make(string_length);
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteBytes(string, string_length);
@@ -170,8 +170,8 @@ zx_status_t WriteStringRecord(Writer* writer, uint16_t index, const char* string
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
 zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, Koid process_koid, Koid thread_koid) {
   const WordSize record_size(3);
-  uint64_t header = MakeHeader(RecordType::kThread, record_size) |
-                    fxt::ThreadRecordFields::ThreadIndex::Make(index);
+  const uint64_t header =
+      MakeHeader(RecordType::kThread, record_size) | ThreadRecordFields::ThreadIndex::Make(index);
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteWord(process_koid);
@@ -182,7 +182,8 @@ zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, Koid process_koid,
 }
 
 namespace internal {
-inline WordSize EventContentWords(EventType eventType) {
+
+constexpr WordSize EventContentWords(EventType eventType) {
   switch (eventType) {
     case EventType::kInstant:
     case EventType::kDurationBegin:
@@ -197,41 +198,44 @@ inline WordSize EventContentWords(EventType eventType) {
     case EventType::kFlowStep:
     case EventType::kFlowEnd:
       return WordSize(1);
-    default:
-      __builtin_abort();
   }
+  __builtin_unreachable();
 }
 
-inline WordSize TotalPayloadSize() { return WordSize(0); }
+constexpr WordSize TotalPayloadSize() { return WordSize(0); }
 
 template <typename First, typename... Rest>
-inline WordSize TotalPayloadSize(const First& first, const Rest&... rest) {
+constexpr WordSize TotalPayloadSize(const First& first, const Rest&... rest) {
   return first.PayloadSize() + TotalPayloadSize(rest...);
+}
+
+template <typename Reservation, typename First, typename... Rest>
+constexpr void WriteElements(Reservation& res, const First& first, const Rest&... rest) {
+  first.Write(res);
+  if constexpr (sizeof...(rest) > 0) {
+    WriteElements(res, rest...);
+  }
 }
 
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-void WriteEventRecord(typename internal::WriterTraits<Writer>::Reservation& res,
-                      uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
-                      const StringRef<category_type>& category_ref,
-                      const StringRef<name_type>& name_ref,
-                      const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
+constexpr void WriteEventRecord(typename internal::WriterTraits<Writer>::Reservation& res,
+                                uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+                                const StringRef<category_type>& category_ref,
+                                const StringRef<name_type>& name_ref,
+                                const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   res.WriteWord(event_time);
-  thread_ref.Write(res);
-  category_ref.Write(res);
-  name_ref.Write(res);
-  bool array[] = {(args.Write(res), false)...};
-  (void)array;
+  WriteElements(res, thread_ref, category_ref, name_ref, args...);
 }
 
 template <RefType thread_type, RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-uint64_t MakeEventHeader(fxt::EventType eventType, const ThreadRef<thread_type>& thread_ref,
-                         const StringRef<category_type>& category_ref,
-                         const StringRef<name_type>& name_ref,
-                         const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  const WordSize content_size = fxt::internal::EventContentWords(eventType);
+constexpr uint64_t MakeEventHeader(
+    EventType eventType, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
+  const WordSize content_size = EventContentWords(eventType);
   WordSize record_size = WordSize::FromBytes(sizeof(RecordHeader)) + WordSize(1) +
                          TotalPayloadSize(thread_ref, category_ref, name_ref) + content_size +
                          TotalPayloadSize(args...);
@@ -248,16 +252,14 @@ uint64_t MakeEventHeader(fxt::EventType eventType, const ThreadRef<thread_type>&
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteZeroWordEventRecord(
+constexpr zx_status_t WriteZeroWordEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
-    fxt::EventType eventType, const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  uint64_t header =
-      internal::MakeEventHeader(eventType, thread_ref, category_ref, name_ref, args...);
-  zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
+    EventType eventType, const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
+  const uint64_t header = MakeEventHeader(eventType, thread_ref, category_ref, name_ref, args...);
+  zx::result<typename WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
-    fxt::internal::WriteEventRecord<Writer>(*res, event_time, thread_ref, category_ref, name_ref,
-                                            args...);
+    WriteEventRecord<Writer>(*res, event_time, thread_ref, category_ref, name_ref, args...);
     res->Commit();
   }
   return res.status_value();
@@ -268,17 +270,15 @@ zx_status_t WriteZeroWordEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteOneWordEventRecord(
+constexpr zx_status_t WriteOneWordEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
-    fxt::EventType eventType, uint64_t content,
+    EventType eventType, uint64_t content,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  uint64_t header =
-      internal::MakeEventHeader(eventType, thread_ref, category_ref, name_ref, args...);
-  zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
+  const uint64_t header = MakeEventHeader(eventType, thread_ref, category_ref, name_ref, args...);
+  zx::result<typename WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
-    fxt::internal::WriteEventRecord<Writer>(*res, event_time, thread_ref, category_ref, name_ref,
-                                            args...);
+    WriteEventRecord<Writer>(*res, event_time, thread_ref, category_ref, name_ref, args...);
     res->WriteWord(content);
     res->Commit();
   }
@@ -295,12 +295,12 @@ zx_status_t WriteOneWordEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteInstantEventRecord(
+constexpr zx_status_t WriteInstantEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   return internal::WriteZeroWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                            fxt::EventType::kInstant, args...);
+                                            EventType::kInstant, args...);
 }
 
 // Write a Counter Event using the given Writer
@@ -312,12 +312,12 @@ zx_status_t WriteInstantEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteCounterEventRecord(
+constexpr zx_status_t WriteCounterEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     uint64_t counter_id, const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kCounter, counter_id, args...);
+                                           EventType::kCounter, counter_id, args...);
 }
 
 // Write a Duration Begin Event using the given Writer
@@ -329,12 +329,12 @@ zx_status_t WriteCounterEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteDurationBeginEventRecord(
+constexpr zx_status_t WriteDurationBeginEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteZeroWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                            fxt::EventType::kDurationBegin, args...);
+                                            EventType::kDurationBegin, args...);
 }
 
 // Write a Duration End Event using the given Writer
@@ -346,12 +346,12 @@ zx_status_t WriteDurationBeginEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteDurationEndEventRecord(
+constexpr zx_status_t WriteDurationEndEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteZeroWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                            fxt::EventType::kDurationEnd, args...);
+                                            EventType::kDurationEnd, args...);
 }
 
 // Write a Duration Complete Event using the given Writer
@@ -362,12 +362,12 @@ zx_status_t WriteDurationEndEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types, RefType... ref_types2>
-zx_status_t WriteDurationCompleteEventRecord(
+constexpr zx_status_t WriteDurationCompleteEventRecord(
     Writer* writer, uint64_t start_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     uint64_t end_time, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, start_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kDurationComplete, end_time, args...);
+                                           EventType::kDurationComplete, end_time, args...);
 }
 
 // Write an Async Begin Event using the given Writer
@@ -380,13 +380,12 @@ zx_status_t WriteDurationCompleteEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteAsyncBeginEventRecord(Writer* writer, uint64_t event_time,
-                                       const ThreadRef<thread_type>& thread_ref,
-                                       const StringRef<category_type>& category_ref,
-                                       const StringRef<name_type>& name_ref, uint64_t async_id,
-                                       Argument<arg_types, arg_name_types, arg_val_types>... args) {
+constexpr zx_status_t WriteAsyncBeginEventRecord(
+    Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    uint64_t async_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kAsyncBegin, async_id, args...);
+                                           EventType::kAsyncBegin, async_id, args...);
 }
 
 // Write an Async Instant Event using the given Writer
@@ -399,12 +398,12 @@ zx_status_t WriteAsyncBeginEventRecord(Writer* writer, uint64_t event_time,
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteAsyncInstantEventRecord(
+constexpr zx_status_t WriteAsyncInstantEventRecord(
     Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
     const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
     uint64_t async_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kAsyncInstant, async_id, args...);
+                                           EventType::kAsyncInstant, async_id, args...);
 }
 
 // Write an Async End Event using the given Writer
@@ -416,13 +415,12 @@ zx_status_t WriteAsyncInstantEventRecord(
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteAsyncEndEventRecord(Writer* writer, uint64_t event_time,
-                                     const ThreadRef<thread_type>& thread_ref,
-                                     const StringRef<category_type>& category_ref,
-                                     const StringRef<name_type>& name_ref, uint64_t async_id,
-                                     Argument<arg_types, arg_name_types, arg_val_types>... args) {
+constexpr zx_status_t WriteAsyncEndEventRecord(
+    Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    uint64_t async_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kAsyncEnd, async_id, args...);
+                                           EventType::kAsyncEnd, async_id, args...);
 }
 
 // Write a Flow Begin Event to the given Writer
@@ -438,13 +436,12 @@ zx_status_t WriteAsyncEndEventRecord(Writer* writer, uint64_t event_time,
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteFlowBeginEventRecord(Writer* writer, uint64_t event_time,
-                                      const ThreadRef<thread_type>& thread_ref,
-                                      const StringRef<category_type>& category_ref,
-                                      const StringRef<name_type>& name_ref, uint64_t flow_id,
-                                      Argument<arg_types, arg_name_types, arg_val_types>... args) {
+constexpr zx_status_t WriteFlowBeginEventRecord(
+    Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    uint64_t flow_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kFlowBegin, flow_id, args...);
+                                           EventType::kFlowBegin, flow_id, args...);
 }
 
 // Write a Flow Step Event to the given Writer
@@ -458,13 +455,12 @@ zx_status_t WriteFlowBeginEventRecord(Writer* writer, uint64_t event_time,
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteFlowStepEventRecord(Writer* writer, uint64_t event_time,
-                                     const ThreadRef<thread_type>& thread_ref,
-                                     const StringRef<category_type>& category_ref,
-                                     const StringRef<name_type>& name_ref, uint64_t flow_id,
-                                     Argument<arg_types, arg_name_types, arg_val_types>... args) {
+constexpr zx_status_t WriteFlowStepEventRecord(
+    Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    uint64_t flow_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kFlowStep, flow_id, args...);
+                                           EventType::kFlowStep, flow_id, args...);
 }
 
 // Write a Flow End Event to the given Writer
@@ -477,13 +473,12 @@ zx_status_t WriteFlowStepEventRecord(Writer* writer, uint64_t event_time,
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, RefType category_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteFlowEndEventRecord(Writer* writer, uint64_t event_time,
-                                    const ThreadRef<thread_type>& thread_ref,
-                                    const StringRef<category_type>& category_ref,
-                                    const StringRef<name_type>& name_ref, uint64_t flow_id,
-                                    Argument<arg_types, arg_name_types, arg_val_types>... args) {
+constexpr zx_status_t WriteFlowEndEventRecord(
+    Writer* writer, uint64_t event_time, const ThreadRef<thread_type>& thread_ref,
+    const StringRef<category_type>& category_ref, const StringRef<name_type>& name_ref,
+    uint64_t flow_id, Argument<arg_types, arg_name_types, arg_val_types>... args) {
   return internal::WriteOneWordEventRecord(writer, event_time, thread_ref, category_ref, name_ref,
-                                           fxt::EventType::kFlowEnd, flow_id, args...);
+                                           EventType::kFlowEnd, flow_id, args...);
 }
 
 // Write Block Record to the given Writer
@@ -493,14 +488,14 @@ zx_status_t WriteFlowEndEventRecord(Writer* writer, uint64_t event_time,
 //
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#blob-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType name_type>
-zx_status_t WriteBlobRecord(Writer* writer, const StringRef<name_type>& blob_name, BlobType type,
-                            const void* bytes, size_t num_bytes) {
+constexpr zx_status_t WriteBlobRecord(Writer* writer, const StringRef<name_type>& blob_name,
+                                      BlobType type, const void* bytes, size_t num_bytes) {
   const WordSize record_size =
       WordSize(1) + blob_name.PayloadSize() + WordSize::FromBytes(num_bytes);
-  uint64_t header = MakeHeader(RecordType::kBlob, record_size) |
-                    fxt::BlobRecordFields::NameStringRef::Make(blob_name.HeaderEntry()) |
-                    fxt::BlobRecordFields::BlobSize::Make(num_bytes) |
-                    fxt::BlobRecordFields::BlobType::Make(ToUnderlyingType(type));
+  const uint64_t header = MakeHeader(RecordType::kBlob, record_size) |
+                          BlobRecordFields::NameStringRef::Make(blob_name.HeaderEntry()) |
+                          BlobRecordFields::BlobSize::Make(num_bytes) |
+                          BlobRecordFields::BlobType::Make(ToUnderlyingType(type));
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
@@ -521,26 +516,22 @@ zx_status_t WriteBlobRecord(Writer* writer, const StringRef<name_type>& blob_nam
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
           RefType name_type, ArgumentType... arg_types, RefType... arg_name_types,
           RefType... arg_val_types>
-zx_status_t WriteUserspaceObjectRecord(
+constexpr zx_status_t WriteUserspaceObjectRecord(
     Writer* writer, uintptr_t pointer, const ThreadRef<thread_type>& thread_arg,
     const StringRef<name_type>& name_arg,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*pointer*/ +
-                         internal::TotalPayloadSize(thread_arg, name_arg, args...);
-
-  uint64_t header =
+  const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*pointer*/ +
+                               internal::TotalPayloadSize(thread_arg, name_arg, args...);
+  const uint64_t header =
       MakeHeader(RecordType::kUserspaceObject, record_size) |
-      fxt::UserspaceObjectRecordFields::ProcessThreadRef::Make(thread_arg.HeaderEntry()) |
-      fxt::UserspaceObjectRecordFields::NameStringRef::Make(name_arg.HeaderEntry()) |
-      fxt::UserspaceObjectRecordFields::ArgumentCount::Make(sizeof...(args));
+      UserspaceObjectRecordFields::ProcessThreadRef::Make(thread_arg.HeaderEntry()) |
+      UserspaceObjectRecordFields::NameStringRef::Make(name_arg.HeaderEntry()) |
+      UserspaceObjectRecordFields::ArgumentCount::Make(sizeof...(args));
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteWord(pointer);
-    thread_arg.Write(*res);
-    name_arg.Write(*res);
-    bool array[] = {(args.Write(*res), false)...};
-    (void)array;
+    internal::WriteElements(*res, thread_arg, name_arg, args...);
     res->Commit();
   }
   return res.status_value();
@@ -555,22 +546,20 @@ zx_status_t WriteUserspaceObjectRecord(
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#kernel-object-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType name_type,
           ArgumentType... arg_types, RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteKernelObjectRecord(
+constexpr zx_status_t WriteKernelObjectRecord(
     Writer* writer, Koid koid, zx_obj_type_t obj_type, const StringRef<name_type>& name_arg,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  WordSize record_size =
+  const WordSize record_size =
       WordSize(1) /*header*/ + WordSize(1) /*koid*/ + internal::TotalPayloadSize(name_arg, args...);
-  uint64_t header = MakeHeader(RecordType::kKernelObject, record_size) |
-                    fxt::KernelObjectRecordFields::ObjectType::Make(obj_type) |
-                    fxt::KernelObjectRecordFields::NameStringRef::Make(name_arg.HeaderEntry()) |
-                    fxt::KernelObjectRecordFields::ArgumentCount::Make(sizeof...(args));
+  const uint64_t header = MakeHeader(RecordType::kKernelObject, record_size) |
+                          KernelObjectRecordFields::ObjectType::Make(obj_type) |
+                          KernelObjectRecordFields::NameStringRef::Make(name_arg.HeaderEntry()) |
+                          KernelObjectRecordFields::ArgumentCount::Make(sizeof...(args));
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteWord(koid.koid);
-    name_arg.Write(*res);
-    bool array[] = {(args.Write(*res), false)...};
-    (void)array;
+    internal::WriteElements(*res, name_arg, args...);
     res->Commit();
   }
   return res.status_value();
@@ -584,22 +573,23 @@ zx_status_t WriteKernelObjectRecord(
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#context-switch-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType outgoing_type,
           RefType incoming_type>
-zx_status_t WriteContextSwitchRecord(Writer* writer, uint64_t event_time, uint8_t cpu_number,
-                                     zx_thread_state_t outgoing_thread_state,
-                                     const ThreadRef<outgoing_type>& outgoing_thread,
-                                     const ThreadRef<incoming_type>& incoming_thread,
-                                     uint8_t outgoing_thread_priority,
-                                     uint8_t incoming_thread_priority) {
+constexpr zx_status_t WriteContextSwitchRecord(Writer* writer, uint64_t event_time,
+                                               uint8_t cpu_number,
+                                               zx_thread_state_t outgoing_thread_state,
+                                               const ThreadRef<outgoing_type>& outgoing_thread,
+                                               const ThreadRef<incoming_type>& incoming_thread,
+                                               uint8_t outgoing_thread_priority,
+                                               uint8_t incoming_thread_priority) {
   const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*timestamp*/ +
                                outgoing_thread.PayloadSize() + incoming_thread.PayloadSize();
-  uint64_t header =
+  const uint64_t header =
       MakeHeader(RecordType::kContextSwitch, record_size) |
-      fxt::ContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
-      fxt::ContextSwitchRecordFields::OutgoingThreadState::Make(outgoing_thread_state) |
-      fxt::ContextSwitchRecordFields::OutgoingThreadRef::Make(outgoing_thread.HeaderEntry()) |
-      fxt::ContextSwitchRecordFields::IncomingThreadRef::Make(incoming_thread.HeaderEntry()) |
-      fxt::ContextSwitchRecordFields::OutgoingThreadPriority::Make(outgoing_thread_priority) |
-      fxt::ContextSwitchRecordFields::IncomingThreadPriority::Make(incoming_thread_priority);
+      ContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
+      ContextSwitchRecordFields::OutgoingThreadState::Make(outgoing_thread_state) |
+      ContextSwitchRecordFields::OutgoingThreadRef::Make(outgoing_thread.HeaderEntry()) |
+      ContextSwitchRecordFields::IncomingThreadRef::Make(incoming_thread.HeaderEntry()) |
+      ContextSwitchRecordFields::OutgoingThreadPriority::Make(outgoing_thread_priority) |
+      ContextSwitchRecordFields::IncomingThreadPriority::Make(incoming_thread_priority);
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
@@ -617,14 +607,14 @@ zx_status_t WriteContextSwitchRecord(Writer* writer, uint64_t event_time, uint8_
 //
 // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#log-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type>
-zx_status_t WriteLogRecord(Writer* writer, uint64_t event_time,
-                           const ThreadRef<thread_type>& thread_arg, const char* log_message,
-                           size_t log_message_length) {
+constexpr zx_status_t WriteLogRecord(Writer* writer, uint64_t event_time,
+                                     const ThreadRef<thread_type>& thread_arg,
+                                     const char* log_message, size_t log_message_length) {
   const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*timestamp*/ +
                                thread_arg.PayloadSize() + WordSize::FromBytes(log_message_length);
-  uint64_t header = MakeHeader(RecordType::kLog, record_size) |
-                    fxt::LogRecordFields::LogMessageLength::Make(log_message_length) |
-                    fxt::LogRecordFields::ThreadRef::Make(thread_arg.HeaderEntry());
+  const uint64_t header = MakeHeader(RecordType::kLog, record_size) |
+                          LogRecordFields::LogMessageLength::Make(log_message_length) |
+                          LogRecordFields::ThreadRef::Make(thread_arg.HeaderEntry());
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
@@ -647,20 +637,20 @@ zx_status_t WriteLogRecord(Writer* writer, uint64_t event_time,
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType category_type,
           RefType name_type, RefType thread_type, ArgumentType... arg_types,
           RefType... arg_name_types, RefType... arg_val_types>
-zx_status_t WriteLargeBlobRecordWithMetadata(
+constexpr zx_status_t WriteLargeBlobRecordWithMetadata(
     Writer* writer, uint64_t timestamp, const StringRef<category_type>& category_ref,
     const StringRef<name_type>& name_ref, const ThreadRef<thread_type>& thread_ref,
     const void* data, size_t num_bytes,
     const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*metadata word*/ +
-                         WordSize(1) /*timestamp*/ +
-                         internal::TotalPayloadSize(category_ref, name_ref, thread_ref) +
-                         /*blob size*/ WordSize(1) + WordSize::FromBytes(num_bytes) +
-                         internal::TotalPayloadSize(args...);
-  uint64_t header =
+  const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*metadata word*/ +
+                               WordSize(1) /*timestamp*/ +
+                               internal::TotalPayloadSize(category_ref, name_ref, thread_ref) +
+                               /*blob size*/ WordSize(1) + WordSize::FromBytes(num_bytes) +
+                               internal::TotalPayloadSize(args...);
+  const uint64_t header =
       MakeLargeHeader(LargeRecordType::kBlob, record_size) |
-      fxt::LargeBlobFields::BlobFormat::Make(ToUnderlyingType(LargeBlobFormat::kMetadata));
-  uint64_t blob_header =
+      LargeBlobFields::BlobFormat::Make(ToUnderlyingType(LargeBlobFormat::kMetadata));
+  const uint64_t blob_header =
       BlobFormatEventFields::CategoryStringRef::Make(category_ref.HeaderEntry()) |
       BlobFormatEventFields::NameStringRef::Make(name_ref.HeaderEntry()) |
       BlobFormatEventFields::ArgumentCount::Make(sizeof...(args)) |
@@ -673,8 +663,7 @@ zx_status_t WriteLargeBlobRecordWithMetadata(
     name_ref.Write(*res);
     res->WriteWord(timestamp);
     thread_ref.Write(*res);
-    bool array[] = {(args.Write(*res), false)...};
-    (void)array;
+    internal::WriteElements(*res, args...);
     res->WriteWord(num_bytes);
     res->WriteBytes(data, num_bytes);
     res->Commit();
@@ -691,18 +680,17 @@ zx_status_t WriteLargeBlobRecordWithMetadata(
 // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#in_band_large_blob_record_no_metadata_blob_format_1
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType category_type,
           RefType name_type>
-zx_status_t WriteLargeBlobRecordWithNoMetadata(Writer* writer,
-                                               const StringRef<category_type>& category_ref,
-                                               const StringRef<name_type>& name_ref,
-                                               const void* data, size_t num_bytes) {
-  WordSize record_size = /*header*/ WordSize(1) + /*blob header*/ WordSize(1) +
-                         internal::TotalPayloadSize(category_ref, name_ref) +
-                         /*blob size*/ WordSize(1) + WordSize::FromBytes(num_bytes);
+constexpr zx_status_t WriteLargeBlobRecordWithNoMetadata(
+    Writer* writer, const StringRef<category_type>& category_ref,
+    const StringRef<name_type>& name_ref, const void* data, size_t num_bytes) {
+  const WordSize record_size = /*header*/ WordSize(1) + /*blob header*/ WordSize(1) +
+                               internal::TotalPayloadSize(category_ref, name_ref) +
+                               /*blob size*/ WordSize(1) + WordSize::FromBytes(num_bytes);
 
-  uint64_t header =
+  const uint64_t header =
       MakeLargeHeader(LargeRecordType::kBlob, record_size) |
-      fxt::LargeBlobFields::BlobFormat::Make(ToUnderlyingType(LargeBlobFormat::kNoMetadata));
-  uint64_t blob_header =
+      LargeBlobFields::BlobFormat::Make(ToUnderlyingType(LargeBlobFormat::kNoMetadata));
+  const uint64_t blob_header =
       BlobFormatAttachmentFields::CategoryStringRef::Make(category_ref.HeaderEntry()) |
       BlobFormatAttachmentFields::NameStringRef::Make(name_ref.HeaderEntry());
 

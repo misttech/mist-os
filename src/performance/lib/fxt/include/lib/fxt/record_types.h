@@ -14,6 +14,7 @@
 #include <type_traits>
 
 namespace fxt {
+
 // Pad a given size to a multiple of 8 bytes.
 constexpr size_t Pad(size_t size) { return size + ((8 - (size & 7)) & 7); }
 
@@ -26,12 +27,13 @@ struct WordSize {
 
   constexpr size_t SizeInBytes() const { return num_words_ * sizeof(uint64_t); }
   constexpr size_t SizeInWords() const { return num_words_; }
-  WordSize operator+=(const WordSize& other) {
+
+  constexpr WordSize operator+=(const WordSize& other) {
     num_words_ += other.num_words_;
     return *this;
   }
 
-  WordSize operator+(const WordSize& other) const {
+  constexpr WordSize operator+(const WordSize& other) const {
     return WordSize(num_words_ + other.num_words_);
   }
 
