@@ -325,7 +325,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
 
     /// Get the count of networks in store, including multiple values with same SSID
     async fn known_network_count(&self) -> usize {
-        self.saved_networks.lock().await.values().into_iter().flatten().count()
+        self.saved_networks.lock().await.values().flatten().count()
     }
 
     async fn lookup(&self, id: &NetworkIdentifier) -> Vec<NetworkConfig> {
@@ -348,7 +348,6 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                         .iter()
                         // Check for conflicts; PSKs can't be used to connect to WPA3 networks.
                         .filter(|config| security_is_compatible(&scan_security, &config.credential))
-                        .into_iter()
                         .map(Clone::clone),
                 );
             }
@@ -543,13 +542,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
-        self.saved_networks
-            .lock()
-            .await
-            .values()
-            .into_iter()
-            .flat_map(|cfgs| cfgs.clone())
-            .collect()
+        self.saved_networks.lock().await.values().flat_map(|cfgs| cfgs.clone()).collect()
     }
 
     async fn get_past_connections(

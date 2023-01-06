@@ -18,10 +18,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use super::size_check::PackageBlobSizeInfo;
-use gcs::{
-    client::{Client},
-    gs_url::split_gs_url,
-};
+use gcs::{client::Client, gs_url::split_gs_url};
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
 
@@ -277,7 +274,6 @@ fn calculate_package_sizes(blobfs_contents: &BlobfsContents) -> Result<Vec<Packa
                 .map(|b| (b.merkle.to_string(), b.used_space_in_blobfs))
                 .collect::<HashMap<String, u64>>()
                 .values()
-                .into_iter()
                 .sum::<u64>(),
             proportional_size: p
                 .blobs
@@ -290,7 +286,6 @@ fn calculate_package_sizes(blobfs_contents: &BlobfsContents) -> Result<Vec<Packa
                 })
                 .collect::<HashMap<String, u64>>()
                 .values()
-                .into_iter()
                 .sum::<u64>(),
             blobs: p
                 .blobs
@@ -354,7 +349,7 @@ fn calculate_total_blobfs_size(blobfs_contents: &BlobfsContents) -> Result<u64> 
         .map(|b| (b.merkle.to_string(), b.used_space_in_blobfs))
         .collect();
 
-    Ok(merkle_size_map.values().into_iter().sum::<u64>())
+    Ok(merkle_size_map.values().sum::<u64>())
 }
 
 /// Prints the difference between the contents of two blobfs images broken down by package
@@ -384,8 +379,7 @@ fn print_size_diff(
         other_package_sizes.iter().map(|p| (p.name.to_string(), p)).collect();
     let all_package_names: HashSet<String> = package_sizes_map
         .keys()
-        .into_iter()
-        .chain(other_package_sizes_map.keys().into_iter())
+        .chain(other_package_sizes_map.keys())
         .map(|name| name.to_string())
         .collect();
 
@@ -614,8 +608,7 @@ fn calculate_package_diff(
     // Sort paths alphabetically within a package.
     let all_paths: BTreeSet<String> = current_package_blobs_map
         .keys()
-        .into_iter()
-        .chain(other_package_blobs_map.keys().into_iter())
+        .chain(other_package_blobs_map.keys())
         .map(|p| p.to_string())
         .collect();
 

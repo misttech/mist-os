@@ -261,13 +261,7 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
-        self.saved_networks
-            .lock()
-            .await
-            .values()
-            .into_iter()
-            .flat_map(|cfgs| cfgs.clone())
-            .collect()
+        self.saved_networks.lock().await.values().flat_map(|cfgs| cfgs.clone()).collect()
     }
 
     async fn get_past_connections(

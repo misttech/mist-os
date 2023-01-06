@@ -298,7 +298,6 @@ impl From<InputDevice> for FidlInputDevice {
         let source_states = Some(
             source_state_map
                 .keys()
-                .into_iter()
                 .map(|source| {
                     let mut source_state = FidlSourceState::EMPTY;
                     source_state.source = Some((*source).into());

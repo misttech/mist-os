@@ -423,7 +423,7 @@ impl PhyManagerApi for PhyManager {
                 // Regardless of whether or not new interfaces were created or existing interfaces
                 // were discovered, notify the caller of all interface IDs available for this PHY.
                 let mut available_interfaces =
-                    phy_container.client_ifaces.keys().into_iter().cloned().collect();
+                    phy_container.client_ifaces.keys().cloned().collect();
                 available_iface_ids.append(&mut available_interfaces);
             }
         }

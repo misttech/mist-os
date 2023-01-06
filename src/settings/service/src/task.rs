@@ -235,7 +235,7 @@ impl<C: Category + 'static> Summary<C> {
 
     /// Returns the completed task count.
     pub(super) fn get_completed_task_count(&self) -> i64 {
-        self.statistics.values().into_iter().map(|stat| stat.lifetime_count).sum()
+        self.statistics.values().map(|stat| stat.lifetime_count).sum()
     }
 
     /// Returns the active task count.
@@ -245,7 +245,7 @@ impl<C: Category + 'static> Summary<C> {
 
     /// Returns the categories with currently running tasks.
     pub(super) fn get_active_categories(&self) -> Vec<C> {
-        self.active_tasks.values().into_iter().unique().cloned().collect()
+        self.active_tasks.values().unique().cloned().collect()
     }
 
     /// Returns the seen categories.
