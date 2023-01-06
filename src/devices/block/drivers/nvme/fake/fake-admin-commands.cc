@@ -49,6 +49,7 @@ void MakeIdentifyController(nvme::IdentifyController* out) {
   out->set_sqes_min_log2(__builtin_ctzl(sizeof(nvme::Submission)));
   out->num_namespaces = 256;
   out->max_data_transfer = 2;
+  out->vwc = 1;
 
   memset(out->serial_number, ' ', sizeof(out->serial_number));
   memset(out->model_number, ' ', sizeof(out->model_number));

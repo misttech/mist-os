@@ -36,9 +36,9 @@ class CreateIoSubmissionQueueSubmission : public Submission {
   DEF_SUBBIT(dword11, 0, contiguous);
 };
 
-class DeleteIoQueue : public Submission {
+class DeleteIoQueueSubmission : public Submission {
  public:
-  explicit DeleteIoQueue(bool is_completion)
+  explicit DeleteIoQueueSubmission(bool is_completion)
       : Submission(is_completion ? AdminCommandOpcode::kDeleteIoCompletionQueue
                                  : AdminCommandOpcode::kDeleteIoSubmissionQueue) {}
 
