@@ -22,7 +22,7 @@ namespace {
 // This is a locally administered MAC address (first byte 0x02) mixed with the
 // Google Organizationally Unique Identifier (00:1a:11). The host gets ff:ff:ff
 // and the guest gets 00:00:00 for the last three octets.
-constexpr fuchsia::hardware::ethernet::MacAddress kGuestMacAddress = {
+constexpr fuchsia::net::MacAddress kGuestMacAddress = {
     .octets = {0x02, 0x1a, 0x11, 0x00, 0x01, 0x00},
 };
 

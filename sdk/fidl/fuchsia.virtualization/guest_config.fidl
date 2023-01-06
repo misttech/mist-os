@@ -4,7 +4,7 @@
 library fuchsia.virtualization;
 
 using fuchsia.hardware.block;
-using fuchsia.hardware.ethernet;
+using fuchsia.net;
 using fuchsia.io;
 using fuchsia.wayland;
 using zx;
@@ -47,7 +47,7 @@ type BlockSpec = resource struct {
 /// Properites describing a network device.
 type NetSpec = struct {
     /// MAC address for the network device.
-    mac_address fuchsia.hardware.ethernet.MacAddress;
+    mac_address fuchsia.net.MacAddress;
     /// Whether to bridge the network device with the host network device.
     enable_bridge bool;
 };

@@ -17,8 +17,8 @@ fidl("fuchsia.virtualization") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block",
-    "//sdk/fidl/fuchsia.hardware.ethernet",
     "//sdk/fidl/fuchsia.io",
+    "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.wayland",
   ]
 }

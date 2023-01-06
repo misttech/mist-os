@@ -8,7 +8,6 @@
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/net/stack/cpp/fidl.h>
 #include <fuchsia/net/virtualization/cpp/fidl.h>
-#include <fuchsia/netstack/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>

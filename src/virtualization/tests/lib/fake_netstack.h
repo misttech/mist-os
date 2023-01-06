@@ -5,8 +5,7 @@
 #ifndef SRC_VIRTUALIZATION_TESTS_LIB_FAKE_NETSTACK_H_
 #define SRC_VIRTUALIZATION_TESTS_LIB_FAKE_NETSTACK_H_
 
-#include <fuchsia/net/interfaces/cpp/fidl_test_base.h>
-#include <fuchsia/netstack/cpp/fidl_test_base.h>
+#include <fuchsia/net/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fpromise/promise.h>
@@ -19,13 +18,11 @@ namespace fake_netstack::internal {
 class FakeNetwork;
 }
 
-// Implements a fake netstack, providing the APIs:
+// Implements a fake netstack, providing the fuchsia.net.virtualization.Control
+// API.
 //
-//   * fuchsia.net.virtualization.Control
-//   * fuchsia.netstack.NetStack
-//
-// and allowing packets to be sent and received from devices that attach to
-// the fake netstack.
+// and allowing packets to be sent and received from devices that attach to the
+// fake netstack.
 //
 // Thread-safe.
 class FakeNetstack : public component_testing::LocalComponent {
@@ -35,16 +32,16 @@ class FakeNetstack : public component_testing::LocalComponent {
 
   // Send a packet with UDP headers, including the ethernet and IPv6 headers, to the interface with
   // the specified MAC address.
-  fpromise::promise<void, zx_status_t> SendUdpPacket(
-      const fuchsia::hardware::ethernet::MacAddress& mac_addr, std::vector<uint8_t> packet);
+  fpromise::promise<void, zx_status_t> SendUdpPacket(const fuchsia::net::MacAddress& mac_addr,
+                                                     std::vector<uint8_t> packet);
 
   // Send a raw packet to the interface with the specified MAC address.
-  fpromise::promise<void, zx_status_t> SendPacket(
-      const fuchsia::hardware::ethernet::MacAddress& mac_addr, std::vector<uint8_t> packet);
+  fpromise::promise<void, zx_status_t> SendPacket(const fuchsia::net::MacAddress& mac_addr,
+                                                  std::vector<uint8_t> packet);
 
   // Receive a raw packet from the interface with the specified MAC address.
   fpromise::promise<std::vector<uint8_t>, zx_status_t> ReceivePacket(
-      const fuchsia::hardware::ethernet::MacAddress& mac_addr);
+      const fuchsia::net::MacAddress& mac_addr);
 
   void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override;
 

@@ -11,7 +11,7 @@ fidl("fuchsia.virtualization.hardware") {
   sources = [ "device.fidl" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.ethernet",
+    "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.sysmem",
     "//sdk/fidl/fuchsia.ui.composition",
     "//sdk/fidl/fuchsia.ui.gfx",

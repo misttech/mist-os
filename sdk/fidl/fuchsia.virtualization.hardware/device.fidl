@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.virtualization.hardware;
 
-using fuchsia.hardware.ethernet;
+using fuchsia.net;
 using fuchsia.sysmem;
 using fuchsia.ui.composition;
 using fuchsia.ui.gfx;
@@ -190,7 +190,7 @@ protocol VirtioNet {
     /// Start the net device.
     Start(resource struct {
         start_info StartInfo;
-        mac_address fuchsia.hardware.ethernet.MacAddress;
+        mac_address fuchsia.net.MacAddress;
         enable_bridge bool;
     }) -> () error zx.status;
 };

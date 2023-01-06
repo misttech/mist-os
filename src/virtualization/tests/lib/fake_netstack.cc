@@ -6,7 +6,6 @@
 
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/net/virtualization/cpp/fidl.h>
-#include <fuchsia/netstack/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
@@ -54,8 +53,7 @@ constexpr uint16_t kTestPort = 4242;
 
 // Compare MacAddress using lexicographical ordering.
 struct MacAddressComparator {
-  bool operator()(const fuchsia::hardware::ethernet::MacAddress& a,
-                  const fuchsia::hardware::ethernet::MacAddress& b) const {
+  bool operator()(const fuchsia::net::MacAddress& a, const fuchsia::net::MacAddress& b) const {
     return std::lexicographical_compare(a.octets.begin(), a.octets.end(), b.octets.begin(),
                                         b.octets.end());
   }
@@ -342,8 +340,7 @@ class FakeNetwork : public fuchsia::net::virtualization::Control,
 
   // Wait for a device with the given MAC address to be added to this network,
   // and then return it.
-  fpromise::promise<Device*, zx_status_t> GetDevice(
-      const fuchsia::hardware::ethernet::MacAddress& mac_addr) {
+  fpromise::promise<Device*, zx_status_t> GetDevice(const fuchsia::net::MacAddress& mac_addr) {
     std::lock_guard guard(checker_);
 
     // If the device is already connected the the netstack then just return
@@ -410,7 +407,7 @@ class FakeNetwork : public fuchsia::net::virtualization::Control,
       FX_LOGS(WARNING) << "Ignoring attempt to add device without a MAC address";
       return;
     }
-    fuchsia::hardware::ethernet::MacAddress device_mac;
+    fuchsia::net::MacAddress device_mac;
     memcpy(&device_mac.octets[0], device->port_info().unicast_address->octets.data(),
            sizeof(device_mac.octets));
 
@@ -440,12 +437,12 @@ class FakeNetwork : public fuchsia::net::virtualization::Control,
   fidl::BindingSet<fuchsia::net::virtualization::Network> network_bindings_ __TA_GUARDED(checker_);
 
   // Maps MAC addresses to devices.
-  std::map<fuchsia::hardware::ethernet::MacAddress, std::unique_ptr<Device>, MacAddressComparator>
-      devices_ __TA_GUARDED(checker_);
+  std::map<fuchsia::net::MacAddress, std::unique_ptr<Device>, MacAddressComparator> devices_
+      __TA_GUARDED(checker_);
 
   // Maps MAC addresses to completers, to enable the GetDevice promises.
-  std::map<fuchsia::hardware::ethernet::MacAddress,
-           std::vector<fpromise::completer<Device*, zx_status_t>>, MacAddressComparator>
+  std::map<fuchsia::net::MacAddress, std::vector<fpromise::completer<Device*, zx_status_t>>,
+           MacAddressComparator>
       completers_ __TA_GUARDED(checker_);
 
   fpromise::scope scope_ __TA_GUARDED(checker_);
@@ -484,7 +481,7 @@ FakeNetstack::~FakeNetstack() {
 }
 
 fpromise::promise<void, zx_status_t> FakeNetstack::SendUdpPacket(
-    const fuchsia::hardware::ethernet::MacAddress& mac_addr, std::vector<uint8_t> packet) {
+    const fuchsia::net::MacAddress& mac_addr, std::vector<uint8_t> packet) {
   size_t total_length = sizeof(ethhdr) + sizeof(iphdr) + sizeof(udphdr) + packet.size();
   if (total_length > kMtu) {
     return fpromise::make_error_promise(ZX_ERR_BUFFER_TOO_SMALL);
@@ -534,7 +531,7 @@ fpromise::promise<void, zx_status_t> FakeNetstack::SendUdpPacket(
 }
 
 fpromise::promise<void, zx_status_t> FakeNetstack::SendPacket(
-    const fuchsia::hardware::ethernet::MacAddress& mac_addr, std::vector<uint8_t> packet) {
+    const fuchsia::net::MacAddress& mac_addr, std::vector<uint8_t> packet) {
   if (packet.size() > kMtu) {
     return fpromise::make_error_promise(ZX_ERR_INVALID_ARGS);
   }
@@ -550,7 +547,7 @@ fpromise::promise<void, zx_status_t> FakeNetstack::SendPacket(
 }
 
 fpromise::promise<std::vector<uint8_t>, zx_status_t> FakeNetstack::ReceivePacket(
-    const fuchsia::hardware::ethernet::MacAddress& mac_addr) {
+    const fuchsia::net::MacAddress& mac_addr) {
   return fpromise::schedule_for_consumer(
              &executor_,
              fpromise::make_promise([mac_addr, this]() { return network_->GetDevice(mac_addr); })

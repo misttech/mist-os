@@ -9,7 +9,7 @@ use {
     crate::guest_config,
     anyhow::{anyhow, Error},
     fidl::endpoints::{Proxy, ServerEnd},
-    fidl_fuchsia_hardware_ethernet::MacAddress,
+    fidl_fuchsia_net::MacAddress,
     fidl_fuchsia_net_interfaces as ninterfaces,
     fidl_fuchsia_virtualization::{
         GuestConfig, GuestDescriptor, GuestError, GuestLifecycleMarker, GuestLifecycleProxy,

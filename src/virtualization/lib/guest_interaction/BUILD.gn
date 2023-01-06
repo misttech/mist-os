@@ -107,7 +107,6 @@ source_set("integration_test_lib") {
     ":fuchsia.virtualization.guest.interaction_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_hlcpp",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
     "//src/lib/testing/predicates",
     "//src/virtualization/tests/lib:guest_console",

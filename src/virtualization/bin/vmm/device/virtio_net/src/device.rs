@@ -8,7 +8,7 @@ use {
         wire,
     },
     anyhow::{anyhow, Error},
-    fidl_fuchsia_hardware_ethernet::MacAddress,
+    fidl_fuchsia_net::MacAddress,
     fuchsia_zircon as zx,
     futures::{channel::mpsc::UnboundedReceiver, StreamExt},
     machina_virtio_device::{GuestMem, WrappedDescChainStream},

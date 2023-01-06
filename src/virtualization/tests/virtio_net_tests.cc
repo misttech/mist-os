@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/netstack/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
@@ -30,10 +29,10 @@ static constexpr size_t kTestPacketSize = 1000;
 // Includes ethernet + IPv4 + UDP headers.
 static constexpr size_t kHeadersSize = 42;
 
-static constexpr fuchsia::hardware::ethernet::MacAddress kDefaultMacAddress = {
+static constexpr fuchsia::net::MacAddress kDefaultMacAddress = {
     .octets = {0x02, 0x1a, 0x11, 0x00, 0x01, 0x00},
 };
-static constexpr fuchsia::hardware::ethernet::MacAddress kSecondNicMacAddress = {
+static constexpr fuchsia::net::MacAddress kSecondNicMacAddress = {
     .octets = {0x02, 0x1a, 0x11, 0x00, 0x01, 0x01},
 };
 static constexpr fuchsia::virtualization::NetSpec kSecondNicNetSpec = {
@@ -63,7 +62,7 @@ fpromise::promise<V, E> SelectPromise(fpromise::promise<V, E>& a, fpromise::prom
         return fpromise::pending();
       });
 }
-static void TestThread(fuchsia::hardware::ethernet::MacAddress mac_addr, FakeNetstack* netstack,
+static void TestThread(fuchsia::net::MacAddress mac_addr, FakeNetstack* netstack,
                        uint8_t receive_byte, uint8_t send_byte, bool rotate_bytes,
                        bool use_raw_packets, fpromise::consumer<void, void> consumer) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

@@ -26,10 +26,9 @@ class VirtioNet
  public:
   explicit VirtioNet(const PhysMem& phys_mem);
 
-  zx_status_t Start(const zx::guest& guest,
-                    const fuchsia::hardware::ethernet::MacAddress& mac_address, bool enable_bridge,
-                    ::sys::ComponentContext* context, async_dispatcher_t* dispatcher,
-                    size_t component_name_suffix);
+  zx_status_t Start(const zx::guest& guest, const fuchsia::net::MacAddress& mac_address,
+                    bool enable_bridge, ::sys::ComponentContext* context,
+                    async_dispatcher_t* dispatcher, size_t component_name_suffix);
 
  private:
   fuchsia::sys::ComponentControllerPtr controller_;

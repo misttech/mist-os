@@ -100,7 +100,6 @@ source_set("fake_netstack") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/connectivity/lib/network-device/cpp",
     "//src/lib/inet",
@@ -110,7 +109,7 @@ source_set("fake_netstack") {
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.netstack:fuchsia.netstack_hlcpp",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp/testing:cpp",
   ]

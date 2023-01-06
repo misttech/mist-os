@@ -20,8 +20,7 @@ VirtioNet::VirtioNet(const PhysMem& phys_mem)
                             fit::bind_member(this, &VirtioNet::ConfigureQueue),
                             fit::bind_member(this, &VirtioNet::Ready)) {}
 
-zx_status_t VirtioNet::Start(const zx::guest& guest,
-                             const fuchsia::hardware::ethernet::MacAddress& mac_address,
+zx_status_t VirtioNet::Start(const zx::guest& guest, const fuchsia::net::MacAddress& mac_address,
                              bool enable_bridge, ::sys::ComponentContext* context,
                              async_dispatcher_t* dispatcher, size_t component_name_suffix) {
   std::string component_name = fxl::StringPrintf("virtio_net_%zu", component_name_suffix);

@@ -8,7 +8,7 @@
 
 use {
     crate::interface,
-    fidl_fuchsia_hardware_ethernet::MacAddress,
+    fidl_fuchsia_net::MacAddress,
     fuchsia_zircon as zx,
     futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     std::{marker::PhantomPinned, pin::Pin},

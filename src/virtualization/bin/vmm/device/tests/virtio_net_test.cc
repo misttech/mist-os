@@ -184,7 +184,7 @@ class VirtioNetTest : public TestWithDevice {
     zx_status_t status = MakeStartInfo(tx_queue_.end(), &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    fuchsia::hardware::ethernet::MacAddress mac_address = {
+    fuchsia::net::MacAddress mac_address = {
         .octets = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
     };
 

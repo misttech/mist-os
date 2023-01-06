@@ -273,7 +273,7 @@ mod test {
     use {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_hardware_ethernet::MacAddress,
+        fidl_fuchsia_net::MacAddress,
         fidl_fuchsia_virtualization::{
             GuestDescriptor, GuestError, GuestInfo, GuestManagerMarker, NetSpec,
         },

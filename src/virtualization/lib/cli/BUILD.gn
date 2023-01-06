@@ -38,7 +38,7 @@ rustc_library("guest_cli") {
   }
 
   test_deps = [
-    "//sdk/fidl/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
