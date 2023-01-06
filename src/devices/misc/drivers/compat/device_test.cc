@@ -785,6 +785,7 @@ TEST_F(DeviceTest, TestBind) {
 
   ASSERT_TRUE(test_loop().RunUntilIdle());
   ASSERT_TRUE(callback_called);
+  ASSERT_FALSE(static_cast<devfs_fidl::DeviceInterface*>(second_device)->IsUnbound());
 }
 
 TEST_F(DeviceTest, TestBindAlreadyBound) {

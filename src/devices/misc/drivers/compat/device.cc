@@ -800,6 +800,7 @@ fpromise::promise<void, zx_status_t> Device::RebindToLibname(std::string_view li
             ptr->node_ = {};
             zx_status_t status = ptr->CreateNode();
             ptr->pending_rebind_ = false;
+            ptr->pending_removal_ = false;
             if (status != ZX_OK) {
               FDF_LOGL(ERROR, ptr->logger(), "Failed to recreate node: %s",
                        zx_status_get_string(status));
@@ -1054,7 +1055,7 @@ void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
 void Device::LogError(const char* error) {
   FDF_LOG(ERROR, "%s: %s", topological_path_.c_str(), error);
 }
-bool Device::IsUnbound() { return pending_removal_; }
+bool Device::IsUnbound() { return pending_removal_ && !pending_rebind_; }
 
 void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                  ConnectToDeviceFidlCompleter::Sync& completer) {
