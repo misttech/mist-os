@@ -12,6 +12,9 @@ namespace a11y::gesture_util_v2 {
 
 namespace {
 
+// Trivial conversion, just massaging types.
+::fuchsia::math::PointF Point2ToPointF(std::array<float, 2> point) { return {point[0], point[1]}; }
+
 ::fuchsia::math::PointF Centroid(const std::vector<::fuchsia::math::PointF>& points) {
   ::fuchsia::math::PointF centroid;
 
@@ -26,15 +29,19 @@ namespace {
   return centroid;
 }
 
-void UpdateLastEventInfo(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event,
+void UpdateLastEventInfo(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event,
                          GestureContext* gesture_context) {
-  gesture_context->last_event_pointer_id = pointer_event.pointer_id();
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
 
-  gesture_context->last_event_time =
-      pointer_event.has_event_time() ? pointer_event.event_time() : 0;
+  FX_DCHECK(sample.has_interaction());
+  gesture_context->last_event_pointer_id = sample.interaction().pointer_id;
 
-  FX_DCHECK(pointer_event.has_phase());
-  gesture_context->last_event_phase = pointer_event.phase();
+  FX_DCHECK(event.touch_event.has_timestamp());
+  gesture_context->last_event_time = event.touch_event.timestamp();
+
+  FX_DCHECK(sample.has_phase());
+  gesture_context->last_event_phase = sample.phase();
 }
 
 }  // namespace
@@ -57,66 +64,50 @@ void UpdateLastEventInfo(const fuchsia::ui::input::accessibility::PointerEvent& 
   return Centroid(points);
 }
 
-bool InitializeStartingGestureContext(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event,
+void InitializeStartingGestureContext(
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event,
     GestureContext* gesture_context) {
-  uint32_t pointer_id;
-  if (!pointer_event.has_pointer_id()) {
-    return false;
-  }
-  pointer_id = pointer_event.pointer_id();
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
 
-  if (!pointer_event.has_viewref_koid()) {
-    return false;
-  }
-  gesture_context->view_ref_koid = pointer_event.viewref_koid();
+  FX_DCHECK(sample.has_interaction());
+  uint32_t pointer_id = sample.interaction().pointer_id;
 
-  PointerLocation location;
-  location.pointer_on_screen = true;
+  gesture_context->view_ref_koid = event.local_viewref_koid;
 
-  if (pointer_event.has_ndc_point()) {
-    location.ndc_point = pointer_event.ndc_point();
-  }
-
-  if (pointer_event.has_local_point()) {
-    location.local_point = pointer_event.local_point();
-  }
+  FX_DCHECK(sample.has_position_in_viewport());
+  PointerLocation location = {
+      .pointer_on_screen = true,
+      .ndc_point = Point2ToPointF(sample.position_in_viewport()),
+      .local_point = Point2ToPointF(event.local_point),
+  };
 
   gesture_context->starting_pointer_locations[pointer_id] =
       gesture_context->current_pointer_locations[pointer_id] = location;
 
-  UpdateLastEventInfo(pointer_event, gesture_context);
-
-  return true;
+  UpdateLastEventInfo(event, gesture_context);
 }
 
-bool UpdateGestureContext(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event,
+void UpdateGestureContext(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event,
                           bool pointer_on_screen, GestureContext* gesture_context) {
-  uint32_t pointer_id;
-  if (!pointer_event.has_pointer_id()) {
-    return false;
-  }
-  pointer_id = pointer_event.pointer_id();
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
 
-  if (!pointer_event.has_viewref_koid()) {
-    return false;
-  }
-  gesture_context->view_ref_koid = pointer_event.viewref_koid();
+  FX_DCHECK(sample.has_interaction());
+  uint32_t pointer_id = sample.interaction().pointer_id;
 
-  if (pointer_event.has_ndc_point()) {
-    gesture_context->current_pointer_locations[pointer_id].ndc_point = pointer_event.ndc_point();
-  }
+  gesture_context->view_ref_koid = event.local_viewref_koid;
 
-  if (pointer_event.has_local_point()) {
-    gesture_context->current_pointer_locations[pointer_id].local_point =
-        pointer_event.local_point();
-  }
+  FX_DCHECK(sample.has_position_in_viewport());
+  gesture_context->current_pointer_locations[pointer_id].ndc_point =
+      Point2ToPointF(sample.position_in_viewport());
+
+  gesture_context->current_pointer_locations[pointer_id].local_point =
+      Point2ToPointF(event.local_point);
 
   gesture_context->current_pointer_locations[pointer_id].pointer_on_screen = pointer_on_screen;
 
-  UpdateLastEventInfo(pointer_event, gesture_context);
-
-  return true;
+  UpdateLastEventInfo(event, gesture_context);
 }
 
 uint32_t NumberOfFingersOnScreen(const GestureContext& gesture_context) {
@@ -145,27 +136,34 @@ void ResetGestureContext(GestureContext* gesture_context) {
 }
 
 bool ValidatePointerEvent(const GestureContext& gesture_context,
-                          const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {
-  // Check if pointer_event has all the required fields.
-  if (!pointer_event.has_event_time() || !pointer_event.has_pointer_id() ||
-      !pointer_event.has_device_id() || !pointer_event.has_ndc_point()) {
-    FX_LOGS(INFO) << "Pointer Event is missing required information.";
-    return false;
+                          const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
+  // Check if `event` has all the required fields.
+  if (event.touch_event.has_timestamp() && event.touch_event.has_pointer_sample() &&
+      event.touch_event.pointer_sample().has_interaction()) {
+    uint32_t pointer_id = event.touch_event.pointer_sample().interaction().pointer_id;
+    return gesture_context.starting_pointer_locations.count(pointer_id);
   }
 
-  return gesture_context.starting_pointer_locations.count(pointer_event.pointer_id());
+  FX_LOGS(INFO) << "Pointer Event is missing required information.";
+  return false;
 }
 
 bool PointerEventIsValidTap(const GestureContext& gesture_context,
-                            const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {
-  FX_DCHECK(pointer_event.has_pointer_id());
-  if (!gesture_context.starting_pointer_locations.count(pointer_event.pointer_id())) {
+                            const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
+
+  FX_DCHECK(sample.has_interaction());
+  uint32_t pointer_id = sample.interaction().pointer_id;
+
+  if (!gesture_context.starting_pointer_locations.count(pointer_id)) {
     return false;
   }
 
+  FX_DCHECK(sample.has_position_in_viewport());
   return SquareDistanceBetweenPoints(
-             pointer_event.ndc_point(),
-             gesture_context.starting_pointer_locations.at(pointer_event.pointer_id()).ndc_point) <=
+             Point2ToPointF(sample.position_in_viewport()),
+             gesture_context.starting_pointer_locations.at(pointer_id).ndc_point) <=
          kGestureMoveThreshold * kGestureMoveThreshold;
 }
 

@@ -5,8 +5,8 @@
 #ifndef SRC_UI_A11Y_LIB_TESTING_INPUT_V2_H_
 #define SRC_UI_A11Y_LIB_TESTING_INPUT_V2_H_
 
-#include <fuchsia/ui/input/accessibility/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 
 #include <vector>
 
@@ -14,14 +14,14 @@
 
 namespace accessibility_test::input_v2 {
 
-using PointerId = decltype(fuchsia::ui::input::PointerEvent::pointer_id);
+using PointerId = decltype(fuchsia::ui::pointer::TouchInteractionId::pointer_id);
 
 struct PointerParams {
-  PointerParams(PointerId pointer_id, fuchsia::ui::input::PointerEventPhase phase,
+  PointerParams(PointerId pointer_id, fuchsia::ui::pointer::EventPhase phase,
                 const glm::vec2& coordinate);
 
   PointerId pointer_id;
-  fuchsia::ui::input::PointerEventPhase phase;
+  fuchsia::ui::pointer::EventPhase phase;
   glm::vec2 coordinate;
 };
 
@@ -88,9 +88,9 @@ std::vector<PointerParams> MoveEvents(PointerId pointer_id, const glm::vec2& sta
 std::vector<PointerParams> DragEvents(PointerId pointer_id, const glm::vec2& start,
                                       const glm::vec2& end, size_t moves = kDefaultMoves);
 
-fuchsia::ui::input::accessibility::PointerEvent ToPointerEvent(const PointerParams& params,
-                                                               uint64_t event_time,
-                                                               zx_koid_t koid = 0);
+fuchsia::ui::pointer::augment::TouchEventWithLocalHit ToTouchEvent(const PointerParams& params,
+                                                                   uint64_t event_time,
+                                                                   zx_koid_t koid = 0);
 
 ::fuchsia::math::PointF ToLocalCoordinates(const glm::vec2& ndc);
 

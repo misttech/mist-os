@@ -5,17 +5,19 @@
 #ifndef SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_M_FINGER_N_TAP_RECOGNIZER_H_
 #define SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_M_FINGER_N_TAP_RECOGNIZER_H_
 
-#include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
+
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/recognizer_v2.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 
 namespace a11y::recognizers_v2 {
 
 // MFingerNTapRecognizer class is responsible for implementing m-finger-n-tap gesture.
-class MFingerNTapRecognizer : public GestureRecognizer {
+class MFingerNTapRecognizer : public GestureRecognizerV2 {
  public:
   // Callback which will be invoked when gesture has been recognized.
-  using OnMFingerNTapCallback = fit::function<void(GestureContext)>;
+  using OnMFingerNTapCallback = fit::function<void(gesture_util_v2::GestureContext)>;
 
   // Constructor of this class takes in following parameters:
   //  1. callback: Callback will be invoked, when the gesture is detected and the recognizer
@@ -34,7 +36,7 @@ class MFingerNTapRecognizer : public GestureRecognizer {
   std::string DebugName() const override;
 
   // Processes incoming pointer events to detect tap gestures like (Single, double, etc.).
-  void HandleEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) override;
+  void HandleEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) override;
 
   // This method gets called when the recognizer has won the arena.
   void OnWin() override;
@@ -45,7 +47,7 @@ class MFingerNTapRecognizer : public GestureRecognizer {
 
   // At the start of every arena contest this method will be called.
   // This also resets the state of the recognizer.
-  void OnContestStarted(std::unique_ptr<ContestMember> contest_member) override;
+  void OnContestStarted(std::unique_ptr<ParticipationTokenInterface> participation_token) override;
 
  private:
   struct Contest;
@@ -54,17 +56,18 @@ class MFingerNTapRecognizer : public GestureRecognizer {
   // screen.
   virtual void OnExcessFingers();
 
-  // Helper method invoked for valid MOVE events.
-  virtual void OnMoveEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event);
+  // Helper method invoked for valid CHANGE events.
+  virtual void OnChangeEvent(
+      const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& pointer_event);
 
-  // Helper method invoked for valid UP events.
-  virtual void OnUpEvent();
+  // Helper method invoked for valid REMOVE events.
+  virtual void OnRemoveEvent();
 
   // Resets contest_ and gesture_context_.
   virtual void ResetRecognizer();
 
   // Stores the Gesture Context which is required to execute the callback.
-  GestureContext gesture_context_;
+  gesture_util_v2::GestureContext gesture_context_;
 
   // Callback which will be executed when gesture is detected and is also a winner in the arena.
   OnMFingerNTapCallback on_recognize_;
