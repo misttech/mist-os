@@ -118,6 +118,15 @@ void Dwc2::HandleEnumDone() {
 
 // Handler for inepintr interrupt.
 void Dwc2::HandleInEpInterrupt() {
+
+  if (timeout_recovering_) {
+    // TODO(105382) remove logging once timeout recovery has stabilized.
+    zxlogf(ERROR, "(diepint.timeout) IN-ep interrupt with timeout_recovering_ = true");
+
+    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
+    timeout_recovering_ = false;
+  }
+
   auto* mmio = get_mmio();
   uint8_t ep_num = 0;
 
@@ -193,8 +202,6 @@ void Dwc2::HandleInEpInterrupt() {
             // we can expect either an IN or OUT EP0 transfer-complete interrupt to follow. See the
             // special case logic in either diepint/doepint.xfercompl() branches.
             timeout_recovering_ = true;
-            GINTMSK::Get().ReadFrom(mmio).set_ginnakeff(1).WriteTo(mmio);
-            dctl.set_sgnpinnak(1).WriteTo(mmio);
             DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
             break;
           }
@@ -251,6 +258,15 @@ void Dwc2::HandleInEpInterrupt() {
 
 // Handler for outepintr interrupt.
 void Dwc2::HandleOutEpInterrupt() {
+
+  if (timeout_recovering_) {
+    // TODO(105382) remove logging once timeout recovery has stabilized.
+    zxlogf(ERROR, "(diepint.timeout) OUT-ep interrupt with timeout_recovering_ = true");
+
+    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
+    timeout_recovering_ = false;
+  }
+
   auto* mmio = get_mmio();
 
   uint8_t ep_num = DWC_EP0_OUT;
@@ -295,25 +311,14 @@ void Dwc2::HandleOutEpInterrupt() {
         HandleEp0Setup();
       }
       if (doepint.xfercompl()) {
-        if (timeout_recovering_) {
-          // (special case) We're recovering from an EP0 diepint.timeout interrupt.
+        DOEPINT::Get(ep_num).FromValue(0).set_xfercompl(1).WriteTo(mmio);
 
-          // TODO(105382) remove logging once timeout recovery has stabilized.
-          zxlogf(ERROR, "(diepint.timeout recovery) OUT-EP0 xfer-complete interrupt");
-
-          FlushTxFifo(0);
-          ep0_state_ = Ep0State::IDLE;  // Reset for next transaction.
-          timeout_recovering_ = false;
-        } else {
-          DOEPINT::Get(ep_num).FromValue(0).set_xfercompl(1).WriteTo(mmio);
-
-          if (ep_num == DWC_EP0_OUT) {
-            if (!doepint.setup()) {
-              HandleEp0TransferComplete();
-            }
-          } else {
-            HandleTransferComplete(ep_num);
+        if (ep_num == DWC_EP0_OUT) {
+          if (!doepint.setup()) {
+            HandleEp0TransferComplete();
           }
+        } else {
+          HandleTransferComplete(ep_num);
         }
       }
       // TODO(voydanoff) Implement error recovery for these interrupts
@@ -1047,6 +1052,12 @@ int Dwc2::IrqThread() {
     // It doesn't seem that this inner loop should be necessary,
     // but without it we miss interrupts on some versions of the IP.
     while (1) {
+
+      if (timeout_recovering_) {
+        // TODO(105382) remove logging once timeout recovery has stabilized.
+        zxlogf(ERROR, "(diepint.timeout) interrupt with timeout_recovering_ = true in loop");
+      }
+
       auto gintsts = GINTSTS::Get().ReadFrom(mmio);
       auto gintmsk = GINTMSK::Get().ReadFrom(mmio);
       gintsts.WriteTo(mmio);
