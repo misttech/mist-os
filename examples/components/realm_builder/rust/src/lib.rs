@@ -5,9 +5,8 @@
 // [START import_statement_rust]
 use {
     // [START_EXCLUDE]
-    anyhow::{self, Error},
+    anyhow::{self, Context, Error},
     fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_async as fasync,
     fuchsia_component::server as fserver,
     // [END_EXCLUDE]
     fuchsia_component_test::{
@@ -94,26 +93,39 @@ async fn routes_from_echo() -> Result<(), Error> {
     Ok(())
 }
 
+pub enum IncomingService {
+    Echo(fecho::EchoRequestStream),
+}
+
 // [START mock_component_impl_rust]
 async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
     // Create a new ServiceFs to host FIDL protocols from
     let mut fs = fserver::ServiceFs::new();
-    let mut tasks = vec![];
 
     // Add the echo protocol to the ServiceFs
-    fs.dir("svc").add_fidl_service(move |mut stream: fecho::EchoRequestStream| {
-        tasks.push(fasync::Task::local(async move {
-            while let Some(fecho::EchoRequest::EchoString { value, responder }) =
-                stream.try_next().await.expect("failed to serve echo service")
-            {
-                responder.send(value.as_ref().map(|s| &**s)).expect("failed to send echo response");
-            }
-        }));
-    });
+    fs.dir("svc").add_fidl_service(IncomingService::Echo);
 
     // Run the ServiceFs on the outgoing directory handle from the mock handles
     fs.serve_connection(handles.outgoing_dir)?;
-    fs.collect::<()>().await;
+
+    fs.for_each_concurrent(0, move |IncomingService::Echo(stream)| async move {
+        stream
+            .map(|result| result.context("Request came with error"))
+            .try_for_each(|request| async move {
+                match request {
+                    fecho::EchoRequest::EchoString { value, responder } => {
+                        responder
+                            .send(value.as_ref().map(|s| &**s))
+                            .expect("failed to send echo response");
+                    }
+                }
+                Ok(())
+            })
+            .await
+            .context("Failed to serve request stream")
+            .unwrap_or_else(|e| eprintln!("Error encountered: {:?}", e))
+    })
+    .await;
 
     Ok(())
 }
