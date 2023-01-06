@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, argh::FromArgs, audio_utils, ffx_core::ffx_command,
+    anyhow::Result, argh::FromArgs, audio_daemon_utils::AudioOutputFormat, ffx_core::ffx_command,
     fidl_fuchsia_media::AudioCaptureUsage, std::time::Duration,
 };
 
@@ -19,7 +19,7 @@ pub struct RecordCommand {
     pub duration: Duration,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: AudioOutputFormat,
 
     #[argh(subcommand)]
     pub subcommand: SubCommand,
@@ -83,5 +83,5 @@ fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
 }
 
 fn parse_duration(value: &str) -> Result<Duration, String> {
-    audio_utils::parse_duration(value)
+    audio_daemon_utils::parse_duration(value)
 }

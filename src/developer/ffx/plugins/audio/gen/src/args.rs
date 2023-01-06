@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, argh::FromArgs, audio_utils, ffx_core::ffx_command, std::time::Duration};
+use {
+    anyhow::Result, argh::FromArgs, audio_daemon_utils, ffx_core::ffx_command, std::time::Duration,
+};
 
 /// TODO(fxbug.dev/109807) - Add support for writing infinite files.
 #[ffx_command()]
@@ -46,7 +48,7 @@ pub struct SineCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -69,7 +71,7 @@ pub struct SquareCommand {
     pub duty_cycle: f64,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -89,7 +91,7 @@ pub struct SawtoothCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -109,7 +111,7 @@ pub struct TriangleCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -126,7 +128,7 @@ pub struct WhiteNoiseCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -143,10 +145,10 @@ pub struct PinkNoiseCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_utils::AudioOutputFormat,
+    pub format: audio_daemon_utils::AudioOutputFormat,
 }
 
 /// Parses a Duration from string.
 fn parse_duration(value: &str) -> Result<Duration, String> {
-    audio_utils::parse_duration(value)
+    audio_daemon_utils::parse_duration(value)
 }

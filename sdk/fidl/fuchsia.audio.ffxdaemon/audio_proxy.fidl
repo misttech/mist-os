@@ -17,7 +17,25 @@ type PlayLocation = flexible union {
 
 /// Configuration for AudioRenderer.
 type RendererInfo = table {
+    /// The usage of the audio stream.
+    /// Required.
     1: usage fuchsia.media.AudioRenderUsage;
+};
+
+/// Where to capture audio data.
+type RecordLocation = flexible union {
+    /// Capture audio through an AudioCapturer.
+    1: capturer CapturerInfo;
+
+    /// Capture audio loopback.
+    2: loopback struct {};
+};
+
+/// Configuration for AudioCapturer.
+type CapturerInfo = table {
+    /// The usage of the audio stream.
+    /// Required.
+    1: usage fuchsia.media.AudioCaptureUsage;
 };
 
 /// Gain settings.
@@ -36,18 +54,45 @@ protocol AudioDaemon {
     /// Returns sockets for transmitting info back to stdout and stderr on host.
     Play(resource table {
         /// Socket for audio data. Should transmit entire file in WAV format.
+        /// Required.
         1: socket zx.handle:SOCKET;
 
         /// Play on device ring buffer or AudioRenderer.
+        /// Required.
         2: location PlayLocation;
 
         /// Play settings.
         3: gain_settings GainSettings;
     }) -> (resource table {
         /// Information from daemon component for ffx plugin to display.
+        /// Required.
         1: stdout zx.handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
+        /// Required.
+        2: stderr zx.handle:SOCKET;
+    }) error zx.status;
+
+    /// Records audio data from either AudioCapturer or device ring buffer.
+    /// Returns sockets containing audio data and errors back to host.
+    Record(resource table {
+        /// Record from AudioCapturer or ring buffer.
+        /// Required.
+        1: location RecordLocation;
+
+        /// Streamtype.
+        /// Required.
+        2: stream_type fuchsia.media.AudioStreamType;
+
+        /// Duration in nanoseconds to record audio data.
+        3: duration zx.duration;
+    }) -> (resource table {
+        /// Contains audio data in the form of a complete WAV file.
+        /// Required.
+        1: stdout zx.handle:SOCKET;
+
+        /// Errors from daemon component for ffx plugin to display.
+        /// Required.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
 };

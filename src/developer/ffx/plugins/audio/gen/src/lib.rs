@@ -4,7 +4,7 @@
 
 use {
     anyhow::Result,
-    audio_utils::{AudioOutputFormat, CommandSampleType},
+    audio_daemon_utils::{AudioOutputFormat, CommandSampleType},
     errors::ffx_bail,
     ffx_audio_gen_args::{
         GenCommand, PinkNoiseCommand, SawtoothCommand, SineCommand, SquareCommand, SubCommand,

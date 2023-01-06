@@ -10,22 +10,20 @@ ffx_plugin("ffx_audio_record") {
 
   args_deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//src/developer/ffx/plugins/audio/utils:audio-utils",
+    "//src/media/audio/services/ffxdaemon/utils:audio-daemon-utils",
     "//third_party/rust_crates:anyhow",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
-
-    #  "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    # "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_rust",
-    # "//src/developer/ffx/lib/errors:lib",
-    #  "//src/developer/ffx/plugins/audio/utils:audio-utils",
+    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
-
-    # "//third_party/rust_crates:hound",
   ]
+
   args_sources = [ "src/args.rs" ]
 
   sources = [ "src/lib.rs" ]

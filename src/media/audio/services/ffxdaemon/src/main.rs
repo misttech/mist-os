@@ -2,16 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_audio_ffxdaemon::{
+    AudioDaemonRecordRequest, AudioDaemonRecordResponder, RecordLocation,
+};
+
 use {
     anyhow::{self, Context, Error},
-    async_lock as _,
+    async_lock as _, audio_daemon_utils,
     fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonPlayRequest, AudioDaemonPlayResponder, AudioDaemonPlayResponse,
-        AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation,
+        AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation,
     },
     fidl_fuchsia_media::{AudioRendererProxy, AudioStreamType},
-    fidl_fuchsia_media_audio as _, fuchsia as _, fuchsia_async as fasync,
+    fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon::{self as zx},
@@ -20,7 +24,7 @@ use {
     futures::StreamExt,
     hound,
     std::cmp,
-    std::io::Cursor,
+    std::io::{Cursor, Seek, SeekFrom, Write},
     std::rc::Rc,
 };
 
@@ -37,6 +41,135 @@ struct AudioDaemon<'a> {
 impl<'a> AudioDaemon<'a> {
     pub fn new(audio_component: &'a fidl_fuchsia_media::AudioProxy) -> Self {
         Self { audio: audio_component }
+    }
+    async fn record_capturer(
+        &self,
+        request: AudioDaemonRecordRequest,
+        responder: AudioDaemonRecordResponder,
+    ) -> Result<(), anyhow::Error> {
+        let location = request.location.ok_or(anyhow::anyhow!("Input missing."))?;
+
+        let (capturer_usage, loopback) = match location {
+            RecordLocation::Capturer(capturer_info) => (capturer_info.usage, false),
+            RecordLocation::Loopback(..) => (None, true),
+            _ => panic!("Expected Capturer RecordLocation"),
+        };
+
+        let mut stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
+
+        let (stdout_remote, stdout_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+
+        let (stderr_remote, _stderr_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
+
+        let (client_end, server_end) =
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>()?;
+
+        let response = AudioDaemonRecordResponse {
+            stdout: Some(stdout_remote),
+            stderr: Some(stderr_remote),
+            ..AudioDaemonRecordResponse::EMPTY
+        };
+        responder.send(&mut Ok(response)).expect("Failed to send play response.");
+
+        let spec = audio_daemon_utils::spec_from_stream_type(stream_type);
+
+        let frames_to_capture = {
+            let duration_nanos =
+                request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64; // TODO(camlloyd): Support capture until stop.
+            let duration = std::time::Duration::from_nanos(duration_nanos);
+
+            (stream_type.frames_per_second as f64 * duration.as_secs_f64()).ceil() as u64
+        };
+
+        let bytes_per_frame = audio_daemon_utils::stream_type_bytes_per_frame(stream_type);
+        let buffer_size_bytes = stream_type.frames_per_second as u64 * bytes_per_frame as u64;
+        let vmo = zx::Vmo::create(buffer_size_bytes)?;
+        let num_packets = 4;
+        let bytes_per_packet = buffer_size_bytes / num_packets;
+
+        // A valid Wav File Header must have the data format and data length fields.
+        // We need all values corresponding to wav header fields set on the cursor_writer before
+        // writing to stdout.
+        let mut cursor_writer = Cursor::new(Vec::<u8>::new());
+        {
+            // Creation of WavWriter writes the Wav File Header to cursor_writer.
+            // This written header has the file size field and data chunk size field both set to 0,
+            // since the number of samples (and resulting file and chunk sizes) are unknown to
+            // the WavWriter at this point.
+            let _writer = hound::WavWriter::new(&mut cursor_writer, spec).unwrap();
+        }
+
+        // The file and chunk size fields are set to 0 as placeholder values by the construction of
+        // the WavWriter above. We can compute the actual values based on the command arguments
+        // for format and duration, and set the file size and chunk size fields to the computed
+        // values in the cursor_writer before writing to stdout.
+
+        let bytes_to_capture: u32 = frames_to_capture as u32
+            * (audio_daemon_utils::stream_type_bytes_per_frame(stream_type)) as u32;
+        let total_header_bytes = 44usize;
+        // The File Size field of a WAV header. 32-bit int starting at position 4, represents
+        // the size of the overall file minus 8 bytes (exclude RIFF description and file size description)
+        let file_size_bytes: u32 = bytes_to_capture as u32 + total_header_bytes as u32 - 8;
+        let packets_to_capture = (bytes_to_capture as f64 / bytes_per_packet as f64).ceil() as u64;
+        cursor_writer.seek(SeekFrom::Start(4))?;
+        cursor_writer.write_all(&file_size_bytes.to_le_bytes()[..])?;
+
+        // Data size field of a WAV header. For PCM, this is a 32-bit int starting at position 40,
+        // and represents the size of the data section.
+        cursor_writer.seek(SeekFrom::Start(40))?;
+        cursor_writer.write_all(&bytes_to_capture.to_le_bytes()[..])?;
+
+        // Write the completed WAV header to stdout. We then write the raw sample values from the
+        // packets received directly to stdout.
+
+        let mut header_bytes_written = 0usize;
+        let header = cursor_writer.into_inner();
+        while header_bytes_written < total_header_bytes {
+            header_bytes_written += stdout_local.write(&header)?;
+        }
+
+        self.audio.create_audio_capturer(server_end, loopback)?;
+
+        let capturer_proxy = client_end.into_proxy()?;
+
+        capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
+        if !(loopback) {
+            match capturer_usage {
+                Some(capturer_usage) => capturer_proxy.set_usage(capturer_usage)?,
+                None => panic!("No usage specified how to capture audio."),
+            }
+        }
+
+        let frames_per_packet = bytes_per_packet / bytes_per_frame;
+        capturer_proxy.add_payload_buffer(0, vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
+
+        capturer_proxy.start_async_capture(frames_per_packet.try_into().unwrap())?;
+
+        let mut stream = capturer_proxy.take_event_stream();
+        let mut packets_so_far = 0;
+
+        while let Some(event) = stream.try_next().await? {
+            match event {
+                fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { mut packet } => {
+                    packets_so_far += 1;
+
+                    let mut data = vec![0u8; packet.payload_size as usize];
+                    let _audio_data = vmo.read(&mut data[..], packet.payload_offset)?;
+
+                    let mut bytes_written_from_packet = 0usize;
+                    while bytes_written_from_packet < packet.payload_size as usize {
+                        bytes_written_from_packet +=
+                            stdout_local.write(&data[bytes_written_from_packet..])?;
+                    }
+                    capturer_proxy.release_packet(&mut packet)?;
+                    if packets_so_far == packets_to_capture {
+                        break;
+                    }
+                }
+                fidl_fuchsia_media::AudioCapturerEvent::OnEndOfStream {} => break,
+            }
+        }
+        Ok(())
     }
 
     fn send_next_packet<'b>(
@@ -244,6 +377,17 @@ impl<'a> AudioDaemon<'a> {
                     Some(..) => Err(anyhow::anyhow!("No PlayLocation variant specified.")),
                     None => Err(anyhow::anyhow!("PlayLocation argument missing. ")),
                 }?,
+
+                AudioDaemonRequest::Record { payload, responder } => {
+                    match payload.location {
+                        Some(RecordLocation::Capturer(..)) => {
+                            self.record_capturer(payload, responder).await?;
+                            Ok(())
+                        }
+                        Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
+                        None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
+                    }?;
+                }
             }
         }
         Ok(())

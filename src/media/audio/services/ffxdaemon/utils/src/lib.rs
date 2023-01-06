@@ -10,10 +10,50 @@ use {
     std::{convert::From, str::FromStr, time::Duration},
 };
 
-pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
-
 // Size of WAV (RIFF) header is 44 bytes.
 pub const WAV_HEADER_BYTE_COUNT: u32 = 44;
+
+pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
+
+pub fn wav_spec_to_sample_format(spec: WavSpec) -> AudioSampleFormat {
+    match spec.bits_per_sample {
+        0..=8 => AudioSampleFormat::Unsigned8,
+        9..=16 => AudioSampleFormat::Signed16,
+        17.. => match spec.sample_format {
+            hound::SampleFormat::Int => AudioSampleFormat::Signed24In32,
+            hound::SampleFormat::Float => AudioSampleFormat::Float,
+        },
+    }
+}
+
+pub fn stream_type_bytes_per_frame(stream_type: fidl_fuchsia_media::AudioStreamType) -> u64 {
+    match stream_type.sample_format {
+        fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 1,
+        fidl_fuchsia_media::AudioSampleFormat::Signed16 => 2,
+        fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => 4,
+        fidl_fuchsia_media::AudioSampleFormat::Float => 4,
+    }
+}
+
+pub fn wav_spec_bytes_per_frame(spec: WavSpec) -> u32 {
+    let output_format = AudioOutputFormat::from(spec);
+    output_format.bytes_per_frame()
+}
+
+pub fn spec_from_stream_type(stream_type: fidl_fuchsia_media::AudioStreamType) -> WavSpec {
+    let (bits_per_sample, sample_format) = match stream_type.sample_format {
+        fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => (8, hound::SampleFormat::Int),
+        fidl_fuchsia_media::AudioSampleFormat::Signed16 => (16, hound::SampleFormat::Int),
+        fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => (32, hound::SampleFormat::Int),
+        fidl_fuchsia_media::AudioSampleFormat::Float => (32, hound::SampleFormat::Float),
+    };
+    hound::WavSpec {
+        channels: stream_type.channels as u16,
+        sample_rate: stream_type.frames_per_second,
+        bits_per_sample,
+        sample_format,
+    }
+}
 
 /// Parses a Duration from string.
 pub fn parse_duration(value: &str) -> Result<Duration, String> {
@@ -34,22 +74,6 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
             value, DURATION_REGEX
         )),
     }
-}
-
-pub fn wav_spec_to_sample_format(spec: WavSpec) -> AudioSampleFormat {
-    match spec.bits_per_sample {
-        0..=8 => AudioSampleFormat::Unsigned8,
-        9..=16 => AudioSampleFormat::Signed16,
-        17.. => match spec.sample_format {
-            hound::SampleFormat::Int => AudioSampleFormat::Signed24In32,
-            hound::SampleFormat::Float => AudioSampleFormat::Float,
-        },
-    }
-}
-
-pub fn bytes_per_frame(spec: WavSpec) -> u32 {
-    let output_format = AudioOutputFormat::from(spec);
-    output_format.bytes_per_frame()
 }
 
 #[derive(Debug, Eq, PartialEq)]
