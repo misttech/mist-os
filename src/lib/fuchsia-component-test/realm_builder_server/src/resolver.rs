@@ -9,9 +9,9 @@ use {
     cm_rust::NativeIntoFidl,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::Vmo,
-    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_config as fconfig,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     futures::{
         lock::{Mutex, MutexGuard},
         TryStreamExt,
@@ -19,6 +19,7 @@ use {
     std::{collections::HashMap, path::Path, sync::Arc},
     tracing::*,
     url::Url,
+    version_history::AbiRevision,
 };
 
 const RESOLVER_SCHEME: &'static str = "realm-builder";
@@ -63,7 +64,8 @@ impl Registry {
         component.map(|c| c.decl.fidl_into_native())
     }
 
-    // Validates the given decl, and returns a URL at which it can be resolved
+    // Validates the given decl, and returns a URL at which it can be resolved.
+    // Assumes the `package_dir` points to the root of the test package.
     pub async fn validate_and_register(
         self: &Arc<Self>,
         decl: &fcdecl::Component,
@@ -199,7 +201,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn resolve(
+    pub async fn resolve(
         self: &Arc<Self>,
         component_url: &str,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
@@ -226,6 +228,8 @@ impl Registry {
             config_override_policy,
         } = resolveable_component;
 
+        let abi_revision =
+            fabi::read_abi_revision_optional(&package_dir, AbiRevision::PATH).await?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
         package_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
@@ -258,6 +262,7 @@ impl Registry {
             package,
             config_values,
             resolution_context: None,
+            abi_revision,
             ..fresolution::Component::EMPTY
         })
     }
@@ -321,6 +326,8 @@ impl Registry {
         )
         .await
         .map_err(|_| fresolution::ResolverError::ConfigValuesNotFound)?;
+        let abi_revision =
+            fabi::read_abi_revision_optional(&component.package_dir, AbiRevision::PATH).await?;
         Ok(fresolution::Component {
             url: Some(component_url.clone()),
             resolution_context: None,
@@ -331,6 +338,7 @@ impl Registry {
                 ..fresolution::Package::EMPTY
             }),
             config_values,
+            abi_revision,
             ..fresolution::Component::EMPTY
         })
     }

@@ -2117,9 +2117,9 @@ mod tests {
         runner_proxy_placeholder: Arc<Mutex<Option<fcrunner::ComponentRunnerProxy>>>,
         realm_has_been_built: Arc<AtomicBool>,
     ) -> (ftest::BuilderProxy, fasync::Task<()>) {
-        let (pkg_dir, pkg_dir_stream) = create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        drop(pkg_dir_stream);
-
+        let pkg_dir =
+            fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
         let builder = Builder {
             pkg_dir,
             realm_node,
@@ -4624,6 +4624,42 @@ mod tests {
             .local_component_proxies()
             .await
             .contains_key(&"0".to_string()));
+    }
+
+    // Test the code paths `load_relative_url` and `load_absolute_url` correctly read the abi revision
+    // from the test package. This uses `launch_builder_task` to pass in the test's package directory.
+    #[fuchsia::test]
+    async fn test_rb_pkg_abi_revision() {
+        let mut realm_and_builder_task = RealmAndBuilderTask::new();
+        realm_and_builder_task
+            .realm_proxy
+            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .await
+            .expect("failed to call add_local_child")
+            .expect("add_child_local returned an error");
+        realm_and_builder_task
+            .realm_proxy
+            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .await
+            .expect("failed to call add_local_child")
+            .expect("add_local_child returned an error");
+
+        realm_and_builder_task.call_build().await.expect("failed to build realm");
+        let registry = realm_and_builder_task.registry;
+
+        // Exercise the code path for `resolver::load_relative_url()`
+        // Note: resolve expects a fully qualified URL to pass to `load_relative_url` which will
+        // load component 'a' using its url fragment (#meta/a.cm) at the relative path meta/a.cml.
+        // Please see comment in `resolver::load_relative_url()` for more information.
+        let res = registry.resolve("realm-builder://0/a#meta/a.cm").await.unwrap();
+        let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
+        assert!(version_history::is_valid_abi_revision(abi_revision.into()));
+
+        // Exercise the code path for `resolver::load_absolute_url()`
+        // load component 'b' identified by its absolute path
+        let res = registry.resolve("realm-builder://1/b").await.unwrap();
+        let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
+        assert!(version_history::is_valid_abi_revision(abi_revision.into()));
     }
 
     // TODO(88429): The following test is impossible to write until sub-realms are supported
