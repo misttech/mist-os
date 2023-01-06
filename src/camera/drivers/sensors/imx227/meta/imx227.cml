@@ -12,6 +12,7 @@
         bind: "meta/bind/imx227_bind.bindbc",
         compat: "driver/imx227.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        colocate: "true",
     },
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
