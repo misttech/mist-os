@@ -14,7 +14,7 @@ use fuchsia_component::client;
 use fuchsia_zircon::{self as zx, Duration, DurationNum};
 use futures::{channel::mpsc, prelude::*, sink::SinkExt, stream::FusedStream};
 use pin_project::pin_project;
-use serde_json::Value as JsonValue;
+use serde::Deserialize;
 use std::{
     pin::Pin,
     sync::Arc,
@@ -211,8 +211,12 @@ impl ArchiveReader {
     where
         D: DiagnosticsData,
     {
-        let raw_json = self.snapshot_raw::<D>().await?;
-        Ok(serde_json::from_value(raw_json).map_err(Error::ReadJson)?)
+        let data_future = self.snapshot_inner::<D, Data<D>>();
+        let data = match self.timeout {
+            Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
+            None => data_future.await?,
+        };
+        Ok(data)
     }
 
     pub fn snapshot_then_subscribe<D>(&self) -> Result<Subscription<D>, Error>
@@ -225,22 +229,30 @@ impl ArchiveReader {
 
     /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
     /// Returns the raw json for each hierarchy fetched.
-    pub async fn snapshot_raw<D>(&self) -> Result<JsonValue, Error>
+    pub async fn snapshot_raw<D>(&self) -> Result<serde_json::Value, Error>
     where
         D: DiagnosticsData,
     {
-        let timeout = self.timeout;
-        let data_future = self.snapshot_raw_inner::<D>();
-        let data = match timeout {
+        let data_future = self.snapshot_inner::<D, serde_json::Value>();
+        let datas = match self.timeout {
             Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
             None => data_future.await?,
         };
-        Ok(JsonValue::Array(data))
+        let mut final_result = vec![];
+        // Flatten the result.
+        for data in datas {
+            match data {
+                serde_json::Value::Array(mut values) => final_result.append(&mut values),
+                data => final_result.push(data),
+            }
+        }
+        Ok(serde_json::Value::Array(final_result))
     }
 
-    async fn snapshot_raw_inner<D>(&self) -> Result<Vec<JsonValue>, Error>
+    async fn snapshot_inner<D, T>(&self) -> Result<Vec<T>, Error>
     where
         D: DiagnosticsData,
+        T: for<'a> Deserialize<'a>,
     {
         loop {
             let mut result = Vec::new();
@@ -306,12 +318,20 @@ impl ArchiveReader {
     }
 }
 
-async fn drain_batch_iterator<Fut>(
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+async fn drain_batch_iterator<T, Fut>(
     iterator: BatchIteratorProxy,
-    mut send: impl FnMut(serde_json::Value) -> Fut,
+    mut send: impl FnMut(T) -> Fut,
 ) -> Result<(), Error>
 where
     Fut: Future<Output = ()>,
+    T: for<'a> Deserialize<'a>,
 {
     loop {
         let next_batch = iterator
@@ -328,21 +348,15 @@ where
                     let mut buf = vec![0; data.size as usize];
                     data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
                     let hierarchy_json = std::str::from_utf8(&buf).unwrap();
-                    let output: JsonValue =
+                    let output: OneOrMany<T> =
                         serde_json::from_str(&hierarchy_json).map_err(Error::ReadJson)?;
-
                     match output {
-                        output @ JsonValue::Object(_) => {
-                            send(output).await;
-                        }
-                        JsonValue::Array(values) => {
-                            for value in values {
-                                send(value).await;
+                        OneOrMany::One(data) => send(data).await,
+                        OneOrMany::Many(datas) => {
+                            for data in datas {
+                                send(data).await;
                             }
                         }
-                        _ => unreachable!(
-                            "ArchiveAccessor only returns top-level objects and arrays"
-                        ),
                     }
                 }
                 _ => unreachable!("JSON was requested, no other data type should be received"),
@@ -373,10 +387,7 @@ where
             let drain_result = drain_batch_iterator(iterator, |d| {
                 let mut sender = sender.clone();
                 async move {
-                    match serde_json::from_value(d) {
-                        Ok(d) => sender.send(Ok(d)).await.ok(),
-                        Err(e) => sender.send(Err(Error::ParseDiagnosticsData(e))).await.ok(),
-                    };
+                    sender.send(Ok(d)).await.ok();
                 }
             })
             .await;
@@ -457,7 +468,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::Data;
     use diagnostics_hierarchy::assert_data_tree;
     use fidl_fuchsia_diagnostics as fdiagnostics;
     use fuchsia_component_test::{
@@ -585,7 +595,21 @@ mod tests {
 
     #[fuchsia::test]
     async fn custom_archive() {
-        let proxy = spawn_fake_archive();
+        let proxy = spawn_fake_archive(serde_json::json!({
+            "moniker": "moniker",
+            "version": 1,
+            "data_source": "Inspect",
+            "metadata": {
+              "component_url": "component-url",
+              "timestamp": 0,
+              "filename": "filename",
+            },
+            "payload": {
+                "root": {
+                    "x": 1,
+                }
+            }
+        }));
         let result = ArchiveReader::new()
             .with_archive(proxy)
             .snapshot::<Inspect>()
@@ -595,7 +619,39 @@ mod tests {
         assert_data_tree!(result[0].payload.as_ref().unwrap(), root: { x: 1u64 });
     }
 
-    fn spawn_fake_archive() -> fdiagnostics::ArchiveAccessorProxy {
+    #[fuchsia::test]
+    async fn handles_lists_correctly_on_snapshot_raw() {
+        let value = serde_json::json!({
+            "moniker": "moniker",
+            "version": 1,
+            "data_source": "Inspect",
+            "metadata": {
+              "component_url": "component-url",
+              "timestamp": 0,
+              "filename": "filename",
+            },
+            "payload": {
+                "root": {
+                    "x": 1,
+                }
+            }
+        });
+        let proxy = spawn_fake_archive(serde_json::json!([value.clone()]));
+        let result = ArchiveReader::new()
+            .with_archive(proxy)
+            .snapshot_raw::<Inspect>()
+            .await
+            .expect("got result");
+        match result {
+            serde_json::Value::Array(values) => {
+                assert_eq!(values.len(), 1);
+                assert_eq!(values[0], value);
+            }
+            result => panic!("unexpected result: {:?}", result),
+        }
+    }
+
+    fn spawn_fake_archive(data_to_send: serde_json::Value) -> fdiagnostics::ArchiveAccessorProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>()
                 .expect("create proxy");
@@ -606,6 +662,7 @@ mod tests {
                         result_stream,
                         ..
                     } => {
+                        let data = data_to_send.clone();
                         fasync::Task::spawn(async move {
                             let mut called = false;
                             let mut stream = result_stream.into_stream().expect("into stream");
@@ -619,19 +676,7 @@ mod tests {
                                             continue;
                                         }
                                         called = true;
-                                        let result = Data::for_inspect(
-                                            "moniker",
-                                            Some(hierarchy! {
-                                                root: {
-                                                    x: 1u64,
-                                                }
-                                            }),
-                                            0i64,
-                                            "component-url",
-                                            "filename",
-                                            vec![],
-                                        );
-                                        let content = serde_json::to_string_pretty(&result)
+                                        let content = serde_json::to_string_pretty(&data)
                                             .expect("json pretty");
                                         let vmo_size = content.len() as u64;
                                         let vmo =
