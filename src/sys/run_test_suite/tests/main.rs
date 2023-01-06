@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use diagnostics_data::Severity;
-use diagnostics_reader::{ArchiveReader, Inspect, Property};
+use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_test_manager::{
     LaunchError, LogsIteratorOption, RunBuilderMarker, RunBuilderProxy,
 };
@@ -348,30 +348,27 @@ async fn experimental_parallel_execution_integ_test(
         .expect("got inspect data");
     assert_eq!(data[0].moniker, "test_manager");
 
-    // Manually look through all of the children in the "finished"
-    // DiagnosticsHierarchy to look for a run that
-    // contains used_parallel_scheduler: true.
+    // Manually look through all of the children in DiagnosticsHierarchy to find one
+    // where parallel executor was used.
+    // inspect structure is roughly
+    // <root>
+    //   + run
+    //     + parallel_executor / serial_executor
+    // So we need to find a grandchild called "parallel_executor"
     let root = data[0].payload.as_ref().unwrap();
     let root_children = &root.children;
 
-    let finished_node = root_children
+    let grandchildren: Vec<_> = root_children
         .iter()
-        .filter(|child| child.name == "finished")
-        .next()
-        .expect("expected finished node");
+        .map(|child| child.children.iter())
+        .flatten()
+        .filter(|grandchild| grandchild.name == "parallel_executor")
+        .collect();
 
-    let finished_node_children = &finished_node.children;
-    for child in finished_node_children {
-        let grandchildren = &child.children;
-        for grandchild in grandchildren {
-            let properties = &grandchild.properties;
-            let expected_property = Property::Bool("used_parallel_scheduler".to_string(), true);
-            if properties.contains(&expected_property) {
-                return;
-            }
-        }
-    }
-    panic!("Did not route parallel config as expected");
+    // This is a weak assertion since other tests might be changed to run in parallel too. If this
+    // happens we'll need to hope that this flakily fails, or run this in an isolated
+    // test_manager instance to prevent the issue.
+    assert_eq!(grandchildren.len(), 1, "expected to find one run executed in parallel");
 }
 
 #[fixture::fixture(run_with_reporter)]

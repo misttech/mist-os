@@ -3,445 +3,271 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_inspect::{
-        types::{LazyNode, Node},
-        Inspector,
-    },
-    fuchsia_inspect_contrib::nodes::BoundedListNode,
-    futures::FutureExt,
+    fuchsia_inspect::Property,
+    parking_lot::Mutex,
     std::{
+        borrow::Cow,
+        collections::{hash_map::Entry, HashMap},
         fmt::{Debug, Error, Formatter},
-        sync::{Arc, Mutex, Weak},
+        ops::Deref,
+        sync::Arc,
     },
 };
 
-/// Top level inspect node for test_manager.
-pub struct RootInspectNode {
-    /// Node under which inspect for currently running test runs is stored.
-    executing_runs_node: Node,
-    /// Node under which inspect for previously executed test runs is stored.
-    /// The caller chooses whether or not to persist runs.
-    finished_runs_node: Arc<Mutex<BoundedListNode>>,
+/// Container to store diagnostic content in inspect.
+pub struct RootDiagnosticNode {
+    inspect: Arc<fuchsia_inspect::Node>,
+    count: std::sync::atomic::AtomicU64,
 }
 
-impl RootInspectNode {
-    const MAX_PERSISTED_RUNS: usize = 3;
-    pub fn new(root: &Node) -> Self {
-        Self {
-            executing_runs_node: root.create_child("executing"),
-            finished_runs_node: Arc::new(Mutex::new(BoundedListNode::new(
-                root.create_child("finished"),
-                Self::MAX_PERSISTED_RUNS,
-            ))),
-        }
+impl RootDiagnosticNode {
+    /// Create a new |RootDiagnosticNode| rooted at |inspect|.
+    pub fn new(inspect: fuchsia_inspect::Node) -> Self {
+        Self { inspect: Arc::new(inspect), count: std::sync::atomic::AtomicU64::new(0) }
     }
 
-    /// Create an inspect node for a new test run.
-    pub fn new_run(&self, run_name: &str) -> RunInspectNode {
-        RunInspectNode::new(
-            &self.executing_runs_node,
-            Arc::downgrade(&self.finished_runs_node),
-            run_name,
-        )
+    /// Create a |DiagnosticNode| that records contents to inspect when dropped.
+    pub(crate) fn persistent_child(&self) -> DiagnosticNode {
+        let name =
+            format!("id-{:?}", self.count.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+        DiagnosticNode::new_set_persistence(name, self.inspect.clone(), true)
+    }
+
+    /// Create a |DiagnosticNode| that erases contents from inspect when dropped.
+    pub(crate) fn child(&self) -> DiagnosticNode {
+        let name =
+            format!("id-{:?}", self.count.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+        DiagnosticNode::new(name, self.inspect.clone())
     }
 }
 
-/// Inspect node containing diagnostics for a single test run.
-pub struct RunInspectNode {
-    node: LazyNode,
-    inner: Arc<Mutex<RunInspectNodeInner>>,
-    finished_runs_node: Weak<Mutex<BoundedListNode>>,
+/// A hierarchical container for diagnostic context.
+///
+/// |DiagnosticNode| contains a name, any properties saved to it, and a reference to
+/// it's parent, if any.
+/// When printed with Debug, prints all context for ancestor roots.
+/// The hierarchy of |DiagnosticNodes| is also output to inspect.
+pub(crate) struct DiagnosticNode {
+    inner: Arc<DiagnosticNodeInner>,
 }
 
-#[derive(Debug)]
-struct RunInspectNodeInner {
-    execution_state: RunExecutionState,
-    debug_data_state: DebugDataState,
-    controller_state: RunControllerState,
-    suites: Vec<Arc<SuiteInspectNode>>,
-    used_parallel_scheduler: bool,
+#[derive(Clone)]
+enum Parent {
+    Root(Arc<fuchsia_inspect::Node>),
+    Node(Arc<DiagnosticNodeInner>),
 }
 
-impl RunInspectNode {
-    /// Create a new run under |executing_root|.
-    fn new(
-        executing_root: &Node,
-        finished_runs_node: Weak<Mutex<BoundedListNode>>,
-        node_name: &str,
+struct DiagnosticNodeInner {
+    name: Cow<'static, str>,
+    properties: Mutex<HashMap<&'static str, (Cow<'static, str>, fuchsia_inspect::StringProperty)>>,
+    parent: Parent,
+    inspect: fuchsia_inspect::Node,
+    persistent: bool,
+}
+
+impl DiagnosticNode {
+    /// Create a new root |DiagnosticNode| using the given inspect node.
+    pub(crate) fn new(
+        name: impl Into<Cow<'static, str>>,
+        inspect_parent: Arc<fuchsia_inspect::Node>,
     ) -> Self {
-        let inner = Arc::new(Mutex::new(RunInspectNodeInner {
-            execution_state: RunExecutionState::NotStarted,
-            debug_data_state: DebugDataState::PendingDebugDataProduced,
-            controller_state: RunControllerState::AwaitingRequest,
-            suites: vec![],
-            used_parallel_scheduler: false,
-        }));
-        let inner_clone = inner.clone();
-        let node = executing_root.create_lazy_child(node_name, move || {
-            let inspector = Inspector::new();
-            let root = inspector.root();
-            let lock = inner_clone.lock().unwrap();
-            root.record_string("execution_state", format!("{:#?}", lock.execution_state));
-            root.record_string("debug_data_state", format!("{:#?}", lock.debug_data_state));
-            root.record_string("controller_state", format!("{:#?}", lock.controller_state));
-            root.record_bool("used_parallel_scheduler", lock.used_parallel_scheduler);
-            let suites = lock.suites.clone();
-            drop(lock);
-            let suite_node = root.create_child("suites");
-            for suite in suites {
-                suite.record(&suite_node);
-            }
-            root.record(suite_node);
-            futures::future::ready(Ok(inspector)).boxed()
-        });
-        Self { inner, node, finished_runs_node }
+        Self::new_set_persistence(name, inspect_parent, false)
     }
 
-    pub fn set_execution_state(&self, state: RunExecutionState) {
-        self.inner.lock().unwrap().execution_state = state;
-    }
-
-    pub fn set_debug_data_state(&self, state: DebugDataState) {
-        self.inner.lock().unwrap().debug_data_state = state;
-    }
-
-    pub fn set_controller_state(&self, state: RunControllerState) {
-        self.inner.lock().unwrap().controller_state = state;
-    }
-
-    pub fn set_used_parallel_scheduler(&self, used_parallel_scheduler: bool) {
-        self.inner.lock().unwrap().used_parallel_scheduler = used_parallel_scheduler;
-    }
-
-    pub fn new_suite(&self, name: &str, url: &str) -> Arc<SuiteInspectNode> {
-        let node = Arc::new(SuiteInspectNode::new(name, url));
-        self.inner.lock().unwrap().suites.push(node.clone());
-        node
-    }
-
-    pub fn persist(self) {
-        if let Some(finished_runs) = self.finished_runs_node.upgrade() {
-            let mut node_lock = finished_runs.lock().unwrap();
-            let parent = node_lock.create_entry();
-            let _ = parent.adopt(&self.node);
-            parent.record(self.node);
-        }
-    }
-}
-
-impl Debug for RunInspectNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.inner.lock().unwrap().fmt(f)
-    }
-}
-
-/// Inspect node containing state for a single test suite.
-pub struct SuiteInspectNode {
-    name: String,
-    url: String,
-    execution_state: Mutex<ExecutionState>,
-}
-
-impl SuiteInspectNode {
-    fn new(name: &str, url: &str) -> Self {
+    fn new_set_persistence(
+        name: impl Into<Cow<'static, str>>,
+        inspect_parent: Arc<fuchsia_inspect::Node>,
+        persistent: bool,
+    ) -> Self {
+        let cow_name = name.into();
         Self {
-            name: name.into(),
-            url: url.into(),
-            execution_state: Mutex::new(ExecutionState::Pending),
+            inner: Arc::new(DiagnosticNodeInner {
+                inspect: inspect_parent.create_child(cow_name.deref()),
+                parent: Parent::Root(inspect_parent),
+                name: cow_name,
+                properties: Mutex::new(HashMap::new()),
+                persistent,
+            }),
         }
     }
 
-    pub fn set_execution_state(&self, state: ExecutionState) {
-        *self.execution_state.lock().unwrap() = state;
+    /// Create a |DiagnosticNode| as a child of &self.
+    pub(crate) fn child(&self, name: impl Into<Cow<'static, str>>) -> Self {
+        let cow_name = name.into();
+        Self {
+            inner: Arc::new(DiagnosticNodeInner {
+                inspect: self.inner.inspect.create_child(cow_name.deref()),
+                name: cow_name,
+                properties: Mutex::new(HashMap::new()),
+                parent: Parent::Node(self.inner.clone()),
+                persistent: self.inner.persistent,
+            }),
+        }
     }
 
-    fn record(&self, parent_node: &Node) {
-        let node = parent_node.create_child(&self.name);
-        node.record_string("url", &self.url);
-        node.record_string(
-            "execution_state",
-            format!("{:#?}", *self.execution_state.lock().unwrap()),
-        );
-        parent_node.record(node);
+    /// Set a property. If the key is already in use, overrides the value.
+    pub(crate) fn set_property(&self, key: &'static str, value: impl Into<Cow<'static, str>>) {
+        let mut prop_lock = self.inner.properties.lock();
+        let cow_val = value.into();
+        match prop_lock.entry(key) {
+            Entry::Occupied(mut entry) => {
+                let mut val = entry.get_mut();
+                val.1.set(cow_val.deref());
+                val.0 = cow_val;
+            }
+            Entry::Vacant(entry) => {
+                let prop = self.inner.inspect.create_string(key, cow_val.deref());
+                entry.insert((cow_val, prop));
+            }
+        }
+    }
+
+    /// Mark a property as true.
+    pub(crate) fn set_flag(&self, key: &'static str) {
+        self.set_property(key, "true")
+    }
+
+    fn ancestors_and_self(&self) -> Vec<Arc<DiagnosticNodeInner>> {
+        let mut ancestors = vec![self.inner.clone()];
+        let mut next_parent = self.inner.parent.clone();
+        while let Parent::Node(parent) = next_parent.clone() {
+            next_parent = parent.parent.clone();
+            ancestors.push(parent);
+        }
+        ancestors.reverse();
+        ancestors
     }
 }
 
-impl Debug for SuiteInspectNode {
+impl std::ops::Drop for DiagnosticNodeInner {
+    fn drop(&mut self) {
+        if self.persistent {
+            let parent_inspect = match &self.parent {
+                Parent::Node(inner) => &inner.inspect,
+                Parent::Root(inspect) => &*inspect,
+            };
+            let inspect = std::mem::take(&mut self.inspect);
+            for (_, val) in self.properties.lock().drain() {
+                inspect.record(val.1);
+            }
+            inspect.record_bool("_dropped", true);
+            parent_inspect.record(inspect);
+        }
+    }
+}
+
+impl Debug for DiagnosticNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct(&self.name)
-            .field("url", &self.url)
-            .field("execution_state", &*self.execution_state.lock().unwrap())
-            .finish()
+        let ancestors = self.ancestors_and_self();
+        f.debug_list().entries(ancestors).finish()
     }
 }
 
-/// The current execution state of a test suite.
-#[derive(Debug)]
-pub enum ExecutionState {
-    Pending,
-    GetFacets,
-    Launch,
-    RunTests,
-    TestsDone,
-    TearDown,
-    Complete,
-}
-
-/// An enumeration of the states run execution may be in.
-#[derive(Debug)]
-pub enum RunExecutionState {
-    /// Suites not started yet.
-    NotStarted,
-    /// Suites are currently running.
-    Executing,
-    /// Suites are complete.
-    Complete,
-}
-
-/// An enumeration of the states debug data reporting may be in.
-#[derive(Debug)]
-pub enum DebugDataState {
-    /// Waiting for debug_data to signal if debug data is available.
-    PendingDebugDataProduced,
-    /// Debug data has been produced.
-    DebugDataProduced,
-    /// No debug data has been produced.
-    NoDebugData,
-}
-
-#[derive(Debug)]
-pub enum RunControllerState {
-    AwaitingEvents,
-    AwaitingRequest,
-    Done { stopped_or_killed: bool, events_drained: bool, events_sent_successfully: bool },
+impl Debug for DiagnosticNodeInner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let mut debug_struct = f.debug_struct(self.name.deref());
+        for (key, value) in self.properties.lock().iter() {
+            debug_struct.field(key, &value.0.deref());
+        }
+        debug_struct.finish()
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use fuchsia_inspect::{testing::assert_data_tree, Inspector};
+    use {
+        super::*,
+        fuchsia_inspect::{testing::assert_data_tree, Inspector},
+    };
 
     #[fuchsia::test]
-    fn empty_root() {
+    fn inspect_lifetimes() {
         let inspector = Inspector::new();
-        let _root_node = RootInspectNode::new(inspector.root());
+        let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
         assert_data_tree!(
             inspector,
             root: {
-                executing: {},
-                finished: {}
+                root: {}
             }
+        );
+
+        root_node.set_property("property", "value");
+
+        assert_data_tree!(
+            inspector,
+            root: {
+                root: {
+                    property: "value",
+                }
+            }
+        );
+
+        let child_node = root_node.child("child");
+        assert_data_tree!(
+            inspector,
+            root: {
+                root: {
+                    property: "value",
+                    child: {}
+                }
+            }
+        );
+
+        drop(child_node);
+        assert_data_tree!(
+            inspector,
+            root: {
+                root: {
+                    property: "value",
+                }
+            }
+        );
+
+        drop(root_node);
+        assert_data_tree!(
+            inspector,
+            root: {}
         );
     }
 
     #[fuchsia::test]
-    fn single_run() {
+    fn debug_fmt_hierarchy() {
         let inspector = Inspector::new();
-        let root_node = RootInspectNode::new(inspector.root());
-        let run = root_node.new_run("run_1");
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "NotStarted",
-                        debug_data_state: "PendingDebugDataProduced",
-                        suites: {},
-                        used_parallel_scheduler: false
-                    }
-                },
-                finished: {}
-            }
-        );
+        let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
-        run.set_execution_state(RunExecutionState::Executing);
-        run.set_debug_data_state(DebugDataState::NoDebugData);
-        run.set_used_parallel_scheduler(true);
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "Executing",
-                        debug_data_state: "NoDebugData",
-                        suites: {},
-                        used_parallel_scheduler: true
-                    }
-                },
-                finished: {}
-            }
-        );
+        assert!(format!("{:?}", root_node).contains("root"));
 
-        let suite = run.new_suite("suite_1", "suite-url");
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "Executing",
-                        debug_data_state: "NoDebugData",
-                        suites: {
-                            suite_1: {
-                                url: "suite-url",
-                                execution_state: "Pending"
-                            }
-                        },
-                        used_parallel_scheduler: true
-                    }
-                },
-                finished: {}
-            }
-        );
+        let child_node = root_node.child("child");
 
-        drop(suite);
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "Executing",
-                        debug_data_state: "NoDebugData",
-                        suites: {
-                            suite_1: {
-                                url: "suite-url",
-                                execution_state: "Pending"
-                            }
-                        },
-                        used_parallel_scheduler: true
-                    }
-                },
-                finished: {}
-            }
-        );
+        // child should display parent too.
+        assert!(format!("{:?}", child_node).contains("child"));
+        assert!(format!("{:?}", child_node).contains("root"));
 
-        drop(run);
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {},
-                finished: {}
-            }
-        );
+        // grandchild should display all ancestors.
+        let grandchild = child_node.child("grand");
+        assert!(format!("{:?}", grandchild).contains("grand"));
+        assert!(format!("{:?}", grandchild).contains("child"));
+        assert!(format!("{:?}", grandchild).contains("root"));
+
+        // descendants still print ancestors even if they are dropped
+        drop(root_node);
+        drop(child_node);
+        assert!(format!("{:?}", grandchild).contains("grand"));
+        assert!(format!("{:?}", grandchild).contains("child"));
+        assert!(format!("{:?}", grandchild).contains("root"));
     }
 
     #[fuchsia::test]
-    fn persisted_run() {
+    fn debug_fmt_properties() {
         let inspector = Inspector::new();
-        let root_node = RootInspectNode::new(inspector.root());
-        let run = root_node.new_run("run_1");
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "NotStarted",
-                        debug_data_state: "PendingDebugDataProduced",
-                        suites: {},
-                        used_parallel_scheduler: false
-                    }
-                },
-                finished: {}
-            }
-        );
+        let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
-        run.set_execution_state(RunExecutionState::Executing);
-        run.set_debug_data_state(DebugDataState::NoDebugData);
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "Executing",
-                        debug_data_state: "NoDebugData",
-                        suites: {},
-                        used_parallel_scheduler: false
-                    }
-                },
-                finished: {}
-            }
-        );
+        assert!(format!("{:?}", root_node).contains("root"));
 
-        let suite = run.new_suite("suite_1", "suite-url");
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {
-                    run_1: {
-                        controller_state: "AwaitingRequest",
-                        execution_state: "Executing",
-                        debug_data_state: "NoDebugData",
-                        suites: {
-                            suite_1: {
-                                url: "suite-url",
-                                execution_state: "Pending"
-                            }
-                        },
-                        used_parallel_scheduler: false
-                    }
-                },
-                finished: {}
-            }
-        );
-        drop(suite);
-
-        run.persist();
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {},
-                finished: {
-                    "0": {
-                        run_1: {
-                            controller_state: "AwaitingRequest",
-                            execution_state: "Executing",
-                            debug_data_state: "NoDebugData",
-                            suites: {
-                                suite_1: {
-                                    url: "suite-url",
-                                    execution_state: "Pending"
-                                }
-                            },
-                            used_parallel_scheduler: false
-                        }
-                    }
-                },
-            }
-        );
-    }
-
-    #[fuchsia::test]
-    fn persisted_run_buffer_overflow() {
-        let inspector = Inspector::new();
-        let root_node = RootInspectNode::new(inspector.root());
-
-        for i in 0..RootInspectNode::MAX_PERSISTED_RUNS {
-            root_node.new_run(&format!("run_{:?}", i)).persist();
-        }
-
-        root_node.new_run("run_overflow").persist();
-
-        // hardcoded assumption here that MAX_PERSISTED_RUNS == 3
-        assert_data_tree!(
-            inspector,
-            root: {
-                executing: {},
-                finished: {
-                    "1": {
-                        run_1: contains {}
-                    },
-                    "2": {
-                        run_2: contains {}
-                    },
-                    "3": { run_overflow: contains {}}
-                },
-            }
-        );
+        root_node.set_property("property", "value");
+        assert!(format!("{:?}", root_node).contains("root"));
+        assert!(format!("{:?}", root_node).contains("property"));
+        assert!(format!("{:?}", root_node).contains("value"));
     }
 }

@@ -14,7 +14,7 @@ use {
         run_events::RunEvent,
         running_suite, scheduler,
         scheduler::Scheduler,
-        self_diagnostics,
+        self_diagnostics::DiagnosticNode,
     },
     anyhow::Error,
     fidl::endpoints::Responder,
@@ -56,25 +56,18 @@ impl TestRunBuilder {
         run_task: futures::future::RemoteHandle<()>,
         stop_sender: oneshot::Sender<()>,
         event_recv: mpsc::Receiver<RunEvent>,
-        inspect_node: &self_diagnostics::RunInspectNode,
-    ) -> Result<(), ()> {
+        diagnostics: DiagnosticNode,
+    ) {
         let mut task = Some(run_task);
         let mut stop_sender = Some(stop_sender);
         let (events_responder_sender, mut events_responder_recv) = mpsc::unbounded();
-
-        let mut stopped_or_killed = false;
-        let mut events_drained = false;
-        let mut events_sent_successfully = false;
-
-        let stopped_or_killed_ref = &mut stopped_or_killed;
-        let events_drained_ref = &mut events_drained;
-        let events_sent_successfully_ref = &mut events_sent_successfully;
+        let diagnostics_ref = &diagnostics;
 
         let serve_controller_fut = async move {
             while let Some(request) = controller.try_next().await? {
                 match request {
                     RunControllerRequest::Stop { .. } => {
-                        *stopped_or_killed_ref = true;
+                        diagnostics_ref.set_flag("stopped");
                         if let Some(stop_sender) = stop_sender.take() {
                             // no need to check error.
                             let _ = stop_sender.send(());
@@ -84,7 +77,7 @@ impl TestRunBuilder {
                         }
                     }
                     RunControllerRequest::Kill { .. } => {
-                        *stopped_or_killed_ref = true;
+                        diagnostics_ref.set_flag("killed");
                         // dropping the remote handle cancels it.
                         drop(task.take());
                         // after this all `senders` go away and subsequent GetEvent call will
@@ -106,11 +99,13 @@ impl TestRunBuilder {
         let get_events_fut = async move {
             let mut event_chunks = event_recv.map(RunEvent::into).ready_chunks(EVENTS_THRESHOLD);
             while let Some(responder) = events_responder_recv.next().await {
+                diagnostics_ref.set_property("events", "awaiting");
                 let next_chunk = event_chunks.next().await.unwrap_or_default();
-                *events_drained_ref = next_chunk.is_empty();
+                diagnostics_ref.set_property("events", "idle");
+                let done = next_chunk.is_empty();
                 responder.send(&mut next_chunk.into_iter())?;
-                if *events_drained_ref {
-                    *events_sent_successfully_ref = true;
+                if done {
+                    diagnostics_ref.set_flag("events_drained");
                     break;
                 }
             }
@@ -128,44 +123,33 @@ impl TestRunBuilder {
         match futures::future::select(serve_controller_fut.boxed(), get_events_fut.boxed()).await {
             Either::Left((serve_result, _fut)) => {
                 if let Err(e) = serve_result {
-                    warn!("Error serving RunController: {:?}", e);
+                    warn!(?diagnostics, "Error serving RunController: {:?}", e);
                 }
             }
             Either::Right((get_events_result, serve_fut)) => {
                 if let Err(e) = get_events_result {
-                    warn!("Error sending events for RunController: {:?}", e);
+                    warn!(?diagnostics, "Error sending events for RunController: {:?}", e);
                 }
                 // Wait for the client to close the channel.
                 // TODO(fxbug.dev/87976) once fxbug.dev/87890 is fixed, this is no longer
                 // necessary.
                 if let Err(e) = serve_fut.await {
-                    warn!("Error serving RunController: {:?}", e);
+                    warn!(?diagnostics, "Error serving RunController: {:?}", e);
                 }
             }
-        }
-
-        inspect_node.set_controller_state(self_diagnostics::RunControllerState::Done {
-            stopped_or_killed,
-            events_drained,
-            events_sent_successfully,
-        });
-
-        match stopped_or_killed || !events_drained || !events_sent_successfully {
-            true => Err(()),
-            false => Ok(()),
         }
     }
 
     pub(crate) async fn run(
         self,
         controller: RunControllerRequestStream,
-        inspect_node: self_diagnostics::RunInspectNode,
+        diagnostics: DiagnosticNode,
         scheduling_options: Option<SchedulingOptions>,
     ) {
         let (stop_sender, mut stop_recv) = oneshot::channel::<()>();
         let (event_sender, event_recv) = mpsc::channel::<RunEvent>(16);
 
-        let inspect_node_ref = &inspect_node;
+        let diagnostics_ref = &diagnostics;
 
         let max_parallel_suites = match &scheduling_options {
             Some(options) => options.max_parallel_suites,
@@ -184,7 +168,7 @@ impl TestRunBuilder {
             DebugDataProcessor::new(debug_data_directory);
 
         let suite_scheduler_fut = async move {
-            inspect_node_ref.set_execution_state(self_diagnostics::RunExecutionState::Executing);
+            diagnostics_ref.set_property("execution", "executing");
 
             let mut debug_tasks = vec![];
 
@@ -192,7 +176,7 @@ impl TestRunBuilder {
             debug_tasks.push(fasync::Task::local(
                 debug_data_processor
                     .collect_and_serve(sender_clone)
-                    .unwrap_or_else(|e| warn!("Error serving debug data: {:?}", e)),
+                    .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
             ));
 
             let serial_executor = scheduler::SerialScheduler {};
@@ -203,7 +187,6 @@ impl TestRunBuilder {
                         suite_runner: scheduler::RunSuiteObj {},
                         max_parallel_suites: *max_parallel_suites,
                     };
-                    inspect_node_ref.set_used_parallel_scheduler(true);
                     let get_facets_fn = |test_url, resolver| async move {
                         facet::get_suite_facets(test_url, resolver).await
                     };
@@ -213,7 +196,7 @@ impl TestRunBuilder {
                     parallel_executor
                         .execute(
                             parallel_suites,
-                            inspect_node_ref,
+                            diagnostics_ref.child("parallel_executor"),
                             &mut stop_recv,
                             debug_data_sender.clone(),
                         )
@@ -221,7 +204,7 @@ impl TestRunBuilder {
                     serial_executor
                         .execute(
                             serial_suites,
-                            inspect_node_ref,
+                            diagnostics_ref.child("serial_executor"),
                             &mut stop_recv,
                             debug_data_sender.clone(),
                         )
@@ -231,7 +214,7 @@ impl TestRunBuilder {
                     serial_executor
                         .execute(
                             self.suites,
-                            inspect_node_ref,
+                            diagnostics_ref.child("serial_executor"),
                             &mut stop_recv,
                             debug_data_sender.clone(),
                         )
@@ -246,30 +229,22 @@ impl TestRunBuilder {
                 accumulate_debug_data,
             )));
             join_all(debug_tasks).await;
-            inspect_node_ref.set_execution_state(self_diagnostics::RunExecutionState::Complete);
+            diagnostics_ref.set_property("execution", "complete");
         };
 
         let (remote, remote_handle) = suite_scheduler_fut.remote_handle();
 
-        let ((), controller_res) = futures::future::join(
+        let ((), ()) = futures::future::join(
             remote,
             Self::run_controller(
                 controller,
                 remote_handle,
                 stop_sender,
                 event_recv,
-                inspect_node_ref,
+                diagnostics.child("controller"),
             ),
         )
         .await;
-
-        if let Err(()) = controller_res {
-            warn!("Controller terminated early. Last known state: {:#?}", &inspect_node);
-            inspect_node.persist();
-        } else if max_parallel_suites.is_some() {
-            warn!("This run used experimental parallel test suite execution");
-            inspect_node.persist();
-        }
     }
 }
 
@@ -362,7 +337,7 @@ impl Suite {
 pub(crate) async fn run_single_suite(
     suite: Suite,
     debug_data_sender: DebugDataSender,
-    inspect_node: Arc<self_diagnostics::SuiteInspectNode>,
+    diagnostics: DiagnosticNode,
 ) {
     let (mut sender, recv) = mpsc::channel(1024);
     let (stop_sender, stop_recv) = oneshot::channel::<()>();
@@ -372,7 +347,7 @@ pub(crate) async fn run_single_suite(
         suite;
 
     let run_test_fut = async {
-        inspect_node.set_execution_state(self_diagnostics::ExecutionState::GetFacets);
+        diagnostics.set_property("execution", "get_facets");
 
         let facets = match facets {
             // Currently, all suites are passed in with unresolved facets by the
@@ -402,21 +377,22 @@ pub(crate) async fn run_single_suite(
                 }
             }
         };
-        inspect_node.set_execution_state(self_diagnostics::ExecutionState::Launch);
+        diagnostics.set_property("execution", "launch");
         match running_suite::RunningSuite::launch(
             &test_url,
             facets,
             resolver,
             above_root_capabilities_for_test,
             debug_data_sender,
+            &diagnostics,
         )
         .await
         {
             Ok(instance) => {
-                inspect_node.set_execution_state(self_diagnostics::ExecutionState::RunTests);
+                diagnostics.set_property("execution", "run_tests");
                 let instance_ref = maybe_instance.insert(instance);
                 instance_ref.run_tests(&test_url, options, sender, stop_recv).await;
-                inspect_node.set_execution_state(self_diagnostics::ExecutionState::TestsDone);
+                diagnostics.set_property("execution", "tests_done");
             }
             Err(e) => {
                 sender.send(Err(e.into())).await.unwrap();
@@ -429,18 +405,18 @@ pub(crate) async fn run_single_suite(
     let ((), controller_ret) = futures::future::join(run_test_remote, controller_fut).await;
 
     if let Err(e) = controller_ret {
-        warn!("Ended test {}: {:?}", test_url, e);
+        warn!(?diagnostics, "Ended test {}: {:?}", test_url, e);
     }
 
     if let Some(instance) = maybe_instance.take() {
-        inspect_node.set_execution_state(self_diagnostics::ExecutionState::TearDown);
+        diagnostics.set_property("execution", "tear_down");
         if let Err(err) = instance.destroy().await {
             // Failure to destroy an instance could mean that some component events fail to send.
-            error!(?err, "Failed to destroy instance for {}. Debug data may be lost.", test_url);
+            error!(?diagnostics, ?err, "Failed to destroy instance. Debug data may be lost.");
         }
     }
-    inspect_node.set_execution_state(self_diagnostics::ExecutionState::Complete);
-    info!("Test destruction complete");
+    diagnostics.set_property("execution", "complete");
+    info!(?diagnostics, "Test destruction complete");
 }
 
 // Separate suite into a hermetic and a non-hermetic collection
@@ -480,11 +456,10 @@ mod tests {
     use {
         super::*, crate::run_events::SuiteEvents, fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync,
-        self_diagnostics::RootInspectNode,
     };
 
-    fn new_run_inspect_node() -> self_diagnostics::RunInspectNode {
-        RootInspectNode::new(&fuchsia_inspect::types::Node::default()).new_run("test-run")
+    fn new_run_inspect_node() -> DiagnosticNode {
+        DiagnosticNode::new("root", Arc::new(fuchsia_inspect::types::Node::default()))
     }
 
     #[fuchsia::test]
@@ -506,7 +481,7 @@ mod tests {
                 remote_handle,
                 stop_sender,
                 recv,
-                &new_run_inspect_node(),
+                new_run_inspect_node(),
             )
             .await
         });
@@ -516,7 +491,7 @@ mod tests {
         assert_eq!(get_events_task.await.unwrap(), vec![]);
 
         drop(proxy);
-        run_controller.await.unwrap_err();
+        run_controller.await;
     }
 
     #[fuchsia::test]
@@ -534,7 +509,7 @@ mod tests {
                 remote_handle,
                 stop_sender,
                 recv,
-                &new_run_inspect_node(),
+                new_run_inspect_node(),
             )
             .await
         });
@@ -545,7 +520,7 @@ mod tests {
         // After controller is dropped, both the controller future and the task it was
         // controlling should terminate.
         pending_task.await;
-        run_controller.await.unwrap_err();
+        run_controller.await;
     }
 
     #[fuchsia::test]

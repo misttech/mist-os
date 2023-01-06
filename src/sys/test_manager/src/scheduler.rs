@@ -4,14 +4,13 @@
 
 use crate::{
     debug_data_processor::DebugDataSender,
-    self_diagnostics,
+    self_diagnostics::DiagnosticNode,
     test_suite::{self, Suite},
 };
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use futures::stream::{self, StreamExt};
 use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::Arc;
 
 #[async_trait]
 pub(crate) trait Scheduler {
@@ -21,8 +20,6 @@ pub(crate) trait Scheduler {
     /// algorithm. Inputs:
     ///     - &self
     ///     - suites: a collection of suites to schedule and execute
-    ///     - inspect_node_ref: a reference to an Inspect node, which contains diagnostics
-    ///                         for a single test run.
     ///     - stop_recv: Receiving end of a channel that receives messages to attempt to stop the
     ///                  test run. Scheduler::execute should check for stop messages over
     ///                  this channel and try to terminate the test run gracefully.
@@ -31,7 +28,7 @@ pub(crate) trait Scheduler {
     async fn execute(
         &self,
         suites: Vec<test_suite::Suite>,
-        inspect_node_ref: &self_diagnostics::RunInspectNode,
+        diagnostics: DiagnosticNode,
         stop_recv: &mut oneshot::Receiver<()>,
         debug_data_sender: DebugDataSender,
     );
@@ -47,7 +44,7 @@ pub(crate) trait RunSuiteFn {
         &self,
         suite: Suite,
         debug_data_sender: DebugDataSender,
-        suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
+        diagnostics: DiagnosticNode,
     );
 }
 
@@ -58,7 +55,7 @@ impl Scheduler for SerialScheduler {
     async fn execute(
         &self,
         suites: Vec<test_suite::Suite>,
-        inspect_node_ref: &self_diagnostics::RunInspectNode,
+        diagnostics: DiagnosticNode,
         stop_recv: &mut oneshot::Receiver<()>,
         debug_data_sender: DebugDataSender,
     ) {
@@ -69,9 +66,10 @@ impl Scheduler for SerialScheduler {
             if let Ok(Some(())) = stop_recv.try_recv() {
                 break;
             }
-            let instance_name = format!("{:?}", suite_idx);
-            let suite_inspect = inspect_node_ref.new_suite(&instance_name, &suite.test_url);
-            test_suite::run_single_suite(suite, debug_data_sender.clone(), suite_inspect).await;
+            let instance_name = format!("suite-{:?}", suite_idx);
+            let suite_node = diagnostics.child(instance_name);
+            suite_node.set_property("url", suite.test_url.clone());
+            test_suite::run_single_suite(suite, debug_data_sender.clone(), suite_node).await;
         }
     }
 }
@@ -89,9 +87,9 @@ impl RunSuiteFn for RunSuiteObj {
         &self,
         suite: Suite,
         debug_data_sender: DebugDataSender,
-        suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
+        diagnostics: DiagnosticNode,
     ) {
-        test_suite::run_single_suite(suite, debug_data_sender, suite_inspect).await;
+        test_suite::run_single_suite(suite, debug_data_sender, diagnostics).await;
     }
 }
 
@@ -100,7 +98,7 @@ impl<T: RunSuiteFn + std::marker::Sync + std::marker::Send> Scheduler for Parall
     async fn execute(
         &self,
         suites: Vec<test_suite::Suite>,
-        inspect_node_ref: &self_diagnostics::RunInspectNode,
+        diagnostics: DiagnosticNode,
         _stop_recv: &mut oneshot::Receiver<()>,
         debug_data_sender: DebugDataSender,
     ) {
@@ -117,14 +115,14 @@ impl<T: RunSuiteFn + std::marker::Sync + std::marker::Send> Scheduler for Parall
         let suite_idx = AtomicU16::new(0);
         let suite_idx_ref = &suite_idx;
         let debug_data_sender_ref = &debug_data_sender;
+        let diagnostics_ref = &diagnostics;
         stream::iter(suites)
             .for_each_concurrent(max_parallel_suites, |suite| async move {
                 let suite_idx_local = suite_idx_ref.fetch_add(1, Ordering::Relaxed);
-                let instance_name = format!("parallel{:?}", suite_idx_local);
-                let suite_inspect = inspect_node_ref.new_suite(&instance_name, &suite.test_url);
-                self.suite_runner
-                    .run_suite(suite, debug_data_sender_ref.clone(), suite_inspect)
-                    .await;
+                let instance_name = format!("suite-{:?}", suite_idx_local);
+                let suite_node = diagnostics_ref.child(instance_name);
+                suite_node.set_property("url", suite.test_url.clone());
+                self.suite_runner.run_suite(suite, debug_data_sender_ref.clone(), suite_node).await;
             })
             .await;
     }
@@ -136,7 +134,6 @@ mod tests {
     use crate::debug_data_processor::{DebugDataDirectory, DebugDataProcessor};
     use crate::facet;
     use crate::AboveRootCapabilitiesForTest;
-    use crate::RootInspectNode;
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_component_resolution as fresolution;
@@ -181,7 +178,7 @@ mod tests {
             &self,
             suite: Suite,
             _debug_data_sender: DebugDataSender,
-            _suite_inspect: Arc<self_diagnostics::SuiteInspectNode>,
+            _diagnostics: DiagnosticNode,
         ) {
             let suite_url = suite.test_url;
             self.test_vec.clone().lock().expect("expected locked").push(suite_url);
@@ -200,9 +197,10 @@ mod tests {
         let parallel_executor =
             ParallelScheduler { suite_runner: &suite_runner, max_parallel_suites: 8 };
 
-        let root_inspect =
-            Arc::new(RootInspectNode::new(fuchsia_inspect::component::inspector().root()));
-        let run_inspect = root_inspect.new_run(&format!("run_0"));
+        let diagnostics = DiagnosticNode::new(
+            "root",
+            Arc::new(fuchsia_inspect::component::inspector().root().clone_weak()),
+        );
 
         let sender =
             DebugDataProcessor::new_for_test(DebugDataDirectory::Isolated { parent: "/tmp" })
@@ -210,7 +208,7 @@ mod tests {
 
         let (_stop_sender, mut stop_recv) = oneshot::channel::<()>();
 
-        parallel_executor.execute(suite_vec, &run_inspect, &mut stop_recv, sender).await;
+        parallel_executor.execute(suite_vec, diagnostics, &mut stop_recv, sender).await;
 
         assert!(suite_runner
             .test_vec

@@ -13,7 +13,7 @@ use {
         convert::{TryFrom, TryInto},
         sync::Arc,
     },
-    test_manager_lib::{constants, AboveRootCapabilitiesForTest},
+    test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode},
     tracing::{info, warn},
 };
 
@@ -69,9 +69,10 @@ async fn main() -> Result<(), Error> {
             .expect("Cannot connect to component resolver"),
     );
     let resolver_clone = resolver.clone();
-    let root_inspect = Arc::new(test_manager_lib::RootInspectNode::new(
-        fuchsia_inspect::component::inspector().root(),
+    let root_inspect = Arc::new(RootDiagnosticNode::new(
+        fuchsia_inspect::component::inspector().root().clone_weak(),
     ));
+    let root_inspect_query = root_inspect.clone();
 
     // Delete data from previous run if leftover due to deletion failure.
     if std::path::Path::new(DATA_FOR_TESTS_PATH).exists() {
@@ -106,12 +107,14 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(move |stream| {
             let routing_info_for_task = routing_info.clone();
             let resolver = resolver_clone.clone();
+            let root_inspect_clone = root_inspect_query.clone();
 
             fasync::Task::local(async move {
                 test_manager_lib::run_test_manager_query_server(
                     stream,
                     resolver,
                     routing_info_for_task,
+                    &*root_inspect_clone,
                 )
                 .await
                 .unwrap_or_else(|error| warn!(?error, "test manager returned error"))

@@ -14,6 +14,7 @@ use {
         error::LaunchTestError,
         facet, resolver,
         run_events::SuiteEvents,
+        self_diagnostics::DiagnosticNode,
         utilities::stream_fn,
     },
     anyhow::{anyhow, format_err, Context, Error},
@@ -86,8 +87,9 @@ impl RunningSuite {
         resolver: Arc<ResolverProxy>,
         above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
         debug_data_sender: DebugDataSender,
+        diagnostics: &DiagnosticNode,
     ) -> Result<Self, LaunchTestError> {
-        info!("Starting '{}' in '{}' collection.", test_url, facets.collection);
+        info!(test_url, ?diagnostics, collection = facets.collection, "Starting test suite.");
 
         let test_package = match AbsoluteComponentUrl::parse(test_url) {
             Ok(component_url) => component_url.package_url().name().to_string(),

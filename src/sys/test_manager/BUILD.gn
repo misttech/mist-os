@@ -62,7 +62,6 @@ rustc_library("lib") {
     "//src/developer/remote-control/diagnostics-bridge",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/data/rust",
-    "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/reader/rust",
@@ -85,11 +84,13 @@ rustc_library("lib") {
     "//third_party/rust_crates:glob",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",

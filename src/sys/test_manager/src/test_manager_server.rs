@@ -10,7 +10,7 @@ use {
         error::TestManagerError,
         facet,
         running_suite::{enumerate_test_cases, RunningSuite},
-        self_diagnostics,
+        self_diagnostics::RootDiagnosticNode,
         test_suite::{Suite, TestRunBuilder},
     },
     fidl::endpoints::ControlHandle,
@@ -29,7 +29,7 @@ pub async fn run_test_manager(
     mut stream: ftest_manager::RunBuilderRequestStream,
     resolver: Arc<ResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
-    inspect_root: &self_diagnostics::RootInspectNode,
+    root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
     let mut builder = TestRunBuilder { suites: vec![] };
     let mut scheduling_options: Option<ftest_manager::SchedulingOptions> = None;
@@ -74,9 +74,18 @@ pub async fn run_test_manager(
                         break;
                     }
                 };
-                let run_inspect = inspect_root
-                    .new_run(&format!("run_{:?}", zx::Time::get_monotonic().into_nanos()));
-                builder.run(controller, run_inspect, scheduling_options).await;
+
+                let persist_diagnostics =
+                    match scheduling_options.as_ref().map(|options| options.max_parallel_suites) {
+                        Some(Some(_)) => true,
+                        Some(None) | None => false,
+                    };
+                let diagnostics = match persist_diagnostics {
+                    true => root_diagnostics.persistent_child(),
+                    false => root_diagnostics.child(),
+                };
+
+                builder.run(controller, diagnostics, scheduling_options).await;
                 // clients should reconnect to run new tests.
                 break;
             }
@@ -90,6 +99,7 @@ pub async fn run_test_manager_query_server(
     mut stream: ftest_manager::QueryRequestStream,
     resolver: Arc<ResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
+    root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
     while let Some(event) = stream.try_next().await.map_err(TestManagerError::Stream)? {
         match event {
@@ -105,6 +115,7 @@ pub async fn run_test_manager_query_server(
                 let (_processor, sender) = DebugDataProcessor::new(DebugDataDirectory::Isolated {
                     parent: constants::ISOLATED_TMP,
                 });
+                let diagnostics = root_diagnostics.child();
                 let launch_fut = facet::get_suite_facets(test_url.clone(), resolver.clone())
                     .and_then(|facets| {
                         RunningSuite::launch(
@@ -113,6 +124,7 @@ pub async fn run_test_manager_query_server(
                             resolver.clone(),
                             above_root_capabilities_for_test.clone(),
                             sender,
+                            &diagnostics,
                         )
                     });
                 match launch_fut.await {
@@ -168,8 +180,8 @@ pub async fn run_test_manager_query_server(
                                     let _ = responder.send(&mut Err(LaunchError::CaseEnumeration));
                                 }
                             }
-                            Err(e) => {
-                                warn!("cannot enumerate tests for {}: {:?}", test_url, e);
+                            Err(err) => {
+                                warn!(?err, "cannot enumerate tests for {}", test_url);
                                 let _ = responder.send(&mut Err(LaunchError::CaseEnumeration));
                             }
                         }
