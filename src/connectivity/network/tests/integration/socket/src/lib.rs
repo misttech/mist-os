@@ -25,16 +25,16 @@ use fuchsia_async::{
 };
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::{
-    future::{self, join_all},
+    future::{self, join_all, LocalBoxFuture},
     io::AsyncReadExt as _,
     io::AsyncWriteExt as _,
-    join, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
+    Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_declare::{
-    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6, std_socket_addr,
+    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, net_subnet_v4, std_ip_v4, std_socket_addr,
 };
 use net_types::{
-    ip::{IpAddress as _, Ipv4, Ipv6},
+    ip::{Ip as _, IpAddress as _, IpInvariant, Ipv4, Ipv6},
     Witness as _,
 };
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
@@ -1962,16 +1962,15 @@ async fn udp_sendto_unroutable_leaves_socket_bound<N: Netstack>(name: &str) {
 
 #[async_trait]
 trait MakeSocket: Sized {
-    async fn new_in_realm(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket>;
+    async fn new_in_realm<I: TestIpExt>(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket>;
 
     fn from_socket(s: socket2::Socket) -> Result<Self>;
 }
 
 #[async_trait]
 impl MakeSocket for UdpSocket {
-    async fn new_in_realm(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket> {
-        t.datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
-            .await
+    async fn new_in_realm<I: TestIpExt>(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket> {
+        t.datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp).await
     }
 
     fn from_socket(s: socket2::Socket) -> Result<Self> {
@@ -1983,8 +1982,8 @@ struct TcpSocket(socket2::Socket);
 
 #[async_trait]
 impl MakeSocket for TcpSocket {
-    async fn new_in_realm(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket> {
-        t.stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp).await
+    async fn new_in_realm<I: TestIpExt>(t: &netemul::TestRealm<'_>) -> Result<socket2::Socket> {
+        t.stream_socket(I::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp).await
     }
 
     fn from_socket(s: socket2::Socket) -> Result<Self> {
@@ -1992,11 +1991,18 @@ impl MakeSocket for TcpSocket {
     }
 }
 
-struct MultiNicAndPeerConfig<S> {
-    multinic_ip: std::net::Ipv4Addr,
-    multinic_socket: S,
-    peer_ip: std::net::Ipv4Addr,
-    peer_socket: S,
+#[derive(Debug)]
+struct Interface<'a, A> {
+    iface: TestInterface<'a>,
+    ip: A,
+}
+
+#[derive(Debug)]
+struct Network<'a, A> {
+    peer_realm: netemul::TestRealm<'a>,
+    peer_interface: Interface<'a, A>,
+    _network: netemul::TestNetwork<'a>,
+    multinic_interface: Interface<'a, A>,
 }
 
 /// Sets up [`num_peers`]+1 realms: `num_peers` peers and 1 multi-nic host. Each
@@ -2006,16 +2012,28 @@ struct MultiNicAndPeerConfig<S> {
 /// When `call_with_sockets` is invoked, all of these sockets are provided as
 /// arguments. The first argument contains the sockets in the multi-NIC realm,
 /// and the second argument is the socket in the peer realm.
-async fn with_multinic_and_peers<
+///
+/// NB: in order for callers to provide a `call_with_networks` that captures
+/// its environment, we need to constrain the HRTB lifetime `'a` with
+/// `'params: 'a`, i.e. "`'params`' outlives `'a`". Since "where" clauses are
+/// unsupported for HRTB, the only way to do this is with an implied bound.
+/// The type `&'a &'params ()` is only well-formed if `'params: 'a`, so adding
+/// an argument of that type implies the bound.
+/// See https://stackoverflow.com/a/72673740 for a more thorough explanation.
+async fn with_multinic_and_peer_networks<
+    'params,
     N: Netstack,
-    S: MakeSocket,
-    F: FnOnce(Vec<MultiNicAndPeerConfig<S>>) -> R,
-    R: Future<Output = ()>,
+    I: net_types::ip::Ip + TestIpExt,
+    F: for<'a> FnOnce(
+        Vec<Network<'a, I::Addr>>,
+        &'a netemul::TestRealm<'a>,
+        &'a &'params (),
+    ) -> LocalBoxFuture<'a, ()>,
 >(
     name: &str,
     num_peers: u8,
-    port: u16,
-    call_with_sockets: F,
+    subnet: net_types::ip::Subnet<I::Addr>,
+    call_with_networks: F,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let sandbox = &sandbox;
@@ -2024,28 +2042,30 @@ async fn with_multinic_and_peers<
         sandbox.create_netstack_realm::<N, _>(format!("{name}_multinic")).expect("create realm");
     let multinic = &multinic;
 
-    struct Interface<'a> {
-        iface: TestInterface<'a>,
-        ip: fnet::Ipv4AddressWithPrefix,
-    }
-    struct Network<'a> {
-        peer: (netemul::TestRealm<'a>, Interface<'a>),
-        _network: netemul::TestNetwork<'a>,
-        multinic_interface: Interface<'a>,
-    }
     let networks: Vec<_> = future::join_all((0..num_peers).map(|i| async move {
-        // Create a single /16 subnet, where addresses are of the form
-        // 192.168.X.Y, where the mult-nic host's interface will have an
-        // address with Y=1 and the peer Y=2.
-        let ip = |host| fnet::Ipv4AddressWithPrefix {
-            addr: fnet::Ipv4Address { addr: [192, 168, i, host] },
-            prefix_len: 16,
+        // Put all addresses in a single subnet, where the mult-nic host's
+        // interface will have an address with a final octet of 1, and the peer
+        // a final octet of 2.
+        let ip = |host| -> I::Addr {
+            I::map_ip(
+                (subnet.network(), IpInvariant(host)),
+                |(v4, IpInvariant(host))| {
+                    let mut addr = v4.ipv4_bytes();
+                    *addr.last_mut().unwrap() = host;
+                    net_types::ip::Ipv4Addr::new(addr)
+                },
+                |(v6, IpInvariant(host))| {
+                    let mut addr = v6.ipv6_bytes();
+                    *addr.last_mut().unwrap() = host;
+                    net_types::ip::Ipv6Addr::from_bytes(addr)
+                },
+            )
         };
         let multinic_ip = ip(1);
         let peer_ip = ip(2);
 
         let network = sandbox.create_network(format!("net_{i}")).await.expect("create network");
-        let peer = {
+        let (peer_realm, peer_interface) = {
             let peer = sandbox
                 .create_netstack_realm::<N, _>(format!("{name}_peer_{i}"))
                 .expect("create realm");
@@ -2055,12 +2075,12 @@ async fn with_multinic_and_peers<
                 .expect("install interface in peer netstack");
             peer_iface
                 .add_address_and_subnet_route(fnet::Subnet {
-                    addr: fnet::IpAddress::Ipv4(peer_ip.addr),
-                    prefix_len: peer_ip.prefix_len,
+                    addr: peer_ip.to_ip_addr().into_ext(),
+                    prefix_len: subnet.prefix(),
                 })
                 .await
                 .expect("configure address");
-            (peer, Interface { iface: peer_iface, ip: peer_ip })
+            (peer, Interface { iface: peer_iface, ip: peer_ip.into() })
         };
         let multinic_interface = {
             let name = format!("multinic-ep-{i}");
@@ -2068,75 +2088,92 @@ async fn with_multinic_and_peers<
                 multinic.join_network(&network, name).await.expect("adding interface failed");
             multinic_iface
                 .add_address_and_subnet_route(fnet::Subnet {
-                    addr: fnet::IpAddress::Ipv4(multinic_ip.addr),
-                    prefix_len: multinic_ip.prefix_len,
+                    addr: multinic_ip.to_ip_addr().into_ext(),
+                    prefix_len: subnet.prefix(),
                 })
                 .await
                 .expect("configure address");
-            Interface { iface: multinic_iface, ip: multinic_ip }
+            Interface { iface: multinic_iface, ip: multinic_ip.into() }
         };
-        Network { peer, _network: network, multinic_interface }
+        Network { peer_realm, peer_interface, _network: network, multinic_interface }
     }))
     .await;
 
-    let config = future::join_all(networks.iter().map(
-        |Network {
-             peer: (peer, Interface { iface: _, ip: peer_ip }),
-             multinic_interface: Interface { iface: multinic_iface, ip: multinic_ip },
-             _network,
-         }| async move {
-            let multinic_socket = {
-                let socket = S::new_in_realm(multinic).await.expect("creating socket");
+    call_with_networks(networks, multinic, &&()).await
+}
 
-                socket
-                    .bind_device(Some(
-                        multinic_iface
-                            .get_interface_name()
-                            .await
-                            .expect("get_name failed")
-                            .as_bytes(),
-                    ))
-                    .and_then(|()| {
-                        socket.bind(
-                            &std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, port))
+async fn with_multinic_and_peers<
+    N: Netstack,
+    S: MakeSocket,
+    I: net_types::ip::Ip + TestIpExt,
+    F: FnOnce(Vec<MultiNicAndPeerConfig<S>>) -> R,
+    R: Future<Output = ()>,
+>(
+    name: &str,
+    num_peers: u8,
+    subnet: net_types::ip::Subnet<I::Addr>,
+    port: u16,
+    call_with_sockets: F,
+) {
+    with_multinic_and_peer_networks::<N, I, _>(name, num_peers, subnet, |networks, multinic, ()| {
+        Box::pin(async move {
+            let config = future::join_all(networks.iter().map(
+                |Network {
+                     peer_realm,
+                     peer_interface: Interface { iface: _, ip: peer_ip },
+                     multinic_interface: Interface { iface: multinic_iface, ip: multinic_ip },
+                     _network,
+                 }| async move {
+                    let multinic_socket = {
+                        let socket = S::new_in_realm::<I>(multinic).await.expect("creating socket");
+
+                        socket
+                            .bind_device(Some(
+                                multinic_iface
+                                    .get_interface_name()
+                                    .await
+                                    .expect("get_name failed")
+                                    .as_bytes(),
+                            ))
+                            .and_then(|()| {
+                                socket.bind(
+                                    &std::net::SocketAddr::from((
+                                        std::net::Ipv4Addr::UNSPECIFIED,
+                                        port,
+                                    ))
+                                    .into(),
+                                )
+                            })
+                            .expect("failed to bind device");
+                        S::from_socket(socket).expect("failed to create server socket")
+                    };
+                    let peer_socket = S::new_in_realm::<I>(&peer_realm)
+                        .await
+                        .and_then(|s| {
+                            s.bind(
+                                &std::net::SocketAddr::from((
+                                    std::net::Ipv4Addr::UNSPECIFIED,
+                                    port,
+                                ))
                                 .into(),
-                        )
-                    })
-                    .expect("failed to bind device");
-                S::from_socket(socket).expect("failed to create server socket")
-            };
-            let peer_socket = S::new_in_realm(peer)
-                .await
-                .and_then(|s| {
-                    s.bind(
-                        &std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, port)).into(),
-                    )?;
-                    S::from_socket(s)
-                })
-                .expect("bind failed");
-            MultiNicAndPeerConfig {
-                multinic_socket,
-                multinic_ip: {
-                    let fnet::Ipv4AddressWithPrefix {
-                        addr: fnet::Ipv4Address { addr },
-                        prefix_len: _,
-                    } = multinic_ip;
-                    std::net::Ipv4Addr::from(*addr)
+                            )?;
+                            S::from_socket(s)
+                        })
+                        .expect("bind failed");
+                    MultiNicAndPeerConfig {
+                        multinic_socket,
+                        multinic_ip: multinic_ip.clone().into(),
+                        peer_socket,
+                        peer_ip: peer_ip.clone().into(),
+                    }
                 },
-                peer_socket,
-                peer_ip: {
-                    let fnet::Ipv4AddressWithPrefix {
-                        addr: fnet::Ipv4Address { addr },
-                        prefix_len: _,
-                    } = peer_ip;
-                    std::net::Ipv4Addr::from(*addr)
-                },
-            }
-        },
-    ))
-    .await;
+            ))
+            .await;
 
-    call_with_sockets(config).await
+            call_with_sockets(config).await
+        })
+    })
+    .await
 }
 
 #[netstack_test]
@@ -2144,9 +2181,10 @@ async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 3;
     const PORT: u16 = 80;
     const BUFFER_SIZE: usize = 1024;
-    with_multinic_and_peers::<N, UdpSocket, _, _>(
+    with_multinic_and_peers::<N, UdpSocket, Ipv4, _, _>(
         name,
         NUM_PEERS,
+        net_subnet_v4!("192.168.0.0/16"),
         PORT,
         |multinic_and_peers| async move {
             // Now send traffic from the peer to the addresses for each of the multinic
@@ -2161,10 +2199,10 @@ async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
                          peer_ip,
                          multinic_socket: _,
                      }| async move {
-                        let buf = &peer_ip.octets();
+                        let buf = peer_ip.to_string();
                         let addr = (*multinic_ip, PORT).into();
                         assert_eq!(
-                            peer_socket.send_to(buf, addr).await.expect("send failed"),
+                            peer_socket.send_to(buf.as_bytes(), addr).await.expect("send failed"),
                             buf.len()
                         );
                     },
@@ -2187,8 +2225,9 @@ async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
                         assert_eq!(send_addr, (peer_ip, PORT).into());
                         // The received packet should contain the IP address of the
                         // sending interface, which is also the source address.
-                        assert_eq!(len, peer_ip.octets().len());
-                        assert_eq!(buffer[..len], peer_ip.octets());
+                        let expected = peer_ip.to_string();
+                        assert_eq!(len, expected.len());
+                        assert_eq!(&buffer[..len], expected.as_bytes());
                     },
                 )
                 .await
@@ -2203,30 +2242,38 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
     const BUFFER_SIZE: usize = 1024;
 
-    with_multinic_and_peers::<N, UdpSocket, _, _>(name, NUM_PEERS, PORT, |configs| async move {
-        // Now send traffic from each of the multinic sockets to the
-        // corresponding peer. The traffic should be sent from the address
-        // corresponding to each socket's bound device.
-        futures::stream::iter(configs.iter())
-            .for_each_concurrent(
-                None,
-                |MultiNicAndPeerConfig {
-                     multinic_ip,
-                     multinic_socket,
-                     peer_ip,
-                     peer_socket: _,
-                 }| async move {
-                    let peer_addr = (*peer_ip, PORT).into();
-                    let buf = &multinic_ip.octets();
-                    assert_eq!(
-                        multinic_socket.send_to(buf, peer_addr).await.expect("send failed"),
-                        buf.len()
-                    );
-                },
-            )
-            .await;
+    with_multinic_and_peers::<N, UdpSocket, Ipv4, _, _>(
+        name,
+        NUM_PEERS,
+        net_subnet_v4!("192.168.0.0/16"),
+        PORT,
+        |configs| async move {
+            // Now send traffic from each of the multinic sockets to the
+            // corresponding peer. The traffic should be sent from the address
+            // corresponding to each socket's bound device.
+            futures::stream::iter(configs.iter())
+                .for_each_concurrent(
+                    None,
+                    |MultiNicAndPeerConfig {
+                         multinic_ip,
+                         multinic_socket,
+                         peer_ip,
+                         peer_socket: _,
+                     }| async move {
+                        let peer_addr = (*peer_ip, PORT).into();
+                        let buf = multinic_ip.to_string();
+                        assert_eq!(
+                            multinic_socket
+                                .send_to(buf.as_bytes(), peer_addr)
+                                .await
+                                .expect("send failed"),
+                            buf.len()
+                        );
+                    },
+                )
+                .await;
 
-        futures::stream::iter(configs)
+            futures::stream::iter(configs)
             .for_each(
                 |MultiNicAndPeerConfig {
                      peer_socket,
@@ -2240,12 +2287,14 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
                     let source_ip =
                         assert_matches!(source_addr, std::net::SocketAddr::V4(addr) => *addr.ip());
                     // The received packet should contain the IP address of the interface.
-                    assert_eq!(len, source_ip.octets().len());
-                    assert_eq!(buffer[..source_ip.octets().len()], source_ip.octets());
+                    let expected = source_ip.to_string();
+                    assert_eq!(len, expected.len());
+                    assert_eq!(&buffer[..expected.len()], expected.as_bytes());
                 },
             )
             .await;
-    })
+        },
+    )
     .await
 }
 
@@ -2283,46 +2332,52 @@ async fn tcp_connect_bound_to_device(name: &str) {
         MultiNicAndPeerConfig { multinic_ip, multinic_socket, peer_ip, peer_socket }
     }
 
-    with_multinic_and_peers::<N, TcpSocket, _, _>(name, NUM_PEERS, PORT, |configs| async move {
-        let connected_configs = futures::stream::iter(configs)
-            .map(connect_to_peer)
-            .buffer_unordered(usize::MAX)
-            .collect::<Vec<_>>()
-            .await;
+    with_multinic_and_peers::<N, TcpSocket, Ipv4, _, _>(
+        name,
+        NUM_PEERS,
+        net_subnet_v4!("192.168.0.0/16").into(),
+        PORT,
+        |configs| async move {
+            let connected_configs = futures::stream::iter(configs)
+                .map(connect_to_peer)
+                .buffer_unordered(usize::MAX)
+                .collect::<Vec<_>>()
+                .await;
 
-        futures::stream::iter(connected_configs)
-            .enumerate()
-            .for_each_concurrent(
-                None,
-                |(
-                    i,
-                    MultiNicAndPeerConfig {
-                        multinic_ip: _,
-                        mut multinic_socket,
-                        peer_ip: _,
-                        mut peer_socket,
+            futures::stream::iter(connected_configs)
+                .enumerate()
+                .for_each_concurrent(
+                    None,
+                    |(
+                        i,
+                        MultiNicAndPeerConfig {
+                            multinic_ip: _,
+                            mut multinic_socket,
+                            peer_ip: _,
+                            mut peer_socket,
+                        },
+                    )| async move {
+                        let message = format!("send number {}", i);
+                        futures::stream::iter([&mut multinic_socket, &mut peer_socket])
+                            .for_each_concurrent(None, |socket| async {
+                                assert_eq!(
+                                    socket
+                                        .write(message.as_bytes())
+                                        .await
+                                        .expect("host write succeeds"),
+                                    message.len()
+                                );
+
+                                let mut buf = vec![0; message.len()];
+                                socket.read_exact(&mut buf).await.expect("host read succeeds");
+                                assert_eq!(&buf, message.as_bytes());
+                            })
+                            .await;
                     },
-                )| async move {
-                    let message = format!("send number {}", i);
-                    futures::stream::iter([&mut multinic_socket, &mut peer_socket])
-                        .for_each_concurrent(None, |socket| async {
-                            assert_eq!(
-                                socket
-                                    .write(message.as_bytes())
-                                    .await
-                                    .expect("host write succeeds"),
-                                message.len()
-                            );
-
-                            let mut buf = vec![0; message.len()];
-                            socket.read_exact(&mut buf).await.expect("host read succeeds");
-                            assert_eq!(&buf, message.as_bytes());
-                        })
-                        .await;
-                },
-            )
-            .await
-    })
+                )
+                .await
+        },
+    )
     .await
 }
 
@@ -2383,90 +2438,74 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     assert_eq!(bound_device, Err(Some(fposix::Errno::Enodev)));
 }
 
+struct MultiNicAndPeerConfig<S> {
+    multinic_ip: net_types::ip::IpAddr,
+    multinic_socket: S,
+    peer_ip: net_types::ip::IpAddr,
+    peer_socket: S,
+}
+
 #[netstack_test]
 async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let net_a = sandbox.create_network("a").await.expect("failed to create network");
-    let net_b = sandbox.create_network("b").await.expect("failed to create network");
+    const NUM_BYTES: usize = 10;
 
-    let host = sandbox.create_netstack_realm::<N, _>(format!("{name}_host")).expect("create realm");
-
-    async fn make_interface<'a, N: Netstack>(
-        host: &netemul::TestRealm<'a>,
-        id: u8,
-        net: &netemul::TestNetwork<'a>,
-        subnet: fnet::Subnet,
-    ) -> TestInterface<'a> {
-        let interface = host
-            .join_network(net, format!("host-{id}"))
-            .await
-            .expect("host failed to join network");
-
-        interface.add_address(subnet).await.expect("peer add addr");
-        match N::VERSION {
-            // Don't add the link-local subnet route on Netstack3 since it will
-            // conflict with the automatically created one.
-            NetstackVersion::Netstack3 => {}
-            NetstackVersion::Netstack2
-            | NetstackVersion::Netstack2WithFastUdp
-            | NetstackVersion::ProdNetstack2 => {
-                interface.add_subnet_route(subnet).await.expect("peer add route")
-            }
-        };
-        interface
-    }
-
-    let host_interface_a =
-        make_interface::<N>(&host, 1, &net_a, fidl_subnet!("fe80::1111/64")).await;
-    let host_interface_b =
-        make_interface::<N>(&host, 2, &net_b, fidl_subnet!("fe80::2222/64")).await;
-
-    let peer_a =
-        sandbox.create_netstack_realm::<N, _>(format!("{name}_peer-a")).expect("create realm");
-    let peer_b =
-        sandbox.create_netstack_realm::<N, _>(format!("{name}_peer-b")).expect("create realm");
-
-    // Use the same IP address for both peers in their respective networks.
-    let peer_ip = std_ip_v6!("fe80::3");
-    let peer_subnet =
-        fnet::Subnet { addr: fnet_ext::IpAddress(peer_ip.into()).into(), prefix_len: 64 };
-    let _peer_a_interface = make_interface::<N>(&peer_a, 3, &net_a, peer_subnet.clone()).await;
-    let _peer_b_interface = make_interface::<N>(&peer_b, 4, &net_b, peer_subnet).await;
-
-    let make_socket = |realm| async move {
+    async fn make_socket(realm: &netemul::TestRealm<'_>) -> fasync::net::UdpSocket {
         fasync::net::UdpSocket::bind_in_realm(realm, (std::net::Ipv6Addr::UNSPECIFIED, PORT).into())
             .await
             .expect("failed to create socket")
-    };
+    }
 
-    let (peer_a_socket, peer_b_socket, host_sock) =
-        join!(make_socket(&peer_a), make_socket(&peer_b), make_socket(&host));
-    let host_sock = &host_sock;
+    with_multinic_and_peer_networks::<N, net_types::ip::Ipv6, _>(
+        name,
+        2,
+        net_types::ip::Ipv6::LINK_LOCAL_UNICAST_SUBNET,
+        |networks, multinic, ()| {
+            Box::pin(async move {
+                let networks_and_peer_sockets =
+                    join_all(networks.iter().map(|network| async move {
+                        let Network { peer_realm, peer_interface, _network, multinic_interface } =
+                            network;
+                        let Interface { iface: _, ip: peer_ip } = peer_interface;
+                        let peer_socket = make_socket(&peer_realm).await;
+                        (multinic_interface, (peer_socket, *peer_ip))
+                    }))
+                    .await;
 
-    const NUM_BYTES: usize = 10;
-    let _: Vec<()> = join_all(
-        [(&host_interface_a, &peer_a_socket), (&host_interface_b, &peer_b_socket)].into_iter().map(
-            |(interface, peer_socket)| async move {
-                let id: u8 = interface.id().try_into().unwrap();
-                assert_eq!(
-                    host_sock
-                        .send_to(
-                            &[id; NUM_BYTES],
-                            std::net::SocketAddrV6::new(peer_ip, PORT, 0, id.into()).into(),
-                        )
-                        .await
-                        .expect("send should succeed"),
-                    NUM_BYTES
-                );
+                let host_sock = make_socket(&multinic).await;
+                let host_sock = &host_sock;
 
-                let mut buf = [0; NUM_BYTES + 1];
-                let (bytes, _sender) =
-                    peer_socket.recv_from(&mut buf).await.expect("recv succeeds");
-                assert_eq!(bytes, NUM_BYTES);
-                assert_eq!(&buf[..NUM_BYTES], &[id; NUM_BYTES]);
-            },
-        ),
+                let _: Vec<()> = join_all(networks_and_peer_sockets.iter().map(
+                    |(multinic_interface, (peer_socket, peer_ip))| async move {
+                        let Interface { iface: interface, ip: _ } = multinic_interface;
+                        let id: u8 = interface.id().try_into().unwrap();
+                        assert_eq!(
+                            host_sock
+                                .send_to(
+                                    &[id; NUM_BYTES],
+                                    std::net::SocketAddrV6::new(
+                                        peer_ip.clone().into(),
+                                        PORT,
+                                        0,
+                                        id.into()
+                                    )
+                                    .into(),
+                                )
+                                .await
+                                .expect("send should succeed"),
+                            NUM_BYTES
+                        );
+
+                        let mut buf = [0; NUM_BYTES + 1];
+                        let (bytes, _sender) =
+                            peer_socket.recv_from(&mut buf).await.expect("recv succeeds");
+                        assert_eq!(bytes, NUM_BYTES);
+                        assert_eq!(&buf[..NUM_BYTES], &[id; NUM_BYTES]);
+                    },
+                ))
+                .await;
+            })
+        },
     )
-    .await;
+    .await
 }
