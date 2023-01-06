@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/product.gni")
-import("//bundles/assembly/platform_aib_names.gni")
+import("//bundles/assembly/platform_aibs.gni")
 
 # Path to the manifest file used to populate the bazel inputs available
 # from the @legacy_ninja_build_outputs repository. This must be relative
@@ -30,20 +30,16 @@ bazel_inputs_manifest = "$root_build_dir/gen/build/bazel/legacy_ninja_build_outp
 #     Useful to list any label that is part of //vendor/..., or to add
 #     experimental labels during local development.
 #
-gn_labels_for_bazel_inputs = [
-  "//build/bazel/tests/bazel_input_resource_directory:bazel_inputs",
-  "//build/bazel/tests/build_action:bazel_inputs",
-  "//build/bazel:build_args_bazel_inputs",
-  "//products/core:core_product_config",
-  "//products/minimal:minimal_product_config",
-  "//products/workstation:workstation_product_config",
-  "//sdk:core",
-]
-
-# Include AIB bundles for assembly.
-foreach(name, platform_aib_names + eng_platform_aib_names) {
-  gn_labels_for_bazel_inputs += [ "//bundles/assembly/:${name}" ]
-}
+gn_labels_for_bazel_inputs =
+    [
+      "//build/bazel/tests/bazel_input_resource_directory:bazel_inputs",
+      "//build/bazel/tests/build_action:bazel_inputs",
+      "//build/bazel:build_args_bazel_inputs",
+      "//products/core:core_product_config",
+      "//products/minimal:minimal_product_config",
+      "//products/workstation:workstation_product_config",
+      "//sdk:core",
+    ] + eng_platform_aib_labels
 
 _assembly_deps = []
 if (use_bringup_assembly) {

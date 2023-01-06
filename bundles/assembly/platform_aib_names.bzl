@@ -25,8 +25,8 @@ PLATFORM_AIB_NAMES = [
     "wlan_softmac_support",
 ]
 
-# The names of all of the platform's 'testonly=true' Assembly Input Bundles
-ENG_PLATFORM_AIB_NAMES = [
+# The names of all of the platform's Assembly Input Bundles.
+ENG_PLATFORM_AIB_NAMES = PLATFORM_AIB_NAMES + [
     "common_minimal_eng",
     "system-update-checker",
     "kernel_args_eng",

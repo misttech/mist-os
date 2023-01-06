@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
-import("//bundles/assembly/platform_aib_names.gni")
+import("//bundles/assembly/platform_aibs.gni")
 
 # Parameters
 #
@@ -88,16 +88,12 @@ template("bazel_assembled_system") {
       deps += invoker.deps
     }
 
-    _aibs = platform_aib_names
+    # Make sure AIBs are built before Bazel assembly.
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
-      # Add the "eng" mode platform Assembly Input Bundles to the set of inputs.
-      _aibs += eng_platform_aib_names
-    }
-
-    # Make sure AIBs are built before Bazel assembly.
-    foreach(name, _aibs) {
-      deps += [ "//bundles/assembly:${name}" ]
+      deps += eng_platform_aib_labels
+    } else {
+      deps += platform_aib_labels
     }
 
     command = "build"

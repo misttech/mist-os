@@ -1,0 +1,85 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
+
+# The names of all of the platform's 'testonly=false' Assembly Input Bundles
+# LINT.IfChange
+platform_aib_names = [
+  ###
+  # The common platform bundles
+
+  # bringup feature-set-level:
+  "common_bringup",
+
+  # minimal feature-set-level:
+  "common_minimal",
+  "common_minimal_userdebug",
+
+  # Emulator Support
+  "emulator_support",
+
+  ###
+  # Feature-level / Subsystem-level bundles
+
+  # SWD (Software Delivery)
+  "omaha-client",
+
+  # Kernel args
+  "kernel_args_user",
+  "kernel_args_userdebug",
+
+  # Archivist
+  "archivist-no-detect-service",
+  "archivist-no-service",
+  "archivist-bringup",
+  "archivist-minimal",
+
+  # WLAN
+  "wlan_base",
+  "wlan_phy",
+  "wlan_legacy_privacy_support",
+  "wlan_contemporary_privacy_only_support",
+  "wlan_fullmac_support",
+  "wlan_softmac_support",
+]
+
+# LINT.ThenChange(platform_aib_names.bzl)
+
+platform_aib_labels = []
+platform_aib_files = []
+foreach(name, platform_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+
+  platform_aib_labels += [ label ]
+  platform_aib_files += [ "${_target_out_dir}/${name}/assembly_config.json" ]
+}
+
+# The names of all of the platform's Assembly Input Bundles.
+# LINT.IfChange
+_eng_aib_names = [
+  # minimal feature-set-level:
+  "common_minimal_eng",
+
+  # SWD (Software Delivery)
+  "system-update-checker",
+
+  # Kernel args
+  "kernel_args_eng",
+]
+eng_platform_aib_names = platform_aib_names + _eng_aib_names
+
+# LINT.ThenChange(platform_aib_names.bzl)
+
+eng_platform_aib_labels = []
+eng_platform_aib_files = []
+foreach(name, eng_platform_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+
+  eng_platform_aib_labels += [ label ]
+  eng_platform_aib_files +=
+      [ "${_target_out_dir}/${name}/assembly_config.json" ]
+}

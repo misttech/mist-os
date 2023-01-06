@@ -8,7 +8,7 @@ import("//build/images/filesystem_limits.gni")
 import("//build/images/size_checker/size_checker_input.gni")
 import("//build/python/python_action.gni")
 import("//build/tools/json_merge/json_merge.gni")
-import("//bundles/assembly/platform_aib_names.gni")
+import("//bundles/assembly/platform_aibs.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 assert(!bootfs_only)
@@ -108,10 +108,9 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     outputs = [ _platform_aibs ]
     data_keys = [ "assembly_input_archives" ]
     output_conversion = "json"
-    deps = []
-    foreach(name, platform_aib_names + eng_platform_aib_names) {
-      deps += [ "//bundles/assembly/:${name}" ]
-    }
+
+    # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
+    deps = eng_platform_aib_labels
   }
 
   action("convert_size_limits_to_size_budgets") {

@@ -10,7 +10,7 @@ import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/assembly/bazel_assembly_images_config_inputs.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//bundles/assembly/platform_aib_names.gni")
+import("//bundles/assembly/platform_aibs.gni")
 
 import("//build/drivers/driver_manifest.gni")
 import("//build/images/filesystem_limits.gni")
@@ -368,17 +368,13 @@ template("assembled_system") {
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
 
-    _platform_aib_names = platform_aib_names
+    # platform_aib_labels and eng_platform_aib_labels come from
+    # //bundles/assembly/platform_aibs.gni.
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
-      # Add the "eng" mode platform Assembly Input Bundles to the set of inputs
-      _platform_aib_names += eng_platform_aib_names
-    }
-
-    # Add platform AIBs, by their names:
-    platform_common_aibs = []
-    foreach(name, _platform_aib_names) {
-      platform_common_aibs += [ "//bundles/assembly:${name}" ]
+      platform_common_aibs = eng_platform_aib_labels
+    } else {
+      platform_common_aibs = platform_aib_labels
     }
 
     bazel_images_config_inputs = "${namespace}.bazel_images_config_inputs"
@@ -458,14 +454,16 @@ template("assembled_system") {
     platform_common_aibs_dir =
         get_label_info("//bundles/assembly", "target_out_dir")
 
+    # platform_aib_files and eng_platform_aib_files come from
+    # //bundles/assembly/platform_aibs.gni.
+    #
     # This isn't strictly required, but it allows the AIB input files to be
     # specified in GN.
-    platform_common_aibs = []
-    foreach(aib, labels.platform_common_aibs) {
-      _name = get_label_info(aib, "name")
-      _target_out_dir = get_label_info(aib, "target_out_dir")
-      platform_common_aibs +=
-          [ "${_target_out_dir}/${_name}/assembly_config.json" ]
+    if (defined(invoker.allow_eng_platform_bundle_use) &&
+        invoker.allow_eng_platform_bundle_use) {
+      platform_common_aibs = eng_platform_aib_files
+    } else {
+      platform_common_aibs = platform_aib_files
     }
   }
 

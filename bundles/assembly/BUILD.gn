@@ -5,6 +5,7 @@
 # NOTE:  This is the only file that can be imported in this BUILD.gn file.  No
 # other files are to be imported.
 import("//build/assembly/assembly_input_bundle.gni")
+import("//bundles/assembly/platform_aibs.gni")
 
 ########
 # Guaranteed Invariants
@@ -52,45 +53,9 @@ assert(is_fuchsia,
 # All of the platform assembly input bundles.
 group("assembly") {
   testonly = true
-  deps = [
-    ###
-    # The common platform bundles
 
-    # bringup feature-set-level:
-    ":common_bringup",
-
-    # minimal feature-set-level:
-    ":common_minimal",
-    ":common_minimal_eng",
-    ":common_minimal_userdebug",
-
-    # Emulator Support
-    ":emulator_support",
-
-    ###
-    # Feature-level / Subsystem-level bundles
-
-    # SWD (Software Delivery)
-    ":system-update-checker",
-    ":omaha-client",
-
-    # Kernel args
-    ":kernel_args_eng",
-    ":kernel_args_user",
-    ":kernel_args_userdebug",
-  ]
-}
-
-# This group is temporarily used to publish the non-eng assembly bundles to the
-# generated_assembly_inputs() template.
-group("prod_only") {
-  testonly = false
-  deps = [
-    ":common_bringup",
-    ":common_minimal",
-    ":emulator_support",
-    ":kernel_args_user",
-  ]
+  # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
+  deps = eng_platform_aib_labels
 }
 
 # The most-common, most-basic, Assembly Input Bundle that is included by all
