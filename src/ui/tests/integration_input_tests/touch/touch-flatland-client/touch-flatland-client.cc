@@ -75,8 +75,10 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
       FX_CHECK(layout_info.has_device_pixel_ratio());
 
       width_ = layout_info.logical_size().width;
-      height_ = layout_info.logical_size().width;
-      display_pixel_ratio_ = layout_info.device_pixel_ratio();
+      height_ = layout_info.logical_size().height;
+      device_pixel_ratio_ = layout_info.device_pixel_ratio();
+      FX_LOGS(INFO) << "Flatland cpp client received layout info: w=" << width_ << ", h=" << height_
+                    << ", dpr=(" << device_pixel_ratio_.x << "," << device_pixel_ratio_.y << ")";
       CreateScene();
     });
 
@@ -171,8 +173,8 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
             // The raw pointer event's coordinates are in pips (logical pixels). The test
             // expects coordinates in physical pixels. The former is transformed into the latter
             // with the DPR values received from |GetLayout|.
-            request.set_local_x(logical[0] * display_pixel_ratio_.x)
-                .set_local_y(logical[1] * display_pixel_ratio_.y)
+            request.set_local_x(logical[0] * device_pixel_ratio_.x)
+                .set_local_y(logical[1] * device_pixel_ratio_.y)
                 .set_time_received(zx_clock_get_monotonic())
                 .set_component_name("touch-flatland-client");
             touch_input_listener_->ReportTouchInput(std::move(request));
@@ -264,7 +266,7 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
   uint32_t height_ = 0;
 
   // DPR received from |fuchsia.ui.composition.ParentViewportWatcher.GetLayout|.
-  fuchsia::math::VecF display_pixel_ratio_ = {.x = 1.f, .y = 1.f};
+  fuchsia::math::VecF device_pixel_ratio_ = {.x = 1.f, .y = 1.f};
 
   // Indicates whether the latest touch interaction has been granted to the client.
   bool interaction_granted_ = false;
