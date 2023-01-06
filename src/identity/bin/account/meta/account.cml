@@ -48,6 +48,12 @@
             to: "#account_manager",
         },
         {
+            protocol: [ "fuchsia.fxfs.Volumes" ],
+            from: "parent",
+            to: "#account_manager",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.identity.authentication.PasswordStorageUnlockMechanism" ],
             from: "#password_authenticator",
             to: "#account_manager",

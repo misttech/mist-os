@@ -298,6 +298,14 @@
             from: "parent",
             to: "#bootstrap",
         },
+
+        // `core/account` needs to create an Fxfs volume for each account.
+        {
+            protocol: "fuchsia.fxfs.Volumes",
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+        },
     ],
     expose: [
         // For reboot_on_terminate

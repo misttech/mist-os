@@ -44,4 +44,14 @@
             availability: "optional",
         },
     ],
+    expose: [
+        {
+            directory: "volumes",
+            from: "#fxfs",
+        },
+        {
+            protocol: "fuchsia.fxfs.Volumes",
+            from: "#fxfs",
+        },
+    ],
 }

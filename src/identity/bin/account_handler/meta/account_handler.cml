@@ -31,6 +31,10 @@
             ],
         },
         {
+            protocol: [ "fuchsia.fxfs.Volumes" ],
+            availability: "optional",
+        },
+        {
             storage: "data",
             path: "/data",
         },

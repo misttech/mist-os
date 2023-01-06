@@ -24,6 +24,12 @@
             to: "#account",
         },
         {
+            protocol: [ "fuchsia.fxfs.Volumes" ],
+            from: "parent",
+            to: "#account",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "#trace_manager",
             to: "#account",
