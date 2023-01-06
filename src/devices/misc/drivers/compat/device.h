@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework.deprecated/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/ddk/device.h>
@@ -42,7 +43,7 @@ class Driver;
 // Device is an implementation of a DFv1 device.
 class Device : public std::enable_shared_from_this<Device>,
                public devfs_fidl::DeviceInterface,
-               public fidl::WireServer<fuchsia_driver_framework::RuntimeConnector> {
+               public fidl::WireServer<fuchsia_driver_framework_deprecated::RuntimeConnector> {
  public:
   Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
          std::optional<Device*> parent, fdf::Logger* logger, async_dispatcher_t* dispatcher);
@@ -106,14 +107,14 @@ class Device : public std::enable_shared_from_this<Device>,
   void PerformUnbind();
   void CompleteUnbind();
 
-  // Serves the |fuchsia_driver_framework::RuntimeConnector| protocol,
+  // Serves the |fuchsia_driver_framework_deprecated::RuntimeConnector| protocol,
   // used for supporting v1 of driver runtime protocol discovery.
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ServeRuntimeConnectorProtocol();
 
   // Serves the |inspect_vmo| from the driver's diagnostics directory.
   zx_status_t ServeInspectVmo(zx::vmo inspect_vmo);
 
-  // |fuchsia_driver_framework::RuntimeConnector| implementation.
+  // |fuchsia_driver_framework_deprecated::RuntimeConnector| implementation.
   void ListProtocols(ListProtocolsRequestView request,
                      ListProtocolsCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -185,7 +186,7 @@ class Device : public std::enable_shared_from_this<Device>,
   uint32_t device_id_ = 0;
 
   fdf::Logger* logger_;
-  fidl::ServerBindingGroup<fuchsia_driver_framework::RuntimeConnector> bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_framework_deprecated::RuntimeConnector> bindings_;
   async_dispatcher_t* const dispatcher_;
   uint32_t device_flags_ = 0;
   std::vector<std::string> fragments_;

@@ -962,22 +962,23 @@ zx_status_t Device::AddNodeGroup(const char* name, const node_group_desc_t* grou
 }
 
 zx_status_t Device::ConnectRuntime(const char* protocol_name, fdf::Channel request) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::RuntimeConnector>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework_deprecated::RuntimeConnector>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
   zx_status_t status = ConnectFragmentFidl(
-      "default", fidl::DiscoverableProtocolName<fuchsia_driver_framework::RuntimeConnector>,
+      "default",
+      fidl::DiscoverableProtocolName<fuchsia_driver_framework_deprecated::RuntimeConnector>,
       endpoints->server.TakeChannel());
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Error connecting to RuntimeConnector protocol: %s",
             zx_status_get_string(status));
     return status;
   }
-  auto result =
-      fidl::WireCall(endpoints->client)
-          ->Connect(fidl::StringView::FromExternal(protocol_name),
-                    fuchsia_driver_framework::wire::RuntimeProtocolServerEnd{request.release()});
+  auto result = fidl::WireCall(endpoints->client)
+                    ->Connect(fidl::StringView::FromExternal(protocol_name),
+                              fuchsia_driver_framework_deprecated::wire::RuntimeProtocolServerEnd{
+                                  request.release()});
   if (result.status() != ZX_OK) {
     FDF_LOG(ERROR, "Error calling RuntimeConnector::Connect fidl: %s", result.status_string());
     return result.status();
@@ -1002,8 +1003,10 @@ zx_status_t Device::ConnectRuntime(const char* service_name, const char* protoco
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::ServeRuntimeConnectorProtocol() {
   auto& outgoing = driver()->outgoing();
-  zx::result<> status = outgoing.component().AddUnmanagedProtocol<fdf::RuntimeConnector>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  zx::result<> status =
+      outgoing.component()
+          .AddUnmanagedProtocol<fuchsia_driver_framework_deprecated::RuntimeConnector>(
+              bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   if (status.is_error()) {
     return status.take_error();
   }
