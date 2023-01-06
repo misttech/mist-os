@@ -83,8 +83,7 @@ type ResultOkEntry struct {
 // A Result is the result type used for a method that is flexible or uses error syntax.
 type Result struct {
 	// Compound identifier for the result type, used for lookups.
-	ECI     EncodedCompoundIdentifier
-	Derives derives
+	ECI EncodedCompoundIdentifier
 	// Rust UpperCamelCase name for the result type used when generating or
 	// referencing it.
 	Name              string
@@ -1551,9 +1550,6 @@ func (c *compiler) fillDerives(ir *Root) {
 	for _, v := range ir.Unions {
 		dc.fillDerivesForECI(v.ECI)
 	}
-	for _, v := range ir.Results {
-		dc.fillDerivesForECI(v.ECI)
-	}
 	for _, v := range ir.Tables {
 		dc.fillDerivesForECI(v.ECI)
 	}
@@ -1651,44 +1647,29 @@ typeSwitch:
 		}
 		table.Derives = derivesOut
 	case fidlgen.UnionDeclType:
-		if result := dc.root.findResult(eci); result != nil {
-			// It's a Result, not a union
-			// Check if the derives have already been calculated
-			if deriveStatus.complete {
-				derivesOut = result.Derives
-				break typeSwitch
-			}
-			derivesOut = derivesAllButZerocopy
-			for _, ok := range result.Ok {
-				derivesOut = derivesOut.and(dc.fillDerivesForType(ok.OGType))
-			}
-			if result.ErrOGType != nil {
-				derivesOut = derivesOut.and(dc.fillDerivesForType(*result.ErrOGType))
-			}
-			result.Derives = derivesOut
-		} else if union := dc.root.findUnion(eci); union != nil {
-			// Check if the derives have already been calculated
-			if deriveStatus.complete {
-				derivesOut = union.Derives
-				break typeSwitch
-			}
-			derivesOut = derivesAllButZerocopy
-			for _, member := range union.Members {
-				derivesOut = derivesOut.and(dc.fillDerivesForType(member.OGType))
-			}
-			if union.IsFlexible() {
-				// An unknown variant behaves like NaN (not equal to itself).
-				derivesOut = derivesOut.andNonReflexive()
-				if union.IsResourceType() {
-					derivesOut = derivesOut.andUnknown()
-				} else {
-					derivesOut = derivesOut.andUnknownNonResource()
-				}
-			}
-			union.Derives = derivesOut
-		} else {
+		union := dc.root.findUnion(eci)
+		if union == nil {
 			panic(fmt.Sprintf("union not found: %v", eci))
 		}
+		// Check if the derives have already been calculated
+		if deriveStatus.complete {
+			derivesOut = union.Derives
+			break typeSwitch
+		}
+		derivesOut = derivesAllButZerocopy
+		for _, member := range union.Members {
+			derivesOut = derivesOut.and(dc.fillDerivesForType(member.OGType))
+		}
+		if union.IsFlexible() {
+			// An unknown variant behaves like NaN (not equal to itself).
+			derivesOut = derivesOut.andNonReflexive()
+			if union.IsResourceType() {
+				derivesOut = derivesOut.andUnknown()
+			} else {
+				derivesOut = derivesOut.andUnknownNonResource()
+			}
+		}
+		union.Derives = derivesOut
 	default:
 		panic(fmt.Sprintf("unknown declaration type: %v", declInfo.Type))
 	}
