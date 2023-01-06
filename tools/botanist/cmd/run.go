@@ -155,7 +155,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.imageManifest, "images", "", "path to an image manifest")
 	f.BoolVar(&r.netboot, "netboot", false, "if set, botanist will not pave; but will netboot instead")
 	f.Var(&r.zirconArgs, "zircon-args", "kernel command-line arguments")
-	f.DurationVar(&r.timeout, "timeout", 10*time.Minute, "duration allowed for the command to finish execution.")
+	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
 	f.StringVar(&r.syslogDir, "syslog-dir", "", "the directory to write all system logs to.")
 	f.StringVar(&r.sshKey, "ssh", "", "file containing a private SSH user key; if not provided, a private key will be generated.")
 	f.StringVar(&r.serialLogDir, "serial-log-dir", "", "the directory to write all serial logs to.")
@@ -180,7 +180,11 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 }
 
 func (r *RunCommand) execute(ctx context.Context, args []string) error {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	ctx, cancel := context.WithCancel(ctx)
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+	}
+
 	testsPath := args[0]
 
 	go func() {
