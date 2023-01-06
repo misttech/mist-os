@@ -12,6 +12,8 @@
 
 #include <gtest/gtest.h>
 
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
+
 namespace gtest {
 // An extension of Test class which sets up a driver runtime message loop for
 // the test.
@@ -39,18 +41,7 @@ class DriverTestLoopFixture : public ::testing::Test {
 
   void SetUp() override {
     ::testing::Test::SetUp();
-    // When creating a new dispatcher, we need to associate it with some owner so that the driver
-    // runtime library doesn't complain.
-    fdf_testing_push_driver(this);
-
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop",
-        [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
-    EXPECT_EQ(ZX_OK, dispatcher.status_value());
-    dispatcher_ = std::move(dispatcher.value());
-
-    // Now that we have created the dispatcher we can pop this.
-    fdf_testing_pop_driver();
+    ASSERT_EQ(ZX_OK, dispatcher_.Start("driver-test-loop").status_value());
   }
 
   void TearDown() override {
@@ -59,27 +50,17 @@ class DriverTestLoopFixture : public ::testing::Test {
   }
 
   // Shuts down the driver dispatcher.
-  void ShutdownDriverDispatcher() {
-    dispatcher_.ShutdownAsync();
-    EXPECT_EQ(ZX_OK, dispatcher_shutdown_.Wait());
-  }
+  void ShutdownDriverDispatcher() { EXPECT_EQ(ZX_OK, dispatcher_.Stop().status_value()); }
 
   // Posts a task on the driver dispatcher and waits synchronously until it is completed.
   void RunOnDispatcher(fit::closure task) {
-    libsync::Completion task_completion;
-    async::PostTask(dispatcher_.async_dispatcher(), [task = std::move(task), &task_completion]() {
-      task();
-      task_completion.Signal();
-    });
-
-    task_completion.Wait();
+    fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), std::move(task));
   }
 
-  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
+  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_.driver_dispatcher(); }
 
  private:
-  fdf::SynchronizedDispatcher dispatcher_;
-  libsync::Completion dispatcher_shutdown_;
+  fdf::TestSynchronizedDispatcher dispatcher_;
 };
 
 }  // namespace gtest

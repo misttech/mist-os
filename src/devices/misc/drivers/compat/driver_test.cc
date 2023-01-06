@@ -26,7 +26,7 @@
 #include <gtest/gtest.h>
 #include <mock-boot-arguments/server.h>
 
-#include "sdk/lib/driver/runtime/testing/loop_fixture/test_loop_fixture.h"
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
@@ -346,13 +346,14 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 }  // namespace
 
-class DriverTest : public gtest::DriverTestLoopFixture {
+class DriverTest : public testing::Test {
  protected:
   TestNode& node() { return node_.value(); }
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
-    DriverTestLoopFixture::SetUp();
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.Start("driver-test-loop").status_value());
+
     fidl_loop_.StartThread("fidl-server-thread");
 
     std::map<std::string, std::string> arguments;
@@ -365,7 +366,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   }
 
   void TearDown() override {
-    DriverTestLoopFixture::TearDown();
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 
     libsync::Completion vfs_shutdown_complete;
     vfs_->Shutdown([&vfs_shutdown_complete](auto status) { vfs_shutdown_complete.Signal(); });
@@ -499,9 +500,9 @@ class DriverTest : public gtest::DriverTestLoopFixture {
     libsync::Completion completion;
     std::unique_ptr<compat::Driver> compat_driver;
 
-    async::PostTask(driver_dispatcher().async_dispatcher(), [&] {
-      auto result =
-          compat::DriverFactory::CreateDriver(std::move(start_args), driver_dispatcher().borrow());
+    async::PostTask(driver_dispatcher_.dispatcher(), [&] {
+      auto result = compat::DriverFactory::CreateDriver(
+          std::move(start_args), driver_dispatcher_.driver_dispatcher().borrow());
       EXPECT_EQ(ZX_OK, result.status_value());
       auto* driver = result.value().release();
       compat_driver.reset(static_cast<compat::Driver*>(driver));
@@ -520,7 +521,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
               reinterpret_cast<libsync::Completion*>(context->driver)->Signal();
             },
     };
-    async::PostTask(driver_dispatcher().async_dispatcher(),
+    async::PostTask(driver_dispatcher_.dispatcher(),
                     [&driver, &stop_context] { driver->PrepareStop(&stop_context); });
 
     // Keep running the test loop while we're waiting for a signal on the dispatcher thread.
@@ -529,13 +530,13 @@ class DriverTest : public gtest::DriverTestLoopFixture {
       RunTestLoopUntilIdle();
     }
 
-    RunOnDispatcher([&] { driver.reset(); });
+    fdf::RunOnDispatcherSync(driver_dispatcher_.dispatcher(), [&] { driver.reset(); });
   }
 
   void RunUntilDispatchersIdle() {
     bool ran = false;
     do {
-      WaitUntilIdle();
+      fdf_testing_wait_until_all_dispatchers_idle();
       ran = RunTestLoopUntilIdle();
     } while (ran);
   }
@@ -556,6 +557,7 @@ class DriverTest : public gtest::DriverTestLoopFixture {
   async_dispatcher_t* dispatcher() { return test_loop_.dispatcher(); }
 
   TestProfileProvider profile_provider_;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_;
 
  private:
   std::optional<TestNode> node_;
@@ -601,7 +603,7 @@ TEST_F(DriverTest, Start) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -631,7 +633,7 @@ TEST_F(DriverTest, Start_WithCreate) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -651,7 +653,7 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
   EXPECT_EQ(nullptr, driver->Context());
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 }
 
 TEST_F(DriverTest, Start_DeviceAddNull) {
@@ -662,7 +664,7 @@ TEST_F(DriverTest, Start_DeviceAddNull) {
   WaitForChildDeviceAdded();
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 }
 
 TEST_F(DriverTest, Start_CheckCompatService) {
@@ -691,7 +693,7 @@ TEST_F(DriverTest, Start_CheckCompatService) {
   ASSERT_EQ(metadata, expected_metadata);
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 }
 
 TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
@@ -713,7 +715,7 @@ TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
   // Check that the root resource's value did not change.
   ASSERT_EQ(resource, resource2);
 
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 }
 
 TEST_F(DriverTest, Start_GetBackingMemory) {
@@ -730,7 +732,7 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
   EXPECT_EQ(nullptr, driver->Context());
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
 }
 
 TEST_F(DriverTest, Start_BindFailed) {
@@ -763,7 +765,7 @@ TEST_F(DriverTest, Start_BindFailed) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 
   {
@@ -808,7 +810,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
   ASSERT_TRUE(was_called);
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -842,7 +844,7 @@ TEST_F(DriverTest, GetProfile) {
   thread.join();
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -881,7 +883,7 @@ TEST_F(DriverTest, GetDeadlineProfile) {
   thread.join();
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -925,7 +927,7 @@ TEST_F(DriverTest, GetVariable) {
   thread.join();
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -964,6 +966,6 @@ TEST_F(DriverTest, SetProfileByRole) {
   thread.join();
 
   UnbindAndFreeDriver(std::move(driver));
-  ShutdownDriverDispatcher();
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
