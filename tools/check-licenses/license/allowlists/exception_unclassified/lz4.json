@@ -1,0 +1,20 @@
+{
+  "license": {
+    "exceptions": [
+      {
+        "entries": [
+          {
+            "bug": "https://fxbug.dev/117823",
+            "projects": [
+              "prebuilt/third_party/android/aemu/release/linux-x64"
+            ]
+          }
+        ],
+        "example": "http://shortn/_KLf9T8E4cH",
+        "licenseType": "lz4",
+        "notes": [],
+        "patternRoot": "//tools/check-licenses/license/patterns/exception_unclassified/lz4"
+      }
+    ]
+  }
+}
