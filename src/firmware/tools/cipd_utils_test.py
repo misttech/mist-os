@@ -449,5 +449,26 @@ class ChangelogTests(unittest.TestCase):
                 repo1: rev1_no_change"""))
 
 
+class CopyTests(unittest.TestCase):
+
+    @mock.patch("cipd_utils.subprocess.run", autospec=True)
+    @mock.patch("cipd_utils.download_cipd", autospec=True)
+    @mock.patch("cipd_utils.fetch_cipd_tags", autospec=True)
+    def test_copy(self, mock_fetch_cipd_tags, mock_download_cipd, mock_run):
+        mock_fetch_cipd_tags.return_value = ["tag1:foo", "tag2:bar"]
+
+        cipd_utils.copy("source_name", "source_version", "dest_name")
+
+        self.assertEqual(
+            get_run_commands(mock_run), [
+                [
+                    cipd_utils.CIPD_TOOL, "create", "-name", "dest_name", "-in",
+                    mock.ANY, "-install-mode", "copy", "-tag", "tag1:foo",
+                    "-tag", "tag2:bar", "-tag",
+                    "copied_from:source_name/source_version"
+                ]
+            ])
+
+
 if __name__ == "__main__":
     unittest.main()

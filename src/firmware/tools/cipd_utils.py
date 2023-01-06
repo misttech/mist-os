@@ -19,7 +19,7 @@ import os
 import re
 import subprocess
 import sys
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, List, Optional
 
 _MY_DIR = os.path.dirname(__file__)
 _FUCHSIA_ROOT = os.path.normpath(os.path.join(_MY_DIR, "..", "..", ".."))
@@ -29,7 +29,7 @@ _GIT_TOOL = "git"
 _REPO_TOOL = "repo"
 
 # `cipd` is available as a prebuilt in the Fuchsia checkout.
-_CIPD_TOOL = os.path.join(_FUCHSIA_ROOT, ".jiri_root", "bin", "cipd")
+CIPD_TOOL = os.path.join(_FUCHSIA_ROOT, ".jiri_root", "bin", "cipd")
 
 
 class Git:
@@ -168,6 +168,63 @@ class Repo:
         return gits
 
 
+def download_cipd(name: str, version: str, path: str):
+    """Downloads a CIPD package.
+
+    Args:
+        name: package name.
+        version: package version.
+        path: path to download the package to.
+    """
+    subprocess.run(
+        [CIPD_TOOL, "ensure", "-root", path, "-ensure-file", "-"],
+        check=True,
+        capture_output=True,
+        text=True,
+        input=f"{name} {version}")
+
+
+def fetch_cipd_tags(name: str, version: str) -> List[str]:
+    """Fetches the tags for a given CIPD package.
+
+    Args:
+        name: package name.
+        version: package version.
+
+    Returns:
+        The package tags in "<key>:<value>" format.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        json_path = os.path.join(temp_dir, "metadata.json")
+        subprocess.run(
+            [
+                CIPD_TOOL, "describe", name, "-version", version,
+                "-json-output", json_path
+            ],
+            check=True,
+            capture_output=True,
+            text=True)
+
+        with open(json_path, 'r') as json_file:
+            metadata = json.load(json_file)
+
+    # `cipd describe` JSON looks like:
+    # {
+    #   "result": {
+    #     ...
+    #     "tags": [
+    #       {
+    #         "tag": "dev_cipd_version:sMPq54z3QpafC2JIAUsl_RiVi2VIs68ZNsA2ANSBvOIC",
+    #         "registered_by": "user:vendor-google-ci-builder@fuchsia-infra.iam.gserviceaccount.com",
+    #         "registered_ts": 1665093335
+    #       },
+    #       ...
+    #     ]
+    #   }
+    # }
+    return [t["tag"] for t in metadata["result"]["tags"]]
+
+
 def get_cipd_version_manifest(package: str,
                               version_or_path: str) -> Dict[str, str]:
     """Returns the contents of the manifest.json file in a CIPD package.
@@ -195,16 +252,9 @@ def get_cipd_version_manifest(package: str,
     if os.path.isdir(version_or_path):
         return read_manifest(os.path.join(version_or_path, "manifest.json"))
 
+    # Download the package so we can read the manifest file.
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Download the package so we can read the manifest file.
-        subprocess.run(
-            [_CIPD_TOOL, "ensure", "-root", temp_dir, "-ensure-file", "-"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            input=f"{package} {version_or_path}")
-
+        download_cipd(package, version_or_path, temp_dir)
         return read_manifest(os.path.join(temp_dir, "manifest.json"))
 
 
@@ -277,6 +327,29 @@ def changelog(
     return "\n".join(lines)
 
 
+def copy(source_package: str, source_version: str, dest_package: str):
+    """Copies a CIPD package.
+
+    Args:
+        source_package: source package name.
+        source_version: source version.
+        dest_package: destination package name.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        download_cipd(source_package, source_version, temp_dir)
+
+        command = [
+            CIPD_TOOL, "create", "-name", dest_package, "-in", temp_dir,
+            "-install-mode", "copy"
+        ]
+        for tag in fetch_cipd_tags(source_package, source_version):
+            command += ["-tag", tag]
+        # Always add an extra tag indicating where this copy came from.
+        command += ["-tag", f"copied_from:{source_package}/{source_version}"]
+
+        subprocess.run(command, check=True)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -300,6 +373,12 @@ def _parse_args() -> argparse.Namespace:
         " provided only the listed git repos are included. Alias is the name"
         " to give the git repo in the changelog, or null to use the project"
         " name.")
+
+    copy_parser = subparsers.add_parser("copy", help="Copy a CIPD package")
+    copy_parser.add_argument("source_package", help="Source CIPD name")
+    copy_parser.add_argument("source_version", help="Source CIPD version")
+    copy_parser.add_argument("dest_package", help="Destination CIPD name")
+
     return parser.parse_args()
 
 
@@ -322,6 +401,12 @@ def main() -> int:
             changelog(
                 Repo(args.repo, spec=spec), args.package, args.old_version,
                 args.new_version))
+
+    elif args.action == "copy":
+        copy(args.source_package, args.source_version, args.dest_package)
+
+    else:
+        raise NotImplementedError(f"Unimplemented command: {args.action}")
 
     return 0
 
