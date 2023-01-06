@@ -32,7 +32,9 @@ group("tests") {
     "limited_netsvc:tests",
     "microbenchmarks:tests",
     "oom:tests",
-    "reboot:tests",
+
+    # Disabled, see https://fxbug.dev/118767.
+    #"reboot:tests",
     "shutdown:tests",
   ]
 }
