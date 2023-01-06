@@ -126,21 +126,6 @@ fuchsia_test_component("gfx_focus_integration_test") {
   deps = [ ":gfx_focus_integration_test_bin" ]
 }
 
-executable("gfx_legacy_coordinate_transform_test2_bin") {
-  testonly = true
-  sources = [ "gfx_integration_tests/gfx_legacy_coordinate_transform_test2.cc" ]
-  deps = [
-    ":common_deps_cts",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
-  ]
-}
-
-fuchsia_test_component("gfx_legacy_coordinate_transform_test2") {
-  component_name = "gfx_legacy_coordinate_transform_test2"
-  manifest = "meta/gfx_legacy_coordinate_transform_test2.cml"
-  deps = [ ":gfx_legacy_coordinate_transform_test2_bin" ]
-}
-
 executable("gfx_touch_integration_test_bin") {
   testonly = true
   sources = [
@@ -464,7 +449,6 @@ fuchsia_test_component("flatland_pixeltest") {
 fuchsia_test_package("gfx_integration_tests") {
   test_components = [
     ":gfx_focus_integration_test",
-    ":gfx_legacy_coordinate_transform_test2",
     ":gfx_mouse_integration_test",
     ":gfx_touch_integration_test",
     ":gfx_view_ref_installed_integration_test",

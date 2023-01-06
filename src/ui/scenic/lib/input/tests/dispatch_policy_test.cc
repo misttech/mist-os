@@ -42,7 +42,6 @@ class DispatchPolicyTest : public gtest::TestLoopFixture {
  public:
   DispatchPolicyTest()
       : input_system_(context_provider_.context(), inspect_node_,
-                      fxl::WeakPtr<scenic_impl::gfx::SceneGraph>(),
                       /*request_focus*/ [](auto...) {}) {}
 
   void SetUp() override {

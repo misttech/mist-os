@@ -12,12 +12,10 @@
 #include <map>
 #include <optional>
 
-#include "src/ui/scenic/lib/gfx/engine/scene_graph.h"
 #include "src/ui/scenic/lib/input/a11y_legacy_contender.h"
 #include "src/ui/scenic/lib/input/a11y_registry.h"
 #include "src/ui/scenic/lib/input/constants.h"
 #include "src/ui/scenic/lib/input/gesture_arena.h"
-#include "src/ui/scenic/lib/input/gfx_legacy_contender.h"
 #include "src/ui/scenic/lib/input/helper.h"
 #include "src/ui/scenic/lib/input/hit_tester.h"
 #include "src/ui/scenic/lib/input/touch_source_base.h"
@@ -30,8 +28,7 @@ class TouchSystem : public fuchsia::ui::pointer::augment::LocalHit {
  public:
   explicit TouchSystem(sys::ComponentContext* context,
                        std::shared_ptr<const view_tree::Snapshot>& view_tree_snapshot,
-                       HitTester& hit_tester, inspect::Node& parent_node,
-                       fxl::WeakPtr<gfx::SceneGraph> scene_graph);
+                       HitTester& hit_tester, inspect::Node& parent_node);
   ~TouchSystem() = default;
 
   fuchsia::ui::input::accessibility::PointerEventListenerPtr&
@@ -69,14 +66,6 @@ class TouchSystem : public fuchsia::ui::pointer::augment::LocalHit {
   zx_koid_t FindViewRefKoidOfRelatedChannel(
       const fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource>& original) const;
 
-  // Enqueue the pointer event into the EventReporter of a View.
-  void ReportPointerEventToGfxLegacyView(const InternalTouchEvent& event, zx_koid_t view_ref_koid,
-                                         fuchsia::ui::input::PointerEventType type);
-
-  // Takes a ViewRef koid and creates a GfxLegacyContender that delivers events to the corresponding
-  // SessionListener on contest victory.
-  ContenderId AddGfxLegacyContender(StreamId stream_id, zx_koid_t view_ref_koid);
-
   fuchsia::ui::input::accessibility::PointerEvent CreateAccessibilityEvent(
       const InternalTouchEvent& event);
 
@@ -105,8 +94,7 @@ class TouchSystem : public fuchsia::ui::pointer::augment::LocalHit {
   // Reference to the ViewTreeSnapshot held by InputSystem.
   std::shared_ptr<const view_tree::Snapshot>& view_tree_snapshot_;
   HitTester& hit_tester_;
-  // TODO(fxbug.dev/64206): Remove when we no longer have any legacy clients.
-  fxl::WeakPtr<gfx::SceneGraph> scene_graph_;
+
   // An inspector that tracks all GestureContenders, so data can persist past contender lifetimes.
   // Must outlive all contenders.
   GestureContenderInspector contender_inspector_;
@@ -128,12 +116,9 @@ class TouchSystem : public fuchsia::ui::pointer::augment::LocalHit {
   std::unordered_map<ContenderId, std::unique_ptr<GestureContender>> contenders_;
 
   // Map of ViewRef koids to ContenderIds.
-  // Does not include ContenderIds for A11yLegacyContender or GfxLegacyContender, since no View is
-  // uniquely associated with either.
+  // Does not include ContenderIds for the A11yLegacyContender, since no View is
+  // uniquely associated with it.
   std::unordered_map<zx_koid_t, ContenderId> viewrefs_to_contender_ids_;
-
-  // Mapping of {device_id, pointer_id} to stream id for gfx legacy injection.
-  std::map<std::pair<uint32_t, uint32_t>, StreamId> gfx_legacy_streams_;
 
   const ContenderId a11y_contender_id_ = 1;
   ContenderId next_contender_id_ = 2;

@@ -12,7 +12,6 @@ executable("unittests") {
     "gesture_arena_test.cc",
     "gesture_contender_inspector_unittest.cc",
     "gesture_disambiguation_test.cc",
-    "gfx_legacy_contender_test.cc",
     "helper_unittest.cc",
     "injector_unittest.cc",
     "mouse_source_test.cc",

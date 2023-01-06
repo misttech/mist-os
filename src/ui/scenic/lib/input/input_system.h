@@ -18,7 +18,7 @@ namespace scenic_impl::input {
 class InputSystem {
  public:
   explicit InputSystem(sys::ComponentContext* context, inspect::Node& inspect_node,
-                       fxl::WeakPtr<gfx::SceneGraph> scene_graph, RequestFocusFunc request_focus);
+                       RequestFocusFunc request_focus);
   ~InputSystem() = default;
 
   void OnNewViewTreeSnapshot(std::shared_ptr<const view_tree::Snapshot> snapshot) {

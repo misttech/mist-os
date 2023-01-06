@@ -139,8 +139,8 @@ class AccessibilityPointerEventsTest : public gtest::TestLoopFixture {
  public:
   AccessibilityPointerEventsTest()
       : hit_tester_(view_tree_snapshot_, inspect_node_),
-        touch_system_(context_provider_.context(), view_tree_snapshot_, hit_tester_, inspect_node_,
-                      nullptr) {}
+        touch_system_(context_provider_.context(), view_tree_snapshot_, hit_tester_,
+                      inspect_node_) {}
 
   void SetUp() override {
     OnNewViewTreeSnapshot(NewSnapshot(

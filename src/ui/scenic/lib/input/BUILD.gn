@@ -82,24 +82,17 @@ source_set("legacy") {
     "a11y_legacy_contender.h",
     "a11y_registry.cc",
     "a11y_registry.h",
-    "gfx_legacy_contender.cc",
-    "gfx_legacy_contender.h",
   ]
 
   deps = [
     ":gesture_contender_interface",
-    "//src/ui/scenic/lib/gfx",
-    "//src/ui/scenic/lib/gfx:ids",
-    "//src/ui/scenic/lib/scenic",
-    "//src/ui/scenic/lib/scheduling:id",
-    "//src/ui/scenic/lib/utils",
+    "//sdk/lib/sys/cpp:cpp",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/trace",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fostr/fidl/fuchsia.ui.input.accessibility",
   ]

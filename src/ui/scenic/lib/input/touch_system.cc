@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
 #include <fidl/fuchsia.ui.pointer/cpp/hlcpp_conversion.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/status.h>
@@ -67,13 +66,6 @@ glm::vec2 GetViewportNDCPoint(const InternalTouchEvent& internal_event) {
   };
 }
 
-void ChattyGfxLog(const fuchsia::ui::input::InputEvent& event) {
-  static uint32_t chatty = 0;
-  if (chatty++ < ChattyMax()) {
-    FX_LOGS(INFO) << "Ptr-GFX[" << chatty << "/" << ChattyMax() << "]: " << event;
-  }
-}
-
 void ChattyA11yLog(const fuchsia::ui::input::accessibility::PointerEvent& event) {
   static uint32_t chatty = 0;
   if (chatty++ < ChattyMax()) {
@@ -85,11 +77,9 @@ void ChattyA11yLog(const fuchsia::ui::input::accessibility::PointerEvent& event)
 
 TouchSystem::TouchSystem(sys::ComponentContext* context,
                          std::shared_ptr<const view_tree::Snapshot>& view_tree_snapshot,
-                         HitTester& hit_tester, inspect::Node& parent_node,
-                         fxl::WeakPtr<gfx::SceneGraph> scene_graph)
+                         HitTester& hit_tester, inspect::Node& parent_node)
     : view_tree_snapshot_(view_tree_snapshot),
       hit_tester_(hit_tester),
-      scene_graph_(std::move(scene_graph)),
       contender_inspector_(parent_node.CreateChild("GestureContenders")) {
   a11y_pointer_event_registry_.emplace(
       context,
@@ -242,31 +232,6 @@ fuchsia::ui::input::accessibility::PointerEvent TouchSystem::CreateAccessibility
   return BuildAccessibilityPointerEvent(event, ndc, top_hit_view_local, view_ref_koid);
 }
 
-ContenderId TouchSystem::AddGfxLegacyContender(StreamId stream_id, zx_koid_t view_ref_koid) {
-  FX_DCHECK(view_ref_koid != ZX_KOID_INVALID);
-
-  const ContenderId contender_id = next_contender_id_++;
-  auto [_, success] = contenders_.emplace(
-      contender_id, std::make_unique<GfxLegacyContender>(
-                        view_ref_koid,
-                        /*respond*/
-                        [this, stream_id, contender_id](GestureResponse response) {
-                          RecordGestureDisambiguationResponse(stream_id, contender_id, {response});
-                        },
-                        /*deliver_events_to_client*/
-                        [this, view_ref_koid](const std::vector<InternalTouchEvent>& events) {
-                          for (const auto& event : events) {
-                            ReportPointerEventToGfxLegacyView(
-                                event, view_ref_koid, fuchsia::ui::input::PointerEventType::TOUCH);
-                          }
-                        },
-                        /*self_destruct*/
-                        [this, contender_id] { EraseContender(contender_id, ZX_KOID_INVALID); },
-                        contender_inspector_));
-  FX_DCHECK(success);
-  return contender_id;
-}
-
 void TouchSystem::RegisterTouchSource(
     fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource> touch_source_request,
     zx_koid_t client_view_ref_koid) {
@@ -336,9 +301,7 @@ void TouchSystem::InjectTouchEventExclusive(const InternalTouchEvent& event, Str
           view_tree_snapshot_->view_tree.at(event.target).bounding_box);
     }
   } else {
-    // If there is no TouchContender for the target, then we assume it to be a GfxLegacyContender.
-    ReportPointerEventToGfxLegacyView(event, event.target,
-                                      fuchsia::ui::input::PointerEventType::TOUCH);
+    FX_NOTREACHED();
   }
 }
 
@@ -438,15 +401,6 @@ std::vector<ContenderId> TouchSystem::CollectContenders(StreamId stream_id,
         FX_DCHECK(contenders_.count(contender_id));
         contenders.push_back(contender_id);
       }
-    }
-
-    // Add a GfxLegacyContender if we didn't find a corresponding TouchSource contender for the top
-    // hit view.
-    // TODO(fxbug.dev/64206): Remove when we no longer have any legacy clients.
-    if (!viewrefs_to_contender_ids_.count(top_koid)) {
-      FX_VLOGS(1) << "View hit: [ViewRefKoid=" << top_koid << "]";
-      const ContenderId contender_id = AddGfxLegacyContender(stream_id, top_koid);
-      contenders.push_back(contender_id);
     }
   }
 
@@ -600,49 +554,6 @@ void TouchSystem::EraseContender(ContenderId contender_id, zx_koid_t view_ref_ko
   }
   for (const auto stream_id : ongoing_streams) {
     RecordGestureDisambiguationResponse(stream_id, contender_id, {GestureResponse::kNo});
-  }
-}
-
-void TouchSystem::ReportPointerEventToGfxLegacyView(const InternalTouchEvent& event,
-                                                    zx_koid_t view_ref_koid,
-                                                    fuchsia::ui::input::PointerEventType type) {
-  TRACE_DURATION("input", "dispatch_event_to_client", "event_type", "pointer");
-  if (!scene_graph_)
-    return;
-
-  auto event_reporter = scene_graph_->view_tree().EventReporterOf(view_ref_koid);
-  if (!event_reporter)
-    return;
-
-  if (view_tree_snapshot_->view_tree.count(view_ref_koid) == 0)
-    return;
-
-  const uint64_t trace_id = TRACE_NONCE();
-  TRACE_FLOW_BEGIN("input", "dispatch_event_to_client", trace_id);
-
-  std::vector<fuchsia::ui::input::PointerEvent> gfx_pointer_events;
-  gfx_pointer_events.push_back(InternalTouchEventToGfxPointerEvent(
-      EventWithReceiverFromViewportTransform(event, /*destination=*/view_ref_koid,
-                                             *view_tree_snapshot_),
-      type, trace_id));
-
-  // Add in legacy UP and DOWN phases for ADD and REMOVE events respectively.
-  const auto& original_event = gfx_pointer_events.front();
-  if (original_event.phase == fuchsia::ui::input::PointerEventPhase::ADD) {
-    auto it = gfx_pointer_events.insert(gfx_pointer_events.end(), fidl::Clone(original_event));
-    it->phase = fuchsia::ui::input::PointerEventPhase::DOWN;
-  } else if (original_event.phase == fuchsia::ui::input::PointerEventPhase::REMOVE) {
-    auto it = gfx_pointer_events.insert(gfx_pointer_events.begin(), fidl::Clone(original_event));
-    it->phase = fuchsia::ui::input::PointerEventPhase::UP;
-  }
-
-  for (auto& event : gfx_pointer_events) {
-    InputEvent input_event;
-    input_event.set_pointer(std::move(event));
-    FX_VLOGS(1) << "Event dispatch to view=" << view_ref_koid << ": " << input_event;
-    ChattyGfxLog(input_event);
-    contender_inspector_.OnInjectedEvents(view_ref_koid, 1);
-    event_reporter->EnqueueEvent(std::move(input_event));
   }
 }
 

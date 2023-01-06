@@ -235,8 +235,8 @@ void InputSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
 
   // TODO(fxbug.dev/72919): There's a bunch of logic copied from app.cc here. This will be removed
   // when moving out the integration tests from this folder.
-  input_system_ = std::make_unique<InputSystem>(context_.get(), *scenic_->inspect_node(),
-                                                engine_->scene_graph(), request_focus);
+  input_system_ =
+      std::make_unique<InputSystem>(context_.get(), *scenic_->inspect_node(), request_focus);
 
   {
     std::vector<view_tree::SubtreeSnapshotGenerator> subtrees;
