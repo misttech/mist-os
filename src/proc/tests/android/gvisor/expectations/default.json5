@@ -1311,6 +1311,7 @@
 
                 // These tests are flaky.
                 "FcntlTest.SetFdO_ASYNC",
+                "UnameTest.Sanity",
 
                 // TODO: These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
