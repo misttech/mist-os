@@ -528,17 +528,19 @@ fn request_controller(
 }
 
 #[track_caller]
-fn process_stash_write(
+fn process_stash_write<BackgroundFut>(
     exec: &mut fasync::TestExecutor,
+    background_tasks: &mut BackgroundFut,
     stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-) {
+) where
+    BackgroundFut: Future + Unpin,
+{
+    let stash_set_req = run_while(exec, background_tasks, stash_server.next());
+    assert_variant!(stash_set_req, Some(Ok(fidl_stash::StoreAccessorRequest::SetValue { .. })));
+    let stash_flush_req = run_while(exec, background_tasks, stash_server.next());
     assert_variant!(
-        exec.run_until_stalled(&mut stash_server.try_next()),
-        Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::SetValue { .. })))
-    );
-    assert_variant!(
-        exec.run_until_stalled(&mut stash_server.try_next()),
-        Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
+        stash_flush_req,
+        Some(Ok(fidl_stash::StoreAccessorRequest::Flush{responder})) => {
             responder.send(&mut Ok(())).expect("failed to send stash response");
         }
     );
@@ -698,7 +700,11 @@ fn save_and_connect(
     );
 
     // Process the stash write from the save
-    process_stash_write(&mut exec, &mut test_values.external_interfaces.stash_server);
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
 
     // Continue processing the save request. Auto-connection process starts
     assert_variant!(
@@ -814,7 +820,11 @@ fn save_and_connect(
     );
 
     // Process stash write for the recording of connect results
-    process_stash_write(&mut exec, &mut test_values.external_interfaces.stash_server);
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
 
     assert_variant!(
         exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
@@ -934,7 +944,11 @@ fn save_and_fail_to_connect(
     );
 
     // Process the stash write from the save
-    process_stash_write(&mut exec, &mut test_values.external_interfaces.stash_server);
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
 
     // Continue processing the save request. Auto-connection process starts
     assert_variant!(
