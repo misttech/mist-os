@@ -24,7 +24,7 @@ use crate::{
     transport::tcp::{
         self,
         seqnum::WindowSize,
-        socket::{isn::IsnGenerator, TcpSockets},
+        socket::{isn::IsnGenerator, Sockets},
     },
 };
 
@@ -70,15 +70,12 @@ pub(crate) enum UserError {
 
 pub(crate) struct TcpState<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncContext> {
     pub(crate) isn_generator: IsnGenerator<C::Instant>,
-    pub(crate) sockets: Mutex<TcpSockets<I, D, C>>,
+    pub(crate) sockets: Mutex<Sockets<I, D, C>>,
 }
 
 impl<I: IpExt, D: IpDeviceId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
     pub(crate) fn new(now: C::Instant, rng: &mut impl RngCore) -> Self {
-        Self {
-            isn_generator: IsnGenerator::new(now, rng),
-            sockets: Mutex::new(TcpSockets::new(rng)),
-        }
+        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Mutex::new(Sockets::new(rng)) }
     }
 }
 

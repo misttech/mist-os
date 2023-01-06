@@ -78,7 +78,8 @@ pub struct TransportStateBuilder {
 
 impl TransportStateBuilder {
     /// Get the builder for the UDP state.
-    pub fn udp_builder(&mut self) -> &mut UdpStateBuilder {
+    #[cfg(test)]
+    pub(crate) fn udp_builder(&mut self) -> &mut UdpStateBuilder {
         &mut self.udp
     }
 

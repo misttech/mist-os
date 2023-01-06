@@ -152,7 +152,7 @@ pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> 
         F: FnOnce(
             &mut Self::IpTransportCtx,
             &IsnGenerator<C::Instant>,
-            &mut TcpSockets<I, Self::DeviceId, C>,
+            &mut Sockets<I, Self::DeviceId, C>,
         ) -> O,
     >(
         &mut self,
@@ -163,7 +163,7 @@ pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> 
     /// to TCP socket state.
     fn with_ip_transport_ctx_and_tcp_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpTransportCtx, &mut TcpSockets<I, Self::DeviceId, C>) -> O,
+        F: FnOnce(&mut Self::IpTransportCtx, &mut Sockets<I, Self::DeviceId, C>) -> O,
     >(
         &mut self,
         cb: F,
@@ -174,7 +174,7 @@ pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> 
     }
 
     /// Calls the function with a mutable reference to TCP socket state.
-    fn with_tcp_sockets_mut<O, F: FnOnce(&mut TcpSockets<I, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets_mut<O, F: FnOnce(&mut Sockets<I, Self::DeviceId, C>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -184,7 +184,7 @@ pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> 
     }
 
     /// Calls the function with an immutable reference to TCP socket state.
-    fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<I, Self::DeviceId, C>) -> O>(&self, cb: F) -> O;
+    fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, Self::DeviceId, C>) -> O>(&self, cb: F) -> O;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -294,7 +294,7 @@ struct Unbound<D> {
 }
 
 /// Holds all the TCP socket states.
-pub struct TcpSockets<I: IpExt, D: IpDeviceId, C: NonSyncContext> {
+pub(crate) struct Sockets<I: IpExt, D: IpDeviceId, C: NonSyncContext> {
     port_alloc: PortAlloc<BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>>,
     inactive: IdMap<Unbound<D>>,
     socketmap: BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
@@ -328,7 +328,7 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> PortAllocImpl
     }
 }
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> TcpSockets<I, D, C> {
+impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> Sockets<I, D, C> {
     fn get_listener_by_id_mut(
         &mut self,
         id: ListenerId<I>,
@@ -696,7 +696,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
     ) -> Result<BoundId<I>, LocalAddressError> {
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
-            |ip_transport_ctx, TcpSockets { port_alloc, inactive, socketmap }| {
+            |ip_transport_ctx, Sockets { port_alloc, inactive, socketmap }| {
                 let port = match port {
                     None => match port_alloc.try_alloc(&local_ip, &socketmap) {
                         Some(port) => {
@@ -930,20 +930,20 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
     }
 
     fn remove_unbound(&mut self, id: UnboundId<I>) {
-        self.with_tcp_sockets_mut(|TcpSockets { socketmap: _, inactive, port_alloc: _ }| {
+        self.with_tcp_sockets_mut(|Sockets { socketmap: _, inactive, port_alloc: _ }| {
             assert_matches!(inactive.remove(id.into()), Some(_));
         });
     }
 
     fn remove_bound(&mut self, id: BoundId<I>) {
-        self.with_tcp_sockets_mut(|TcpSockets { socketmap, inactive: _, port_alloc: _ }| {
+        self.with_tcp_sockets_mut(|Sockets { socketmap, inactive: _, port_alloc: _ }| {
             assert_matches!(socketmap.listeners_mut().remove(&id.into()), Some(_));
         });
     }
 
     fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
-            |ip_transport_ctx, TcpSockets { socketmap, inactive: _, port_alloc: _ }| {
+            |ip_transport_ctx, Sockets { socketmap, inactive: _, port_alloc: _ }| {
                 let (maybe_listener, (), _addr) = socketmap
                     .listeners_mut()
                     .get_by_id_mut(&id.into())
@@ -985,7 +985,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         device: Option<Self::DeviceId>,
     ) {
         self.with_tcp_sockets_mut(|sockets| {
-            let TcpSockets { inactive, port_alloc: _, socketmap: _ } = sockets;
+            let Sockets { inactive, port_alloc: _, socketmap: _ } = sockets;
             let Unbound { bound_device, buffer_sizes: _, keep_alive: _ } =
                 inactive.get_mut(id.into()).expect("invalid unbound socket ID");
             *bound_device = device;
@@ -999,7 +999,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError> {
         self.with_tcp_sockets_mut(|sockets| {
-            let TcpSockets { socketmap, inactive: _, port_alloc: _ } = sockets;
+            let Sockets { socketmap, inactive: _, port_alloc: _ } = sockets;
             let entry = socketmap.listeners_mut().entry(&id.into()).expect("invalid ID");
             let (_, _, addr): &(MaybeListener<_, _>, (), _) = entry.get();
             let ListenerAddr { device: old_device, ip: ip_addr } = addr;
@@ -1027,7 +1027,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         new_device: Option<Self::DeviceId>,
     ) -> Result<(), SetDeviceError> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
-            |ip_transport_ctx, TcpSockets { socketmap, inactive: _, port_alloc: _ }| {
+            |ip_transport_ctx, Sockets { socketmap, inactive: _, port_alloc: _ }| {
                 let entry = socketmap.conns_mut().entry(&id.into()).expect("invalid conn ID");
                 let (_, _, addr): &(Connection<_, _, _, _, _, _>, (), _) = entry.get();
                 let ConnAddr {
@@ -1075,7 +1075,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
 
     fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<SC::DeviceId> {
         self.with_tcp_sockets(|sockets| {
-            let TcpSockets { socketmap: _, inactive, port_alloc: _ } = sockets;
+            let Sockets { socketmap: _, inactive, port_alloc: _ } = sockets;
             inactive.get(id.into()).expect("invalid unbound ID").into()
         })
     }
@@ -1202,7 +1202,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
 
     fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, _ctx: &mut C, id: Id, size: usize) {
         self.with_tcp_sockets_mut(|sockets| {
-            let TcpSockets { port_alloc: _, inactive, socketmap } = sockets;
+            let Sockets { port_alloc: _, inactive, socketmap } = sockets;
             let get_listener = match id.into() {
                 SocketId::Unbound(id) => {
                     let Unbound { bound_device: _, buffer_sizes, keep_alive: _ } =
@@ -1992,14 +1992,14 @@ mod tests {
 
     struct FakeTcpState<I: TcpTestIpExt, D: IpDeviceId> {
         isn_generator: IsnGenerator<FakeInstant>,
-        sockets: TcpSockets<I, D, TcpNonSyncCtx>,
+        sockets: Sockets<I, D, TcpNonSyncCtx>,
     }
 
     impl<I: TcpTestIpExt, D: IpDeviceId> Default for FakeTcpState<I, D> {
         fn default() -> Self {
             Self {
                 isn_generator: Default::default(),
-                sockets: TcpSockets {
+                sockets: Sockets {
                     inactive: IdMap::new(),
                     socketmap: BoundSocketMap::default(),
                     port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
@@ -2157,7 +2157,7 @@ mod tests {
             F: FnOnce(
                 &mut FakeBufferIpTransportCtx<I, D>,
                 &IsnGenerator<FakeInstant>,
-                &mut TcpSockets<I, D, TcpNonSyncCtx>,
+                &mut Sockets<I, D, TcpNonSyncCtx>,
             ) -> O,
         >(
             &mut self,
@@ -2170,10 +2170,7 @@ mod tests {
             cb(ip_transport_ctx, isn_generator, sockets)
         }
 
-        fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<I, D, TcpNonSyncCtx>) -> O>(
-            &self,
-            cb: F,
-        ) -> O {
+        fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, D, TcpNonSyncCtx>) -> O>(&self, cb: F) -> O {
             let WrappedFakeSyncCtx { outer: FakeTcpState { isn_generator: _, sockets }, inner: _ } =
                 self;
             cb(sockets)
@@ -2192,7 +2189,7 @@ mod tests {
                 )),
                 FakeTcpState {
                     isn_generator: Default::default(),
-                    sockets: TcpSockets {
+                    sockets: Sockets {
                         inactive: IdMap::new(),
                         socketmap: BoundSocketMap::default(),
                         port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
@@ -2965,7 +2962,7 @@ mod tests {
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
         SocketHandler::remove_unbound(&mut sync_ctx, unbound);
 
-        sync_ctx.with_tcp_sockets(|TcpSockets { socketmap: _, inactive, port_alloc: _ }| {
+        sync_ctx.with_tcp_sockets(|Sockets { socketmap: _, inactive, port_alloc: _ }| {
             assert_eq!(inactive.get(unbound.into()), None);
         })
     }
@@ -2989,7 +2986,7 @@ mod tests {
         .expect("bind should succeed");
         SocketHandler::remove_bound(&mut sync_ctx, bound);
 
-        sync_ctx.with_tcp_sockets(|TcpSockets { socketmap, inactive, port_alloc: _ }| {
+        sync_ctx.with_tcp_sockets(|Sockets { socketmap, inactive, port_alloc: _ }| {
             assert_eq!(inactive.get(unbound.into()), None);
             assert_eq!(socketmap.listeners().get_by_id(&bound.into()), None);
         })

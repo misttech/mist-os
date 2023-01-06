@@ -6,12 +6,8 @@ use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     transport::{
-        tcp::{
-            self,
-            socket::{isn::IsnGenerator, TcpSockets},
-            TcpState,
-        },
-        udp::{self, UdpSockets},
+        tcp::{self, socket::isn::IsnGenerator, TcpState},
+        udp::{self},
     },
     DeviceId, NonSyncContext, SyncCtx,
 };
@@ -21,7 +17,11 @@ impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
-        F: FnOnce(&mut Self, &IsnGenerator<C::Instant>, &mut TcpSockets<Ipv4, Self::DeviceId, C>) -> O,
+        F: FnOnce(
+            &mut Self,
+            &IsnGenerator<C::Instant>,
+            &mut tcp::socket::Sockets<Ipv4, Self::DeviceId, C>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -31,7 +31,7 @@ impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C> {
         cb(&mut s, isn_generator, &mut sockets.lock())
     }
 
-    fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<Ipv4, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv4, Self::DeviceId, C>) -> O>(
         &self,
         cb: F,
     ) -> O {
@@ -45,7 +45,11 @@ impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
-        F: FnOnce(&mut Self, &IsnGenerator<C::Instant>, &mut TcpSockets<Ipv6, Self::DeviceId, C>) -> O,
+        F: FnOnce(
+            &mut Self,
+            &IsnGenerator<C::Instant>,
+            &mut tcp::socket::Sockets<Ipv6, Self::DeviceId, C>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -55,7 +59,7 @@ impl<C: NonSyncContext> tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C> {
         cb(&mut s, isn_generator, &mut sockets.lock())
     }
 
-    fn with_tcp_sockets<O, F: FnOnce(&TcpSockets<Ipv6, Self::DeviceId, C>) -> O>(
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv6, Self::DeviceId, C>) -> O>(
         &self,
         cb: F,
     ) -> O {
@@ -69,7 +73,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&Self::IpSocketsCtx, &UdpSockets<Ipv4, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&Self::IpSocketsCtx, &udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
     >(
         &self,
         cb: F,
@@ -79,7 +83,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut UdpSockets<Ipv4, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
     >(
         &mut self,
         cb: F,
@@ -97,7 +101,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&Self::IpSocketsCtx, &UdpSockets<Ipv6, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&Self::IpSocketsCtx, &udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
     >(
         &self,
         cb: F,
@@ -107,7 +111,7 @@ impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut UdpSockets<Ipv6, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
     >(
         &mut self,
         cb: F,

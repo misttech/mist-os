@@ -70,7 +70,7 @@ use crate::{
 
 /// A builder for UDP layer state.
 #[derive(Clone)]
-pub struct UdpStateBuilder {
+pub(crate) struct UdpStateBuilder {
     send_port_unreachable: bool,
 }
 
@@ -97,7 +97,8 @@ impl UdpStateBuilder {
     /// disabled by default.
     ///
     /// [RFC 1122 Section 4.1.3.1]: https://tools.ietf.org/html/rfc1122#section-4.1.3.1
-    pub fn send_port_unreachable(&mut self, send_port_unreachable: bool) -> &mut Self {
+    #[cfg(test)]
+    pub(crate) fn send_port_unreachable(&mut self, send_port_unreachable: bool) -> &mut Self {
         self.send_port_unreachable = send_port_unreachable;
         self
     }
@@ -113,7 +114,7 @@ type UdpBoundSocketMap<I, D> = BoundSocketMap<IpPortSpec<I, D>, Udp<I, D>>;
 /// A collection of UDP sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct UdpSockets<I: Ip + IpExt, D: IpDeviceId> {
+pub(crate) struct Sockets<I: Ip + IpExt, D: IpDeviceId> {
     sockets: DatagramSockets<IpPortSpec<I, D>, Udp<I, D>>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
@@ -123,7 +124,7 @@ pub struct UdpSockets<I: Ip + IpExt, D: IpDeviceId> {
 ///
 /// `D` is the device ID type.
 pub(crate) struct UdpState<I: IpExt, D: IpDeviceId> {
-    pub(crate) sockets: RwLock<UdpSockets<I, D>>,
+    pub(crate) sockets: RwLock<Sockets<I, D>>,
     pub(crate) send_port_unreachable: bool,
 }
 
@@ -847,7 +848,7 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
         + MulticastMembershipHandler<I, C>;
 
     /// Calls the function with an immutable reference to UDP sockets.
-    fn with_sockets<O, F: FnOnce(&Self::IpSocketsCtx, &UdpSockets<I, Self::DeviceId>) -> O>(
+    fn with_sockets<O, F: FnOnce(&Self::IpSocketsCtx, &Sockets<I, Self::DeviceId>) -> O>(
         &self,
         cb: F,
     ) -> O;
@@ -855,7 +856,7 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
     /// Calls the function with a mutable reference to UDP sockets.
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut UdpSockets<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::DeviceId>) -> O,
     >(
         &mut self,
         cb: F,
@@ -955,7 +956,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
             sync_ctx.with_sockets(|_sync_ctx, state| {
-        let UdpSockets {sockets: DatagramSockets{bound, unbound: _, }, lazy_port_alloc: _} = state;
+        let Sockets {sockets: DatagramSockets{bound, unbound: _, }, lazy_port_alloc: _} = state;
                 let receiver = bound
                     .lookup(src_ip, dst_ip, src_port, dst_port, device.clone())
                     .next();
@@ -1005,7 +1006,7 @@ impl<
                 // TODO(joshlf): Do something with ICMP here?
                 return Ok(());
             };
-            let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+            let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
 
             let recipients: Vec<LookupResult<_, _>> = SpecifiedAddr::new(src_ip)
@@ -1230,7 +1231,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
     fn set_udp_posix_reuse_port(&mut self, _ctx: &mut C, id: UnboundId<I>, reuse_port: bool) {
         self.with_sockets_mut(|_sync_ctx, state| {
-            let UdpSockets { sockets: DatagramSockets { unbound, bound: _ }, lazy_port_alloc: _ } =
+            let Sockets { sockets: DatagramSockets { unbound, bound: _ }, lazy_port_alloc: _ } =
                 state;
 
             let UnboundSocketState { device: _, sharing, ip_options: _ } =
@@ -1245,8 +1246,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
     fn get_udp_posix_reuse_port(&self, _ctx: &C, id: SocketId<I>) -> bool {
         self.with_sockets(|_sync_ctx, state| {
-            let UdpSockets { sockets: DatagramSockets { bound, unbound }, lazy_port_alloc: _ } =
-                state;
+            let Sockets { sockets: DatagramSockets { bound, unbound }, lazy_port_alloc: _ } = state;
             match id {
                 SocketId::Unbound(id) => {
                     let UnboundSocketState { device: _, sharing, ip_options: _ } =
@@ -1366,7 +1366,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
     fn get_udp_conn_info(&self, _ctx: &mut C, id: ConnId<I>) -> ConnInfo<I::Addr, Self::DeviceId> {
         self.with_sockets(|_sync_ctx, state| {
-            let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+            let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
             let (_state, _sharing, addr) =
                 bound.conns().get_by_id(&id).expect("UDP connection not found");
@@ -1398,7 +1398,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         id: ListenerId<I>,
     ) -> ListenerInfo<I::Addr, Self::DeviceId> {
         self.with_sockets(|_sync_ctx, state| {
-            let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+            let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
                 state;
             let (_, _sharing, addr): &(ListenerState<_, _>, PosixSharingOptions, _) =
                 bound.listeners().get_by_id(&id).expect("UDP listener not found");
@@ -1630,7 +1630,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         &self,
         cb: F,
     ) -> O {
-        self.with_sockets(|sync_ctx, UdpSockets { sockets: state, lazy_port_alloc: _ }| {
+        self.with_sockets(|sync_ctx, Sockets { sockets: state, lazy_port_alloc: _ }| {
             cb(sync_ctx, state)
         })
     }
@@ -1646,7 +1646,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
         &mut self,
         cb: F,
     ) -> O {
-        self.with_sockets_mut(|sync_ctx, UdpSockets { sockets: state, lazy_port_alloc }| {
+        self.with_sockets_mut(|sync_ctx, Sockets { sockets: state, lazy_port_alloc }| {
             cb(sync_ctx, state, lazy_port_alloc)
         })
     }
@@ -2341,7 +2341,7 @@ mod tests {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeUdpState<I: TestIpExt, D: IpDeviceId> {
-        sockets: UdpSockets<I, D>,
+        sockets: Sockets<I, D>,
     }
 
     impl<I: TestIpExt> Default for FakeUdpSyncCtx<I, FakeDeviceId> {
@@ -2424,7 +2424,7 @@ mod tests {
     {
         type IpSocketsCtx = FakeBufferSyncCtx<I, D>;
 
-        fn with_sockets<O, F: FnOnce(&Self::IpSocketsCtx, &UdpSockets<I, Self::DeviceId>) -> O>(
+        fn with_sockets<O, F: FnOnce(&Self::IpSocketsCtx, &Sockets<I, Self::DeviceId>) -> O>(
             &self,
             cb: F,
         ) -> O {
@@ -2435,7 +2435,7 @@ mod tests {
 
         fn with_sockets_mut<
             O,
-            F: FnOnce(&mut Self::IpSocketsCtx, &mut UdpSockets<I, Self::DeviceId>) -> O,
+            F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::DeviceId>) -> O,
         >(
             &mut self,
             cb: F,
@@ -4016,7 +4016,7 @@ mod tests {
             remote_port,
         )
         .expect("connect_udp_listener failed");
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         let (_state, _tag_state, addr) = bound.conns().get_by_id(&conn).unwrap();
 
@@ -4082,7 +4082,7 @@ mod tests {
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect_udp failed");
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         let valid_range = &UdpBoundSocketMap::<I, FakeDeviceId>::EPHEMERAL_RANGE;
         let port_a = assert_matches!(bound.conns().get_by_id(&conn_a),
@@ -4174,7 +4174,7 @@ mod tests {
         )
         .expect("listen_udp failed");
 
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         let wildcard_port = assert_matches!(bound.listeners().get_by_id(&wildcard_list),
             Some((
@@ -4225,7 +4225,7 @@ mod tests {
             ip: ListenerIpAddr { addr: None, identifier: local_port },
             device: None,
         };
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         for listener in listeners {
             assert_matches!(bound.listeners().get_by_id(&listener),
@@ -4315,7 +4315,7 @@ mod tests {
 
         // Assert that that connection id was removed from the connections
         // state.
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         assert_matches!(bound.conns().get_by_id(&conn), None);
     }
@@ -4341,7 +4341,7 @@ mod tests {
         let info = SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
         assert_eq!(info.local_ip.unwrap(), local_ip);
         assert_eq!(info.local_port, local_port);
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         assert_matches!(bound.listeners().get_by_id(&list), None);
 
@@ -4358,7 +4358,7 @@ mod tests {
         let info = SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, local_port);
-        let UdpSockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
+        let Sockets { sockets: DatagramSockets { bound, unbound: _ }, lazy_port_alloc: _ } =
             &sync_ctx.outer.sockets;
         assert_matches!(bound.listeners().get_by_id(&list), None);
     }
@@ -5620,7 +5620,7 @@ where {
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
         SocketHandler::remove_udp_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound);
 
-        let UdpSockets {
+        let Sockets {
             sockets: DatagramSockets { bound: _, unbound: unbound_sockets },
             lazy_port_alloc: _,
         } = &sync_ctx.outer.sockets;
