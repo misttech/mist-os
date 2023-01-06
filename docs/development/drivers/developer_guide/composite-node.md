@@ -102,12 +102,9 @@ extend uint fuchsia.BIND_FIDL_PROTOCOL {
 };
 
 extend uint fuchsia.BIND_I2C_BUS_ID {
-  ASTRO_A0_0 = 0,
-  ASTRO_2 = 1,
-  ASTRO_3 = 2,
-  NELSON_I2C_A0_0 = 0,
-  NELSON_I2C_2 = 1,
-  NELSON_I2C_3 = 2,
+  I2C_A0_0 = 0,
+  I2C_2 = 1,
+  I2C_3 = 2,
 };
 
 extend uint fuchsia.BIND_I2C_ADDRESS {
@@ -126,7 +123,7 @@ extend uint fuchsia.BIND_I2C_ADDRESS {
 This lets us remap the node properties to:
 
 *   `fuchsia.BIND_FIDL_PROTOCOL` = `fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE`
-*   `fuchsia.BIND_I2C_BUS_ID` = `fuchsia.i2c.BIND_I2C_BUS_ID.ASTRO_2`
+*   `fuchsia.BIND_I2C_BUS_ID` = `fuchsia.i2c.BIND_I2C_BUS_ID.I2C_2`
 *   `fuchsia.BIND_I2C_ADDRESS` = `fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH`
 
 The bind library values can be accessed in the driver source code through its
@@ -138,7 +135,7 @@ We can define the following bind rules to match to these properties:
 
 ```
 accept BIND_FIDL_PROTOCOL { fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE }
-accept BIND_I2C_BUS_ID { fuchsia.i2c.BIND_I2C_BUS_ID.ASTRO_2 }
+accept BIND_I2C_BUS_ID { fuchsia.i2c.BIND_I2C_BUS_ID.I2C_2 }
 accept BIND_I2C_ADDRESS { fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH }
 ```
 
@@ -153,7 +150,7 @@ const ddk::NodeGroupBindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
-                            bind_fuchsia_i2c::BIND_I2C_BUS_ID_ASTRO_2),
+                            bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                             bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
@@ -175,7 +172,7 @@ auto i2c_bind_rules = std::vector {
     MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                        bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
-                       bind_fuchsia_i2c::BIND_I2C_BUS_ID_ASTRO_2),
+                       bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                        bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
@@ -354,7 +351,7 @@ const ddk::NodeGroupBindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
-                            bind_fuchsia_i2c::BIND_I2C_BUS_ID_ASTRO_2),
+                            bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                             bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
@@ -439,7 +436,7 @@ auto i2c_bind_rules = std::vector {
     MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                        bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
-                       bind_fuchsia_i2c::BIND_I2C_BUS_ID_ASTRO_2),
+                       bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                        bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };

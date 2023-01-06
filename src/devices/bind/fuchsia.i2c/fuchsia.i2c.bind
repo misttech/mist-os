@@ -18,13 +18,9 @@ extend uint fuchsia.BIND_I2C_CLASS {
 };
 
 extend uint fuchsia.BIND_I2C_BUS_ID {
-  ASTRO_A0_0 = 0,
-  ASTRO_2 = 1,
-  ASTRO_3 = 2,
-  NELSON_I2C_A0_0 = 0,
-  NELSON_I2C_2 = 1,
-  NELSON_I2C_3 = 2,
-
+  I2C_A0_0 = 0,
+  I2C_2 = 1,
+  I2C_3 = 2,
 };
 
 extend uint fuchsia.BIND_I2C_ADDRESS {
