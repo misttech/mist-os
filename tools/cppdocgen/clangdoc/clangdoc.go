@@ -321,17 +321,7 @@ func (d dirInput) ReadFile(name string) ([]byte, error) {
 	return os.ReadFile(path.Join(d.dir, name))
 }
 
-func LoadRecord(reader fileReader, subdir string, rec Reference) *RecordInfo {
-	// Record (structs, classes, etc.) are stored in a file in the same directory
-	// with the name of the record. Anonymous records are named by the USR id.
-	var recname string
-	if len(rec.Name) == 0 {
-		recname = "@nonymous_record_" + rec.USR
-	} else {
-		recname = rec.Name
-	}
-
-	filename := path.Join(subdir, recname+".yaml")
+func LoadRecord(reader fileReader, filename string) *RecordInfo {
 	content, err := reader.ReadFile(filename)
 	if err != nil {
 		log.Fatal(err)
@@ -343,33 +333,22 @@ func LoadRecord(reader fileReader, subdir string, rec Reference) *RecordInfo {
 		log.Fatalf("error: %v in file %v", err, filename)
 	}
 
-	// Child structs are in a subdirectory with the current struct name.
+	// Child records reference other files in the same directory, named according to the unique
+	// USR key.
 	for _, c := range r.ChildRecordRefs {
-		r.ChildRecords = append(r.ChildRecords, LoadRecord(reader, c.Path, c))
+		r.ChildRecords = append(r.ChildRecords, LoadRecord(reader, c.USR+".yaml"))
 	}
 	return r
 }
 
-// LoadNamespace loads everything in the given namespace.
-//
-// |dir| is the name of the namespace to load, and |child_ns_dir| is the directory that contains the
-// child namespaces of this one.
-//
-// The global namespace stores its items in a "GlobalNamespace" directory. Child namespaces are
-// siblings of this directory if the `IsInGlobalNamespace` attribute is set. Otherwise, the
-// directory is described by the `Path` attribute.
-func LoadNamespace(reader fileReader, subdir string) *NamespaceInfo {
-	filename := path.Join(subdir, "index.yaml")
+// LoadNamespace loads everything in the given namespace from the given file.
+func LoadNamespace(reader fileReader, filename string) *NamespaceInfo {
 	content, err := reader.ReadFile(filename)
 	if os.IsNotExist(err) {
-		// index.yaml may not exist if the child namespace has no additional attributes
+		// The file may not exist if the child namespace has no additional attributes
 		if Debug {
 			log.Printf("WARNING: %v.\n", err)
 		}
-		// Return an empty namespace object
-		return &NamespaceInfo{}
-	} else if err != nil {
-		log.Fatal(err)
 	}
 
 	ns := &NamespaceInfo{}
@@ -378,25 +357,22 @@ func LoadNamespace(reader fileReader, subdir string) *NamespaceInfo {
 		log.Fatalf("error: %v in file %v", err, filename)
 	}
 
+	// The child namespaces and records reference other files in the same directory, named
+	// according to the unique USR key.
 	for _, c := range ns.ChildNamespaceRefs {
-		var child_path string
-		if c.IsInGlobalNamespace {
-			child_path = c.Name
-		} else {
-			child_path = path.Join(c.Path, c.Name)
-		}
-		ns.ChildNamespaces = append(ns.ChildNamespaces, LoadNamespace(reader, child_path))
+		ns.ChildNamespaces = append(ns.ChildNamespaces,
+			LoadNamespace(reader, c.USR+".yaml"))
 	}
-
 	for _, c := range ns.ChildRecordRefs {
-		ns.ChildRecords = append(ns.ChildRecords, LoadRecord(reader, c.Path, c))
+		ns.ChildRecords = append(ns.ChildRecords,
+			LoadRecord(reader, c.USR+".yaml"))
 	}
 
 	return ns
 }
 
 func loadWithReader(reader fileReader) *NamespaceInfo {
-	return LoadNamespace(reader, "GlobalNamespace")
+	return LoadNamespace(reader, "index.yaml")
 }
 
 // Returns the root namespace. All other namespaces will be inside of this.
