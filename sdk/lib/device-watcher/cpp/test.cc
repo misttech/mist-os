@@ -9,6 +9,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <memory>
 
@@ -16,9 +17,9 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
+#include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/pseudo_file.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 
@@ -41,7 +42,7 @@ TEST(DeviceWatcherTest, Smoke) {
   ASSERT_OK(endpoints);
   auto& [client, server] = endpoints.value();
 
-  fs::SynchronousVfs vfs(loop.dispatcher());
+  fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
   ASSERT_OK(loop.StartThread());
@@ -50,6 +51,14 @@ TEST(DeviceWatcherTest, Smoke) {
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
 
   ASSERT_OK(device_watcher::RecursiveWaitForFile(dir.get(), "second/third/file"));
+
+  libsync::Completion shutdown_complete;
+  vfs.Shutdown([&shutdown_complete](zx_status_t status) {
+    EXPECT_OK(status);
+    shutdown_complete.Signal();
+  });
+
+  ASSERT_OK(shutdown_complete.Wait());
 }
 
 TEST(DeviceWatcherTest, OpenInNamespace) {
@@ -76,7 +85,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
   ASSERT_OK(endpoints);
   auto& [client, server] = endpoints.value();
 
-  fs::SynchronousVfs vfs(loop.dispatcher());
+  fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
   ASSERT_OK(loop.StartThread());
@@ -100,6 +109,14 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
 
   ASSERT_OK(third->RemoveEntry("file"));
   ASSERT_OK(sub_watcher->WaitForRemoval("file", zx::duration::infinite()));
+
+  libsync::Completion shutdown_complete;
+  vfs.Shutdown([&shutdown_complete](zx_status_t status) {
+    EXPECT_OK(status);
+    shutdown_complete.Signal();
+  });
+
+  ASSERT_OK(shutdown_complete.Wait());
 }
 
 TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
@@ -114,7 +131,7 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
   ASSERT_OK(endpoints);
   auto& [client, server] = endpoints.value();
 
-  fs::SynchronousVfs vfs(loop.dispatcher());
+  fs::ManagedVfs vfs(loop.dispatcher());
   ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
 
   ASSERT_OK(loop.StartThread());
@@ -131,6 +148,14 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
   // Verify the watcher can still successfully wait for removal
   ASSERT_OK(first->RemoveEntry("file"));
   ASSERT_OK(root_watcher->WaitForRemoval("file", zx::duration::infinite()));
+
+  libsync::Completion shutdown_complete;
+  vfs.Shutdown([&shutdown_complete](zx_status_t status) {
+    EXPECT_OK(status);
+    shutdown_complete.Signal();
+  });
+
+  ASSERT_OK(shutdown_complete.Wait());
 }
 
 class IterateDirectoryTest : public zxtest::Test {
@@ -160,13 +185,21 @@ class IterateDirectoryTest : public zxtest::Test {
     ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir_.reset_and_get_address()));
   }
 
-  void TearDown() override { loop_.Shutdown(); }
+  void TearDown() override {
+    libsync::Completion shutdown_complete;
+    vfs_.Shutdown([&shutdown_complete](zx_status_t status) {
+      EXPECT_OK(status);
+      shutdown_complete.Signal();
+    });
+
+    ASSERT_OK(shutdown_complete.Wait());
+  }
 
   const fbl::unique_fd& dir() { return dir_; }
 
  private:
   async::Loop loop_;
-  fs::SynchronousVfs vfs_;
+  fs::ManagedVfs vfs_;
   fbl::unique_fd dir_;
 };
 
