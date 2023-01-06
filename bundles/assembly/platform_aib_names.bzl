@@ -18,6 +18,7 @@ PLATFORM_AIB_NAMES = [
     "archivist-bringup",
     "archivist-minimal",
     "wlan_base",
+    "wlan_phy",
     "wlan_legacy_privacy_support",
     "wlan_contemporary_privacy_only_support",
     "wlan_fullmac_support",

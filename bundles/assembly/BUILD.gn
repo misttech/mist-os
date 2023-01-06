@@ -382,9 +382,17 @@ assembly_input_bundle("archivist-minimal") {
 assembly_input_bundle("wlan_base") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",
-    "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2",
     "//src/connectivity/wlan/wlancfg",
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
+  ]
+}
+
+assembly_input_bundle("wlan_phy") {
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2"
+      driver_components = [ "meta/wlanphy_dfv2.cm" ]
+    },
   ]
 }
 
@@ -398,9 +406,19 @@ assembly_input_bundle("wlan_contemporary_privacy_only_support") {
 }
 
 assembly_input_bundle("wlan_fullmac_support") {
-  base_packages = [ "//src/connectivity/wlan/drivers/wlanif" ]
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/wlan/drivers/wlanif"
+      driver_components = [ "meta/wlanif.cm" ]
+    },
+  ]
 }
 
 assembly_input_bundle("wlan_softmac_support") {
-  base_packages = [ "//src/connectivity/wlan/drivers/wlansoftmac" ]
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/wlan/drivers/wlansoftmac"
+      driver_components = [ "meta/wlansoftmac.cm" ]
+    },
+  ]
 }
