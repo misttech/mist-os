@@ -207,7 +207,7 @@ where
                             .get_by_id(&listener_id)
                             .expect("invalid listener_id");
 
-                        let Listener {pending, backlog, buffer_sizes, ready: _, keep_alive } = match maybe_listener {
+                        let Listener {pending, backlog, buffer_sizes, ready, keep_alive } = match maybe_listener {
                             MaybeListener::Bound(_bound) => {
                                 // If the socket is only bound, but not listening.
                                 return false;
@@ -215,12 +215,12 @@ where
                             MaybeListener::Listener(listener) => listener,
                         };
 
-                        if pending.len() == backlog.get() {
+                        if pending.len() + ready.len() == backlog.get() {
                             // TODO(https://fxbug.dev/101993): Increment the counter.
                             trace!(
                                 "incoming SYN dropped because of the full backlog of the listener"
                             );
-                            return false;
+                            return true;
                         }
 
                         let ListenerAddr {ip: _, device: bound_device} = listener_addr;

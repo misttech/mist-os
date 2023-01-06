@@ -1495,6 +1495,11 @@ pub enum ConnectError {
 }
 
 /// Connects a socket that has been bound locally.
+///
+/// When the method returns, the connection is not guaranteed to be established.
+/// It is up to the caller (Bindings) to determine when the connection has been
+/// established. Bindings are free to use anything available on the platform to
+/// check, for instance, signals.
 pub fn connect_bound<I, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
@@ -1518,6 +1523,11 @@ where
 }
 
 /// Connects a socket that is in unbound state.
+///
+/// When the method returns, the connection is not guaranteed to be established.
+/// It is up to the caller (Bindings) to determine when the connection has been
+/// established. Bindings are free to use anything available on the platform to
+/// check, for instance, signals.
 pub fn connect_unbound<I, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,

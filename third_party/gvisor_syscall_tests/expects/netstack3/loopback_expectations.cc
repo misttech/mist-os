@@ -74,7 +74,6 @@ void AddNonPassingTests(TestMap& tests) {
   SkipTest(tests, "All/SocketInetLoopbackTest.TCPListenUnbound/*");
 
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCP/*");
-  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPBacklog/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPInfoState/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenCloseConnectingRead/*");
   ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPListenShutdownConnectingRead/*");
@@ -201,7 +200,6 @@ void AddNonPassingTests(TestMap& tests) {
                 "All/SocketInetLoopbackTest.TCPListenShutdownDuringConnect/"
                 "ListenV4Any_ConnectV4Any");
 
-  ExpectFailure(tests, "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/*");
   ExpectFailure(tests, "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*");
 
   // Netstack3 does not have complete support for multicast sockets.
@@ -256,6 +254,42 @@ void AddNonPassingTests(TestMap& tests) {
                 "ListenV4Any_ConnectV4MappedLoopback");
   ExpectFailure(tests,
                 "All/SocketInetLoopbackTest.TCPListenShutdown/"
+                "ListenV4MappedLoopback_ConnectV4MappedLoopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV6Any_ConnectV4MappedAny");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4Loopback_ConnectV4MappedLoopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedAny_ConnectV4Any");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV6Any_ConnectV4MappedLoopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedAny_ConnectV4Loopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedAny_ConnectV4MappedAny");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedAny_ConnectV4MappedLoopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedLoopback_ConnectV4Any");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4Any_ConnectV4MappedAny");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4MappedLoopback_ConnectV4Loopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
+                "ListenV4Any_ConnectV4MappedLoopback");
+  ExpectFailure(tests,
+                "All/SocketInetLoopbackTest.TCPNonBlockingConnectClose/"
                 "ListenV4MappedLoopback_ConnectV4MappedLoopback");
 
   // TODO(https://fxbug.dev/113481): Netstack3 does not interpret listener
