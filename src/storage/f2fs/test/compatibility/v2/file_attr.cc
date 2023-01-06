@@ -331,5 +331,76 @@ TEST_F(FileAttrCompatibilityTest, FallocatePunchHoleLinuxToFuchsia) {
     CompareStat(target_stat, host_stat);
   }
 }
+
+TEST_F(FileAttrCompatibilityTest, VerifyXattrsLinuxToFuchsia) {
+  constexpr uint32_t kVerifyPatternSize = 64 * 1024;  // 64KB
+  constexpr uint32_t num_blocks = kVerifyPatternSize / kBlockSize;
+  const std::string filename = "alpha";
+
+  std::string name = "user.comment";
+  std::string value = "\"This is a user comment\"";
+  std::string mkfs_option = "-O extra_attr -O flexible_inline_xattr";
+  std::string mount_option = "-o inline_xattr,inline_xattr_size=60";
+
+  // Setfattr on Linux
+  {
+    GetEnclosedGuest().GetLinuxOperator().Mkfs(mkfs_option);
+    GetEnclosedGuest().GetLinuxOperator().Mount(mount_option);
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
+
+    auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
+        std::string(kLinuxPathPrefix) + filename, O_RDWR | O_CREAT, 0755);
+    ASSERT_TRUE(test_file->IsValid());
+
+    auto file_path =
+        GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) + filename);
+    std::string command = "setfattr ";
+    command.append("-n ").append(name).append(" -v ").append(value).append(" ").append(file_path);
+    GetEnclosedGuest().GetLinuxOperator().ExecuteWithAssert({command});
+  }
+
+  // Write on Fuchsia
+  {
+    GetEnclosedGuest().GetFuchsiaOperator().Fsck();
+    GetEnclosedGuest().GetFuchsiaOperator().Mount();
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
+
+    auto test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filename, O_RDWR, 0644);
+    ASSERT_TRUE(test_file->IsValid());
+    test_file->WritePattern(num_blocks);
+  }
+
+  // Verify on Linux
+  {
+    GetEnclosedGuest().GetLinuxOperator().Fsck();
+    GetEnclosedGuest().GetLinuxOperator().Mount();
+
+    auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
+
+    auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
+        std::string(kLinuxPathPrefix) + filename, O_RDWR, 0644);
+    ASSERT_TRUE(test_file->IsValid());
+    test_file->VerifyPattern(num_blocks);
+
+    auto file_path =
+        GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) + filename);
+    std::string command = "getfattr ";
+    command.append("-d ")
+        .append(file_path)
+        .append(" | grep \"")
+        .append(name)
+        .append("=\\")
+        .append(value)
+        .append("\\\"")
+        .append(" | tr -d '\\n'");
+
+    std::string result;
+    GetEnclosedGuest().GetLinuxOperator().ExecuteWithAssert({command}, &result);
+    ASSERT_EQ(result, name + "=" + value + "");
+  }
+}
+
 }  // namespace
 }  // namespace f2fs

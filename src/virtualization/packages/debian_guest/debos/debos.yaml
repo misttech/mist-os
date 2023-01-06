@@ -52,6 +52,7 @@ actions:
         - strace
         # Package for f2fs cross-OS compatibility testing.
         - f2fs-tools
+        - attr
 
   # Pack the file system
   - action: pack
