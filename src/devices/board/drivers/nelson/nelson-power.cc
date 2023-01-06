@@ -76,7 +76,7 @@ constexpr composite_device_desc_t mlb_power_sensor_dev = {
     .fragments = ti_ina231_mlb_fragments,
     .fragments_count = std::size(ti_ina231_mlb_fragments),
     .primary_fragment = "i2c",
-    .spawn_colocated = true,
+    .spawn_colocated = false,
     .metadata_list = kMlbMetadata,
     .metadata_count = std::size(kMlbMetadata),
 };
@@ -87,7 +87,7 @@ constexpr composite_device_desc_t speakers_power_sensor_dev = {
     .fragments = ti_ina231_speakers_fragments,
     .fragments_count = std::size(ti_ina231_speakers_fragments),
     .primary_fragment = "i2c",
-    .spawn_colocated = true,
+    .spawn_colocated = false,
     .metadata_list = kAudioMetadata,
     .metadata_count = std::size(kAudioMetadata),
 };
@@ -98,7 +98,7 @@ constexpr composite_device_desc_t mlb_power_sensor_proto_dev = {
     .fragments = ti_ina231_mlb_proto_fragments,
     .fragments_count = std::size(ti_ina231_mlb_proto_fragments),
     .primary_fragment = "i2c",
-    .spawn_colocated = true,
+    .spawn_colocated = false,
     .metadata_list = kMlbMetadata,
     .metadata_count = std::size(kMlbMetadata),
 };
