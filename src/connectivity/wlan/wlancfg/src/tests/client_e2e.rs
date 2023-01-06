@@ -331,20 +331,21 @@ fn prepare_client_interface(
     let start_connections_fut = controller.start_client_connections();
     pin_mut!(start_connections_fut);
     assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
 
     // Expect an interface creation request
+    let iface_creation_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
+        iface_creation_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
             req: fidl_fuchsia_wlan_device_service::CreateIfaceRequest {
                 phy_id: TEST_PHY_ID, role: fidl_common::WlanMacRole::Client, sta_addr: [0, 0, 0, 0, 0, 0]
             },
             responder
-        }))) => {
+        })) => {
             assert!(responder.send(
                 zx::sys::ZX_OK,
                 Some(&mut fidl_fuchsia_wlan_device_service::CreateIfaceResponse {iface_id: TEST_CLIENT_IFACE_ID})
@@ -352,31 +353,31 @@ fn prepare_client_interface(
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Expect a feature support query as part of the interface creation
+    let feature_support_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
+        feature_support_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-        }))) => {
+        })) => {
             assert!(responder.send(&mut Ok(())).is_ok());
-
             let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
-            assert_variant!(
-                exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-                Poll::Pending
-            );
 
             // Send back feature support information
+            let security_support_req = run_while(
+                exec,
+                &mut test_values.internal_objects.internal_futures,
+                &mut stream.next(),
+            );
             assert_variant!(
-                exec.run_until_stalled(&mut stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
+                security_support_req,
+                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
-                }))) => {
+                })) => {
                     assert!(responder.send(
                         &mut fidl_sme::FeatureSupportQuerySecuritySupportResult::Ok(
                             security_support_with_wpa3()
@@ -388,17 +389,17 @@ fn prepare_client_interface(
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Expect an interface query and notify that this is a client interface.
+    let iface_query = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
+        iface_query,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::QueryIface {
             iface_id: TEST_CLIENT_IFACE_ID, responder
-        }))) => {
+        })) => {
             let response = fidl_fuchsia_wlan_device_service::QueryIfaceResponse {
                 role: fidl_fuchsia_wlan_common::WlanMacRole::Client,
                 id: TEST_CLIENT_IFACE_ID,
@@ -412,17 +413,17 @@ fn prepare_client_interface(
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Expect that we have requested a client SME proxy as part of interface creation
+    let sme_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     let sme_server = assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+        sme_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        }))) => {
+        })) => {
             // Send back a positive acknowledgement.
             assert!(responder.send(&mut Ok(())).is_ok());
             sme_server
@@ -432,31 +433,31 @@ fn prepare_client_interface(
     let iface_sme_stream =
         sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // There will be another security support query as part of adding the interface to iface_manager
+    let feature_support_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
+        feature_support_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetFeatureSupport {
             iface_id: TEST_CLIENT_IFACE_ID, feature_support_server, responder
-        }))) => {
+        })) => {
             assert!(responder.send(&mut Ok(())).is_ok());
-
             let (mut stream, _handle) = feature_support_server.into_stream_and_control_handle().unwrap();
-            assert_variant!(
-                exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-                Poll::Pending
-            );
 
             // Send back feature support information
+            let security_support_req = run_while(
+                exec,
+                &mut test_values.internal_objects.internal_futures,
+                &mut stream.next(),
+            );
             assert_variant!(
-                exec.run_until_stalled(&mut stream.next()),
-                Poll::Ready(Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
+                security_support_req,
+                Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
-                }))) => {
+                })) => {
                     assert!(responder.send(
                         &mut fidl_sme::FeatureSupportQuerySecuritySupportResult::Ok(
                             security_support_with_wpa3()
@@ -468,17 +469,17 @@ fn prepare_client_interface(
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Expect to get an SME request for the state machine creation
+    let sme_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     let sme_server = assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-            Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+        sme_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        }))) => {
+        })) => {
             // Send back a positive acknowledgement.
             assert!(responder.send(&mut Ok(())).is_ok());
             sme_server
@@ -486,31 +487,26 @@ fn prepare_client_interface(
     );
     let mut sme_stream = sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // State machine does an initial disconnect
+    let sme_req =
+        run_while(exec, &mut test_values.internal_objects.internal_futures, &mut sme_stream.next());
     assert_variant!(
-        exec.run_until_stalled(&mut sme_stream.next()),
-        Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
+        sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
-        }))) => {
+        })) => {
             assert_eq!(fidl_sme::UserDisconnectReason::Startup, reason);
             assert!(responder.send().is_ok());
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
+    // Check for a response to the Policy API start client connections request
+    let start_connections_resp = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut start_connections_fut,
     );
-
-    assert_variant!(
-        exec.run_until_stalled(&mut start_connections_fut),
-        Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
-    );
+    assert_variant!(start_connections_resp, Ok(fidl_common::RequestStatus::Acknowledged));
 
     iface_sme_stream
 }
@@ -548,13 +544,18 @@ fn process_stash_write<BackgroundFut>(
 }
 
 #[track_caller]
-fn get_client_state_update(
+fn get_client_state_update<BackgroundFut>(
     exec: &mut TestExecutor,
+    background_tasks: &mut BackgroundFut,
     client_listener_update_requests: &mut fidl_policy::ClientStateUpdatesRequestStream,
-    // test_values: &mut TestValues,
-) -> fidl_policy::ClientStateSummary {
+) -> fidl_policy::ClientStateSummary
+where
+    BackgroundFut: Future + Unpin,
+{
+    let next_update_req =
+        run_while(exec, background_tasks, &mut client_listener_update_requests.next());
     let update_request = assert_variant!(
-        exec.run_singlethreaded(&mut client_listener_update_requests.next()),
+        next_update_req,
         Some(Ok(update_request)) => {
             update_request
         }
@@ -660,14 +661,13 @@ fn save_and_connect(
     // Request a new controller.
     let (controller, mut client_listener_update_requests) =
         request_controller(&test_values.external_interfaces.client_provider_proxy);
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
 
     // Initial update should reflect client connections are disabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
     assert_eq!(networks.unwrap().len(), 0);
 
@@ -675,8 +675,11 @@ fn save_and_connect(
     let mut iface_sme_stream = prepare_client_interface(&mut exec, &controller, &mut test_values);
 
     // Check for a listener update saying client connections are enabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     assert_eq!(networks.unwrap().len(), 0);
 
@@ -693,31 +696,24 @@ fn save_and_connect(
     let save_fut = controller.save_network(network_config);
     pin_mut!(save_fut);
 
-    // Begin processing the save request
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
-    // Process the stash write from the save
+    // Begin processing the save request and the stash write from the save
     process_stash_write(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
         &mut test_values.external_interfaces.stash_server,
     );
 
-    // Continue processing the save request. Auto-connection process starts
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
-    // Save request returns once the scan has been queued.
-    assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
+    // Continue processing the save request. Auto-connection process starts, and save request returns once the scan has been queued.
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, &mut save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
 
     // Check for a listener update saying we're connecting
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
@@ -744,27 +740,32 @@ fn save_and_connect(
             channel: types::WlanChan::new(1, types::Cbw::Cbw20),
         ),
     }];
+    let next_sme_stream_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut iface_sme_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut iface_sme_stream.next()),
-        Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+        next_sme_stream_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
             req, responder
-        }))) => {
+        })) => {
             assert_eq!(req, expected_scan_request);
             responder.send(&mut Ok(mock_scan_results)).expect("failed to send scan data");
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Expect to get an SME request for state machine creation.
+    let next_device_monitor_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.monitor_service_stream.next(),
+    );
     let sme_server = assert_variant!(
-        exec.run_until_stalled(&mut test_values.external_interfaces.monitor_service_stream.next()),
-        Poll::Ready(Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+        next_device_monitor_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
             iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        }))) => {
+        })) => {
             // Send back a positive acknowledgement.
             assert!(responder.send(&mut Ok(())).is_ok());
             sme_server
@@ -772,33 +773,33 @@ fn save_and_connect(
     );
     let mut sme_stream = sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // State machine does an initial disconnect. Ack.
+    let next_sme_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut sme_stream.next(),
+    );
     assert_variant!(
-        exec.run_until_stalled(&mut sme_stream.next()),
-        Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
+        next_sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
             reason, responder
-        }))) => {
+        })) => {
             assert_eq!(fidl_sme::UserDisconnectReason::Startup, reason);
             assert!(responder.send().is_ok());
         }
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // State machine connects
+    let next_sme_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut sme_stream.next(),
+    );
     let connect_txn_handle = assert_variant!(
-        exec.run_until_stalled(&mut sme_stream.next()),
-        Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect {
+        next_sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Connect {
             req, txn, control_handle: _
-        }))) => {
+        })) => {
             assert_eq!(req.ssid, TEST_SSID.clone());
             assert_eq!(expected_credential, req.authentication.credentials);
             let (_stream, ctrl) = txn.expect("connect txn unused")
@@ -814,11 +815,6 @@ fn save_and_connect(
         })
         .expect("failed to send connection completion");
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Process stash write for the recording of connect results
     process_stash_write(
         &mut exec,
@@ -826,14 +822,12 @@ fn save_and_connect(
         &mut test_values.external_interfaces.stash_server,
     );
 
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
     // Check for a listener update saying we're connected
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
@@ -905,14 +899,13 @@ fn save_and_fail_to_connect(
     // Request a new controller.
     let (controller, mut client_listener_update_requests) =
         request_controller(&test_values.external_interfaces.client_provider_proxy);
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
 
     // Initial update should reflect client connections are disabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
     assert_eq!(networks.unwrap().len(), 0);
 
@@ -920,8 +913,11 @@ fn save_and_fail_to_connect(
     let mut iface_sme_stream = prepare_client_interface(&mut exec, &controller, &mut test_values);
 
     // Check for a listener update saying client connections are enabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
+    );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     assert_eq!(networks.unwrap().len(), 0);
 
@@ -937,28 +933,21 @@ fn save_and_fail_to_connect(
     // Save the network
     let save_fut = controller.save_network(network_config);
     pin_mut!(save_fut);
-    // Begin processing the save request
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
 
-    // Process the stash write from the save
+    // Begin processing the save request and the stash write from the save
     process_stash_write(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
         &mut test_values.external_interfaces.stash_server,
     );
 
-    // Continue processing the save request. Auto-connection process starts
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
+    // Continue processing the save request. Auto-connection process starts, and we get an update
+    // saying we are connecting.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
     );
-
-    // Get update saying we are connecting.
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
@@ -967,7 +956,9 @@ fn save_and_fail_to_connect(
     assert_eq!(network.id.unwrap(), network_id.clone());
 
     // Save request returns once the scan has been queued.
-    assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Ok(()))));
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, &mut save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
 
     let mut bss_selection_scan_count = 0;
     while bss_selection_scan_count < 3 {
@@ -1014,12 +1005,11 @@ fn save_and_fail_to_connect(
     }
 
     // Check for a listener update saying we failed to connect
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut client_listener_update_requests,
     );
-    let fidl_policy::ClientStateSummary { state, networks, .. } =
-        get_client_state_update(&mut exec, &mut client_listener_update_requests);
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
     assert_eq!(networks.len(), 1);
