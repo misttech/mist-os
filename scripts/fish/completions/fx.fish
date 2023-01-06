@@ -62,7 +62,7 @@ find $FUCHSIA_DIR/tools/devshell/ \
         set longoption $flgs[2]
 
         # is the second option another long?
-        if printf "%s\n" $flgs[3] | string match --regex '(--[^ ,|]+).*'
+        if set -l second_option (printf "%s\n" $flgs[3] | string match --regex '(--[^ ,|]+).*')
             set longoption2 $flgs[3]
         else
             set shortoption $flgs[3]
