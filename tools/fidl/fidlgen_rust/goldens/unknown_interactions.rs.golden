@@ -698,7 +698,7 @@ pub type UnknownInteractionsProtocolFlexibleEventTableErrResult =
 pub type UnknownInteractionsProtocolFlexibleEventTableErrResultHandleWrapper =
     Result<(UnknownInteractionsProtocolFlexibleEventTableErrResponse,), i32>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -714,6 +714,16 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseUnkno
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
@@ -759,7 +769,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -775,6 +785,16 @@ macro_rules! UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponseUn
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
@@ -823,7 +843,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
@@ -839,6 +859,16 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
@@ -881,7 +911,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -897,6 +927,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
@@ -939,7 +979,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -955,6 +995,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -997,7 +1047,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1013,6 +1063,16 @@ macro_rules! UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
@@ -1055,7 +1115,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1071,6 +1131,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
@@ -1113,7 +1183,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1129,6 +1199,16 @@ macro_rules! UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown 
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
@@ -1171,7 +1251,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1187,6 +1267,16 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseUnk
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
@@ -1232,7 +1322,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1248,6 +1338,16 @@ macro_rules! UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
@@ -1296,7 +1396,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -1312,6 +1412,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
@@ -1354,7 +1464,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1370,6 +1480,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -1412,7 +1532,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1428,6 +1548,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
@@ -1470,7 +1600,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1486,6 +1616,16 @@ macro_rules! UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknow
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
@@ -1528,7 +1668,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1544,6 +1684,16 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
@@ -1586,7 +1736,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1602,6 +1752,16 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponseUnkn
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
@@ -1647,7 +1807,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1663,6 +1823,16 @@ macro_rules! UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponseUnknown
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
@@ -1705,7 +1875,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1721,6 +1891,16 @@ macro_rules! UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponseUnknow
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
@@ -1763,7 +1943,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
@@ -1779,6 +1959,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolFlexibleEventUnionRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
@@ -1821,7 +2011,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
@@ -1837,6 +2027,16 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolStrictEventUnionRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolStrictEventUnionRequest {
@@ -1879,7 +2079,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -1895,6 +2095,16 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -1937,7 +2147,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -1953,6 +2163,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
@@ -1995,7 +2215,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -2011,6 +2231,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
@@ -2053,7 +2283,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
@@ -2069,6 +2299,16 @@ macro_rules! UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
@@ -2111,7 +2351,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolStrictEventUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
@@ -2127,6 +2367,16 @@ macro_rules! UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolStrictEventUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
@@ -2169,7 +2419,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
     #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
@@ -2185,6 +2435,16 @@ macro_rules! UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::SomeField(x), Self::SomeField(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {

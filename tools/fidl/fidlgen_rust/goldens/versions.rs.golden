@@ -129,7 +129,7 @@ fidl_enum! {
     flexible: true,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Union {
     X(u32),
     #[deprecated = "Use `Union::unknown()` to construct and `UnionUnknown!()` to exhaustively match."]
@@ -145,6 +145,16 @@ macro_rules! UnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for Union {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::X(x), Self::X(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl Union {

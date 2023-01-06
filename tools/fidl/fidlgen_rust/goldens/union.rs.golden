@@ -32,7 +32,7 @@ use {
 
 const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum EmptyFlexibleUnion {
     #[deprecated = "Use `EmptyFlexibleUnion::unknown()` to construct and `EmptyFlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
@@ -45,6 +45,15 @@ macro_rules! EmptyFlexibleUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for EmptyFlexibleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            _ => false,
+        }
+    }
 }
 
 impl EmptyFlexibleUnion {
@@ -81,7 +90,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ExplicitFoo {
     I(i32),
     S(String),
@@ -98,6 +107,17 @@ macro_rules! ExplicitFooUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for ExplicitFoo {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::I(x), Self::I(y)) => *x == *y,
+            (Self::S(x), Self::S(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl ExplicitFoo {
@@ -262,7 +282,7 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ExplicitXUnion {
     I(i64),
     F(f32),
@@ -279,6 +299,17 @@ macro_rules! ExplicitXUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for ExplicitXUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::I(x), Self::I(y)) => *x == *y,
+            (Self::F(x), Self::F(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl ExplicitXUnion {
@@ -359,7 +390,7 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum FlexibleFoo {
     S(String),
     I(i32),
@@ -376,6 +407,17 @@ macro_rules! FlexibleFooUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for FlexibleFoo {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::S(x), Self::S(y)) => *x == *y,
+            (Self::I(x), Self::I(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl FlexibleFoo {
@@ -423,7 +465,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum FlexiblePizzaOrPasta {
     Pizza(Pizza),
     Pasta(Pasta),
@@ -440,6 +482,17 @@ macro_rules! FlexiblePizzaOrPastaUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for FlexiblePizzaOrPasta {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Pizza(x), Self::Pizza(y)) => *x == *y,
+            (Self::Pasta(x), Self::Pasta(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl FlexiblePizzaOrPasta {
@@ -487,7 +540,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum FlexibleUnion {
     Primitive(i32),
     StringNeedsConstructor(String),
@@ -505,6 +558,21 @@ macro_rules! FlexibleUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for FlexibleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Primitive(x), Self::Primitive(y)) => *x == *y,
+            (Self::StringNeedsConstructor(x), Self::StringNeedsConstructor(y)) => *x == *y,
+            (
+                Self::VectorStringAlsoNeedsConstructor(x),
+                Self::VectorStringAlsoNeedsConstructor(y),
+            ) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl FlexibleUnion {
@@ -557,7 +625,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum NewerSimpleUnion {
     I(i64),
     S(String),
@@ -575,6 +643,18 @@ macro_rules! NewerSimpleUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for NewerSimpleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::I(x), Self::I(y)) => *x == *y,
+            (Self::S(x), Self::S(y)) => *x == *y,
+            (Self::V(x), Self::V(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl NewerSimpleUnion {
@@ -627,7 +707,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum OlderSimpleUnion {
     I(i64),
     F(f32),
@@ -644,6 +724,17 @@ macro_rules! OlderSimpleUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for OlderSimpleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::I(x), Self::I(y)) => *x == *y,
+            (Self::F(x), Self::F(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl OlderSimpleUnion {
@@ -691,7 +782,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum OnlyReservedFlexibleUnion {
     #[deprecated = "Use `OnlyReservedFlexibleUnion::unknown()` to construct and `OnlyReservedFlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
@@ -704,6 +795,15 @@ macro_rules! OnlyReservedFlexibleUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for OnlyReservedFlexibleUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            _ => false,
+        }
+    }
 }
 
 impl OnlyReservedFlexibleUnion {
@@ -1064,7 +1164,7 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnionWithAttributes {
     X(i64),
     #[deprecated = "Use `UnionWithAttributes::unknown()` to construct and `UnionWithAttributesUnknown!()` to exhaustively match."]
@@ -1080,6 +1180,16 @@ macro_rules! UnionWithAttributesUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnionWithAttributes {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::X(x), Self::X(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnionWithAttributes {
@@ -1122,7 +1232,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum XUnionContainingEmptyStruct {
     Empty(Empty),
     #[deprecated = "Use `XUnionContainingEmptyStruct::unknown()` to construct and `XUnionContainingEmptyStructUnknown!()` to exhaustively match."]
@@ -1138,6 +1248,16 @@ macro_rules! XUnionContainingEmptyStructUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for XUnionContainingEmptyStruct {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Empty(x), Self::Empty(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl XUnionContainingEmptyStruct {

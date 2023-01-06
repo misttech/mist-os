@@ -32,7 +32,7 @@ use {
 
 const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum FlexibleFoo {
     S(String),
     I(i32),
@@ -49,6 +49,17 @@ macro_rules! FlexibleFooUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for FlexibleFoo {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::S(x), Self::S(y)) => *x == *y,
+            (Self::I(x), Self::I(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl FlexibleFoo {

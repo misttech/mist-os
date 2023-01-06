@@ -123,12 +123,26 @@ fn strict_value_union() {
 
 #[test]
 fn flexible_value_union() {
-    assert_eq!(FlexibleValueThing::Number(42).is_unknown(), false);
-    assert_eq!(FlexibleValueThing::Name("hello".to_owned()).is_unknown(), false);
-    assert_eq!(FlexibleValueThing::Number(42).ordinal(), 1);
-    assert_eq!(FlexibleValueThing::Name("hello".to_owned()).ordinal(), 2);
-    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().is_unknown(), true);
-    assert_eq!(FlexibleValueThing::unknown_variant_for_testing().ordinal(), 0);
+    let number = FlexibleValueThing::Number(42);
+    let name = FlexibleValueThing::Name("hello".to_owned());
+    let unknown = FlexibleValueThing::unknown_variant_for_testing();
+
+    assert_eq!(number.is_unknown(), false);
+    assert_eq!(name.is_unknown(), false);
+    assert_eq!(unknown.is_unknown(), true);
+
+    assert_eq!(number.ordinal(), 1);
+    assert_eq!(name.ordinal(), 2);
+    assert_eq!(unknown.ordinal(), 0);
+
+    assert_eq!(number, number);
+    assert_eq!(name, name);
+    assert_ne!(number, name);
+    assert_ne!(name, number);
+
+    // Unknowns are like NaN, not equal to anything, including themselves.
+    assert_ne!(unknown, unknown);
+    assert_ne!(number, unknown);
 }
 
 #[test]

@@ -211,7 +211,7 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum MainProtocolOnAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolOnAnonRequest::unknown()` to construct and `MainProtocolOnAnonRequestUnknown!()` to exhaustively match."]
@@ -227,6 +227,16 @@ macro_rules! MainProtocolOnAnonRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for MainProtocolOnAnonRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::B(x), Self::B(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl MainProtocolOnAnonRequest {
@@ -269,7 +279,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonRequest::unknown()` to construct and `MainProtocolTwoWayAnonRequestUnknown!()` to exhaustively match."]
@@ -285,6 +295,16 @@ macro_rules! MainProtocolTwoWayAnonRequestUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for MainProtocolTwoWayAnonRequest {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::B(x), Self::B(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl MainProtocolTwoWayAnonRequest {
@@ -327,7 +347,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
     #[deprecated = "Use `MainProtocolTwoWayAnonWithErrorResponse::unknown()` to construct and `MainProtocolTwoWayAnonWithErrorResponseUnknown!()` to exhaustively match."]
@@ -343,6 +363,16 @@ macro_rules! MainProtocolTwoWayAnonWithErrorResponseUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for MainProtocolTwoWayAnonWithErrorResponse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::B(x), Self::B(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl MainProtocolTwoWayAnonWithErrorResponse {

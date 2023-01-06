@@ -126,7 +126,7 @@ fidl_union! {
     ],
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ExampleXUnion {
     Variant(u32),
     #[deprecated = "Use `ExampleXUnion::unknown()` to construct and `ExampleXUnionUnknown!()` to exhaustively match."]
@@ -142,6 +142,16 @@ macro_rules! ExampleXUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for ExampleXUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Variant(x), Self::Variant(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl ExampleXUnion {

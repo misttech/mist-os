@@ -310,6 +310,10 @@ expand to an exhaustive match. This is useful for discovering missing cases.
 When a FIDL message containing a union with an unknown variant is decoded into
 `JsonValue`, `JsonValue::is_unknown()` returns true.
 
+Flexible unions have a custom `PartialEq` to make unknown variants behave like
+NaN: they do not compare equal to anything, including themselves. See [RFC-0137:
+Discard unknown data in FIDL][rfc-0137] for background on this decision.
+
 [Strict][lang-flexible] unions fail when decoding an unknown variant.
 [Flexible][lang-flexible] unions succeed when decoding an unknown variant, but
 fail when re-encoding it.
@@ -811,5 +815,6 @@ The calculation of traits derivation rules is visible in
 [lang-tables]: /docs/reference/fidl/language/language.md#tables
 [lang-unions]: /docs/reference/fidl/language/language.md#unions
 [rfc-0120]: /docs/contribute/governance/rfcs/0120_standalone_use_of_fidl_wire_format.md
+[rfc-0137]: /docs/contribute/governance/rfcs/0137_discard_unknown_data_in_fidl.md
 [tutorial]: /docs/development/languages/fidl/tutorials/rust
 [unknown-attr]: /docs/reference/fidl/language/attributes.md#unknown

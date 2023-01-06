@@ -1466,8 +1466,33 @@ func (v derives) andUnknownNonResource() derives {
 	return v.and(derivesMinimalNonResource)
 }
 
+func (v derives) andNonReflexive() derives {
+	return v.remove(derivesEq, derivesOrd, derivesHash)
+}
+
 func (v derives) contains(other derives) bool {
 	return (v & other) != 0
+}
+
+// RemoveCustom removes traits by name. Templates use it when they are providing
+// a custom impl instead of deriving. (We can't just omit the traits in
+// fillDerives because it would recursively remove it from containing types.)
+func (v derives) RemoveCustom(traits ...string) (derives, error) {
+	result := v
+	for _, name := range traits {
+		found := false
+		for i, n := range derivesNames {
+			if n == name {
+				found = true
+				result = result.remove(1 << i)
+				break
+			}
+		}
+		if !found {
+			return 0, fmt.Errorf("trait '%s' not found", name)
+		}
+	}
+	return result, nil
 }
 
 func (v derives) String() string {
@@ -1652,6 +1677,8 @@ typeSwitch:
 				derivesOut = derivesOut.and(dc.fillDerivesForType(member.OGType))
 			}
 			if union.IsFlexible() {
+				// An unknown variant behaves like NaN (not equal to itself).
+				derivesOut = derivesOut.andNonReflexive()
 				if union.IsResourceType() {
 					derivesOut = derivesOut.andUnknown()
 				} else {
@@ -1716,7 +1743,7 @@ func (dc *derivesCompiler) fillDerivesForType(ogType fidlgen.Type) derives {
 			return derivesAll
 		case fidlgen.Float32, fidlgen.Float64:
 			// Floats don't have a total ordering due to NAN and its multiple representations.
-			return derivesAllButZerocopy.remove(derivesEq, derivesOrd, derivesHash)
+			return derivesAllButZerocopy.andNonReflexive()
 		default:
 			panic(fmt.Sprintf("unknown primitive type: %v", ogType.PrimitiveSubtype))
 		}

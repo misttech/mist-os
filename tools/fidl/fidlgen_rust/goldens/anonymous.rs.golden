@@ -242,7 +242,7 @@ pub type SomeProtocolSomeMethodResult = Result<(BitsMember), SomeProtocolSomeMet
 pub type SomeProtocolSomeMethodResultHandleWrapper =
     Result<(BitsMember,), SomeProtocolSomeMethodError>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Value(u64),
     BinOp(OverrideTest),
@@ -260,6 +260,18 @@ macro_rules! ExpressionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for Expression {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Value(x), Self::Value(y)) => *x == *y,
+            (Self::BinOp(x), Self::BinOp(y)) => *x == *y,
+            (Self::FunctionApplication(x), Self::FunctionApplication(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl Expression {
@@ -312,7 +324,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum UnionMember {
     UnionData(u8),
     #[deprecated = "Use `UnionMember::unknown()` to construct and `UnionMemberUnknown!()` to exhaustively match."]
@@ -328,6 +340,16 @@ macro_rules! UnionMemberUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for UnionMember {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::UnionData(x), Self::UnionData(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl UnionMember {

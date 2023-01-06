@@ -105,7 +105,7 @@ pub type WithErrorSyntaxHandleInResultResult = Result<(fidl::Handle), u32>;
 pub type WithErrorSyntaxHandleInResultResultHandleWrapper =
     Result<(HandleWrapperObjectTypeNONERights2147483648<fidl::Handle>,), u32>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum TheUnion {
     V(u32),
     #[deprecated = "Use `TheUnion::unknown()` to construct and `TheUnionUnknown!()` to exhaustively match."]
@@ -121,6 +121,16 @@ macro_rules! TheUnionUnknown {
     () => {
         _
     };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for TheUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::V(x), Self::V(y)) => *x == *y,
+            _ => false,
+        }
+    }
 }
 
 impl TheUnion {

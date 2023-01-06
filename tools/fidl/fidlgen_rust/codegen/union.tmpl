@@ -8,7 +8,11 @@
 {{- range .DocComments}}
 ///{{ . }}
 {{- end}}
+{{- if .IsFlexible }}
+{{ .Derives.RemoveCustom "PartialEq" }}
+{{- else }}
 {{ .Derives }}
+{{- end }}
 pub enum {{ .Name }} {
     {{- range .Members }}
     {{- range .DocComments }}
@@ -31,6 +35,18 @@ pub enum {{ .Name }} {
 #[macro_export]
 macro_rules! {{ .Name }}Unknown {
     () => { _ };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for {{ .Name }} {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            {{- range .Members }}
+            (Self::{{ .Name }}(x), Self::{{ .Name }}(y)) => *x == *y,
+            {{- end }}
+            _ => false,
+        }
+    }
 }
 {{- end }}
 
