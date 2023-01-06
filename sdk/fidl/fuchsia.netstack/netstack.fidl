@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.netstack;
 
-using fuchsia.hardware.ethernet;
-using fuchsia.net.interfaces;
-using zx;
-
 @discoverable
 protocol Netstack {
     /// Creates a bridge and returns the newly created nicid or an
@@ -20,22 +16,4 @@ protocol Netstack {
             2: nicid uint32;
         };
     });
-
-    /// Adds a new interface backed by the given ethernet device.
-    AddEthernetDevice(resource struct {
-        topological_path string:MAX;
-        interface_config struct {
-            name fuchsia.net.interfaces.Name;
-
-            /// An unstable file path corresponding to the interface. Used in
-            /// watching the creation and destruction of the interface, or in
-            /// accessing the interface using netdump.
-            filepath string:MAX;
-
-            metric uint32;
-        };
-        device client_end:fuchsia.hardware.ethernet.Device;
-    }) -> (struct {
-        nicid uint32;
-    }) error zx.status;
 };

@@ -5,8 +5,6 @@
 use std::collections::hash_map::HashMap;
 
 use derivative::Derivative;
-use ethernet as eth;
-use fidl_fuchsia_hardware_ethernet::Features;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use futures::stream::StreamExt as _;
 use net_types::{ethernet::Mac, ip::IpAddr, SpecifiedAddr, UnicastAddr};
@@ -137,7 +135,6 @@ impl<C: IdMapCollectionKey> Devices<C, DeviceSpecificInfo> {
 /// Device specific iformation.
 #[derive(Debug)]
 pub enum DeviceSpecificInfo {
-    Ethernet(EthernetInfo),
     Netdevice(NetdeviceInfo),
     Loopback(LoopbackInfo),
 }
@@ -145,7 +142,6 @@ pub enum DeviceSpecificInfo {
 impl DeviceSpecificInfo {
     pub fn common_info(&self) -> &CommonInfo {
         match self {
-            Self::Ethernet(i) => &i.common_info,
             Self::Netdevice(i) => &i.common_info,
             Self::Loopback(i) => &i.common_info,
         }
@@ -153,7 +149,6 @@ impl DeviceSpecificInfo {
 
     pub fn common_info_mut(&mut self) -> &mut CommonInfo {
         match self {
-            Self::Ethernet(i) => &mut i.common_info,
             Self::Netdevice(i) => &mut i.common_info,
             Self::Loopback(i) => &mut i.common_info,
         }
@@ -215,17 +210,6 @@ pub struct LoopbackInfo {
     pub rx_notifier: NeedsDataNotifier,
 }
 
-/// Ethernet device information.
-#[derive(Debug)]
-pub struct EthernetInfo {
-    pub common_info: CommonInfo,
-    pub client: eth::Client,
-    pub mac: UnicastAddr<Mac>,
-    pub features: Features,
-    pub phy_up: bool,
-    pub(crate) interface_control: FidlWorkerInfo<fnet_interfaces_admin::InterfaceRemovedReason>,
-}
-
 /// Information associated with FIDL Protocol workers.
 #[derive(Debug)]
 pub(crate) struct FidlWorkerInfo<R> {
@@ -236,12 +220,6 @@ pub(crate) struct FidlWorkerInfo<R> {
     // active (and holds the `Receiver`). Otherwise, the worker has been
     // canceled.
     pub cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
-}
-
-impl From<EthernetInfo> for DeviceSpecificInfo {
-    fn from(i: EthernetInfo) -> Self {
-        Self::Ethernet(i)
-    }
 }
 
 /// Network device information.

@@ -372,8 +372,7 @@ async fn run_link_state_watcher<
                         mac: _,
                         phy_up,
                     }) => *phy_up = online,
-                    i @ devices::DeviceSpecificInfo::Ethernet(_)
-                    | i @ devices::DeviceSpecificInfo::Loopback(_) => {
+                    i @ devices::DeviceSpecificInfo::Loopback(_) => {
                         unreachable!("unexpected device info {:?} for interface {}", i, id)
                     }
                 };
@@ -595,8 +594,7 @@ async fn remove_interface(ctx: NetstackContext, id: BindingId) {
             mac: _,
             phy_up: _,
         }) => handler,
-        i @ devices::DeviceSpecificInfo::Ethernet(_)
-        | i @ devices::DeviceSpecificInfo::Loopback(_) => {
+        i @ devices::DeviceSpecificInfo::Loopback(_) => {
             unreachable!("unexpected device info {:?} for interface {}", i, id)
         }
     };
@@ -613,18 +611,7 @@ async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: Binding
     let mut ctx = ctx.lock().await;
     let (common_info, port_handler) =
         match ctx.non_sync_ctx.devices.get_device_mut(id).expect("device not present").info_mut() {
-            devices::DeviceSpecificInfo::Ethernet(devices::EthernetInfo {
-                common_info,
-                // NB: In theory we should also start and stop the ethernet
-                // device when we enable and disable, we'll skip that because
-                // it's work and Ethernet is going to be deleted soon.
-                client: _,
-                mac: _,
-                features: _,
-                phy_up: _,
-                interface_control: _,
-            })
-            | devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
+            devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
                 common_info,
                 rx_notifier: _,
             }) => (common_info, None),

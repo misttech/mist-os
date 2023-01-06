@@ -86,7 +86,6 @@ async fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::Interfa
         .map(|device_info| {
             let mac = match device_info.info() {
                 DeviceSpecificInfo::Loopback(_) => LOOPBACK_MAC,
-                DeviceSpecificInfo::Ethernet(info) => info.mac.into(),
                 DeviceSpecificInfo::Netdevice(info) => info.mac.into(),
             };
             Some(Box::new(mac.into_fidl()))
@@ -102,9 +101,7 @@ async fn handle_get_port(
     let port_handler =
         ctx.non_sync_ctx.devices.get_device(interface_id).ok_or(zx::Status::NOT_FOUND).and_then(
             |device_info| match device_info.info() {
-                DeviceSpecificInfo::Loopback(_) | DeviceSpecificInfo::Ethernet(_) => {
-                    Err(zx::Status::NOT_SUPPORTED)
-                }
+                DeviceSpecificInfo::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
                 DeviceSpecificInfo::Netdevice(info) => Ok(&info.handler),
             },
         );

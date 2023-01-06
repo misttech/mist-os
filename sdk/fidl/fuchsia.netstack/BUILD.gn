@@ -7,9 +7,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.netstack") {
   sdk_category = "excluded"
   sources = [ "netstack.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.ethernet",
-    "//sdk/fidl/fuchsia.net.interfaces",
-    "//zircon/vdso/zx",
-  ]
 }

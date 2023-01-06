@@ -7,11 +7,8 @@
 package netstack
 
 import (
-	"errors"
-	"syscall/zx"
 	"syscall/zx/fidl"
 
-	"fidl/fuchsia/hardware/ethernet"
 	"fidl/fuchsia/netstack"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -31,19 +28,4 @@ func (ni *netstackImpl) BridgeInterfaces(_ fidl.Context, nicids []uint32) (netst
 		return netstack.ResultWithMessage(err.Error()), nil
 	}
 	return netstack.ResultWithNicid(uint32(ifs.nicid)), nil
-}
-
-func (ni *netstackImpl) AddEthernetDevice(_ fidl.Context, topopath string, interfaceConfig netstack.InterfaceConfig, device ethernet.DeviceWithCtxInterface) (netstack.NetstackAddEthernetDeviceResult, error) {
-	var result netstack.NetstackAddEthernetDeviceResult
-	if ifs, err := ni.ns.addEth(topopath, interfaceConfig, &device); err != nil {
-		var tcpipErr *TcpIpError
-		if errors.As(err, &tcpipErr) {
-			result.SetErr(int32(tcpipErr.ToZxStatus()))
-		} else {
-			result.SetErr(int32(zx.ErrInternal))
-		}
-	} else {
-		result.SetResponse(netstack.NetstackAddEthernetDeviceResponse{Nicid: uint32(ifs.nicid)})
-	}
-	return result, nil
 }

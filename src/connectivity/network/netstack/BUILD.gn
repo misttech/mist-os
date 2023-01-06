@@ -84,20 +84,6 @@ fuchsia_component("component-with-tracing") {
   deps = [ ":bin_with_tracing" ]
 }
 
-generated_go("gen/netstack/link/eth") {
-  definitions = [
-    {
-      src = "link/eth/handler.json"
-      template = "link/fifo/gen/handler.tmpl"
-      copy = [ "link/fifo/gen/fifo_entry.go" ]
-    },
-    {
-      src = "link/eth/entries.json"
-      template = "link/fifo/gen/entries.tmpl"
-    },
-  ]
-}
-
 generated_go("gen/netstack/link/netdevice") {
   definitions = [
     {
@@ -137,12 +123,10 @@ go_library("lib") {
     "dhcp",
     "dns",
     "fidlconv",
-    "fidlext/fuchsia/hardware/ethernet",
     "filter",
     "inspect",
     "link",
     "link/bridge",
-    "link/eth",
     "link/netdevice",
     "routes",
     "sync",
@@ -151,7 +135,6 @@ go_library("lib") {
     "tracing/trace",
     "udp_serde:golib",
     "util",
-    "//sdk/fidl/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_go($go_toolchain)",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_go($go_toolchain)",
     "//sdk/fidl/fuchsia.inspect.deprecated:fuchsia.inspect.deprecated_go($go_toolchain)",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_go($go_toolchain)",
@@ -244,7 +227,6 @@ group("tests") {
     "filter:tests",
     "inspect:tests",
     "link/bridge:tests",
-    "link/eth:tests",
     "link/fifo:tests",
     "link/netdevice:tests",
     "routes:tests",

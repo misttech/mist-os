@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.net.stack;
 
-using fuchsia.hardware.ethernet;
 using fuchsia.net.name;
 using fuchsia.net;
 
@@ -42,15 +41,8 @@ type Error = strict enum {
 
 @discoverable
 protocol Stack {
-    /// Add an Ethernet interface to the network stack. On success, returns the
-    /// identifier assigned by the stack for use in subsequent calls.
-    AddEthernetInterface(resource struct {
-        topological_path DevicePath;
-        device client_end:fuchsia.hardware.ethernet.Device;
-    }) -> (struct {
-        id fuchsia.net.InterfaceId;
-    }) error Error;
-
+    // TODO(https://fxbug.dev/118758): Delete once no longer load-bearing for
+    // fuchsia.net.virtualizatin implementation in netcfg.
     /// Remove an Ethernet interface from the network stack.
     DelEthernetInterface(struct {
         id fuchsia.net.InterfaceId;

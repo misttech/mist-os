@@ -16,11 +16,9 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 
-	fidlethernet "fidl/fuchsia/hardware/ethernet"
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/name"
 	"fidl/fuchsia/net/stack"
-	"fidl/fuchsia/netstack"
 
 	"gvisor.dev/gvisor/pkg/atomicbitops"
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -123,23 +121,6 @@ func (ns *Netstack) delForwardingEntry(entry stack.ForwardingEntry) stack.StackD
 		return stack.StackDelForwardingEntryResultWithErr(stack.ErrorNotFound)
 	}
 	return stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{})
-}
-
-func (ni *stackImpl) AddEthernetInterface(_ fidl.Context, topologicalPath string, device fidlethernet.DeviceWithCtxInterface) (stack.StackAddEthernetInterfaceResult, error) {
-	var result stack.StackAddEthernetInterfaceResult
-	if ifs, err := ni.ns.addEth(topologicalPath, netstack.InterfaceConfig{}, &device); err != nil {
-		var tcpipErr *TcpIpError
-		if errors.As(err, &tcpipErr) {
-			result.SetErr(tcpipErr.ToStackError())
-		} else {
-			result.SetErr(stack.ErrorInternal)
-		}
-	} else {
-		result.SetResponse(stack.StackAddEthernetInterfaceResponse{
-			Id: uint64(ifs.nicid),
-		})
-	}
-	return result, nil
 }
 
 func (ni *stackImpl) DelEthernetInterface(_ fidl.Context, id uint64) (stack.StackDelEthernetInterfaceResult, error) {

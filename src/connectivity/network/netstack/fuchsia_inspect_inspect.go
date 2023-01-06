@@ -20,8 +20,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/eth"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/fifo"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/netdevice"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
@@ -51,7 +49,6 @@ const (
 	dhcpInfo                    = "DHCP Info"
 	dhcpStateRecentHistoryLabel = "DHCP State Recent History"
 	neighborsLabel              = "Neighbors"
-	ethInfo                     = "Ethernet Info"
 	netdeviceInfo               = "Network Device Info"
 	rxReads                     = "RxReads"
 	rxWrites                    = "RxWrites"
@@ -524,8 +521,6 @@ func (impl *nicInfoInspectImpl) ListChildren() []string {
 	}
 
 	switch impl.value.controller.(type) {
-	case *eth.Client:
-		children = append(children, ethInfo)
 	case *netdevice.Port:
 		children = append(children, netdeviceInfo)
 	}
@@ -556,11 +551,6 @@ func (impl *nicInfoInspectImpl) GetChild(childName string) inspectInner {
 		return &neighborTableInspectImpl{
 			name:  childName,
 			value: impl.value.neighbors,
-		}
-	case ethInfo:
-		return &ethInfoInspectImpl{
-			name:  childName,
-			value: impl.value.controller.(*eth.Client),
 		}
 	case netdeviceInfo:
 		return &netdevInspectImpl{
@@ -698,28 +688,26 @@ func (impl *dhcpInfoInspectImpl) GetChild(childName string) inspectInner {
 	}
 }
 
-var _ inspectInner = (*ethInfoInspectImpl)(nil)
+var _ inspectInner = (*netdevInspectImpl)(nil)
 
-type ethInfoInspectImpl struct {
+type netdevInspectImpl struct {
 	name  string
-	value *eth.Client
+	value *netdevice.Port
 }
 
-func (impl *ethInfoInspectImpl) ReadData() inspect.Object {
+func (impl *netdevInspectImpl) ReadData() inspect.Object {
 	return inspect.Object{
 		Name: impl.name,
 		Metrics: []inspect.Metric{
 			{Key: "TxDrops", Value: inspect.MetricValueWithUintValue(impl.value.TxStats().Drops.Value())},
 		},
 		Properties: []inspect.Property{
-			{Key: "Topopath", Value: inspect.PropertyValueWithStr(impl.value.Topopath())},
-			{Key: "Filepath", Value: inspect.PropertyValueWithStr(impl.value.Filepath())},
-			{Key: "Features", Value: inspect.PropertyValueWithStr(impl.value.Info.Features.String())},
+			{Key: "Class", Value: inspect.PropertyValueWithStr(impl.value.Class().String())},
 		},
 	}
 }
 
-func getFifoStatsChildren() []string {
+func (*netdevInspectImpl) ListChildren() []string {
 	return []string{
 		rxReads,
 		rxWrites,
@@ -728,7 +716,10 @@ func getFifoStatsChildren() []string {
 	}
 }
 
-func getFifoStatsImpl(childName string, rx *fifo.RxStats, tx *fifo.TxStats) inspectInner {
+func (impl *netdevInspectImpl) GetChild(childName string) inspectInner {
+	rx := impl.value.RxStats()
+	tx := impl.value.TxStats()
+
 	switch childName {
 	case rxReads:
 		return &fifoStatsInspectImpl{
@@ -757,41 +748,6 @@ func getFifoStatsImpl(childName string, rx *fifo.RxStats, tx *fifo.TxStats) insp
 	default:
 		return nil
 	}
-}
-
-func (*ethInfoInspectImpl) ListChildren() []string {
-	return getFifoStatsChildren()
-}
-
-func (impl *ethInfoInspectImpl) GetChild(childName string) inspectInner {
-	return getFifoStatsImpl(childName, impl.value.RxStats(), impl.value.TxStats())
-}
-
-var _ inspectInner = (*netdevInspectImpl)(nil)
-
-type netdevInspectImpl struct {
-	name  string
-	value *netdevice.Port
-}
-
-func (impl *netdevInspectImpl) ReadData() inspect.Object {
-	return inspect.Object{
-		Name: impl.name,
-		Metrics: []inspect.Metric{
-			{Key: "TxDrops", Value: inspect.MetricValueWithUintValue(impl.value.TxStats().Drops.Value())},
-		},
-		Properties: []inspect.Property{
-			{Key: "Class", Value: inspect.PropertyValueWithStr(impl.value.Class().String())},
-		},
-	}
-}
-
-func (*netdevInspectImpl) ListChildren() []string {
-	return getFifoStatsChildren()
-}
-
-func (impl *netdevInspectImpl) GetChild(childName string) inspectInner {
-	return getFifoStatsImpl(childName, impl.value.RxStats(), impl.value.TxStats())
 }
 
 var _ inspectInner = (*fifoStatsInspectImpl)(nil)

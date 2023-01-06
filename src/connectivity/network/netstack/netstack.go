@@ -18,16 +18,13 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/bridge"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/eth"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	fidlethernet "fidl/fuchsia/hardware/ethernet"
 	"fidl/fuchsia/net/interfaces/admin"
-	"fidl/fuchsia/netstack"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -1194,22 +1191,6 @@ func makeEndpointName(prefix, configName string) func(nicid tcpip.NICID) string 
 		}
 		return configName
 	}
-}
-
-func (ns *Netstack) addEth(topopath string, config netstack.InterfaceConfig, device fidlethernet.DeviceWithCtx) (*ifState, error) {
-	client, err := eth.NewClient("netstack", topopath, config.Filepath, device)
-	if err != nil {
-		return nil, err
-	}
-
-	return ns.addEndpoint(
-		makeEndpointName("eth", config.Name),
-		ethernet.New(client),
-		client,
-		client,
-		routes.Metric(config.Metric),
-		qdiscConfig{numQueues: numQDiscFIFOQueues, queueLen: int(client.TxDepth()) * qdiscTxDepthMultiplier},
-	)
 }
 
 type qdiscConfig struct {

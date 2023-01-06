@@ -20,16 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"fidl/fuchsia/hardware/ethernet"
 	"fidl/fuchsia/logger"
 	fidlnet "fidl/fuchsia/net"
-	"fidl/fuchsia/netstack"
 	"fidl/fuchsia/unknown"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/eth/testutil"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
@@ -958,30 +955,6 @@ func TestOnLinkV6Route(t *testing.T) {
 	}
 }
 
-func TestMulticastPromiscuousModeEnabledByDefault(t *testing.T) {
-	addGoleakCheck(t)
-	ns, _ := newNetstack(t, netstackTestOptions{})
-
-	multicastPromiscuousModeEnabled := false
-	eth, _ := testutil.MakeEthernetDevice(t, ethernet.Info{
-		Mac: ethernet.MacAddress{Octets: [6]uint8{0, 1, 2, 3, 4, 5}},
-	}, 1)
-	eth.ConfigMulticastSetPromiscuousModeImpl = func(enabled bool) (int32, error) {
-		multicastPromiscuousModeEnabled = enabled
-		return int32(zx.ErrOk), nil
-	}
-
-	ifs, err := ns.addEth(testTopoPath, netstack.InterfaceConfig{Name: t.Name()}, &eth)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ifs.RemoveByUser()
-
-	if !multicastPromiscuousModeEnabled {
-		t.Error("expected a call to ConfigMulticastSetPromiscuousMode(true) by addEth")
-	}
-}
-
 func TestUniqueFallbackNICNames(t *testing.T) {
 	addGoleakCheck(t)
 	ns, _ := newNetstack(t, netstackTestOptions{})
@@ -1004,95 +977,6 @@ func TestUniqueFallbackNICNames(t *testing.T) {
 
 	if nicInfo1.Name == nicInfo2.Name {
 		t.Fatalf("got (%+v).Name == (%+v).Name, want non-equal", nicInfo1, nicInfo2)
-	}
-}
-
-func TestStaticIPConfiguration(t *testing.T) {
-	addGoleakCheck(t)
-	ns, _ := newNetstack(t, netstackTestOptions{})
-
-	addr := fidlconv.ToNetIpAddress(testV4Address)
-	ifAddr := fidlnet.Subnet{Addr: addr, PrefixLen: 32}
-	protocolAddr := fidlconv.ToTCPIPProtocolAddress(ifAddr)
-	for _, test := range []struct {
-		name     string
-		features ethernet.Features
-	}{
-		{name: "default"},
-		{name: "wlan", features: ethernet.FeaturesWlan},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			d, _ := testutil.MakeEthernetDevice(t, ethernet.Info{
-				Features: test.features,
-				Mtu:      1400,
-				Mac:      ethernet.MacAddress{Octets: [6]uint8{0, 1, 2, 3, 4, 5}},
-			}, 1)
-			ifs, err := ns.addEth(testTopoPath, netstack.InterfaceConfig{Name: t.Name()}, &d)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer ifs.RemoveByUser()
-
-			onlineChanged := make(chan bool, 1)
-			ifs.observer.SetOnLinkOnlineChanged(func(linkOnline bool) {
-				ifs.onLinkOnlineChanged(linkOnline)
-				onlineChanged <- linkOnline
-			})
-
-			name := ifs.ns.name(ifs.nicid)
-			if ok, status := ifs.addAddress(protocolAddr, tcpipstack.AddressProperties{}); !ok {
-				t.Fatalf("ifs.addAddress(%#v, {}): %s", protocolAddr, status)
-			}
-
-			if mainAddr, err := ns.stack.GetMainNICAddress(ifs.nicid, ipv4.ProtocolNumber); err != nil {
-				t.Errorf("stack.GetMainNICAddress(%d, ipv4.ProtocolNumber): %s", ifs.nicid, err)
-			} else if got := mainAddr.Address; got != testV4Address {
-				t.Errorf("got stack.GetMainNICAddress(%d, ipv4.ProtocolNumber).Addr = %s, want = %s", ifs.nicid, got, testV4Address)
-			}
-
-			ifs.mu.Lock()
-			if ifs.mu.dhcp.enabled {
-				t.Error("expected dhcp state to be disabled initially")
-			}
-			ifs.mu.Unlock()
-
-			if err := ifs.Down(); err != nil {
-				t.Fatal(err)
-			}
-
-			ifs.mu.Lock()
-			if ifs.mu.dhcp.enabled {
-				t.Error("expected dhcp state to remain disabled after bringing interface down")
-			}
-			if ifs.mu.dhcp.running() {
-				t.Error("expected dhcp state to remain stopped after bringing interface down")
-			}
-			ifs.mu.Unlock()
-
-			if err := ifs.Up(); err != nil {
-				t.Fatal(err)
-			}
-			if got, want := <-onlineChanged; got != want {
-				t.Errorf("got state = %t, want %t", got, want)
-			}
-
-			ifs.mu.Lock()
-			if ifs.mu.dhcp.enabled {
-				t.Error("expected dhcp state to remain disabled after restarting interface")
-			}
-			ifs.mu.Unlock()
-
-			ifs.setDHCPStatus(name, true)
-
-			ifs.mu.Lock()
-			if !ifs.mu.dhcp.enabled {
-				t.Error("expected dhcp state to become enabled after manually enabling it")
-			}
-			if !ifs.mu.dhcp.running() {
-				t.Error("expected dhcp state running")
-			}
-			ifs.mu.Unlock()
-		})
 	}
 }
 

@@ -18,12 +18,9 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
-	ethernetext "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlext/fuchsia/hardware/ethernet"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/eth"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
-	"fidl/fuchsia/hardware/ethernet"
 	inspect "fidl/fuchsia/inspect/deprecated"
 
 	"github.com/google/go-cmp/cmp"
@@ -805,92 +802,6 @@ func TestDHCPInfoInspectImpl(t *testing.T) {
 				t.Error(err)
 			}
 		}
-	}
-}
-
-func TestEthInfoInspectImpl(t *testing.T) {
-	addGoleakCheck(t)
-
-	const topopath, filepath = "topopath", "filepath"
-	const features = ethernet.FeaturesWlan | ethernet.FeaturesSynthetic | ethernet.FeaturesLoopback
-
-	device := ethernetext.Device{
-		TB: t,
-		GetInfoImpl: func() (ethernet.Info, error) {
-			return ethernet.Info{
-				Features: features,
-				Mac:      ethernet.MacAddress{Octets: [6]uint8{0, 1, 2, 3, 4, 5}},
-			}, nil
-		},
-		GetFifosImpl: func() (ethernet.DeviceGetFifosResult, error) {
-			return ethernet.DeviceGetFifosResultWithResponse(ethernet.DeviceGetFifosResponse{Fifos: ethernet.Fifos{
-				RxDepth: 1,
-				TxDepth: 1,
-			}}), nil
-		},
-		SetIoBufferImpl: func(zx.VMO) (int32, error) {
-			return int32(zx.ErrOk), nil
-		},
-		StopImpl: func() error {
-			return nil
-		},
-		SetClientNameImpl: func(string) (int32, error) {
-			return int32(zx.ErrOk), nil
-		},
-		ConfigMulticastSetPromiscuousModeImpl: func(bool) (int32, error) {
-			return int32(zx.ErrOk), nil
-		},
-	}
-
-	client, err := eth.NewClient("client", topopath, filepath, &device)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			t.Errorf("failed to close eth client: %s", err)
-		}
-		client.Wait()
-	}()
-
-	v := ethInfoInspectImpl{
-		name:  "doesn't matter",
-		value: client,
-	}
-	children := v.ListChildren()
-	if diff := cmp.Diff([]string{
-		"RxReads",
-		"RxWrites",
-		"TxReads",
-		"TxWrites",
-	}, children); diff != "" {
-		t.Errorf("ListChildren() mismatch (-want +got):\n%s", diff)
-	}
-	for _, childName := range children {
-		if child := v.GetChild(childName); child == nil {
-			t.Errorf("got GetChild(%s) = nil, want non-nil", childName)
-		} else if _, ok := child.(*fifoStatsInspectImpl); !ok {
-			t.Errorf("got GetChild(%s) = %#v, want %T", childName, child, (*fifoStatsInspectImpl)(nil))
-		}
-	}
-
-	childName := "not a real child"
-	if child := v.GetChild(childName); child != nil {
-		t.Errorf("got GetChild(%s) = %s, want = nil", childName, child)
-	}
-
-	if diff := cmp.Diff(inspect.Object{
-		Name: v.name,
-		Metrics: []inspect.Metric{
-			{Key: "TxDrops", Value: inspect.MetricValueWithUintValue(client.TxStats().Drops.Value())},
-		},
-		Properties: []inspect.Property{
-			{Key: "Topopath", Value: inspect.PropertyValueWithStr(topopath)},
-			{Key: "Filepath", Value: inspect.PropertyValueWithStr(filepath)},
-			{Key: "Features", Value: inspect.PropertyValueWithStr(features.String())},
-		},
-	}, v.ReadData(), cmpopts.IgnoreUnexported(inspect.Object{}, inspect.Property{}, inspect.Metric{})); diff != "" {
-		t.Errorf("ReadData() mismatch (-want +got):\n%s", diff)
 	}
 }
 

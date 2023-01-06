@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 common_deps = [
-  "//sdk/fidl/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_rust",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
@@ -30,8 +29,6 @@ common_deps = [
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
-  "//src/lib/network/ethernet",
-  "//src/lib/network/fidl_fuchsia_hardware_ethernet_ext",
   "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
   "//src/lib/network/packet",
   "//src/lib/zircon/rust:fuchsia-zircon",
@@ -65,7 +62,6 @@ common_sources = [
   "src/bindings/context.rs",
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
-  "src/bindings/ethernet_worker.rs",
   "src/bindings/filter_worker.rs",
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",

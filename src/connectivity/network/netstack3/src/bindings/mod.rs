@@ -15,7 +15,6 @@ mod integration_tests;
 mod context;
 mod debug_fidl_worker;
 mod devices;
-mod ethernet_worker;
 mod filter_worker;
 mod interfaces_admin;
 mod interfaces_watcher;
@@ -48,9 +47,7 @@ use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
 use rand::rngs::OsRng;
 use util::{ConversionContext, IntoFidl as _};
 
-use devices::{
-    BindingId, CommonInfo, DeviceSpecificInfo, Devices, EthernetInfo, LoopbackInfo, NetdeviceInfo,
-};
+use devices::{BindingId, CommonInfo, DeviceSpecificInfo, Devices, LoopbackInfo, NetdeviceInfo};
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
 
@@ -263,7 +260,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
     fn wake_rx_task(&mut self, device: &DeviceId<StackTime>) {
         match self.devices.get_core_device_mut(device) {
             Some(dev) => match dev.info_mut() {
-                DeviceSpecificInfo::Ethernet(_) | DeviceSpecificInfo::Netdevice(_) => {
+                DeviceSpecificInfo::Netdevice(_) => {
                     unreachable!("only loopback supports RX queues")
                 }
                 DeviceSpecificInfo::Loopback(LoopbackInfo { common_info: _, rx_notifier }) => {
@@ -297,26 +294,6 @@ where
         };
 
         match dev.info_mut() {
-            DeviceSpecificInfo::Ethernet(EthernetInfo {
-                common_info:
-                    CommonInfo {
-                        admin_enabled,
-                        mtu: _,
-                        events: _,
-                        name: _,
-                        control_hook: _,
-                        addresses: _,
-                    },
-                client,
-                mac: _,
-                features: _,
-                phy_up,
-                interface_control: _,
-            }) => {
-                if *admin_enabled && *phy_up {
-                    client.send(frame.as_ref())
-                }
-            }
             DeviceSpecificInfo::Netdevice(NetdeviceInfo {
                 common_info:
                     CommonInfo {
@@ -547,16 +524,7 @@ fn set_interface_enabled(
     let core_id = device.core_id().clone();
 
     let dev_enabled = match device.info_mut() {
-        DeviceSpecificInfo::Ethernet(EthernetInfo {
-            common_info:
-                CommonInfo { admin_enabled, mtu: _, events: _, name: _, control_hook: _, addresses: _ },
-            client: _,
-            mac: _,
-            features: _,
-            phy_up,
-            interface_control: _,
-        })
-        | DeviceSpecificInfo::Netdevice(NetdeviceInfo {
+        DeviceSpecificInfo::Netdevice(NetdeviceInfo {
             common_info:
                 CommonInfo { admin_enabled, mtu: _, events: _, name: _, control_hook: _, addresses: _ },
             handler: _,
