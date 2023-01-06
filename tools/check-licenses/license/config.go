@@ -5,14 +5,26 @@
 package license
 
 type LicenseConfig struct {
-	FuchsiaDir   string         `json:"fuchsiaDir"`
+	// FuchsiaDir is the path to the root of your fuchsia workspace.
+	// Typically ~/fuchsia, but can be set by environment variables
+	// or command-line arguments.
+	FuchsiaDir string `json:"fuchsiaDir"`
+
+	// List of PatternRoot objects, defining paths to folders containing
+	// license patterns.
 	PatternRoots []*PatternRoot `json:"patternRoot"`
-	AllowLists   []*AllowList   `json:"allowlists"`
-	Exceptions   []*Exception   `json:"exceptions"`
+
+	// Allowlists define projects that have been given approval to use
+	// a given restricted license type.
+	Allowlists               []*Allowlist `json:"allowlists"`
+	AllowlistsSoftTransition []*Allowlist `json:"exceptions"`
 }
 
 type PatternRoot struct {
+	// Path to the directory holding the license patterns.
 	Paths []string `json:"paths"`
+	// Optional freeform text field for describing how this directory is
+	// meant to be used.
 	Notes []string `json:"notes"`
 }
 
@@ -22,30 +34,40 @@ type PatternRoot struct {
 // exist to allow that project access to that license type.
 //
 // This struct describes how the allowlist is formatted.
-// It is named "Exception" instead of "Allowlist" since the old format for
-// allowlists is currently being used. (soft transition)
 // TODO(fxbug.dev/109828): Rename "Exception" to "Allowlist".
-type Exception struct {
-	Notes       []string          `json:"notes"`
-	LicenseType string            `json:"licenseType"`
-	Example     string            `json:"example"`
-	PatternRoot string            `json:"patternRoot"`
-	Entries     []*ExceptionEntry `json:"entries"`
+type Allowlist struct {
+	// LicenseType describes the type of license that this pattern matches
+	// with (e.g. bsd-3).
+	LicenseType string `json:"licenseType"`
+
+	// PatternRoot is a reference field, pointing to the license pattern
+	// that matches this license text.
+	PatternRoot string `json:"patternRoot"`
+
+	// List of allowlist entries.
+	Entries []*AllowlistEntry `json:"entries"`
+
+	// Example is a freeform text field used to make verification easier.
+	// Provide a string snippet or a URL to license text that requires
+	// this allowlist entry.
+	Example string `json:"example"`
+
+	// Notes is a freeform text field which can be used to explain
+	// why these project were granted this exception.
+	Notes []string `json:"notes"`
 }
 
-// Each exception can define a bug which should describe why / when the project
+// Each allowlist entry can define a bug which should describe why / when the project
 // was allowlisted.
 //
 // In the future, bug entries will be required for each exception entry.
-type ExceptionEntry struct {
-	Bug      string   `json:"bug"`
-	Projects []string `json:"projects"`
-}
+type AllowlistEntry struct {
+	// Link to a bug granting this exception.
+	// TODO(b/264579404): Make this a required field
+	Bug string `json:"bug"`
 
-type AllowList struct {
-	Projects []string `json:"paths"`
-	Patterns []string `json:"patterns"`
-	Notes    []string `json:"notes"`
+	// Project paths that this exception applies to.
+	Projects []string `json:"projects"`
 }
 
 var Config *LicenseConfig
@@ -57,7 +79,7 @@ func init() {
 func NewConfig() *LicenseConfig {
 	return &LicenseConfig{
 		PatternRoots: make([]*PatternRoot, 0),
-		AllowLists:   make([]*AllowList, 0),
+		Allowlists:   make([]*Allowlist, 0),
 	}
 }
 
@@ -65,6 +87,7 @@ func (c *LicenseConfig) Merge(other *LicenseConfig) {
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
 	}
+
 	if c.PatternRoots == nil {
 		c.PatternRoots = make([]*PatternRoot, 0)
 	}
@@ -73,12 +96,19 @@ func (c *LicenseConfig) Merge(other *LicenseConfig) {
 	}
 	c.PatternRoots = append(c.PatternRoots, other.PatternRoots...)
 
-	if c.AllowLists == nil {
-		c.AllowLists = make([]*AllowList, 0)
+	if c.Allowlists == nil {
+		c.Allowlists = make([]*Allowlist, 0)
 	}
-	if other.AllowLists == nil {
-		other.AllowLists = make([]*AllowList, 0)
+	if c.AllowlistsSoftTransition == nil {
+		c.AllowlistsSoftTransition = make([]*Allowlist, 0)
 	}
-	c.AllowLists = append(c.AllowLists, other.AllowLists...)
-	c.Exceptions = append(c.Exceptions, other.Exceptions...)
+	if other.Allowlists == nil {
+		other.Allowlists = make([]*Allowlist, 0)
+	}
+	if other.AllowlistsSoftTransition == nil {
+		other.AllowlistsSoftTransition = make([]*Allowlist, 0)
+	}
+	c.Allowlists = append(c.Allowlists, other.Allowlists...)
+	c.Allowlists = append(c.Allowlists, c.AllowlistsSoftTransition...)
+	c.Allowlists = append(c.Allowlists, other.AllowlistsSoftTransition...)
 }

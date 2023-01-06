@@ -63,12 +63,16 @@ func (c *FileConfig) Merge(other *FileConfig) {
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
 	}
+
 	if c.CopyrightSize == 0 {
 		c.CopyrightSize = other.CopyrightSize
 	}
+
 	c.Replacements = append(c.Replacements, other.Replacements...)
+
 	for k, v := range other.Extensions {
 		c.Extensions[k] = v
 	}
+
 	c.FileDataURLs = append(c.FileDataURLs, other.FileDataURLs...)
 }

@@ -1,7 +1,6 @@
 {
   "directory": {
     "fuchsiaDir": "{FUCHSIA_DIR}",
-    "exitOnMissingProject": false,
     "skips": [
       {
         "paths": [

@@ -11,14 +11,22 @@ import (
 var Config *DirectoryConfig
 
 type DirectoryConfig struct {
+	// FuchsiaDir is the path to the root of your fuchsia workspace.
+	// Typically ~/fuchsia, but can be set by environment variables
+	// or command-line arguments.
 	FuchsiaDir string `json:"fuchsiaDir"`
 
-	Skips                []*Skip `json:"skips"`
-	ExitOnMissingProject bool    `json:"exitOnMissingProject"`
+	// Skips are individual files or directories that should be skipped
+	// while traversing the repository.
+	Skips []*Skip `json:"skips"`
 }
 
 type Skip struct {
+	// Paths is a list of strings, describing all of the file paths
+	// that should not be processed. Can be individual files or folders.
 	Paths []string `json:"paths"`
+	// Notes is a freeform text field that will be printed out when this
+	// skip entry is exercised during verbose runs of the check-licenses tool.
 	Notes []string `json:"notes"`
 
 	// By default, "Paths" entries are full paths relative to $FUCHSIA_DIR.
@@ -53,6 +61,6 @@ func (c *DirectoryConfig) Merge(other *DirectoryConfig) {
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
 	}
+
 	c.Skips = append(c.Skips, other.Skips...)
-	c.ExitOnMissingProject = c.ExitOnMissingProject || other.ExitOnMissingProject
 }

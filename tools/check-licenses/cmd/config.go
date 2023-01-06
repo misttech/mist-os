@@ -33,9 +33,19 @@ func init() {
 }
 
 type CheckLicensesConfig struct {
+	// Includes defines a list of files or directories that contain
+	// config.json files. This allows check-licenses configuration details
+	// to be spread out across the fuchsia workspace.
+	Includes []Include `json:"includes"`
+
 	// LogLevel controls how much output is printed to stdout.
 	// See log.go for more information.
 	LogLevel int `json:"logLevel"`
+
+	// Flag stating whether or not check-licenses should generate
+	// a NOTICE file.
+	OutputLicenseFile bool `json:"outputLicenseFile"`
+
 	// FuchsiaDir is the path to the root of your fuchsia workspace.
 	// Typically ~/fuchsia, but can be set by environment variables
 	// or command-line arguments.
@@ -44,20 +54,6 @@ type CheckLicensesConfig struct {
 	// Typically ~/fuchsia/out/default, but can be set by environment variables
 	// or command-line arguments.
 	OutDir string `json:"outDir"`
-
-	// Includes defines a list of files or directories that contain
-	// config.json files. This allows check-licenses configuration details
-	// to be spread out across the fuchsia workspace.
-	Includes []Include `json:"includes"`
-
-	// The following variables represent Config files for the
-	// check-licenses subpackage of the same name.
-	File      *file.FileConfig           `json:"file"`
-	License   *license.LicenseConfig     `json:"license"`
-	Project   *project.ProjectConfig     `json:"project"`
-	Directory *directory.DirectoryConfig `json:"directory"`
-	Result    *result.ResultConfig       `json:"result"`
-	World     *world.WorldConfig         `json:"world"`
 
 	// On the command-line, a user can provide a GN target (e.g. //sdk)
 	// to generate a NOTICE file for.
@@ -69,9 +65,14 @@ type CheckLicensesConfig struct {
 	// The board currently set in the fx args for the local workspace.
 	BuildInfoBoard string `json:"buildInfoBoard"`
 
-	// Flag stating whether or not check-licenses should generate
-	// a NOTICE file.
-	OutputLicenseFile bool `json:"outputLicenseFile"`
+	// The following variables represent Config files for the
+	// check-licenses subpackage of the same name.
+	File      *file.FileConfig           `json:"file"`
+	License   *license.LicenseConfig     `json:"license"`
+	Project   *project.ProjectConfig     `json:"project"`
+	Directory *directory.DirectoryConfig `json:"directory"`
+	Result    *result.ResultConfig       `json:"result"`
+	World     *world.WorldConfig         `json:"world"`
 }
 
 // Create a new CheckLicensesConfig object by reading in a config.json file.
@@ -126,14 +127,13 @@ func NewCheckLicensesConfigJson(configJson string) (*CheckLicensesConfig, error)
 
 // Merge two CheckLicenseConfig objects together.
 func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
-	c.File.Merge(other.File)
-	c.License.Merge(other.License)
-	c.Directory.Merge(other.Directory)
-	c.Project.Merge(other.Project)
-	c.Result.Merge(other.Result)
-	c.World.Merge(other.World)
-
 	c.Includes = append(c.Includes, other.Includes...)
+
+	if other.LogLevel > c.LogLevel {
+		c.LogLevel = other.LogLevel
+	}
+
+	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
 
 	if c.FuchsiaDir == "" {
 		c.FuchsiaDir = other.FuchsiaDir
@@ -142,11 +142,9 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 		c.OutDir = other.OutDir
 	}
 
-	if other.LogLevel > c.LogLevel {
-		c.LogLevel = other.LogLevel
+	if c.Target == "" {
+		c.Target = other.Target
 	}
-
-	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
 	if c.BuildInfoVersion == "" {
 		c.BuildInfoVersion = other.BuildInfoVersion
 	}
@@ -156,6 +154,13 @@ func (c *CheckLicensesConfig) Merge(other *CheckLicensesConfig) error {
 	if c.BuildInfoBoard == "" {
 		c.BuildInfoBoard = other.BuildInfoBoard
 	}
+
+	c.File.Merge(other.File)
+	c.License.Merge(other.License)
+	c.Project.Merge(other.Project)
+	c.Directory.Merge(other.Directory)
+	c.Result.Merge(other.Result)
+	c.World.Merge(other.World)
 
 	return nil
 }

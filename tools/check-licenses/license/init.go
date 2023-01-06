@@ -18,7 +18,7 @@ var (
 	AllPatterns          []*Pattern
 	AllCopyrightPatterns []*Pattern
 	AllSearchResults     []*SearchResult
-	AllowListPatternMap  map[string][]string
+	AllowlistPatternMap  map[string][]string
 
 	Unrecognized *Pattern
 	Empty        *Pattern
@@ -28,7 +28,7 @@ func init() {
 	AllPatterns = make([]*Pattern, 0)
 	AllCopyrightPatterns = make([]*Pattern, 0)
 	AllSearchResults = make([]*SearchResult, 0)
-	AllowListPatternMap = make(map[string][]string, 0)
+	AllowlistPatternMap = make(map[string][]string, 0)
 }
 
 func Initialize(c *LicenseConfig) error {
@@ -39,12 +39,6 @@ func Initialize(c *LicenseConfig) error {
 		return err
 	} else {
 		plusFile("_config.json", b)
-	}
-
-	for _, al := range Config.AllowLists {
-		for _, p := range al.Patterns {
-			AllowListPatternMap[p] = append(AllowListPatternMap[p], al.Projects...)
-		}
 	}
 
 	// Initialize all license patterns.
@@ -65,7 +59,7 @@ func Initialize(c *LicenseConfig) error {
 		Name:               "_empty",
 		RelPath:            "_empty",
 		Matches:            make([]*file.FileData, 0),
-		AllowList:          []string{".*"},
+		Allowlist:          []*Allowlist{},
 		PreviousMatches:    make(map[string]bool),
 		PreviousMismatches: make(map[string]bool),
 		Re:                 re,
@@ -86,7 +80,7 @@ func Initialize(c *LicenseConfig) error {
 		Category:           "Unrecognized",
 		Type:               "Unrecognized",
 		Matches:            make([]*file.FileData, 0),
-		AllowList:          []string{".*"},
+		Allowlist:          []*Allowlist{},
 		PreviousMatches:    make(map[string]bool),
 		PreviousMismatches: make(map[string]bool),
 		Re:                 re,

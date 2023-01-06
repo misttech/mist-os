@@ -7,7 +7,6 @@ package result
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -108,6 +107,9 @@ func AllLicensePatternUsagesMustBeApproved() error {
 	var b strings.Builder
 OUTER:
 	for _, sr := range license.AllSearchResults {
+		if sr.Pattern.Name == "_empty" {
+			continue
+		}
 		if sr.Pattern.Category == "approved_production" {
 			continue
 		}
@@ -118,18 +120,8 @@ OUTER:
 		}
 
 		filepath := sr.LicenseData.FilePath
-		allowlist := sr.Pattern.AllowList
-		for _, entry := range allowlist {
-			re, err := regexp.Compile("(" + entry + ")")
-			if err != nil {
-				return err
-			}
-			if m := re.Find([]byte(filepath)); m != nil {
-				continue OUTER
-			}
-		}
-		for _, exceptions := range sr.Pattern.Exceptions {
-			for _, entry := range exceptions.Entries {
+		for _, allowlist := range sr.Pattern.Allowlist {
+			for _, entry := range allowlist.Entries {
 				for _, project := range entry.Projects {
 					if sr.ProjectRoot == project {
 						continue OUTER

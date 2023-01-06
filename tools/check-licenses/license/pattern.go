@@ -37,12 +37,8 @@ type Pattern struct {
 	// This is set using the name of the grandparent folder where the pattern file lives.
 	Category string
 
-	// AllowList is a string of regex patterns that match with project paths.
-	// This license pattern is only allowed to match with projects listed here.
-	AllowList []string
-
-	// Exceptions is a list of structs that hold information about allowlisted projects.
-	Exceptions []*Exception
+	// Allowlist is a list of structs that hold information about allowlisted projects.
+	Allowlist []*Allowlist
 
 	// Matches maintains a slice of pointers to the data fragments that it matched against.
 	// This is used in some templates in the result package, for grouping license texts
@@ -128,17 +124,6 @@ func NewPattern(path string) (*Pattern, error) {
 	// Retrieve the license category (e.g. Approved, Restricted) from the filepath.
 	licCategory := filepath.Base(filepath.Dir(filepath.Dir(path)))
 
-	allowlist := make([]string, 0)
-	if licCategory == "approved" || licCategory == "notice" {
-		allowlist = append(allowlist, ".*")
-	} else {
-		// allowlist_only and restricted
-		// TODO: make restricted licenses un-allowlist-able.
-		if regexes, ok := AllowListPatternMap[name]; ok {
-			allowlist = append(allowlist, regexes...)
-		}
-	}
-
 	relPath := path
 	if filepath.IsAbs(path) {
 		relPath, err = filepath.Rel(Config.FuchsiaDir, path)
@@ -152,10 +137,10 @@ func NewPattern(path string) (*Pattern, error) {
 		return nil, err
 	}
 
-	exceptions := make([]*Exception, 0)
-	for _, e := range Config.Exceptions {
-		if e.LicenseType == licType {
-			exceptions = append(exceptions, e)
+	allowlist := make([]*Allowlist, 0)
+	for _, a := range Config.Allowlists {
+		if a.LicenseType == licType {
+			allowlist = append(allowlist, a)
 		}
 	}
 
@@ -165,8 +150,7 @@ func NewPattern(path string) (*Pattern, error) {
 		RelPath:            relPath,
 		Type:               licType,
 		Category:           licCategory,
-		AllowList:          allowlist,
-		Exceptions:         exceptions,
+		Allowlist:          allowlist,
 		Matches:            make([]*file.FileData, 0),
 		PreviousMatches:    make(map[string]bool),
 		PreviousMismatches: make(map[string]bool),
