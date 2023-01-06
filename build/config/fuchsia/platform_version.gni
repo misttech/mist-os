@@ -3,15 +3,32 @@
 # found in the LICENSE file.
 platform_version = read_file("platform_version.json", "json")
 
-# TODO(https://fxbug.dev/104513) upstream clang support for HEAD
-# Emulate a "HEAD" API level since it is not supported directly by clang.
-# Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
-# so we define this as `((uint32_t)-1)`. clang expects API levels to be integer literals.
-platform_version.head_fuchsia_api_level = 4294967295
-
 declare_args() {
   # If true, build for N+1 api level, where N is platform_version.in_development_api_level
   bump_api_level = false
+
+  # Allows building the platform source code for a specific API level.
+  override_target_api_level = -1
+}
+
+if (override_target_api_level == -1) {
+  # The platform is built for "HEAD" by default. "HEAD" is an artificial API
+  # level that represents the bleeding edge of the Fuchsia API surface. It is
+  # not really meant to be used by SDK users unless they want to try some
+  # unreleased APIs.
+
+  # We use `UINT32_MAX` to represent the HEAD API level in Clang (Clang
+  # stores API levels as 32-bit integers).
+  platform_version.clang_fuchsia_api_level = 4294967295
+
+  # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
+  # only meant to be used in the platform itself, SDK users aren't expected to
+  # target it. It's a higher level than the "HEAD" API level, in other words,
+  # "HEAD" is a subset of "LEGACY".
+  platform_version.fidl_fuchsia_api_level = "LEGACY"
+} else {
+  platform_version.clang_fuchsia_api_level = override_target_api_level
+  platform_version.fidl_fuchsia_api_level = "$override_target_api_level"
 }
 
 declare_args() {
