@@ -16,22 +16,16 @@
                 // repository.
                 "/core/session-manager/session:session/dart_jit_runner",
                 "/core/session-manager/session:session/flutter_jit_runner",
-
-                // TODO(fxbug.dev/114052): The `1` in `application_shell:1` will
-                // change eventually.
-                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/chrome",
+                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/chrome",
 
                 // FOR _ENG BUILDS ONLY: We allow elements in the Workstation
                 // session to access ambient accessibility to develop
                 // runnerless Flutter apps using JIT compilation (which enables hot
                 // reload). This should never be exposed to release builds, which
                 // should use AOT compilation instead.
-                //
-                // TODO(fxbug.dev/114052): The `1` in `application_shell:1` will
-                // change eventually.
-                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
-                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/shell_settings:**",
-                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
+                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/elements:**",
+                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/shell_settings:**",
+                "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/terminal:**",
 
                 // We allow tests to access ambient executability in the same
                 // way that we're permissive with use of the components v1
@@ -261,10 +255,7 @@
                     "/core",
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
-
-                    // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
-                    // will change eventually.
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/chrome",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/chrome",
                     "/core/termina-guest-manager/vmm",
                     "/core/starnix_manager/starmium",
                     "/core/starnix_manager/stardroid",
@@ -410,11 +401,8 @@
                     // removed here.
                     //
                     // This protocol is available to the terminal in workstation
-                    //
-                    // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
-                    // will change eventually.
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/elements:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/terminal:**",
 
                     // TODO(https://fxbug.dev/106062): Scrutiny throws an routing error unless
                     // this is added. `process_resolver` does not have a `use` declaration for
@@ -467,11 +455,8 @@
                     // permissions can be migrated to an ermine-specific policy
                     // file (outside fuchsia.git), the following entry should be
                     // removed here.
-                    //
-                    // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
-                    // will change eventually.
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/elements:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/terminal:**",
                 ],
             },
             {
@@ -513,11 +498,8 @@
                     // permissions can be migrated to an ermine-specific policy
                     // file (outside fuchsia.git), the following entry should be
                     // removed here.
-                    //
-                    // TODO(fxbug.dev/114052): The `1` in `application_shell:1`
-                    // will change eventually.
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:**",
-                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:1/terminal:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/elements:**",
+                    "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/terminal:**",
                 ],
             },
             {
