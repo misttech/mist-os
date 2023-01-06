@@ -16,6 +16,11 @@
 
 namespace elfldltl {
 
+/// This is the base class for LocalVmarLoader and RemoteVmarLoader, below.
+/// All versions have mostly the same API.  The protected Load method here has
+/// the same signature as the public Load methods in the derived classes, so
+/// the one API comment on Load here applies to those public methods.
+///
 /// This object encapsulates the work needed to load an object into a VMAR
 /// based on an elfldltl::LoadInfo struct (see load.h) previously populated
 /// from program headers.  The Load method does the loading and initializes
@@ -23,18 +28,41 @@ namespace elfldltl {
 /// destroyed without calling other methods.
 class VmarLoader {
  public:
-  // TODO(fxbug.dev/91206): Enable root VMAR being specified out of process.
-  explicit VmarLoader(const zx::vmar& vmar = *zx::vmar::root_self()) : vmar_(vmar.borrow()) {}
+  explicit VmarLoader(const zx::vmar& vmar) : vmar_(vmar.borrow()) {}
 
   ~VmarLoader() {
     if (load_image_vmar_) {
-      // Confirm that load_image_vmar_ and direct memory state haven't diverged.
-      ZX_DEBUG_ASSERT(!image().empty());
       load_image_vmar_.destroy();
     }
   }
 
   [[gnu::const]] static size_t page_size() { return zx_system_get_page_size(); }
+
+  /// After Load(), this is the bias added to the given LoadInfo::vaddr_start()
+  /// to find the runtime load address.
+  zx_vaddr_t load_bias() const { return load_bias_; }
+
+  /// Commit is used to keep the mapping created by Load around even after the
+  /// VmarLoader object is destroyed. This method must be the last thing called
+  /// on the object if it is used, hence it can only be called with
+  /// `std::move(loader).Commit();`. If Commit() is not called, then loading is
+  /// aborted by destroying the VMAR when the VmarLoader object is destroyed.
+  /// Commit() returns the handle for the VMAR containing the load image. This
+  /// handle can usually be discarded, but saving makes it possible to modify
+  /// page protections after loading.
+  zx::vmar Commit() && { return std::exchange(load_image_vmar_, {}); }
+
+ protected:
+  // This encapsulates the main differences between the Load methods of the
+  // derived classes.  Each derived class's Load method just calls a different
+  // VmarLoader::Load<Policy> instantiaton.  The PartialPagePolicy applies
+  // specifically to LoadInfo::DataWithZeroFillSegment segments where the
+  // segment's memsz > filesz and its vaddr + filesz is not page-aligned.
+  enum class PartialPagePolicy {
+    kProhibited,     // vaddr + filesz must be page-aligned.
+    kCopyInProcess,  // zx_vmo_read the partial page into zero-fill memory.
+    kZeroInVmo,      // ZX_VMO_OP_ZERO the remainder after a COW partial page.
+  };
 
   // This loads the segments according to the elfldltl::LoadInfo<...>
   // instructions, mapping contents from the given VMO handle.  It's the real
@@ -47,7 +75,7 @@ class VmarLoader {
   // passed to the constructor may have new mappings whether the call succeeded
   // or not. Any mappings made are cleared out by destruction of the VmarLoader
   // object unless Commit() is called, see below.
-  template <class Diagnostics, class LoadInfo>
+  template <PartialPagePolicy PartialPage, class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
     ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "elfldltl::VmarLoader::Load called twice");
 
@@ -132,15 +160,29 @@ class VmarLoader {
       // This is tautologically false in DataSegment.  In ZeroFillSegment
       // map_size is statically zero so copy_size statically stays zero too.
       if (segment.memsz() > segment.filesz()) {
-        copy_size = map_size & (page_size() - 1);
-        map_size &= -page_size();
-        zero_size = segment.memsz() - map_size;
+        switch (PartialPage) {
+          case PartialPagePolicy::kProhibited:
+            // MapWritable will assert that map_size is aligned.
+            break;
+          case PartialPagePolicy::kCopyInProcess:
+            // Round down what's mapped, and copy the difference.
+            copy_size = map_size & (page_size() - 1);
+            map_size &= -page_size();
+            // Zero the remaining whole pages.
+            zero_size = segment.memsz() - map_size;
+            break;
+          case PartialPagePolicy::kZeroInVmo:
+            // MapWritable will round up what's mapped and zero the difference.
+            // Just zero the remaining whole pages.
+            zero_size = segment.memsz() - ((map_size + page_size() - 1) & -page_size());
+            break;
+        }
       }
 
       // First map data from the file, if any.
       if (map_size > 0) {
-        zx_status_t status = MapWritable(vmar_offset, vmo->borrow(), base_name, segment.offset(),
-                                         map_size, num_data_segments);
+        zx_status_t status = MapWritable<PartialPage == PartialPagePolicy::kZeroInVmo>(
+            vmar_offset, vmo->borrow(), base_name, segment.offset(), map_size, num_data_segments);
         if (status != ZX_OK) [[unlikely]] {
           diag.SystemError("cannot map writable segment from file", FileAddress{segment.vaddr()},
                            ZirconError{status});
@@ -160,9 +202,12 @@ class VmarLoader {
         }
 
         // Finally, copy the partial intersecting page, if any.
-        if (copy_size > 0) {
+        if constexpr (PartialPage != PartialPagePolicy::kCopyInProcess) {
+          ZX_DEBUG_ASSERT(copy_size == 0);
+        } else if (copy_size > 0) {
           const size_t copy_offset = segment.offset() + map_size;
-          void* const copy_data = image().data() + zero_fill_vmar_offset;
+          void* const copy_data =
+              reinterpret_cast<void*>(vaddr_start + zero_fill_vmar_offset + load_bias_);
           zx_status_t status = vmo->read(copy_data, copy_offset, copy_size);
           if (status != ZX_OK) [[unlikely]] {
             diag.SystemError("cannot read segment data from file", FileOffset{copy_offset},
@@ -175,27 +220,6 @@ class VmarLoader {
     };
 
     return load_info.VisitSegments(mapper);
-  }
-
-  // This returns the DirectMemory of the mapping created by Load(). It should
-  // not be used after destruction or after Commit(). If Commit() has been
-  // called before destruction then the address range will continue to be
-  // usable, in which case one should save memory().image() before Commit().
-  // TODO(fxbug.dev/91206): This API will not make sense once we support out
-  // of process loading.
-  DirectMemory& memory() { return memory_; }
-
-  // Commit is used to keep the mapping created by Load around even after the
-  // VmarLoader object is destroyed. This method must be the last thing called
-  // on the object if it is used, hence it can only be called with
-  // `std::move(loader).Commit();`. If Commit() is not called, then loading is
-  // aborted by destroying the VMAR when the VmarLoader object is destroyed.
-  // Commit() returns the handle for the VMAR containing the load image. This
-  // handle can usually be discarded, but saving makes it possible to modify
-  // page protections after loading.
-  zx::vmar Commit() && {
-    memory_.set_image({});
-    return std::exchange(load_image_vmar_, {});
   }
 
  private:
@@ -238,15 +262,12 @@ class VmarLoader {
     return load_image_vmar_.map(options, vmar_offset, *vmo, vmo_offset, size, &vaddr);
   }
 
+  template <bool ZeroPartialPage>
   zx_status_t MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo, std::string_view base_name,
                           uint64_t vmo_offset, size_t size, size_t& num_data_segments);
 
   zx_status_t MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
                           size_t& num_zero_segments);
-
-  cpp20::span<std::byte> image() { return memory_.image(); }
-
-  DirectMemory memory_;
 
   // The region of the address space that the module is being loaded into.  The
   // load_image_vmar_ is initialized during loading and only cleared by either
@@ -260,7 +281,66 @@ class VmarLoader {
 
   // This is the root VMAR that the mapping is placed into.
   zx::unowned_vmar vmar_;
+
+  zx_vaddr_t load_bias_ = 0;
 };
+
+/// elfldltl::LocalVmarLoader performs loading within the current process only.
+/// See VmarLoader above for the primary API details.  LocalVmarLoader can be
+/// default-constructed to place the module inside the root VMAR.  It also
+/// provides the memory() method for access to the image after Load.
+class LocalVmarLoader : public VmarLoader {
+ public:
+  explicit LocalVmarLoader(const zx::vmar& vmar = *zx::vmar::root_self()) : VmarLoader(vmar) {}
+
+  template <class Diagnostics, class LoadInfo>
+  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
+    if (!VmarLoader::Load<PartialPagePolicy::kCopyInProcess>(diag, load_info, vmo->borrow())) {
+      return false;
+    }
+    const uintptr_t image = load_info.vaddr_start() + load_bias();
+    memory_.set_image({reinterpret_cast<std::byte*>(image), load_info.vaddr_size()});
+    memory_.set_base(load_info.vaddr_start());
+    return true;
+  }
+
+  // This returns the DirectMemory of the mapping created by Load(). It should
+  // not be used after destruction or after Commit(). If Commit() has been
+  // called before destruction then the address range will continue to be
+  // usable, in which case one should save memory().image() before Commit().
+  DirectMemory& memory() { return memory_; }
+
+ private:
+  DirectMemory memory_;
+};
+
+/// elfldltl::RemoteVmarLoader performs loading in any process, given a VMAR
+/// (that process's root VMAR or a smaller region).  See VmarLoader above for
+/// the primary API details.  RemoteVmarLoader works fine for the current
+/// process too, but LocalVmarLoader may optimize that case better.
+class RemoteVmarLoader : public VmarLoader {
+ public:
+  using VmarLoader::VmarLoader;  // Requires a const zx::vmar& argument.
+
+  template <class Diagnostics, class LoadInfo>
+  [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
+    return VmarLoader::Load<PartialPagePolicy::kZeroInVmo>(diag, load_info, vmo->borrow());
+  }
+};
+
+// Both possible MapWritable instantiations are defined in vmar-loader.cc.
+
+extern template zx_status_t VmarLoader::MapWritable<false>(uintptr_t vmar_offset,
+                                                           zx::unowned_vmo vmo,
+                                                           std::string_view base_name,
+                                                           uint64_t vmo_offset, size_t size,
+                                                           size_t& num_data_segments);
+
+extern template zx_status_t VmarLoader::MapWritable<true>(uintptr_t vmar_offset,
+                                                          zx::unowned_vmo vmo,
+                                                          std::string_view base_name,
+                                                          uint64_t vmo_offset, size_t size,
+                                                          size_t& num_data_segments);
 
 }  // namespace elfldltl
 

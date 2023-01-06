@@ -29,8 +29,8 @@
 namespace {
 
 #ifdef __Fuchsia__
-struct VmarLoaderTraits {
-  using Loader = elfldltl::VmarLoader;
+struct LocalVmarLoaderTraits {
+  static auto MakeLoader() { return elfldltl::LocalVmarLoader{}; }
 
   static inline auto TestLibProvider = GetTestLibVmo;
 
@@ -40,11 +40,19 @@ struct VmarLoaderTraits {
   }
 
   static zx::unowned_vmo LoadFileArgument(const zx::vmo& vmo) { return vmo.borrow(); }
+
+  static constexpr bool kHasMemory = true;
+};
+
+struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
+  static auto MakeLoader() { return elfldltl::RemoteVmarLoader{*zx::vmar::root_self()}; }
+
+  static constexpr bool kHasMemory = false;
 };
 #endif
 
 struct MmapLoaderTraits {
-  using Loader = elfldltl::MmapLoader;
+  static auto MakeLoader() { return elfldltl::MmapLoader{}; }
 
   static inline auto TestLibProvider = GetTestLib;
 
@@ -54,11 +62,13 @@ struct MmapLoaderTraits {
   }
 
   static int LoadFileArgument(const fbl::unique_fd& fd) { return fd.get(); }
+
+  static constexpr bool kHasMemory = true;
 };
 
 using LoaderTypes = ::testing::Types<
 #ifdef __Fuchsia__
-    VmarLoaderTraits,
+    LocalVmarLoaderTraits, RemoteVmarLoaderTraits,
 #endif
     MmapLoaderTraits>;
 
@@ -97,13 +107,26 @@ class ElfldltlLoaderTests : public testing::Test {
     ASSERT_TRUE(phdrs_result);
     cpp20::span<const Phdr> phdrs = phdrs_result.get();
 
-    typename Traits::Loader loader;
+    auto loader = Traits::MakeLoader();
     elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())));
 
     ASSERT_TRUE(loader.Load(diag, load_info, Traits::LoadFileArgument(lib_file)));
 
-    elfldltl::DirectMemory& mem = loader.memory();
+    elfldltl::DirectMemory mem;
+    if constexpr (Traits::kHasMemory) {
+      mem.set_base(loader.memory().base());
+      mem.set_image(loader.memory().image());
+    } else {
+      mem.set_base(load_info.vaddr_start());
+      mem.set_image({reinterpret_cast<std::byte*>(load_info.vaddr_start() + loader.load_bias()),
+                     load_info.vaddr_size()});
+    }
+
+    EXPECT_EQ(mem.base(), load_info.vaddr_start());
+    EXPECT_EQ(mem.image().size_bytes(), load_info.vaddr_size());
+    EXPECT_EQ(reinterpret_cast<uintptr_t>(mem.image().data()),
+              load_info.vaddr_start() + loader.load_bias());
 
     std::optional<Phdr> ph;
     elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph));

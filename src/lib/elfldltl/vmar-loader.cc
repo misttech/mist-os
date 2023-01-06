@@ -70,18 +70,23 @@ zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start) {
       vaddr_size, &load_image_vmar_, &child_addr);
 
   if (status == ZX_OK) {
-    // Convert the absolute address of the child VMAR to a platform-generic
-    // address type needed for the generic DirectMemory abstraction.
-    memory_.set_image({reinterpret_cast<std::byte*>(child_addr), vaddr_size});
-    memory_.set_base(vaddr_start);
+    // Convert the absolute address of the child VMAR to the load bias relative
+    // to the link-time vaddr.
+    load_bias_ = child_addr - vaddr_start;
   }
 
   return status;
 }
 
+// This has both explicit instantiations below.
+template <bool ZeroInVmo>
 zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
                                     std::string_view base_name, uint64_t vmo_offset, size_t size,
                                     size_t& num_data_segments) {
+  if constexpr (!ZeroInVmo) {
+    ZX_DEBUG_ASSERT((size & (page_size() - 1)) == 0);
+  }
+
   zx::vmo writable_vmo;
   zx_status_t status =
       vmo->create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, vmo_offset, size, &writable_vmo);
@@ -89,10 +94,29 @@ zx_status_t VmarLoader::MapWritable(uintptr_t vmar_offset, zx::unowned_vmo vmo,
     return status;
   }
 
+  if constexpr (ZeroInVmo) {
+    const size_t zero_offset = size;
+    const size_t zero_size = page_size() - (size & (page_size() - 1));
+    status = writable_vmo.op_range(ZX_VMO_OP_ZERO, zero_offset, zero_size, nullptr, 0);
+    if (status != ZX_OK) [[unlikely]] {
+      return status;
+    }
+  }
+
   SetVmoName<kVmoNamePrefixData>(writable_vmo.borrow(), base_name, num_data_segments++);
 
   return Map(vmar_offset, kMapWritable, writable_vmo.borrow(), 0, size);
 }
+
+// Explicitly instantiate both flavors.
+
+template zx_status_t VmarLoader::MapWritable<false>(uintptr_t vmar_offset, zx::unowned_vmo vmo,
+                                                    std::string_view base_name, uint64_t vmo_offset,
+                                                    size_t size, size_t& num_data_segments);
+
+template zx_status_t VmarLoader::MapWritable<true>(uintptr_t vmar_offset, zx::unowned_vmo vmo,
+                                                   std::string_view base_name, uint64_t vmo_offset,
+                                                   size_t size, size_t& num_data_segments);
 
 zx_status_t VmarLoader::MapZeroFill(uintptr_t vmar_offset, std::string_view base_name, size_t size,
                                     size_t& num_zero_segments) {

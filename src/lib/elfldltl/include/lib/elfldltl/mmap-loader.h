@@ -123,6 +123,12 @@ class MmapLoader {
     return load_info.VisitSegments(mapper);
   }
 
+  // After Load(), this is the bias added to the given LoadInfo::vaddr_start()
+  // to find the runtime load address.
+  uintptr_t load_bias() const {
+    return reinterpret_cast<uintptr_t>(image().data()) - memory_.base();
+  }
+
   // This returns the DirectMemory of the mapping created by Load(). It should not be used after
   // destruction or after Commit(). If Commit() has been called before destruction then the
   // address range will continue to be usable, in which case one should save the object's
@@ -135,7 +141,7 @@ class MmapLoader {
   void Commit() && { memory_.set_image({}); }
 
  private:
-  cpp20::span<std::byte> image() { return memory_.image(); }
+  cpp20::span<std::byte> image() const { return memory_.image(); }
 
   DirectMemory memory_;
 };
