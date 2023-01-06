@@ -21,8 +21,12 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                     );
                     responder_send!(responder, &mut Ok(()));
                 }
-                FilterRequest::EnableInterface { .. } => {
-                    todo!("https://fxbug.dev/106604: implement filtering support");
+                FilterRequest::EnableInterface { responder, .. } => {
+                    error!(
+                        "fuchsia.net.filter.Filter is not implemented \
+                           (https://fxbug.dev/106604); ignoring EnableInterface"
+                    );
+                    responder_send!(responder, &mut Ok(()));
                 }
                 FilterRequest::GetRules { responder } => {
                     error!(
