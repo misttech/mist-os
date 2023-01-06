@@ -137,6 +137,13 @@ int use_after_free(volatile unsigned int* arg) {
   return 0;
 }
 
+int double_free(volatile unsigned int* arg) {
+  mem_alloc = malloc(1024);
+  free((void*)mem_alloc);
+  free((void*)mem_alloc);
+  return 0;
+}
+
 typedef struct {
   int depth;
   int max_depth;
@@ -306,6 +313,7 @@ command_t commands[] = {
     {"port_packets", port_packet_overflow, "overflow a port with packets"},
     {"port_observers", port_observer_overflow, "overflow a port with observers"},
     {"use_after_free", use_after_free, "use memory after freeing it"},
+    {"double_free", double_free, "double free memory"},
     {"write0_mt", blind_write_multithreaded,
      "write to address 0x0 in one thread, sleeping in 5 others"},
     {"abort", call_abort, "call abort()"},
