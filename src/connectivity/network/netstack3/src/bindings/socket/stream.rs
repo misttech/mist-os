@@ -30,6 +30,7 @@ use net_types::{
     SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
+    device::DeviceId,
     ip::IpExt,
     transport::tcp::{
         self,
@@ -53,7 +54,11 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::bindings::{
     socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
-    util::{IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl},
+    util::{
+        DeviceNotFoundError, IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl,
+        TryIntoFidlWithContext,
+    },
+    StackTime,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
@@ -494,7 +499,11 @@ fn spawn_send_task<I: IpExt>(
     .detach();
 }
 
-impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
+impl<I: IpSockAddrExt + IpExt> SocketWorker<I>
+where
+    DeviceId<StackTime>:
+        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+{
     fn spawn(mut self, request_stream: fposix_socket::StreamSocketRequestStream) {
         fasync::Task::spawn(async move {
             // Keep a set of futures, one per pollable stream. Each future is a
@@ -673,7 +682,7 @@ impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
 
     async fn get_sock_name(&self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let mut guard = self.ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx: _ } = guard.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
         let fidl = match self.id {
             SocketId::Unbound(_, _) => return Err(fposix::Errno::Einval),
             SocketId::Bound(id, _) => {
@@ -687,7 +696,7 @@ impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
             SocketId::Connection(id) => {
                 let ConnectionInfo { local_addr, remote_addr: _, device: _ } =
                     get_connection_info::<I, _>(sync_ctx, id);
-                local_addr.into_fidl()
+                local_addr.try_into_fidl_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?
             }
         };
         Ok(fidl.into_sock_addr())
@@ -695,13 +704,17 @@ impl<I: IpSockAddrExt + IpExt> SocketWorker<I> {
 
     async fn get_peer_name(&self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let mut guard = self.ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx: _ } = guard.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
         match self.id {
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => {
                 Err(fposix::Errno::Enotconn)
             }
             SocketId::Connection(id) => Ok({
-                get_connection_info::<I, _>(sync_ctx, id).remote_addr.into_fidl().into_sock_addr()
+                get_connection_info::<I, _>(sync_ctx, id)
+                    .remote_addr
+                    .try_into_fidl_with_ctx(non_sync_ctx)
+                    .map_err(IntoErrno::into_errno)?
+                    .into_sock_addr()
             }),
         }
     }
