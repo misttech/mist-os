@@ -396,7 +396,7 @@ TEST(VmoReference, AttributedCounts) {
   ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_REFERENCE, 0, 0, &ref));
 
   // Commit a page in the parent.
-  uint8_t data = 0xaa;
+  const uint8_t data = 0xaa;
   ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
 
   // The parent should see the page committed while the reference does not.
@@ -408,6 +408,18 @@ TEST(VmoReference, AttributedCounts) {
 
   // The reference should see the page.
   uint8_t buf;
+  ASSERT_OK(ref.read(&buf, 0, sizeof(buf)));
+  EXPECT_EQ(data, buf);
+
+  // Drop the parent.
+  vmo.reset();
+
+  // Committed pages still not attributed to the reference.
+  ASSERT_OK(ref.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(0u, info.committed_bytes);
+
+  // The reference can read the parent's page though.
+  buf = 0;
   ASSERT_OK(ref.read(&buf, 0, sizeof(buf)));
   EXPECT_EQ(data, buf);
 }
