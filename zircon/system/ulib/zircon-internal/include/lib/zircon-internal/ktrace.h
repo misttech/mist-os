@@ -42,19 +42,32 @@ __BEGIN_CDECLS
 
 #define KTRACE_VERSION            (0x00020000u)
 
+// Category bits.
+enum {
+  KTRACE_GRP_META_BIT = 0,
+  KTRACE_GRP_LIFECYCLE_BIT,
+  KTRACE_GRP_SCHEDULER_BIT,
+  KTRACE_GRP_TASKS_BIT,
+  KTRACE_GRP_IPC_BIT,
+  KTRACE_GRP_IRQ_BIT,
+  KTRACE_GRP_PROBE_BIT,
+  KTRACE_GRP_ARCH_BIT,
+  KTRACE_GRP_SYSCALL_BIT,
+  KTRACE_GRP_VM_BIT,
+};
+
 // Filter Groups
-#define KTRACE_GRP_ALL            0xFFF
-#define KTRACE_GRP_META           0x001
-#define KTRACE_GRP_LIFECYCLE      0x002
-#define KTRACE_GRP_SCHEDULER      0x004
-#define KTRACE_GRP_TASKS          0x008
-#define KTRACE_GRP_IPC            0x010
-#define KTRACE_GRP_IRQ            0x020
-#define KTRACE_GRP_PROBE          0x040
-#define KTRACE_GRP_ARCH           0x080
-#define KTRACE_GRP_SYSCALL        0x100
-#define KTRACE_GRP_VM             0x200
-#define KTRACE_GRP_FXT            0x800
+#define KTRACE_GRP_ALL            (0xFFFu)
+#define KTRACE_GRP_META           (1u << KTRACE_GRP_META_BIT)
+#define KTRACE_GRP_LIFECYCLE      (1u << KTRACE_GRP_LIFECYCLE_BIT)
+#define KTRACE_GRP_SCHEDULER      (1u << KTRACE_GRP_SCHEDULER_BIT)
+#define KTRACE_GRP_TASKS          (1u << KTRACE_GRP_TASKS_BIT)
+#define KTRACE_GRP_IPC            (1u << KTRACE_GRP_IPC_BIT)
+#define KTRACE_GRP_IRQ            (1u << KTRACE_GRP_IRQ_BIT)
+#define KTRACE_GRP_PROBE          (1u << KTRACE_GRP_PROBE_BIT)
+#define KTRACE_GRP_ARCH           (1u << KTRACE_GRP_ARCH_BIT)
+#define KTRACE_GRP_SYSCALL        (1u << KTRACE_GRP_SYSCALL_BIT)
+#define KTRACE_GRP_VM             (1u << KTRACE_GRP_VM_BIT)
 
 #define KTRACE_GRP_TO_MASK(grp)   ((grp) << 20)
 

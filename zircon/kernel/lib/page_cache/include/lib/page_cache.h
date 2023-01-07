@@ -42,7 +42,7 @@ class PageCache {
   static constexpr bool kTraceEnabled = false;
 
   using LocalTraceDuration =
-      TraceDuration<TraceEnabled<kTraceEnabled>, KTRACE_GRP_SCHEDULER, TraceContext::Thread>;
+      TraceDuration<TraceEnabled<kTraceEnabled>, "kernel:sched"_category, TraceContext::Thread>;
 
  public:
   // Creates a page cache with the given number of reserve pages per CPU.

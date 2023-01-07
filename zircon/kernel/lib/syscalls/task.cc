@@ -116,10 +116,11 @@ zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char
     return result;
   }
 
-  const zx_koid_t tid = handle.dispatcher()->get_koid();
-
-  fxt_kernel_object(TAG_THREAD_NAME, /*always*/ false, tid, ZX_OBJ_TYPE_THREAD, fxt::StringRef(buf),
-                    fxt::Argument{"process"_stringref, fxt::Koid(pid)});
+  if (ktrace_thunks::category_enabled("kernel:meta"_category)) {
+    const zx_koid_t tid = handle.dispatcher()->get_koid();
+    fxt_kernel_object(tid, ZX_OBJ_TYPE_THREAD, fxt::StringRef(buf),
+                      fxt::Argument{"process"_stringref, fxt::Koid(pid)});
+  }
 
   return out->make(ktl::move(handle), thread_rights);
 }
@@ -275,9 +276,10 @@ zx_status_t sys_process_create(zx_handle_t job_handle, user_in_ptr<const char> _
   if (result != ZX_OK)
     return result;
 
-  uint32_t koid = (uint32_t)new_process_handle.dispatcher()->get_koid();
-  fxt_kernel_object(TAG_PROC_NAME, /*always*/ false, koid, ZX_OBJ_TYPE_PROCESS,
-                    fxt::StringRef(buf));
+  if (ktrace_thunks::category_enabled("kernel:meta"_category)) {
+    const zx_koid_t koid = new_process_handle.dispatcher()->get_koid();
+    fxt_kernel_object(koid, ZX_OBJ_TYPE_PROCESS, fxt::StringRef(buf));
+  }
 
   result = proc_handle->make(ktl::move(new_process_handle), proc_rights);
   if (result == ZX_OK)
@@ -336,9 +338,10 @@ zx_status_t sys_process_create_shared(zx_handle_t shared_proc_handle, uint32_t o
     return result;
   }
 
-  uint32_t koid = (uint32_t)new_process_handle.dispatcher()->get_koid();
-  fxt_kernel_object(TAG_PROC_NAME, /*always*/ false, koid, ZX_OBJ_TYPE_PROCESS,
-                    fxt::StringRef(buf));
+  if (ktrace_thunks::category_enabled("kernel:meta"_category)) {
+    const zx_koid_t koid = new_process_handle.dispatcher()->get_koid();
+    fxt_kernel_object(koid, ZX_OBJ_TYPE_PROCESS, fxt::StringRef(buf));
+  }
 
   result = proc_handle->make(ktl::move(new_process_handle), proc_rights);
 

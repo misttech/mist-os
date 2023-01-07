@@ -56,9 +56,9 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
 
   const zx_status_t status = aspace->AccessedFault(addr);
 
-  if (unlikely(ktrace_tag_enabled(TAG_ACCESS_FAULT))) {
-    fxt_duration_complete(TAG_ACCESS_FAULT, start_time, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:vm"_stringref},
+  if (unlikely(ktrace_category_enabled("kernel:vm"_category))) {
+    fxt_duration_complete("kernel:vm"_category, start_time,
+                          ThreadRefFromContext(TraceContext::Thread),
                           fxt::StringRef{"access_fault"_stringref}, current_ticks(),
                           fxt::Argument{"vaddr"_stringref, addr});
   }
@@ -102,12 +102,11 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
     printf("PageFault: error %d for virtual address 0x%lx\n", status, addr);
   }
 
-  if (unlikely(ktrace_tag_enabled(TAG_PAGE_FAULT))) {
-    fxt_duration_complete(TAG_PAGE_FAULT, start_time, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:vm"_stringref},
-                          fxt::StringRef{"page_fault"_stringref}, current_ticks(),
-                          fxt::Argument{"vaddr"_stringref, addr},
-                          fxt::Argument{"flags"_stringref, flags});
+  if (unlikely(ktrace_category_enabled("kernel:vm"_category))) {
+    fxt_duration_complete(
+        "kernel:vm"_category, start_time, ThreadRefFromContext(TraceContext::Thread),
+        fxt::StringRef{"page_fault"_stringref}, current_ticks(),
+        fxt::Argument{"vaddr"_stringref, addr}, fxt::Argument{"flags"_stringref, flags});
   }
 
   return status;

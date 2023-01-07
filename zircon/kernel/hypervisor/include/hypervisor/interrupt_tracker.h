@@ -131,8 +131,8 @@ class InterruptTracker {
     if (invalidator != nullptr) {
       invalidator->Invalidate();
     }
-    ktrace_vcpu(TAG_VCPU_BLOCK, VCPU_INTERRUPT);
-    auto defer = fit::defer([] { ktrace_vcpu(TAG_VCPU_UNBLOCK, VCPU_INTERRUPT); });
+    ktrace_vcpu(VCPU_BLOCK, VCPU_INTERRUPT);
+    auto defer = fit::defer([] { ktrace_vcpu(VCPU_UNBLOCK, VCPU_INTERRUPT); });
     do {
       zx_status_t status = event_.Wait(Deadline::no_slack(deadline));
       switch (status) {

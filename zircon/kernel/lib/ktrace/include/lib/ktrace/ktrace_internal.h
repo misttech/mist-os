@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <lib/fit/function.h>
+#include <lib/fxt/interned_category.h>
 #include <lib/fxt/serializer.h>
 #include <lib/user_copy/user_ptr.h>
 #include <lib/zircon-internal/ktrace.h>
@@ -101,7 +102,12 @@ class KTraceState {
     return static_cast<uint32_t>(grpmask_and_inflight_writes_.load(ktl::memory_order_acquire));
   }
 
-  bool tag_enabled(uint32_t tag) const { return (tag & grpmask()) != 0; }
+  bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
+    const uint32_t bit_number = category.GetBit();
+    const uint32_t bitmask =
+        bit_number != fxt::InternedCategory::kInvalidBitNumber ? 1u << bit_number : 0;
+    return (bitmask & grpmask()) != 0;
+  }
 
   uint32_t IncPendingWrite() {
     const uint64_t previous_value =

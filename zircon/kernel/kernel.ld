@@ -239,14 +239,19 @@ SECTIONS
     }
 
     /*
-     * Collects instances of fxt::InternedString for registration during
-     * trace subsystem initialization, where ids are allocated and instances
-     * are added to the global list.
+     * Collects instances of fxt::InternedString and fxt::InternedCategory for
+     * registration during trace subsystem initialization, when string ids and
+     * category bits are allocated and instances are added to global lists.
      */
     __fxt_interned_string_table : ALIGN(8) {
         PROVIDE_HIDDEN(__start___fxt_interned_string_table = .);
         *(__fxt_interned_string_table)
         PROVIDE_HIDDEN(__stop___fxt_interned_string_table = .);
+    }
+    __fxt_interned_category_table : ALIGN(8) {
+        PROVIDE_HIDDEN(__start___fxt_interned_category_table = .);
+        *(__fxt_interned_category_table)
+        PROVIDE_HIDDEN(__stop___fxt_interned_category_table = .);
     }
 
     /*

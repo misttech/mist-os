@@ -134,7 +134,7 @@
 #include <kernel/auto_preempt_disabler.h>
 
 using LocalTraceDuration =
-    TraceDuration<TraceEnabled<false>, KTRACE_GRP_SCHEDULER, TraceContext::Thread>;
+    TraceDuration<TraceEnabled<false>, "kernel:sched"_category, TraceContext::Thread>;
 
 #define LOCAL_TRACE_DURATION(label, name, ...) \
   LocalTraceDuration name { KTRACE_STRING_REF(label), ##__VA_ARGS__ }

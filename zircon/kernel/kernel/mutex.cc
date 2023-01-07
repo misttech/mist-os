@@ -93,25 +93,27 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
 
  private:
   void KernelMutexTrace(uint32_t tag, const Mutex* mutex, const Thread* t, uint32_t waiter_count) {
-    auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_stringref
-                                    : t->user_thread() == nullptr ? "kernel_mode"_stringref
-                                                                  : "user_mode"_stringref)};
+    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+      auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_stringref
+                                      : t->user_thread() == nullptr ? "kernel_mode"_stringref
+                                                                    : "user_mode"_stringref)};
 
-    fxt::Argument mutex_id_arg{"mutex_id"_stringref,
-                               fxt::Pointer(reinterpret_cast<uintptr_t>(mutex))};
-    fxt::Argument tid_name_arg{"tid"_stringref,
-                               fxt::Koid(t == nullptr ? ZX_KOID_INVALID : t->tid())};
-    fxt::Argument tid_type_arg{"tid_type"_stringref, tid_type};
-    fxt::Argument wait_count_arg{"waiter_count"_stringref, waiter_count};
+      fxt::Argument mutex_id_arg{"mutex_id"_stringref,
+                                 fxt::Pointer(reinterpret_cast<uintptr_t>(mutex))};
+      fxt::Argument tid_name_arg{"tid"_stringref,
+                                 fxt::Koid(t == nullptr ? ZX_KOID_INVALID : t->tid())};
+      fxt::Argument tid_type_arg{"tid_type"_stringref, tid_type};
+      fxt::Argument wait_count_arg{"waiter_count"_stringref, waiter_count};
 
-    auto event_name = fxt::StringRef{(tag == TAG_KERNEL_MUTEX_ACQUIRE   ? "mutex_acquire"_stringref
-                                      : tag == TAG_KERNEL_MUTEX_RELEASE ? "mutex_release"_stringref
-                                      : tag == TAG_KERNEL_MUTEX_BLOCK   ? "mutex_block"_stringref
-                                                                        : "unknown"_stringref)};
+      auto event_name =
+          fxt::StringRef{(tag == TAG_KERNEL_MUTEX_ACQUIRE   ? "mutex_acquire"_stringref
+                          : tag == TAG_KERNEL_MUTEX_RELEASE ? "mutex_release"_stringref
+                          : tag == TAG_KERNEL_MUTEX_BLOCK   ? "mutex_block"_stringref
+                                                            : "unknown"_stringref)};
 
-    fxt_duration_complete(tag, ts_, t->fxt_ref(), fxt::StringRef{"kernel:sched"_stringref},
-                          event_name, ts_ + 50, mutex_id_arg, tid_name_arg, tid_type_arg,
-                          wait_count_arg);
+      fxt_duration_complete("kernel:sched"_category, ts_, t->fxt_ref(), event_name, ts_ + 50,
+                            mutex_id_arg, tid_name_arg, tid_type_arg, wait_count_arg);
+    }
   }
 
   const uint64_t ts_;

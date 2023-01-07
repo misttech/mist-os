@@ -7,6 +7,7 @@
 #include <debug.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/fxt/fields.h>
+#include <lib/fxt/interned_category.h>
 #include <lib/ktrace.h>
 #include <lib/ktrace/ktrace_internal.h>
 #include <lib/ktrace/string_ref.h>
@@ -34,6 +35,39 @@ internal::KTraceState KTRACE_STATE;
 
 namespace {
 
+using fxt::operator""_category;
+
+struct CategoryEntry {
+  uint32_t bit_number;
+  const fxt::InternedCategory& category;
+};
+
+const CategoryEntry kCategories[] = {
+    {KTRACE_GRP_META_BIT, "kernel:meta"_category},
+    {KTRACE_GRP_LIFECYCLE_BIT, "kernel:lifecycle"_category},
+    {KTRACE_GRP_SCHEDULER_BIT, "kernel:sched"_category},
+    {KTRACE_GRP_TASKS_BIT, "kernel:tasks"_category},
+    {KTRACE_GRP_IPC_BIT, "kernel:ipc"_category},
+    {KTRACE_GRP_IRQ_BIT, "kernel:irq"_category},
+    {KTRACE_GRP_PROBE_BIT, "kernel:probe"_category},
+    {KTRACE_GRP_ARCH_BIT, "kernel:arch"_category},
+    {KTRACE_GRP_SYSCALL_BIT, "kernel:syscall"_category},
+    {KTRACE_GRP_VM_BIT, "kernel:vm"_category},
+};
+
+void SetupCategoryBits() {
+  for (const CategoryEntry& entry : kCategories) {
+    const uint32_t bit_number = entry.category.bit_number;
+    if (bit_number == fxt::InternedCategory::kInvalidBitNumber) {
+      entry.category.bit_number = entry.bit_number;
+      fxt::InternedCategory::RegisterInitialized(entry.category);
+    } else {
+      dprintf(INFO, "Found category \"%s\" already initialized to 0x%04x!\n",
+              entry.category.string(), bit_number);
+    }
+  }
+}
+
 const StringRef* ktrace_find_probe(const char* name) {
   for (const StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
     if (!strcmp(name, ref->string)) {
@@ -60,12 +94,9 @@ void ktrace_report_cpu_pseudo_threads() {
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    fxt_kernel_object(TAG_THREAD_NAME, /* always */ true, kKernelPseudoCpuBase + i,
-                      ZX_OBJ_TYPE_THREAD, fxt::StringRef(name),
+    fxt_kernel_object(kKernelPseudoCpuBase + i, ZX_OBJ_TYPE_THREAD, fxt::StringRef(name),
                       fxt::Argument{"process"_stringref, fxt::Koid{kNoProcess}});
   }
-  fxt_kernel_object(TAG_THREAD_NAME, /* always */ true, 0, ZX_OBJ_TYPE_THREAD,
-                    fxt::StringRef{"kernel"_stringref});
 }
 
 }  // namespace
@@ -89,9 +120,6 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Allocations are rounded up to the nearest page size.
   target_bufsize_ = fbl::round_up(target_bufsize, static_cast<uint32_t>(PAGE_SIZE));
 
-  StringRef::SetMapStringCallback(fxt_string_record);
-  StringRef::PreRegister();
-
   if (initial_groups != 0) {
     if (AllocBuffer() == ZX_OK) {
       ReportStaticNames();
@@ -100,7 +128,7 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
     }
   }
 
-  SetGroupMask(KTRACE_GRP_TO_MASK(initial_groups));
+  SetGroupMask(initial_groups);
 }
 
 zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
@@ -147,7 +175,14 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   }
 
   is_started_ = true;
-  SetGroupMask(KTRACE_GRP_TO_MASK(groups));
+  SetGroupMask(groups);
+
+  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", groups);
+  DiagsPrintf(INFO, "Trace category states:\n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::IterateList) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.bit_number),
+                ktrace_category_enabled(category) ? "enabled" : "disabled");
+  }
 
   return ZX_OK;
 }
@@ -611,9 +646,23 @@ static void ktrace_init(unsigned level) {
   const uint32_t bufsize = syscalls_enabled ? (gBootOptions->ktrace_bufsize << 20) : 0;
   const uint32_t initial_grpmask = gBootOptions->ktrace_grpmask;
 
+  dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
+          bufsize, initial_grpmask);
+
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");
     return;
+  }
+
+  StringRef::SetMapStringCallback(fxt_string_record);
+  StringRef::PreRegister();
+
+  SetupCategoryBits();
+  fxt::InternedCategory::PreRegister();
+
+  dprintf(INFO, "Trace categories: \n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::IterateList) {
+    dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.bit_number));
   }
 
   KTRACE_STATE.Init(bufsize, initial_grpmask);

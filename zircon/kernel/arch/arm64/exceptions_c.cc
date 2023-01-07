@@ -529,17 +529,17 @@ extern "C" void arm64_serror_exception(iframe_t* iframe, uint exception_flags) {
   // SError is largely implementation defined and may or may not be fatal. For now, just count the
   // occurrences and add a tracer to help analyze possible causes.
 
-  if (unlikely(ktrace_tag_enabled(TAG_IRQ_ENTER))) {
-    fxt_duration_begin(TAG_IRQ_ENTER, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
-                       fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
+    fxt_duration_begin("kernel:irq"_category, current_ticks(),
+                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
                        fxt::Argument{"irq #"_stringref, 0xaa55});
   }
 
   exceptions_serror.Add(1);
 
-  if (unlikely(ktrace_tag_enabled(TAG_IRQ_EXIT))) {
-    fxt_duration_end(TAG_IRQ_EXIT, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
-                     fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
+    fxt_duration_end("kernel:irq"_category, current_ticks(),
+                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
                      fxt::Argument{"irq #"_stringref, 0xaa55});
   }
 }

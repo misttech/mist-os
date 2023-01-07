@@ -81,10 +81,9 @@ inline fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) 
 // Try to do as much as possible in the shared preamble code to maximize code reuse
 // between syscalls.
 __NO_INLINE syscall_pre_out do_syscall_pre(uint64_t syscall_num, uint64_t pc) {
-  if (unlikely(ktrace_tag_enabled(TAG_SYSCALL_ENTER))) {
-    fxt_duration_begin(TAG_SYSCALL_ENTER, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Thread),
-                       fxt::StringRef{"kernel:syscall"_stringref}, syscall_name_ref(syscall_num));
+  if (unlikely(ktrace_category_enabled("kernel:syscall"_category))) {
+    fxt_duration_begin("kernel:syscall"_category, current_ticks(),
+                       ThreadRefFromContext(TraceContext::Thread), syscall_name_ref(syscall_num));
   }
 
   CPU_STATS_INC(syscalls);
@@ -110,9 +109,9 @@ __NO_INLINE syscall_result do_syscall_post(uint64_t ret, uint64_t syscall_num) {
      This must be done before the below fxt_duration_end call. */
   arch_disable_ints();
 
-  if (unlikely(ktrace_tag_enabled(TAG_SYSCALL_EXIT))) {
-    fxt_duration_end(TAG_SYSCALL_EXIT, current_ticks(), ThreadRefFromContext(TraceContext::Thread),
-                     fxt::StringRef{"kernel:syscall"_stringref}, syscall_name_ref(syscall_num));
+  if (unlikely(ktrace_category_enabled("kernel:syscall"_category))) {
+    fxt_duration_end("kernel:syscall"_category, current_ticks(),
+                     ThreadRefFromContext(TraceContext::Thread), syscall_name_ref(syscall_num));
   }
 
   // The assembler caller will re-disable interrupts at the appropriate time.

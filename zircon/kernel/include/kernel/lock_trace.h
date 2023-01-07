@@ -19,30 +19,30 @@ using LockTraceEnabled = TraceEnabled<LOCK_TRACING_ENABLED>;
 #define INTERNAL_LOCK_TRACE_NAME_CAT(x, y) INTERNAL_LOCK_TRACE_NAME_CAT2(x, y)
 #define LOCK_TRACE_VARIABLE_NAME(name) INTERNAL_LOCK_TRACE_NAME_CAT(name, __COUNTER__)
 
-#define LOCK_TRACE_DURATION(label, args...)                                   \
-  TraceDuration<LockTraceEnabled, KTRACE_GRP_SCHEDULER, TraceContext::Thread> \
-  LOCK_TRACE_VARIABLE_NAME(duration_) {                                       \
-    KTRACE_STRING_REF(label), ##args                                          \
+#define LOCK_TRACE_DURATION(label, args...)                                      \
+  TraceDuration<LockTraceEnabled, "kernel:sched"_category, TraceContext::Thread> \
+  LOCK_TRACE_VARIABLE_NAME(duration_) {                                          \
+    KTRACE_STRING_REF(label), ##args                                             \
   }
 
-#define LOCK_TRACE_DURATION_BEGIN(label, args...)                                       \
-  ktrace_begin_duration(LockTraceEnabled{}, TraceContext::Thread, KTRACE_GRP_SCHEDULER, \
+#define LOCK_TRACE_DURATION_BEGIN(label, args...)                                          \
+  ktrace_begin_duration(LockTraceEnabled{}, "kernel:sched"_category, TraceContext::Thread, \
                         KTRACE_STRING_REF(label), ##args)
 
-#define LOCK_TRACE_DURATION_END(label, args...)                                       \
-  ktrace_end_duration(LockTraceEnabled{}, TraceContext::Thread, KTRACE_GRP_SCHEDULER, \
+#define LOCK_TRACE_DURATION_END(label, args...)                                          \
+  ktrace_end_duration(LockTraceEnabled{}, "kernel:sched"_category, TraceContext::Thread, \
                       KTRACE_STRING_REF(label), ##args)
 
-#define LOCK_TRACE_FLOW_BEGIN(label, args...)                                       \
-  ktrace_flow_begin(LockTraceEnabled{}, TraceContext::Thread, KTRACE_GRP_SCHEDULER, \
+#define LOCK_TRACE_FLOW_BEGIN(label, args...)                                          \
+  ktrace_flow_begin(LockTraceEnabled{}, "kernel:sched"_category, TraceContext::Thread, \
                     KTRACE_STRING_REF(label), ##args)
 
-#define LOCK_TRACE_FLOW_STEP(label, args...)                                       \
-  ktrace_flow_step(LockTraceEnabled{}, TraceContext::Thread, KTRACE_GRP_SCHEDULER, \
+#define LOCK_TRACE_FLOW_STEP(label, args...)                                          \
+  ktrace_flow_step(LockTraceEnabled{}, "kernel:sched"_category, TraceContext::Thread, \
                    KTRACE_STRING_REF(label), ##args)
 
-#define LOCK_TRACE_FLOW_END(label, args...)                                       \
-  ktrace_flow_end(LockTraceEnabled{}, TraceContext::Thread, KTRACE_GRP_SCHEDULER, \
+#define LOCK_TRACE_FLOW_END(label, args...)                                          \
+  ktrace_flow_end(LockTraceEnabled{}, "kernel:sched"_category, TraceContext::Thread, \
                   KTRACE_STRING_REF(label), ##args)
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_LOCK_TRACE_H_

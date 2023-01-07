@@ -64,64 +64,69 @@ class KTrace<true> : public KTraceBase {
   KTrace() : ts_(ktrace_timestamp()) {}
 
   void FutexWait(FutexId futex_id, Thread* new_owner) {
-    const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
-    const fxt::Argument futex_owner_arg{"new_owner_TID"_stringref, fxt::Koid{new_owner->tid()}};
-    fxt_duration_complete(TAG_FUTEX_WAIT, ts_, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:sched"_stringref},
-                          fxt::StringRef{"futex_wait"_stringref}, ts_ + 50, futex_id_arg,
-                          futex_owner_arg);
+    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+      const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
+      const fxt::Argument futex_owner_arg{"new_owner_TID"_stringref, fxt::Koid{new_owner->tid()}};
+      fxt_duration_complete(
+          "kernel:sched"_category, ts_, ThreadRefFromContext(TraceContext::Thread),
+          fxt::StringRef{"futex_wait"_stringref}, ts_ + 50, futex_id_arg, futex_owner_arg);
+    }
   }
 
   void FutexWoke(FutexId futex_id, zx_status_t result) {
-    const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
-    const fxt::Argument futex_wait_result_arg{"wait_result"_stringref, result};
-    fxt_duration_complete(TAG_FUTEX_WOKE, ts_, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:sched"_stringref},
-                          fxt::StringRef{"futex_woke"_stringref}, ts_ + 50, futex_id_arg,
-                          futex_wait_result_arg);
+    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+      const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
+      const fxt::Argument futex_wait_result_arg{"wait_result"_stringref, result};
+      fxt_duration_complete(
+          "kernel:sched"_category, ts_, ThreadRefFromContext(TraceContext::Thread),
+          fxt::StringRef{"futex_woke"_stringref}, ts_ + 50, futex_id_arg, futex_wait_result_arg);
+    }
   }
 
   void FutexWake(FutexId futex_id, FutexActive active, RequeueOp requeue_op, uint32_t count,
                  Thread* assigned_owner) {
-    if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
-      count = kCountSaturate;
-    }
-    const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
-    const fxt::Argument futex_owner_arg{
-        "futex_owner"_stringref,
-        fxt::Koid{assigned_owner ? assigned_owner->tid() : ZX_KOID_INVALID}};
-    const fxt::Argument futex_count_arg{"futex_count"_stringref, count};
-    const fxt::Argument futex_was_requeue_arg{"futex_was_requeue"_stringref,
-                                              requeue_op == RequeueOp::Yes};
-    const fxt::Argument futex_was_active_arg{"futex_was_active"_stringref,
-                                             active == FutexActive::Yes};
+    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+      if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
+        count = kCountSaturate;
+      }
+      const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
+      const fxt::Argument futex_owner_arg{
+          "futex_owner"_stringref,
+          fxt::Koid{assigned_owner ? assigned_owner->tid() : ZX_KOID_INVALID}};
+      const fxt::Argument futex_count_arg{"futex_count"_stringref, count};
+      const fxt::Argument futex_was_requeue_arg{"futex_was_requeue"_stringref,
+                                                requeue_op == RequeueOp::Yes};
+      const fxt::Argument futex_was_active_arg{"futex_was_active"_stringref,
+                                               active == FutexActive::Yes};
 
-    fxt_duration_complete(TAG_FUTEX_WAKE, ts_, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:sched"_stringref},
-                          fxt::StringRef{"futex_wake"_stringref}, ts_ + 50, futex_id_arg,
-                          futex_owner_arg, futex_count_arg, futex_was_requeue_arg,
-                          futex_was_active_arg);
+      fxt_duration_complete(
+          "kernel:sched"_category, ts_, ThreadRefFromContext(TraceContext::Thread),
+          fxt::StringRef{"futex_wake"_stringref}, ts_ + 50, futex_id_arg, futex_owner_arg,
+          futex_count_arg, futex_was_requeue_arg, futex_was_active_arg);
+    }
   }
 
   void FutexRequeue(FutexId futex_id, FutexActive active, uint32_t count, Thread* assigned_owner) {
-    if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
-      count = kCountSaturate;
-    }
-    if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
-      count = kCountSaturate;
-    }
-    const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
-    const fxt::Argument futex_owner_arg{
-        "futex_owner"_stringref,
-        fxt::Koid(assigned_owner ? assigned_owner->tid() : ZX_KOID_INVALID)};
-    const fxt::Argument futex_count_arg{"futex_count"_stringref, count};
-    const fxt::Argument futex_was_active_arg{"futex_was_active"_stringref,
-                                             active == FutexActive::Yes};
+    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+      if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
+        count = kCountSaturate;
+      }
+      if ((count >= kCountSaturate) && (count != kUnlimitedCount)) {
+        count = kCountSaturate;
+      }
+      const fxt::Argument futex_id_arg{"futex_id"_stringref, futex_id.get()};
+      const fxt::Argument futex_owner_arg{
+          "futex_owner"_stringref,
+          fxt::Koid(assigned_owner ? assigned_owner->tid() : ZX_KOID_INVALID)};
+      const fxt::Argument futex_count_arg{"futex_count"_stringref, count};
+      const fxt::Argument futex_was_active_arg{"futex_was_active"_stringref,
+                                               active == FutexActive::Yes};
 
-    fxt_duration_complete(TAG_FUTEX_REQUEUE, ts_, ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"kernel:sched"_stringref},
-                          fxt::StringRef{"futex_wake"_stringref}, ts_ + 50, futex_id_arg,
-                          futex_owner_arg, futex_count_arg, futex_was_active_arg);
+      fxt_duration_complete("kernel:sched"_category, ts_,
+                            ThreadRefFromContext(TraceContext::Thread),
+                            fxt::StringRef{"futex_wake"_stringref}, ts_ + 50, futex_id_arg,
+                            futex_owner_arg, futex_count_arg, futex_was_active_arg);
+    }
   }
 
  private:

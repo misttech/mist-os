@@ -65,25 +65,25 @@ using ffl::Round;
   ktrace_probe(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, TraceContext::Cpu, \
                KTRACE_STRING_REF(string), ##args)
 
-#define LOCAL_KTRACE_FLOW_BEGIN(level, string, flow_id, args...)                      \
-  ktrace_flow_begin(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, TraceContext::Cpu, \
-                    KTRACE_GRP_SCHEDULER, KTRACE_STRING_REF(string), flow_id, ##args)
+#define LOCAL_KTRACE_FLOW_BEGIN(level, string, flow_id, args...)                            \
+  ktrace_flow_begin(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
+                    TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
 
-#define LOCAL_KTRACE_FLOW_END(level, string, flow_id, args...)                      \
-  ktrace_flow_end(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, TraceContext::Cpu, \
-                  KTRACE_GRP_SCHEDULER, KTRACE_STRING_REF(string), flow_id, ##args)
+#define LOCAL_KTRACE_FLOW_END(level, string, flow_id, args...)                            \
+  ktrace_flow_end(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
+                  TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
 
-#define LOCAL_KTRACE_FLOW_STEP(level, string, flow_id, args...)                      \
-  ktrace_flow_step(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, TraceContext::Cpu, \
-                   KTRACE_GRP_SCHEDULER, KTRACE_STRING_REF(string), flow_id, ##args)
+#define LOCAL_KTRACE_FLOW_STEP(level, string, flow_id, args...)                            \
+  ktrace_flow_step(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
+                   TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
 
-#define LOCAL_KTRACE_COUNTER(level, string, value, args...)                           \
-  ktrace_counter(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, KTRACE_GRP_SCHEDULER, \
+#define LOCAL_KTRACE_COUNTER(level, string, value, args...)                              \
+  ktrace_counter(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
                  KTRACE_STRING_REF(string), value, ##args)
 
 template <size_t level>
 using LocalTraceDuration = TraceDuration<TraceEnabled<LOCAL_KTRACE_LEVEL_ENABLED(level)>,
-                                         KTRACE_GRP_SCHEDULER, TraceContext::Cpu>;
+                                         "kernel:sched"_category, TraceContext::Cpu>;
 
 namespace {
 
@@ -123,7 +123,7 @@ constexpr zx_time_t& operator+=(zx_time_t& value, SchedDuration delta) {
 // so that user mode tracing can track which threads are running.
 inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
                                cpu_num_t current_cpu) {
-  if (unlikely(ktrace_tag_enabled(TAG_CONTEXT_SWITCH))) {
+  if (unlikely(ktrace_category_enabled("kernel:sched"_category))) {
     zx_thread_state_t user_thread_state = [](thread_state ts) {
       switch (ts) {
         case THREAD_INITIAL:
@@ -143,8 +143,8 @@ inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_
           return UINT32_MAX;
       }
     }(current_thread->state());
-    fxt_context_switch(TAG_CONTEXT_SWITCH, current_ticks(), static_cast<uint8_t>(current_cpu),
-                       user_thread_state, current_thread->fxt_ref(), next_thread->fxt_ref(),
+    fxt_context_switch(current_ticks(), static_cast<uint8_t>(current_cpu), user_thread_state,
+                       current_thread->fxt_ref(), next_thread->fxt_ref(),
                        static_cast<uint8_t>(current_thread->scheduler_state().base_priority()),
                        static_cast<uint8_t>(next_thread->scheduler_state().base_priority()));
   }

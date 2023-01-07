@@ -56,34 +56,32 @@ static fxt::StringRef<fxt::RefType::kId> vcpu_exit[] = {
 static_assert((sizeof(vcpu_exit) / sizeof(vcpu_exit[0])) == VCPU_EXIT_COUNT,
               "vcpu_exit array must match enum VcpuExit");
 
-void ktrace_vcpu(uint32_t tag, VcpuMeta meta) {
-  if (unlikely(ktrace_tag_enabled(tag))) {
+void ktrace_vcpu(VcpuBlockOp block_op, VcpuMeta meta) {
+  if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
     const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
-    const fxt::StringRef category = "kernel:vcpu"_stringref;
     const fxt::Argument arg = {"meta #"_stringref, meta};
     const fxt::StringRef name = meta < VCPU_META_COUNT ? vcpu_meta[meta] : "vcpu meta"_stringref;
-    if (tag == TAG_VCPU_BLOCK) {
-      fxt_duration_begin(tag, current_ticks(), thread, category, name, arg);
-    } else if (tag == TAG_VCPU_UNBLOCK) {
-      fxt_duration_end(tag, current_ticks(), thread, category, name, arg);
+    if (block_op == VCPU_BLOCK) {
+      fxt_duration_begin("kernel:vcpu"_category, current_ticks(), thread, name, arg);
+    } else if (block_op == VCPU_UNBLOCK) {
+      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, arg);
     }
   }
 }
 
 void ktrace_vcpu_exit(VcpuExit exit, uint64_t exit_address) {
-  if (unlikely(ktrace_tag_enabled(TAG_VCPU_EXIT))) {
+  if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
     const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
-    const fxt::StringRef category = "kernel:vcpu"_stringref;
     const fxt::Argument addr_arg = {"exit_address"_stringref, exit_address};
     const fxt::StringRef name = "vcpu"_stringref;
 
     if (exit < VCPU_EXIT_COUNT) {
       const fxt::Argument exit_type_arg = {"exit_address"_stringref, vcpu_exit[exit]};
-      fxt_duration_end(TAG_VCPU_EXIT, current_ticks(), thread, category, name, addr_arg,
+      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, addr_arg,
                        exit_type_arg);
     } else {
       const fxt::Argument exit_type_arg = {"exit_address"_stringref, exit};
-      fxt_duration_end(TAG_VCPU_EXIT, current_ticks(), thread, category, name, addr_arg,
+      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, addr_arg,
                        exit_type_arg);
     }
   }

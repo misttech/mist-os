@@ -54,7 +54,7 @@
                ##args)
 
 using LocalTraceDuration =
-    TraceDuration<TraceEnabled<LOCAL_KTRACE_ENABLE>, KTRACE_GRP_VM, TraceContext::Thread>;
+    TraceDuration<TraceEnabled<LOCAL_KTRACE_ENABLE>, "kernel:vm"_category, TraceContext::Thread>;
 
 // Use one of the ignored bits for a software simulated accessed flag for non-terminal entries.
 // TODO: Once the hardware setting of the terminal AF is supported usage of this for non-terminal AF

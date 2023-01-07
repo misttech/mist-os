@@ -341,9 +341,9 @@ static void gic_handle_irq(iframe_t* frame) {
     CPU_STATS_INC(interrupts);
   }
 
-  if (unlikely(ktrace_tag_enabled(TAG_IRQ_ENTER))) {
-    fxt_duration_begin(TAG_IRQ_ENTER, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
-                       fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
+    fxt_duration_begin("kernel:irq"_category, current_ticks(),
+                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
                        fxt::Argument{"irq #"_stringref, vector});
   }
 
@@ -356,9 +356,9 @@ static void gic_handle_irq(iframe_t* frame) {
 
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 
-  if (unlikely(ktrace_tag_enabled(TAG_IRQ_EXIT))) {
-    fxt_duration_end(TAG_IRQ_EXIT, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
-                     fxt::StringRef{"kernel:irq"_stringref}, fxt::StringRef{"irq"_stringref},
+  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
+    fxt_duration_end("kernel:irq"_category, current_ticks(),
+                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
                      fxt::Argument{"irq #"_stringref, vector});
   }
 }

@@ -46,7 +46,7 @@
 #define LOCAL_KTRACE_ENABLE 0 || LOCAL_TRACE
 
 using LocalTraceDuration =
-    TraceDuration<TraceEnabled<LOCAL_KTRACE_ENABLE>, KTRACE_GRP_SCHEDULER, TraceContext::Cpu>;
+    TraceDuration<TraceEnabled<LOCAL_KTRACE_ENABLE>, "kernel:sched"_category, TraceContext::Cpu>;
 
 struct x86_percpu* ap_percpus;
 uint8_t x86_num_cpus = 1;

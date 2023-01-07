@@ -1626,8 +1626,7 @@ void ktrace_report_live_threads() {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   for (Thread& t : thread_list.Get()) {
     t.canary().Assert();
-    fxt_kernel_object(TAG_THREAD_NAME, /*always*/ true, t.tid(), ZX_OBJ_TYPE_THREAD,
-                      fxt::StringRef(t.name()),
+    fxt_kernel_object(t.tid(), ZX_OBJ_TYPE_THREAD, fxt::StringRef(t.name()),
                       fxt::Argument("process"_stringref, fxt::Koid(t.pid())));
   }
 }

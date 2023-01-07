@@ -72,7 +72,7 @@ class TestKTraceState : public ::internal::KTraceState {
         EXPECT_EQ(1u, state.static_name_report_count_);
         EXPECT_EQ(1u, state.thread_name_report_count_);
         EXPECT_LE(state.last_static_name_report_time_, state.last_thread_name_report_time_);
-        EXPECT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+        EXPECT_EQ(kAllGroups, state.grpmask());
       }
     }
 
@@ -91,7 +91,7 @@ class TestKTraceState : public ::internal::KTraceState {
         EXPECT_EQ(1u, state.static_name_report_count_);
         EXPECT_EQ(1u, state.thread_name_report_count_);
         EXPECT_LE(state.last_static_name_report_time_, state.last_thread_name_report_time_);
-        EXPECT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+        EXPECT_EQ(kAllGroups, state.grpmask());
       }
     }
 
@@ -177,7 +177,7 @@ class TestKTraceState : public ::internal::KTraceState {
     // The buffer will not think that it is full just yet.
     uint32_t rcnt = 0;
     auto checker = [&](const uint64_t* hdr) -> bool { return true; };
-    EXPECT_EQ(KTRACE_GRP_TO_MASK(kGroups), state.grpmask());
+    EXPECT_EQ(kGroups, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_TRUE(state.CheckExpectedOffset(kDefaultBufferSize - 8));
@@ -233,7 +233,7 @@ class TestKTraceState : public ::internal::KTraceState {
     uint32_t rcnt = 0;
     auto checker = [&](const uint64_t* hdr) -> bool { return true; };
     EXPECT_TRUE(state.CheckExpectedOffset(expected_offset, CheckOp::LT));
-    EXPECT_EQ(KTRACE_GRP_TO_MASK(kGroups), state.grpmask());
+    EXPECT_EQ(kGroups, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(2u, rcnt);
@@ -286,27 +286,27 @@ class TestKTraceState : public ::internal::KTraceState {
       ASSERT_OK(state.Stop());
       ASSERT_EQ(0u, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
       ASSERT_OK(state.Rewind());
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(0u), state.grpmask());
+      ASSERT_EQ(0u, state.grpmask());
 
       // Starting should succeed.
       ASSERT_OK(state.Start(kAllGroups, StartMode::Saturate));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+      ASSERT_EQ(kAllGroups, state.grpmask());
 
       // Now that we are started, rewinding or should fail because of the state
       // check.
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.Rewind());
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+      ASSERT_EQ(kAllGroups, state.grpmask());
 
       // Starting while already started should succeed, but change the active
       // group mask.
       ASSERT_OK(state.Start(kSomeGroups, StartMode::Saturate));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kSomeGroups), state.grpmask());
+      ASSERT_EQ(kSomeGroups, state.grpmask());
 
       // Stopping is still OK, and actually does something now (it clears the
       // group mask).
       ASSERT_OK(state.Stop());
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(0u), state.grpmask());
+      ASSERT_EQ(0u, state.grpmask());
 
       // Now that we are stopped, we can read, rewind, and stop again.  Since we
       // have started before, we expect that the amount of data available to
@@ -321,21 +321,21 @@ class TestKTraceState : public ::internal::KTraceState {
       // init by providing a non-zero set of groups.
       TestKTraceState state;
       ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+      ASSERT_EQ(kAllGroups, state.grpmask());
 
       // We are started, so rewinding or reading should fail because of the
       // state check.
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.Rewind());
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kAllGroups), state.grpmask());
+      ASSERT_EQ(kAllGroups, state.grpmask());
 
       // "Restarting" should change the active group mask.
       ASSERT_OK(state.Start(kSomeGroups, StartMode::Saturate));
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(kSomeGroups), state.grpmask());
+      ASSERT_EQ(kSomeGroups, state.grpmask());
 
       // Stopping should work.
       ASSERT_OK(state.Stop());
-      ASSERT_EQ(KTRACE_GRP_TO_MASK(0u), state.grpmask());
+      ASSERT_EQ(0u, state.grpmask());
 
       // Stopping again, rewinding, and reading are all OK now.
       const ssize_t expected_size = sizeof(uint64_t) * 3;

@@ -175,7 +175,7 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   template <typename EnabledOption>
   using LocalTraceDuration =
-      TraceDuration<EnabledOption, KTRACE_GRP_SCHEDULER, TraceContext::Thread>;
+      TraceDuration<EnabledOption, "kernel:sched"_category, TraceContext::Thread>;
 
   static_assert(ktl::has_single_bit(Allocator::kSlabSize), "Slabs must be a power of two!");
   static constexpr uintptr_t kSlabAddrMask = Allocator::kSlabSize - 1;

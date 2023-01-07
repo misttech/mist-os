@@ -289,9 +289,8 @@ zx_status_t Vcpu::Enter(zx_port_packet_t& packet) {
         return ZX_ERR_CANCELED;
       }
 
-      if (unlikely(ktrace_tag_enabled(TAG_VCPU_ENTER))) {
-        fxt_duration_begin(TAG_VCPU_ENTER, current_ticks(), current_thread->fxt_ref(),
-                           fxt::StringRef{"kernel:vcpu"_stringref},
+      if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
+        fxt_duration_begin("kernel:vcpu"_category, current_ticks(), current_thread->fxt_ref(),
                            fxt::StringRef{"vcpu"_stringref});
       }
 
