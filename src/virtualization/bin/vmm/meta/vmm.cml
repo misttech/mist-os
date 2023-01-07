@@ -132,6 +132,7 @@
         },
         {
             protocol: [
+                "fuchsia.input.wayland.Keymap",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",

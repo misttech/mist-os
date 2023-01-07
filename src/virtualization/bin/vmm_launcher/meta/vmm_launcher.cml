@@ -47,6 +47,7 @@
         },
         {
             protocol: [
+                "fuchsia.input.wayland.Keymap",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
