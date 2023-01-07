@@ -328,6 +328,10 @@ impl fidl::endpoints::ControlHandle for SubControlHandle {
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
+    }
 }
 
 impl SubControlHandle {}
@@ -709,6 +713,10 @@ impl fidl::endpoints::ControlHandle for Super_ControlHandle {
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
     }
 }
 

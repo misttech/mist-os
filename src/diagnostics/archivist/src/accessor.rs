@@ -15,7 +15,7 @@ use {
     },
     async_lock::Mutex,
     diagnostics_data::{Data, DiagnosticsData},
-    fidl::endpoints::RequestStream,
+    fidl::prelude::*,
     fidl_fuchsia_diagnostics::{
         self, ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorRequest,
         BatchIteratorRequestStream, ClientSelectorConfiguration, DataType, Format,
@@ -326,10 +326,7 @@ impl SchemaTruncationCounter {
 }
 
 pub struct BatchIterator {
-    /// requests is always populated on construction and is removed in run().
-    /// This is an option as run() needs to consume it, but the Drop impl prevents us
-    /// from unpacking BatchIterator.
-    requests: Option<BatchIteratorRequestStream>,
+    requests: BatchIteratorRequestStream,
     stats: Arc<BatchIteratorConnectionStats>,
     data: FormattedStream,
     truncation_counter: Option<Arc<Mutex<SchemaTruncationCounter>>>,
@@ -479,19 +476,11 @@ impl BatchIterator {
         parent_trace_id: ftrace::Id,
     ) -> Result<Self, AccessorError> {
         stats.open_connection();
-        Ok(Self { data, requests: Some(requests), stats, truncation_counter, parent_trace_id })
+        Ok(Self { data, requests, stats, truncation_counter, parent_trace_id })
     }
 
     pub async fn run(mut self) -> Result<(), AccessorError> {
-        let (serve_inner, terminated) =
-            self.requests.take().expect("request stream should be present").into_inner();
-        let serve_inner_clone = serve_inner.clone();
-        let channel_closed_fut =
-            fasync::OnSignals::new(serve_inner_clone.channel(), zx::Signals::CHANNEL_PEER_CLOSED)
-                .shared();
-        let mut requests = BatchIteratorRequestStream::from_inner(serve_inner, terminated);
-
-        while let Some(res) = requests.next().await {
+        while let Some(res) = self.requests.next().await {
             let BatchIteratorRequest::GetNext { responder } = res?;
             self.stats.add_request();
             let start_time = zx::Time::get_monotonic();
@@ -505,7 +494,8 @@ impl BatchIterator {
                 "parent_trace_id" => u64::from(self.parent_trace_id),
                 "trace_id" => u64::from(trace_id)
             );
-            let batch = match select(self.data.next(), channel_closed_fut.clone()).await {
+            let batch = match select(self.data.next(), responder.control_handle().on_closed()).await
+            {
                 // if we get None back, treat that as a terminal batch with an empty vec
                 Either::Left((batch_option, _)) => batch_option.unwrap_or_default(),
                 // if the client closes the channel, stop waiting and terminate.

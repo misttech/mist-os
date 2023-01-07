@@ -4636,6 +4636,10 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsAjarProtocolControlHa
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
+    }
 }
 
 impl UnknownInteractionsAjarProtocolControlHandle {
@@ -6849,6 +6853,10 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsClosedProtocolControl
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
     }
 }
 
@@ -9857,6 +9865,10 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsProtocolControlHandle
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
     }
 }
 

@@ -130,6 +130,10 @@ pub trait ControlHandle {
     /// only closed the next time the stream is polled.
     // TODO(fxbug.dev/81036): Fix behavior or above docs.
     fn shutdown_with_epitaph(&self, status: zx_status::Status);
+
+    /// Returns a future that completes when the server receives the
+    /// `PEER_CLOSED` signal.
+    fn on_closed<'a>(&'a self) -> OnSignals<'a>;
 }
 
 /// A type associated with a particular two-way FIDL method, used by servers to
