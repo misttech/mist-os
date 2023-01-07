@@ -8,6 +8,11 @@
 
 ## **STRUCTS**
 
+### EmptyResourceStruct [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#EmptyResourceStruct data-text="EmptyResourceStruct"}
+*Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=36)*
+
+&lt;EMPTY&gt;
+
 ### HandlesInTypes [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#HandlesInTypes data-text="HandlesInTypes"}
 *Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=25)*
 
@@ -88,6 +93,15 @@ Type: <code>uint32</code>
 
 ## **TABLES**
 
+### EmptyResourceTable [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#EmptyResourceTable data-text="EmptyResourceTable"}
+
+
+*Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=37)*
+
+<table>
+    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
+</table>
+
 ### TableWithHandle [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#TableWithHandle data-text="TableWithHandle"}
 
 
@@ -107,6 +121,9 @@ Type: <code>uint32</code>
 
 
 ## **UNIONS**
+
+### EmptyResourceUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#EmptyResourceUnion data-text="EmptyResourceUnion"}
+*Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=41)*
 
 ### UnionWithHandle [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#UnionWithHandle data-text="UnionWithHandle"}
 *Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=21)*

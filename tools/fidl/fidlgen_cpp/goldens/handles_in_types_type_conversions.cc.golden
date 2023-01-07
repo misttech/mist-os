@@ -32,6 +32,19 @@ namespace internal {
 
 #ifdef __Fuchsia__
 
+::test_handlesintypes::EmptyResourceStruct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceStruct, ::test_handlesintypes::EmptyResourceStruct>::ToNatural(::test_handlesintypes::wire::EmptyResourceStruct src) {
+  return ::test_handlesintypes::EmptyResourceStruct(WireNaturalConversionTraits<uint8_t, uint8_t>::ToNatural(std::move(src.__reserved)));
+}
+::test_handlesintypes::wire::EmptyResourceStruct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceStruct, ::test_handlesintypes::EmptyResourceStruct>::ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceStruct src) {
+  return ::test_handlesintypes::wire::EmptyResourceStruct{
+      .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
+  };
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 ::test_handlesintypes::TableWithHandle WireNaturalConversionTraits<::test_handlesintypes::wire::TableWithHandle, ::test_handlesintypes::TableWithHandle>::ToNatural(::test_handlesintypes::wire::TableWithHandle src) {
   ::test_handlesintypes::TableWithHandle dst;
   if (src.has_h()) {
@@ -47,6 +60,20 @@ namespace internal {
     builder.h(
         WireNaturalConversionTraits<::zx::vmo, ::zx::vmo>::ToWire(arena, std::move(src.h().value())));
   }
+  return builder.Build();
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+::test_handlesintypes::EmptyResourceTable WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceTable, ::test_handlesintypes::EmptyResourceTable>::ToNatural(::test_handlesintypes::wire::EmptyResourceTable src) {
+  ::test_handlesintypes::EmptyResourceTable dst;
+
+  return dst;
+}
+::test_handlesintypes::wire::EmptyResourceTable WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceTable, ::test_handlesintypes::EmptyResourceTable>::ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceTable src) {
+  auto builder = ::test_handlesintypes::wire::EmptyResourceTable::Builder(arena);
   return builder.Build();
 }
 
@@ -70,6 +97,23 @@ namespace internal {
           WireNaturalConversionTraits<::zx::vmo, ::zx::vmo>::ToWire(arena, std::move(src.h().value())));
     default:
       return ::test_handlesintypes::wire::UnionWithHandle();
+  }
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+::test_handlesintypes::EmptyResourceUnion WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceUnion, ::test_handlesintypes::EmptyResourceUnion>::ToNatural(::test_handlesintypes::wire::EmptyResourceUnion src) {
+  switch (src.Which()) {
+    default:
+      return ::test_handlesintypes::EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
+  }
+}
+::test_handlesintypes::wire::EmptyResourceUnion WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceUnion, ::test_handlesintypes::EmptyResourceUnion>::ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceUnion src) {
+  switch (src.Which()) {
+    default:
+      return ::test_handlesintypes::wire::EmptyResourceUnion();
   }
 }
 

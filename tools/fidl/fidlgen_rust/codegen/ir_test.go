@@ -44,12 +44,16 @@ func TestDerivesCalculation(t *testing.T) {
 			expected: "#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]",
 		},
 		{
+			fidl:     `type MyStruct = resource struct { field client_end:P; }; protocol P {};`,
+			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]",
+		},
+		{
 			fidl:     `type MyStruct = resource struct { field uint64; };`,
-			expected: "#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes)]",
+			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes)]",
 		},
 		{
 			fidl:     `type MyStruct = resource struct {};`,
-			expected: "#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]",
+			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]",
 		},
 	}
 	for _, ex := range cases {

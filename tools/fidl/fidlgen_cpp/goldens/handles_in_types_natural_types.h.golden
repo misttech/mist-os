@@ -20,9 +20,15 @@ namespace test_handlesintypes {
 
 class HandlesInTypes;
 
+class EmptyResourceStruct;
+
 class TableWithHandle;
 
+class EmptyResourceTable;
+
 class UnionWithHandle;
+
+class EmptyResourceUnion;
 
 #ifdef __Fuchsia__
 
@@ -326,6 +332,161 @@ class HandlesInTypes {
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
+
+class EmptyResourceStruct {
+ private:
+  struct Storage_;
+
+ public:
+  EmptyResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  EmptyResourceStruct(uint8_t __reserved) noexcept
+      : storage_({.__reserved = std::move(__reserved)}) {}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
+  // Default constructs a |EmptyResourceStruct| only if all of its members are default constructible.
+  EmptyResourceStruct() = default;
+#pragma clang diagnostic pop
+
+  EmptyResourceStruct(EmptyResourceStruct&&) noexcept = default;
+  EmptyResourceStruct& operator=(EmptyResourceStruct&&) noexcept = default;
+
+  uint8_t
+  __reserved() const {
+    return storage_.__reserved;
+  }
+
+  uint8_t& __reserved() {
+    return storage_.__reserved;
+  }
+
+  // Setter for __reserved.
+  //
+
+  EmptyResourceStruct& __reserved(uint8_t value) {
+    storage_.__reserved = std::move(value);
+    return *this;
+  }
+
+  EmptyResourceStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceStruct(Storage_{
+                                                                                        .__reserved = 0u,
+                                                                                    }) {}
+
+ private:
+  struct Storage_ final {
+    uint8_t __reserved = 0u;
+  };
+
+  Storage_ storage_;
+
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_handlesintypes::EmptyResourceStruct, 1>;
+  friend struct ::fidl::internal::MemberVisitor<::test_handlesintypes::EmptyResourceStruct>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, uint8_t, fidl::internal::NaturalCodingConstraintEmpty>{
+      &Storage_::__reserved, 0});
+  static constexpr auto kPadding = std::make_tuple();
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
+
+class EmptyResourceTable {
+ private:
+  struct Storage_;
+
+ public:
+  EmptyResourceTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  EmptyResourceTable() noexcept = default;
+  EmptyResourceTable(EmptyResourceTable&&) noexcept = default;
+  EmptyResourceTable& operator=(EmptyResourceTable&&) noexcept = default;
+
+  bool IsEmpty() const {
+    return true;
+  }
+
+  EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceTable(Storage_{}) {}
+
+ private:
+  struct Storage_ final {
+  };
+
+  // TODO(https://fxbug.dev/91252): Box the storage.
+  Storage_ storage_;
+  friend struct ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::EmptyResourceTable>;
+  friend struct ::fidl::internal::MemberVisitor<::test_handlesintypes::EmptyResourceTable>;
+  static constexpr auto kMembers = std::make_tuple();
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
+
+class EmptyResourceUnion {
+ private:
+  using Storage_ =
+      std::variant<
+          std::monostate>;
+
+ public:
+  // TODO: share union tag types between wire & natural.
+  enum class Tag : fidl_xunion_tag_t {
+    _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
+  };
+
+  EmptyResourceUnion(EmptyResourceUnion&& other) noexcept
+      : EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+    *storage_ = std::move(*other.storage_);
+  }
+  EmptyResourceUnion& operator=(EmptyResourceUnion&& other) noexcept {
+    if (this != &other) {
+      *storage_ = std::move(*other.storage_);
+    }
+    return *this;
+  }
+  constexpr bool IsUnknown() const {
+    return Which() == ::test_handlesintypes::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+  }
+
+  constexpr ::test_handlesintypes::EmptyResourceUnion::Tag Which() const {
+    return EmptyResourceUnion::IndexToTag(storage_->index()).value();
+  }
+
+  EmptyResourceUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+      : storage_(std::make_shared<Storage_>()) {}
+
+ private:
+  std::shared_ptr<Storage_> storage_;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_handlesintypes::EmptyResourceUnion>;
+  static constexpr auto kMembers = std::make_tuple(
+      ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>());
+
+  explicit EmptyResourceUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_handlesintypes::EmptyResourceUnion::Tag tag) {
+    switch (tag) {
+      default: {
+        return 0;
+      }
+    }
+  }
+
+  static constexpr std::optional<::test_handlesintypes::EmptyResourceUnion::Tag> IndexToTag(size_t index) {
+    switch (index) {
+      default:
+        return ::test_handlesintypes::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+    }
+  }
+};
+
+#endif  // __Fuchsia__
+
 }  // namespace test_handlesintypes
 namespace fidl {
 
@@ -359,6 +520,34 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::HandlesInTypes, ::fi
 
 #ifdef __Fuchsia__
 
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
+
+template <>
+struct IsResource<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
+template <>
+struct IsFidlType<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
+
+template <>
+struct TypeTraits<::test_handlesintypes::EmptyResourceStruct> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 0;
+  static constexpr uint32_t kPrimarySize = 1;
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasEnvelope = false;
+  static constexpr bool kHasPointer = false;
+};
+
+template <>
+struct IsStruct<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
+
+template <>
+struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_handlesintypes::EmptyResourceStruct> {};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 extern "C" const fidl_type_t test_handlesintypes_TableWithHandleTable;
 
 template <>
@@ -381,6 +570,33 @@ struct IsTable<::test_handlesintypes::TableWithHandle> : public std::true_type {
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::TableWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::TableWithHandle> {};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
+
+template <>
+struct IsResource<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
+template <>
+struct IsFidlType<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
+
+template <>
+struct TypeTraits<::test_handlesintypes::EmptyResourceTable> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 1;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsTable<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
+
+template <>
+struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::EmptyResourceTable> {};
 
 #endif  // __Fuchsia__
 
@@ -409,6 +625,34 @@ struct IsUnion<::test_handlesintypes::UnionWithHandle> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::UnionWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_handlesintypes::UnionWithHandle> {};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
+
+template <>
+struct IsResource<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
+template <>
+struct IsFidlType<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
+
+template <>
+struct TypeTraits<::test_handlesintypes::EmptyResourceUnion> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 1;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasEnvelope = true;
+  static constexpr bool kHasPointer = true;
+};
+
+template <>
+struct IsUnion<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
+
+template <>
+struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_handlesintypes::EmptyResourceUnion> {};
 
 #endif  // __Fuchsia__
 

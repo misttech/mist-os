@@ -392,6 +392,213 @@ zx_status_t HandlesInTypes::Clone(HandlesInTypes* _result) const {
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
+const fidl_type_t* EmptyResourceStruct::FidlType = &test_handlesintypes_EmptyResourceStructTable;
+
+void EmptyResourceStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<EmptyResourceStruct>::value) {
+    memcpy(_encoder->template GetPtr<EmptyResourceStruct>(_offset), this, sizeof(EmptyResourceStruct));
+  } else {
+    ::fidl::Encode(_encoder, &__reserved, _offset + 0);
+  }
+}
+
+void EmptyResourceStruct::Decode(::fidl::Decoder* _decoder, EmptyResourceStruct* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<EmptyResourceStruct>::value) {
+    memcpy(_value, _decoder->template GetPtr<EmptyResourceStruct>(_offset), sizeof(EmptyResourceStruct));
+  } else {
+    ::fidl::Decode(_decoder, &_value->__reserved, _offset + 0);
+  }
+}
+
+zx_status_t EmptyResourceStruct::Clone(EmptyResourceStruct* _result) const {
+  zx_status_t _status = ::fidl::Clone(__reserved, &_result->__reserved);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
+const fidl_type_t* EmptyResourceTable::FidlType = &test_handlesintypes_EmptyResourceTableTable;
+
+EmptyResourceTable::EmptyResourceTable() {}
+
+EmptyResourceTable::EmptyResourceTable(EmptyResourceTable&& other) {
+  field_presence_ = other.field_presence_;
+}
+
+EmptyResourceTable::~EmptyResourceTable() {
+}
+
+EmptyResourceTable& EmptyResourceTable::operator=(EmptyResourceTable&& other) {
+  return *this;
+}
+
+bool EmptyResourceTable::IsEmpty() const {
+  return field_presence_.IsEmpty();
+}
+
+void EmptyResourceTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  size_t max_ordinal = MaxOrdinal();
+  ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
+  if (max_ordinal == 0) return;
+  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_v2_t));
+}
+
+void EmptyResourceTable::Decode(::fidl::Decoder* _decoder, EmptyResourceTable* _value, size_t _offset) {
+  fidl_vector_t* encoded = _decoder->GetPtr<fidl_vector_t>(_offset);
+  [[maybe_unused]] size_t base;
+  [[maybe_unused]] size_t count;
+  if (!encoded->data) {
+    goto clear_all;
+  }
+
+  base = _decoder->GetOffset(encoded->data);
+  count = encoded->count;
+
+  if (count > 0) {
+    for (uint64_t ordinal = 1; ordinal <= count; ordinal++) {
+      if (IsOrdinalKnown(ordinal)) {
+        continue;
+      }
+
+      size_t envelope_base = base + (ordinal - 1) * sizeof(fidl_envelope_v2_t);
+      fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      _decoder->CloseUnknownHandlesInEnvelope(envelope);
+    }
+  }
+
+  return;
+
+  // Clear unset values.
+clear_all:
+  return;
+}
+
+zx_status_t EmptyResourceTable::Clone(EmptyResourceTable* result) const {
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
+const fidl_type_t* EmptyResourceUnion::FidlType = &test_handlesintypes_EmptyResourceUnionTable;
+
+EmptyResourceUnion::EmptyResourceUnion() {}
+
+EmptyResourceUnion::~EmptyResourceUnion() {
+  Destroy();
+}
+
+EmptyResourceUnion::EmptyResourceUnion(EmptyResourceUnion&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid):
+      break;
+    default:
+      new (&unknown_data_) decltype(unknown_data_);
+      unknown_data_ = std::move(other.unknown_data_);
+      break;
+  }
+}
+
+EmptyResourceUnion& EmptyResourceUnion::operator=(EmptyResourceUnion&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid):
+        break;
+      default:
+        new (&unknown_data_) decltype(unknown_data_);
+        unknown_data_ = std::move(other.unknown_data_);
+        break;
+    }
+  }
+  return *this;
+}
+
+void EmptyResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
+                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  switch (Which()) {
+    case ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown: {
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      *encoder->GetPtr<uint64_t>(offset) = tag_;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void EmptyResourceUnion::Decode(::fidl::Decoder* _decoder, EmptyResourceUnion* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+}
+
+zx_status_t EmptyResourceUnion::Clone(EmptyResourceUnion* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::handlesintypes::EmptyResourceUnion::Tag::Invalid:
+      return ZX_OK;
+    default:
+      new (&result->unknown_data_) decltype(unknown_data_);
+      return ::fidl::Clone(unknown_data_, &result->unknown_data_);
+      return ZX_OK;
+  }
+}
+EmptyResourceUnion& EmptyResourceUnion::SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes, std::vector<zx::handle> handles) {
+  EnsureStorageInitialized(ordinal);
+  unknown_data_.bytes = std::move(bytes);
+  unknown_data_.handles = std::move(handles);
+  return *this;
+}
+
+void EmptyResourceUnion::Destroy() {
+  switch (tag_) {
+    case static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid):
+      break;
+    default:
+      unknown_data_.~decltype(unknown_data_)();
+      break;
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid);
+}
+
+void EmptyResourceUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid):
+        break;
+      default:
+        new (&unknown_data_) decltype(unknown_data_);
+        break;
+    }
+  }
+}
+
+#endif  // __Fuchsia__
+
 //
 // Proxies and stubs definitions
 //

@@ -30,6 +30,12 @@ class UnionWithHandle;
 
 class HandlesInTypes;
 
+class EmptyResourceStruct;
+
+class EmptyResourceTable;
+
+class EmptyResourceUnion;
+
 #ifdef __Fuchsia__
 
 class TableWithHandle final {
@@ -251,6 +257,159 @@ using HandlesInTypesPtr = ::std::unique_ptr<HandlesInTypes>;
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+class EmptyResourceStruct final {
+ public:
+  static const fidl_type_t* FidlType;
+
+  uint8_t __reserved = 0u;
+
+  static inline ::std::unique_ptr<EmptyResourceStruct> New() { return ::std::make_unique<EmptyResourceStruct>(); }
+
+  void Encode(::fidl::Encoder* _encoder, size_t _offset,
+              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+  static void Decode(::fidl::Decoder* _decoder, EmptyResourceStruct* value, size_t _offset);
+  zx_status_t Clone(EmptyResourceStruct* result) const;
+};
+
+inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceStruct& _value,
+                         ::test::handlesintypes::EmptyResourceStruct* _result) {
+  return _value.Clone(_result);
+}
+
+using EmptyResourceStructPtr = ::std::unique_ptr<EmptyResourceStruct>;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+class EmptyResourceTable final {
+ public:
+  static const fidl_type_t* FidlType;
+  /// Returns whether no field is set.
+  bool IsEmpty() const;
+
+  EmptyResourceTable();
+  EmptyResourceTable(EmptyResourceTable&& other);
+  ~EmptyResourceTable();
+  EmptyResourceTable& operator=(EmptyResourceTable&& other);
+
+  static inline ::std::unique_ptr<EmptyResourceTable> New() { return ::std::make_unique<EmptyResourceTable>(); }
+
+  void Encode(::fidl::Encoder* _encoder, size_t _offset,
+              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+  static void Decode(::fidl::Decoder* _decoder, EmptyResourceTable* _value, size_t _offset);
+  zx_status_t Clone(EmptyResourceTable* _result) const;
+
+ private:
+  template <class T, class... Args>
+  void Construct(T* p, Args&&... args) {
+    new (p) T(std::forward<Args>(args)...);
+  }
+
+  template <class T>
+  void Destruct(T* p) {
+    p->~T();
+  }
+
+  size_t MaxOrdinal() const {
+    return static_cast<size_t>(field_presence_.MaxSetIndex()) + std::size_t{1};
+  }
+
+  static bool IsOrdinalKnown(uint64_t ordinal) {
+    switch (ordinal) {
+      return true;
+      default:
+        return false;
+    }
+  }
+
+  ::fidl::internal::BitSet<0> field_presence_;
+};
+
+using EmptyResourceTablePtr = ::std::unique_ptr<EmptyResourceTable>;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+class EmptyResourceUnion final {
+ public:
+  static const fidl_type_t* FidlType;
+
+  EmptyResourceUnion();
+  ~EmptyResourceUnion();
+
+  EmptyResourceUnion(EmptyResourceUnion&&);
+  EmptyResourceUnion& operator=(EmptyResourceUnion&&);
+
+  enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
+    kUnknown = 0,
+
+    Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
+  };
+
+  static inline ::std::unique_ptr<EmptyResourceUnion> New() { return ::std::make_unique<EmptyResourceUnion>(); }
+
+  void Encode(::fidl::Encoder* encoder, size_t offset,
+              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+  static void Decode(::fidl::Decoder* _decoder, EmptyResourceUnion* value, size_t offset);
+  zx_status_t Clone(EmptyResourceUnion* result) const;
+
+  bool has_invalid_tag() const {
+    return tag_ == Invalid;
+  }
+  EmptyResourceUnion& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes, std::vector<zx::handle> handles);
+
+  ::test::handlesintypes::EmptyResourceUnion::Tag Which() const {
+    switch (tag_) {
+      case ::test::handlesintypes::EmptyResourceUnion::Tag::Invalid:
+        return ::test::handlesintypes::EmptyResourceUnion::Tag(tag_);
+      default:
+        return ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown;
+    }
+  }
+
+  // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
+  // access to the raw integral ordinal value.
+  fidl_xunion_tag_t Ordinal() const {
+    return tag_;
+  }
+  const std::vector<uint8_t>* UnknownBytes() const {
+    if (Which() != ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown) {
+      return nullptr;
+    }
+    return &unknown_data_.bytes;
+  }
+  const std::vector<zx::handle>* UnknownHandles() const {
+    if (Which() != ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown) {
+      return nullptr;
+    }
+    return &unknown_data_.handles;
+  }
+
+  friend ::fidl::Equality<::test::handlesintypes::EmptyResourceUnion>;
+
+ private:
+  void Destroy();
+  void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
+
+  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid);
+  union {
+    ::fidl::UnknownData unknown_data_;
+  };
+};
+
+inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceUnion& value,
+                         ::test::handlesintypes::EmptyResourceUnion* result) {
+  return value.Clone(result);
+}
+
+using EmptyResourceUnionPtr = ::std::unique_ptr<EmptyResourceUnion>;
+
+#endif  // __Fuchsia__
+
 }  // namespace handlesintypes
 }  // namespace test
 namespace fidl {
@@ -410,6 +569,109 @@ struct Equality<::test::handlesintypes::HandlesInTypes> {
       return false;
     }
     return true;
+  }
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct CodingTraits<::test::handlesintypes::EmptyResourceStruct>
+    : public EncodableCodingTraits<::test::handlesintypes::EmptyResourceStruct, 1> {};
+
+template <>
+struct IsMemcpyCompatible<::test::handlesintypes::EmptyResourceStruct> : public internal::BoolConstant<
+                                                                             !HasPadding<::test::handlesintypes::EmptyResourceStruct>::value && IsMemcpyCompatible<uint8_t>::value> {};
+
+inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceStruct& value,
+                         ::test::handlesintypes::EmptyResourceStruct* result) {
+  return ::test::handlesintypes::Clone(value, result);
+}
+
+template <>
+struct Equality<::test::handlesintypes::EmptyResourceStruct> {
+  bool operator()(const ::test::handlesintypes::EmptyResourceStruct& _lhs, const ::test::handlesintypes::EmptyResourceStruct& _rhs) const {
+    if (!::fidl::Equals(_lhs.__reserved, _rhs.__reserved)) {
+      return false;
+    }
+    return true;
+  }
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct CodingTraits<::test::handlesintypes::EmptyResourceTable>
+    : public EncodableCodingTraits<::test::handlesintypes::EmptyResourceTable, 16> {};
+
+inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceTable& _value,
+                         ::test::handlesintypes::EmptyResourceTable* result) {
+  return _value.Clone(result);
+}
+template <>
+struct Equality<::test::handlesintypes::EmptyResourceTable> {
+  bool operator()(const ::test::handlesintypes::EmptyResourceTable& _lhs, const ::test::handlesintypes::EmptyResourceTable& _rhs) const {
+    return true;
+  }
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct IsFidlXUnion<::test::handlesintypes::EmptyResourceUnion> : public std::true_type {};
+
+template <>
+struct CodingTraits<::test::handlesintypes::EmptyResourceUnion>
+    : public EncodableCodingTraits<::test::handlesintypes::EmptyResourceUnion, 16> {};
+
+template <>
+struct CodingTraits<std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>> {
+  static constexpr size_t inline_size_v2 = 16;
+
+  static void Encode(Encoder* encoder, std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>* value, size_t offset,
+                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+    auto&& p_xunion = *value;
+    if (p_xunion) {
+      p_xunion->Encode(encoder, offset);
+    }
+  }
+
+  static void Decode(Decoder* _decoder, std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>* value, size_t offset) {
+    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    if (encoded->tag == 0) {
+      value->reset(nullptr);
+      return;
+    }
+
+    value->reset(new ::test::handlesintypes::EmptyResourceUnion);
+
+    ::test::handlesintypes::EmptyResourceUnion::Decode(_decoder, value->get(), offset);
+  }
+};
+
+inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceUnion& value,
+                         ::test::handlesintypes::EmptyResourceUnion* result) {
+  return ::test::handlesintypes::Clone(value, result);
+}
+
+template <>
+struct Equality<::test::handlesintypes::EmptyResourceUnion> {
+  bool operator()(const ::test::handlesintypes::EmptyResourceUnion& _lhs, const ::test::handlesintypes::EmptyResourceUnion& _rhs) const {
+    if (_lhs.Ordinal() != _rhs.Ordinal()) {
+      return false;
+    }
+
+    switch (_lhs.Ordinal()) {
+      case static_cast<fidl_xunion_tag_t>(::test::handlesintypes::EmptyResourceUnion::Tag::Invalid):
+        return true;
+      default:
+        return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
+    }
   }
 };
 

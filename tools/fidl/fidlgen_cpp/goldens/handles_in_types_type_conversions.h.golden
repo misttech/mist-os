@@ -46,6 +46,25 @@ struct WireTypeForNaturalType<::test_handlesintypes::HandlesInTypes> {
 #ifdef __Fuchsia__
 
 template <>
+struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceStruct, ::test_handlesintypes::EmptyResourceStruct> {
+  static ::test_handlesintypes::EmptyResourceStruct ToNatural(::test_handlesintypes::wire::EmptyResourceStruct src);
+  static ::test_handlesintypes::wire::EmptyResourceStruct ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceStruct src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_handlesintypes::wire::EmptyResourceStruct> {
+  using type = ::test_handlesintypes::EmptyResourceStruct;
+};
+template <>
+struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceStruct> {
+  using type = ::test_handlesintypes::wire::EmptyResourceStruct;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::TableWithHandle, ::test_handlesintypes::TableWithHandle> {
   static ::test_handlesintypes::TableWithHandle ToNatural(::test_handlesintypes::wire::TableWithHandle src);
   static ::test_handlesintypes::wire::TableWithHandle ToWire(fidl::AnyArena& arena, ::test_handlesintypes::TableWithHandle src);
@@ -58,6 +77,25 @@ struct NaturalTypeForWireType<::test_handlesintypes::wire::TableWithHandle> {
 template <>
 struct WireTypeForNaturalType<::test_handlesintypes::TableWithHandle> {
   using type = ::test_handlesintypes::wire::TableWithHandle;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceTable, ::test_handlesintypes::EmptyResourceTable> {
+  static ::test_handlesintypes::EmptyResourceTable ToNatural(::test_handlesintypes::wire::EmptyResourceTable src);
+  static ::test_handlesintypes::wire::EmptyResourceTable ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceTable src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_handlesintypes::wire::EmptyResourceTable> {
+  using type = ::test_handlesintypes::EmptyResourceTable;
+};
+template <>
+struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceTable> {
+  using type = ::test_handlesintypes::wire::EmptyResourceTable;
 };
 
 #endif  // __Fuchsia__
@@ -83,6 +121,31 @@ struct NaturalTypeForWireType<::test_handlesintypes::wire::UnionWithHandle> {
 template <>
 struct WireTypeForNaturalType<::test_handlesintypes::UnionWithHandle> {
   using type = ::test_handlesintypes::wire::UnionWithHandle;
+};
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceUnion, ::test_handlesintypes::EmptyResourceUnion> {
+  static ::test_handlesintypes::EmptyResourceUnion ToNatural(::test_handlesintypes::wire::EmptyResourceUnion src);
+  static ::test_handlesintypes::wire::EmptyResourceUnion ToWire(fidl::AnyArena& arena, ::test_handlesintypes::EmptyResourceUnion src);
+};
+
+template <>
+struct WireNaturalConversionTraits<::fidl::WireOptional<::test_handlesintypes::wire::EmptyResourceUnion>, std::unique_ptr<::test_handlesintypes::EmptyResourceUnion>> {
+  static std::unique_ptr<::test_handlesintypes::EmptyResourceUnion> ToNatural(::fidl::WireOptional<::test_handlesintypes::wire::EmptyResourceUnion> src);
+  static ::fidl::WireOptional<::test_handlesintypes::wire::EmptyResourceUnion> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_handlesintypes::EmptyResourceUnion> src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_handlesintypes::wire::EmptyResourceUnion> {
+  using type = ::test_handlesintypes::EmptyResourceUnion;
+};
+template <>
+struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceUnion> {
+  using type = ::test_handlesintypes::wire::EmptyResourceUnion;
 };
 
 #endif  // __Fuchsia__

@@ -98,7 +98,7 @@ fidl_struct! {
 {{- range .DocComments}}
 ///{{ . }}
 {{- end}}
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+{{ .Derives }}
 pub struct {{ .Name }};
 
 impl fidl::encoding::TopLevel for {{ .Name }} {}

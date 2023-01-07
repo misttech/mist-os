@@ -67,6 +67,62 @@ fidl_enum! {
 }
 
 #[derive(Debug)]
+pub enum EmptyResourceUnion {
+    #[deprecated = "Use `EmptyResourceUnion::unknown()` to construct and `EmptyResourceUnionUnknown!()` to exhaustively match."]
+    #[doc(hidden)]
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
+}
+/// Pattern that matches an unknown `EmptyResourceUnion` member.
+#[macro_export]
+macro_rules! EmptyResourceUnionUnknown {
+    () => {
+        _
+    };
+}
+
+// Custom PartialEq so that unknown variants are not equal to themselves.
+impl PartialEq for EmptyResourceUnion {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            _ => false,
+        }
+    }
+}
+
+impl EmptyResourceUnion {
+    #[inline]
+    pub fn ordinal(&self) -> u64 {
+        match *self {
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
+        }
+    }
+    #[inline]
+    pub fn unknown_variant_for_testing() -> Self {
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
+    }
+
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
+        }
+    }
+}
+
+impl fidl::encoding::TopLevel for EmptyResourceUnion {}
+
+fidl_union! {
+    name: EmptyResourceUnion,
+    members: [
+    ],
+    unknown_member: __Unknown,
+}
+
+#[derive(Debug)]
 pub enum UnionWithHandle {
     H(fidl::Vmo),
     #[deprecated = "Use `UnionWithHandle::unknown()` to construct and `UnionWithHandleUnknown!()` to exhaustively match."]
@@ -135,6 +191,13 @@ fidl_union! {
     ],
     unknown_member: __Unknown,
 }
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmptyResourceStruct;
+
+impl fidl::encoding::TopLevel for EmptyResourceStruct {}
+
+fidl_empty_struct!(EmptyResourceStruct);
 
 #[derive(Debug, PartialEq)]
 pub struct HandlesInTypes {
@@ -224,6 +287,27 @@ fidl_struct! {
     size_v2: 96,
     align_v1: 8,
     align_v2: 8,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct EmptyResourceTable {
+    #[deprecated = "Use `..EmptyResourceTable::EMPTY` to construct and `..` to match."]
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl EmptyResourceTable {
+    /// An empty table with every field set to `None`.
+    #[allow(deprecated)]
+    pub const EMPTY: Self = Self { __non_exhaustive: () };
+}
+
+impl fidl::encoding::TopLevel for EmptyResourceTable {}
+
+fidl_table! {
+    name: EmptyResourceTable,
+    members: [
+    ],
 }
 
 #[derive(Debug, PartialEq)]

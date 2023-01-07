@@ -5,6 +5,15 @@
 
 include <test/handlesintypes/c/fidl.h>
 test_handlesintypes_obj_type = test_handlesintypes_obj_type_NONE, test_handlesintypes_obj_type_VMO
+test_handlesintypes_EmptyResourceStructInLine {
+    padding int8
+} [packed]
+test_handlesintypes_EmptyResourceStructOutOfLine {
+    void void
+} [packed]
+test_handlesintypes_EmptyResourceStructHandles {
+    void void
+} [packed]
 test_handlesintypes_HandlesInTypesInLine {
     normal_handle flags[fidl_handle_presence, int32]
     handle_in_vecInLine fidl_vector
@@ -23,6 +32,14 @@ test_handlesintypes_HandlesInTypesHandles {
     handle_in_arrayHandles array[zx_vmo, 5]
     handle_in_mixed_vec_array array[array[zx_vmo, 5]]
 } [packed]
+test_handlesintypes_EmptyResourceUnionInLine [
+]
+test_handlesintypes_EmptyResourceUnionOutOfLine [
+    void void
+][varlen]
+test_handlesintypes_EmptyResourceUnionHandles [
+    void void
+][varlen]
 test_handlesintypes_UnionWithHandleInLine [
     h fidl_union_member[1, flags[fidl_handle_presence, int32]]
 ]

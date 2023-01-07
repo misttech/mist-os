@@ -23,6 +23,18 @@ template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::HandlesInTypes> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::HandlesInTypes& value);
 };
+template <>
+struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceStruct> {
+  static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceTable> {
+  static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value);
+};
 
 namespace test_handlesintypes {
 
@@ -33,5 +45,11 @@ std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::TableWit
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::UnionWithHandle& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::HandlesInTypes& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value);
 
 }  // namespace test_handlesintypes

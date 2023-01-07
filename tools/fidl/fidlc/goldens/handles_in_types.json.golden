@@ -140,6 +140,40 @@
   "service_declarations": [],
   "struct_declarations": [
     {
+      "name": "test.handlesintypes/EmptyResourceStruct",
+      "naming_context": [
+        "EmptyResourceStruct"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "line": 36,
+        "column": 6,
+        "length": 19
+      },
+      "members": [],
+      "resource": true,
+      "type_shape_v1": {
+        "inline_size": 1,
+        "alignment": 1,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 1,
+        "alignment": 1,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
       "name": "test.handlesintypes/HandlesInTypes",
       "naming_context": [
         "HandlesInTypes"
@@ -538,6 +572,41 @@
   "external_struct_declarations": [],
   "table_declarations": [
     {
+      "name": "test.handlesintypes/EmptyResourceTable",
+      "naming_context": [
+        "EmptyResourceTable"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "line": 37,
+        "column": 6,
+        "length": 18
+      },
+      "members": [],
+      "strict": false,
+      "resource": true,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      }
+    },
+    {
       "name": "test.handlesintypes/TableWithHandle",
       "naming_context": [
         "TableWithHandle"
@@ -614,6 +683,74 @@
     }
   ],
   "union_declarations": [
+    {
+      "name": "test.handlesintypes/EmptyResourceUnion",
+      "naming_context": [
+        "EmptyResourceUnion"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "line": 41,
+        "column": 6,
+        "length": 18
+      },
+      "maybe_attributes": [
+        {
+          "name": "bindings_denylist",
+          "arguments": [
+            {
+              "name": "value",
+              "type": "string",
+              "value": {
+                "kind": "literal",
+                "value": "libfuzzer",
+                "expression": "\"libfuzzer\"",
+                "literal": {
+                  "kind": "string",
+                  "value": "libfuzzer",
+                  "expression": "\"libfuzzer\""
+                }
+              },
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+                "line": 40,
+                "column": 20,
+                "length": 11
+              }
+            }
+          ],
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+            "line": 40,
+            "column": 1,
+            "length": 31
+          }
+        }
+      ],
+      "members": [],
+      "strict": false,
+      "resource": true,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      }
+    },
     {
       "name": "test.handlesintypes/UnionWithHandle",
       "naming_context": [
@@ -697,13 +834,19 @@
     "test.handlesintypes/handle",
     "test.handlesintypes/UnionWithHandle",
     "test.handlesintypes/TableWithHandle",
-    "test.handlesintypes/HandlesInTypes"
+    "test.handlesintypes/HandlesInTypes",
+    "test.handlesintypes/EmptyResourceUnion",
+    "test.handlesintypes/EmptyResourceTable",
+    "test.handlesintypes/EmptyResourceStruct"
   ],
   "declarations": {
     "test.handlesintypes/obj_type": "enum",
     "test.handlesintypes/handle": "experimental_resource",
+    "test.handlesintypes/EmptyResourceStruct": "struct",
     "test.handlesintypes/HandlesInTypes": "struct",
+    "test.handlesintypes/EmptyResourceTable": "table",
     "test.handlesintypes/TableWithHandle": "table",
+    "test.handlesintypes/EmptyResourceUnion": "union",
     "test.handlesintypes/UnionWithHandle": "union"
   }
 }

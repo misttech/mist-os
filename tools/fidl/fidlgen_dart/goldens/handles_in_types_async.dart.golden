@@ -85,6 +85,61 @@ const $fidl.EnumType<ObjType> kobj_type_Type = $fidl.EnumType<ObjType>(
     values: {0x0: null, 0x3: null},
     ctor: ObjType._ctor);
 
+enum EmptyResourceUnionTag {
+  $unknown,
+}
+
+const Map<int, EmptyResourceUnionTag> _EmptyResourceUnionTag_map = {};
+
+class EmptyResourceUnion extends $fidl.Union {
+  const EmptyResourceUnion.with$UnknownData(
+      this._ordinal, $fidl.UnknownRawData data)
+      : _data = data;
+
+  EmptyResourceUnion._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  EmptyResourceUnionTag get $tag =>
+      _EmptyResourceUnionTag_map[_ordinal] ?? EmptyResourceUnionTag.$unknown;
+
+  $fidl.UnknownRawData? get $unknownData {
+    return _data;
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static EmptyResourceUnion _ctor(int ordinal, Object data) {
+    return EmptyResourceUnion._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<EmptyResourceUnion> kEmptyResourceUnion_Type =
+    $fidl.UnionType<EmptyResourceUnion>(
+  members: <int, $fidl.FidlType>{},
+  ctor: EmptyResourceUnion._ctor,
+  flexible: true,
+  resource: true,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<EmptyResourceUnion> kEmptyResourceUnion_OptType =
+    $fidl.NullableUnionType<EmptyResourceUnion>(
+  members: <int, $fidl.FidlType>{},
+  ctor: EmptyResourceUnion._ctor,
+  flexible: true,
+  resource: true,
+);
+
 enum UnionWithHandleTag {
   $unknown,
   h, // 0x1
@@ -161,6 +216,58 @@ const $fidl.NullableUnionType<UnionWithHandle> kUnionWithHandle_OptType =
   flexible: true,
   resource: true,
 );
+
+class EmptyResourceStruct extends $fidl.Struct {
+  const EmptyResourceStruct({
+    this.reserved = 0x0,
+  });
+  EmptyResourceStruct.clone(
+    EmptyResourceStruct $orig, {
+    int? reserved,
+  }) : this(
+          reserved: reserved ?? $orig.reserved,
+        );
+
+  EmptyResourceStruct $cloneWith({
+    int? reserved,
+  }) {
+    return EmptyResourceStruct(
+      reserved: reserved ?? this.reserved,
+    );
+  }
+
+  final int reserved;
+
+  @override
+  List<Object?> get $fields {
+    return <Object?>[
+      reserved,
+    ];
+  }
+
+  static const $fieldType0 = $fidl.Uint8Type();
+
+  @override
+  void $encode($fidl.Encoder $encoder, int $offset, int $depth) {
+    $fieldType0.encode($encoder, reserved, $offset + 0, $depth);
+  }
+
+  static EmptyResourceStruct _structDecode(
+      $fidl.Decoder $decoder, int $offset, int $depth) {
+    switch ($decoder.wireFormat) {
+      case $fidl.WireFormat.v2:
+        $decoder.checkPadding($offset + 0, 1);
+        return EmptyResourceStruct(
+            reserved: $fieldType0.decode($decoder, $offset + 0, $depth));
+    }
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.StructType<EmptyResourceStruct> kEmptyResourceStruct_Type =
+    $fidl.StructType<EmptyResourceStruct>(
+        inlineSize: 1, structDecode: EmptyResourceStruct._structDecode);
 
 class HandlesInTypes extends $fidl.Struct {
   const HandlesInTypes({
@@ -278,6 +385,51 @@ class HandlesInTypes extends $fidl.Struct {
 const $fidl.StructType<HandlesInTypes> kHandlesInTypes_Type =
     $fidl.StructType<HandlesInTypes>(
         inlineSize: 96, structDecode: HandlesInTypes._structDecode);
+
+class EmptyResourceTable extends $fidl.Table {
+  const EmptyResourceTable({
+    this.$unknownData,
+  });
+
+  EmptyResourceTable._(Map<int, dynamic> argv, this.$unknownData);
+
+  EmptyResourceTable $cloneWith({
+    $fidl.OptionalNullable<Map<int, $fidl.UnknownRawData>> $unknownData =
+        const $fidl.OptionalNullable.undefined(),
+  }) {
+    return EmptyResourceTable();
+  }
+
+  @override
+  final Map<int, $fidl.UnknownRawData>? $unknownData;
+
+  @override
+  dynamic $field(int index) {
+    switch (index) {
+      
+    }
+    return null;
+  }
+
+  @override
+  Map<int, dynamic> get $fields {
+    return {};
+  }
+
+  static EmptyResourceTable _ctor(Map<int, dynamic> argv,
+          [Map<int, $fidl.UnknownRawData>? unknownData]) =>
+      EmptyResourceTable._(argv, unknownData);
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.TableType<EmptyResourceTable> kEmptyResourceTable_Type =
+    $fidl.TableType<EmptyResourceTable>(
+  inlineSize: 16,
+  members: [],
+  ctor: EmptyResourceTable._ctor,
+  resource: true,
+);
 
 class TableWithHandle extends $fidl.Table {
   const TableWithHandle({

@@ -23,6 +23,12 @@ void ::test_handlesintypes::wire::HandlesInTypes::_CloseHandles() {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+void ::test_handlesintypes::wire::EmptyResourceStruct::_CloseHandles() {
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 auto ::test_handlesintypes::wire::UnionWithHandle::Which() const -> ::test_handlesintypes::wire::UnionWithHandle::Tag {
   ZX_ASSERT(!has_invalid_tag());
@@ -75,6 +81,42 @@ void ::test_handlesintypes::wire::UnionWithHandle::_CloseHandles() {
 
 #ifdef __Fuchsia__
 
+auto ::test_handlesintypes::wire::EmptyResourceUnion::Which() const -> ::test_handlesintypes::wire::EmptyResourceUnion::Tag {
+  ZX_ASSERT(!has_invalid_tag());
+  return ::test_handlesintypes::wire::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+}
+
+void ::test_handlesintypes::wire::EmptyResourceUnion::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(EmptyResourceUnion) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(EmptyResourceUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(EmptyResourceUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+::test_handlesintypes::wire::EmptyResourceUnion::~EmptyResourceUnion() {
+  switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+void ::test_handlesintypes::wire::EmptyResourceUnion::_Move(EmptyResourceUnion&& other) {
+  ordinal_ = other.ordinal_;
+  switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+void ::test_handlesintypes::wire::EmptyResourceUnion::_CloseHandles() {
+  switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 bool ::fidl::WireTableFrame<::test_handlesintypes::wire::TableWithHandle>::HasUnknownData() const {
   return false;
 }
@@ -101,6 +143,32 @@ void ::test_handlesintypes::wire::TableWithHandle::_CloseHandles() {
   if (has_h()) {
     h().reset();
   }
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+bool ::fidl::WireTableFrame<::test_handlesintypes::wire::EmptyResourceTable>::HasUnknownData() const {
+  return false;
+}
+
+uint64_t fidl::WireTableFrame<::test_handlesintypes::wire::EmptyResourceTable>::ComputeMaxOrdinal() const {
+  uint64_t max_ordinal = 0;
+  return max_ordinal;
+}
+
+bool ::test_handlesintypes::wire::EmptyResourceTable::HasUnknownData() const {
+  if (max_ordinal_ > 0) {
+    return true;
+  }
+  if (frame_ptr_ == nullptr) {
+    return false;
+  }
+  return frame_ptr_->HasUnknownData();
+}
+
+void ::test_handlesintypes::wire::EmptyResourceTable::_CloseHandles() {
 }
 
 #endif  // __Fuchsia__

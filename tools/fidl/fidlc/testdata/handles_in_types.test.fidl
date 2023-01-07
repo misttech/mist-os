@@ -32,3 +32,10 @@ type HandlesInTypes = resource struct {
     table_with_handle TableWithHandle;
     union_with_handle UnionWithHandle;
 };
+
+type EmptyResourceStruct = resource struct {};
+type EmptyResourceTable = resource table {};
+
+// TODO(fxbug.dev/118943): Support empty flexible unions in libfuzzer.
+@bindings_denylist("libfuzzer")
+type EmptyResourceUnion = flexible resource union {};

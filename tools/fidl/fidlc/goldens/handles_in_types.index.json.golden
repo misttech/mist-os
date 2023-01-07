@@ -57,6 +57,18 @@
   "unions": [
     {
       "is_anonymous": false,
+      "identifier": "test.handlesintypes/EmptyResourceUnion",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "data": "EmptyResourceUnion",
+        "start_offset": 993,
+        "end_offset": 1011
+      },
+      "members": []
+    },
+    {
+      "is_anonymous": false,
       "identifier": "test.handlesintypes/UnionWithHandle",
       "location": {
         "is_virtual": false,
@@ -86,6 +98,18 @@
   "tables": [
     {
       "is_anonymous": false,
+      "identifier": "test.handlesintypes/EmptyResourceTable",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "data": "EmptyResourceTable",
+        "start_offset": 844,
+        "end_offset": 862
+      },
+      "members": []
+    },
+    {
+      "is_anonymous": false,
       "identifier": "test.handlesintypes/TableWithHandle",
       "location": {
         "is_virtual": false,
@@ -113,6 +137,18 @@
     }
   ],
   "structs": [
+    {
+      "is_anonymous": false,
+      "identifier": "test.handlesintypes/EmptyResourceStruct",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
+        "data": "EmptyResourceStruct",
+        "start_offset": 797,
+        "end_offset": 816
+      },
+      "members": []
+    },
     {
       "is_anonymous": false,
       "identifier": "test.handlesintypes/HandlesInTypes",
