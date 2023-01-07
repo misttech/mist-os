@@ -30,6 +30,7 @@ config("testing_config") {
 # Tests to make sure our utilities are working as expected.
 test("efi_testing_test") {
   sources = [
+    "efi_guid_test.cc",
     "fake_disk_io_protocol_test.cc",
     "stub_boot_services_test.cc",
   ]

@@ -79,10 +79,6 @@ bool AddMemoryRanges(void* zbi, size_t capacity) {
   return true;
 }
 
-bool operator==(const efi_guid& l, const efi_guid& r) {
-  return memcmp(&l, &r, sizeof(efi_guid)) == 0;
-}
-
 bool AppendAcpiRsdp(zbi_header_t* image, size_t capacity) {
   acpi_rsdp_t const* rsdp = nullptr;
   cpp20::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
