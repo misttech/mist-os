@@ -220,7 +220,7 @@ mod tests {
         lazy_static::lazy_static,
         moniker::AbsoluteMonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
-        routing::resolving::{ComponentAddressKind, ComponentResolutionContext},
+        routing::resolving::{ComponentAddress, ComponentResolutionContext},
         serde_json::json,
         std::sync::{Mutex, Weak},
     };
@@ -579,7 +579,7 @@ mod tests {
 
         let abs =
             ComponentAddress::from("fuchsia-pkg://fuchsia.com/package#meta/comp.cm", &root).await?;
-        assert_matches!(abs.kind(), ComponentAddressKind::Absolute { .. });
+        assert_matches!(abs, ComponentAddress::Absolute { .. });
         assert_eq!(abs.scheme(), "fuchsia-pkg");
         assert_eq!(abs.path(), "/package");
         assert_eq!(abs.resource(), Some("meta/comp.cm"));
@@ -634,7 +634,7 @@ mod tests {
         );
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
-        assert_matches!(relpath.kind(), ComponentAddressKind::RelativePath { .. });
+        assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
         assert_eq!(
@@ -705,7 +705,7 @@ mod tests {
         );
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
-        assert_matches!(relpath.kind(), ComponentAddressKind::RelativePath { .. });
+        assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
         assert_eq!(
@@ -764,7 +764,7 @@ mod tests {
         );
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
-        assert_matches!(relpath.kind(), ComponentAddressKind::RelativePath { .. });
+        assert_matches!(relpath, ComponentAddress::RelativePath { .. });
         assert_eq!(relpath.path(), "subpackage");
         assert_eq!(relpath.resource(), Some("meta/subcomp.cm"));
         assert_eq!(
