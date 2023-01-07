@@ -833,8 +833,10 @@ group("serde_repr") {
   public_deps = [ ":serde_repr-v0_1_7($host_toolchain)" ]
 }
 
-group("serde_yaml") {
-  public_deps = [ ":serde_yaml-v0_8_23" ]
+if (!(current_os == "fuchsia")) {
+  group("serde_yaml") {
+    public_deps = [ ":serde_yaml-v0_9_14" ]
+  }
 }
 
 if (!(current_os == "fuchsia")) {
@@ -5340,6 +5342,7 @@ rust_library("indexmap-v1_9_2") {
     "-Cextra-filename=-48d3353175399349",
     "--cfg=feature=\"serde\"",
     "--cfg=feature=\"serde-1\"",
+    "--cfg=feature=\"std\"",
     "--cfg=has_std",
   ]
 
@@ -9954,25 +9957,26 @@ rust_proc_macro("serde_repr-v0_1_7") {
   visibility = [ ":*" ]
 }
 
-rust_library("serde_yaml-v0_8_23") {
+rust_library("serde_yaml-v0_9_14") {
   crate_name = "serde_yaml"
-  crate_root = "//third_party/rust_crates/vendor/serde_yaml-0.8.23/src/lib.rs"
-  output_name = "serde_yaml-283f398247437007"
+  crate_root = "//third_party/rust_crates/vendor/serde_yaml-0.9.14/src/lib.rs"
+  output_name = "serde_yaml-ffc5fc40615e989"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":indexmap-v1_9_2" ]
+  deps += [ ":itoa-v1_0_2" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_147" ]
-  deps += [ ":yaml-rust-v0_4_5" ]
+  deps += [ ":unsafe-libyaml-v0_2_4" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=283f398247437007",
-    "-Cextra-filename=-283f398247437007",
+    "--edition=2021",
+    "-Cmetadata=ffc5fc40615e989",
+    "-Cextra-filename=-ffc5fc40615e989",
   ]
 
   visibility = [ ":*" ]
@@ -12091,6 +12095,27 @@ rust_library("universal-hash-v0_4_1") {
   visibility = [ ":*" ]
 }
 
+rust_library("unsafe-libyaml-v0_2_4") {
+  crate_name = "unsafe_libyaml"
+  crate_root =
+      "//third_party/rust_crates/vendor/unsafe-libyaml-0.2.4/src/lib.rs"
+  output_name = "unsafe_libyaml-6ca95d2df768fdf1"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=6ca95d2df768fdf1",
+    "-Cextra-filename=-6ca95d2df768fdf1",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("untrusted-v0_7_1") {
   crate_name = "untrusted"
   crate_root =
@@ -12882,27 +12907,6 @@ rust_library("xts-mode-v0_4_1") {
     "--edition=2018",
     "-Cmetadata=d1613781edf44aa",
     "-Cextra-filename=-d1613781edf44aa",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("yaml-rust-v0_4_5") {
-  crate_name = "yaml_rust"
-  crate_root = "//third_party/rust_crates/vendor/yaml-rust-0.4.5/src/lib.rs"
-  output_name = "yaml_rust-35f1e10c7571231"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":linked-hash-map-v0_5_3" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=35f1e10c7571231",
-    "-Cextra-filename=-35f1e10c7571231",
   ]
 
   visibility = [ ":*" ]
