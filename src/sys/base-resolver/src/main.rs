@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fuchsia_pkg::PackageName,
+    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_resolution as fresolution, fuchsia_pkg::PackageName,
 };
 
 mod base_resolver;
@@ -71,7 +71,7 @@ enum ResolverError {
     #[error("subpackage name was not found in the package's subpackage list")]
     SubpackageNotFound(#[source] anyhow::Error),
 
-    #[error("the subpackage hash was not found in the system base package index: {0}")]
+    #[error("the subpackage hash was not found in the system base package index")]
     SubpackageNotInBase(#[source] anyhow::Error),
 
     #[error("a package name cannot start with '{}'", PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES)]
@@ -85,6 +85,9 @@ enum ResolverError {
 
     #[error("internal error")]
     Internal,
+
+    #[error("failed to read abi revision")]
+    AbiRevision(#[source] fabi::AbiRevisionFileError),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
@@ -107,6 +110,7 @@ impl From<&ResolverError> for fresolution::ResolverError {
                 ferror::Internal
             }
             SubpackageNotInBase(_) | SubpackageNotFound(_) => ferror::PackageNotFound,
+            AbiRevision(_) => ferror::InvalidAbiRevision,
         }
     }
 }

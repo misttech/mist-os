@@ -5,7 +5,7 @@
 use {
     anyhow::{self, Context},
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::{
         self as fresolution, ResolverRequest, ResolverRequestStream,
     },
@@ -20,6 +20,7 @@ use {
     fuchsia_url::{ComponentUrl, PackageUrl},
     futures::prelude::*,
     tracing::*,
+    version_history::AbiRevision,
 };
 
 fn context_to_string(context: &fresolution::Context) -> String {
@@ -163,7 +164,9 @@ async fn resolve_component_async(
     } else {
         None
     };
-
+    let abi_revision = fabi::read_abi_revision_optional(&package.dir, AbiRevision::PATH)
+        .await
+        .map_err(crate::ResolverError::AbiRevision)?;
     let package_dir = ClientEnd::new(
         package.dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
     );
@@ -177,6 +180,7 @@ async fn resolve_component_async(
             ..fresolution::Package::EMPTY
         }),
         config_values,
+        abi_revision,
         ..fresolution::Component::EMPTY
     })
 }
@@ -539,6 +543,40 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn resolves_component_in_subpackage_with_unique_abi_revision() {
+        let parent_component_url = "fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm";
+        let subpackaged_component_url = SUBPACKAGE_NAME.to_string() + "#meta/subfoo.cm";
+
+        let subpackage_as_base_package_url: UnpinnedAbsolutePackageUrl =
+            "fuchsia-pkg://fuchsia.com/toplevel-subpackage".parse().unwrap();
+        let subpackage_blob_id = BlobId::parse(SUBPACKAGE_HASH).unwrap();
+        let index = hashmap! {
+            subpackage_as_base_package_url => subpackage_blob_id,
+        };
+        let base_package_index = BasePackageIndex::create_mock(index);
+
+        // Test ABI revision value of the top-level package component
+        let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
+        let parent_component =
+            resolve_component(parent_component_url, &packages_dir).await.unwrap();
+        assert_matches!(parent_component, fresolution::Component { abi_revision: Some(0), .. });
+
+        // Test ABI revision value of the sub-packaged component
+        let subpackaged_component = resolve_component_with_context(
+            &subpackaged_component_url,
+            &parent_component.resolution_context.unwrap(),
+            &packages_dir,
+            &base_package_index,
+        )
+        .await
+        .unwrap();
+        assert_matches!(
+            subpackaged_component,
+            fresolution::Component { abi_revision: Some(1), .. }
+        );
+    }
+
+    #[fuchsia::test]
     async fn fails_to_resolve_component_in_subpackage_not_in_base() {
         let parent_component_url = "fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm";
         let subpackaged_component_url = SUBPACKAGE_NAME.to_string() + "#meta/other_subfoo.cm";
@@ -702,6 +740,9 @@ mod tests {
                         &serde_json::to_vec(&subpackages).unwrap()
                     ),
                 },
+                "fuchsia.abi" => vfs::pseudo_directory! {
+                  "abi-revision" => vfs::file::vmo::read_only_static(0u64.to_le_bytes()),
+                },
                 "foo.cm" => vfs::file::vmo::asynchronous::read_only_const(&cm_bytes),
                 "foo-with-config.cm" => vfs::file::vmo::asynchronous::read_only_const(
                     &persist(
@@ -778,6 +819,9 @@ mod tests {
         vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {
                 "subfoo.cm" => vfs::file::vmo::asynchronous::read_only_const(&cm_bytes),
+                "fuchsia.abi" => vfs::pseudo_directory! {
+                  "abi-revision" => vfs::file::vmo::read_only_static(1u64.to_le_bytes()),
+                },
             }
         }
     }

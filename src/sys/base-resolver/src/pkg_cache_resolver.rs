@@ -5,7 +5,7 @@
 use {
     anyhow::{self, Context},
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::{
         self as fresolution, ResolverRequest, ResolverRequestStream,
     },
@@ -20,6 +20,7 @@ use {
         stream::{StreamExt as _, TryStreamExt as _},
     },
     tracing::error,
+    version_history::AbiRevision,
 };
 
 pub(crate) async fn main() -> anyhow::Result<()> {
@@ -153,7 +154,9 @@ async fn resolve_pkg_cache(
     } else {
         None
     };
-
+    let abi_revision = fabi::read_abi_revision_optional(&proxy, AbiRevision::PATH)
+        .await
+        .map_err(crate::ResolverError::AbiRevision)?;
     Ok(fresolution::Component {
         url: Some(fuchsia_pkg_cache_component_url().clone().into()),
         decl: Some(data),
@@ -168,6 +171,7 @@ async fn resolve_pkg_cache(
             ..fresolution::Package::EMPTY
         }),
         config_values,
+        abi_revision,
         ..fresolution::Component::EMPTY
     })
 }
@@ -220,6 +224,7 @@ mod tests {
         let () = additional_verifier(&component);
         assert_eq!(component.url.unwrap(), "fuchsia-pkg-cache:///#meta/pkg-cache.cm");
         assert_matches!(component.decl.unwrap(), fmem::Data::Buffer(_));
+        assert!(version_history::is_valid_abi_revision(component.abi_revision.unwrap().into()));
         assert_eq!(
             component.package.as_ref().unwrap().url.as_ref().unwrap(),
             "fuchsia-pkg-cache:///"
