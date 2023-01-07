@@ -5,35 +5,11 @@
 #ifndef SRC_PERFORMANCE_LIB_FXT_INCLUDE_LIB_FXT_INTERNED_STRING_H_
 #define SRC_PERFORMANCE_LIB_FXT_INCLUDE_LIB_FXT_INTERNED_STRING_H_
 
-#include <lib/special-sections/special-sections.h>
+#include <lib/fxt/section_symbols.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
 #include <atomic>
-
-namespace fxt {
-
-// Forward declaration.
-struct InternedString;
-
-}  // namespace fxt
-
-extern "C" {
-
-#if _KERNEL
-#define FXT_WEAK_SECTION_SYMBOL
-#else
-#define FXT_WEAK_SECTION_SYMBOL [[gnu::weak]]
-#endif
-
-// Symbols for the beginning and end of the interned string section. These symbols are always
-// provided by the kernel (see //zircon/kernel/kernel.ld), regardless of whether the section is
-// empty. However, in userspace an empty section does not generate the begin/end symbols. Avoid
-// linker errors by providing weak alternatives.
-extern const fxt::InternedString __start___fxt_interned_string_table FXT_WEAK_SECTION_SYMBOL[];
-extern const fxt::InternedString __stop___fxt_interned_string_table FXT_WEAK_SECTION_SYMBOL[];
-
-}  // extern "C"
 
 namespace fxt {
 
@@ -192,8 +168,21 @@ struct InternedString {
   inline static MapStringCallback map_string_callback_{nullptr};
 };
 
-// Linker section for the array of InternedString instances.
-#define FXT_INTERNED_STRING_SECTION SPECIAL_SECTION("__fxt_interned_string_table", InternedString)
+namespace internal {
+
+// Indirection to allow the literal operator below to be constexpr. Addresses of variables with
+// static storage druation are valid constant expressions, however, constexpr functions may not
+// directly declare local variables with static storage duration.
+template <char... chars>
+struct InternedStringStorage {
+  inline static const char storage[] = {chars..., '\0'};
+  inline static InternedString interned_string FXT_INTERNED_STRING_SECTION{storage};
+
+  // Since InternedString has mutable members it must not be placed in a read-only data section.
+  static_assert(!std::is_const_v<decltype(interned_string)>);
+};
+
+}  // namespace internal
 
 // String literal template operator that generates a unique InternedString instance for the given
 // string literal. Every invocation for a given string literal value returns the same InternedString
@@ -214,10 +203,9 @@ struct InternedString {
 //
 
 template <typename T, T... chars>
-inline const InternedString& operator""_intern() {
-  static const char storage[] = {chars..., '\0'};
-  static InternedString interned_string FXT_INTERNED_STRING_SECTION{storage};
-  return interned_string;
+constexpr const InternedString& operator""_intern() {
+  static_assert(std::is_same_v<T, char>);
+  return internal::InternedStringStorage<chars...>::interned_string;
 }
 
 }  // namespace fxt

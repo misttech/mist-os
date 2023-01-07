@@ -13,8 +13,10 @@ library_headers("headers") {
   headers = [
     "lib/fxt/argument.h",
     "lib/fxt/fields.h",
+    "lib/fxt/interned_category.h",
     "lib/fxt/interned_string.h",
     "lib/fxt/record_types.h",
+    "lib/fxt/section_symbols.h",
     "lib/fxt/serializer.h",
     "lib/fxt/string_ref.h",
     "lib/fxt/thread_ref.h",
@@ -53,6 +55,7 @@ executable("fxt_tests_app") {
   sources = [
     "deduction_tests.cc",
     "fields_tests.cc",
+    "interned_category_tests.cc",
     "interned_string_tests.cc",
     "serializer_test.cc",
   ]
