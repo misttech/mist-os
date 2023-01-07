@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
 use futures::ready;
 
-use crate::RWHandle;
+use crate::{OnSignals, RWHandle};
 
 /// An I/O object representing a `Channel`.
 pub struct Channel(RWHandle<zx::Channel>);
@@ -42,6 +42,11 @@ impl Channel {
     /// Tests to see if the channel received a OBJECT_PEER_CLOSED signal
     pub fn is_closed(&self) -> bool {
         self.0.is_closed()
+    }
+
+    /// Returns a future that completes when `is_closed()` is true.
+    pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
+        OnSignals::new(self, zx::Signals::CHANNEL_PEER_CLOSED)
     }
 
     /// Receives a message on the channel and registers this `Channel` as

@@ -7,7 +7,7 @@
 use {
     crate::{
         epitaph::ChannelEpitaphExt, AsHandleRef, AsyncChannel, Channel, Error, Handle, HandleBased,
-        HandleRef, ServeInner,
+        HandleRef, OnSignals, ServeInner,
     },
     fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
     futures::{self, Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt},
@@ -16,9 +16,6 @@ use {
     std::sync::Arc,
     tracing::error,
 };
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
 
 /// A marker for a particular FIDL protocol.
 ///
@@ -85,13 +82,8 @@ pub trait Proxy: Sized + Send + Sync {
 
     /// Returns a future that completes when the proxy receives the
     /// `PEER_CLOSED` signal.
-    fn on_closed<'a>(&'a self) -> fasync::OnSignals<'a> {
-        #[cfg(not(target_os = "fuchsia"))]
-        use fasync::emulated_handle::Signals;
-        #[cfg(target_os = "fuchsia")]
-        use zx::Signals;
-
-        fasync::OnSignals::new(self.as_channel(), Signals::CHANNEL_PEER_CLOSED)
+    fn on_closed<'a>(&'a self) -> OnSignals<'a> {
+        self.as_channel().on_closed()
     }
 }
 
