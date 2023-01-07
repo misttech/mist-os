@@ -446,24 +446,13 @@ zx_status_t KTraceState::AllocBuffer() {
   return ZX_OK;
 }
 
-zx::result<KTraceState::PendingCommit> KTraceState::Reserve(uint64_t header) {
-  uint32_t fxt_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
-  uint64_t* ptr = reinterpret_cast<uint64_t*>(ReserveRaw(fxt_words * sizeof(uint64_t)));
-  if (ptr == nullptr) {
-    DisableGroupMask();
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  return zx::ok(PendingCommit(ptr, header, this));
-}
+uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
+  const uint32_t num_bytes = num_words * sizeof(uint64_t);
 
-void* KTraceState::ReserveRaw(uint32_t num_bytes) {
   constexpr uint64_t kUncommitedRecordTag = 0;
-  auto Commit = [](void* ptr, uint64_t tag) -> void {
-    ktl::atomic_ref(*static_cast<uint64_t*>(ptr)).store(tag, ktl::memory_order_release);
+  auto Commit = [](uint64_t* ptr, uint64_t tag) -> void {
+    ktl::atomic_ref(*ptr).store(tag, ktl::memory_order_release);
   };
-
-  DEBUG_ASSERT(num_bytes >= sizeof(uint64_t));
-  DEBUG_ASSERT(num_bytes % sizeof(uint64_t) == 0);
 
   Guard<SpinLock, IrqSave> write_guard{&write_lock_};
   if (!bufsize_) {
@@ -482,7 +471,7 @@ void* KTraceState::ReserveRaw(uint32_t num_bytes) {
     // We have the space for this record.  Stash the tag with a sentinel value
     // of zero, indicating that there is a reservation here, but that the record
     // payload has not been fully committed yet.
-    void* ptr = buffer_ + wr_;
+    uint64_t* ptr = reinterpret_cast<uint64_t*>(buffer_ + wr_);
     Commit(ptr, kUncommitedRecordTag);
     wr_ += num_bytes;
     return ptr;
@@ -542,7 +531,7 @@ void* KTraceState::ReserveRaw(uint32_t num_bytes) {
       // for our entire record, go ahead and reserve the space now.  Otherwise,
       // stuff in a placeholder which fills all of the remaining contiguous
       // space in the buffer, then try the allocation again.
-      void* ptr = buffer_ + wr_offset;
+      uint64_t* ptr = reinterpret_cast<uint64_t*>(buffer_ + wr_offset);
       wr_ += to_reserve;
       if (num_bytes == to_reserve) {
         Commit(ptr, kUncommitedRecordTag);

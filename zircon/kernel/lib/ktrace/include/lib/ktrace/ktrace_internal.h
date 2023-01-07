@@ -97,39 +97,32 @@ class KTraceState {
 
   ssize_t ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) TA_EXCL(lock_, write_lock_);
 
-  // Write a record to the tracelog.
-  //
-  // |payload| must consist of all uint32_t or all uint64_t types.
-  template <typename... Args>
-  void WriteRecord(uint32_t effective_tag, uint64_t explicit_ts, Args... args);
-
-  inline uint32_t grpmask() const {
+  uint32_t grpmask() const {
     return static_cast<uint32_t>(grpmask_and_inflight_writes_.load(ktl::memory_order_acquire));
   }
 
-  // Check to see if a tag is currently enabled using either a new observation
-  // of the group mask (default), or a previous observation.
-  static inline bool tag_enabled(uint32_t tag, uint32_t mask) { return (mask & tag) != 0; }
+  bool tag_enabled(uint32_t tag) const { return (tag & grpmask()) != 0; }
 
-  inline bool tag_enabled(uint32_t tag) const { return tag_enabled(tag, grpmask()); }
+  uint32_t IncPendingWrite() {
+    const uint64_t previous_value =
+        grpmask_and_inflight_writes_.fetch_add(kInflightWritesInc, ktl::memory_order_acq_rel);
+    DEBUG_ASSERT((previous_value & kInflightWritesMask) != kInflightWritesMask);
+    return previous_value & ~kInflightWritesMask;
+  }
 
-  // A small helper class which should make it impossible to forget to commit a
-  // record after a successful reservation as well as implements an fxt serializer
+  void DecPendingWrite() {
+    [[maybe_unused]] uint64_t previous_value =
+        grpmask_and_inflight_writes_.fetch_sub(kInflightWritesInc, ktl::memory_order_release);
+    DEBUG_ASSERT((previous_value & kInflightWritesMask) > 0);
+  }
+
+  // A RAII that implements the FXT Writer protocol and automatically commits the record after a
+  // successful reservation.
   class PendingCommit {
    public:
-    // There are only two ways to make an instance of a PendingCommit.  Either
-    // via implicit conversion from nullptr (a failed reservation), or from a
-    // pointer to the start of the record, and a value for the tag which
-    // eventually must be committed.
-    PendingCommit(nullptr_t) {}
     PendingCommit(uint64_t* ptr, uint64_t header, KTraceState* ks)
-        : ptr_(ptr),
-          header_(header),
-          ks_(ks),
-          observed_grpmask_(
-              static_cast<uint32_t>(ks_->grpmask_and_inflight_writes_.fetch_add(
-                                        kInflightWritesInc, ktl::memory_order_acq_rel) &
-                                    ~kInflightWritesMask)) {}
+        : ptr_{ptr}, header_{header}, ks_{ks}, observed_grpmask_{ks_->IncPendingWrite()} {}
+
     // No copy.
     PendingCommit(const PendingCommit&) = delete;
     PendingCommit& operator=(const PendingCommit&) = delete;
@@ -150,41 +143,25 @@ class KTraceState {
     // Going out of scope is what triggers the commit.
     ~PendingCommit() {
       if (ptr_ != nullptr) {
-        ktl::atomic_ref(*static_cast<uint64_t*>(ptr_)).store(header_, ktl::memory_order_release);
-      }
-      if (ks_ != nullptr) {
-        [[maybe_unused]] uint64_t prev;
-        prev = ks_->grpmask_and_inflight_writes_.fetch_sub(kInflightWritesInc,
-                                                           ktl::memory_order_release);
-        DEBUG_ASSERT((prev & kInflightWritesMask) > 0);
+        ktl::atomic_ref(*ptr_).store(header_, ktl::memory_order_release);
+        ks_->DecPendingWrite();
       }
     }
 
-    // Users need access to the reserved pointer in order to fill out their
-    // record payload.
-    uint64_t* hdr() const { return static_cast<uint64_t*>(ptr_); }
-    bool is_valid() const { return (ptr_ != nullptr); }
-
     void WriteWord(uint64_t word) {
-      DEBUG_ASSERT(word_offset_ < (fxt::RecordFields::RecordSize::Get<size_t>(header_)));
-      *(ptr_ + word_offset_) = word;
+      ptr_[word_offset_] = word;
       word_offset_++;
     }
 
     void WriteBytes(const void* bytes, size_t num_bytes) {
-      size_t num_words = (num_bytes + 7) / 8;
-      DEBUG_ASSERT(word_offset_ + num_words <=
-                   (fxt::RecordFields::RecordSize::Get<size_t>(header_)));
+      const size_t num_words = (num_bytes + 7) / 8;
       // Write 0 to the last word to cover any padding bytes.
-      *(ptr_ + (word_offset_ + num_words - 1)) = 0;
-      memcpy(static_cast<void*>(ptr_ + word_offset_), bytes, num_bytes);
+      ptr_[word_offset_ + num_words - 1] = 0;
+      memcpy(&ptr_[word_offset_], bytes, num_bytes);
       word_offset_ += num_words;
     }
 
-    uint32_t observed_grpmask() const { return observed_grpmask_; }
-
-    void Commit() { /* Nothing, we commit in the destructor */
-    }
+    void Commit() {}
 
    private:
     size_t word_offset_{1};
@@ -196,16 +173,17 @@ class KTraceState {
 
   // Reserve enough bytes of contiguous space in the buffer to fit the FXT Record described by
   // `header`, if possible.
-  zx::result<PendingCommit> Reserve(uint64_t header);
+  zx::result<PendingCommit> Reserve(uint64_t header) {
+    uint64_t* const ptr = ReserveRaw(fxt::RecordFields::RecordSize::Get<uint32_t>(header));
+    if (ptr == nullptr) {
+      DisableGroupMask();
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    return zx::ok(PendingCommit(ptr, header, this));
+  }
 
  private:
   friend class ktrace_tests::TestKTraceState;
-
-  static inline uint32_t MakeTidField(uint32_t tag) {
-    return KTRACE_FLAGS(tag) & KTRACE_FLAGS_CPU
-               ? arch_curr_cpu_num()
-               : static_cast<uint32_t>(Thread::Current::Get()->tid());
-  }
 
   [[nodiscard]] zx_status_t RewindLocked() TA_REQ(lock_);
 
@@ -227,7 +205,7 @@ class KTraceState {
 
   // A small printf stand-in which gives tests the ability to disable diagnostic
   // printing during testing.
-  int DiagsPrintf(int level, const char* fmt, ...) __PRINTFLIKE(3, 4) {
+  int DiagsPrintf(int level, const char* fmt, ...) const __PRINTFLIKE(3, 4) {
     if (!disable_diags_printfs_ && DPRINTF_ENABLED_FOR_LEVEL(level)) {
       va_list args;
       va_start(args, fmt);
@@ -235,22 +213,21 @@ class KTraceState {
       va_end(args);
       return result;
     }
-
     return 0;
   }
 
   // Attempt to allocate our buffer, if we have not already done so.
   zx_status_t AllocBuffer() TA_REQ(lock_);
 
-  // Reserve the specified number of bytes in the buffer, if possible, without
-  // the Reservation wrapper.
-  void* ReserveRaw(uint32_t num_bytes);
+  // Reserve the given number of words in the trace buffer. Returns nullptr if the reservation
+  // fails.
+  uint64_t* ReserveRaw(uint32_t num_words);
 
-  inline void DisableGroupMask() {
+  void DisableGroupMask() {
     grpmask_and_inflight_writes_.fetch_and(kInflightWritesMask, ktl::memory_order_release);
   }
 
-  inline void SetGroupMask(uint32_t new_mask) {
+  void SetGroupMask(uint32_t new_mask) {
     grpmask_and_inflight_writes_.fetch_and(kInflightWritesMask, ktl::memory_order_relaxed);
     grpmask_and_inflight_writes_.fetch_or(new_mask, ktl::memory_order_release);
   }
@@ -263,7 +240,7 @@ class KTraceState {
     return static_cast<uint32_t>((ptr % circular_size_) + wrap_offset_);
   }
 
-  inline uint32_t inflight_writes() const {
+  uint32_t inflight_writes() const {
     return static_cast<uint32_t>(
         (grpmask_and_inflight_writes_.load(ktl::memory_order_acquire) & kInflightWritesMask) >> 32);
   }
