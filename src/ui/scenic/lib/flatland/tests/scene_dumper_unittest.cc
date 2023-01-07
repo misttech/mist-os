@@ -39,9 +39,11 @@ constexpr char kImageDumpLineIdentifierToken[] = "image:";
 
 constexpr flatland::TransformHandle::InstanceId kLinkInstanceId = 0;
 
-// Creates a link in |links| to the the graph rooted at |instance_id:0|.
-void MakeLink(flatland::GlobalTopologyData::LinkTopologyMap& links, uint64_t instance_id) {
-  links[{kLinkInstanceId, instance_id}] = {instance_id, 0};
+// Creates a link in |links| to the the graph rooted at |instance_id:transform_id|. If transform_id
+// is not specified, it is initialized as id 0.
+void MakeLink(flatland::GlobalTopologyData::LinkTopologyMap& links, uint64_t instance_id,
+              uint64_t transform_id = 0) {
+  links[{kLinkInstanceId, instance_id}] = {instance_id, transform_id};
 }
 
 // Returns lines from a scene dump input stream. Ignores |kIgnoredLinesAtStartOfDump| lines at the
@@ -163,7 +165,7 @@ size_t FindInstanceDumpLineNumber(const std::vector<std::string>& line_dump,
                                   flatland::TransformHandle::InstanceId instance_id) {
   for (size_t i = 0; i < line_dump.size(); i++) {
     if (line_dump[i].find(std::string(kInstanceDumpLineIdentifierToken) + " " +
-                          std::to_string(instance_id) + " ") == 0) {
+                          std::to_string(instance_id)) == 0) {
       return i;
     }
   }
@@ -188,8 +190,14 @@ void ExpectInstanceDump(flatland::TransformHandle::InstanceId instance_id, const
                         const std::vector<std::string>& line_dump) {
   auto line_number = FindInstanceDumpLineNumber(line_dump, instance_id);
   ASSERT_LT(line_number, line_dump.size());
-  auto instance_str = std::string(" (") + name + std::string(")");
-  ExpectNameLineNumberAndGetIndex(instance_str, line_number, line_dump);
+  if (name.empty()) {
+    // There shouldn't be an opening or closing bracket for the name.
+    EXPECT_EQ(line_dump[line_number].find('('), std::string::npos);
+    EXPECT_EQ(line_dump[line_number].find(')'), std::string::npos);
+  } else {
+    auto instance_str = std::string(" (") + name + std::string(")");
+    ExpectNameLineNumberAndGetIndex(instance_str, line_number, line_dump);
+  }
 }
 
 // Find the line number containing an image dump (and also |kImageDumpLineIdentifierToken|). Returns
@@ -351,20 +359,19 @@ TEST(SceneDumperTest, TopologyTreeWithNames) {
   GlobalTopologyData::LinkTopologyMap links;
 
   const TransformGraph::TopologyVector vectors[] = {
-      {{{1, 0}, 2}, {{0, 2}, 0}, {{0, 5}, 0}},  // 1:0 - 0:5
-                                                //    \
-                                                //     0:2
-                                                //
-      {{{2, 0}, 2}, {{0, 3}, 0}, {{0, 4}, 0}},  // 2:0 - 0:4
-                                                //    \
-                                                //     0:3
-                                                //
-      {{{3, 0}, 0}},                            // 3:0
-      {{{4, 0}, 0}},                            // 4:0
-      {{{5, 0}, 0}}                             // 5:0
+      {{{1, 0}, 2}, {{0, 2}, 0}, {{0, 5}, 0}},               // 1:0 - 0:5
+                                                             //    \
+                                                             //     0:2
+                                                             //
+      {{{2, 1}, 1}, {{2, 0}, 2}, {{0, 3}, 0}, {{0, 4}, 0}},  // 2:1 - 2:0 - 0:3
+                                                             //     \
+                                                             //      0:4
+      {{{3, 0}, 0}},                                         // 3:0
+      {{{4, 0}, 0}},                                         // 4:0
+      {{{5, 0}, 0}}                                          // 5:0
   };
 
-  const std::string names[] = {"", "2_0_ABC", "3_0_DEF", "", "5_0_GHI"};
+  const std::string names[] = {"", "2_1_ABC", "3_0_DEF", "", "5_0_GHI"};
 
   for (int i = 0; i < 5; i++) {
     auto uber_struct = std::make_unique<UberStruct>();
@@ -373,10 +380,10 @@ TEST(SceneDumperTest, TopologyTreeWithNames) {
     uber_structs[vectors[i][0].handle.GetInstanceId()] = std::move(uber_struct);
   }
 
-  MakeLink(links, 2);  // 0:2 - 2:0
-  MakeLink(links, 3);  // 0:3 - 3:0
-  MakeLink(links, 4);  // 0:4 - 4:0
-  MakeLink(links, 5);  // 0:5 - 5:0
+  MakeLink(links, 2, 1);  // 0:2 - 2:1
+  MakeLink(links, 3);     // 0:3 - 3:0
+  MakeLink(links, 4);     // 0:4 - 4:0
+  MakeLink(links, 5);     // 0:5 - 5:0
 
   GlobalImageVector images;
   GlobalIndexVector image_indices;
@@ -390,18 +397,20 @@ TEST(SceneDumperTest, TopologyTreeWithNames) {
   DumpScene(uber_structs, topology_data, images, image_indices, image_rectangles, output);
   auto lines = GetLines(output);
 
-  // {1, 0} is the root with {2, 0} as a child node.
-  ExpectTopologyNodeHasLessDepthLevel({1, 0}, 0, {2, 0}, 1, lines);
+  // {1, 0} is the root with {2, 1} as a child node.
+  ExpectTopologyNodeHasLessDepthLevel({1, 0}, 0, {2, 1}, 1, lines);
+  // {2, 1} has one child node - {2, 0}.
+  ExpectTopologyNodeHasLessDepthLevel({2, 1}, 1, {2, 0}, 2, lines);
   // {2, 0} has two children - {3, 0} and {4, 0}.
-  ExpectTopologyNodeHasLessDepthLevel({2, 0}, 1, {3, 0}, 2, lines);
-  ExpectTopologyNodeHasSameDepthLevel({3, 0}, 2, {4, 0}, 3, lines);
-  // {5, 0} is direct child of {1, 0} and sibling of {2, 0}.
-  ExpectTopologyNodeHasLessDepthLevel({1, 0}, 0, {5, 0}, 4, lines);
-  ExpectTopologyNodeHasSameDepthLevel({2, 0}, 1, {5, 0}, 4, lines);
+  ExpectTopologyNodeHasLessDepthLevel({2, 0}, 2, {3, 0}, 3, lines);
+  ExpectTopologyNodeHasSameDepthLevel({3, 0}, 3, {4, 0}, 4, lines);
+  // {5, 0} is direct child of {1, 0} and sibling of {2, 1}.
+  ExpectTopologyNodeHasLessDepthLevel({1, 0}, 0, {5, 0}, 5, lines);
+  ExpectTopologyNodeHasSameDepthLevel({2, 1}, 1, {5, 0}, 5, lines);
 
-  ExpectNodeName({2, 0}, 1, names[1], lines);
-  ExpectNodeName({3, 0}, 2, names[2], lines);
-  ExpectNodeName({5, 0}, 4, names[4], lines);
+  ExpectNodeName({2, 1}, 1, names[1], lines);
+  ExpectNodeName({3, 0}, 3, names[2], lines);
+  ExpectNodeName({5, 0}, 5, names[4], lines);
 
   ExpectInstanceDumpCount(lines, 5);
   ExpectInstanceDump(1, names[0], lines);
