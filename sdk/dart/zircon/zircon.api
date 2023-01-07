@@ -2476,6 +2476,14 @@
               "type": "VariableDeclarationImpl",
               "varType": "int"
             },
+            "VMO_CHILD_REFERENCE": {
+              "isConst": true,
+              "isFinal": false,
+              "isLate": false,
+              "name": "VMO_CHILD_REFERENCE",
+              "type": "VariableDeclarationImpl",
+              "varType": "int"
+            },
             "VMO_CHILD_RESIZABLE": {
               "isConst": true,
               "isFinal": false,

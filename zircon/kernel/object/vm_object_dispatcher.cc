@@ -409,6 +409,19 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
     return vmo_->CreateChildSlice(offset, size, copy_name, child_vmo);
   }
 
+  Resizability resizable = Resizability::NonResizable;
+  if (options & ZX_VMO_CHILD_REFERENCE) {
+    options &= ~ZX_VMO_CHILD_REFERENCE;
+    if (options & ZX_VMO_CHILD_RESIZABLE) {
+      resizable = Resizability::Resizable;
+      options &= ~ZX_VMO_CHILD_RESIZABLE;
+    }
+    if (options) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    return vmo_->CreateChildReference(resizable, offset, size, copy_name, child_vmo);
+  }
+
   // Check for mutually-exclusive child type flags.
   CloneType type;
   if (options & ZX_VMO_CHILD_SNAPSHOT) {
@@ -425,7 +438,6 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Resizability resizable = Resizability::NonResizable;
   if (options & ZX_VMO_CHILD_RESIZABLE) {
     resizable = Resizability::Resizable;
     options &= ~ZX_VMO_CHILD_RESIZABLE;

@@ -254,9 +254,14 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
   }
 
   fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(size, &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
+  // A reference child shares the same content size manager as the parent.
+  if (options & ZX_VMO_CHILD_REFERENCE) {
+    content_size_manager = fbl::RefPtr(vmo->content_size_manager());
+  } else {
+    status = ContentSizeManager::Create(size, &content_size_manager);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
   // create a Vm Object dispatcher

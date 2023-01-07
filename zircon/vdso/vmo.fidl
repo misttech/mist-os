@@ -698,6 +698,14 @@ protocol Vmo {
     /// with VMOs created with [`zx_vmo_create_physical()`] or [`zx_vmo_create_contiguous()`] and their
     /// descendants. This flag may not be used with VMOs created with the **ZX_VMO_RESIZABLE** option.
     ///
+    /// - **ZX_VMO_CHILD_REFERENCE** - Create a reference to the VMO. All operations on the reference VMO
+    /// behave as if they were done on the parent. A reference always spans the entirety of the parent, and
+    /// *offset* and *size* are required to be 0. This is useful for cases where the user wants to keep
+    /// track of outstanding references to a VMO, by using the **ZX_VMO_ZERO_CHILDREN** signal. Refer to
+    /// [Notes](#notes) for more details on this signal.
+    /// This flag may not be used for VMOs created with [`zx_vmo_create_physical()`],
+    /// [`zx_vmo_create_contiguous()`] or descendants of such VMOs.
+    ///
     /// In addition, *options* can contain zero or more of the following flags to
     /// further specify the child's behavior:
     ///
@@ -726,6 +734,12 @@ protocol Vmo {
     /// discussion of the details of each right.
     ///
     /// If *options* includes **ZX_VMO_CHILD_RESIZABLE** then **ZX_RIGHT_RESIZE** will be added.
+    ///
+    /// For **ZX_VMO_CHILD_REFERENCE**, the **ZX_VMO_CHILD_RESIZABLE** option controls whether the parent
+    /// VMO may be resized using the reference handle returned in *out*. The reference will see a resize on
+    /// the parent VMO if the parent VMO was resizable, regardless of the presence of
+    /// **ZX_VMO_CHILD_RESIZABLE**. However **ZX_VMO_CHILD_RESIZABLE** is only supported if the parent VMO
+    /// was resizable, i.e. it is not possible to create a resizable reference of a non-resizable VMO.
     ///
     /// In all cases if **ZX_VMO_NO_WRITE** is set then **ZX_RIGHT_WRITE** will be removed.
     ///
