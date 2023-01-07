@@ -930,7 +930,7 @@ the package.
 
 Sometimes there is the need to include additional files. Below we demonstrate
 the use of two [`resource.gni`](/build/dist/resource.gni) templates,
-`resource()` and `resource_group()`.
+`resource()`, `resource_group()`, and `resource_tree()`.
 
 ### Example: fonts
 
@@ -1066,8 +1066,39 @@ directories, some even under different names. To express this same relationship
 we might need as many `resource()` targets as we have files. Situations like
 this call for the use of `resource_group()` instead, as shown above.
 
-The underlying behavior of `resource()` and `resource_group()` is identical.
-You are free to choose whichever one you prefer.
+### Example: using `resource_tree()`
+
+Mapping each source file to a destination file path using `resource_group()` can
+be cumbersome for larger file sets. `resource_tree()` offers a way to map a
+directory tree of source files to an identical hierarchy under a destation
+directory in the package. The following example copies the subdirectory
+`default_repo_files/` to the package directory `repo/` (using the `sources` list
+to ensure only the explicitly listed files are included).
+
+```gn
+import("//build/components.gni")
+
+resource_tree("default-repo") {
+  sources_root = "default_repo_files"
+  sources = [
+    "keys/root.json",
+    "keys/snapshot.json",
+    "keys/targets.json",
+    "keys/timestamp.json",
+    "repository/1.root.json",
+    "repository/1.snapshot.json",
+    "repository/1.targets.json",
+    "repository/root.json",
+    "repository/snapshot.json",
+    "repository/targets.json",
+    "repository/timestamp.json",
+  ]
+  dest_dir = "repo"
+}
+```
+
+The underlying behavior of `resource()`, `resource_group()`, and
+`resource_tree()` is identical. You are free to choose whichever one you prefer.
 
 Note: see more information in [provide data files to components][provide-data].
 

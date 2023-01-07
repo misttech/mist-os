@@ -23,11 +23,14 @@ resource("greetings") {
 }{% endverbatim %}
 ```
 
-See the [resource][resource] template for more usage instructions.
 For information about `{% verbatim %}{{source_file_part}}{% endverbatim %}`
 and similar syntax see [GN placeholders][gn-placeholders]{:.external}.
 
-Using `resource()` is also demonstrated in [additional packaged resources][additional-packaged-resources].
+See [resource.gni][resource-gni] for more usage instructions on the `resource()`
+template, and related templates `resource_group()` and `resource_tree()`.
+
+More examples using `resource()`, `resource_group()`, and `resource_tree()` can
+be found in [additional packaged resources][additional-packaged-resources].
 
 ### Including resources with a component
 
@@ -134,4 +137,4 @@ version, depending on the package association.
 [build-components]: /docs/development/components/build.md
 [gn-placeholders]: https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#placeholders
 [metafar]: /docs/concepts/packages/package.md#metafar
-[resource]: /build/dist/resource.gni
+[resource-gni]: /build/dist/resource.gni
