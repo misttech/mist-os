@@ -360,9 +360,8 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
       FX_LOGS(INFO) << "Could not connect to scenic allocator service";
       return fit::error(GuestError::FAILED_SERVICE_CONNECT);
     }
-    status = wl_->Start(
-        guest_->object(), std::move(wl_vmar), std::move(cfg.mutable_wayland_device()->server),
-        std::move(sysmem_allocator), std::move(scenic_allocator), context, dispatcher);
+    status = wl_->Start(guest_->object(), std::move(wl_vmar), std::move(sysmem_allocator),
+                        std::move(scenic_allocator), context, dispatcher);
     if (status != ZX_OK) {
       FX_LOGS(INFO) << "Could not start wayland device";
       return fit::error(GuestError::DEVICE_START_FAILURE);

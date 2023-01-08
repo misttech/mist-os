@@ -113,14 +113,9 @@ fit::result<GuestManagerError, GuestConfig> TerminaGuestManager::GetDefaultGuest
   termina_config.set_block_devices(std::move(block_devices_result.value()));
   termina_config.set_magma_device(fuchsia::virtualization::MagmaDevice());
 
-  // Connect to the wayland bridge afresh, restarting it if it has crashed. We only do this if we
-  // are not linking the wayland server directly into the virtio_wl device.
+  // Include a wayland device.
   fuchsia::wayland::ServerPtr server_proxy;
   termina_config.mutable_wayland_device();
-#ifndef USE_VIRTIO_WL_LOCAL_WAYLAND_SERVER
-  context_->svc()->Connect(server_proxy.NewRequest());
-  termina_config.mutable_wayland_device()->server = std::move(server_proxy);
-#endif
 
   // Add the vsock listeners for gRPC services.
   *termina_config.mutable_vsock_listeners() = guest_->take_vsock_listeners();

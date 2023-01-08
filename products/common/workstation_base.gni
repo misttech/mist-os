@@ -32,7 +32,6 @@ legacy_base_package_labels += [
 
 # Add Linux VM
 legacy_base_package_labels += [
-  "//src/ui/wayland/bin/bridge",
   "//src/virtualization/bin/vmm",
   "//src/virtualization/bin/termina_guest_manager",
   "//src/virtualization/bin/guest",

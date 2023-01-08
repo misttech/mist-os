@@ -15,10 +15,6 @@
             name: "guest_pkg",
             url: "fuchsia-pkg://fuchsia.com/termina_guest#meta/termina_guest.cm",
         },
-        {
-            name: "wayland_bridge",
-            url: "#meta/wayland_bridge.cm",
-        },
     ],
     capabilities: [
         { protocol: "fuchsia.virtualization.LinuxManager" },
@@ -39,30 +35,6 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.wayland.Server",
-            from: "#wayland_bridge",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#wayland_bridge",
-        },
-        {
-            protocol: [
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.input.wayland.Keymap",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-            ],
-            from: "parent",
-            to: "#wayland_bridge",
             availability: "optional",
         },
     ],

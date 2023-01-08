@@ -9,10 +9,6 @@ config("args") {
   if (rust_virtio_net) {
     defines += [ "USE_RUST_VIRTIO_NET" ]
   }
-
-  if (virtio_wl_local_wayland_server) {
-    defines += [ "USE_VIRTIO_WL_LOCAL_WAYLAND_SERVER" ]
-  }
 }
 
 group("bin") {
