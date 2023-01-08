@@ -7685,14 +7685,6 @@ From //build/images/args.gni:169
 
 From //src/bringup/bin/virtcon/virtcon_args.gni:8
 
-### virtio_wl_local_wayland_server
-If true, use a wayland server linked into the virtio_wl device instead of using
-a wayland_bridge component.
-
-**Current value (from the default):** `true`
-
-From //src/virtualization/bin/args.gni:11
-
 ### virtmagma_debug
 Enable verbose logging in virtmagma-related code
 
