@@ -128,10 +128,6 @@ rustc_binary("rust_coverage_test_bin") {
   source_root = "rust_coverage_test.rs"
   sources = [ "rust_coverage_test.rs" ]
   configs += [ "//build/config/rust:coverage" ]
-
-  # TODO(fxbug.dev/104854): Figure out link errors when lto is enabled for
-  # this target.
-  exclude_toolchain_tags = [ "lto" ]
 }
 
 rust_coverage_test_rspfile_on_host =
