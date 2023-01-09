@@ -45,7 +45,7 @@ use {
         convert::{TryFrom, TryInto},
         default::Default,
         fs,
-        path::{Path, PathBuf},
+        path::Path,
         sync::Arc,
     },
     tempfile::TempDir,
@@ -108,11 +108,6 @@ impl RoutingTestBuilder {
         }
     }
 
-    pub fn add_hooks(mut self, mut hooks: Vec<HooksRegistration>) -> Self {
-        self.additional_hooks.append(&mut hooks);
-        self
-    }
-
     /// Expose the given `DirectoryEntry` at the given path of the `component`'s outgoing
     /// directory.
     pub fn add_outgoing_path(
@@ -141,11 +136,6 @@ impl RoutingTestBuilder {
         self
     }
 
-    pub fn set_namespace_capabilities(mut self, caps: Vec<CapabilityDecl>) -> Self {
-        self.namespace_capabilities = caps;
-        self
-    }
-
     /// Set the list of built-in capabilities that are provided from component manager.
     /// The `test_runner` capability is always provided.
     pub fn set_builtin_capabilities(mut self, caps: Vec<CapabilityDecl>) -> Self {
@@ -165,26 +155,6 @@ impl RoutingTestBuilder {
 
     pub fn set_reboot_on_terminate_policy(mut self, allowlist: Vec<AllowlistEntry>) -> Self {
         self.child_policy.reboot_on_terminate = allowlist;
-        self
-    }
-
-    /// Add a custom capability security policy to restrict routing of certain caps.
-    pub fn add_capability_policy(
-        mut self,
-        key: CapabilityAllowlistKey,
-        allowlist: HashSet<AllowlistEntry>,
-    ) -> Self {
-        self.capability_policy.insert(key, allowlist);
-        self
-    }
-
-    /// Add a custom debug capability security policy to restrict routing of certain caps.
-    pub fn add_debug_capability_policy(
-        mut self,
-        key: DebugCapabilityKey,
-        allowlist: HashSet<DebugCapabilityAllowlistEntry>,
-    ) -> Self {
-        self.debug_capability_policy.insert(key, allowlist);
         self
     }
 
@@ -362,10 +332,6 @@ impl RoutingTest {
             test_dir_proxy,
             root_component_name: builder.root_component.clone(),
         }
-    }
-
-    pub fn test_dir_path(&self) -> &Path {
-        self.test_dir.path()
     }
 
     /// Set up the given OutDir, installing a set of files assumed to exist by
@@ -659,38 +625,6 @@ impl RoutingTest {
         }
 
         Ok((instance, component_name))
-    }
-
-    /// Wait for the given component to start running.
-    ///
-    /// We define "running" as "the components outgoing directory has responded to a simple
-    /// request", which the MockRunner supports.
-    pub async fn wait_for_component_start(&self, moniker: &AbsoluteMoniker) {
-        // Lookup, start, and open a connection to the component's outgoing directory.
-        let (dir_proxy, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        self.model.look_up(moniker).await.expect("lookup component failed");
-        let mut server_end = server_end.into_channel();
-        self.model
-            .start_instance(moniker, &StartReason::Eager)
-            .await
-            .expect("failed to start component")
-            .open_outgoing(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
-                PathBuf::from("/."),
-                &mut server_end,
-            )
-            .await
-            .expect("failed to open component's outgoing directory");
-
-        // Ensure we can successfully talk to the directory.
-        dir_proxy
-            .sync()
-            .await
-            .expect("could not communicate with directory")
-            .map_err(zx::Status::from_raw)
-            .expect("failed to sync directory");
     }
 
     pub fn resolved_url(component_name: &str) -> String {
@@ -990,26 +924,6 @@ impl RoutingTestModel for RoutingTest {
     }
 }
 
-/// Installs a new directory at `path` in the test's namespace, removing it when this object
-/// goes out of scope.
-pub struct ScopedNamespaceDir<'a> {
-    path: &'a str,
-}
-
-impl<'a> ScopedNamespaceDir<'a> {
-    pub fn new(test: &RoutingTest, path: &'a str) -> Self {
-        test.install_namespace_directory(path);
-        Self { path }
-    }
-}
-
-impl Drop for ScopedNamespaceDir<'_> {
-    fn drop(&mut self) {
-        let ns = fdio::Namespace::installed().expect("Failed to get installed namespace");
-        ns.unbind(self.path).expect(&format!("Failed to unbind dir {}", self.path));
-    }
-}
-
 /// Contains functions to use capabilities in routing tests.
 pub mod capability_util {
     use {
@@ -1251,36 +1165,6 @@ pub mod capability_util {
             .expect("failed to open service")
     }
 
-    pub async fn subscribe_to_event_stream_v2(
-        namespace: &ManagedNamespace,
-        path: CapabilityPath,
-        expected_res: ExpectedResult,
-    ) {
-        let event_source_proxy =
-            connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(namespace, &path).await;
-        let res = event_source_proxy.get_next().await;
-        match expected_res {
-            ExpectedResult::Ok => assert_matches!(res, Ok(_)),
-            ExpectedResult::Err(expected_epitaph) => {
-                let err = res.expect_err("used echo service successfully when it should fail");
-                assert!(err.is_closed(), "expected file closed error, got: {:?}", err);
-                let epitaph =
-                    event_source_proxy.take_event_stream().next().await.expect("no epitaph");
-                assert_matches!(
-                    epitaph,
-                    Err(fidl::Error::ClientChannelClosed {
-                        status, ..
-                    }) if status == expected_epitaph
-                );
-            }
-            ExpectedResult::ErrWithNoEpitaph => {
-                let err = res.expect_err("used echo service successfully when it should fail");
-                assert!(err.is_closed(), "expected file closed error, got: {:?}", err);
-                assert_matches!(event_source_proxy.take_event_stream().next().await, None);
-            }
-        }
-    }
-
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`. Expects the service
     /// to be fidl.examples.routing.echo.Echo.
     pub async fn call_echo_svc_from_namespace(
@@ -1484,26 +1368,6 @@ pub mod capability_util {
         let child_decl = child_decl.native_into_fidl();
         let res = realm_proxy.create_child(&mut collection_ref, child_decl, args).await;
         res.expect("failed to send fidl message").expect("failed to create child");
-    }
-
-    /// Call `fuchsia.component.Realm.DestroyChild` to destroy a dynamic child, waiting for
-    /// destruction to complete.
-    pub async fn call_destroy_child<'a>(
-        namespace: &ManagedNamespace,
-        collection: &'a str,
-        name: &'a str,
-    ) {
-        let path = CapabilityPath::try_from(&format!(
-            "/svc/{}",
-            fcomponent::RealmMarker::PROTOCOL_NAME
-        ) as &str)
-        .expect("no realm service");
-        let realm_proxy =
-            connect_to_svc_in_namespace::<fcomponent::RealmMarker>(namespace, &path).await;
-        let mut child_ref =
-            fdecl::ChildRef { collection: Some(collection.to_string()), name: name.to_string() };
-        let res = realm_proxy.destroy_child(&mut child_ref).await;
-        res.expect("failed to send fidl message").expect("failed to destroy child");
     }
 
     pub async fn take_dir_from_namespace(

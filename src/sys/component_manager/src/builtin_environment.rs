@@ -57,7 +57,7 @@ use {
             },
             hooks::EventType,
             model::{Model, ModelParams},
-            resolver::{BuiltinResolver, Resolver, ResolverRegistry},
+            resolver::{BuiltinResolver, ResolverRegistry},
             storage::admin_protocol::StorageAdmin,
         },
         root_stop_notifier::RootStopNotifier,
@@ -87,6 +87,9 @@ use {
     thiserror::Error,
     tracing::{info, warn},
 };
+
+#[cfg(test)]
+use crate::model::resolver::Resolver;
 
 // Allow shutdown to take up to an hour.
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
@@ -175,10 +178,6 @@ impl BuiltinEnvironmentBuilder {
         BuiltinEnvironmentBuilder::default()
     }
 
-    pub fn use_default_config(self) -> Self {
-        self.set_runtime_config(RuntimeConfig::default())
-    }
-
     pub fn set_runtime_config(mut self, runtime_config: RuntimeConfig) -> Self {
         self.runtime_config = Some(runtime_config);
         self
@@ -189,6 +188,7 @@ impl BuiltinEnvironmentBuilder {
         self
     }
 
+    #[cfg(test)]
     pub fn set_inspector(mut self, inspector: Inspector) -> Self {
         self.inspector = Some(inspector);
         self
@@ -209,11 +209,6 @@ impl BuiltinEnvironmentBuilder {
             None
         };
         Ok(self)
-    }
-
-    pub fn set_utc_clock(mut self, clock: Arc<Clock>) -> Self {
-        self.utc_clock = Some(clock);
-        self
     }
 
     pub fn add_elf_runner(self) -> Result<Self, Error> {
@@ -241,6 +236,7 @@ impl BuiltinEnvironmentBuilder {
         self
     }
 
+    #[cfg(test)]
     pub fn add_resolver(
         mut self,
         scheme: String,

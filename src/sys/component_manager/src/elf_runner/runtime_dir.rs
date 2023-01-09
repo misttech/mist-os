@@ -40,6 +40,7 @@ impl RuntimeDirectory {
     }
 
     // Create an empty runtime directory, for test purpose only.
+    #[cfg(test)]
     pub fn empty() -> Self {
         let mut empty = TreeBuilder::empty_dir();
         empty.add_empty_dir(["elf"]).expect("failed to add elf directory");

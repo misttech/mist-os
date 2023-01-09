@@ -3,21 +3,24 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        events::{
-            dispatcher::{EventDispatcher, EventDispatcherScope},
-            event::Event,
-            registry::ComponentEventRoute,
-        },
-        hooks::{EventType, HasEventType},
+    crate::model::events::{
+        dispatcher::{EventDispatcher, EventDispatcherScope},
+        event::Event,
+        registry::ComponentEventRoute,
     },
     futures::{channel::mpsc, poll, stream::Peekable, task::Context, Stream, StreamExt},
-    moniker::{AbsoluteMoniker, ExtendedMoniker},
+    moniker::ExtendedMoniker,
     std::{
         pin::Pin,
         sync::{Arc, Weak},
         task::Poll,
     },
+};
+
+#[cfg(test)]
+use {
+    crate::model::hooks::{EventType, HasEventType},
+    moniker::AbsoluteMoniker,
 };
 
 pub struct EventStream {
@@ -76,6 +79,7 @@ impl EventStream {
 
     /// Waits for an event with a particular EventType against a component with a
     /// particular moniker. Ignores all other events.
+    #[cfg(test)]
     pub async fn wait_until(
         &mut self,
         expected_event_type: EventType,

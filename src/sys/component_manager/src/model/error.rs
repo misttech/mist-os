@@ -74,12 +74,6 @@ pub enum ModelError {
     },
     #[error("expected a component instance moniker")]
     UnexpectedComponentManagerMoniker,
-    #[error("ComponentDecl invalid {}: {}", url, err)]
-    ComponentDeclInvalid {
-        url: String,
-        #[source]
-        err: cm_rust::Error,
-    },
     #[error("The model is not available")]
     ModelNotAvailable,
     #[error("Namespace creation failed: {}", err)]
@@ -247,14 +241,6 @@ impl ModelError {
 
     pub fn reboot_failed(err: impl Into<Error>) -> ModelError {
         ModelError::RebootFailed { err: err.into().into() }
-    }
-
-    pub fn component_decl_invalid(url: impl Into<String>, err: cm_rust::Error) -> ModelError {
-        ModelError::ComponentDeclInvalid { url: url.into(), err }
-    }
-
-    pub fn model_not_available() -> ModelError {
-        ModelError::ModelNotAvailable
     }
 
     pub fn open_directory_error(

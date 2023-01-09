@@ -50,6 +50,7 @@ pub struct EventDispatcher {
 }
 
 impl EventDispatcher {
+    #[cfg(test)]
     pub fn new(
         subscriber: ExtendedMoniker,
         scopes: Vec<EventDispatcherScope>,

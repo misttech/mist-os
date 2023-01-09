@@ -1551,16 +1551,6 @@ impl ResolvedInstanceState {
             .collect()
     }
 
-    /// Return all children that match the `ChildMoniker` regardless of
-    /// whether that child is live.
-    pub fn get_all_children_by_name(&self, m: &ChildMoniker) -> Vec<Arc<ComponentInstance>> {
-        self.children
-            .iter()
-            .filter(|(child, _)| m.name() == child.name() && m.collection() == child.collection())
-            .map(|(_, c)| c.clone())
-            .collect()
-    }
-
     /// Returns the exposed directory bound to this instance.
     pub fn get_exposed_dir(&self) -> &ExposedDir {
         &self.exposed_dir
@@ -1579,22 +1569,6 @@ impl ResolvedInstanceState {
     /// Returns information about the package of the instance, if any.
     pub fn package(&self) -> Option<&Package> {
         self.package.as_ref()
-    }
-
-    /// Extends an instanced absolute moniker with the live child with moniker `p`. Returns `None`
-    /// if no matching child was found.
-    pub fn extend_moniker_with(
-        &self,
-        moniker: &InstancedAbsoluteMoniker,
-        child_moniker: &ChildMoniker,
-    ) -> Option<InstancedAbsoluteMoniker> {
-        match self.get_child(child_moniker).map(|c| c.incarnation_id()) {
-            Some(instance_id) => Some(
-                moniker
-                    .child(InstancedChildMoniker::from_child_moniker(child_moniker, instance_id)),
-            ),
-            None => None,
-        }
     }
 
     /// Removes a child.
@@ -1987,13 +1961,6 @@ impl Runtime {
                 }
             });
             self.exit_listener = Some(exit_listener);
-        }
-    }
-
-    pub async fn wait_on_channel_close(&mut self) {
-        if let Some(controller) = &self.controller {
-            controller.wait_for_epitaph().await;
-            self.controller = None;
         }
     }
 

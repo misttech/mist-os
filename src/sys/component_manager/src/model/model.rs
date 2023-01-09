@@ -123,6 +123,7 @@ impl Model {
 
     /// Finds a resolved component matching the absolute moniker, if such a component exists.
     /// This function has no side-effects.
+    #[cfg(test)]
     pub async fn find_resolved(
         &self,
         find_abs_moniker: &AbsoluteMoniker,

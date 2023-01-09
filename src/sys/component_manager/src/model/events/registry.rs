@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashSet;
-
 use {
     crate::{
         capability::CapabilitySource,
@@ -18,21 +16,27 @@ use {
             },
             hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
             model::Model,
-            routing::{RouteRequest, RouteSource},
+            routing::RouteSource,
         },
     },
     ::routing::{
         capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
-        event::EventFilter, route_capability, route_event_stream_capability,
+        event::EventFilter, route_event_stream_capability,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityName, UseDecl, UseEventDecl, UseEventStreamDecl},
+    cm_rust::{CapabilityName, UseDecl, UseEventStreamDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, ExtendedMoniker},
     std::{
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         sync::{Arc, Weak},
     },
+};
+
+#[cfg(test)]
+use {
+    cm_rust::UseEventDecl,
+    routing::{route_capability, RouteRequest},
 };
 
 // TODO(https://fxbug.dev/61861): remove alias once the routing lib has a stable API.
@@ -79,10 +83,6 @@ impl RouteEventsResult {
         if !event_state.scopes.contains(&scope) {
             event_state.scopes.push(scope);
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.mapping.len()
     }
 
     pub fn contains_event(&self, event_name: &CapabilityName) -> bool {
@@ -210,6 +210,7 @@ impl EventRegistry {
     }
 
     /// Subscribes to events of a provided set of EventTypes.
+    #[cfg(test)]
     pub async fn subscribe(
         &self,
         subscriber: &WeakExtendedInstance,
@@ -379,6 +380,7 @@ impl EventRegistry {
         Ok(result)
     }
 
+    #[cfg(test)]
     pub async fn route_events(
         &self,
         target_moniker: &AbsoluteMoniker,
@@ -419,6 +421,7 @@ impl EventRegistry {
     }
 
     /// Routes an event and returns its source name and scope on success.
+    #[cfg(test)]
     async fn route_event(
         event_decl: UseEventDecl,
         component: &Arc<ComponentInstance>,

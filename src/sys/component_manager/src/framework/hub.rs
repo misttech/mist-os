@@ -102,6 +102,7 @@ impl Hub {
         Ok(Hub { instances: Mutex::new(instance_map), scope: ExecutionScope::new() })
     }
 
+    #[cfg(test)]
     pub async fn open_root(
         &self,
         flags: fio::OpenFlags,

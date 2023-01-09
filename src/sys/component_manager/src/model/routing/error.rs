@@ -6,7 +6,6 @@ use {
     anyhow::Error,
     clonable_error::ClonableError,
     cm_moniker::{InstancedAbsoluteMoniker, InstancedExtendedMoniker, InstancedRelativeMoniker},
-    fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
     thiserror::Error,
 };
 
@@ -42,16 +41,6 @@ pub enum OpenResourceError {
 }
 
 impl OpenResourceError {
-    /// Convert this error into its approximate `fuchsia.component.Error` equivalent.
-    pub fn as_fidl_error(&self) -> fcomponent::Error {
-        fcomponent::Error::ResourceUnavailable
-    }
-
-    /// Convert this error into its approximate `zx::Status` equivalent.
-    pub fn as_zx_status(&self) -> zx::Status {
-        zx::Status::UNAVAILABLE
-    }
-
     pub fn open_outgoing_failed(
         moniker: &InstancedAbsoluteMoniker,
         path: impl Into<String>,

@@ -16,12 +16,12 @@ use {
     async_trait::async_trait,
     cm_rust::EnvironmentDecl,
     fidl_fuchsia_component_decl as fdecl,
-    std::{
-        sync::{Arc, Weak},
-        time::Duration,
-    },
+    std::{sync::Arc, time::Duration},
     tracing::error,
 };
+
+#[cfg(test)]
+use std::sync::Weak;
 
 /// A realm's environment, populated from a component's [`EnvironmentDecl`].
 /// An environment defines intrinsic behaviors of a component's realm. Components
@@ -51,6 +51,7 @@ pub const DEFAULT_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl Environment {
     /// Creates a new empty environment parented to component manager.
+    #[cfg(test)]
     pub fn empty() -> Environment {
         Environment {
             name: None,

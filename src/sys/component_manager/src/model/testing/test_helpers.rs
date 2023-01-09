@@ -128,14 +128,6 @@ pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
     execution.runtime.is_none() && execution.is_shut_down()
 }
 
-/// Returns true if the given live child exists.
-pub async fn has_live_child<'a>(component: &'a ComponentInstance, child: &'a str) -> bool {
-    match *component.lock_state().await {
-        InstanceState::Resolved(ref s) => s.get_child(&child.try_into().unwrap()).is_some(),
-        _ => panic!("not resolved"),
-    }
-}
-
 /// Returns true if the given child (live or deleting) exists.
 pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -> bool {
     match *component.lock_state().await {
@@ -175,28 +167,6 @@ pub async fn get_live_child<'a>(
         InstanceState::Resolved(ref s) => s.get_child(&child.try_into().unwrap()).unwrap().clone(),
         _ => panic!("not resolved"),
     }
-}
-
-/// Create a cm_rust::OfferRunnerDecl offering the given cap from the parent to the given child
-/// component.
-pub fn offer_runner_cap_to_child(runner_cap: &str, child: &str) -> cm_rust::OfferDecl {
-    cm_rust::OfferDecl::Runner(cm_rust::OfferRunnerDecl {
-        source: cm_rust::OfferSource::Parent,
-        source_name: runner_cap.into(),
-        target: cm_rust::OfferTarget::static_child(child.to_string()),
-        target_name: runner_cap.into(),
-    })
-}
-
-/// Create a cm_rust::OfferRunnerDecl offering the given cap from the parent to the given child
-/// collection.
-pub fn offer_runner_cap_to_collection(runner_cap: &str, child: &str) -> cm_rust::OfferDecl {
-    cm_rust::OfferDecl::Runner(cm_rust::OfferRunnerDecl {
-        source: cm_rust::OfferSource::Parent,
-        source_name: runner_cap.into(),
-        target: cm_rust::OfferTarget::Collection(child.to_string()),
-        target_name: runner_cap.into(),
-    })
 }
 
 pub async fn dir_contains<'a>(
@@ -355,11 +325,6 @@ impl TestEnvironmentBuilder {
 
     pub fn set_runtime_config(mut self, runtime_config: RuntimeConfig) -> Self {
         self.runtime_config = runtime_config;
-        self
-    }
-
-    pub fn enable_reboot_on_terminate(mut self, val: bool) -> Self {
-        self.runtime_config.reboot_on_terminate_enabled = val;
         self
     }
 

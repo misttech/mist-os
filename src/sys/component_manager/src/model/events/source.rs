@@ -166,6 +166,7 @@ impl EventSource {
     /// The client might request to subscribe to events that it's not allowed to see. Events
     /// that are allowed should have been defined in its manifest and either offered to it or
     /// requested from the current realm.
+    #[cfg(test)]
     pub async fn subscribe(
         &mut self,
         requests: Vec<EventSubscription>,
