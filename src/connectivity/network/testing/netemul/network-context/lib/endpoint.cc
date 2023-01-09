@@ -44,7 +44,7 @@ class EndpointImpl : public data::Consumer {
   void SetClosedCallback(fit::closure cb) { closed_callback_ = std::move(cb); }
 
   virtual zx_status_t Setup(const std::string& name, bool start_online,
-                            const NetworkContext& context, size_t id) = 0;
+                            const NetworkContext& context) = 0;
 
   virtual void SetLinkUp(bool up, fit::callback<void()> done) = 0;
 
@@ -95,8 +95,8 @@ class NetworkDeviceImpl : public EndpointImpl,
  public:
   explicit NetworkDeviceImpl(Endpoint::Config config) : EndpointImpl(std::move(config)) {}
 
-  zx_status_t Setup(const std::string& name, bool start_online, const NetworkContext& context,
-                    /* unused by NetworkDevice endpoints */ size_t it) override {
+  zx_status_t Setup(const std::string& name, bool start_online,
+                    const NetworkContext& context) override {
     device_name_ = name;
 
     auto tun_ctl = context.ConnectNetworkTun().BindSync();
@@ -281,8 +281,8 @@ Endpoint::Endpoint(NetworkContext* context, std::string name, Endpoint::Config c
   bindings_.set_empty_set_handler(close_handler);
 }
 
-zx_status_t Endpoint::Startup(const NetworkContext& context, bool start_online, size_t id) {
-  return impl_->Setup(name_, start_online, context, id);
+zx_status_t Endpoint::Startup(const NetworkContext& context, bool start_online) {
+  return impl_->Setup(name_, start_online, context);
 }
 
 Endpoint::~Endpoint() = default;
