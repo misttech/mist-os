@@ -199,12 +199,20 @@ void ElfImage::Relocate() {
   }
 }
 
-void ElfImage::AssertInterp(ktl::string_view prefix, ktl::string_view interp) {
-  ZX_ASSERT_MSG(interp_, "%.*s: ELF image has no PT_INTERP (expected %.*s)",
+void ElfImage::AssertInterpMatchesBuildId(ktl::string_view prefix,
+                                          const elfldltl::ElfNote& build_id_note) {
+  ZX_DEBUG_ASSERT(build_id_note.IsBuildId());
+  ZX_ASSERT_MSG(build_id_note.desc.size() <= kMaxBuildIdLen,
+                "%.*s: reference build ID of %zu bytes > max supported %zu",
                 static_cast<int>(prefix.size()), prefix.data(),  //
-                static_cast<int>(interp.size()), interp.data());
-  ZX_ASSERT_MSG(*interp_ == interp, "%.*s: ELF image PT_INTERP %.*s != expected %.*s)",
+                build_id_note.desc.size(), kMaxBuildIdLen);
+  char build_id_hex_buffer[kMaxBuildIdLen * 2];
+  ktl::string_view build_id_hex = build_id_note.HexString(build_id_hex_buffer);
+  ZX_ASSERT_MSG(interp_, "%.*s: ELF image has no PT_INTERP (expected %.*s)",
+                static_cast<int>(prefix.size()), prefix.data(),
+                static_cast<int>(build_id_hex.size()), build_id_hex.data());
+  ZX_ASSERT_MSG(*interp_ == build_id_hex, "%.*s: ELF image PT_BUILD_ID_HEX %.*s != expected %.*s)",
                 static_cast<int>(prefix.size()), prefix.data(),      //
                 static_cast<int>(interp_->size()), interp_->data(),  //
-                static_cast<int>(interp.size()), interp.data());
+                static_cast<int>(build_id_hex.size()), build_id_hex.data());
 }

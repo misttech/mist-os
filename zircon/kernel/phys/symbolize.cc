@@ -18,6 +18,10 @@
 #include <phys/stack.h>
 #include <pretty/hexdump.h>
 
+#ifdef __ELF__
+#include <lib/elfldltl/note.h>
+#endif
+
 // The zx_*_t types used in the exception stuff aren't defined for 32-bit.
 // There is no exception handling implementation for 32-bit.
 #ifndef __i386__
@@ -25,8 +29,6 @@
 #endif
 
 #include <ktl/enforce.h>
-
-Symbolize* gSymbolize = nullptr;
 
 #ifdef __ELF__
 
@@ -39,78 +41,20 @@ static constexpr auto kLinkTimeAddress = PHYS_LOAD_ADDRESS;
 static constexpr uintptr_t kLinkTimeAddress = 0;
 #endif
 
-// Arbitrary, but larger than any known format in use.
-static constexpr size_t kMaxBuildIdSize = 32;
-
-struct BuildIdNote final {
-  static constexpr char kName_[] = "GNU";
-  static constexpr uint32_t kType_ = 3;  // NT_GNU_BUILD_ID
-
-  uint32_t n_namesz, n_descsz, n_type;
-  alignas(4) char name[sizeof(kName_)];
-  alignas(4) uint8_t build_id[/* n_descsz */];
-
-  bool matches() const {
-    return (n_type == kType_ &&
-            // n_namesz includes the NUL terminator.
-            ktl::string_view{name, n_namesz} == ktl::string_view{kName_, sizeof(kName_)});
-  }
-
-  const BuildIdNote* next() const {
-    return reinterpret_cast<const BuildIdNote*>(&name[(n_namesz + 3) & -4] + ((n_descsz + 3) & -4));
-  }
-};
-
 // These are defined by the linker script.
 extern "C" void __code_start();
-extern "C" const BuildIdNote __start_note_gnu_build_id[];
-extern "C" const BuildIdNote __stop_note_gnu_build_id[];
-
-class BuildId {
- public:
-  auto begin() const { return note_->build_id; }
-  auto end() const { return begin() + size(); }
-  size_t size() const { return note_->n_descsz; }
-
-  ktl::string_view Print() const { return {hex_, size() * 2}; }
-
-  void Init(const BuildIdNote* start = __start_note_gnu_build_id,
-            const BuildIdNote* stop = __stop_note_gnu_build_id) {
-    note_ = start;
-    ZX_ASSERT(note_->matches());
-    ZX_ASSERT(note_->next() <= stop);
-    ZX_ASSERT(size() <= kMaxBuildIdSize);
-    char* p = hex_;
-    for (uint8_t byte : *this) {
-      *p++ = "0123456789abcdef"[byte >> 4];
-      *p++ = "0123456789abcdef"[byte & 0xf];
-    }
-  }
-
-  static const BuildId& GetInstance() {
-    if (!gInstance.note_) {
-      gInstance.Init();
-    }
-    return gInstance;
-  }
-
- private:
-  static BuildId gInstance;
-
-  const BuildIdNote* note_;
-  char hex_[kMaxBuildIdSize * 2];
-};
-
-BuildId BuildId::gInstance;
+extern "C" const ktl::byte __start_note_gnu_build_id[];
+extern "C" const ktl::byte __stop_note_gnu_build_id[];
 
 }  // namespace
 
-ktl::string_view Symbolize::BuildIdString() { return BuildId::GetInstance().Print(); }
+elfldltl::ElfNote Symbolize::BuildId() const {
+  ktl::span kNoteBytes{__start_note_gnu_build_id, __stop_note_gnu_build_id};
 
-ktl::span<const ktl::byte> Symbolize::BuildId() const {
-  const auto& id = BuildId::GetInstance();
-  return {reinterpret_cast<const ktl::byte*>(id.begin()),
-          reinterpret_cast<const ktl::byte*>(id.end())};
+  elfldltl::ElfNoteSegment<> notes({kNoteBytes.data(), kNoteBytes.size()});
+  ZX_DEBUG_ASSERT(notes.begin() != notes.end());
+  ZX_DEBUG_ASSERT(++notes.begin() == notes.end());
+  return *notes.begin();
 }
 
 void Symbolize::ContextAlways() {
@@ -122,7 +66,7 @@ void Symbolize::ContextAlways() {
   auto start = reinterpret_cast<uintptr_t>(__code_start);
   auto end = reinterpret_cast<uintptr_t>(_end);
   writer_.Prefix(name_).Reset().Newline();
-  writer_.Prefix(name_).ElfModule(0, name_, BuildId()).Newline();
+  writer_.Prefix(name_).ElfModule(0, name_, BuildId().desc).Newline();
   writer_.Prefix(name_)
       .LoadImageMmap(start, static_cast<size_t>(end - start), 0, kRWX,
                      reinterpret_cast<uint64_t>(kLinkTimeAddress))
@@ -135,6 +79,8 @@ void Symbolize::ContextAlways() {
 void Symbolize::ContextAlways() {}
 
 #endif  // __ELF__
+
+Symbolize* gSymbolize = nullptr;
 
 const char* ProgramName() {
   if (gSymbolize) {

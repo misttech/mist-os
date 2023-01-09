@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_
 
 #include <lib/stdcompat/span.h>
+#include <zircon/compiler.h>
 
 #include <optional>
 #include <string_view>
@@ -607,7 +608,7 @@ class DynamicNeededObserver
 
  private:
   const SymbolInfo& si;
-  [[no_unique_address]] Callback callback;
+  __NO_UNIQUE_ADDRESS Callback callback;
 };
 
 // Deduction guides.

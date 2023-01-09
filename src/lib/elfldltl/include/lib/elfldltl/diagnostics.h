@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 
 #include <string_view>
 #include <tuple>
@@ -176,9 +177,9 @@ struct DiagnosticsFlags {
 // An alternative Flags type can be defined like this one to make one or more
 // of the values fixed, or to change the default value of a mutable flag.
 struct DiagnosticsPanicFlags {
-  [[no_unique_address]] std::false_type multiple_errors;
-  [[no_unique_address]] std::true_type warnings_are_errors;
-  [[no_unique_address]] std::false_type extra_checking;
+  __NO_UNIQUE_ADDRESS std::false_type multiple_errors;
+  __NO_UNIQUE_ADDRESS std::true_type warnings_are_errors;
+  __NO_UNIQUE_ADDRESS std::false_type extra_checking;
 };
 
 // elfldltl::Diagnostics provides a canonical implementation of a diagnostics
@@ -259,7 +260,7 @@ class Diagnostics {
  private:
   // This is either a wrapper around an integer, or is an empty object.
   // The tag is unused but makes the two Count types always distinct so
-  // that adjacent empty members with [[no_unique_address]] can be elided.
+  // that adjacent empty members with __NO_UNIQUE_ADDRESS can be elided.
   template <bool Counting, auto Tag>
   struct Count;
 
@@ -289,10 +290,10 @@ class Diagnostics {
   static constexpr bool kCount =
       !std::is_same_v<decltype(std::declval<Flags>().multiple_errors), std::false_type>;
 
-  [[no_unique_address]] Report report_;
-  [[no_unique_address]] Flags flags_;
-  [[no_unique_address]] Count<kCount, &Flags::multiple_errors> errors_;
-  [[no_unique_address]] Count<kCount, &Flags::warnings_are_errors> warnings_;
+  __NO_UNIQUE_ADDRESS Report report_;
+  __NO_UNIQUE_ADDRESS Flags flags_;
+  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::multiple_errors> errors_;
+  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::warnings_are_errors> warnings_;
 };
 
 // This creates a callable object to use as the Report function in a

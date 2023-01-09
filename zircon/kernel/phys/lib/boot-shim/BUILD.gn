@@ -33,6 +33,9 @@ zx_library("boot-shim") {
     # <lib/boot-shim/item-base.h> has #include <lib/zbitl/image.h>.
     "//src/lib/zbitl",
 
+    # <lib/boot-shim/boot-shim.h> has #include <lib/elfldltl/note.h>.
+    "//src/lib/elfldltl",
+
     # <lib/boot-shim/item-base.h> has #include <lib/fit/result.h>
     "//zircon/system/ulib/zx",
 

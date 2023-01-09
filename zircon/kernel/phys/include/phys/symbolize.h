@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
 
+#include <lib/elfldltl/note.h>
 #include <lib/symbolizer-markup/writer.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -61,11 +62,8 @@ class Symbolize {
   ShadowCallStackBacktrace GetShadowCallStackBacktrace(
       uintptr_t scsp = GetShadowCallStackPointer()) const;
 
-  // Return the hex string for the program's own build ID.
-  ktl::string_view BuildIdString();
-
-  // Return the raw bytes for the program's own build ID.
-  ktl::span<const ktl::byte> BuildId() const;
+  // Return the ELF build ID note for the main executable.
+  elfldltl::ElfNote BuildId() const;
 
   // Print the contextual markup elements describing this phys executable.
   void ContextAlways();

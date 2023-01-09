@@ -66,7 +66,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   // The GN target for get-int uses kernel_elf_interp() on this test binary.
   printf("Verifying PT_INTERP matches test build ID...\n");
-  elf.AssertInterp(kGetInt, symbolize.BuildIdString());
+  elf.AssertInterpMatchesBuildId(kGetInt, symbolize.BuildId());
 
   printf("Calling entry point...\n");
 

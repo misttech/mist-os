@@ -34,6 +34,8 @@ class ElfImage {
 
   static constexpr size_t kMaxLoad = 4;  // RODATA, CODE, RELRO, DATA
 
+  static constexpr size_t kMaxBuildIdLen = 32;
+
   using LoadInfo = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxLoad>::Container,
                                       elfldltl::PhdrLoadPolicy::kContiguous>;
 
@@ -108,9 +110,9 @@ class ElfImage {
   // Apply relocations to the image in place after setting the load address.
   void Relocate();
 
-  // Panic if the loaded file doesn't have a PT_INTERP matching this string.
-  // The prefix is used in the panic message.
-  void AssertInterp(ktl::string_view prefix, ktl::string_view interp);
+  // Panic if the loaded file doesn't have a PT_INTERP matching the hex string
+  // corresponding to this build ID note; the prefix is used in panic messages.
+  void AssertInterpMatchesBuildId(ktl::string_view prefix, const elfldltl::ElfNote& build_id);
 
   // Call the image's entry point as a function type F.
   template <typename F, typename... Args>

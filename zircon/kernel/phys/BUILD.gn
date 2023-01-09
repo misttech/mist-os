@@ -134,6 +134,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
 
     deps = [
+      "//src/lib/elfldltl",
       "//src/lib/symbolizer-markup",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/ktl",
@@ -145,8 +146,11 @@ if (toolchain_environment == "kernel.phys" ||
       # "symbolize.h" has #include <phys/main.h>.
       ":main",
 
-      # "symbolize.h" has #include <lib/symbolizer-markup/writer.h>.
+      # <phys/symbolize.h> has #include <lib/symbolizer-markup/writer.h>.
       "//src/lib/symbolizer-markup",
+
+      # <phys/symbolize.h> has #include <lib/elfldltl/note.h>
+      "//src/lib/elfldltl",
     ]
 
     public_configs = [ ":includes" ]

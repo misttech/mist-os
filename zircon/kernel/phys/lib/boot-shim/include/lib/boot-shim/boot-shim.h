@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_BOOT_SHIM_H_
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_BOOT_SHIM_H_
 
+#include <lib/elfldltl/note.h>
 #include <lib/stdcompat/span.h>
 #include <stdio.h>
 
@@ -44,11 +45,13 @@ class BootShimBase : public ItemBase {
  protected:
   class Cmdline : public ItemBase {
    public:
-    enum Index : size_t { kName, kInfo, kBuildId, kLegacy, kCount };
+    enum Index : size_t { kName, kInfo, kLegacy, kCount };
 
     constexpr std::string_view& operator[](Index i) { return chunks_[i]; }
 
     constexpr std::string_view operator[](Index i) const { return chunks_[i]; }
+
+    void set_build_id(const elfldltl::ElfNote& build_id) { build_id_ = build_id; }
 
     void set_strings(cpp20::span<std::string_view> strings) { strings_ = strings; }
     void set_cstr(cpp20::span<const char*> cstr) { cstr_ = cstr; }
@@ -59,6 +62,7 @@ class BootShimBase : public ItemBase {
    private:
     size_t Collect(std::optional<WritableBytes> payload = std::nullopt) const;
 
+    elfldltl::ElfNote build_id_;
     std::array<std::string_view, kCount> chunks_;
     cpp20::span<std::string_view> strings_;
     cpp20::span<const char*> cstr_;
@@ -122,8 +126,8 @@ class BootShim : public BootShimBase {
     return *this;
   }
 
-  constexpr BootShim& set_build_id(std::string_view str) {
-    Get<Cmdline>()[Cmdline::kBuildId] = str;
+  constexpr BootShim& set_build_id(const elfldltl::ElfNote& build_id) {
+    Get<Cmdline>().set_build_id(build_id);
     return *this;
   }
 

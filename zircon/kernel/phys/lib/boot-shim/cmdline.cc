@@ -23,21 +23,20 @@ size_t BootShimBase::Cmdline::Collect(std::optional<ItemBase::WritableBytes> pay
     total += str.size();
   };
 
-  auto chunk = [this](std::string_view prefix, Index i) {
-    return std::array<std::string_view, 2>{prefix, chunks_[i]};
+  auto add_chunk = [this, &add](std::string_view prefix, Index i) {
+    if (!chunks_[i].empty()) {
+      add(prefix);
+      add(chunks_[i]);
+    }
   };
 
-  for (auto [prefix, value] : {
-           chunk("bootloader.name=", kName),
-           chunk(" bootloader.info=", kInfo),
-           chunk(" bootloader.build-id=", kBuildId),
-           chunk(" ", kLegacy),
-       }) {
-    if (!value.empty()) {
-      add(prefix);
-      add(value);
-    }
+  add_chunk("bootloader.name=", kName);
+  add_chunk(" bootloader.info=", kInfo);
+  if (!build_id_.desc.empty()) {
+    add(" bootloader.build_id=");
+    build_id_.HexDump([&add](char c) { add({&c, 1}); });
   }
+  add_chunk(" ", kLegacy);
 
   auto add_strings = [add_one = [&add](std::string_view str) {
     add(" ");

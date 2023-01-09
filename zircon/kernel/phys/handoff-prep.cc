@@ -88,7 +88,7 @@ void HandoffPrep::SetInstrumentation() {
 
   // Publish llvm-profdata if present.
   LlvmProfdata profdata;
-  profdata.Init(gSymbolize->BuildId());
+  profdata.Init(gSymbolize->BuildId().desc);
   if (profdata.size_bytes() != 0) {
     fbl::AllocChecker ac;
     ktl::span buffer = New(handoff()->instrumentation.llvm_profdata, ac, profdata.size_bytes());

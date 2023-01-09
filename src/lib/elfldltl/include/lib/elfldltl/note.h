@@ -28,7 +28,7 @@ namespace elfldltl {
 struct ElfNote {
   using Bytes = cpp20::span<const std::byte>;
 
-  ElfNote() = delete;
+  constexpr ElfNote() = default;
 
   constexpr ElfNote(const ElfNote&) = default;
 
@@ -39,13 +39,7 @@ struct ElfNote {
         desc(note.subspan(nhdr.desc_offset(), nhdr.descsz)),
         type(nhdr.type) {}
 
-  // For some reason `= default;` here doesn't permit constexpr.
-  constexpr ElfNote& operator=(const ElfNote& other) {
-    name = other.name;
-    desc = other.desc;
-    type = other.type;
-    return *this;
-  }
+  constexpr ElfNote& operator=(const ElfNote& other) = default;
 
   // Match against an expected name.
   template <size_t N>
@@ -96,7 +90,7 @@ struct ElfNote {
 
   std::string_view name;
   Bytes desc;
-  uint32_t type;
+  uint32_t type = 0;
 };
 
 // This is a forward-iterable container view of notes in a note segment,

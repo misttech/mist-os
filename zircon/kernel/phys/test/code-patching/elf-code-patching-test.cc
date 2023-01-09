@@ -61,7 +61,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
       return 1;
     }
 
-    add_one.AssertInterp(kAddOne, symbolize.BuildIdString());
+    add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
     unpatched = add_one.Load(false);
     add_one.Relocate();
 
@@ -82,7 +82,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
       return 1;
     }
 
-    add_one.AssertInterp(kAddOne, symbolize.BuildIdString());
+    add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
     patched = add_one.Load(false);
     add_one.Relocate();
 
@@ -119,7 +119,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
       return 1;
     }
 
-    multiply.AssertInterp(kMultiply, symbolize.BuildIdString());
+    multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
     patched_stub2 = multiply.Load(false);
     multiply.Relocate();
 
@@ -157,7 +157,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
       return 1;
     }
 
-    multiply.AssertInterp(kMultiply, symbolize.BuildIdString());
+    multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
     patched_stub10 = multiply.Load(false);
     multiply.Relocate();
 

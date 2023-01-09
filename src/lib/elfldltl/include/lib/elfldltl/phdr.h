@@ -7,6 +7,7 @@
 
 #include <lib/stdcompat/bit.h>
 #include <lib/stdcompat/span.h>
+#include <zircon/compiler.h>
 
 #include <algorithm>
 #include <limits>
@@ -324,7 +325,7 @@ class PhdrStackObserver : public PhdrSingletonObserver<Elf, ElfPhdrType::kStack>
 
   std::optional<Phdr> phdr_;
   std::optional<size_type>& size_;
-  [[no_unique_address]] std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
+  __NO_UNIQUE_ADDRESS std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
 };
 
 // A generic metadata, singleton observer that validates constraints around
@@ -586,11 +587,10 @@ class PhdrLoadObserver
 
   // The highest `p_align`-aligned address and offset seen thus far.
   size_type high_memory_watermark_;
-  [[no_unique_address]] std::conditional_t<kTrackFileOffsets, size_type, Empty>
-      high_file_watermark_;
+  __NO_UNIQUE_ADDRESS std::conditional_t<kTrackFileOffsets, size_type, Empty> high_file_watermark_;
 
   // Additional tail of observer function.
-  [[no_unique_address]] Callback callback_;
+  __NO_UNIQUE_ADDRESS Callback callback_;
 };
 
 // This acts as a deduction guide with partial explicit specialization.
