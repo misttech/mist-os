@@ -12,6 +12,7 @@ use lowpan_driver_common::net::BackboneInterface;
 use lowpan_driver_common::AsyncConditionWait;
 use lowpan_driver_common::Driver as LowpanDriver;
 use lowpan_driver_common::ZxResult;
+use openthread::ot::SrpServerLeaseInfo;
 
 /// Helpers for API-related tasks.
 impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
@@ -834,6 +835,60 @@ where
 
         let ot = &driver_state.ot_instance;
 
+        // Compute total lease times and host/service fresh counts.
+        let mut hosts_registration = SrpServerRegistration {
+            deleted_count: Some(0),
+            fresh_count: Some(0),
+            lease_time_total: Some(0),
+            key_lease_time_total: Some(0),
+            remaining_lease_time_total: Some(0),
+            remaining_key_lease_time_total: Some(0),
+            ..SrpServerRegistration::EMPTY
+        };
+        let mut services_registration = SrpServerRegistration {
+            deleted_count: Some(0),
+            fresh_count: Some(0),
+            lease_time_total: Some(0),
+            key_lease_time_total: Some(0),
+            remaining_lease_time_total: Some(0),
+            remaining_key_lease_time_total: Some(0),
+            ..SrpServerRegistration::EMPTY
+        };
+        for srp_host in ot.srp_server_hosts() {
+            if srp_host.is_deleted() {
+                *hosts_registration.deleted_count.get_or_insert(0) += 1;
+            } else {
+                *hosts_registration.fresh_count.get_or_insert(0) += 1;
+                let mut lease_info = SrpServerLeaseInfo::default();
+                srp_host.get_lease_info(&mut lease_info);
+                *hosts_registration.lease_time_total.get_or_insert(0) +=
+                    lease_info.lease().into_nanos();
+                *hosts_registration.key_lease_time_total.get_or_insert(0) +=
+                    lease_info.key_lease().into_nanos();
+                *hosts_registration.remaining_lease_time_total.get_or_insert(0) +=
+                    lease_info.remaining_lease().into_nanos();
+                *hosts_registration.remaining_key_lease_time_total.get_or_insert(0) +=
+                    lease_info.remaining_key_lease().into_nanos();
+            }
+            for srp_service in srp_host.services() {
+                if srp_service.is_deleted() {
+                    *services_registration.deleted_count.get_or_insert(0) += 1;
+                } else {
+                    *services_registration.fresh_count.get_or_insert(0) += 1;
+                    let mut lease_info = SrpServerLeaseInfo::default();
+                    srp_service.get_lease_info(&mut lease_info);
+                    *services_registration.lease_time_total.get_or_insert(0) +=
+                        lease_info.lease().into_nanos();
+                    *services_registration.key_lease_time_total.get_or_insert(0) +=
+                        lease_info.key_lease().into_nanos();
+                    *services_registration.remaining_lease_time_total.get_or_insert(0) +=
+                        lease_info.remaining_lease().into_nanos();
+                    *services_registration.remaining_key_lease_time_total.get_or_insert(0) +=
+                        lease_info.remaining_key_lease().into_nanos();
+                }
+            }
+        }
+
         Ok(Telemetry {
             rssi: Some(ot.get_rssi()),
             partition_id: Some(ot.get_partition_id()),
@@ -857,6 +912,8 @@ where
                 },
                 address_mode: Some(ot.srp_server_get_address_mode().into_ext()),
                 response_counters: Some(ot.srp_server_get_response_counters().into_ext()),
+                hosts_registration: Some(hosts_registration),
+                services_registration: Some(services_registration),
                 ..SrpServerInfo::EMPTY
             }),
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),

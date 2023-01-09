@@ -91,7 +91,7 @@ pub mod lowpan_fidl {
         LegacyJoiningConnectorRequestStream, LegacyJoiningMarker, LegacyJoiningRequest,
         LegacyJoiningRequestStream, NetworkScanParameters, OnMeshPrefix, ProvisionError,
         ProvisioningMonitorRequest, ProvisioningProgress, RoutePreference, SrpServerAddressMode,
-        SrpServerInfo, SrpServerState, Telemetry,
+        SrpServerInfo, SrpServerRegistration, SrpServerState, Telemetry,
     };
     pub use fidl_fuchsia_lowpan_test::*;
     pub use fidl_fuchsia_lowpan_thread::*;

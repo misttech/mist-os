@@ -838,6 +838,82 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                         },
                                     );
                                 }
+                                if let Some(y) = x.hosts_registration {
+                                    srp_server_info_child.record_child(
+                                        "hosts_registration",
+                                        |hosts_registration_child| {
+                                            if let Some(z) = y.fresh_count {
+                                                hosts_registration_child
+                                                    .record_uint("fresh_count", z.into());
+                                            }
+                                            if let Some(z) = y.deleted_count {
+                                                hosts_registration_child
+                                                    .record_uint("deleted_count", z.into());
+                                            }
+                                            if let Some(z) = y.lease_time_total {
+                                                if let Ok(t) = u64::try_from(z) {
+                                                    hosts_registration_child
+                                                        .record_uint("lease_time_total", t);
+                                                }
+                                            }
+                                            if let Some(z) = y.key_lease_time_total {
+                                                if let Ok(t) = u64::try_from(z) {
+                                                    hosts_registration_child
+                                                        .record_uint("key_lease_time_total", t);
+                                                }
+                                            }
+                                            if let Some(z) = y.remaining_lease_time_total {
+                                                if let Ok(t) = u64::try_from(z) {
+                                                    hosts_registration_child.record_uint(
+                                                        "remaining_lease_time_total",
+                                                        t,
+                                                    );
+                                                }
+                                            }
+                                            if let Some(z) = y.remaining_key_lease_time_total {
+                                                if let Ok(t) = u64::try_from(z) {
+                                                    hosts_registration_child.record_uint(
+                                                        "remaining_key_lease_time_total",
+                                                        t,
+                                                    );
+                                                }
+                                            }
+                                        },
+                                    );
+                                }
+                                if let Some(y) = x.services_registration {
+                                    srp_server_info_child.record_child(
+                                        "services_registration",
+                                        |services_registration_child| {
+                                            if let Some(z) = y.fresh_count {
+                                                services_registration_child
+                                                    .record_uint("fresh_count", z.into());
+                                            }
+                                            if let Some(z) = y.deleted_count {
+                                                services_registration_child
+                                                    .record_uint("deleted_count", z.into());
+                                            }
+                                            if let Some(z) = y.lease_time_total {
+                                                services_registration_child
+                                                    .record_int("lease_time_total", z);
+                                            }
+                                            if let Some(z) = y.key_lease_time_total {
+                                                services_registration_child
+                                                    .record_int("key_lease_time_total", z);
+                                            }
+                                            if let Some(z) = y.remaining_lease_time_total {
+                                                services_registration_child
+                                                    .record_int("remaining_lease_time_total", z);
+                                            }
+                                            if let Some(z) = y.remaining_key_lease_time_total {
+                                                services_registration_child.record_int(
+                                                    "remaining_key_lease_time_total",
+                                                    z,
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
                             });
                         }
                         if let Some(x) = telemetry_data.leader_data {

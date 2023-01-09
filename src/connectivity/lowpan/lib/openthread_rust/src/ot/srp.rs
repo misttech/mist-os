@@ -201,6 +201,12 @@ impl SrpServerHost {
     }
 
     /// Functional equivalent of
+    /// [`otsys::otSrpServerHostGetLeaseInfo`](crate::otsys::otSrpServerHostGetLeaseInfo).
+    pub fn get_lease_info(&self, lease_info: &mut SrpServerLeaseInfo) {
+        unsafe { otSrpServerHostGetLeaseInfo(self.as_ot_ptr(), lease_info.as_ot_mut_ptr()) }
+    }
+
+    /// Functional equivalent of
     /// [`otsys::otSrpServerHostGetNextService`](crate::otsys::otSrpServerHostGetNextService).
     pub fn next_service<'a>(
         &'a self,
@@ -311,6 +317,12 @@ impl SrpServerService {
     /// [`otsys::otSrpServerServiceIsDeleted`](crate::otsys::otSrpServerServiceIsDeleted).
     pub fn is_deleted(&self) -> bool {
         unsafe { otSrpServerServiceIsDeleted(self.as_ot_ptr()) }
+    }
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerServiceGetLeaseInfo`](crate::otsys::otSrpServerServiceGetLeaseInfo).
+    pub fn get_lease_info(&self, lease_info: &mut SrpServerLeaseInfo) {
+        unsafe { otSrpServerServiceGetLeaseInfo(self.as_ot_ptr(), lease_info.as_ot_mut_ptr()) }
     }
 
     /// Functional equivalent of

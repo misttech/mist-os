@@ -4,6 +4,7 @@
 library fuchsia.lowpan.experimental;
 
 using fuchsia.lowpan;
+using zx;
 
 /// Protocol for connecting to [`TelemetryProvider`] on a LoWPAN interface.
 @discoverable
@@ -144,6 +145,39 @@ type DnssdCounters = table {
     7: resolved_by_srp uint32;
 };
 
+/// Registration information about the SRP server.
+type SrpServerRegistration = table {
+    /// Number of hosts/services that have not been deleted.
+    ///
+    /// Required.
+    1: fresh_count uint32;
+
+    /// Number of hosts/services that have been deleted.
+    ///
+    /// Required.
+    2: deleted_count uint32;
+
+    /// Total lease time.
+    ///
+    /// Required.
+    3: lease_time_total zx.duration;
+
+    /// Total key lease time.
+    ///
+    /// Required.
+    4: key_lease_time_total zx.duration;
+
+    /// Total remaining lease time.
+    ///
+    /// Required.
+    5: remaining_lease_time_total zx.duration;
+
+    /// Total remaining key lease time.
+    ///
+    /// Required.
+    6: remaining_key_lease_time_total zx.duration;
+};
+
 /// State information about the SRP server.
 type SrpServerInfo = table {
     /// The operational state of the SRP server.
@@ -207,6 +241,16 @@ type SrpServerInfo = table {
         /// Required.
         6: other_response uint32;
     };
+
+    /// The registration information of SRP hosts.
+    ///
+    /// Required.
+    5: hosts_registration SrpServerRegistration;
+
+    /// The registration information of SRP services.
+    ///
+    /// Required.
+    6: services_registration SrpServerRegistration;
 };
 
 
