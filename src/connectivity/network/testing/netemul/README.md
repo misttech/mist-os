@@ -165,7 +165,6 @@ defined in the source code of the Netemul Runner
 | `mac`     | (optional) String  | MAC address of the virtual endpoint. If not set, will be generated randomly using the endpoint's name as a seed. |
 | `mtu`     | (optional) Number  | MTU of the virtual endpoint. If not set, defaults to 1500.                                                       |
 | `up`      | (optional) Boolean | Whether to bring the link up during network setup. If not set, defaults to `true`.                               |
-| `backing` | (optional) String  | Backing type of endpoint, either `"ethertap"` or `"network_device"`. If not set, defaults to `"network_device"`. |
 
 ##### `Netstack`: a configurable netstack component.
 
