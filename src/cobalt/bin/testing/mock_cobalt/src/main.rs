@@ -269,7 +269,8 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(IncomingService::Metrics)
         .add_fidl_service(IncomingService::MetricsQuery);
     fs.take_and_serve_directory_handle()?;
-    fs.then(futures::future::ok)
+    let _ = fs
+        .then(futures::future::ok)
         .try_for_each_concurrent(None, |client_request| async {
             let loggers = loggers.clone();
             match client_request {
@@ -279,7 +280,9 @@ async fn main() -> Result<(), Error> {
                 }
             }
         })
-        .await?;
+        .await;
+
+    info!("Exiting mock cobalt service...");
 
     Ok(())
 }
