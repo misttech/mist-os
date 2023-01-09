@@ -11,6 +11,8 @@ sdk_source_set("cpp") {
 
   sources = [
     "constants.h",
+    "internal.cc",
+    "internal.h",
     "service_client.cc",
     "service_client.h",
   ]
