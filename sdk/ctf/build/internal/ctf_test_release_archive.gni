@@ -109,6 +109,7 @@ template("ctf_test_release_archive") {
           component_name = invoker.component_name
           package_name = invoker.package_name
           plasa_element = invoker.plasa_element
+          gn_label = get_label_info(invoker.package_name, "label_no_toolchain")
           if (defined(invoker.log_settings)) {
             log_settings = invoker.log_settings
           }
