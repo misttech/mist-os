@@ -25,7 +25,7 @@ ReleaseFenceManager::ReleaseFenceManager(async_dispatcher_t* dispatcher) : dispa
 
 void ReleaseFenceManager::OnGpuCompositedFrame(
     uint64_t frame_number, zx::event render_finished_fence, std::vector<zx::event> release_fences,
-    scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback) {
+    scheduling::FramePresentedCallback frame_presented_callback) {
   auto record = NewGpuCompositionFrameRecord(frame_number, std::move(render_finished_fence),
                                              std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
@@ -34,7 +34,7 @@ void ReleaseFenceManager::OnGpuCompositedFrame(
 
 void ReleaseFenceManager::OnDirectScanoutFrame(
     uint64_t frame_number, std::vector<zx::event> release_fences,
-    scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback) {
+    scheduling::FramePresentedCallback frame_presented_callback) {
   auto record = NewDirectScanoutFrameRecord(std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
   StashFrameRecord(frame_number, std::move(record));
@@ -158,7 +158,7 @@ void ReleaseFenceManager::SignalOrScheduleSignalForReleaseFences(
 
 std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewGpuCompositionFrameRecord(
     uint64_t frame_number, zx::event render_finished_fence,
-    scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback) {
+    scheduling::FramePresentedCallback frame_presented_callback) {
   FX_DCHECK(render_finished_fence);
   auto record = std::make_unique<ReleaseFenceManager::FrameRecord>();
   record->frame_type = FrameType::kGpuComposition;
@@ -191,7 +191,7 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewGpuCom
 }
 
 std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewDirectScanoutFrameRecord(
-    scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback) {
+    scheduling::FramePresentedCallback frame_presented_callback) {
   auto record = std::make_unique<ReleaseFenceManager::FrameRecord>();
   record->frame_type = FrameType::kDirectScanout;
   record->frame_presented_callback = std::move(frame_presented_callback);

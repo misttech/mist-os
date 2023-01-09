@@ -114,8 +114,7 @@ DisplaySwapchain::~DisplaySwapchain() {
       if (record->render_finished_wait->is_pending()) {
         // There has not been an OnFrameRendered signal. The wait will be destroyed when this
         // function returns. Record infinite time to signal unknown render time.
-        record->frame_timings->OnFrameRendered(record->swapchain_index,
-                                               scheduling::FrameRenderer::kTimeDropped);
+        record->frame_timings->OnFrameRendered(record->swapchain_index, scheduling::kTimeDropped);
       }
       record->frame_timings->OnFrameDropped(record->swapchain_index);
     }

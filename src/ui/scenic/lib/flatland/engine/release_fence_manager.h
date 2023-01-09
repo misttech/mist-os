@@ -9,6 +9,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/zx/event.h>
 
+#include <map>
 #include <vector>
 
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
@@ -31,7 +32,7 @@ namespace flatland {
 // ReleaseFenceManager handles these cases separately, in order to minimize the latency before
 // clients can reuse their images.
 //
-// === Design Requirements for invoking FrameRenderer::FramePresentedCallback ===
+// === Design Requirements for invoking FramePresentedCallback ===
 //
 // The contract with FrameScheduler requires that these callbacks are invoked in the order that they
 // are received.  As a result, callback invocation may be delayed even though all of the information
@@ -74,18 +75,17 @@ class ReleaseFenceManager final {
   //   - |render_finished_fence| has been signaled, and:
   //   - corresponding OnVsync() has been called, and:
   //   - all previous callbacks have been invoked
-  void OnGpuCompositedFrame(
-      uint64_t frame_number, zx::event render_finished_fence, std::vector<zx::event> release_fences,
-      scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback);
+  void OnGpuCompositedFrame(uint64_t frame_number, zx::event render_finished_fence,
+                            std::vector<zx::event> release_fences,
+                            scheduling::FramePresentedCallback frame_presented_callback);
 
   // Stores a record for a new direct-scanout frame.  |frame_number| must be one larger than the
   // previous frame.  Later, when it is safe, signals |release_fences| (see class comment).
   // Invokes |frame_presented_callback| when:
   //   - corresponding OnVsync() has been called, and:
   //   - all previous callbacks have been invoked
-  void OnDirectScanoutFrame(
-      uint64_t frame_number, std::vector<zx::event> release_fences,
-      scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback);
+  void OnDirectScanoutFrame(uint64_t frame_number, std::vector<zx::event> release_fences,
+                            scheduling::FramePresentedCallback frame_presented_callback);
 
   // Called when the specified frame has appeared on screen.  |frame_number| must monotonically
   // increase with each subsequent call (repeats are OK).
@@ -100,12 +100,12 @@ class ReleaseFenceManager final {
   struct FrameRecord {
     FrameType frame_type;
 
-    scheduling::FrameRenderer::Timestamps timestamps;
+    scheduling::Timestamps timestamps;
 
     std::vector<zx::event> release_fences_to_signal_when_render_finished;
     std::vector<zx::event> release_fences_to_signal_when_frame_presented;
 
-    scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback;
+    scheduling::FramePresentedCallback frame_presented_callback;
 
     // Note the relative ordering of these two fields is important because
     // during destruction we need to destruct the WaitOnce before closing
@@ -129,10 +129,10 @@ class ReleaseFenceManager final {
 
   std::unique_ptr<FrameRecord> NewGpuCompositionFrameRecord(
       uint64_t frame_number, zx::event render_finished_fence,
-      scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback);
+      scheduling::FramePresentedCallback frame_presented_callback);
 
   std::unique_ptr<FrameRecord> NewDirectScanoutFrameRecord(
-      scheduling::FrameRenderer::FramePresentedCallback frame_presented_callback);
+      scheduling::FramePresentedCallback frame_presented_callback);
 
   void StashFrameRecord(uint64_t frame_number, std::unique_ptr<FrameRecord> record);
 

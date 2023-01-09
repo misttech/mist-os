@@ -70,7 +70,7 @@ void Engine::InitializeInspectObjects() {
 
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                                   const FlatlandDisplay& display,
-                                  scheduling::FrameRenderer::FramePresentedCallback callback) {
+                                  scheduling::FramePresentedCallback callback) {
   TRACE_DURATION("gfx", "flatland::Engine::RenderScheduledFrame");
   // NOTE: This is a temporary situation; soon FlatlandDisplay will be the only way to connect
   // content to a display.

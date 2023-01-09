@@ -14,7 +14,6 @@
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/ui/lib/display/get_hardware_display_controller.h"
 #include "src/ui/lib/escher/escher.h"
-#include "src/ui/scenic/bin/temporary_frame_renderer_delegator.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/annotation/annotation_registry.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
@@ -128,8 +127,8 @@ class App {
   escher::EscherUniquePtr escher_;
 
   std::shared_ptr<gfx::ImagePipeUpdater> image_pipe_updater_;
-  std::shared_ptr<gfx::Engine> engine_;
-  std::shared_ptr<Scenic> scenic_;
+  std::unique_ptr<gfx::Engine> engine_;
+  std::unique_ptr<Scenic> scenic_;
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
   std::unique_ptr<async_watchdog::Watchdog> watchdog_;
 
@@ -144,17 +143,11 @@ class App {
 
   display::ColorConverter color_converter_;
 
-  std::shared_ptr<TemporaryFrameRendererDelegator> frame_renderer_;
-
   std::unique_ptr<input::InputSystem> input_;
   std::unique_ptr<focus::FocusManager> focus_manager_;
-
-  std::shared_ptr<view_tree::ViewTreeSnapshotter> view_tree_snapshotter_;
-
-  std::shared_ptr<screen_capture::ScreenCaptureManager> screen_capture_manager_;
-
-  std::shared_ptr<screen_capture2::ScreenCapture2Manager> screen_capture2_manager_;
-
+  std::unique_ptr<view_tree::ViewTreeSnapshotter> view_tree_snapshotter_;
+  std::unique_ptr<screen_capture::ScreenCaptureManager> screen_capture_manager_;
+  std::unique_ptr<screen_capture2::ScreenCapture2Manager> screen_capture2_manager_;
   std::unique_ptr<screenshot::ScreenshotManager> screenshot_manager_;
 
   view_tree::ViewRefInstalledImpl view_ref_installed_impl_;
@@ -163,6 +156,9 @@ class App {
   std::unique_ptr<view_tree::ScopedRegistry> scoped_observer_registry_;
 
   std::shared_ptr<view_tree::GeometryProvider> geometry_provider_;
+
+  uint64_t gfx_frame_count_ = 0;
+  uint64_t flatland_frame_count_ = 0;
 
   AnnotationRegistry annotation_registry_;
 

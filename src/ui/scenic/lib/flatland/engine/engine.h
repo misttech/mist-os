@@ -47,7 +47,7 @@ class Engine {
   // Builds a display list for the Flatland content tree rooted at |display|.
   void RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                             const FlatlandDisplay& display,
-                            scheduling::FrameRenderer::FramePresentedCallback callback);
+                            scheduling::FramePresentedCallback callback);
 
   // Snapshots the current Flatland content tree rooted at |root_transform|. |root_transform| is set
   // from the root transform of the display returned from

@@ -243,7 +243,8 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                            scheduling::DefaultFrameScheduler::kInitialRenderDuration,
                            scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
                        inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
-      scenic_(std::make_shared<Scenic>(
+      image_pipe_updater_(std::make_shared<gfx::ImagePipeUpdater>(frame_scheduler_)),
+      scenic_(std::make_unique<Scenic>(
           app_context_.get(), inspect_node_, frame_scheduler_,
           [weak = std::weak_ptr<ShutdownManager>(shutdown_manager_)] {
             if (auto strong = weak.lock()) {
@@ -453,13 +454,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
       std::make_shared<gfx::GfxBufferCollectionImporter>(escher_->GetWeakPtr());
   {
     TRACE_DURATION("gfx", "App::InitializeServices[engine]");
-    engine_ = std::make_shared<gfx::Engine>(escher_->GetWeakPtr(), gfx_buffer_collection_importer,
+    engine_ = std::make_unique<gfx::Engine>(escher_->GetWeakPtr(), gfx_buffer_collection_importer,
                                             inspect_node_.CreateChild("Engine"));
   }
 
   annotation_registry_.InitializeWithGfxAnnotationManager(engine_->annotation_manager());
 
-  image_pipe_updater_ = std::make_shared<gfx::ImagePipeUpdater>(frame_scheduler_);
   auto gfx = scenic_->RegisterSystem<gfx::GfxSystem>(engine_.get(), &sysmem_,
                                                      display_manager_.get(), image_pipe_updater_);
   FX_DCHECK(gfx);
@@ -582,9 +582,6 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           return display ? std::optional<flatland::TransformHandle>(display->root_transform())
                          : std::nullopt;
         });
-
-    frame_renderer_ = std::make_shared<TemporaryFrameRendererDelegator>(flatland_manager_,
-                                                                        flatland_engine_, engine_);
   }
 
   // Make ScreenCaptureManager.
@@ -602,8 +599,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture>)> handler =
         fit::bind_member(screen_capture_manager_.get(),
                          &screen_capture::ScreenCaptureManager::CreateClient);
-    zx_status_t status = app_context_->outgoing()->AddPublicService(std::move(handler));
-    FX_DCHECK(status == ZX_OK);
+    FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
   }
 
   // Make ScreenCapture2Manager.
@@ -611,7 +607,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     TRACE_DURATION("gfx", "App::InitializeServices[screen_capture2_manager]");
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
-    screen_capture2_manager_ = std::make_shared<screen_capture2::ScreenCapture2Manager>(
+    screen_capture2_manager_ = std::make_unique<screen_capture2::ScreenCapture2Manager>(
         flatland_renderer, screen_capture_buffer_collection_importer, [this]() {
           FX_DCHECK(flatland_manager_);
           FX_DCHECK(flatland_engine_);
@@ -625,8 +621,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::internal::ScreenCapture>)>
         handler = fit::bind_member(screen_capture2_manager_.get(),
                                    &screen_capture2::ScreenCapture2Manager::CreateClient);
-    zx_status_t status = app_context_->outgoing()->AddPublicService(std::move(handler));
-    FX_DCHECK(status == ZX_OK);
+    FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
   }
 
   // Make ScreenshotManager for the client-friendly screenshot protocol.
@@ -767,7 +762,7 @@ void App::InitializeHeartbeat(display::Display& display) {
                              .dispatcher = async_get_default_dispatcher()});
     }
 
-    view_tree_snapshotter_ = std::make_shared<view_tree::ViewTreeSnapshotter>(
+    view_tree_snapshotter_ = std::make_unique<view_tree::ViewTreeSnapshotter>(
         std::move(subtrees_generator_callbacks), std::move(subscribers));
   }
 
@@ -776,8 +771,14 @@ void App::InitializeHeartbeat(display::Display& display) {
       display.vsync_timing(),
       /*update_sessions*/
       [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
-        frame_renderer_->SignalFencesWhenPreviousRendersAreDone(
-            std::move(fences_from_previous_presents));
+        if (config_values_.i_can_haz_flatland) {
+          // Flatland doesn't pass release fences into the FrameScheduler. Instead, they are stored
+          // in the FlatlandPresenter and pulled out by the flatland::Engine during rendering.
+          FX_CHECK(fences_from_previous_presents.empty())
+              << "Flatland fences should not be handled by FrameScheduler.";
+        } else {
+          engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
+        }
 
         const scheduling::SessionsWithFailedUpdates failed_sessions =
             scenic_->UpdateSessions(sessions_to_update, trace_id);
@@ -800,7 +801,14 @@ void App::InitializeHeartbeat(display::Display& display) {
       },
       /*render_scheduled_frame*/
       [this](auto frame_number, auto presentation_time, auto callback) {
-        frame_renderer_->RenderScheduledFrame(frame_number, presentation_time, std::move(callback));
+        FX_CHECK(flatland_frame_count_ + gfx_frame_count_ == frame_number - 1);
+        if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
+          flatland_engine_->RenderScheduledFrame(++flatland_frame_count_, presentation_time,
+                                                 *display, std::move(callback));
+        } else {
+          // Render the good ol' Gfx Engine way.
+          engine_->RenderScheduledFrame(++gfx_frame_count_, presentation_time, std::move(callback));
+        }
       });
 }
 

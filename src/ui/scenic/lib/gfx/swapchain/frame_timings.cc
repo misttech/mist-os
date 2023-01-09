@@ -7,8 +7,6 @@
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 
-using scheduling::FrameRenderer;
-
 namespace scenic_impl {
 namespace gfx {
 
@@ -91,15 +89,15 @@ void FrameTimings::OnFramePresented(size_t swapchain_index, zx::time time) {
 
 void FrameTimings::OnFrameDropped(size_t swapchain_index) {
   // Indicates that "frame was dropped".
-  actual_presentation_time_ = FrameRenderer::kTimeDropped;
+  actual_presentation_time_ = scheduling::kTimeDropped;
   frame_was_dropped_ = true;
 
   // The record should also reflect that "frame was dropped". Additionally,
   // update counts to simulate calls to OnFrameRendered/OnFramePresented; this
   // maintains count-related invariants.
   auto& record = swapchain_records_[swapchain_index];
-  record.frame_presented_time = FrameRenderer::kTimeDropped;
-  actual_presentation_time_ = FrameRenderer::kTimeDropped;
+  record.frame_presented_time = scheduling::kTimeDropped;
+  actual_presentation_time_ = scheduling::kTimeDropped;
   ++frame_presented_count_;
 
   // Do scheduler-related cleanup.
@@ -127,18 +125,17 @@ void FrameTimings::OnFrameCpuRendered(zx::time time) {
   rendering_cpu_finished_time_ = std::max(rendering_cpu_finished_time_, time);
 }
 
-FrameRenderer::Timestamps FrameTimings::GetTimestamps() const {
+scheduling::Timestamps FrameTimings::GetTimestamps() const {
   // Copy the current time values to a Timestamps struct. Some callers may call
   // this before all times are finalized - it is the caller's responsibility to
   // check if this is |finalized()| if it wants timestamps that are guaranteed
   // not to change. Additionally, some callers will maintain this struct beyond
   // the lifetime of the FrameTimings object (ie for collecting FrameStats), and
   // so the values are copied to allow the FrameTiming object to be destroyed.
-  FrameRenderer::Timestamps timestamps = {
+  return scheduling::Timestamps{
       .render_done_time = std::max(rendering_finished_time_, rendering_cpu_finished_time_),
       .actual_presentation_time = actual_presentation_time_,
   };
-  return timestamps;
 }
 
 void FrameTimings::ValidateRenderTime() {

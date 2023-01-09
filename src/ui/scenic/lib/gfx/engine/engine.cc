@@ -107,7 +107,7 @@ void Engine::InitializeInspectObjects() {
 }
 
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
-                                  FramePresentedCallback callback) {
+                                  scheduling::FramePresentedCallback callback) {
   is_rendering_ = true;
   // Because this timings object is passed to the compositor, it may outlive this object. So we
   // capture this weakly, just in case.

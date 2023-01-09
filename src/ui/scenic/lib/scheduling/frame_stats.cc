@@ -55,7 +55,7 @@ void FrameStats::RecordFrame(Timestamps timestamps, zx::duration display_vsync_i
   ++frame_count_;
   uint32_t latch_to_actual_presentation_bucket_index =
       GetCobaltBucketIndex(timestamps.actual_presentation_time - timestamps.latch_point_time);
-  if (timestamps.actual_presentation_time == FrameRenderer::kTimeDropped) {
+  if (timestamps.actual_presentation_time == kTimeDropped) {
     RecordDroppedFrame(timestamps);
     cobalt_dropped_frame_times_histogram_[latch_to_actual_presentation_bucket_index]++;
   } else if (timestamps.actual_presentation_time - (display_vsync_interval / 2) >=

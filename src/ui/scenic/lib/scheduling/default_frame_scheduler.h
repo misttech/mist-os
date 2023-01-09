@@ -27,10 +27,11 @@ using UpdateSessions = fit::function<SessionsWithFailedUpdates(
     std::vector<zx::event> fences_from_previous_presents)>;
 using OnCpuWorkDone = fit::function<void()>;
 using OnFramePresented = fit::function<void(
-    const std::unordered_map<SessionId, std::map<PresentId, /*latched_time*/ zx::time>>&,
-    PresentTimestamps)>;
+    const std::unordered_map<SessionId, std::map<PresentId, /*latched_time*/ zx::time>>&
+        latched_times,
+    PresentTimestamps present_times)>;
 using RenderScheduledFrame =
-    fit::function<void(uint64_t, zx::time, FrameRenderer::FramePresentedCallback)>;
+    fit::function<void(uint64_t frame_number, zx::time presentation_time, FramePresentedCallback)>;
 
 // TODOs can be found in the frame scheduler epic: fxbug.dev/24406. Any new bugs filed concerning
 // the frame scheduler should be added to it as well.
@@ -52,7 +53,7 @@ class DefaultFrameScheduler final : public FrameScheduler {
   // Set the renderer and session updaters to be used. Can only be called once.
   // |session_updaters| will be called in this order for every event.
   void Initialize(std::shared_ptr<const VsyncTiming> vsync_timing, UpdateSessions update_sessions,
-                  OnCpuWorkDone on_cpu_work_done, ::scheduling::OnFramePresented on_frame_presented,
+                  OnCpuWorkDone on_cpu_work_done, OnFramePresented on_frame_presented,
                   RenderScheduledFrame render_scheduled_frame);
 
   // |FrameScheduler|
@@ -82,8 +83,7 @@ class DefaultFrameScheduler final : public FrameScheduler {
 
  private:
   void HandleFramePresented(uint64_t frame_number, zx::time render_start_time,
-                            zx::time target_presentation_time,
-                            const FrameRenderer::Timestamps& timestamps);
+                            zx::time target_presentation_time, const Timestamps& timestamps);
 
   // Requests a new frame to be drawn, which schedules the next wake up time for rendering. If we've
   // already scheduled a wake up time, it checks if it needs rescheduling and deals with it

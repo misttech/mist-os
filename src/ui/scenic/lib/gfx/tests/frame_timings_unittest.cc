@@ -9,8 +9,6 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-using scheduling::FrameRenderer;
-
 namespace scenic_impl {
 namespace gfx {
 namespace test {
@@ -54,7 +52,7 @@ TEST_F(FrameTimingsTest, ReceivingCallsInOrder_ShouldTriggerFrameSchedulerCallsI
   EXPECT_EQ(frame_presented_call_count(), 1u);
 
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_LE(timestamps.render_done_time, timestamps.actual_presentation_time);
 }
 
@@ -71,7 +69,7 @@ TEST_F(FrameTimingsTest, ReceivingCallsOutOfOrder_ShouldTriggerFrameSchedulerCal
 
   // Rendering should never finish after presentation.
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_LE(timestamps.render_done_time, timestamps.actual_presentation_time);
 }
 
@@ -88,7 +86,7 @@ TEST_F(FrameTimingsTest, ReceivingCallsAndTimesOutOfOrder_ShouldTriggerFrameSche
 
   // Rendering should never finish after presentation.
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_LE(timestamps.render_done_time, timestamps.actual_presentation_time);
 }
 
@@ -105,7 +103,7 @@ TEST_F(FrameTimingsTest, ReceivingTimesOutOfOrder_ShouldRecordTimesInOrder) {
 
   // Rendering should never finish after presentation.
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_LE(timestamps.render_done_time, timestamps.actual_presentation_time);
 }
 
@@ -125,7 +123,7 @@ TEST_F(FrameTimingsTest, FrameDroppedAfterRender_ShouldNotTriggerSecondFrameRend
   EXPECT_EQ(frame_presented_call_count(), 1u);
 
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, render_finished_time);
   EXPECT_TRUE(frame_timings_->FrameWasDropped());
 }
@@ -145,10 +143,10 @@ TEST_F(FrameTimingsTest, FrameDroppedBeforeRender_ShouldStillTriggerFrameRendere
   EXPECT_EQ(frame_presented_call_count(), 1u);
 
   EXPECT_TRUE(frame_timings_->finalized());
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, render_finished_time);
   EXPECT_TRUE(frame_timings_->FrameWasDropped());
-  EXPECT_EQ(timestamps.actual_presentation_time, FrameRenderer::kTimeDropped);
+  EXPECT_EQ(timestamps.actual_presentation_time, scheduling::kTimeDropped);
 }
 
 TEST_F(FrameTimingsTest, FrameSkipped_ShouldStillTriggerPresentCallbacks) {
@@ -166,7 +164,7 @@ TEST_F(FrameTimingsTest, FrameSkipped_ShouldStillTriggerPresentCallbacks) {
   EXPECT_TRUE(frame_timings_->FrameWasSkipped());
   EXPECT_TRUE(frame_timings_->finalized());
 
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, Now());
   EXPECT_EQ(timestamps.actual_presentation_time, Now());
 }
@@ -175,7 +173,7 @@ TEST_F(FrameTimingsTest, LargerRenderingCpuDuration_ShouldBeReturned) {
   frame_timings_->OnFrameRendered(0, zx::time(100));
   frame_timings_->OnFrameCpuRendered(zx::time(400));
 
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, zx::time(400));
 }
 
@@ -183,7 +181,7 @@ TEST_F(FrameTimingsTest, LargerRenderingGpuDuration_ShouldBeReturned) {
   frame_timings_->OnFrameCpuRendered(zx::time(100));
   frame_timings_->OnFrameRendered(0, zx::time(400));
 
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, zx::time(400));
 }
 
@@ -191,19 +189,19 @@ TEST_F(FrameTimingsTest, RenderingCpu_Duration_ShouldBeMaxed) {
   frame_timings_->OnFrameCpuRendered(zx::time(400));
   frame_timings_->OnFrameCpuRendered(zx::time(100));
 
-  FrameRenderer::Timestamps timestamps = frame_timings_->GetTimestamps();
+  scheduling::Timestamps timestamps = frame_timings_->GetTimestamps();
   EXPECT_EQ(timestamps.render_done_time, zx::time(400));
 }
 
 TEST(FrameTimings, DroppedAndUnitializedTimesAreUnique) {
-  EXPECT_LT(FrameTimings::kTimeUninitialized, FrameRenderer::kTimeDropped);
+  EXPECT_LT(FrameTimings::kTimeUninitialized, scheduling::kTimeDropped);
 }
 
 TEST(FrameTimings, InitTimestamps) {
   const uint64_t kFrameNumber = 5;
   auto timings = std::make_unique<FrameTimings>(kFrameNumber, [](const FrameTimings& timings) {});
 
-  FrameRenderer::Timestamps init_timestamps = timings->GetTimestamps();
+  scheduling::Timestamps init_timestamps = timings->GetTimestamps();
   // The frame is not finalized, and none of the outputs have been recorded.
   EXPECT_FALSE(timings->finalized());
   EXPECT_EQ(init_timestamps.render_done_time, FrameTimings::kTimeUninitialized);

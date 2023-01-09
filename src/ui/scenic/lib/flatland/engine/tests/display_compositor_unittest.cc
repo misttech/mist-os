@@ -814,8 +814,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
             fuchsia::hardware::display::ConfigStamp stamp = {kConfigStamp1};
             callback(stamp);
           }));
-  display_compositor_->RenderFrame(1, zx::time(1), {}, {},
-                                   [](const scheduling::FrameRenderer::Timestamps&) {});
+  display_compositor_->RenderFrame(1, zx::time(1), {}, {}, [](const scheduling::Timestamps&) {});
 
   const uint64_t kConfigStamp2 = 123;
   EXPECT_CALL(*mock_display_controller_, GetLatestAppliedConfigStamp(_))
@@ -824,8 +823,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
             fuchsia::hardware::display::ConfigStamp stamp = {kConfigStamp2};
             callback(stamp);
           }));
-  display_compositor_->RenderFrame(2, zx::time(2), {}, {},
-                                   [](const scheduling::FrameRenderer::Timestamps&) {});
+  display_compositor_->RenderFrame(2, zx::time(2), {}, {}, [](const scheduling::Timestamps&) {});
 
   EXPECT_EQ(2u, GetPendingApplyConfigs().size());
 
@@ -1062,7 +1060,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   display_compositor_->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
-      [](const scheduling::FrameRenderer::Timestamps&) {});
+      [](const scheduling::Timestamps&) {});
 
   for (uint32_t i = 0; i < 2; i++) {
     EXPECT_CALL(*mock_display_controller_, DestroyLayer(layers[i]));
@@ -1246,7 +1244,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   display_compositor_->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
-      [](const scheduling::FrameRenderer::Timestamps&) {});
+      [](const scheduling::Timestamps&) {});
 
   EXPECT_CALL(*mock_display_controller_, DestroyLayer(layers[0]));
 
@@ -1555,14 +1553,14 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   const auto& display_list =
       GenerateDisplayListForTest({{kDisplayId, {display_info, root_handle}}});
   display_compositor_->RenderFrame(1, zx::time(1), display_list, {},
-                                   [](const scheduling::FrameRenderer::Timestamps&) {});
+                                   [](const scheduling::Timestamps&) {});
 
   // Try rendering again. Because |imported_event| isn't signaled and no render targets were created
   // when adding display, we should fail.
   auto status = imported_event.wait_one(ZX_EVENT_SIGNALED, zx::time(), nullptr);
   EXPECT_NE(status, ZX_OK);
   display_compositor_->RenderFrame(1, zx::time(1), display_list, {},
-                                   [](const scheduling::FrameRenderer::Timestamps&) {});
+                                   [](const scheduling::Timestamps&) {});
 
   for (uint32_t i = 0; i < 2; i++) {
     EXPECT_CALL(*mock_display_controller_, DestroyLayer(layers[i]));

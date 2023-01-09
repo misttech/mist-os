@@ -216,16 +216,16 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   const trace_flow_id_t frame_render_trace_id = TRACE_NONCE();
   TRACE_FLOW_BEGIN("gfx", "render_to_presented", frame_render_trace_id);
-  auto on_presented_callback =
-      [=, weak = weak_factory_.GetWeakPtr()](const FrameRenderer::Timestamps& timestamps) {
-        TRACE_FLOW_END("gfx", "render_to_presented", frame_render_trace_id);
-        if (weak) {
-          weak->HandleFramePresented(frame_number, render_start_time, target_presentation_time,
-                                     timestamps);
-        } else {
-          FX_LOGS(ERROR) << "Error, cannot record presentation time: FrameScheduler does not exist";
-        }
-      };
+  auto on_presented_callback = [=,
+                                weak = weak_factory_.GetWeakPtr()](const Timestamps& timestamps) {
+    TRACE_FLOW_END("gfx", "render_to_presented", frame_render_trace_id);
+    if (weak) {
+      weak->HandleFramePresented(frame_number, render_start_time, target_presentation_time,
+                                 timestamps);
+    } else {
+      FX_LOGS(ERROR) << "Error, cannot record presentation time: FrameScheduler does not exist";
+    }
+  };
   outstanding_latch_points_.push_back(update_end_time);
 
   inspect_frame_number_.Set(frame_number);
@@ -318,7 +318,7 @@ std::vector<FuturePresentationInfo> DefaultFrameScheduler::GetFuturePresentation
 
 void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time render_start_time,
                                                  zx::time target_presentation_time,
-                                                 const FrameRenderer::Timestamps& timestamps) {
+                                                 const Timestamps& timestamps) {
   FX_DCHECK(frame_number == last_presented_frame_number_ + 1);
   FX_DCHECK(vsync_timing_->vsync_interval().get() >= 0);
 
@@ -339,7 +339,7 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
 
   stats_.RecordFrame(frame_stats, vsync_timing_->vsync_interval());
 
-  if (timestamps.render_done_time != FrameRenderer::kTimeDropped) {
+  if (timestamps.render_done_time != kTimeDropped) {
     zx::duration duration =
         std::max(timestamps.render_done_time - render_start_time, zx::duration(0));
     frame_predictor_->ReportRenderDuration(zx::duration(duration));
@@ -347,7 +347,7 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
     last_successful_render_start_time_ = target_presentation_time;
   }
 
-  if (timestamps.actual_presentation_time == FrameRenderer::kTimeDropped) {
+  if (timestamps.actual_presentation_time == kTimeDropped) {
     TRACE_INSTANT("gfx", "FrameDropped", TRACE_SCOPE_PROCESS, "frame_number", frame_number);
   } else {
     if (TRACE_CATEGORY_ENABLED("gfx")) {

@@ -41,16 +41,16 @@ using FenceQueue = std::deque<zx::event>;
 
 // This macro works like a function that checks a variety of conditions, but if those conditions
 // fail, the line number for the failure will appear in-line rather than in a helper function.
-#define RENDER_SKIPPED_FRAME()                                                                    \
-  {                                                                                               \
-    bool presented = false;                                                                       \
-    engine()->RenderScheduledFrame(/*frame_number=*/1, /*presentation_time=*/zx::time(0),         \
-                                   [&](const scheduling::FrameRenderer::Timestamps& timestamps) { \
-                                     EXPECT_EQ(timestamps.render_done_time, Now());               \
-                                     EXPECT_EQ(timestamps.actual_presentation_time, Now());       \
-                                     presented = true;                                            \
-                                   });                                                            \
-    EXPECT_TRUE(presented);                                                                       \
+#define RENDER_SKIPPED_FRAME()                                                              \
+  {                                                                                         \
+    bool presented = false;                                                                 \
+    engine()->RenderScheduledFrame(/*frame_number=*/1, /*presentation_time=*/zx::time(0),   \
+                                   [&](const scheduling::Timestamps& timestamps) {          \
+                                     EXPECT_EQ(timestamps.render_done_time, Now());         \
+                                     EXPECT_EQ(timestamps.actual_presentation_time, Now()); \
+                                     presented = true;                                      \
+                                   });                                                      \
+    EXPECT_TRUE(presented);                                                                 \
   }
 
 zx::time Now() { return async::Now(async_get_default_dispatcher()); }
@@ -263,7 +263,7 @@ VK_TEST_F(EngineTest, ImmediateRender) {
   bool presented = false;
   engine()->RenderScheduledFrame(
       /*frame_number=*/1, /*presentation_time=*/zx::time(0),
-      [&](const scheduling::FrameRenderer::Timestamps& timestamps) { presented = true; });
+      [&](const scheduling::Timestamps& timestamps) { presented = true; });
 
   // Wait for all rendering to complete.
   VkWaitUntilIdle();
@@ -294,7 +294,7 @@ VK_TEST_F(EngineTest, RenderWithDelay) {
   bool presented[2] = {false, false};
   engine()->RenderScheduledFrame(
       /*frame_number=*/1, /*presentation_time=*/zx::time(0),
-      [&](const scheduling::FrameRenderer::Timestamps& timestamps) { presented[0] = true; });
+      [&](const scheduling::Timestamps& timestamps) { presented[0] = true; });
 
   // There shouldn't be any rendering, as the fence has not been signaled yet.
   loop.RunUntilIdle();
@@ -306,7 +306,7 @@ VK_TEST_F(EngineTest, RenderWithDelay) {
   // Queue another frame.
   engine()->RenderScheduledFrame(
       /*frame_number=*/1, /*presentation_time=*/zx::time(0),
-      [&](const scheduling::FrameRenderer::Timestamps& timestamps) { presented[1] = true; });
+      [&](const scheduling::Timestamps& timestamps) { presented[1] = true; });
 
   // Queue some more signal fences.
   auto fences1 = CreateAndInsertFences(false);
@@ -355,7 +355,7 @@ VK_TEST_F(EngineTest, RenderWithDelayOutOfOrder) {
   bool presented[2] = {false, false};
   engine()->RenderScheduledFrame(
       /*frame_number=*/1, /*presentation_time=*/zx::time(0),
-      [&](const scheduling::FrameRenderer::Timestamps& timestamps) { presented[0] = true; });
+      [&](const scheduling::Timestamps& timestamps) { presented[0] = true; });
 
   // There shouldn't be any rendering, as the fence has not been signaled yet.
   loop.RunUntilIdle();
@@ -367,7 +367,7 @@ VK_TEST_F(EngineTest, RenderWithDelayOutOfOrder) {
   // Queue another frame.
   engine()->RenderScheduledFrame(
       /*frame_number=*/1, /*presentation_time=*/zx::time(0),
-      [&](const scheduling::FrameRenderer::Timestamps& timestamps) { presented[1] = true; });
+      [&](const scheduling::Timestamps& timestamps) { presented[1] = true; });
 
   // Queue some more signal fences.
   auto fences1 = CreateAndInsertFences(false);

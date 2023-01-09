@@ -62,8 +62,8 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
     update_sessions_return_value_ = new_value;
   }
 
-  FrameRenderer::Timestamps CreateTimestamps() {
-    return FrameRenderer::Timestamps{
+  Timestamps CreateTimestamps() {
+    return Timestamps{
         .render_done_time = Now(),
         .actual_presentation_time = Now(),
     };
@@ -78,8 +78,7 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
         presentation_time, {.session_id = session_id, .present_id = present_id}, squashable);
   }
 
-  void FireFramePresentedCallback(
-      std::optional<FrameRenderer::Timestamps> timestamps = std::nullopt) {
+  void FireFramePresentedCallback(std::optional<Timestamps> timestamps = std::nullopt) {
     frame_presented_callback_.value()(timestamps.value_or(CreateTimestamps()));
     frame_presented_callback_.reset();
   }
@@ -151,7 +150,7 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
       last_latched_times_;
   zx::time last_presented_time_;
 
-  std::optional<FrameRenderer::FramePresentedCallback> frame_presented_callback_;
+  std::optional<FramePresentedCallback> frame_presented_callback_;
   std::vector<zx::event> last_received_fences_;
 
   std::shared_ptr<VsyncTiming> vsync_timing_;
@@ -396,8 +395,7 @@ TEST_F(FrameSchedulerTest, SignalSuccessfulPresentCallbackOnlyWhenFramePresented
 
   // Drop frame #0. This should not trigger a frame presented signal.
   FireFramePresentedCallback(
-      FrameRenderer::Timestamps{.render_done_time = FrameRenderer::kTimeDropped,
-                                .actual_presentation_time = FrameRenderer::kTimeDropped});
+      Timestamps{.render_done_time = kTimeDropped, .actual_presentation_time = kTimeDropped});
   EXPECT_FALSE(frame_presented_callback_.has_value());
   RunLoopFor(zx::duration(vsync_timing_->vsync_interval()));
   EXPECT_TRUE(frame_presented_callback_.has_value());
@@ -477,7 +475,7 @@ TEST_F(FrameSchedulerTest, LongRenderTime_ShouldTriggerAReschedule_WithALatePres
   // time, given prediction.
   RunLoopFor(zx::msec(91));
   FireFramePresentedCallback(
-      FrameRenderer::Timestamps{.render_done_time = Now(), .actual_presentation_time = Now()});
+      Timestamps{.render_done_time = Now(), .actual_presentation_time = Now()});
   EXPECT_FALSE(frame_presented_callback_.has_value());
 
   ScheduleUpdate(kSessionId, zx::time(0));

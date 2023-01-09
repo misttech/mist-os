@@ -88,7 +88,7 @@ using OnPresentedCallback = fit::function<void(PresentationInfo)>;
 // (*) semaphore ensures GpuUploader will never upload to a HostImage if it
 // hasn't finished rendering.
 //
-class Engine : public scheduling::FrameRenderer {
+class Engine {
  public:
   Engine(escher::EscherWeakPtr escher,
          std::shared_ptr<GfxBufferCollectionImporter> buffer_collection_importer,
@@ -96,8 +96,6 @@ class Engine : public scheduling::FrameRenderer {
 
   // Only used for testing.
   explicit Engine(escher::EscherWeakPtr escher);
-
-  ~Engine() override = default;
 
   escher::Escher* escher() const { return escher_.get(); }
   escher::EscherWeakPtr GetEscherWeakPtr() const { return escher_; }
@@ -131,15 +129,14 @@ class Engine : public scheduling::FrameRenderer {
   void DumpScenes(std::ostream& output,
                   std::unordered_set<GlobalId, GlobalId::Hash>* visited_resources) const;
 
-  // |scheduling::FrameRenderer|
+  // Called by the FrameScheduler.
   void RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
-                            FramePresentedCallback callback) override;
+                            scheduling::FramePresentedCallback callback);
 
-  // |scheduling::FrameRenderer|
-  void SignalFencesWhenPreviousRendersAreDone(std::vector<zx::event> events) override;
+  // Called by the FrameScheduler.
+  void SignalFencesWhenPreviousRendersAreDone(std::vector<zx::event> events);
 
  private:
-
   // Initialize annotation session and annotation manager.
   void InitializeAnnotationManager();
 

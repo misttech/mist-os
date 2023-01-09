@@ -93,8 +93,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   void RenderFrame(uint64_t frame_number, zx::time presentation_time,
                    const std::vector<RenderData>& render_data_list,
                    std::vector<zx::event> release_fences,
-                   scheduling::FrameRenderer::FramePresentedCallback callback)
-      FXL_LOCKS_EXCLUDED(lock_);
+                   scheduling::FramePresentedCallback callback) FXL_LOCKS_EXCLUDED(lock_);
 
   // Register a new display to the DisplayCompositor, which also generates the render targets to be
   // presented on the display when compositing on the GPU. If |num_render_targets| is 0, this
@@ -198,7 +197,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   bool PerformGpuComposition(uint64_t frame_number, zx::time presentation_time,
                              const std::vector<RenderData>& render_data_list,
                              std::vector<zx::event> release_fences,
-                             scheduling::FrameRenderer::FramePresentedCallback callback)
+                             scheduling::FramePresentedCallback callback)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Does all the setup for applying the render data, which includes images and rectangles,

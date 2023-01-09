@@ -543,7 +543,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
       1, zx::time(1),
       GenerateDisplayListForTest(
           {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-      {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+      {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
   std::vector<uint8_t> read_values;
@@ -658,7 +658,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
         1, zx::time(1),
         GenerateDisplayListForTest(
             {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-        {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+        {}, [](const scheduling::Timestamps&) {});
 
     // Grab the capture vmo data.
     std::vector<uint8_t> read_values;
@@ -771,7 +771,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
       1, zx::time(1),
       GenerateDisplayListForTest(
           {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-      {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+      {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
   std::vector<uint8_t> read_values;
@@ -883,7 +883,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
       1, zx::time(1),
       GenerateDisplayListForTest(
           {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-      {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+      {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
   std::vector<uint8_t> readback_values;
@@ -1036,7 +1036,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
     render_data.images.push_back(image_metadatas[1]);
   }
   display_compositor->RenderFrame(1, zx::time(1), {std::move(render_data)}, {},
-                                  [](const scheduling::FrameRenderer::Timestamps&) {});
+                                  [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
@@ -1177,7 +1177,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
     render_data.images.push_back(image_metadatas[1]);
   }
   display_compositor->RenderFrame(1, zx::time(1), {std::move(render_data)}, {},
-                                  [](const scheduling::FrameRenderer::Timestamps&) {});
+                                  [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
@@ -1367,7 +1367,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
       1, zx::time(1),
       GenerateDisplayListForTest(
           {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-      {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+      {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
@@ -1541,7 +1541,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
       1, zx::time(1),
       GenerateDisplayListForTest(
           {{display->display_id(), std::make_pair(display_info, root_handle)}}),
-      {}, [](const scheduling::FrameRenderer::Timestamps&) {});
+      {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.

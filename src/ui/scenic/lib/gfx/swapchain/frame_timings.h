@@ -85,7 +85,7 @@ class FrameTimings {
 
   // Returns all the timestamps that this class is tracking. Values are subject
   // to change until this class is |finalized()|.
-  scheduling::FrameRenderer::Timestamps GetTimestamps() const;
+  scheduling::Timestamps GetTimestamps() const;
 
   // Returns true if the frame was dropped by at least one swapchain that it was
   // submitted to. Value is subject to change until this class is |finalized()|.

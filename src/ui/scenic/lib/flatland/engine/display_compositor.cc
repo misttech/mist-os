@@ -633,10 +633,11 @@ fuchsia::hardware::display::ConfigStamp DisplayCompositor::ApplyConfig() {
   return pending_config_stamp;
 }
 
-bool DisplayCompositor::PerformGpuComposition(
-    const uint64_t frame_number, const zx::time presentation_time,
-    const std::vector<RenderData>& render_data_list, std::vector<zx::event> release_fences,
-    scheduling::FrameRenderer::FramePresentedCallback callback) {
+bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
+                                              const zx::time presentation_time,
+                                              const std::vector<RenderData>& render_data_list,
+                                              std::vector<zx::event> release_fences,
+                                              scheduling::FramePresentedCallback callback) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Create an event that will be signaled when the final display's content has finished
   // rendering; it will be passed into |release_fence_manager_.OnGpuCompositedFrame()|.  If there
@@ -749,7 +750,7 @@ bool DisplayCompositor::PerformGpuComposition(
 void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time presentation_time,
                                     const std::vector<RenderData>& render_data_list,
                                     std::vector<zx::event> release_fences,
-                                    scheduling::FrameRenderer::FramePresentedCallback callback) {
+                                    scheduling::FramePresentedCallback callback) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
   TRACE_FLOW_STEP("gfx", "scenic_frame", frame_number);

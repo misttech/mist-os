@@ -9,8 +9,6 @@ executable("bin") {
     "app.cc",
     "app.h",
     "main.cc",
-    "temporary_frame_renderer_delegator.cc",
-    "temporary_frame_renderer_delegator.h",
   ]
 
   deps = [

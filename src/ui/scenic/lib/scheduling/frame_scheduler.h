@@ -9,8 +9,6 @@
 #include <lib/zx/event.h>
 #include <lib/zx/time.h>
 
-#include <map>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "src/ui/scenic/lib/scheduling/id.h"
@@ -29,38 +27,22 @@ struct FuturePresentationInfo {
 
 using SessionsWithFailedUpdates = std::unordered_set<SessionId>;
 
-// Interface for rendering frames.
-class FrameRenderer {
- public:
-  // Time value used to signal the time measurement was dropped.
-  static constexpr zx::time kTimeDropped = zx::time(ZX_TIME_INFINITE);
-
-  // The timestamp data that is expected to be delivered after rendering and presenting a frame.
-  // TODO(fxbug.dev/24669): If there are multiple render passes, |render_done_time| is the time
-  // furthest forward in time. Solving 24669 may involve expanding this struct to support multiple
-  // passes in data.
-  // TODO(fxbug.dev/70283): when there are multiple displays, there is no single "actual
-  // presentation time" that the FrameRenderer can return.
-  struct Timestamps {
-    zx::time render_done_time;
-    zx::time actual_presentation_time;
-  };
-
-  virtual ~FrameRenderer() = default;
-
-  // Called when it's time to render a new frame.  It is the responsibility of the renderer to
-  // trigger the callback once all timestamp data is available. The callback must be triggered at
-  // some point, though multiple callbacks can be pending at any point in time.
-  //
-  // Frames must be rendered in the order they are requested, and callbacks must be triggered in the
-  // same order.
-  using FramePresentedCallback = std::function<void(const Timestamps&)>;
-  virtual void RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
-                                    FramePresentedCallback callback) = 0;
-
-  // The FrameRenderer should signal these events when all pending rendering is complete.
-  virtual void SignalFencesWhenPreviousRendersAreDone(std::vector<zx::event> events) = 0;
+// The timestamp data that is expected to be delivered after rendering and presenting a frame.
+// TODO(fxbug.dev/24669): If there are multiple render passes, |render_done_time| is the time
+// furthest forward in time. Solving 24669 may involve expanding this struct to support multiple
+// passes in data.
+// TODO(fxbug.dev/70283): when there are multiple displays, there is no single "actual
+// presentation time" that the FrameRenderer can return.
+struct Timestamps {
+  zx::time render_done_time;
+  zx::time actual_presentation_time;
 };
+// Time value used to signal the time measurement was dropped.
+static constexpr zx::time kTimeDropped = zx::time(ZX_TIME_INFINITE);
+
+// Callback passed to the renderer when rendering a frame. It is the responsibility of the renderer
+// to trigger the callback once all timestamp data is available.
+using FramePresentedCallback = fit::function<void(const Timestamps&)>;
 
 // The FrameScheduler is responsible for scheduling frames to be drawn in response to requests from
 // clients.  When a frame is requested, the FrameScheduler will decide at which Vsync the frame

@@ -230,7 +230,7 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
                                           .render_start_time = zx::time(0) + zx::msec(6),
                                           .render_done_time = zx::time(0) + zx::msec(12),
                                           .target_presentation_time = zx::time(0) + zx::msec(16),
-                                          .actual_presentation_time = FrameRenderer::kTimeDropped};
+                                          .actual_presentation_time = kTimeDropped};
   for (int i = 0; i < 30; i++) {
     stats.RecordFrame(dropped_times, vsync_interval);
 
@@ -430,7 +430,7 @@ TEST_F(FrameStatsMetricsTest, LogFrameTimes) {
       .render_start_time = zx::time(10) + zx::msec(6),
       .render_done_time = zx::time(10) + zx::msec(12),
       .target_presentation_time = zx::time(10) + zx::msec(16),
-      .actual_presentation_time = FrameRenderer::kTimeDropped,
+      .actual_presentation_time = kTimeDropped,
   };
   FrameStats::Timestamps delayed_frame_times = {
       .latch_point_time = zx::time(20) + zx::msec(4),
