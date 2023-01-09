@@ -6,10 +6,7 @@ use super::{Calibration, LedConfig, LedMap, Parameters, Rgbc};
 use crate::light_sensor::types::{CalibrationConfiguration, FileLoader};
 use anyhow::format_err;
 use async_trait::async_trait;
-use fasync::TestExecutor;
-use fuchsia_async as fasync;
-use futures::FutureExt;
-use std::{collections::HashMap, path::Path, task::Poll};
+use std::collections::HashMap;
 use test_case::test_case;
 
 #[test_case(
@@ -33,25 +30,18 @@ use test_case::test_case;
     "clear error map"
 )]
 #[fuchsia::test]
-fn rgbc_map_async(n: u8) -> Result<Rgbc<u8>, String> {
+async fn rgbc_map_async(n: u8) -> Result<Rgbc<u8>, String> {
     let rgbc = Rgbc { red: 1, green: 2, blue: 3, clear: 4 };
 
-    let mut result_fut = rgbc
-        .map_async(|c| async move {
-            if c == n {
-                Err(format_err!("my_error"))
-            } else {
-                Ok(c + 1)
-            }
-        })
-        .boxed();
-
-    let mut executor = TestExecutor::new().expect("should be able to creat test excutor");
-    let result = match executor.run_until_stalled(&mut result_fut) {
-        Poll::Ready(result) => result,
-        Poll::Pending => panic!("Simple map should not have failed"),
-    };
-    result.map_err(|e| format!("{:?}", e))
+    rgbc.map_async(|c| async move {
+        if c == n {
+            Err(format_err!("my_error"))
+        } else {
+            Ok(c + 1)
+        }
+    })
+    .await
+    .map_err(|e| format!("{:?}", e))
 }
 
 #[fuchsia::test]
@@ -153,7 +143,7 @@ fn rgbc_parameters_close_enough(left: Rgbc<Parameters>, right: Rgbc<Parameters>)
 #[test_case(Some("all_on-b"), Some(&["Failed to map all_on rgbc", "blue"]); "all_on blue failure")]
 #[test_case(Some("all_on-c"), Some(&["Failed to map all_on rgbc", "clear"]); "all_on clear failure")]
 #[fuchsia::test]
-fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
+async fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
     let configuration = CalibrationConfiguration {
         leds: vec![
             LedConfig {
@@ -179,23 +169,19 @@ fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
         },
     };
 
-    let mut executor = TestExecutor::new().expect("should get test executor");
-
     struct FakeFileLoader<'a> {
         failure_file: Option<&'a str>,
     }
 
     #[async_trait(?Send)]
     impl FileLoader for FakeFileLoader<'_> {
-        async fn load_file(&self, path: &Path) -> Result<String, anyhow::Error> {
-            if let Some(file_path) = self.failure_file {
-                if path == AsRef::<Path>::as_ref(&file_path) {
-                    return Err(format_err!("my_error"));
-                }
+        async fn load_file(&self, path: &str) -> Result<String, anyhow::Error> {
+            if self.failure_file == Some(path) {
+                return Err(format_err!("my_error"));
             }
 
             // unwrap safe since we only call this method with strings.
-            let parts: Vec<_> = path.to_str().unwrap().split('-').collect();
+            let parts: Vec<_> = path.split('-').collect();
             assert_eq!(parts.len(), 2);
             let file_type = parts[0];
             let color_channel = parts[1];
@@ -240,12 +226,8 @@ fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
         }
     }
 
-    let mut calibration_result_fut =
-        Calibration::new(configuration, FakeFileLoader { failure_file }).boxed_local();
-    let calibration_result = match executor.run_until_stalled(&mut calibration_result_fut) {
-        Poll::Ready(result) => result,
-        Poll::Pending => panic!("calibration new should not stall in this test"),
-    };
+    let file_loader = FakeFileLoader { failure_file };
+    let calibration_result = Calibration::new(configuration, &file_loader).await;
 
     fn leds_match(left: &LedMap, right: &LedMap) -> bool {
         if left.len() != right.len() {
@@ -365,26 +347,20 @@ fn calibration_new(failure_file: Option<&str>, error_strings: Option<&[&str]>) {
     "negative infinty intercept format"
 )]
 #[fuchsia::test]
-fn calibration_parse_file_trims(input: &str, errors: Option<&[&str]>) {
+async fn calibration_parse_file_trims(input: &str, errors: Option<&[&str]>) {
     struct SimpleFileLoader<'a> {
         input: &'a str,
     }
 
     #[async_trait(?Send)]
     impl FileLoader for SimpleFileLoader<'_> {
-        async fn load_file(&self, _: &Path) -> Result<String, anyhow::Error> {
+        async fn load_file(&self, _: &str) -> Result<String, anyhow::Error> {
             Ok(String::from(self.input))
         }
     }
 
     let simple_file_loader = SimpleFileLoader { input };
-    let mut result_fut =
-        Calibration::parse_file("not_important", &simple_file_loader).boxed_local();
-    let mut executor = TestExecutor::new().expect("should get test executor");
-    let result = match executor.run_until_stalled(&mut result_fut) {
-        Poll::Ready(result) => result,
-        Poll::Pending => panic!("parsing file should not stall in this test"),
-    };
+    let result = Calibration::parse_file("not_important", &simple_file_loader).await;
     match (result, errors) {
         (Ok(parameters), None) => {
             assert!(parameters_close_enough(parameters, Parameters { slope: 1.0, intercept: 2.0 }))
@@ -413,7 +389,7 @@ async fn calibration_parse_file_bad_parse() {
 
     #[async_trait(?Send)]
     impl FileLoader for ErrFileLoader {
-        async fn load_file(&self, _: &Path) -> Result<String, anyhow::Error> {
+        async fn load_file(&self, _: &str) -> Result<String, anyhow::Error> {
             Err(format_err!("oh no"))
         }
     }

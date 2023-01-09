@@ -11,7 +11,7 @@ use fidl_fuchsia_settings::{LightGroup as LightGroupFidl, LightRequest, LightSta
 use fidl_fuchsia_ui_brightness::ControlRequest;
 use fuchsia_async as fasync;
 use futures::channel::{mpsc, oneshot};
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::task::Poll;
@@ -193,7 +193,8 @@ fn cancelable_task_triggers_controlled_cancelation() {
     let cancelable_task = CancelableTask::new(cancelation_tx, task);
 
     // Canceling should
-    let mut cancelation_future = cancelable_task.cancel().boxed();
+    let cancelation_future = cancelable_task.cancel();
+    futures::pin_mut!(cancelation_future);
     if let Poll::Pending = executor.run_until_stalled(&mut cancelation_future) {
         panic!("Should not have stalled after triggering cancelation");
     }

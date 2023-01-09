@@ -122,7 +122,7 @@ pub async fn handle_input(
                 .context("unable to connect to factory file loader for light sensor")?;
             let calibration = LightSensorCalibration::new(
                 light_sensor_configuration.calibration,
-                factory_file_loader,
+                &factory_file_loader,
             )
             .await
             .map_err(|e| {

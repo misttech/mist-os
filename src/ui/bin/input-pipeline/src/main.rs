@@ -91,7 +91,7 @@ async fn main() -> Result<(), Error> {
             .expect("should get factory proxy");
         let factory_file_loader = FactoryFileLoader::new(factory_store_proxy)
             .expect("should be able to load factory data");
-        let calibration = Calibration::new(configuration.calibration, factory_file_loader)
+        let calibration = Calibration::new(configuration.calibration, &factory_file_loader)
             .await
             .map_err(|e| {
                 fx_log_warn!(

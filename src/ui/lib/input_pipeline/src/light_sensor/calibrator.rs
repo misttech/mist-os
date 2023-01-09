@@ -157,10 +157,10 @@ impl FactoryFileLoader {
 
 #[async_trait(?Send)]
 impl FileLoader for FactoryFileLoader {
-    async fn load_file(&self, file_path: &Path) -> Result<String, Error> {
+    async fn load_file(&self, file_path: &str) -> Result<String, Error> {
         let file_proxy = fuchsia_fs::open_file(
             &self.directory_proxy,
-            file_path,
+            Path::new(file_path),
             OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE,
         )
         .with_context(|| format!("Failed to open configuration at {:?}", file_path))?;

@@ -8,7 +8,6 @@ use futures::{Future, FutureExt as _, TryFutureExt as _};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Sub};
-use std::path::Path;
 
 /// Abstracts over grouping of red, green, blue and clear color channel data.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -209,7 +208,7 @@ type LedMap = HashMap<String, Rgbc<Parameters>>;
 
 #[async_trait(?Send)]
 pub trait FileLoader {
-    async fn load_file(&self, file_path: &Path) -> Result<String, Error>;
+    async fn load_file(&self, file_path: &str) -> Result<String, Error>;
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -229,7 +228,7 @@ pub struct Calibration {
 impl Calibration {
     pub async fn new(
         configuration: CalibrationConfiguration,
-        file_loader: impl FileLoader,
+        file_loader: &impl FileLoader,
     ) -> Result<Self, Error> {
         let mut leds = HashMap::new();
         for led_config in configuration.leds {
@@ -238,7 +237,9 @@ impl Calibration {
                 name.clone(),
                 led_config
                     .rgbc
-                    .map_async(|file_path| Self::parse_file(file_path, &file_loader))
+                    .map_async(|file_path| async move {
+                        Self::parse_file(&file_path, file_loader).await
+                    })
                     .await
                     .with_context(|| format!("Failed to map {:?}'s rgbc field", name))?,
             );
@@ -246,12 +247,12 @@ impl Calibration {
 
         let off = configuration
             .off
-            .map_async(|file_path| Self::parse_file(file_path, &file_loader))
+            .map_async(|file_path| async move { Self::parse_file(&file_path, file_loader).await })
             .await
             .context("Failed to map off rgbc")?;
         let all_on = configuration
             .all_on
-            .map_async(|file_path| Self::parse_file(file_path, &file_loader))
+            .map_async(|file_path| async move { Self::parse_file(&file_path, file_loader).await })
             .await
             .context("Failed to map all_on rgbc")?;
         let calibrated_slope =
@@ -270,10 +271,7 @@ impl Calibration {
         Self { leds, off, all_on, calibrated_slope }
     }
 
-    async fn parse_file(
-        path: impl AsRef<Path>,
-        file_loader: &impl FileLoader,
-    ) -> Result<Parameters, Error> {
+    async fn parse_file(path: &str, file_loader: &impl FileLoader) -> Result<Parameters, Error> {
         let path = path.as_ref();
         let cal_contents = file_loader
             .load_file(path)
