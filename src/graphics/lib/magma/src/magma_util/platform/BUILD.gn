@@ -83,9 +83,6 @@ group("entry") {
   if (is_fuchsia) {
     deps = [ "zircon:entry" ]
   }
-  if (is_linux) {
-    deps = [ "linux:entry" ]
-  }
 }
 
 group("entry_test") {
@@ -112,9 +109,6 @@ source_set("handle") {
   if (is_fuchsia) {
     deps = [ "zircon:handle" ]
   }
-  if (is_linux) {
-    deps = [ "linux:handle" ]
-  }
 }
 
 source_set("interrupt_header") {
@@ -139,9 +133,6 @@ source_set("iommu") {
 
   if (is_fuchsia) {
     deps = [ "zircon:iommu" ]
-  }
-  if (is_linux) {
-    deps = [ "linux:iommu" ]
   }
 }
 
@@ -180,8 +171,6 @@ source_set("device") {
 
   if (is_fuchsia) {
     deps = [ "zircon:device" ]
-  } else if (is_linux) {
-    deps = [ "linux:device" ]
   }
 }
 
@@ -205,9 +194,6 @@ source_set("connection_client") {
 
   if (is_fuchsia) {
     deps = [ "zircon:connection_client" ]
-  }
-  if (is_linux) {
-    deps = [ "linux:connection_client" ]
   }
 }
 
@@ -234,9 +220,6 @@ source_set("connection") {
   if (is_fuchsia) {
     deps = [ "zircon:connection" ]
   }
-  if (is_linux) {
-    deps = [ "linux:connection" ]
-  }
 }
 
 source_set("device_client_header") {
@@ -253,9 +236,6 @@ source_set("device_client") {
   if (is_fuchsia) {
     deps = [ "zircon:device_client" ]
   }
-  if (is_linux) {
-    deps = [ "linux:device_client" ]
-  }
 }
 
 source_set("thread_header") {
@@ -271,8 +251,6 @@ source_set("thread") {
 
   if (is_fuchsia) {
     deps = [ "zircon:thread" ]
-  } else if (is_linux) {
-    deps = [ "linux:thread" ]
   }
 }
 
@@ -337,9 +315,6 @@ source_set("object") {
   if (is_fuchsia) {
     deps = [ "zircon:object" ]
   }
-  if (is_linux) {
-    deps = [ "linux:object" ]
-  }
 }
 
 source_set("semaphore_header") {
@@ -362,9 +337,6 @@ source_set("semaphore") {
   if (is_fuchsia) {
     deps = [ "zircon:semaphore" ]
   }
-  if (is_linux) {
-    deps = [ "linux:semaphore" ]
-  }
 }
 
 source_set("port_header") {
@@ -382,9 +354,6 @@ source_set("port") {
 
   if (is_fuchsia) {
     deps += [ "zircon:port" ]
-  }
-  if (is_linux) {
-    deps += [ "linux:port" ]
   }
 }
 
