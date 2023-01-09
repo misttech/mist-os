@@ -302,7 +302,7 @@ impl FilesystemLauncher {
         zxcrypt::unseal_or_format(device).await
     }
 
-    async fn serve_blobfs(&self, device: &mut dyn Device) -> Result<Filesystem, Error> {
+    pub async fn serve_blobfs(&self, device: &mut dyn Device) -> Result<Filesystem, Error> {
         tracing::info!(path = %device.path(), "Mounting /blob");
 
         // Setting max partition size for blobfs

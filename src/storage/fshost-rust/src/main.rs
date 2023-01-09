@@ -66,7 +66,12 @@ async fn main() -> Result<(), Error> {
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fshost::AdminMarker::PROTOCOL_NAME =>
-                service::fshost_admin(config.clone(), env.launcher(), env.data_root()?),
+                service::fshost_admin(
+                    config.clone(),
+                    env.launcher(),
+                    env.data_root()?,
+                    watcher.clone()
+                ),
             fshost::BlockWatcherMarker::PROTOCOL_NAME =>
                 service::fshost_block_watcher(watcher),
         },

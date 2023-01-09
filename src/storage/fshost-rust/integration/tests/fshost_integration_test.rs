@@ -20,17 +20,8 @@ use {
     futures::FutureExt,
 };
 
-// wipe_storage is currently only supported on the cpp fshost
-// TODO(fxbug.dev/110901): add support for wipe_storage to the rust fshost
-#[cfg(not(feature = "fshost_rust"))]
-mod wipe_storage;
-// If we aren't including the wipe_storage tests, we need to mark some deps as used.
-#[cfg(feature = "fshost_rust")]
-use {
-    fidl_fuchsia_hardware_block as _, fs_management as _, fuchsia_fs as _, remote_block_device as _,
-};
-
 mod migration;
+mod wipe_storage;
 mod write_data_file;
 
 const FSHOST_COMPONENT_NAME: &'static str = std::env!("FSHOST_COMPONENT_NAME");

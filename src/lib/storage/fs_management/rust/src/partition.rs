@@ -7,7 +7,10 @@ use {
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::Proxy,
     fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_partition::{PartitionAndDeviceMarker, PartitionAndDeviceProxy},
+    fidl_fuchsia_hardware_block_partition::{
+        Guid, PartitionAndDeviceMarker, PartitionAndDeviceProxy,
+    },
+    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
     fuchsia_async::TimeoutExt,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_watch::{watch, PathEvent},
@@ -167,6 +170,34 @@ async fn partition_matches_res(
         }
     }
     return Ok(true);
+}
+
+pub async fn fvm_allocate_partition(
+    fvm_proxy: &VolumeManagerProxy,
+    type_guid: [u8; 16],
+    instance_guid: [u8; 16],
+    name: &str,
+    flags: u32,
+    slice_count: u64,
+) -> Result<String, Error> {
+    let status = fvm_proxy
+        .allocate_partition(
+            slice_count,
+            &mut Guid { value: type_guid },
+            &mut Guid { value: instance_guid },
+            name,
+            flags,
+        )
+        .await?;
+    zx::Status::ok(status)?;
+
+    let matcher = PartitionMatcher {
+        type_guids: Some(vec![type_guid]),
+        instance_guids: Some(vec![instance_guid]),
+        ..Default::default()
+    };
+
+    find_partition(matcher, Duration::from_seconds(10)).await
 }
 
 #[cfg(test)]

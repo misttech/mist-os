@@ -84,7 +84,7 @@ async fn no_fvm_device() {
         .await
         .expect("FIDL call to WipeStorage failed")
         .expect_err("WipeStorage unexpectedly succeeded");
-    assert_eq!(zx::Status::from_raw(result), zx::Status::TIMED_OUT);
+    assert_eq!(zx::Status::from_raw(result), zx::Status::INTERNAL);
     fixture.tear_down().await;
 }
 

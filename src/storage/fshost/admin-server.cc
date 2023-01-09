@@ -462,19 +462,6 @@ void AdminServer::WipeStorage(WipeStorageRequestView request,
     return;
   }
 
-  // We need to pause the block watcher to make sure fshost doesn't try to mount or format any of
-  // the newly provisioned volumes in the FVM.
-  if (!block_watcher_.IsPaused()) {
-    FX_LOGS(INFO) << "Pausing block watcher.";
-    if (const zx_status_t status = block_watcher_.Pause(); status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to pause block watcher: " << zx_status_get_string(status);
-      completer.ReplyError(status);
-      return;
-    }
-  } else {
-    FX_LOGS(INFO) << "Block watcher already paused.";
-  }
-
   // Find the first non-ramdisk FVM partition to wipe.
   ZX_DEBUG_ASSERT(!config_.ramdisk_prefix().empty());
 
@@ -488,10 +475,23 @@ void AdminServer::WipeStorage(WipeStorageRequestView request,
       fs_management::OpenPartition(fvm_matcher, kOpenPartitionDuration, nullptr);
   if (fvm_device.is_error()) {
     FX_LOGS(ERROR) << "Failed get FVM block device: " << fvm_device.status_string();
-    completer.ReplyError(fvm_device.status_value());
+    completer.ReplyError(ZX_ERR_INTERNAL);
     return;
   }
   ZX_ASSERT(fvm_device->is_valid());
+
+  // We need to pause the block watcher to make sure fshost doesn't try to mount or format any of
+  // the newly provisioned volumes in the FVM.
+  if (!block_watcher_.IsPaused()) {
+    FX_LOGS(INFO) << "Pausing block watcher.";
+    if (const zx_status_t status = block_watcher_.Pause(); status != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to pause block watcher: " << zx_status_get_string(status);
+      completer.ReplyError(status);
+      return;
+    }
+  } else {
+    FX_LOGS(INFO) << "Block watcher already paused.";
+  }
 
   // Wipe and reprovision the FVM partition with the product/board configured values.
   zx::result<fs_management::StartedSingleVolumeFilesystem> blobfs =
