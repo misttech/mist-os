@@ -374,6 +374,12 @@
     {
         "kind": "table/member",
         "name": "fuchsia.lowpan.device/Identity.xpanid",
+        "ordinal": "7",
+        "type": "array<uint8,8>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.device/Identity.xpanid_deprecated",
         "ordinal": "2",
         "type": "vector<uint8>:8"
     },

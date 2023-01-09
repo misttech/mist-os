@@ -11,7 +11,6 @@ use fidl_fuchsia_lowpan_experimental::{
 use hex;
 
 const PROVISION_CMD_NAME_LEN: usize = 63;
-const PROVISION_CMD_XPANID_LEN: usize = 8;
 const PROVISION_CMD_CRED_MASTER_LEY_LEN: &[usize] = &[16, 32];
 
 /// Contains the arguments decoded for the `join` command.
@@ -75,15 +74,15 @@ impl JoinCommand {
         Ok(Some(self.name.clone().unwrap().as_bytes().to_vec()))
     }
 
-    fn get_xpanid_vec(&self) -> Result<Option<Vec<u8>>, Error> {
+    fn get_xpanid(&self) -> Result<Option<[u8; 8]>, Error> {
         self.xpanid
             .as_ref()
             .map(|value| {
-                let res = hex::decode(value.to_string())?;
-                if res.len() != PROVISION_CMD_XPANID_LEN {
-                    return Err(format_err!("xpanid has to be 8 bytes"));
-                }
-                Ok(res)
+                let vec = hex::decode(value.to_string())?;
+                let octets = vec
+                    .try_into()
+                    .map_err(|_: Vec<u8>| format_err!("malformed xpanid {}", value))?;
+                Ok(octets)
             })
             .transpose()
     }
@@ -106,7 +105,8 @@ impl JoinCommand {
     fn get_identity(&self) -> Result<Identity, Error> {
         Ok(Identity {
             raw_name: self.get_name_vec_from_str()?,
-            xpanid: self.get_xpanid_vec()?,
+            xpanid: self.get_xpanid()?,
+            xpanid_deprecated: self.get_xpanid()?.map(|array| array.to_vec()),
             net_type: self.net_type.clone(),
             channel: self.channel.clone(),
             panid: self.panid.clone(),

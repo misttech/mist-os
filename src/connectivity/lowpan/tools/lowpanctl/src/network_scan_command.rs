@@ -111,9 +111,7 @@ impl NetworkScanCommand {
 
                 let xpanid = item
                     .identity
-                    .as_ref()
-                    .map(|x| x.xpanid.as_ref().map(Vec::as_slice))
-                    .flatten()
+                    .and_then(|fidl_fuchsia_lowpan_device::Identity { xpanid, .. }| xpanid)
                     .map(hex::encode)
                     .unwrap_or_else(|| "N/A".to_string());
 

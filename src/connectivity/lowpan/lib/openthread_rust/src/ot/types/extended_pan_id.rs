@@ -24,15 +24,16 @@ impl std::fmt::Display for ExtendedPanId {
     }
 }
 
+impl std::convert::From<[u8; 8]> for ExtendedPanId {
+    fn from(value: [u8; 8]) -> Self {
+        Self(otExtendedPanId { m8: value })
+    }
+}
+
 impl ExtendedPanId {
-    /// Tries to create an `ExtendedPanId` reference from a byte slice.
-    pub fn try_ref_from_slice(slice: &[u8]) -> Result<&ExtendedPanId, ot::WrongSize> {
-        if slice.len() == OT_EXT_PAN_ID_SIZE as usize {
-            Ok(unsafe { Self::ref_from_ot_ptr((slice as *const [u8]) as *const otExtendedPanId) }
-                .unwrap())
-        } else {
-            Err(ot::WrongSize)
-        }
+    /// Returns the underlying address octets.
+    pub fn into_array(self) -> [u8; 8] {
+        self.0.m8
     }
 
     /// Returns this Extended PAN-ID as a byte slice.

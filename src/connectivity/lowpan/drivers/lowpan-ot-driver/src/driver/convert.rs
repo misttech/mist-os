@@ -122,7 +122,8 @@ impl FromExt<ot::ActiveScanResult> for BeaconInfo {
                 },
                 channel: Some(x.channel().into()),
                 panid: Some(x.pan_id()),
-                xpanid: Some(x.extended_pan_id().to_vec()),
+                xpanid: Some(x.extended_pan_id().into_array()),
+                xpanid_deprecated: Some(x.extended_pan_id().to_vec()),
                 ..Identity::EMPTY
             }),
             rssi: Some(x.rssi()),
@@ -137,7 +138,13 @@ impl FromExt<&ot::OperationalDataset> for Identity {
     fn from_ext(operational_dataset: &ot::OperationalDataset) -> Self {
         Identity {
             raw_name: operational_dataset.get_network_name().map(ot::NetworkName::to_vec),
-            xpanid: operational_dataset.get_extended_pan_id().map(ot::ExtendedPanId::to_vec),
+            xpanid: operational_dataset
+                .get_extended_pan_id()
+                .copied()
+                .map(ot::ExtendedPanId::into_array),
+            xpanid_deprecated: operational_dataset
+                .get_extended_pan_id()
+                .map(ot::ExtendedPanId::to_vec),
             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
             channel: operational_dataset.get_channel().map(|x| x as u16),
             panid: operational_dataset.get_pan_id(),
@@ -249,13 +256,7 @@ impl UpdateOperationalDataset<Identity> for ot::OperationalDataset {
             self.set_pan_id(ident.panid)
         }
         if ident.xpanid.is_some() {
-            self.set_extended_pan_id(
-                ident
-                    .xpanid
-                    .as_ref()
-                    .map(|v| ot::ExtendedPanId::try_ref_from_slice(v.as_slice()))
-                    .transpose()?,
-            );
+            self.set_extended_pan_id(ident.xpanid.map(Into::into).as_ref());
         }
         if ident.raw_name.is_some() {
             self.set_network_name(

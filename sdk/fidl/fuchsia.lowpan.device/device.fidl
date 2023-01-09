@@ -18,9 +18,12 @@ type Identity = table {
     /// [1]: https://tools.ietf.org/html/rfc3454
     1: raw_name vector<uint8>:63;
 
-    /// Extended PANID.
-    // TODO(https://fxbug.dev/105014): make this an array.
+    @available(removed=11)
     2: xpanid vector<uint8>:8;
+    // TODO(https://fxbug.dev/118274): nominally `removed=11` but FIDL requires
+    // added < removed.
+    @available(added=11, deprecated=11, removed=12, legacy=true)
+    2: xpanid_deprecated vector<uint8>:8;
 
     /// String identifying the type of network.
     ///
@@ -52,6 +55,10 @@ type Identity = table {
     ///
     /// This field is ignored when supplied to `JoinNetwork()`.
     6: mesh_local_prefix fuchsia.net.Ipv6AddressWithPrefix;
+
+    /// Extended PANID.
+    @available(added=11)
+    7: xpanid array<uint8, 8>;
 };
 
 /// LoWPAN Role Type.
