@@ -210,7 +210,7 @@ async fn remove_policy(env: &TestEnvironment, policy_id: u32) {
 
 // A simple validation test to ensure the policy message hub propagates messages
 // properly.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_message_hub() {
     let delegate = service::MessageHub::create_hub();
     let policy_handler_address = service::Address::PolicyHandler(PolicyType::Audio);
@@ -254,7 +254,7 @@ async fn test_policy_message_hub() {
 }
 
 // Tests that from a clean slate, the policy service returns the expected default property targets.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_get_default() {
     let expected_stream_types = default_audio_info()
         .streams
@@ -283,7 +283,7 @@ async fn test_policy_get_default() {
 
 // Tests that adding a new policy transform returns its policy ID and is reflected by the output
 // from GetProperties.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_policy() {
     let expected_policy_target = AudioStreamType::Media;
     let policy_transform = Transform::Max(1.0);
@@ -321,7 +321,7 @@ async fn test_policy_add_policy() {
 
 // Tests that starting the service with existing transforms then adding new policies still
 // unique policy IDs.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_policy_ids_unique_across_restart() {
     let target = AudioStreamType::Media;
     let transform = Transform::Min(0.0);
@@ -351,7 +351,7 @@ async fn test_policy_add_policy_ids_unique_across_restart() {
 }
 
 // Tests that volume limits specified in transform parameters for new policies are rounded.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_policy_rounds_volume_limits() {
     // Test various starting volumes to make sure the actual added policy limit is rounded.
     let mut input_volume_limit = 0.0;
@@ -369,7 +369,7 @@ async fn test_policy_add_policy_rounds_volume_limits() {
 
 // Tests that volume limits specified in transform parameters for new policies are clamped to the
 // [0-1] range.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_policy_clamps_volume_limits() {
     let min_volume = 0.0;
     let max_volume = 1.0;
@@ -385,7 +385,7 @@ async fn test_policy_add_policy_clamps_volume_limits() {
 }
 
 // Tests that invalid volume limits specified in transform parameters throw errors
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_policy_invalid_volume_limits() {
     add_invalid_volume_policy_and_expect_error(f32::INFINITY).await;
     add_invalid_volume_policy_and_expect_error(f32::NEG_INFINITY).await;
@@ -394,7 +394,7 @@ async fn test_policy_add_policy_invalid_volume_limits() {
 
 // Tests that removing and added policy transform works and the removed policy is gone
 // from GetProperties.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_remove_policy() {
     let expected_policy_target = AudioStreamType::Media;
 
@@ -417,7 +417,7 @@ async fn test_policy_remove_policy() {
 }
 
 // Tests that adding a new min policy transform affects the audio output from the audio setting.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_min_policy_adjusts_volume() {
     let expected_policy_target = AudioStreamType::Media;
     let expected_user_volume: f32 = 0.8;
@@ -437,7 +437,7 @@ async fn test_policy_add_min_policy_adjusts_volume() {
 }
 
 // Tests that adding a new min policy transform unmutes a stream.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_min_policy_unmutes_stream() {
     let policy_target = AudioStreamType::Media;
     let starting_stream = AudioStream {
@@ -468,7 +468,7 @@ async fn test_policy_add_min_policy_unmutes_stream() {
 
 // Tests that adding a new max policy transform does not initially affect the audio output from the
 // audio setting when at max, but does take effect after removal.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_add_max_policy_adjusts_volume_after_removal() {
     let expected_policy_target = AudioStreamType::Media;
     let initial_volume: f32 = 1.0;
@@ -500,7 +500,7 @@ async fn test_policy_add_max_policy_adjusts_volume_after_removal() {
 }
 
 // Tests that incoming sets are clamped when a min policy is present.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_min_policy_clamps_sets() {
     let expected_policy_target = AudioStreamType::Media;
     let expected_user_volume: f32 = 0.2;
@@ -540,7 +540,7 @@ async fn test_policy_min_policy_clamps_sets() {
 }
 
 // Tests that incoming sets are scaled when a max policy is present.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_max_policy_scales_sets() {
     let expected_policy_target = AudioStreamType::Media;
     let initial_volume: f32 = 0.4;

@@ -125,13 +125,13 @@ mod tests {
         modified_counters: None,
     };
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_config() {
         let settings = default_audio_info();
         assert_eq!(CONFIG_AUDIO_INFO, settings);
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_info_migration_v1_to_v2() {
         let mut v1 = AudioInfoV1::default_value();
         let updated_mic_mute_val = !v1.input.mic_mute;

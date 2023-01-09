@@ -205,7 +205,7 @@ mod tests {
     }
 
     // Verify that a WatchLightGroups request is converted into a sequential job.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_light_groups_request() {
         // Connect to the Light service and make a watch request.
         let (proxy, server) =
@@ -246,7 +246,7 @@ mod tests {
         assert_matches!(job.execution_type(), execution::Type::Sequential(signature) => signature)
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_individual_light_group_request() {
         const TEST_LIGHT_NAME: &str = "test_light";
 
@@ -269,7 +269,7 @@ mod tests {
     }
 
     // Verify that a SetLightGroupValues request is converted into an independent job
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_light_group_values_request() {
         // Connect to the Light service and make a set request.
         let (proxy, server) =

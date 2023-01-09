@@ -26,7 +26,7 @@ macro_rules! async_property_test {
     ) => {
         $(paste::paste!{
             #[allow(non_snake_case)]
-            #[fuchsia_async::run_until_stalled(test)]
+            #[fuchsia::test(allow_stalls = false)]
             $(#[$attr])*
             async fn [<$test_func ___ $test_name>]() {
                 $test_func($($args,)+).await;

@@ -305,7 +305,7 @@ mod tests {
     use std::sync::Arc;
 
     // Validates that multiple messages can be handled from a single source
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_manager_job_processing_multiple_jobs_one_source() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();
@@ -358,7 +358,7 @@ mod tests {
 
     // Validates that a request that failed to convert to a job does not block the remaining jobs
     // from running.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_manager_job_processing_handles_errored_conversions() {
         struct TestResponder;
         impl source::ErrorResponder for TestResponder {
@@ -427,7 +427,7 @@ mod tests {
 
     // Validates that a request that failed to convert to a job does not block the remaining jobs
     // from running.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_manager_job_processing_handles_errored_fidl() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();
@@ -501,7 +501,7 @@ mod tests {
 
     // Validates that an InvalidPolicyInput error causes the stream to close and not run further
     // jobs.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_invalid_policy_input_returns_error() {
         struct TestPolicyResponder;
         impl source::PolicyErrorResponder for TestPolicyResponder {
@@ -597,7 +597,7 @@ mod tests {
 
     // Validates that a hanging get on one source does not block jobs from being processed on
     // another source.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_manager_job_processing_multiple_sources() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();
@@ -665,7 +665,7 @@ mod tests {
 
     // Validates that sequential jobs like hanging gets are canceled when the source stream ends,
     // which corresponds to a client closing their connection.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_manager_cancels_jobs_on_stream_end() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();

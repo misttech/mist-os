@@ -27,7 +27,7 @@ async fn create_service() -> Arc<Mutex<ServiceRegistry>> {
 }
 
 // Tests that the volume event stream thread exits when the StreamVolumeControl is deleted.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_drop_thread() {
     let delegate = service::MessageHub::create_hub();
 
@@ -72,7 +72,7 @@ async fn test_drop_thread() {
 
 // Ensures that the StreamVolumeControl properly fires the provided early exit
 // closure when the underlying AudioCoreService closes unexpectedly.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_detect_early_exit() {
     let service_registry = ServiceRegistry::create();
     let audio_core_service_handle =

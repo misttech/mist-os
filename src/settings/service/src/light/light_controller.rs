@@ -504,7 +504,7 @@ mod tests {
 
     // Verify that a set call without a restore call succeeds. This can happen when the controller
     // is shutdown after inactivity and is brought up again to handle the set call.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_set_before_restore() {
         let message_hub = service::MessageHub::create_hub();
 
@@ -599,7 +599,7 @@ mod tests {
 
     // Verify that an on_mic_mute event without a restore call succeeds. This can happen when the
     // controller is shutdown after inactivity and is brought up again to handle the set call.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_on_mic_mute_before_restore() {
         let message_hub = service::MessageHub::create_hub();
 

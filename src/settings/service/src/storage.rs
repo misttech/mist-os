@@ -300,7 +300,7 @@ pub(crate) mod testing {
         }
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_in_memory_storage() {
         let factory = InMemoryStorageFactory::new();
         factory.initialize_storage::<TestStruct>().await;

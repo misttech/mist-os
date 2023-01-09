@@ -18,7 +18,7 @@ use std::sync::Arc;
 const ENV_NAME: &str = "settings_service_light_sensor_test_environment";
 const TEST_DELTA: f32 = 0.2;
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_light_sensor() {
     let service_gen = |service_name: &str,
                        channel: zx::Channel|
@@ -66,7 +66,7 @@ async fn test_light_sensor() {
 }
 
 // Tests for light sensor.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_watch_light_sensor_no_service_error() {
     let expected_error = fuchsia_zircon::Status::UNAVAILABLE;
 

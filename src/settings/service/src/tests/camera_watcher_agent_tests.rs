@@ -42,7 +42,7 @@ async fn create_services(
     (service_registry, FakeServices { camera3_service: camera3_service_handle })
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_camera_agent_proxy() {
     let service_hub = service::MessageHub::create_hub();
 

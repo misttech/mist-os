@@ -356,7 +356,7 @@ async fn run_end_listen(env: Arc<Mutex<TestEnvironment>>, listen_receptor: Liste
 }
 
 // Ensures setting proxy registers with the MessageHub.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_message_hub_presence() {
     let setting_type = SettingType::Unknown;
     let environment = TestEnvironmentBuilder::new(setting_type).build().await;
@@ -428,7 +428,7 @@ fn test_notify() {
     }
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_request() {
     let setting_type = SettingType::Unknown;
     let environment = TestEnvironmentBuilder::new(setting_type).build().await;
@@ -457,7 +457,7 @@ async fn test_request() {
     }
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_request_order() {
     let setting_type = SettingType::Unknown;
     let request_id_1 = 0;
@@ -989,7 +989,7 @@ fn test_retry() {
 }
 
 // Ensures early exit triggers retry flow.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_early_exit() {
     let exit_result = Ok(());
     let setting_type = SettingType::Unknown;

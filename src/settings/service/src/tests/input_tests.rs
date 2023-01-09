@@ -319,7 +319,7 @@ fn verify_muted_state(
 }
 
 // Test that a watch is executed correctly.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_watch() {
     let env = TestInputEnvironmentBuilder::new()
         .set_input_device_config(default_mic_config())
@@ -523,7 +523,7 @@ fn test_camera3_hw_change() {
 
 // Test to ensure camera sw state is changed on camera3 api
 // when the sw state is changed.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_camera3_sw_change() {
     let env = TestInputEnvironmentBuilder::new()
         .set_input_device_config(default_mic_cam_config())
@@ -680,7 +680,7 @@ fn test_camera_disable_combinations() {
 }
 
 // Test that the input settings are restored correctly.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_restore() {
     let mut stored_info = create_default_input_info().clone();
     stored_info.input_device_state = default_mic_cam_config_cam_sw_disabled().into();
@@ -695,7 +695,7 @@ async fn test_restore() {
 }
 
 // Test to ensure mic input change events are received.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_bringup_without_input_registry() {
     let env = TestInputEnvironmentBuilder::new()
         .set_input_device_config(default_mic_cam_config())
@@ -715,7 +715,7 @@ fn test_input_info_copy() {
 }
 
 // Test that the values in the persistent store are restored at the start.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_persisted_values_applied_at_start() {
     let mut test_input_info = InputInfoSources {
         input_device_state: InputState {
@@ -757,7 +757,7 @@ async fn test_persisted_values_applied_at_start() {
 }
 
 // Test that a failure results in the correct epitaph.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let input_proxy =
         create_input_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;
@@ -765,7 +765,7 @@ async fn test_channel_failure_watch() {
     assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_media_buttons() {
     let service_registry = ServiceRegistry::create();
     let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
@@ -797,7 +797,7 @@ async fn test_media_buttons() {
     }
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_device_listener_failure() {
     let service_registry = ServiceRegistry::create();
     let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));

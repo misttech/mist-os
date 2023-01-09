@@ -42,7 +42,7 @@ mod test {
     use super::*;
     use crate::config::default_settings::DefaultSetting;
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_display_configuration() {
         let default_value = DefaultSetting::<DisplayConfiguration, &str>::new(
             None,

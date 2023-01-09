@@ -36,7 +36,7 @@ async fn create_test_environment() -> (service::message::Delegate, Arc<DeviceSto
 }
 
 // Assert that we can read values by sending messages to the storage agent and receive a response.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_read() {
     let (delegate, _) = create_test_environment().await;
     let (messenger, _) =
@@ -62,7 +62,7 @@ async fn test_read() {
 
 // Assert that we can write values by sending messages to the storage agent and seeing a response
 // and the value in the in memory storage.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_write() {
     const CHANGED_VALUE: bool = false;
 

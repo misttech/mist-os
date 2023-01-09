@@ -494,7 +494,7 @@ mod tests {
         assert!(generator.generate() != generator.generate());
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_job_functionality() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();

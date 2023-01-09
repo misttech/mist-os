@@ -132,7 +132,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_request_basic_functionality() {
         // Create MessageHub for communication between components.
         let message_hub_delegate = MessageHub::create_hub();
@@ -179,7 +179,7 @@ mod tests {
         work_task_handle.await;
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_error_propagation() {
         // Create MessageHub for communication between components. Do not create any handler for the
         // test PolicyType address.

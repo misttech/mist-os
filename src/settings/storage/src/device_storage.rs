@@ -568,7 +568,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_get() {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -602,7 +602,7 @@ mod tests {
         assert_eq!(result.value, VALUE1);
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_get_default() {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -632,7 +632,7 @@ mod tests {
     }
 
     // For an invalid stash value, the get() method should return the default value.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_invalid_stash() {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -807,7 +807,7 @@ mod tests {
 
     // Test that an initial write to DeviceStorage causes a SetValue and Flush to Stash
     // without any wait.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_write_with_mismatch_type_returns_error() {
         let (stash_proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();

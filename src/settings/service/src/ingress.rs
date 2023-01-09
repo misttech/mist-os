@@ -111,7 +111,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_component::server::ServiceFs;
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_registration() {
         let (tx, rx) = futures::channel::oneshot::channel::<()>();
         let dependency = Dependency::Entity(Entity::Handler(SettingType::Unknown));

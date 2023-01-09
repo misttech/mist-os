@@ -101,7 +101,7 @@ async fn create_environment(
 }
 
 // Test that the audio settings are restored correctly.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_volume_restore() {
     let (service_registry, fake_services) = create_services().await;
     let expected_info = (0.9, false);
@@ -128,7 +128,7 @@ async fn test_volume_restore() {
 }
 
 // Ensure that we won't crash if audio core fails.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_bringup_without_audio_core() {
     let service_registry = ServiceRegistry::create();
 
@@ -144,7 +144,7 @@ async fn test_bringup_without_audio_core() {
     );
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_persisted_values_applied_at_start() {
     let (service_registry, fake_services) = create_services().await;
 
@@ -214,7 +214,7 @@ async fn test_persisted_values_applied_at_start() {
     }
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let audio_proxy =
         create_audio_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;
@@ -223,7 +223,7 @@ async fn test_channel_failure_watch() {
 }
 
 // Tests that a set call for a stream that isn't in the audio settings fails.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_invalid_stream_fails() {
     // Create a service registry with a fake audio core service that suppresses client errors, since
     // the invalid set call will cause the connection to close.

@@ -334,7 +334,7 @@ mod tests {
         assert!(generator.generate() != generator.generate());
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_seeding() {
         // Create delegate for communication between components.
         let message_hub_delegate = MessageHub::create_hub();
@@ -359,7 +359,7 @@ mod tests {
         assert_matches!(receptor.next_of::<Payload>().await, Ok((Payload::Source(_), _)));
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_handling() {
         // Create delegate for communication between components.
         let mut message_hub_delegate = MessageHub::create_hub();
@@ -410,7 +410,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_drop_pending() {
         // Create delegate for communication between components.
         let mut message_hub_delegate = MessageHub::create_hub();
@@ -476,7 +476,7 @@ mod tests {
     }
 
     // Ensures that proper queueing happens amongst Jobs within Execution Groups.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_execution_order() {
         let (execution_tx, mut execution_rx) = futures::channel::mpsc::unbounded::<job::Info>();
 
@@ -586,7 +586,7 @@ mod tests {
     }
 
     // Ensures that proper queueing happens amongst Jobs within Execution Groups.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_data() {
         let mut rng = rand::thread_rng();
 

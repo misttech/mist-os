@@ -23,7 +23,7 @@ async fn create_intl_test_env_with_failures(
         .unwrap()
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let intl_service =
         create_intl_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;

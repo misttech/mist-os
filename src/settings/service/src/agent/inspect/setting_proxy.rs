@@ -540,7 +540,7 @@ mod tests {
 
     // Verifies that request + response pairs with the same value and request type are grouped
     // together.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_grouped_responses() {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
@@ -622,7 +622,7 @@ mod tests {
 
     // Test that multiple requests of different request types for the same setting records the
     // correct inspect data.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_mixed_request_types() {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
@@ -721,7 +721,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_pending_request() {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
@@ -769,7 +769,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_response_counts_inspect() {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
@@ -824,7 +824,7 @@ mod tests {
 
     // Verifies that old requests are dropped after MAX_REQUEST_RESPONSE_PAIRS are received for a
     // given request + response pair.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn inspect_queue_test() {
         // Set the clock so that timestamps will always be 0.
         clock::mock::set(Time::from_nanos(0));

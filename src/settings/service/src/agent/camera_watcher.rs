@@ -165,7 +165,7 @@ mod tests {
     use futures::StreamExt;
 
     // Tests that the initialization lifespan is not handled.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn initialization_lifespan_is_unhandled() {
         // Setup messengers needed to construct the agent.
         let (messenger, publisher) = create_messenger_and_publisher().await;
@@ -186,7 +186,7 @@ mod tests {
     }
 
     // Tests that the agent cannot start without a camera3 service.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn when_camera3_inaccessible_returns_err() {
         // Setup messengers needed to construct the agent.
         let (messenger, publisher) = create_messenger_and_publisher().await;
@@ -208,7 +208,7 @@ mod tests {
     }
 
     // Tests that events can be sent to the intended recipients.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn event_handler_proxies_event() {
         let service_message_hub = service::MessageHub::create_hub();
         let (messenger, publisher) =
@@ -286,7 +286,7 @@ mod tests {
     }
 
     // Tests that events are not sent to unavailable settings.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn event_handler_sends_no_events_if_no_settings_available() {
         let service_message_hub = service::MessageHub::create_hub();
         let (messenger, publisher) =

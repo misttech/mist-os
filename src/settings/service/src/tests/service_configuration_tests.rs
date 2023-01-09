@@ -26,7 +26,7 @@ fn get_test_interface_specs() -> HashSet<InterfaceSpec> {
     [InterfaceSpec::Accessibility, InterfaceSpec::Privacy].into()
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_no_configuration_provided() {
     let factory = InMemoryStorageFactory::new();
 
@@ -54,7 +54,7 @@ async fn test_no_configuration_provided() {
     let _ = policy.get_properties().await.expect_err("Policy get should fail");
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_default_interfaces_configuration_provided() {
     let factory = InMemoryStorageFactory::new();
 
@@ -82,7 +82,7 @@ async fn test_default_interfaces_configuration_provided() {
 }
 
 // Verify that providing a policy in the interface configuration allows us to connect to it.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_configuration_provided() {
     let factory = InMemoryStorageFactory::new();
 
@@ -121,7 +121,7 @@ async fn test_policy_configuration_provided() {
 
 // Verify that providing a policy in the interface configuration without its dependencies causes
 // connections to fali.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_policy_configuration_provided_without_base_setting() {
     let factory = InMemoryStorageFactory::new();
 

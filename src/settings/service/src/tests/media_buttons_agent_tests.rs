@@ -35,7 +35,7 @@ async fn create_services() -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
     (service_registry, FakeServices { input_device_registry: input_device_registry_service_handle })
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_media_buttons_proxied() {
     let service_hub = service::MessageHub::create_hub();
     // Create the agent receptor for use by the agent.

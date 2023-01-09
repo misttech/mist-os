@@ -306,7 +306,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_watch_basic_functionality() {
         // Create store for job.
         let store_handle = Arc::new(Mutex::new(HashMap::new()));
@@ -409,7 +409,7 @@ mod tests {
 
     // This test verifies that custom change functions work by using a custom change function that
     // always says a new value is different, even if the actual value is unchanged.
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_custom_change_function() {
         // Create store for job.
         let store_handle = Arc::new(Mutex::new(HashMap::new()));
@@ -437,7 +437,7 @@ mod tests {
         .await;
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_error_propagation() {
         // Create MessageHub for communication between components.
         let message_hub_delegate = MessageHub::create_hub();

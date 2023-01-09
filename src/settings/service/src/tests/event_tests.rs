@@ -17,7 +17,7 @@ use std::sync::Arc;
 const ENV_NAME: &str = "settings_service_event_test_environment";
 
 // Exercises the event publishing path from agents.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_agent_event_propagation() {
     let agent_publisher: Arc<Mutex<Option<event::Publisher>>> = Arc::new(Mutex::new(None));
     let delegate: Arc<Mutex<Option<service::message::Delegate>>> = Arc::new(Mutex::new(None));

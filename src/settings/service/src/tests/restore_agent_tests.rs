@@ -87,7 +87,7 @@ async fn verify_restore_handling(
     assert_eq!(*counter.lock().await, 1);
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_restore() {
     // Should succeed when the restore command is handled.
     verify_restore_handling(Box::new(|| Ok(None)), true).await;
@@ -117,7 +117,7 @@ async fn test_restore() {
 }
 
 // Verifies the no-op event was properly passed through and matches.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_unimplemented() {
     // The environment uses SettingType::Setup, whose controller, setup_controller, does not
     // implement Restore.

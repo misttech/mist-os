@@ -439,7 +439,7 @@ async fn verify_media_volume_set(
 
 // Verifies that the audio policy handler restores to a default state with all stream types when no
 // persisted value is found.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_no_persisted_state() {
     let expected_value = get_default_state();
 
@@ -456,7 +456,7 @@ async fn test_handler_no_persisted_state() {
 }
 
 // Verifies that the audio policy handler reads the persisted state and restores it.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_restore_persisted_state() {
     let modified_property = AudioStreamType::Media;
     let expected_transform = Transform::Max(1.0f32);
@@ -494,7 +494,7 @@ async fn test_handler_restore_persisted_state() {
 }
 
 // Tests adding and reading policies.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_policy() {
     let expected_transform = Transform::Max(1.0);
     let modified_property = AudioStreamType::Media;
@@ -528,7 +528,7 @@ async fn test_handler_add_policy() {
 }
 
 // Tests that attempting to removing an unknown policy returns an appropriate error.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_remove_unknown_policy() {
     let mut env = TestEnvironment::new().await;
     let invalid_policy_id = PolicyId::create(42);
@@ -551,7 +551,7 @@ async fn test_handler_remove_unknown_policy() {
 }
 
 // Tests removing added policies.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_remove_policy() {
     let expected_value = get_default_state();
 
@@ -601,7 +601,7 @@ async fn test_handler_remove_policy() {
 
 // Verifies that adding a max volume policy adjusts the internal volume level if it's above the
 // new max.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_policy_modifies_internal_volume_above_max() {
     let mut env = TestEnvironment::new().await;
 
@@ -623,7 +623,7 @@ async fn test_handler_add_policy_modifies_internal_volume_above_max() {
 
 // Verifies that adding a min volume policy adjusts the internal volume level if it's below the
 // new min.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_policy_modifies_internal_volume_below_min() {
     let mut env = TestEnvironment::new().await;
 
@@ -642,7 +642,7 @@ async fn test_handler_add_policy_modifies_internal_volume_below_min() {
 }
 
 // Verifies that adding a min volume policy unmutes the volume stream.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_min_limit_unmutes() {
     let mut env = TestEnvironment::new().await;
 
@@ -669,7 +669,7 @@ async fn test_handler_add_min_limit_unmutes() {
 }
 
 // Verifies that adding a max volume policy of 0% succeeds and sets the volume 0%.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_zero_max() {
     let mut env = TestEnvironment::new().await;
 
@@ -688,7 +688,7 @@ async fn test_handler_add_zero_max() {
 }
 
 // Verifies that the internal volume will not be adjusted when it's already within policy limits.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_add_policy_does_not_modify_internal_volume_within_limits() {
     let mut env = TestEnvironment::new().await;
 
@@ -727,7 +727,7 @@ async fn verify_media_volume_changed(
 
 // Verifies that when a max volume policy is removed, listeners will receive a changed event with
 // the new external volume.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_remove_policy_notifies_listeners() {
     let mut env = TestEnvironment::new().await;
 
@@ -769,7 +769,7 @@ async fn test_handler_remove_policy_notifies_listeners() {
 }
 
 // Verifies that when multiple max volume policies are in place, that the most strict one applies.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_lowest_max_limit_applies_internally() {
     let mut env = TestEnvironment::new().await;
 
@@ -810,7 +810,7 @@ async fn test_handler_lowest_max_limit_applies_internally() {
 }
 
 // Verifies that when multiple min volume policies are in place, that the most strict one applies.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_highest_min_limit_applies_internally() {
     let mut env = TestEnvironment::new().await;
 
@@ -851,7 +851,7 @@ async fn test_handler_highest_min_limit_applies_internally() {
 }
 
 // Verifies that when no policies are in place that external set requests are not modified.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_no_policy_external_sets_not_modified() {
     let mut env = TestEnvironment::new().await;
 
@@ -867,7 +867,7 @@ async fn test_handler_no_policy_external_sets_not_modified() {
 
 // Verifies that adding a max volume policy scales external set requests to an appropriate internal
 // volume level.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_max_volume_policy_scales_external_sets() {
     let mut env = TestEnvironment::new().await;
 
@@ -896,7 +896,7 @@ async fn test_handler_max_volume_policy_scales_external_sets() {
 
 // Verifies that adding a min volume policy scales external set requests to an appropriate internal
 // volume level.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_min_volume_policy_scales_external_sets() {
     let mut env = TestEnvironment::new().await;
 
@@ -924,7 +924,7 @@ async fn test_handler_min_volume_policy_scales_external_sets() {
 }
 
 // Verifies that adding a min volume policy prevents external sets from muting the stream.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_min_volume_policy_prevents_mute() {
     let mut env = TestEnvironment::new().await;
 
@@ -945,7 +945,7 @@ async fn test_handler_min_volume_policy_prevents_mute() {
 
 // Verifies that adding both a max and a min volume policy scales external set requests to an
 // appropriate internal volume level.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_min_and_max_volume_policy_scales_external_volume() {
     let mut env = TestEnvironment::new().await;
 
@@ -982,7 +982,7 @@ async fn test_handler_min_and_max_volume_policy_scales_external_volume() {
 
 // Verifies that when no policies are in place that external get requests return the same
 // level as the internal volume levels.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_no_policy_gets_not_modified() {
     let mut env = TestEnvironment::new().await;
 
@@ -999,7 +999,7 @@ async fn test_handler_no_policy_gets_not_modified() {
 
 // Verifies that a max volume policy scales the result of get requests to the correct external
 // volume level.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_max_volume_policy_scales_gets() {
     let mut env = TestEnvironment::new().await;
 
@@ -1029,7 +1029,7 @@ async fn test_handler_max_volume_policy_scales_gets() {
 
 // Verifies that a min volume policy alone won't result in any scaling of the external volume
 // levels.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_min_volume_policy_scales_gets() {
     let mut env = TestEnvironment::new().await;
 
@@ -1053,7 +1053,7 @@ async fn test_handler_min_volume_policy_scales_gets() {
 
 // Verifies that the external volume returned by a get request is properly scaled when both a min
 // and a max volume policy are in place.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_min_and_max_volume_policy_scales_gets() {
     let mut env = TestEnvironment::new().await;
 
@@ -1089,7 +1089,7 @@ async fn test_handler_min_and_max_volume_policy_scales_gets() {
 }
 
 // Verifies that build-time configuration scales external set calls.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_audio_policy_config_scales_external_sets() {
     // Set a max volume of 0.6 through the configuration.
     let max_volume = 0.6;
@@ -1109,7 +1109,7 @@ async fn test_handler_audio_policy_config_scales_external_sets() {
 }
 
 // Verifies that build-time configuration scales get calls.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_audio_policy_config_scales_gets() {
     // Set a max volume of 0.6 through the configuration.
     let max_volume = 0.6;
@@ -1130,7 +1130,7 @@ async fn test_handler_audio_policy_config_scales_gets() {
 
 // Verifies that build-time configuration scales external set calls and work in conjunction with
 // policies added by clients of the volume policy FIDL api.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_handler_audio_policy_config_works_with_client_policies() {
     // Set a max volume of 0.6 through the configuration.
     let config_max_volume = 0.6;

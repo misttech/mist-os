@@ -20,7 +20,7 @@ const ENV_NAME: &str = "settings_service_factory_test_environment";
 
 // Tests that the FIDL calls for the reset setting result in appropriate
 // commands sent to the service.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_error_propagation() {
     let service_registry = ServiceRegistry::create();
     let recovery_policy_service_handler = RecoveryPolicy::create();

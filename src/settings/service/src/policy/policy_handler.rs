@@ -240,7 +240,7 @@ mod tests {
     use crate::service;
     use crate::tests::message_utils::verify_payload;
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_client_proxy_send_setting_request() {
         let policy_type = PolicyType::Unknown;
         let setting_request = Request::Get;
@@ -272,7 +272,7 @@ mod tests {
         .await
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_client_proxy_request_rebroadcast() {
         let setting_type = SettingType::Unknown;
 

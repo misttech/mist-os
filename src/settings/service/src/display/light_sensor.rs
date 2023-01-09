@@ -289,7 +289,7 @@ mod tests {
     use fuchsia_syslog::fx_log_info;
     use futures::future;
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_read_sensor() {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<InputDeviceMarker>().unwrap();

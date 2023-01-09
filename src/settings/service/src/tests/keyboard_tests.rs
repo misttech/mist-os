@@ -47,7 +47,7 @@ async fn create_test_keyboard_env(
     (keyboard_service, store)
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_keyboard_storage() {
     let changed_value = KeyboardInfo {
         keymap: Some(KeymapId::UsDvorak),
@@ -69,7 +69,7 @@ async fn test_keyboard_storage() {
     assert_eq!(changed_value, retrieved_struct);
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let keyboard_service = create_keyboard_test_env_with_failures().await;
     let result = keyboard_service.watch().await;

@@ -328,7 +328,7 @@ mod tests {
         (fake_streams, old_timestamps, new_timestamps, expected_changed_streams)
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_changed_streams() {
         let (fake_streams, old_timestamps, new_timestamps, expected_changed_streams) =
             fake_values();

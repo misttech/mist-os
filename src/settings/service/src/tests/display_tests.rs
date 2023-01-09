@@ -41,7 +41,7 @@ async fn create_display_test_env_with_failures(
 }
 
 // Makes sure that settings are restored from storage when service comes online.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_display_restore_with_storage_controller() {
     // Ensure auto-brightness value is restored correctly.
     validate_restore_with_storage_controller(
@@ -107,7 +107,7 @@ async fn validate_restore_with_storage_controller(
 }
 
 // Makes sure that settings are restored from storage when service comes online.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_display_restore_with_brightness_controller() {
     // Ensure auto-brightness value is restored correctly.
     validate_restore_with_brightness_controller(
@@ -179,7 +179,7 @@ async fn validate_restore_with_brightness_controller(
 }
 
 // Makes sure that a failing display stream doesn't cause a failure for a different interface.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_display_failure() {
     let service_gen =
         |service_name: &str, channel: zx::Channel| -> BoxFuture<'static, Result<()>> {
@@ -216,7 +216,7 @@ async fn test_display_failure() {
     let _settings = intl_service.watch().await.expect("watch completed");
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let display_proxy =
         create_display_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;

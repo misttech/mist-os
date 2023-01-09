@@ -28,7 +28,7 @@ async fn create_privacy_test_env_with_failures() -> PrivacyProxy {
     .unwrap()
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let privacy_service = create_privacy_test_env_with_failures().await;
     let result = privacy_service.watch().await;

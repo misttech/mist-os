@@ -309,7 +309,7 @@ mod tests {
 
     use super::Interface;
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_fidl_seeder_bringup() {
         let mut fs = ServiceFs::new();
         let delegate = service::MessageHub::create_hub();

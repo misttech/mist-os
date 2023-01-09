@@ -147,7 +147,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn try_from_set_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
             .expect("should be able to create proxy");
@@ -168,7 +168,7 @@ mod tests {
         assert_matches!(job.map(|j| j.execution_type()), Ok(execution::Type::Independent));
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn try_from_watch_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<KeyboardMarker>()
             .expect("should be able to create proxy");

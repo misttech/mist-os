@@ -148,7 +148,7 @@ pub(crate) mod testing {
         value: u32,
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_load_valid_config_data() {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
@@ -161,7 +161,7 @@ pub(crate) mod testing {
         );
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_load_invalid_config_data() {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
@@ -170,7 +170,7 @@ pub(crate) mod testing {
         assert!(setting.load_default_value().is_err());
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_load_invalid_config_file_path() {
         let mut setting = DefaultSetting::new(Some(TestConfigData { value: 3 }), "nuthatch");
 
@@ -180,14 +180,14 @@ pub(crate) mod testing {
         );
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_load_default_none() {
         let mut setting = DefaultSetting::<TestConfigData, &str>::new(None, "nuthatch");
 
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_no_inspect_write() {
         let mut setting = DefaultSetting::<TestConfigData, &str>::new(None, "nuthatch");
 

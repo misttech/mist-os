@@ -446,7 +446,7 @@ mod tests {
         .await
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_create_connection() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");
@@ -483,7 +483,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_pending() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");
@@ -523,7 +523,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_success_response() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");
@@ -594,7 +594,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_error() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");
@@ -666,7 +666,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_channel_closed() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");
@@ -737,7 +737,7 @@ mod tests {
         });
     }
 
-    #[fuchsia_async::run_until_stalled(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_multiple_requests() {
         let inspector = Inspector::new();
         let inspect_node = inspector.root().create_child("external_apis");

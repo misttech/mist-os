@@ -115,7 +115,7 @@ impl TestAgent {
 
 // Ensure that the messenger factory returned from environment creation is able
 // to send events to the test agent.
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_message_hub() {
     let service_registry = ServiceRegistry::create();
 
@@ -150,7 +150,7 @@ async fn test_message_hub() {
     .await;
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_dependency_generation() {
     let entity = Entity::Handler(SettingType::Unknown);
 
@@ -170,7 +170,7 @@ async fn test_dependency_generation() {
     assert!(entities.contains(&entity));
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_display_interface_consolidation() {
     let Environment { entities, .. } =
         EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
@@ -186,7 +186,7 @@ async fn test_display_interface_consolidation() {
     assert!(entities.contains(&Entity::Handler(SettingType::LightSensor)));
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn test_job_sourcing() {
     // Create channel to send the current job state.
     let (job_state_tx, mut job_state_rx) = futures::channel::mpsc::unbounded::<channel::State>();
@@ -238,7 +238,7 @@ fn serve_vfs_dir(
     (client, vmo_map)
 }
 
-#[fuchsia_async::run_until_stalled(test)]
+#[fuchsia::test(allow_stalls = false)]
 async fn migration_error_does_not_cause_early_exit() {
     const UNKNOWN_ID: u64 = u64::MAX;
     let unknown_id_str = UNKNOWN_ID.to_string();
