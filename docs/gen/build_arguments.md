@@ -2466,43 +2466,43 @@ From //build/images/args.gni:88
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:195](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#195)
+From [//third_party/perfetto/gn/perfetto.gni:195](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#195)
 
 ### enable_perfetto_fuzzers
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:198](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#198)
+From [//third_party/perfetto/gn/perfetto.gni:198](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#198)
 
 ### enable_perfetto_heapprofd
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:157](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#157)
+From [//third_party/perfetto/gn/perfetto.gni:157](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#157)
 
 ### enable_perfetto_integration_tests
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#193)
+From [//third_party/perfetto/gn/perfetto.gni:193](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#193)
 
 ### enable_perfetto_ipc
 
 **Current value (from the default):** `true`
 
-From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#150)
+From [//third_party/perfetto/gn/perfetto.gni:150](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#150)
 
 ### enable_perfetto_llvm_demangle
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:309](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#309)
+From [//third_party/perfetto/gn/perfetto.gni:309](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#309)
 
 ### enable_perfetto_platform_services
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:141](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#141)
+From [//third_party/perfetto/gn/perfetto.gni:141](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#141)
 
 ### enable_perfetto_site
 Allows to build the perfetto.dev website.
@@ -2512,73 +2512,73 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:326](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#326)
+From [//third_party/perfetto/gn/perfetto.gni:326](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#326)
 
 ### enable_perfetto_stderr_crash_dump
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#235)
+From [//third_party/perfetto/gn/perfetto.gni:235](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#235)
 
 ### enable_perfetto_system_consumer
 
 **Current value (from the default):** `true`
 
-From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#251)
+From [//third_party/perfetto/gn/perfetto.gni:251](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#251)
 
 ### enable_perfetto_tools
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:187](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#187)
+From [//third_party/perfetto/gn/perfetto.gni:187](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#187)
 
 ### enable_perfetto_trace_processor
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:173](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#173)
+From [//third_party/perfetto/gn/perfetto.gni:173](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#173)
 
 ### enable_perfetto_trace_processor_httpd
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:296](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#296)
+From [//third_party/perfetto/gn/perfetto.gni:296](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#296)
 
 ### enable_perfetto_trace_processor_json
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:291](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#291)
+From [//third_party/perfetto/gn/perfetto.gni:291](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#291)
 
 ### enable_perfetto_trace_processor_linenoise
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:285](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#285)
+From [//third_party/perfetto/gn/perfetto.gni:285](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#285)
 
 ### enable_perfetto_trace_processor_percentile
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:280](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#280)
+From [//third_party/perfetto/gn/perfetto.gni:280](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#280)
 
 ### enable_perfetto_trace_processor_sqlite
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:275](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#275)
+From [//third_party/perfetto/gn/perfetto.gni:275](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#275)
 
 ### enable_perfetto_traceconv
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:315](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#315)
+From [//third_party/perfetto/gn/perfetto.gni:315](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#315)
 
 ### enable_perfetto_traced_perf
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:165](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#165)
+From [//third_party/perfetto/gn/perfetto.gni:165](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#165)
 
 ### enable_perfetto_traced_probes
 The traced_probes daemon is very Linux-specific, as it depends on ftrace and
@@ -2591,43 +2591,43 @@ extremely low.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:267](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#267)
+From [//third_party/perfetto/gn/perfetto.gni:267](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#267)
 
 ### enable_perfetto_ui
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:319](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#319)
+From [//third_party/perfetto/gn/perfetto.gni:319](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#319)
 
 ### enable_perfetto_unittests
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:189](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#189)
+From [//third_party/perfetto/gn/perfetto.gni:189](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#189)
 
 ### enable_perfetto_version_gen
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:204](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#204)
+From [//third_party/perfetto/gn/perfetto.gni:204](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#204)
 
 ### enable_perfetto_watchdog
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:182](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#182)
+From [//third_party/perfetto/gn/perfetto.gni:182](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#182)
 
 ### enable_perfetto_x64_cpu_opt
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:243](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#243)
+From [//third_party/perfetto/gn/perfetto.gni:243](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#243)
 
 ### enable_perfetto_zlib
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:302](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#302)
+From [//third_party/perfetto/gn/perfetto.gni:302](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#302)
 
 ### enable_power_manager_debug
 
@@ -3411,7 +3411,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3610,16 +3610,21 @@ Path to file to use for recovery logo
 From //src/recovery/system/system_recovery_args.gni:7
 
 ### icu_disable_thin_archive
+If true, compile icu into a standalone static library. Currently this is
+only useful on Chrome OS.
 
 **Current value (from the default):** `false`
 
-From //third_party/icu/default/config.gni:22
+From //third_party/icu/default/config.gni:17
 
 ### icu_fuchsia_override_data_dir
+If set to nonempty, this is the label of the directory to be used to pull
+the ICU data files content.  The setting has effect only when building
+inside the Fuchsia source tree.
 
 **Current value (from the default):** `""`
 
-From //third_party/icu/default/config.gni:29
+From //third_party/icu/default/config.gni:22
 
 ### icu_major_version_number
 Contains the major version number of the ICU library, for dependencies that
@@ -3659,16 +3664,21 @@ and may be newer than what's available in the ICU data monolith.
 From //src/lib/icu/tzdata/icu_tzres_source.gni:16
 
 ### icu_use_data_file
+Tells icu to load an external data file rather than rely on the icudata
+being linked directly into the binary.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:9
+From //third_party/icu/default/config.gni:8
 
 ### icu_use_stub_data
+If true, then this creates a stub data file. This should be disabled if
+a custom data file will be used instead, in order to avoid conflicting
+symbols.
 
 **Current value (from the default):** `true`
 
-From //third_party/icu/default/config.gni:16
+From //third_party/icu/default/config.gni:13
 
 ### images_config_label
 The images config information used during assembly.
@@ -3822,7 +3832,7 @@ All the tools/gen_* scripts set this to true. This is mainly used to locate
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:82](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#82)
+From [//third_party/perfetto/gn/perfetto.gni:82](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#82)
 
 ### is_perfetto_embedder
 This is for override via `gn args` (e.g. for tools/gen_xxx). Embedders
@@ -3831,7 +3841,7 @@ perfetto_build_with_embedder=true in their GN files.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:87](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#87)
+From [//third_party/perfetto/gn/perfetto.gni:87](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#87)
 
 ### jtrace_enabled
 Please refer to https://fuchsia.dev/fuchsia-src/development/debugging/jtrace
@@ -4444,7 +4454,7 @@ Android. See also comments on PERFETTO_EXPORT_ENTRYPOINT in compiler.h.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:214](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#214)
+From [//third_party/perfetto/gn/perfetto.gni:214](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#214)
 
 ### msd_arm_enable_all_cores
 Enable all 8 cores, which is faster but emits more heat.
@@ -5102,13 +5112,13 @@ In standalone Android builds and Chromium Android builds, this is false.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:78](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#78)
+From [//third_party/perfetto/gn/perfetto.gni:78](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#78)
 
 ### perfetto_enable_git_rev_version_header
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:257](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#257)
+From [//third_party/perfetto/gn/perfetto.gni:257](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#257)
 
 ### perfetto_force_dcheck
 Whether DCHECKs should be enabled or not. Values: "on" | "off" | "".
@@ -5122,7 +5132,7 @@ See base/logging.h for the implementation of all this.
 
 **Current value (from the default):** `""`
 
-From [//third_party/perfetto/gn/perfetto.gni:229](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#229)
+From [//third_party/perfetto/gn/perfetto.gni:229](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#229)
 
 ### perfetto_force_dlog
 Whether DLOG should be enabled on debug builds (""), all builds ("on"), or
@@ -5131,7 +5141,7 @@ console.
 
 **Current value (from the default):** `""`
 
-From [//third_party/perfetto/gn/perfetto.gni:219](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#219)
+From [//third_party/perfetto/gn/perfetto.gni:219](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#219)
 
 ### perfetto_use_system_protobuf
 Used by CrOS system builds. Uses the system version of protobuf
@@ -5139,7 +5149,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:333](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#333)
+From [//third_party/perfetto/gn/perfetto.gni:333](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#333)
 
 ### perfetto_use_system_sqlite
 Used by CrOS system builds. Uses the system version of sqlite
@@ -5147,19 +5157,19 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:337](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#337)
+From [//third_party/perfetto/gn/perfetto.gni:337](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#337)
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:339](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#339)
+From [//third_party/perfetto/gn/perfetto.gni:339](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#339)
 
 ### perfetto_verbose_logs_enabled
 
 **Current value (from the default):** `true`
 
-From [//third_party/perfetto/gn/perfetto.gni:271](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#271)
+From [//third_party/perfetto/gn/perfetto.gni:271](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#271)
 
 ### persistent_ram_allocation_granularity
 Controls the granularity of allocation of the global pool of persistent RAM.
@@ -6984,7 +6994,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From [//third_party/perfetto/gn/perfetto.gni:329](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/7e5827f63b513c4619989149728ec439b2b66259/gn/perfetto.gni#329)
+From [//third_party/perfetto/gn/perfetto.gni:329](https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto//+/8c08b67c90e499036368cc820a24ec34a3159b76/gn/perfetto.gni#329)
 
 ### smp_max_cpus
 
@@ -7218,7 +7228,7 @@ From //build/security.gni:228
 ### thinlto_cache_dir
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
