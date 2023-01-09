@@ -8,7 +8,8 @@
 
 use {
     ::gcs::client::{Client, ProgressResponse, ProgressState},
-    anyhow::{Context, Result},
+    anyhow::{anyhow, Context, Result},
+    async_fs::rename,
     errors::ffx_bail,
     ffx_core::ffx_plugin,
     ffx_product_get_args::GetCommand,
@@ -24,6 +25,8 @@ pub async fn pb_get(cmd: GetCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    // TODO(fxbug.dev/118921): Do not put a .context() on this because it will
+    // break ffx_bail!().
     pb_get_impl(&cmd, &mut ui).await
 }
 
@@ -39,13 +42,18 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
         _ => ffx_bail!("The source location must be a URL, failed to parse {:?}", cmd.manifest_url),
     };
     let local_dir = &cmd.out_dir;
-    make_way_for_output(&local_dir, cmd.force).await.context("make_way_for_output")?;
+    tracing::debug!("make_way_for_output {:?}", local_dir);
+    // TODO(fxbug.dev/118921): Do not put a .context() on this because it will
+    // break ffx_bail!().
+    make_way_for_output(&local_dir, cmd.force).await?;
 
+    let parent_dir = local_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
+    let temp_dir = tempfile::TempDir::new_in(&parent_dir)?;
     let client = Client::initial()?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
-        local_dir,
+        &temp_dir.path(),
         &cmd.auth,
         &|layers| {
             let mut progress = structured_ui::Progress::builder();
@@ -62,6 +70,13 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     )
     .await
     .context("downloading via transfer manifest")?;
+
+    // Workaround for having the product bundle nested in a sub-dir.
+    let extra_dir = temp_dir.path().join("product_bundle");
+    let pb_dir = if extra_dir.exists() { extra_dir } else { temp_dir.path().to_path_buf() };
+    rename(&pb_dir, &local_dir)
+        .await
+        .with_context(|| format!("moving dir {:?} to {:?}", pb_dir, local_dir))?;
 
     let layers = vec![ProgressState { name: "complete", at: 2, of: 2, units: "steps" }];
     let mut progress = structured_ui::Progress::builder();
