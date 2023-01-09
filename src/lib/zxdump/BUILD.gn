@@ -322,10 +322,19 @@ install_host_tools("host-tools") {
   deps = [ ":gcore" ]
 }
 
+# This is not part of the library, but it's shared by the tools.
+source_set("cli") {
+  visibility = [ ":*" ]
+
+  sources = [ "cli.cc" ]
+  public = [ "cli.h" ]
+  public_deps = [ ":zxdump" ]
+}
+
 executable("gcore") {
   sources = [ "gcore.cc" ]
   deps = [
-    ":zxdump",
+    ":cli",
     "//sdk/lib/fit",
     "//third_party/rapidjson",
     "//zircon/system/ulib/fbl",

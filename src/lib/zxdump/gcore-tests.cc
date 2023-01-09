@@ -41,6 +41,7 @@ constexpr const char* kNoDateSwitch = "--no-date";
 constexpr const char* kRemarksSwitch = "--remarks=";
 constexpr const char* kRawRemarksSwitch = "--remarks-raw=";
 constexpr const char* kJsonRemarksSwitch = "--remarks-json=";
+constexpr const char* kLiveSwitch = "--live";
 
 constexpr std::string_view kArchiveSuffix = ".a";
 
@@ -154,7 +155,8 @@ TEST(ZxdumpTests, GcoreJobRequiresSwitch) {
   EXPECT_EQ(status, EXIT_FAILURE);
   EXPECT_EQ(child.collected_stdout(), "");
   std::string error_text = child.collected_stderr();
-  EXPECT_TRUE(cpp20::ends_with(std::string_view(error_text), ": KOID is not a process\n"));
+  EXPECT_TRUE(cpp20::ends_with(std::string_view(error_text), ": KOID is not a process\n"))
+      << error_text;
 }
 
 // With --jobs, you still just get an ET_CORE file (for each process).
@@ -672,6 +674,42 @@ TEST(ZxdumpTests, GcoreProcessDumpMemory) {
   auto read_result = holder.Insert(std::move(fd));
   ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
   ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpViaLiveSwitch) {
+  zxdump::testing::TestProcessForPropertiesAndInfo process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  const auto& [dump_file, prefix, pid_string] =
+      GetOutputFile(child, "process-dump-no-threads", process.koid());
+  std::vector<std::string> args({
+      kLiveSwitch,
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      kOutputSwitch,
+      prefix,
+      pid_string,
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_SUCCESS);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_EQ(child.collected_stderr(), "");
+
+  fbl::unique_fd fd = dump_file.OpenOutput();
+  ASSERT_TRUE(fd) << dump_file.name() << ": " << strerror(errno);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(fd));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, false));
 }
 
 #endif  // __Fuchsia__

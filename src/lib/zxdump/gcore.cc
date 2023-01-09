@@ -28,6 +28,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "cli.h"
+
 namespace {
 
 using namespace std::literals;
@@ -735,7 +737,7 @@ std::optional<Remarks> ParseRemarks(const char* arg, RemarksType type) {
   return result;
 }
 
-constexpr const char kOptString[] = "hlo:zamtcpJjfDUsSkKr:q:B:R";
+constexpr const char kOptString[] = "hlo:zamtcpJjfDUsSkKr:q:B:Rd:L";
 constexpr const option kLongOpts[] = {
     {"help", no_argument, nullptr, 'h'},                 //
     {"limit", required_argument, nullptr, 'l'},          //
@@ -759,6 +761,8 @@ constexpr const option kLongOpts[] = {
     {"remarks-raw", required_argument, nullptr, 'B'},    //
     {"remarks-recursive", no_argument, nullptr, 'R'},    //
     {"root-job", no_argument, nullptr, 'a'},             //
+    {"dump-file", required_argument, nullptr, 'd'},      //
+    {"live", no_argument, nullptr, 'L'},                 //
     {nullptr, no_argument, nullptr, 0},                  //
 };
 
@@ -768,7 +772,7 @@ int main(int argc, char** argv) {
   Flags flags;
   bool allow_jobs = false;
   auto handle_job = WriteManyCoreFiles;
-  bool dump_root_job = false;
+  CommandLineHelper cli;
 
   auto usage = [&](int status = EXIT_FAILURE) {
     std::cerr << "Usage: " << argv[0] << R"""( [SWITCHES...] PID...
@@ -795,6 +799,8 @@ int main(int argc, char** argv) {
     --remarks-raw=REMARKS, -B REMARKS  add dump remarks (raw binary)
     --remarks-recursive, -R            repeat dump remarks in each child dump
     --root-job, -a                     dump the root job
+    --dump-file=FILE, -d FILE          read a previous dump file
+    --live, -L                         use live data from the running system
 
 By default, each PID must be the KOID of a process.
 
@@ -847,6 +853,17 @@ dumping every job on the system; and without --no-process, it means dumping
 every process on the system.  Doing this without --no-threads may deadlock
 essential services.  PID arguments are not allowed with --root-job unless
 --no-children is also given, since they would always be redundant.
+
+By default, data for dumps is drawn from the running system.  Of course, this
+only works on Fuchsia.  One or more --dump-file (-d) switches can be given to
+read old postmortem data instead.  This allows, for example, extracting a
+subset of the jobs or processes from the original dump set; merging multiple
+dumps into one job archive; adding dump remarks; changing configuration details
+to dump a subset of the original postmortem data; etc.  If no --dump-file (-d)
+switches are given, then --live (-L) is the default.  Using --live (-L)
+explicitly in combination with dump files is allowed, but the results may be
+confusing either if the dumps are not from the current running system or if a
+task found in the postmortem data is also still alive on the running system.
 )""";
     return status;
   };
@@ -948,104 +965,56 @@ essential services.  PID arguments are not allowed with --root-job unless
         return usage();
 
       case 'a':
-        dump_root_job = true;
+        cli.RootJobArgument();
         continue;
 
       case 'z':
         flags.zstd = true;
         continue;
 
-      default:
+      case 'd':
+        cli.DumpFileArgument(optarg);
+        continue;
+
+      case 'L':
+        cli.LiveArgument();
+        continue;
+
+      case 'h':
         return usage(EXIT_SUCCESS);
+
+      default:
+        return usage();
     }
     break;
   }
 
-  if (optind == argc && !dump_root_job) {
+  cli.KoidArguments(argc, argv, optind, allow_jobs);
+
+  cli.NeedRootResource(flags.collect_kernel);
+  cli.NeedSystem(flags.collect_system);
+
+  if (cli.empty() && cli.ok()) {
     return usage();
   }
 
-  if (optind != argc && dump_root_job && flags.collect_job_children) {
-    std::cerr << "PID arguments are redundant with root job" << std::endl;
-  }
+  for (auto tasks = cli.take_tasks(); !tasks.empty(); tasks.pop()) {
+    zxdump::Task& task = tasks.front();
 
-  int exit_status = EXIT_SUCCESS;
-
-  zxdump::TaskHolder holder;
-  if (auto root = zxdump::GetRootJob(); root.is_error()) {
-    std::cerr << "cannot get root job: " << root.error_value() << std::endl;
-    exit_status = EXIT_FAILURE;
-  } else {
-    auto result = holder.Insert(std::move(root).value());
-    if (result.is_error()) {
-      std::cerr << "root job: " << root.error_value() << std::endl;
-      exit_status = EXIT_FAILURE;
-    }
-  }
-
-  if (flags.collect_kernel) {
-    auto root = zxdump::GetRootResource();
-    if (root.is_error()) {
-      std::cerr << "cannot get root resource: " << root.error_value() << std::endl;
-      exit_status = EXIT_FAILURE;
-    } else {
-      auto result = holder.Insert(std::move(root).value());
-      if (result.is_error()) {
-        std::cerr << "root resource: " << root.error_value() << std::endl;
-        exit_status = EXIT_FAILURE;
-      }
-    }
-  }
-
-  if (flags.collect_system) {
-    auto result = holder.InsertSystem();
-    if (result.is_error()) {
-      std::cerr << "cannot get live system data: " << result.error_value() << std::endl;
-    }
-  }
-
-  if (dump_root_job && !handle_job(JobDumper{holder.root_job()}, flags, holder)) {
-    exit_status = EXIT_FAILURE;
-  }
-
-  for (int i = optind; i < argc; ++i) {
-    char* p;
-    zx_koid_t pid = strtoul(argv[i], &p, 0);
-    if (*p != '\0') {
-      std::cerr << "Not a PID or job KOID: " << argv[i] << std::endl;
-      return usage();
-    }
-
-    auto result = holder.root_job().find(pid);
-    if (result.is_error()) {
-      std::cerr << pid << ": " << result.error_value() << std::endl;
-      exit_status = EXIT_FAILURE;
-      continue;
-    }
-
-    zxdump::Task& task = result.value();
     switch (task.type()) {
       case ZX_OBJ_TYPE_PROCESS:
-        if (!WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags, holder)) {
-          exit_status = EXIT_FAILURE;
-        }
+        cli.Ok(WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags, cli.holder()));
         break;
 
       case ZX_OBJ_TYPE_JOB:
-        if (allow_jobs) {
-          if (!handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags, holder)) {
-            exit_status = EXIT_FAILURE;
-          }
-          break;
-        }
-        [[fallthrough]];
+        cli.Ok(handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags, cli.holder()));
+        break;
 
       default:
-        std::cerr << pid << ": KOID is not a process\n";
-        exit_status = EXIT_FAILURE;
+        ZX_PANIC("impossible task type %u", task.type());
         break;
     }
   }
 
-  return exit_status;
+  return cli.exit_status();
 }
