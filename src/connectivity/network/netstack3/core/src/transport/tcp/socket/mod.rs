@@ -676,6 +676,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     ) -> R;
 
     fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, ctx: &mut C, id: Id) -> usize;
 }
 
 impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
@@ -1234,6 +1235,43 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                 }) => buffer_sizes,
             };
             *send = size;
+        })
+    }
+
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, _ctx: &mut C, id: Id) -> usize {
+        self.with_tcp_sockets(|sockets| {
+            let Sockets { port_alloc: _, inactive, socketmap } = sockets;
+            let get_listener = match id.into() {
+                SocketId::Unbound(id) => {
+                    let Unbound { bound_device: _, buffer_sizes, keep_alive: _ } =
+                        inactive.get(id.into()).expect("invalid unbound ID");
+                    let BufferSizes { send } = buffer_sizes;
+                    return *send;
+                }
+                SocketId::Connection(id) => {
+                    let (conn, _, _): &(_, (), ConnAddr<_, _, _, _>) =
+                        socketmap.conns().get_by_id(&id.into()).expect("invalid ID");
+                    let Connection { acceptor: _, state, ip_sock: _, defunct: _, keep_alive: _ } =
+                        conn;
+                    return state.send_buffer_size();
+                }
+                SocketId::Bound(id) => socketmap.listeners().get_by_id(&id.into()),
+                SocketId::Listener(id) => socketmap.listeners().get_by_id(&id.into()),
+            };
+
+            let (state, _, _): &(_, (), ListenerAddr<_, _, _>) =
+                get_listener.expect("invalid socket ID");
+            let BufferSizes { send } = match state {
+                MaybeListener::Bound(BoundState { buffer_sizes, keep_alive: _ }) => buffer_sizes,
+                MaybeListener::Listener(Listener {
+                    backlog: _,
+                    ready: _,
+                    pending: _,
+                    buffer_sizes,
+                    keep_alive: _,
+                }) => buffer_sizes,
+            };
+            *send
         })
     }
 }
@@ -1873,6 +1911,24 @@ pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I
     )
 }
 
+/// Get the size of the send buffer for this socket and future derived sockets.
+pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
+    mut sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: Id,
+) -> usize {
+    let IpInvariant(size) = I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx)), id.into()),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::send_buffer_size(sync_ctx, ctx, id))
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::send_buffer_size(sync_ctx, ctx, id))
+        },
+    );
+    size
+}
+
 /// Call this function whenever a socket can push out more data. That means either:
 ///
 /// - A retransmission timer fires.
@@ -2061,13 +2117,13 @@ mod tests {
         fn len(&self) -> usize {
             self.borrow().len()
         }
-    }
 
-    impl ReceiveBuffer for Rc<RefCell<RingBuffer>> {
         fn cap(&self) -> usize {
             self.borrow().cap()
         }
+    }
 
+    impl ReceiveBuffer for Rc<RefCell<RingBuffer>> {
         fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
             self.borrow_mut().write_at(offset, data)
         }
@@ -2092,6 +2148,11 @@ mod tests {
         fn len(&self) -> usize {
             let Self { fake_stream, ring } = self;
             ring.len() + fake_stream.borrow().len()
+        }
+
+        fn cap(&self) -> usize {
+            let Self { fake_stream, ring } = self;
+            ring.cap() + fake_stream.borrow().capacity()
         }
     }
 

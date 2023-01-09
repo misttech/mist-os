@@ -1308,9 +1308,13 @@ async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &
         // If the sender supports setting SO_SNDBUF, it should be able to buffer
         // a large amount of data even if the receiver isn't reading.
         const BUFFER_SIZE: usize = 1024 * 1024;
-        socket2::Socket::from(sender.std().try_clone().expect("stream is cloneable"))
-            .set_send_buffer_size(BUFFER_SIZE)
-            .expect("set size is infallible");
+        {
+            let socket =
+                socket2::Socket::from(sender.std().try_clone().expect("stream is cloneable"));
+            socket.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
+            let size = socket.send_buffer_size().expect("get size is infallible");
+            assert!(size >= BUFFER_SIZE, "{} >= {}", size, BUFFER_SIZE);
+        }
 
         let data = Vec::from_iter((0..BUFFER_SIZE).map(|i| i as u8));
         sender.write_all(data.as_slice()).await.expect("all written");

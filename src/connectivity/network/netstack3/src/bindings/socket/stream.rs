@@ -39,10 +39,11 @@ use netstack3_core::{
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
-            remove_unbound, set_bound_device, set_connection_device, set_listener_device,
-            set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
-            with_keep_alive, with_keep_alive_mut, AcceptError, BoundId, BoundInfo, ConnectError,
-            ConnectionId, ConnectionInfo, ListenerId, NoConnection, SocketAddr, UnboundId,
+            remove_unbound, send_buffer_size, set_bound_device, set_connection_device,
+            set_listener_device, set_send_buffer_size, set_unbound_device, shutdown_conn,
+            shutdown_listener, with_keep_alive, with_keep_alive_mut, AcceptError, BoundId,
+            BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection,
+            SocketAddr, UnboundId,
         },
         state::Takeable,
         BufferSizes, KeepAlive,
@@ -217,13 +218,13 @@ impl Buffer for ReceiveBufferWithZirconSocket {
         let info = self.socket.info().expect("failed to get socket info");
         info.tx_buf_size
     }
-}
 
-impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
     fn cap(&self) -> usize {
         self.capacity
     }
+}
 
+impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
     fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
         self.out_of_order.write_at(offset, data)
     }
@@ -296,6 +297,10 @@ impl Buffer for SendBufferWithZirconSocket {
     fn len(&self) -> usize {
         let info = self.socket.info().expect("failed to get socket info");
         info.rx_buf_size + self.ready_to_send.len()
+    }
+
+    fn cap(&self) -> usize {
+        self.capacity
     }
 }
 
@@ -861,6 +866,20 @@ where
         }
     }
 
+    async fn send_buffer_size(&self) -> u64 {
+        let mut guard = self.ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        match self.id {
+            SocketId::Unbound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Bound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Connection(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Listener(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
+        }
+        .try_into()
+        .ok_checked::<TryFromIntError>()
+        .unwrap_or(u64::MAX)
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -941,7 +960,7 @@ where
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, &mut Ok(self.send_buffer_size().await));
             }
             fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1371,7 +1390,7 @@ mod tests {
             zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
         let notifier = NeedsDataNotifier::default();
         let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
-        let ring_buffer_capacity = sbuf.capacity - sbuf.socket.info().unwrap().rx_buf_max;
+        let ring_buffer_capacity = sbuf.cap() - sbuf.socket.info().unwrap().rx_buf_max;
         assert_eq!(ring_buffer_capacity, expected)
     }
 

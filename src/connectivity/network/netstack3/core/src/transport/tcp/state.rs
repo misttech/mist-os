@@ -946,6 +946,23 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         } = self;
         buffer.request_capacity(size)
     }
+
+    fn capacity(&self) -> usize {
+        let Self {
+            nxt: _,
+            max: _,
+            una: _,
+            wnd: _,
+            wl1: _,
+            wl2: _,
+            buffer,
+            last_seq_ts: _,
+            rtt_estimator: _,
+            timer: _,
+            congestion_control: _,
+        } = self;
+        buffer.cap()
+    }
 }
 
 impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
@@ -1866,6 +1883,33 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => snd.set_capacity(size),
         }
     }
+
+    pub(crate) fn send_buffer_size(&self) -> usize {
+        match self {
+            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => 0,
+            State::Listen(Listen { iss: _, buffer_sizes: BufferSizes { send } })
+            | State::SynRcvd(SynRcvd {
+                iss: _,
+                irs: _,
+                timestamp: _,
+                retrans_timer: _,
+                simultaneous_open: _,
+                buffer_sizes: BufferSizes { send },
+            })
+            | State::SynSent(SynSent {
+                iss: _,
+                timestamp: _,
+                retrans_timer: _,
+                active_open: _,
+                buffer_sizes: BufferSizes { send },
+            }) => *send,
+            State::Established(Established { snd, rcv: _ })
+            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => snd.capacity(),
+            State::FinWait1(FinWait1 { snd, rcv: _ })
+            | State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
+            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.capacity(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1947,13 +1991,13 @@ mod test {
         fn len(&self) -> usize {
             0
         }
-    }
 
-    impl ReceiveBuffer for NullBuffer {
         fn cap(&self) -> usize {
             0
         }
+    }
 
+    impl ReceiveBuffer for NullBuffer {
         fn write_at<P: Payload>(&mut self, _offset: usize, _data: &P) -> usize {
             0
         }
@@ -3660,6 +3704,10 @@ mod test {
     impl<B: Buffer> Buffer for ReservingBuffer<B> {
         fn len(&self) -> usize {
             self.buffer.len()
+        }
+
+        fn cap(&self) -> usize {
+            self.buffer.cap()
         }
     }
 
