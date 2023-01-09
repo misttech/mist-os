@@ -97,8 +97,6 @@ zx_status_t PcieDevice::Init() {
     return status;
   }
 
-  // TODO(sheu): make the device visible once higher-level functionality is present.
-  // return ZX_OK;
   return ZX_ERR_NOT_SUPPORTED;
 }
 

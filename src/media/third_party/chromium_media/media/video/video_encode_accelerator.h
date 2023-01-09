@@ -372,7 +372,7 @@ class MEDIA_EXPORT VideoEncodeAccelerator {
   //  |client| is the client of this video encoder.  The provided pointer must
   //  be valid until Destroy() is called.
   //  |media_log| is used to report error messages.
-  // TODO(sheu): handle resolution changes.  http://crbug.com/249944
+  // TODO(crbug.com/249944): handle resolution changes.
   virtual bool Initialize(const Config& config,
                           Client* client,
                           std::unique_ptr<MediaLog> media_log) = 0;
