@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/note.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/zxdump/task.h>
@@ -841,38 +842,16 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
     notes.size = std::min(notes.size, where.size - notes.offset);
 
     // Read the whole segment and keep it forever.
-    ByteView bytes;
+    Elf::NoteSegment segment;
     if (auto result = file.ReadPermanent(where / notes); result.is_error()) {
       return result.take_error();
     } else {
-      bytes = result.value();
+      segment = result.value();
     }
 
-    // TODO(mcgrathr): Use elfldltl note parser.
     // Iterate through the notes.
-    Elf::Nhdr nhdr;
-    while (bytes.size() >= sizeof(nhdr)) {
-      memcpy(&nhdr, bytes.data(), sizeof(nhdr));
-      bytes = bytes.subspan(sizeof(nhdr));
-      auto name_bytes = bytes.subspan(0, nhdr.namesz);
-      if (bytes.size() < NoteAlign(nhdr.namesz)) {
-        break;
-      }
-      bytes = bytes.subspan(NoteAlign(nhdr.namesz));
-      if (bytes.size() < NoteAlign(nhdr.descsz)) {
-        break;
-      }
-      auto desc = bytes.subspan(0, nhdr.descsz);
-      if (bytes.size() < NoteAlign(nhdr.descsz)) {
-        break;
-      }
-      bytes = bytes.subspan(NoteAlign(nhdr.descsz));
-
+    for (auto [name, desc, type] : segment) {
       // All valid note names end with a NUL terminator.
-      std::string_view name{
-          reinterpret_cast<const char*>(name_bytes.data()),
-          name_bytes.size(),
-      };
       if (name.empty() || name.back() != '\0') {
         // Ignore bogus notes.  Could make them an error?
         continue;
@@ -890,7 +869,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
       // Check for a kernel note.
       if (name == std::string_view{kKernelInfoNoteName}) {
-        auto result = ReadKernelNote(nhdr.type, desc);
+        auto result = ReadKernelNote(type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -914,7 +893,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
       // Check for a process info note.
       if (name == kProcessInfoNoteName) {
-        if (nhdr.type == ZX_INFO_HANDLE_BASIC) {
+        if (type == ZX_INFO_HANDLE_BASIC) {
           zx_info_handle_basic_t info;
           if (desc.size() < sizeof(info)) {
             return CorruptedDump();
@@ -926,7 +905,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
             return CorruptedDump();
           }
         }
-        auto result = AddNote(process.info_, nhdr.type(), desc);
+        auto result = AddNote(process.info_, type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -935,7 +914,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
       // Not a process info note.  Check for a process property note.
       if (name == kProcessPropertyNoteName) {
-        auto result = AddNote(process.properties_, nhdr.type(), desc);
+        auto result = AddNote(process.properties_, type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -944,7 +923,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
       // Not any kind of process note.  Check for a thread info note.
       if (name == kThreadInfoNoteName) {
-        if (nhdr.type == ZX_INFO_HANDLE_BASIC) {
+        if (type == ZX_INFO_HANDLE_BASIC) {
           // This marks the first note of a new thread.  Reify the last one.
           reify_thread();
 
@@ -978,7 +957,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
           });
         }
 
-        auto result = AddNote(thread->info_, nhdr.type(), desc);
+        auto result = AddNote(thread->info_, type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -994,7 +973,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
           });
         }
 
-        auto result = AddNote(thread->properties_, nhdr.type(), desc);
+        auto result = AddNote(thread->properties_, type, desc);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -1010,7 +989,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
           });
         }
 
-        auto result = AddNote(thread->state_, nhdr.type(), desc);
+        auto result = AddNote(thread->state_, type, desc);
         if (result.is_error()) {
           return result.take_error();
         }

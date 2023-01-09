@@ -157,12 +157,19 @@ class ElfNoteSegment {
 
   using const_iterator = iterator;
 
-  ElfNoteSegment() = delete;
+  constexpr ElfNoteSegment() = default;
 
   constexpr ElfNoteSegment(const ElfNoteSegment&) = default;
 
   explicit constexpr ElfNoteSegment(Bytes notes)
       : notes_(notes.size() < sizeof(Nhdr) ? Bytes{} : notes) {}
+
+  constexpr ElfNoteSegment& operator=(const ElfNoteSegment&) = default;
+
+  constexpr ElfNoteSegment& operator=(Bytes notes) noexcept {
+    *this = ElfNoteSegment(notes);
+    return *this;
+  }
 
   iterator begin() const { return Check(notes_) ? iterator{notes_} : end(); }
 
