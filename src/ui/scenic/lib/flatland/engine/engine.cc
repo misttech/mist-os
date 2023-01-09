@@ -187,9 +187,9 @@ Engine::SceneState::SceneState(Engine& engine, TransformHandle root_transform) {
       topology_data.topology_vector, topology_data.parent_indices, global_matrices, snapshot);
 
   image_rectangles =
-      ComputeGlobalRectangles(SelectAttribute(global_matrices, image_indices),
-                              SelectAttribute(global_image_sample_regions, image_indices),
-                              SelectAttribute(global_clip_regions, image_indices), images);
+      ComputeGlobalRectangles(FilterByIndices(global_matrices, image_indices),
+                              FilterByIndices(global_image_sample_regions, image_indices),
+                              FilterByIndices(global_clip_regions, image_indices), images);
 }
 
 }  // namespace flatland

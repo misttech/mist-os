@@ -87,9 +87,9 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
                                                             topology_data.parent_indices, snapshot);
 
       auto image_rectangles =
-          ComputeGlobalRectangles(SelectAttribute(global_matrices, image_indices),
-                                  SelectAttribute(global_sample_regions, image_indices),
-                                  SelectAttribute(global_clip_regions, image_indices), images);
+          ComputeGlobalRectangles(FilterByIndices(global_matrices, image_indices),
+                                  FilterByIndices(global_sample_regions, image_indices),
+                                  FilterByIndices(global_clip_regions, image_indices), images);
 
       link_system_->UpdateLinks(topology_data.topology_vector, topology_data.live_handles,
                                 global_matrices, /*device_pixel_ratio*/ glm::vec2(1.0), snapshot);

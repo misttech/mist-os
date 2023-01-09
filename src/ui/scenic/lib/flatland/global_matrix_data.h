@@ -86,10 +86,10 @@ GlobalRectangleVector ComputeGlobalRectangles(const GlobalMatrixVector& matrices
 void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
                     uint64_t display_width, uint64_t display_height);
 
-// Templatized function to retrieve a vector of attributes that correspond to the provided
-// indices, from the original vector.
+// Templatized function to retrieve a new vector containing a subset of the input vector values that
+// correspond to the provided indices.
 template <typename T>
-T SelectAttribute(const T& vector, const GlobalIndexVector& indices) {
+T FilterByIndices(const T& vector, const GlobalIndexVector& indices) {
   T selection;
   for (auto index : indices) {
     selection.push_back(vector[index]);
