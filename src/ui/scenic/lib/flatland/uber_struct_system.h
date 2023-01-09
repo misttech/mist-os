@@ -71,9 +71,8 @@ class UberStructSystem {
   // InstanceMap.
   void RemoveSession(scheduling::SessionId session_id);
 
-  // The results of calling UpdateSessions().
+  // The results of calling UpdateInstances().
   struct UpdateResults {
-    scheduling::SessionUpdater::UpdateResults scheduling_results;
     // The number of present tokens available to each updated session. Values will always be
     // positive; sessions with no available tokens will be excluded.
     std::unordered_map<scheduling::SessionId, /*present_credits_returned=*/uint32_t>
@@ -83,8 +82,8 @@ class UberStructSystem {
   // Commits a new UberStruct to the instance map for each key/value pair in |sessions_to_update|.
   // All pending UberStructs associated with each SessionId with lower PresentIds will be
   // discarded.
-  UpdateResults UpdateSessions(
-      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update);
+  UpdateResults UpdateInstances(
+      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& instances_to_update);
 
   // Snapshots the current map of UberStructs and returns the copy.
   UberStruct::InstanceMap Snapshot();

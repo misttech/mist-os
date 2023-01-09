@@ -17,7 +17,6 @@
 namespace flatland {
 
 class FlatlandPresenterImpl final : public FlatlandPresenter,
-                                    public scheduling::SessionUpdater,
                                     public std::enable_shared_from_this<FlatlandPresenterImpl> {
  public:
   // The |main_dispatcher| must be the dispatcher that GFX sessions run and update on. That thread
@@ -42,26 +41,18 @@ class FlatlandPresenterImpl final : public FlatlandPresenter,
   // |FlatlandPresenter|
   void RemoveSession(scheduling::SessionId session_id) override;
 
-  // |scheduling::SessionUpdater|
-  // Accumulates release fences which will be returned by TakeReleaseFences(), so that the caller
-  // can obtain the release fences corresponding to an atomic snapshot of the scene graph.
-  scheduling::SessionUpdater::UpdateResults UpdateSessions(
-      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-      uint64_t trace_id) override;
-
-  // |scheduling::SessionUpdater|
-  // No-op; this is taken care of by FlatlandManager, which is also a SessionUpdater.
-  void OnCpuWorkDone() override {}
-
-  // |scheduling::SessionUpdater|
-  // No-op; this is taken care of by FlatlandManager, which is also a SessionUpdater.
-  void OnFramePresented(
-      const std::unordered_map<scheduling::SessionId, std::map<scheduling::PresentId, zx::time>>&
-          latched_times,
-      scheduling::PresentTimestamps present_times) override {}
+  // Called at FrameScheduler's UpdateSessions() time.
+  // Takes the release fences up to the corresponding PresentId for each SessionId in
+  // |sessions_to_update| and moves them to the set of fences to be returned by the next call to
+  // TakeReleaseFences().
+  // This way the caller can get all fences accumulated since the last call to
+  // TakeReleaseFences(), i.e. the complete set of fences for one frame (allowing for multiple
+  // UpdateSessions() calls per frame).
+  void AccumulateReleaseFences(
+      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update);
 
  private:
-  async_dispatcher_t* main_dispatcher_;
+  async_dispatcher_t* const main_dispatcher_;
   scheduling::FrameScheduler& frame_scheduler_;
   std::map<scheduling::SchedulingIdPair, std::vector<zx::event>> release_fences_;
   std::vector<zx::event> accumulated_release_fences_;

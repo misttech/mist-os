@@ -316,10 +316,10 @@ TEST_F(FlatlandManagerTest, FirstPresentReturnsMaxPresentCredits) {
 
   // Update the session, this should return max tokens through OnNextFrameBegin().
   const auto next_present_id = PopPendingPresent(id);
-  manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id, next_present_id}});
 
   EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-  manager_->OnCpuWorkDone();
+  manager_->SendHintsToStartRendering();
 
   snapshot = uber_struct_system_->Snapshot();
   EXPECT_EQ(snapshot.size(), 1u);
@@ -330,7 +330,7 @@ TEST_F(FlatlandManagerTest, FirstPresentReturnsMaxPresentCredits) {
   EXPECT_EQ(GetNumPendingSessionUpdates(id), 0ul);
 }
 
-TEST_F(FlatlandManagerTest, UpdateSessionsReturnsPresentCredits) {
+TEST_F(FlatlandManagerTest, UpdateInstancesReturnsPresentCredits) {
   // Setup two Flatland instances with OnNextFrameBegin() callbacks.
   fidl::InterfacePtr<fuchsia::ui::composition::Flatland> flatland1 = CreateFlatland();
   const scheduling::SessionId id1 = uber_struct_system_->GetLatestInstanceId();
@@ -357,9 +357,9 @@ TEST_F(FlatlandManagerTest, UpdateSessionsReturnsPresentCredits) {
     PRESENT(flatland2, id2, true);
     const auto next_present_id1 = PopPendingPresent(id1);
     const auto next_present_id2 = PopPendingPresent(id2);
-    manager_->UpdateSessions({{id1, next_present_id1}, {id2, next_present_id2}}, /*trace_id=*/0);
+    manager_->UpdateInstances({{id1, next_present_id1}, {id2, next_present_id2}});
     EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-    manager_->OnCpuWorkDone();
+    manager_->SendHintsToStartRendering();
     RunLoopUntil([&] {
       return returned_tokens1 == scheduling::FrameScheduler::kMaxPresentsInFlight &&
              returned_tokens2 == scheduling::FrameScheduler::kMaxPresentsInFlight;
@@ -384,10 +384,10 @@ TEST_F(FlatlandManagerTest, UpdateSessionsReturnsPresentCredits) {
   // Update the first session, but only with the first PresentId, which should push an UberStruct
   // and return one token to the first instance.
   auto next_present_id1 = PopPendingPresent(id1);
-  manager_->UpdateSessions({{id1, next_present_id1}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id1, next_present_id1}});
 
   EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-  manager_->OnCpuWorkDone();
+  manager_->SendHintsToStartRendering();
 
   RunLoopUntil([&returned_tokens1] { return returned_tokens1 != 0; });
 
@@ -404,10 +404,10 @@ TEST_F(FlatlandManagerTest, UpdateSessionsReturnsPresentCredits) {
   PopPendingPresent(id2);
   const auto next_present_id2 = PopPendingPresent(id2);
 
-  manager_->UpdateSessions({{id2, next_present_id2}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id2, next_present_id2}});
 
   EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-  manager_->OnCpuWorkDone();
+  manager_->SendHintsToStartRendering();
 
   const auto snapshot = uber_struct_system_->Snapshot();
   EXPECT_EQ(snapshot.size(), 2u);
@@ -423,10 +423,10 @@ TEST_F(FlatlandManagerTest, UpdateSessionsReturnsPresentCredits) {
   EXPECT_EQ(GetNumPendingSessionUpdates(id2), 0ul);
 }
 
-// It is possible for the session to update multiple times in a row before OnCpuWorkDone() is
-// called. If that's the case, we need to ensure that present credits returned from the first
-// update are not lost.
-TEST_F(FlatlandManagerTest, ConsecutiveUpdateSessions_ReturnsCorrectPresentCredits) {
+// It is possible for the session to update multiple times in a row before
+// SendHintsToStartRendering() is called. If that's the case, we need to ensure that present credits
+// returned from the first update are not lost.
+TEST_F(FlatlandManagerTest, ConsecutiveUpdateInstances_ReturnsCorrectPresentCredits) {
   fidl::InterfacePtr<fuchsia::ui::composition::Flatland> flatland = CreateFlatland();
   const scheduling::SessionId id = uber_struct_system_->GetLatestInstanceId();
 
@@ -440,9 +440,9 @@ TEST_F(FlatlandManagerTest, ConsecutiveUpdateSessions_ReturnsCorrectPresentCredi
   {  // Receive the initial allotment of tokens, then forget those tokens.
     PRESENT(flatland, id, true);
     const auto next_present_id = PopPendingPresent(id);
-    manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+    manager_->UpdateInstances({{id, next_present_id}});
     EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-    manager_->OnCpuWorkDone();
+    manager_->SendHintsToStartRendering();
     RunLoopUntil(
         [&] { return returned_tokens == scheduling::FrameScheduler::kMaxPresentsInFlight; });
     EXPECT_EQ(GetNumPendingSessionUpdates(id), 0ul);
@@ -457,15 +457,15 @@ TEST_F(FlatlandManagerTest, ConsecutiveUpdateSessions_ReturnsCorrectPresentCredi
   // Update the session, but only with the first PresentId, which should push an UberStruct
   // and return one token to the first instance.
   auto next_present_id = PopPendingPresent(id);
-  manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id, next_present_id}});
 
   // Update again.
   next_present_id = PopPendingPresent(id);
-  manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id, next_present_id}});
 
   // Finally, the work is done according to the frame scheduler.
   EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-  manager_->OnCpuWorkDone();
+  manager_->SendHintsToStartRendering();
 
   const auto snapshot = uber_struct_system_->Snapshot();
   EXPECT_EQ(snapshot.size(), 1u);
@@ -550,9 +550,9 @@ TEST_F(FlatlandManagerTest, TokensAreReplenishedAfterRunningOut) {
   {  // Receive the initial allotment of tokens.
     PRESENT(flatland, id, true);
     const auto next_present_id = PopPendingPresent(id);
-    manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+    manager_->UpdateInstances({{id, next_present_id}});
     EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-    manager_->OnCpuWorkDone();
+    manager_->SendHintsToStartRendering();
     RunLoopUntil(
         [&] { return tokens_remaining == scheduling::FrameScheduler::kMaxPresentsInFlight; });
   }
@@ -565,11 +565,11 @@ TEST_F(FlatlandManagerTest, TokensAreReplenishedAfterRunningOut) {
 
   // Process the first present.
   auto next_present_id = PopPendingPresent(id);
-  manager_->UpdateSessions({{id, next_present_id}}, /*trace_id=*/0);
+  manager_->UpdateInstances({{id, next_present_id}});
 
   // Signal that the work is done, which should return present credits to the client.
   EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-  manager_->OnCpuWorkDone();
+  manager_->SendHintsToStartRendering();
 
   RunLoopUntil([&tokens_remaining] { return tokens_remaining != 0; });
 
@@ -607,9 +607,9 @@ TEST_F(FlatlandManagerTest, OnFramePresentedEvent) {
     PRESENT(flatland2, id2, true);
     const auto next_present_id1 = PopPendingPresent(id1);
     const auto next_present_id2 = PopPendingPresent(id2);
-    manager_->UpdateSessions({{id1, next_present_id1}, {id2, next_present_id2}}, /*trace_id=*/0);
+    manager_->UpdateInstances({{id1, next_present_id1}, {id2, next_present_id2}});
     EXPECT_CALL(*mock_flatland_presenter_, GetFuturePresentationInfos());
-    manager_->OnCpuWorkDone();
+    manager_->SendHintsToStartRendering();
     RunLoopUntil([&] {
       return returned_tokens1 == scheduling::FrameScheduler::kMaxPresentsInFlight &&
              returned_tokens2 == scheduling::FrameScheduler::kMaxPresentsInFlight;

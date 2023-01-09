@@ -221,10 +221,10 @@ void GfxSystem::TakeScreenshot(fuchsia::ui::scenic::Scenic::TakeScreenshotCallba
   Screenshotter::TakeScreenshot(engine_, std::move(callback));
 }
 
-scheduling::SessionUpdater::UpdateResults GfxSystem::UpdateSessions(
+scheduling::SessionsWithFailedUpdates GfxSystem::UpdateSessions(
     const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
     uint64_t frame_trace_id, fit::function<void(scheduling::SessionId)> destroy_session) {
-  scheduling::SessionUpdater::UpdateResults update_results;
+  scheduling::SessionsWithFailedUpdates session_with_failed_updates;
   CommandContext command_context{
       .sysmem = sysmem_,
       .display_manager = display_manager_,
@@ -255,7 +255,7 @@ scheduling::SessionUpdater::UpdateResults GfxSystem::UpdateSessions(
     if (auto session = session_manager_.FindSession(session_id)) {
       bool success = session->ApplyScheduledUpdates(&command_context, present_id);
       if (!success) {
-        update_results.sessions_with_failed_updates.insert(session_id);
+        session_with_failed_updates.insert(session_id);
         destroy_session(session_id);
       }
     }
@@ -289,7 +289,7 @@ scheduling::SessionUpdater::UpdateResults GfxSystem::UpdateSessions(
   // NOTE: Failure to call this operation will result in an inconsistent SceneGraph state.
   engine_->scene_graph()->ProcessViewTreeUpdates(std::move(updates));
 
-  return update_results;
+  return session_with_failed_updates;
 }
 
 VkBool32 GfxSystem::HandleDebugReport(VkDebugReportFlagsEXT flags_in,

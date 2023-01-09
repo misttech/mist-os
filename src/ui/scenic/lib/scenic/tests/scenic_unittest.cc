@@ -208,7 +208,7 @@ TEST_F(ScenicUnitTest, FailedUpdate_ShouldDestroySession) {
   auto id = mock_system->GetLastSessionId();
   ASSERT_GE(id, 0);
   scheduling::SessionId session_id = static_cast<scheduling::SessionId>(id);
-  mock_system->SetUpdateSessionsReturnValue({.sessions_with_failed_updates = {session_id}});
+  mock_system->SetUpdateSessionsReturnValue({session_id});
 
   // Check that the next update causes Session destruction.
   EXPECT_EQ(scenic_->num_sessions(), 1U);
@@ -216,8 +216,8 @@ TEST_F(ScenicUnitTest, FailedUpdate_ShouldDestroySession) {
   EXPECT_EQ(scenic_->num_sessions(), 0U);
 
   // Returned |update_result| should contain the same sessions returned from the system.
-  ASSERT_EQ(update_result.sessions_with_failed_updates.size(), 1u);
-  EXPECT_EQ(*update_result.sessions_with_failed_updates.begin(), session_id);
+  ASSERT_EQ(update_result.size(), 1u);
+  EXPECT_EQ(*update_result.begin(), session_id);
 }
 
 TEST_F(ScenicUnitTest, ScenicApiAfterDelegate) {

@@ -212,9 +212,7 @@ TEST_F(ImagePipeUpdaterTest, UpdatesSignaledInOrder_AfterUpdate_ShouldBeSchedule
   RunLoopUntilIdle();
   EXPECT_EQ(schedule_call_count_, 1);
 
-  image_pipe_updater_->UpdateSessions(
-      /*sessions_to_update=*/{{kSchedulingId, present_id1}},
-      /*trace_id=*/0);
+  image_pipe_updater_->UpdateSessions(/*sessions_to_update=*/{{kSchedulingId, present_id1}});
 
   fence2.signal(0u, ZX_EVENT_SIGNALED);
   RunLoopUntilIdle();
@@ -244,9 +242,7 @@ TEST_F(ImagePipeUpdaterTest, UpdatesSignaledOutOfOrder_AfterUpdate_ShouldNeverBe
   RunLoopUntilIdle();
   EXPECT_EQ(schedule_call_count_, 1);
 
-  image_pipe_updater_->UpdateSessions(
-      /*sessions_to_update=*/{{kSchedulingId, present_id2}},
-      /*trace_id=*/0);
+  image_pipe_updater_->UpdateSessions(/*sessions_to_update=*/{{kSchedulingId, present_id2}});
 
   fence1.signal(0u, ZX_EVENT_SIGNALED);
   RunLoopUntilIdle();

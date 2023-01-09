@@ -15,9 +15,8 @@ FlatlandPresenterImpl::FlatlandPresenterImpl(async_dispatcher_t* main_dispatcher
                                              scheduling::FrameScheduler& frame_scheduler)
     : main_dispatcher_(main_dispatcher), frame_scheduler_(frame_scheduler) {}
 
-scheduling::SessionUpdater::UpdateResults FlatlandPresenterImpl::UpdateSessions(
-    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-    uint64_t trace_id) {
+void FlatlandPresenterImpl::AccumulateReleaseFences(
+    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 
   for (const auto& [session_id, present_id] : sessions_to_update) {
@@ -33,10 +32,6 @@ scheduling::SessionUpdater::UpdateResults FlatlandPresenterImpl::UpdateSessions(
         });
     release_fences_.erase(begin_it, end_it);
   }
-
-  // There is no way for any updates to fail, since the code above is simply gathering a vector of
-  // fences; it has no visibility into changes to the scene graph.
-  return UpdateResults{};
 }
 
 std::vector<zx::event> FlatlandPresenterImpl::TakeReleaseFences() {

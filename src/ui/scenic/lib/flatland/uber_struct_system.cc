@@ -42,12 +42,12 @@ void UberStructSystem::RemoveSession(scheduling::SessionId session_id) {
   uber_struct_map_.erase(session_id);
 }
 
-UberStructSystem::UpdateResults UberStructSystem::UpdateSessions(
-    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update) {
-  FLATLAND_VERBOSE_LOG << "UberStructSystem::UpdateSessions for " << sessions_to_update.size()
+UberStructSystem::UpdateResults UberStructSystem::UpdateInstances(
+    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& instances_to_update) {
+  FLATLAND_VERBOSE_LOG << "UberStructSystem::UpdateSessions for " << instances_to_update.size()
                        << " sessions.";
   UpdateResults results;
-  for (const auto& [session_id, present_id] : sessions_to_update) {
+  for (const auto& [session_id, present_id] : instances_to_update) {
     // Find the queue associated with this SessonId. It may not exist if the SessionId is
     // associated with a GFX session instead of a Flatland one.
     auto queue_kv = pending_structs_queues_.find(session_id);
@@ -77,12 +77,8 @@ UberStructSystem::UpdateResults UberStructSystem::UpdateSessions(
       pending_struct = queue_kv->second->Pop();
     }
 
-    if (!successful_update) {
-      FLATLAND_VERBOSE_LOG << "    No update for session_id: " << session_id;
-      results.scheduling_results.sessions_with_failed_updates.insert(session_id);
-    } else {
-      results.present_credits_returned[session_id] = present_credits_returned;
-    }
+    FX_DCHECK(successful_update);
+    results.present_credits_returned[session_id] = present_credits_returned;
   }
   return results;
 }

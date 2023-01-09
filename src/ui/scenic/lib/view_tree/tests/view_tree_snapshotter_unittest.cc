@@ -141,7 +141,7 @@ TEST(ViewTreeSnapshotterTest, BasicTreeTest) {
 
   ViewTreeSnapshotter tree(BasicTree(), std::move(subscribers));
 
-  tree.OnCpuWorkDone();
+  tree.UpdateSnapshot();
   loop.RunUntilIdle();
   EXPECT_TRUE(callback_fired);
 }
@@ -160,7 +160,7 @@ TEST(ViewTreeSnapshotterTest, DISABLED_Subscriber_RunsOnCorrectDispatcher) {
 
   ViewTreeSnapshotter tree(BasicTree(), std::move(subscribers));
 
-  tree.UpdateSessions({}, {});
+  tree.UpdateSnapshot();
 
   EXPECT_FALSE(callback_fired);
   loop1.RunUntilIdle();
@@ -186,7 +186,7 @@ TEST(ViewTreeSnapshotterTest, MultipleSubscribers) {
 
   ViewTreeSnapshotter tree(BasicTree(), std::move(subscribers));
 
-  tree.OnCpuWorkDone();
+  tree.UpdateSnapshot();
   loop.RunUntilIdle();
   EXPECT_TRUE(snapshot1);
   EXPECT_TRUE(snapshot2);
@@ -225,7 +225,7 @@ TEST(ViewTreeSnapshotterTest, MultipleUpdateSessionsCalls) {
 
   ViewTreeSnapshotter tree(std::move(subtrees), std::move(subscribers));
 
-  tree.OnCpuWorkDone();
+  tree.UpdateSnapshot();
   loop.RunUntilIdle();
   ASSERT_TRUE(snapshot1);
   EXPECT_EQ(snapshot1->root, kRoot1A);
@@ -233,7 +233,7 @@ TEST(ViewTreeSnapshotterTest, MultipleUpdateSessionsCalls) {
   std::shared_ptr<const Snapshot> snapshot1_copy = snapshot1;
   EXPECT_EQ(snapshot1_copy, snapshot1);
 
-  tree.OnCpuWorkDone();
+  tree.UpdateSnapshot();
   loop.RunUntilIdle();
   EXPECT_NE(snapshot1_copy, snapshot1);
   EXPECT_EQ(snapshot1->root, kRoot4B);
@@ -262,8 +262,8 @@ TEST(ViewTreeSnapshotterTest, SubscriberCallbackLifetime) {
 
   auto tree = std::make_unique<ViewTreeSnapshotter>(std::move(subtrees), std::move(subscribers));
 
-  tree->OnCpuWorkDone();
-  tree->OnCpuWorkDone();
+  tree->UpdateSnapshot();
+  tree->UpdateSnapshot();
   tree.reset();
   // TODO(fxbug.dev/75864): Re-enable or fix up.
   // EXPECT_EQ(called_count, 0);

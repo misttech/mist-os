@@ -203,17 +203,15 @@ void FlatlandManager::CreateFlatlandDisplay(
   alive_sessions_++;
 }
 
-scheduling::SessionUpdater::UpdateResults FlatlandManager::UpdateSessions(
-    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-    uint64_t trace_id) {
-  TRACE_DURATION("gfx", "flatland::UpdateSessions");
+void FlatlandManager::UpdateInstances(
+    const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& instances_to_update) {
+  TRACE_DURATION("gfx", "flatland::UpdateInstances");
   CheckIsOnMainThread();
 
-  auto results = uber_struct_system_->UpdateSessions(sessions_to_update);
+  const auto results = uber_struct_system_->UpdateInstances(instances_to_update);
 
   // Prepares the return of tokens to each session that didn't fail to update.
   for (const auto& [session_id, present_credits_returned] : results.present_credits_returned) {
-    auto instance_kv = flatland_instances_.find(session_id);
     FX_DCHECK((flatland_instances_.find(session_id) != flatland_instances_.end()) ||
               (flatland_display_instances_.find(session_id) != flatland_display_instances_.end()));
 
@@ -224,22 +222,16 @@ scheduling::SessionUpdater::UpdateResults FlatlandManager::UpdateSessions(
     // not FlatlandDisplays?
 
     // Add the session to the map of updated_sessions, and increment the number of present tokens it
-    // should receive after the firing of the OnCpuWorkDone() is issued from the scheduler.
+    // should receive after the firing of the SendHintsToStartRendering().
     if (flatland_instances_updated_.find(session_id) == flatland_instances_updated_.end()) {
       flatland_instances_updated_[session_id] = 0;
     }
     flatland_instances_updated_[session_id] += present_credits_returned;
   }
-
-  // TODO(fxbug.dev/62292): there shouldn't ever be sessions with failed updates, but if there
-  // somehow are, those sessions should probably be closed.
-  FX_DCHECK(results.scheduling_results.sessions_with_failed_updates.empty());
-
-  return results.scheduling_results;
 }
 
-void FlatlandManager::OnCpuWorkDone() {
-  TRACE_DURATION("gfx", "flatland::OnCpuWorkDone");
+void FlatlandManager::SendHintsToStartRendering() {
+  TRACE_DURATION("gfx", "flatland::SendHintsToStartRendering");
   CheckIsOnMainThread();
 
   // Get 8 frames of data, which we then pass onto all Flatland instances that had updates this

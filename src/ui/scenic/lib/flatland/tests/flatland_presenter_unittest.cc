@@ -159,8 +159,7 @@ TEST_F(FlatlandPresenterTest, GetFuturePresentationInfosForwardsToFrameScheduler
 static std::vector<zx::event> TakeReleaseFences(
     const std::shared_ptr<FlatlandPresenterImpl>& presenter,
     const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update) {
-  auto result = presenter->UpdateSessions(sessions_to_update, 0);
-  EXPECT_TRUE(result.sessions_with_failed_updates.empty());
+  presenter->AccumulateReleaseFences(sessions_to_update);
   return presenter->TakeReleaseFences();
 }
 

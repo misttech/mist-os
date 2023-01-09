@@ -40,7 +40,7 @@ void ScreenCapture2Manager::CreateClient(
   client_bindings_.AddBinding(std::move(instance), std::move(request));
 }
 
-void ScreenCapture2Manager::OnCpuWorkDone() {
+void ScreenCapture2Manager::RenderPendingScreenCaptures() {
   // After the newest batch of renderables has been produced, loop through all of the bindings and
   // render into the client's buffer if they have requested one.
   for (const auto& binding : client_bindings_.bindings()) {

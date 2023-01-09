@@ -29,7 +29,7 @@ namespace scenic_impl {
 // A Scenic instance has two main areas of responsibility:
 //   - manage Session lifecycles
 //   - provide a host environment for Services
-class Scenic final : public fuchsia::ui::scenic::Scenic, public scheduling::SessionUpdater {
+class Scenic final : public fuchsia::ui::scenic::Scenic {
  public:
   // TODO(fxbug.dev/23686): Remove when we get rid of Scenic.GetDisplayInfo().
   class GetDisplayInfoDelegateDeprecated {
@@ -55,18 +55,15 @@ class Scenic final : public fuchsia::ui::scenic::Scenic, public scheduling::Sess
   // |fuchsia::ui::scenic::Scenic|
   void UsesFlatland(fuchsia::ui::scenic::Scenic::UsesFlatlandCallback callback) override;
 
-  // |scheduling::SessionUpdater|
-  UpdateResults UpdateSessions(
+  // Called by the FrameScheduler.
+  scheduling::SessionsWithFailedUpdates UpdateSessions(
       const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-      uint64_t trace_id) override;
-  // |scheduling::SessionUpdater|
+      uint64_t trace_id);
+  // Called by the FrameScheduler.
   void OnFramePresented(
       const std::unordered_map<scheduling::SessionId, std::map<scheduling::PresentId, zx::time>>&
           latched_times,
-      scheduling::PresentTimestamps present_times) override;
-
-  // |scheduling::SessionUpdater|
-  void OnCpuWorkDone() override {}
+      scheduling::PresentTimestamps present_times);
 
   // Register a delegate class for implementing top-level Scenic operations (e.g., GetDisplayInfo).
   // This delegate must outlive the Scenic instance.

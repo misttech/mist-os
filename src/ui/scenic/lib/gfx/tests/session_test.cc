@@ -22,10 +22,10 @@ void SessionTest::SetUp() {
       std::make_shared<scheduling::VsyncTiming>(),
       /*update_sessions*/
       [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
-        return image_pipe_updater_->UpdateSessions(sessions_to_update, trace_id);
+        image_pipe_updater_->UpdateSessions(sessions_to_update);
+        return scheduling::SessionsWithFailedUpdates{};
       },
-      /*on_cpu_work_done*/
-      [this] { image_pipe_updater_->OnCpuWorkDone(); },
+      /*on_cpu_work_done*/ [] {},
       /*on_frame_presented*/
       [this](auto latched_times, auto present_times) {
         image_pipe_updater_->OnFramePresented(latched_times, present_times);

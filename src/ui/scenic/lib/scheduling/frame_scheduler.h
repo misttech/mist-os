@@ -27,39 +27,7 @@ struct FuturePresentationInfo {
   zx::time presentation_time = zx::time(0);
 };
 
-// Interface for performing session updates.
-class SessionUpdater {
- public:
-  // Returned by |UpdateSessions()|.
-  struct UpdateResults {
-    // SessionIds whose updates failed.
-    std::unordered_set<SessionId> sessions_with_failed_updates;
-
-    void merge(UpdateResults& other) {
-      sessions_with_failed_updates.merge(other.sessions_with_failed_updates);
-    }
-    void merge(UpdateResults&& other) {
-      sessions_with_failed_updates.merge(other.sessions_with_failed_updates);
-    }
-  };
-
-  virtual ~SessionUpdater() = default;
-
-  // For each known session in |sessions_to_update|, apply all updates up to and including
-  // |PresentId|.
-  virtual UpdateResults UpdateSessions(
-      const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t trace_id) = 0;
-
-  // Signaled after FrameRenderer::RenderFrame() completes.
-  virtual void OnCpuWorkDone() = 0;
-
-  // Called whenever a new set of presents have been presented to the screen. |latched_times| gives
-  // information about when each individual update was latched.
-  virtual void OnFramePresented(
-      const std::unordered_map<SessionId, std::map<PresentId, /*latched_time*/ zx::time>>&
-          latched_times,
-      PresentTimestamps present_times) = 0;
-};
+using SessionsWithFailedUpdates = std::unordered_set<SessionId>;
 
 // Interface for rendering frames.
 class FrameRenderer {

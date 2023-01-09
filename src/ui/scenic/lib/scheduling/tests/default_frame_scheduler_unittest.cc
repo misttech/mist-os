@@ -58,7 +58,7 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
         });
   }
 
-  void SetUpdateSessionsReturnValue(SessionUpdater::UpdateResults new_value) {
+  void SetUpdateSessionsReturnValue(SessionsWithFailedUpdates new_value) {
     update_sessions_return_value_ = new_value;
   }
 
@@ -141,7 +141,7 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
 
   DefaultFrameScheduler scheduler_;
 
-  SessionUpdater::UpdateResults update_sessions_return_value_;
+  SessionsWithFailedUpdates update_sessions_return_value_;
   uint64_t update_sessions_call_count_ = 0;
   uint64_t on_frame_presented_call_count_ = 0;
   uint64_t cpu_work_done_count_ = 0;
@@ -413,7 +413,7 @@ TEST_F(FrameSchedulerTest, SignalSuccessfulPresentCallbackOnlyWhenFramePresented
 
 TEST_F(FrameSchedulerTest, FailedUpdateWithRender_ShouldNotCrash) {
   constexpr SessionId kSessionId1 = 1;
-  SetUpdateSessionsReturnValue({.sessions_with_failed_updates = {kSessionId1}});
+  SetUpdateSessionsReturnValue({kSessionId1});
 
   constexpr SessionId kSessionId2 = 2;
 
@@ -592,7 +592,7 @@ TEST_F(FrameSchedulerTest, InfinitelyLargePredictionRequest_ShouldBeTruncated) {
   }
 }
 
-// Tests whether the SessionUpdater::OnPresented is called at the correct times with the correct
+// Tests whether the OnPresented is called at the correct times with the correct
 // data.
 TEST_F(FrameSchedulerTest, SessionUpdater_OnPresented_Test) {
   constexpr SessionId kSessionId1 = 1;

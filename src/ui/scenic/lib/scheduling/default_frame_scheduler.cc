@@ -481,9 +481,9 @@ bool DefaultFrameScheduler::ApplyUpdates(zx::time target_presentation_time, zx::
   const auto update_map = CollectUpdatesForThisFrame(target_presentation_time);
   const bool have_updates = !update_map.empty();
   auto fences_from_previous_presents = PrepareUpdates(update_map, latched_time, frame_number);
-  const auto update_results =
+  const auto sessions_with_failed_updates =
       update_sessions_(update_map, frame_number, std::move(fences_from_previous_presents));
-  RemoveFailedSessions(update_results.sessions_with_failed_updates);
+  RemoveFailedSessions(sessions_with_failed_updates);
 
   // If anything was updated, we need to render.
   return have_updates;

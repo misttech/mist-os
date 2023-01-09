@@ -78,9 +78,9 @@ class System {
       std::shared_ptr<ErrorReporter> error_reporter) = 0;
 
   // Performs updates up to the corresponding PresentId for Sessions managed by this System.
-  // Mirrors the functionality of scheduling::SessionUpdater::UpdateSessions.
+  // Mirrors the functionality of scheduling::IpdateSessions.
   // |destroy_sessions| will be called on failed updates and should remove the Session completely.
-  virtual scheduling::SessionUpdater::UpdateResults UpdateSessions(
+  virtual scheduling::SessionsWithFailedUpdates UpdateSessions(
       const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
       uint64_t frame_trace_id, fit::function<void(scheduling::SessionId)> destroy_session) {
     return {};

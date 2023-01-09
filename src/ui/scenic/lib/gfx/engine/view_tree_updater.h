@@ -41,7 +41,7 @@ class ViewTreeUpdater {
   std::unordered_map<zx_koid_t, ViewHolderStatus> tracked_view_holders_;
 
   // Sequentially ordered updates for ViewRef and ViewHolder objects.
-  // Actively maintained over one SessionUpdater::UpdateSessions() call.
+  // Actively maintained over one UpdateSessions() call.
   ViewTreeUpdates view_tree_updates_;
 
   fxl::WeakPtrFactory<ViewTreeUpdater> weak_factory_;  // must be last

@@ -38,7 +38,7 @@ class GfxSystem final : public System, public scenic_impl::TakeScreenshotDelegat
   void TakeScreenshot(fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) override;
 
   // |scenic_impl::System|
-  scheduling::SessionUpdater::UpdateResults UpdateSessions(
+  scheduling::SessionsWithFailedUpdates UpdateSessions(
       const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
       uint64_t trace_id, fit::function<void(scheduling::SessionId)> destroy_session) override;
 

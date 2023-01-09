@@ -34,14 +34,10 @@ using PresentImageCallback = fuchsia::images::ImagePipe2::PresentImageCallback;
 //     the corresponding ImagePipe with the corresponding PresentId. Older scheduled updates are
 //     discarded, whether their acquire fences have been signaled or not.
 //   - The ImagePipe *must* call CleanupImagePipe() on destruction.
-//
-// Note that creating an ImagePipeUpdater does not add it to the FrameScheduler as a
-// SessionUpdater; the creation code should manually do this after construction.
-class ImagePipeUpdater : public scheduling::SessionUpdater,
-                         public std::enable_shared_from_this<ImagePipeUpdater> {
+class ImagePipeUpdater : public std::enable_shared_from_this<ImagePipeUpdater> {
  public:
   ImagePipeUpdater(scheduling::FrameScheduler& frame_scheduler);
-  ~ImagePipeUpdater();
+  virtual ~ImagePipeUpdater();
 
   // Called in ImagePipe::PresentImage(). Waits until the |acquire_fences| for an update have been
   // reached and then schedules it with the FrameScheduler.
@@ -51,17 +47,14 @@ class ImagePipeUpdater : public scheduling::SessionUpdater,
       fxl::WeakPtr<ImagePipeBase> image_pipe, std::vector<zx::event> acquire_fences,
       std::vector<zx::event> release_fences,
       fuchsia::images::ImagePipe2::PresentImageCallback callback);
-  // |scheduling::SessionUpdater|
-  UpdateResults UpdateSessions(
-      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-      uint64_t trace_id) override;
-  // |scheduling::SessionUpdater|
+  // Called at FrameScheduler UpdateSessions time.
+  void UpdateSessions(
+      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update);
+  // Called at FrameScheduler OnFramePresented time.
   void OnFramePresented(
       const std::unordered_map<scheduling::SessionId, std::map<scheduling::PresentId, zx::time>>&
           latched_times,
-      scheduling::PresentTimestamps present_times) override;
-  // |scheduling::SessionUpdater|
-  void OnCpuWorkDone() override {}
+      scheduling::PresentTimestamps present_times);
 
   // Removes all references to ImagePipe with |scheduling_id|.
   // Virtual for testing.

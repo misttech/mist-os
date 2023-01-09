@@ -160,7 +160,7 @@ TEST_F(ScreenCapture2ManagerTest, Client_Configure) {
   ConfigureScreenCapture(sc, buffer_count, image_width, image_height);
 }
 
-TEST_F(ScreenCapture2ManagerTest, Manager_OnCpuWorkDone) {
+TEST_F(ScreenCapture2ManagerTest, Manager_RenderPendingScreenCaptures) {
   fidl::InterfacePtr<fuchsia::ui::composition::internal::ScreenCapture> sc = CreateScreenCapture();
   RunLoopUntilIdle();
   EXPECT_TRUE(sc.is_bound());
@@ -197,7 +197,7 @@ TEST_F(ScreenCapture2ManagerTest, Manager_OnCpuWorkDone) {
   EXPECT_FALSE(callback_called);
 
   // Since |recieved_last_frame_| is true, GetNextFrame() will be hanging for new frame.
-  manager_->OnCpuWorkDone();
+  manager_->RenderPendingScreenCaptures();
   RunLoopUntilIdle();
 
   EXPECT_TRUE(gnf_result2.is_ok());
@@ -224,7 +224,7 @@ TEST_F(ScreenCapture2ManagerTest, ManagerClient_BothWantNewFrame) {
     EXPECT_FALSE(result.is_error());
     gnf_result = std::move(result);
   });
-  manager_->OnCpuWorkDone();
+  manager_->RenderPendingScreenCaptures();
   RunLoopUntilIdle();
   EXPECT_TRUE(gnf_result.is_ok());
 }

@@ -19,34 +19,19 @@
 
 namespace screen_capture2 {
 
-using LatchedTimes =
-    const std::unordered_map<scheduling::SessionId,
-                             std::map<scheduling::PresentId, /*latched_time=*/zx::time>>;
-using SessionsToUpdate = const std::unordered_map<scheduling::SessionId, scheduling::PresentId>;
-
-class ScreenCapture2Manager : public scheduling::SessionUpdater {
+class ScreenCapture2Manager {
  public:
   ScreenCapture2Manager(std::shared_ptr<flatland::Renderer> renderer,
                         std::shared_ptr<screen_capture::ScreenCaptureBufferCollectionImporter>
                             screen_capture_buffer_collection_importer,
                         std::function<flatland::Renderables()> get_renderables_callback);
-  ~ScreenCapture2Manager() override;
+  ~ScreenCapture2Manager();
 
   void CreateClient(
       fidl::InterfaceRequest<fuchsia::ui::composition::internal::ScreenCapture> screen_capture);
 
-  // |scheduling::SessionUpdater|
-  scheduling::SessionUpdater::UpdateResults UpdateSessions(SessionsToUpdate& sessions_to_update,
-                                                           uint64_t trace_id) override {
-    return {};
-  }
-
-  // |scheduling::SessionUpdater|
-  void OnCpuWorkDone() override;
-
-  // |scheduling::SessionUpdater|
-  void OnFramePresented(LatchedTimes& latched_times,
-                        scheduling::PresentTimestamps present_times) override {}
+  // Called at FrameScheduler OnCpuWorkDone time.
+  void RenderPendingScreenCaptures();
 
   size_t client_count() const { return client_bindings_.size(); }
 

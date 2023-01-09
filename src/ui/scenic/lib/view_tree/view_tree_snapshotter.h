@@ -18,7 +18,7 @@ using SubtreeSnapshotGenerator = fit::function<SubtreeSnapshot()>;
 
 // Class for building and handing out snapshots of a ViewTree out of subtrees.
 // All calls to ViewTreeSnapshotter must be made on the same thread.
-class ViewTreeSnapshotter final : public scheduling::SessionUpdater {
+class ViewTreeSnapshotter final {
  public:
   struct Subscriber {
     // |on_new_view_tree| will run on |dispatcher|.
@@ -44,26 +44,11 @@ class ViewTreeSnapshotter final : public scheduling::SessionUpdater {
                                std::vector<Subscriber> subscribers);
   ~ViewTreeSnapshotter() = default;
 
-  // |scheduling::SessionUpdater|
-  // Must be called after all other SessionUpdaters.
-  UpdateResults UpdateSessions(
-      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-      uint64_t trace_id) override {
-    return {};
-  }
-  // |scheduling::SessionUpdater|
-  void OnCpuWorkDone() override { UpdateSnapshot(); }
-  // |scheduling::SessionUpdater|
-  void OnFramePresented(
-      const std::unordered_map<scheduling::SessionId, std::map<scheduling::PresentId, zx::time>>&
-          latched_times,
-      scheduling::PresentTimestamps present_times) override {}
-
- private:
   // Calls each SubtreeSnapshotGenerator() in |subtree_generators_| in turn, combines the results
   // into a snapshot and hands out the snapshot to each subscriber in |subscriber_callbacks_|.
   void UpdateSnapshot() const;
 
+ private:
   const std::vector<SubtreeSnapshotGenerator> subtree_generators_;
   std::vector<OnNewViewTree> subscriber_callbacks_;
 };

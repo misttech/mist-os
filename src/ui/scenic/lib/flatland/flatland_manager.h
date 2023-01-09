@@ -29,7 +29,7 @@
 
 namespace flatland {
 
-class FlatlandManager : public scheduling::SessionUpdater {
+class FlatlandManager {
  public:
   FlatlandManager(
       async_dispatcher_t* dispatcher, const std::shared_ptr<FlatlandPresenter>& flatland_presenter,
@@ -46,7 +46,7 @@ class FlatlandManager : public scheduling::SessionUpdater {
           register_touch_source,
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
           register_mouse_source);
-  ~FlatlandManager() override;
+  ~FlatlandManager();
 
   void CreateFlatland(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> flatland);
 
@@ -58,20 +58,19 @@ class FlatlandManager : public scheduling::SessionUpdater {
   void CreateFlatlandDisplay(
       fidl::InterfaceRequest<fuchsia::ui::composition::FlatlandDisplay> flatland);
 
-  // |scheduling::SessionUpdater|
-  scheduling::SessionUpdater::UpdateResults UpdateSessions(
-      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
-      uint64_t trace_id) override;
+  // Called at FrameScheduler UpdateSessions time.
+  void UpdateInstances(
+      const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& instance_to_update);
 
-  // |scheduling::SessionUpdater|
-  void OnCpuWorkDone() override;
+  // Called at FrameScheduler OnCpuWorkDone time.
+  void SendHintsToStartRendering();
 
-  // |scheduling::SessionUpdater|
+  // Called at FrameScheduler OnFramePresented time.
   void OnFramePresented(
       const std::unordered_map<scheduling::SessionId,
                                std::map<scheduling::PresentId, /*latched_time*/ zx::time>>&
           latched_times,
-      scheduling::PresentTimestamps present_times) override;
+      scheduling::PresentTimestamps present_times);
 
   // For validating test logic.
   // Sessions still "owned" by FlatlandManager.

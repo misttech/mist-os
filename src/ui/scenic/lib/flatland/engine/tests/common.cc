@@ -93,7 +93,7 @@ void DisplayCompositorTestBase::FakeFlatlandSession::PushUberStruct(
   EXPECT_EQ(uber_struct->local_topology[0].handle.GetInstanceId(), id_);
 
   queue_->Push(/*present_id=*/0, std::move(uber_struct));
-  uber_struct_system_->UpdateSessions({{id_, 0}});
+  uber_struct_system_->UpdateInstances({{id_, 0}});
 }
 
 }  // namespace flatland

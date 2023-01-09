@@ -57,20 +57,19 @@ void Scenic::CloseSession(scheduling::SessionId session_id) {
                                             /*squashable*/ false);
 }
 
-scheduling::SessionUpdater::UpdateResults Scenic::UpdateSessions(
+scheduling::SessionsWithFailedUpdates Scenic::UpdateSessions(
     const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& sessions_to_update,
     uint64_t trace_id) {
-  scheduling::SessionUpdater::UpdateResults results;
+  scheduling::SessionsWithFailedUpdates sessions_with_failed_updates;
   for (auto& [type_id, system] : systems_) {
     auto temp_result = system->UpdateSessions(
         sessions_to_update, trace_id,
         // Have to destroy the session *inside* GfxSystem to make sure the resulting ViewTree
         // updates are added before we commit updates to the ViewTree.
         /*destroy_session*/ [this](scheduling::SessionId session_id) { CloseSession(session_id); });
-    results.sessions_with_failed_updates.insert(temp_result.sessions_with_failed_updates.begin(),
-                                                temp_result.sessions_with_failed_updates.end());
+    sessions_with_failed_updates.insert(temp_result.begin(), temp_result.end());
   }
-  return results;
+  return sessions_with_failed_updates;
 }
 
 void Scenic::OnFramePresented(

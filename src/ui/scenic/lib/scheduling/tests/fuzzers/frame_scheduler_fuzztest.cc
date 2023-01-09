@@ -52,7 +52,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* Data, size_t Size) {
       [&update_sessions_count](auto& sessions_to_update, auto trace_id,
                                auto fences_from_previous_frames) {
         update_sessions_count++;
-        return SessionUpdater::UpdateResults{};
+        return SessionsWithFailedUpdates{};
       },
       /*on_cpu_work_done*/
       [&on_cpu_work_done_count] { on_cpu_work_done_count++; },

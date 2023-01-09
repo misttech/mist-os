@@ -22,7 +22,7 @@
 
 namespace scheduling {
 
-using UpdateSessions = fit::function<SessionUpdater::UpdateResults(
+using UpdateSessions = fit::function<SessionsWithFailedUpdates(
     const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t trace_id,
     std::vector<zx::event> fences_from_previous_presents)>;
 using OnCpuWorkDone = fit::function<void()>;

@@ -27,18 +27,13 @@ void GfxSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
       /*update_sessions*/
       [this, scenic, image_pipe_updater](auto& sessions_to_update, auto trace_id,
                                          auto fences_from_previous_presents) {
-        auto results = image_pipe_updater->UpdateSessions(sessions_to_update, trace_id);
-        results.merge(scenic->UpdateSessions(sessions_to_update, trace_id));
+        image_pipe_updater->UpdateSessions(sessions_to_update);
+        auto results = scenic->UpdateSessions(sessions_to_update, trace_id);
 
         engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
-
         return results;
       },
-      /*on_cpu_work_done*/
-      [scenic, image_pipe_updater] {
-        image_pipe_updater->OnCpuWorkDone();
-        scenic->OnCpuWorkDone();
-      },
+      /*on_cpu_work_done*/ [] {},
       /*on_frame_presented*/
       [scenic, image_pipe_updater](auto latched_times, auto present_times) {
         image_pipe_updater->OnFramePresented(latched_times, present_times);

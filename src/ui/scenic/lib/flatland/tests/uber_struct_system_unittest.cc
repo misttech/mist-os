@@ -145,7 +145,7 @@ TEST(UberStructSystemTest, RemoveSessionCleansUpSession) {
   EXPECT_TRUE(snapshot.empty());
 }
 
-TEST(UberStructSystemTest, UpdateSessionsTriggersSnapshotUpdate) {
+TEST(UberStructSystemTest, UpdateInstancesTriggersSnapshotUpdate) {
   UberStructSystem system;
 
   // Queue empty UberStructs for two different instances and ensure the snapshot stays empty.
@@ -162,10 +162,9 @@ TEST(UberStructSystemTest, UpdateSessionsTriggersSnapshotUpdate) {
   auto snapshot = system.Snapshot();
   EXPECT_TRUE(snapshot.empty());
 
-  // Call UpdateSessions, but with only the second session, which should push that UberStruct into
+  // Call UpdateInstances, but with only the second session, which should push that UberStruct into
   // the snapshot.
-  auto result = system.UpdateSessions({{kSession2, 0}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances({{kSession2, 0}});
 
   snapshot = system.Snapshot();
   EXPECT_EQ(snapshot.size(), 1ul);
@@ -176,8 +175,7 @@ TEST(UberStructSystemTest, UpdateSessionsTriggersSnapshotUpdate) {
 
   // Call it a second time with the first session, which should result in both UberStructs being in
   // the snapshot.
-  result = system.UpdateSessions({{kSession1, 0}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances({{kSession1, 0}});
 
   snapshot = system.Snapshot();
   EXPECT_EQ(snapshot.size(), 2ul);
@@ -191,7 +189,7 @@ TEST(UberStructSystemTest, UpdateSessionsTriggersSnapshotUpdate) {
   EXPECT_NE(iter->second, nullptr);
 }
 
-TEST(UberStructSystemTest, UpdateSessionsIgnoresGfxSessionIds) {
+TEST(UberStructSystemTest, UpdateInstancesIgnoresGfxSessionIds) {
   UberStructSystem system;
 
   // Queue an UberStruct for a Flatland session and pretend there is a GFX session too.
@@ -205,17 +203,15 @@ TEST(UberStructSystemTest, UpdateSessionsIgnoresGfxSessionIds) {
   auto snapshot = system.Snapshot();
   EXPECT_TRUE(snapshot.empty());
 
-  // Call UpdateSessions, but with only the GFX session, which should update nothing.
-  auto result = system.UpdateSessions({{kGfxSession, 0}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  // Call UpdateInstances, but with only the GFX session, which should update nothing.
+  system.UpdateInstances({{kGfxSession, 0}});
 
   snapshot = system.Snapshot();
   EXPECT_TRUE(snapshot.empty());
 
   // Call it a second time with the Flatland session, which should result in an UberStruct in the
   // snapshot.
-  result = system.UpdateSessions({{kFlatlandSession, 0}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances({{kFlatlandSession, 0}});
 
   snapshot = system.Snapshot();
   EXPECT_EQ(snapshot.size(), 1ul);
@@ -225,7 +221,7 @@ TEST(UberStructSystemTest, UpdateSessionsIgnoresGfxSessionIds) {
   EXPECT_NE(iter->second, nullptr);
 }
 
-TEST(UberStructSystemTest, UpdateSessionsConsumesPreviousPresents) {
+TEST(UberStructSystemTest, UpdateInstancesConsumesPreviousPresents) {
   UberStructSystem system;
 
   // Make three UberStructs with different topologies.
@@ -251,10 +247,9 @@ TEST(UberStructSystemTest, UpdateSessionsConsumesPreviousPresents) {
   auto snapshot = system.Snapshot();
   EXPECT_TRUE(snapshot.empty());
 
-  // Call UpdateSessions with PresentId = 2. This should skip struct1, place struct2 in the
+  // Call UpdateInstances with PresentId = 2. This should skip struct1, place struct2 in the
   // snapshot, and leave struct3 queued.
-  auto result = system.UpdateSessions({{kSession, 2}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances({{kSession, 2}});
 
   snapshot = system.Snapshot();
   EXPECT_EQ(snapshot.size(), 1ul);
@@ -264,9 +259,8 @@ TEST(UberStructSystemTest, UpdateSessionsConsumesPreviousPresents) {
   EXPECT_NE(iter->second, nullptr);
   EXPECT_EQ(iter->second->local_topology[0].handle, kTransform2);
 
-  // Call UpdateSessions with PresentId = 3 to confirm that struct3 is still queued.
-  result = system.UpdateSessions({{kSession, 3}});
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  // Call UpdateInstances with PresentId = 3 to confirm that struct3 is still queued.
+  system.UpdateInstances({{kSession, 3}});
 
   snapshot = system.Snapshot();
   EXPECT_EQ(snapshot.size(), 1ul);
@@ -278,40 +272,6 @@ TEST(UberStructSystemTest, UpdateSessionsConsumesPreviousPresents) {
 
   // Ensure there are no queued updates left.
   EXPECT_EQ(queue->GetPendingSize(), 0ul);
-}
-
-TEST(UberStructSystemTest, UpdateSessionsFailedUpdates) {
-  UberStructSystem system;
-
-  // Create two Flatland sessions.
-  const scheduling::SessionId kSession1 = 1;
-  const scheduling::SessionId kSession2 = 2;
-
-  auto queue1 = system.AllocateQueueForSession(kSession1);
-  auto queue2 = system.AllocateQueueForSession(kSession2);
-
-  std::unordered_map<scheduling::SessionId, scheduling::PresentId> sessions_to_update;
-
-  // Queue an UberStruct for session 1 with PresentId 1, but request that the session update to
-  // PresentId 2, which will fail since the queue will be empty before the PresentId shows up.
-  queue1->Push(1, std::make_unique<UberStruct>());
-  sessions_to_update[kSession1] = 2;
-
-  // Queue two UberStructs for session 2 with PresentId 10 and PresentId 12, but request that the
-  // session update to PresentId 11, which will fail because the queue will pass the requested
-  // PresentId without finding it, even though the queue isn't empty.
-  queue1->Push(10, std::make_unique<UberStruct>());
-  queue1->Push(12, std::make_unique<UberStruct>());
-  sessions_to_update[kSession2] = 11;
-
-  // Call UpdateSessions and expect both sessions to be in the result.
-  auto result = system.UpdateSessions(sessions_to_update);
-  EXPECT_THAT(result.scheduling_results.sessions_with_failed_updates,
-              ::testing::UnorderedElementsAre(kSession1, kSession2));
-
-  // The snapshot should be empty.
-  auto snapshot = system.Snapshot();
-  EXPECT_TRUE(snapshot.empty());
 }
 
 TEST(UberStructSystemTest, BasicTopologyRetrieval) {
@@ -331,18 +291,17 @@ TEST(UberStructSystemTest, BasicTopologyRetrieval) {
       system.AllocateQueueForSession(2),
   };
 
-  std::unordered_map<scheduling::SessionId, scheduling::PresentId> sessions_to_update;
+  std::unordered_map<scheduling::SessionId, scheduling::PresentId> instances_to_update;
   for (const auto& v : vectors) {
     auto uber_struct = std::make_unique<UberStruct>();
     uber_struct->local_topology = v;
 
     const auto session_id = v[0].handle.GetInstanceId();
     queues[session_id]->Push(0, std::move(uber_struct));
-    sessions_to_update[session_id] = 0;
+    instances_to_update[session_id] = 0;
   }
 
-  auto result = system.UpdateSessions(sessions_to_update);
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances(instances_to_update);
 
   auto snapshot = system.Snapshot();
   for (const auto& v : vectors) {
@@ -475,7 +434,7 @@ TEST(UberStructSystemTest, GlobalTopologyMultithreadedUpdates) {
   }
 
   // Initialize the graph.
-  std::unordered_map<scheduling::SessionId, scheduling::PresentId> sessions_to_update;
+  std::unordered_map<scheduling::SessionId, scheduling::PresentId> instances_to_update;
   std::atomic<scheduling::PresentId> next_present_id = 0;
 
   for (size_t i = 0; i < 11; ++i) {
@@ -486,13 +445,12 @@ TEST(UberStructSystemTest, GlobalTopologyMultithreadedUpdates) {
     const auto session_id = v[0].handle.GetInstanceId();
     const auto present_id = next_present_id++;
     queues[i]->Push(present_id, std::move(uber_struct));
-    sessions_to_update[session_id] = present_id;
+    instances_to_update[session_id] = present_id;
   }
 
-  auto result = system.UpdateSessions(sessions_to_update);
-  EXPECT_TRUE(result.scheduling_results.sessions_with_failed_updates.empty());
+  system.UpdateInstances(instances_to_update);
 
-  sessions_to_update.clear();
+  instances_to_update.clear();
 
   // The expected output child counts should be the same regardless.
   const std::vector<uint64_t> expected_child_counts = {2, 2, 2, 0, 0, 0, 2, 2, 0, 0, 0};
