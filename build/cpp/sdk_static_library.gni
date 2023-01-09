@@ -4,6 +4,7 @@
 
 import("//build/cpp/verify_pragma_once.gni")
 import("//build/cpp/verify_public_headers.gni")
+import("//build/cpp/verify_runtime_deps.gni")
 import("//build/sdk/plasa/config.gni")
 import("//build/sdk/plasa/plasa_fragment_cc.gni")
 import("//build/sdk/sdk_atom.gni")
@@ -42,7 +43,8 @@ import("//build/sdk/sdk_atom_alias.gni")
 #   runtime_deps (optional)
 #     List of labels representing the library's runtime dependencies. This is
 #     only needed for runtime dependencies inherited from private dependencies.
-#     Note that these labels should represent SDK targets.
+#     Note that these labels should represent SDK targets. See the related
+#     technical note in the sdk_shared_library() for details.
 #
 #   sdk_headers_for_internal_use (optional)
 #     Out of the headers specified in `public` or `sources`, some headers are
@@ -102,16 +104,14 @@ template("sdk_static_library") {
   manifest_target_name = "${target_name}_sdk_manifest"
   sdk_target_name = "${target_name}_sdk"
 
-  runtime_deps_file = "${target_out_dir}/${target_name}.runtime_deps"
-
   # This is subtle: If one of the dependencies is listed in runtime_deps
   # with an _sdk suffix, assume it is a shared_library() target, and ensure
   # that the current target depends on the dependency built in the same
   # build variant, i.e. ignoring build variant redirection, even when we
   # are in the default toolchain.
   if (current_toolchain == default_toolchain && defined(invoker.runtime_deps)) {
-    _new_deps = []
     if (defined(invoker.deps)) {
+      _new_deps = []
       foreach(dep, invoker.deps) {
         _dep_label = get_label_info(dep, "label_no_toolchain")
         _dep_sdk_label = _dep_label + "_sdk"
@@ -170,10 +170,6 @@ template("sdk_static_library") {
       # does not have a sufficiently stable ABI for the purposes of our SDK.
       configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
-
-    # Request that the runtime deps be written out to a file. This file will be
-    # used later to verify that all runtime deps are available in the SDK.
-    write_runtime_deps = runtime_deps_file
 
     metadata = {
       if (defined(invoker.metadata)) {
@@ -315,6 +311,9 @@ template("sdk_static_library") {
                              ])
       all_deps = build_deps
       file_base = sdk_root_path
+      if (!defined(all_headers)) {
+        all_headers = []
+      }
     }
   } else {
     not_needed(invoker, [ "sdk_headers_for_internal_use" ])
@@ -405,42 +404,17 @@ template("sdk_static_library") {
   }
 
   sdk_manifest_file = "${target_gen_dir}/${manifest_target_name}.sdk"
-  verify_target_name = "${target_name}_verify"
+  verify_runtime_deps_target = "${target_name}_verify_runtime_deps"
 
-  # Verify that the SDK manifest for this target includes all of the expected
-  # runtime dependencies.
-  # TODO(fxbug.dev/5365): also check that everything in there is either prebuilt or
-  # headers only.
-  action(verify_target_name) {
-    script = "//build/cpp/verify_runtime_deps.py"
-
-    inputs = [
-      sdk_manifest_file,
-      runtime_deps_file,
-    ]
-
-    stamp_file = "${target_gen_dir}/${target_name}.gn_stamp"
-
-    outputs = [ stamp_file ]
-
-    args = [
-      "--stamp",
-      rebase_path(stamp_file, root_build_dir),
-      "--manifest",
-      rebase_path(sdk_manifest_file, root_build_dir),
-      "--runtime-deps-file",
-      rebase_path(runtime_deps_file, root_build_dir),
-    ]
-
-    deps = [
-      ":${main_target_name}",
-      ":${manifest_target_name}",
-    ]
+  sdk_verify_runtime_deps(verify_runtime_deps_target) {
+    atom_target = ":$main_target_name"
+    manifest_file = sdk_manifest_file
+    manifest_target = ":$manifest_target_name"
   }
 
   sdk_atom_alias(sdk_target_name) {
     atom = ":${manifest_target_name}"
-    non_sdk_deps = [ ":${verify_target_name}" ]
+    non_sdk_deps = [ ":${verify_runtime_deps_target}" ]
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":$_plasa_artifacts_target_name" ]
     }

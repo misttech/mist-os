@@ -1,0 +1,63 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#
+# atom_target:
+#
+# manifest_target:
+# manifest_file:
+#
+template("sdk_verify_runtime_deps") {
+  # Collect all sdk_runtime_deps metadata entry from the dependencies of
+  # `atom_target`. The metadata.sdk_runtime_deps list entries should be scopes
+  # describing shared libraries, with the following schema:
+  #
+  #    label: the GN label that defines the shared library target, including
+  #           its toolchain suffix, e.g.
+  #           '//sdk/lib/fdio:fdio(//build/toolchain/fuchsa:x64-shared)'
+  #
+  #    source: (optional) the source path to the shared library binary,
+  #       relative to the build directory (e.g. 'x64-shared/libfdio.so').
+  #       This MUST ONLY be set for regular shared_library() instances
+  #       (i.e. not those from sdk_shared_library()).
+  #
+  #    sdk_id: (optional) the SDK atom id that generates the library
+  #       (e.g. '//pkg:fdio'). This MUST ONLY be set for sdk_shared_library()
+  #       targets, and not regular shared_library() ones.
+  #
+  _runtime_deps_file = "${target_gen_dir}/${target_name}.sdk_runtime_deps"
+  _runtime_deps_target = "${target_name}_runtime_deps"
+
+  generated_file(_runtime_deps_target) {
+    deps = [ invoker.atom_target ]
+    outputs = [ _runtime_deps_file ]
+    output_conversion = "json"
+    data_keys = [ "sdk_runtime_deps" ]
+    walk_keys = [ "sdk_runtime_deps_barrier" ]
+  }
+
+  action(target_name) {
+    script = "//build/cpp/verify_runtime_deps.py"
+
+    inputs = [
+      invoker.manifest_file,
+      _runtime_deps_file,
+    ]
+
+    outputs = [ "${target_gen_dir}/${target_name}.gn_stamp" ]
+
+    args = [
+      "--sdk-runtime-deps",
+      rebase_path(_runtime_deps_file, root_build_dir),
+      "--sdk-manifest",
+      rebase_path(invoker.manifest_file, root_build_dir),
+      "--stamp-file",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+    deps = [
+      ":${_runtime_deps_target}",
+      invoker.manifest_target,
+    ]
+  }
+}

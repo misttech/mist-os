@@ -5,6 +5,7 @@
 import("//build/cpp/verify_pragma_once.gni")
 import("//build/cpp/verify_public_headers.gni")
 import("//build/cpp/verify_public_symbols.gni")
+import("//build/cpp/verify_runtime_deps.gni")
 import("//build/sdk/plasa/config.gni")
 import("//build/sdk/plasa/plasa_fragment_cc.gni")
 import("//build/sdk/sdk_atom.gni")
@@ -51,8 +52,7 @@ import("//build/sdk/sdk_atom_alias.gni")
 #
 #   runtime_deps (optional)
 #     List of labels representing the library's runtime dependencies. This is
-#     only needed for runtime dependencies inherited from private dependencies.
-#     Note that these labels should represent SDK targets.
+#     Note that these labels should represent SDK targets. See note below.
 #
 #   sdk_headers_for_internal_use (optional)
 #     Out of the headers specified in `public` or `sources`, some headers are
@@ -64,6 +64,70 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
 #
 #     See fxbug.dev/117085 for more details about this field.
+#
+# TECHNICAL NOTE ON 'runtime_deps':
+#
+# The `runtime_deps` parameter is used to list the sdk_shared_library()
+# targets that this one depends on at runtime. Unfortunately, this cannot be
+# computed directly by GN. To better understand why, consider the following
+# example:
+#
+#     sdk_shared_library("foo") {
+#       ...
+#       deps = [ ":bar" ]
+#     }
+#
+#     sdk_shared_library("bar") {
+#       ...
+#     }
+#
+# These definitions end up creating at least four GN targets:
+#
+#  - a 'foo' and 'bar' target, which are real shared_library() targets
+#    used to build libfoo.so and libbar.so respectively.
+#
+#    and due to the 'deps' value, 'foo' will depend on 'bar'.
+#
+#  - a 'foo_sdk' and a 'bar_sdk' targets that generate an sdk_atom() wrapping
+#    each library, i.e. the target responsible for creating a meta.json file
+#    for each library, and used to generate exported SDKs.
+#
+#    'foo_sdk' depends on 'foo', and 'bar_sdk' depends on 'bar', as in:
+#
+#
+#     foo <--- foo_sdk
+#      |
+#      v
+#     bar <--- bar_sdk
+#
+#
+# However, without "runtime_deps", 'foo_sdk' will _not_ depend on 'bar_sdk',
+# which means that if an sdk() target depends on 'foo_sdk', the atom for
+# the 'bar_sdk' target will be ignored. The result is a "broken" exported
+# SDK that will not include a prebuilt for libbar.so, even though it is
+# needed at runtime by libfoo.so.
+#
+# To fix this, set 'runtime_deps' to point to the SDK atom target for bar,
+# as in:
+#
+#    sdk_shared_library("foo") {
+#      ...
+#      deps = [ ":bar" ]
+#      runtime_deps = [ ":bar_sdk" ]
+#    }
+#
+#    sdk_shared_library("bar") {
+#      ...
+#    }
+#
+# Which results in the following (correct) dependency graph:
+#
+#     foo <--- foo_sdk
+#      |          |
+#      |          |--- this dependency added through runtime_deps!
+#      v          v
+#     bar <--- bar_sdk
+#
 
 # The defaults for a sdk_shared_library should match that of a shared_library.
 set_defaults("sdk_shared_library") {
@@ -170,16 +234,20 @@ template("sdk_shared_library") {
       configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
-    # Request that the runtime deps be written out to a file. This file will be
-    # used later to verify that all runtime deps are available in the SDK.
-    write_runtime_deps = "${target_out_dir}/${target_name}.runtime_deps"
-
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
       if (is_fuchsia) {
         component_catalog = [
+          {
+            sdk_id = sdk_id
+            label = get_label_info(":${target_name}", "label_with_toolchain")
+          },
+        ]
+
+        # Used by sdk_verify_runtime_deps() template.
+        sdk_runtime_deps = [
           {
             sdk_id = sdk_id
             label = get_label_info(":${target_name}", "label_with_toolchain")
@@ -449,46 +517,20 @@ template("sdk_shared_library") {
     }
   }
 
-  shared_gen_dir = get_label_info(shared_lib_target, "target_out_dir")
-  runtime_deps_file = "${shared_gen_dir}/${target_name}.runtime_deps"
   sdk_manifest_file = "${target_gen_dir}/${manifest_target_name}.sdk"
-  verify_target_name = "${target_name}_verify"
 
-  # Verify that the SDK manifest for this target includes all of the expected
-  # runtime dependencies.
-  # TODO(fxbug.dev/5365): also check that everything in there is either prebuilt or
-  # headers only.
-  action(verify_target_name) {
-    script = "//build/cpp/verify_runtime_deps.py"
+  verify_runtime_deps_target = "${target_name}_verify"
 
-    inputs = [
-      sdk_manifest_file,
-      runtime_deps_file,
-    ]
-
-    stamp_file = "${target_gen_dir}/${target_name}.gn_stamp"
-
-    outputs = [ stamp_file ]
-
-    args = [
-      "--stamp",
-      rebase_path(stamp_file, root_build_dir),
-      "--manifest",
-      rebase_path(sdk_manifest_file, root_build_dir),
-      "--runtime-deps-file",
-      rebase_path(runtime_deps_file, root_build_dir),
-    ]
-
-    deps = [
-      ":${manifest_target_name}",
-      shared_lib_target,
-    ]
+  sdk_verify_runtime_deps(verify_runtime_deps_target) {
+    atom_target = ":$main_target_name"
+    manifest_file = sdk_manifest_file
+    manifest_target = ":$manifest_target_name"
   }
 
   sdk_atom_alias(sdk_target_name) {
     atom = ":${manifest_target_name}"
 
-    non_sdk_deps = [ ":${verify_target_name}" ]
+    non_sdk_deps = [ ":${verify_runtime_deps_target}" ]
 
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":${_plasa_artifacts_target_name}" ]
