@@ -17,27 +17,27 @@ use test_case::test_case;
     "successful map"
 )]
 #[test_case(
-    1 => Err(String::from("Failed to map red\n\nCaused by:\n    my_error"));
+    1 => Err(String::from("map red\n\nCaused by:\n    my_error"));
     "red error map"
 )]
 #[test_case(
-    2 => Err(String::from("Failed to map green\n\nCaused by:\n    my_error"));
+    2 => Err(String::from("map green\n\nCaused by:\n    my_error"));
     "green error map"
 )]
 #[test_case(
-    3 => Err(String::from("Failed to map blue\n\nCaused by:\n    my_error"));
+    3 => Err(String::from("map blue\n\nCaused by:\n    my_error"));
     "blue error map"
 )]
 #[test_case(
-    4 => Err(String::from("Failed to map clear\n\nCaused by:\n    my_error"));
+    4 => Err(String::from("map clear\n\nCaused by:\n    my_error"));
     "clear error map"
 )]
 #[fuchsia::test]
-fn rgbc_async_mapped(n: u8) -> Result<Rgbc<u8>, String> {
+fn rgbc_map_async(n: u8) -> Result<Rgbc<u8>, String> {
     let rgbc = Rgbc { red: 1, green: 2, blue: 3, clear: 4 };
 
     let mut result_fut = rgbc
-        .async_mapped(|c| async move {
+        .map_async(|c| async move {
             if c == n {
                 Err(format_err!("my_error"))
             } else {

@@ -4,14 +4,14 @@
 
 use anyhow::{bail, format_err, Context, Error};
 use async_trait::async_trait;
-use futures::Future;
+use futures::{Future, FutureExt as _, TryFutureExt as _};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Sub};
 use std::path::Path;
 
 /// Abstracts over grouping of red, green, blue and clear color channel data.
-#[derive(Copy, Clone, Deserialize, Serialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Rgbc<T> {
     pub(crate) red: T,
     pub(crate) green: T,
@@ -19,24 +19,7 @@ pub struct Rgbc<T> {
     pub(crate) clear: T,
 }
 
-impl<T> Default for Rgbc<T>
-where
-    T: Default,
-{
-    fn default() -> Self {
-        Self {
-            red: Default::default(),
-            green: Default::default(),
-            blue: Default::default(),
-            clear: Default::default(),
-        }
-    }
-}
-
-impl<T> Rgbc<T>
-where
-    T: Copy,
-{
+impl<T> Rgbc<T> {
     /// Maps the supplied function to each color channel.
     ///
     /// # Example
@@ -45,13 +28,26 @@ where
     /// let rgbc = rgbc.map(|c| c + 1);
     /// assert_eq!(rgbc, Rgbc { red: 2, green: 3, blue: 4, clear: 5 });
     /// ```
-    pub(crate) fn map<U>(&self, func: impl Fn(T) -> U) -> Rgbc<U> {
-        Rgbc {
-            red: func(self.red),
-            green: func(self.green),
-            blue: func(self.blue),
-            clear: func(self.clear),
-        }
+    pub(crate) fn map<U>(self, func: impl Fn(T) -> U) -> Rgbc<U> {
+        let Self { red, green, blue, clear } = self;
+        Rgbc { red: func(red), green: func(green), blue: func(blue), clear: func(clear) }
+    }
+
+    /// Maps the supplied function to each color channel, but returns the first error that occurs.
+    pub(crate) fn map_async<U, F>(
+        self,
+        func: impl Fn(T) -> F,
+    ) -> impl Future<Output = Result<Rgbc<U>, Error>>
+    where
+        F: Future<Output = Result<U, Error>>,
+    {
+        let Self { red, green, blue, clear } = self;
+        let red = func(red).map(|result| result.context("map red"));
+        let green = func(green).map(|result| result.context("map green"));
+        let blue = func(blue).map(|result| result.context("map blue"));
+        let clear = func(clear).map(|result| result.context("map clear"));
+        let fut = futures::future::try_join4(red, green, blue, clear);
+        fut.map_ok(|(red, green, blue, clear)| Rgbc { red, green, blue, clear })
     }
 
     /// Maps the supplied function to the matching pair of color channels of the inputs.
@@ -63,16 +59,14 @@ where
     /// let rgbc = Rgbc::multi_map(left, right, |l, r| l + r);
     /// assert_eq!(rgbc, Rgbc { red: 6, green: 8, blue: 10, clear: 12 });
     /// ```
-    pub(crate) fn multi_map<U>(
-        rgbc1: Rgbc<T>,
-        rgbc2: Rgbc<T>,
-        func: impl Fn(T, T) -> U,
-    ) -> Rgbc<U> {
+    pub(crate) fn multi_map<U>(rgbc1: Self, rgbc2: Self, func: impl Fn(T, T) -> U) -> Rgbc<U> {
+        let Self { red: red1, green: green1, blue: blue1, clear: clear1 } = rgbc1;
+        let Self { red: red2, green: green2, blue: blue2, clear: clear2 } = rgbc2;
         Rgbc {
-            red: func(rgbc1.red, rgbc2.red),
-            green: func(rgbc1.green, rgbc2.green),
-            blue: func(rgbc1.blue, rgbc2.blue),
-            clear: func(rgbc1.clear, rgbc2.clear),
+            red: func(red1, red2),
+            green: func(green1, green2),
+            blue: func(blue1, blue2),
+            clear: func(clear1, clear2),
         }
     }
 
@@ -85,34 +79,17 @@ where
     /// let value = rgbc.fold(0, |acc, v| acc + v);
     /// assert_eq!(value, 10);
     /// ```
-    pub(crate) fn fold<U>(&self, acc: U, func: impl Fn(U, T) -> U) -> U {
-        func(func(func(func(acc, self.red), self.green), self.blue), self.clear)
+    pub(crate) fn fold<U>(self, acc: U, func: impl Fn(U, T) -> U) -> U {
+        let Self { red, green, blue, clear } = self;
+        [red, green, blue, clear].into_iter().fold(acc, func)
     }
 
     /// Helper function that ensures all fields of both [Rgbc] structs match according to the supplied
     /// predicate.
     #[cfg(test)]
     pub(crate) fn match_all(left: Self, right: Self, predicate: impl Fn(T, T) -> bool) -> bool {
-        let matches = Rgbc::multi_map(left, right, predicate);
-        matches.red && matches.green && matches.blue && matches.clear
-    }
-}
-
-impl<T> Rgbc<T>
-where
-    T: Clone,
-{
-    /// Maps the supplied function to each color channel, but returns the first error that occurs.
-    pub(crate) async fn async_mapped<U, F>(self, func: impl Fn(T) -> F) -> Result<Rgbc<U>, Error>
-    where
-        F: Future<Output = Result<U, Error>>,
-    {
-        Ok(Rgbc {
-            red: func(self.red.clone()).await.context("Failed to map red")?,
-            green: func(self.green.clone()).await.context("Failed to map green")?,
-            blue: func(self.blue.clone()).await.context("Failed to map blue")?,
-            clear: func(self.clear.clone()).await.context("Failed to map clear")?,
-        })
+        let Rgbc { red, green, blue, clear } = Self::multi_map(left, right, predicate);
+        red && green && blue && clear
     }
 }
 
@@ -261,7 +238,7 @@ impl Calibration {
                 name.clone(),
                 led_config
                     .rgbc
-                    .async_mapped(|file_path| Self::parse_file(file_path, &file_loader))
+                    .map_async(|file_path| Self::parse_file(file_path, &file_loader))
                     .await
                     .with_context(|| format!("Failed to map {:?}'s rgbc field", name))?,
             );
@@ -269,12 +246,12 @@ impl Calibration {
 
         let off = configuration
             .off
-            .async_mapped(|file_path| Self::parse_file(file_path, &file_loader))
+            .map_async(|file_path| Self::parse_file(file_path, &file_loader))
             .await
             .context("Failed to map off rgbc")?;
         let all_on = configuration
             .all_on
-            .async_mapped(|file_path| Self::parse_file(file_path, &file_loader))
+            .map_async(|file_path| Self::parse_file(file_path, &file_loader))
             .await
             .context("Failed to map all_on rgbc")?;
         let calibrated_slope =
