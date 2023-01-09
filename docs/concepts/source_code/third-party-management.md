@@ -89,6 +89,16 @@ You need a README.fuchsia file with information about the project from which
 you're reusing code. Check out [`README.fuchsia`][readme-fuchsia] for the list
 of required fields to include.
 
+### Get a review
+
+All third-party additions and substantive changes like re-licensing need the
+following sign-offs:
+
+* Get the code reviewed as instructed in the [OSRB approval][osrb-process].
+* If the third-party project is security-critical (as defined in
+  [`README.fuchsia`][readme-fuchsia]), include someone in
+  `security-dev@fuchsia.dev` to review the change.
+
 ### Exceptional cases
 
 Most third-party dependencies can follow the layout described above. However, a
