@@ -23,7 +23,7 @@ use {
     fuchsia_zircon::Clock,
     futures::TryStreamExt,
     identity_common::{EnrollmentData, PrekeyMaterial},
-    tracing::log::{error, warn},
+    tracing::log::{error, info, warn},
 };
 
 /// A struct to handle authentication and enrollment requests.
@@ -158,6 +158,10 @@ where
             .handle_password_interaction_request_stream(stream)
             .await?;
 
+        info!(
+            "Successfully generated authentication AttemptedEvent using {}",
+            authenticator_data.flavor()
+        );
         Ok(AttemptedEvent {
             timestamp: self.read_clock().map(|time| time.into_nanos()),
             enrollment_id: Some(enrollment.id),
@@ -188,6 +192,7 @@ where
             .await?;
         let enrollment_data =
             translate_to_enrollment(metadata).map_err(|_| ApiError::InvalidDataFormat)?;
+        info!("Successfully completed enrollment using {}", metadata.flavor());
         Ok((enrollment_data, key))
     }
 }

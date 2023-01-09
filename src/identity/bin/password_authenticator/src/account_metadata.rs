@@ -93,6 +93,16 @@ pub enum AuthenticatorMetadata {
     Pinweaver(PinweaverMetadata),
 }
 
+impl AuthenticatorMetadata {
+    /// Returns a short string describing the metadata, useful for logging.
+    pub fn flavor(&self) -> &'static str {
+        match &self {
+            AuthenticatorMetadata::ScryptOnly(_) => "scrypt",
+            AuthenticatorMetadata::Pinweaver(_) => "pinweaver",
+        }
+    }
+}
+
 // Implement converting each backend's enrollment data into an AuthenticatorMetadata, to be saved
 // after enrolling a key.
 
