@@ -21,10 +21,16 @@
 
     // Capabilities used by this component.
     use: [
-        { protocol: "fuchsia.pkg.PackageResolver" },
-        { protocol: "fuchsia.process.Launcher" },
-        { protocol: "fuchsia.sys2.RealmQuery" },
-        { protocol: "fuchsia.hardware.pty.Device" },
+        {
+            protocol: [
+                "fuchsia.hardware.pty.Device",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.pkg.PackageResolver",
+                "fuchsia.process.Launcher",
+                "fuchsia.process.Resolver",
+                "fuchsia.sys2.RealmQuery",
+            ],
+        },
     ],
     expose: [
         {

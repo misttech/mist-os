@@ -1,0 +1,27 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "process_resolver",
+            url: "fuchsia-pkg://fuchsia.com/process-resolver#meta/process_resolver.cm",
+        },
+        {
+            name: "debug-dash-launcher",
+            url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug_dash_launcher.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.process.Resolver" ],
+            from: "#process_resolver",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: [ "fuchsia.kernel.VmexResource" ],
+            from: "parent",
+            to: "#debug-dash-launcher",
+        },
+    ],
+}

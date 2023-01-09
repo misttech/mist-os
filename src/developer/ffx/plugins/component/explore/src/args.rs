@@ -35,7 +35,11 @@ PWD=/
 
 The environment also contains the following directories, irrespective of the explored instance:
 * /.dash/bin  Basic command-line tools like ls, cat and more
-* /svc        Protocols required by the dash shell"
+* /svc        Protocols required by the dash shell
+
+If additional binaries are provided via --tools, they will be loaded into .dash/tools/<pkg>/<binary>
+The path will be set so that they can be run by name. The path preference is given by command line
+order of the --tools packages."
 )]
 
 pub struct ExploreComponentCommand {
@@ -44,9 +48,11 @@ pub struct ExploreComponentCommand {
     pub query: String,
 
     #[argh(option)]
-    /// URL of a tools package to include in the shell environment.
-    /// the PATH variable will be updated to include binaries from this tools package.
-    pub tools: Option<String>,
+    /// list of URLs of tools packages to include in the shell environment.
+    /// the PATH variable will be updated to include binaries from these tools packages.
+    /// repeat `--tools url` for each package to be included.         
+    /// The path preference is given by command line order.
+    pub tools: Vec<String>,
 
     #[argh(option, short = 'c', long = "command")]
     /// execute a command instead of reading from stdin.

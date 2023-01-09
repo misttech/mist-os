@@ -75,7 +75,6 @@ pub async fn explore(
 
     // LifecycleController accepts RelativeMonikers only.
     let relative_moniker = format!(".{}", moniker.to_string());
-    let tools_url = cmd.tools.as_deref();
 
     // Launch dash with the given moniker and stdio handles.
     let (pty, pty_server) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
@@ -83,8 +82,12 @@ pub async fn explore(
 
     let ns_layout = cmd.ns_layout.map(|l| l.0).unwrap_or(DashNamespaceLayout::NestAllInstanceDirs);
 
+    // The launch_with_socket() FIDL call requires a `&mut dyn
+    // ExactSizeIterator<Item = &str>` to be passed in, even though the Rust
+    // declaration in launch.rs is given as a `Vec<String>`.
+    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut cmd.tools.iter().map(|s| s.as_str());
     launcher_proxy
-        .launch_with_socket(&relative_moniker, pty_server, tools_url, cmd.command.as_deref(), ns_layout)
+        .launch_with_socket(&relative_moniker, pty_server, urls, cmd.command.as_deref(), ns_layout)
         .await
         .map_err(|e| ffx_error!("fidl error launching dash: {}", e))?
         .map_err(|e| match e {

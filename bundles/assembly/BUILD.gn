@@ -289,6 +289,20 @@ assembly_input_bundle("common_minimal_eng") {
     # Dash launcher should be available in every engineering-mode product.
     "//src/sys/tools/debug-dash-launcher",
   ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          rebase_path(
+              "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
+              root_build_dir),
+        ]
+      }
+    },
+  ]
 }
 
 # This is common across all eng-mode and user-debug products, at the minimal or

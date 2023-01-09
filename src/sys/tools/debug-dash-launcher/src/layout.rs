@@ -21,20 +21,18 @@ use vfs::{
 };
 
 // PATH must contain the three possible sources of binaries:
-// * binaries in the tools package.
 // * binaries in the instance's package.
 // * binaries in dash-launcher's package.
-// Note that dash can handle paths that do not exist.
 // For the nested root layout, the instance's package is under /ns/pkg.
-const PATH_ENVVAR_NESTED_ROOT: &str = "PATH=/.dash/tools/bin:/ns/pkg/bin:/.dash/bin:";
+// Tools binaries will added to the path under .dash/tools/<package_name>/bin if present.
+const PATH_ENVVAR_NESTED_ROOT: &str = "/ns/pkg/bin:/.dash/bin";
 
 // PATH must contain the three possible sources of binaries:
-// * binaries in the tools package.
 // * binaries in the instance's package.
 // * binaries in dash-launcher's package.
-// Note that dash can handle paths that do not exist.
 // For the namespace root layout, the instance's package is under /pkg.
-const PATH_ENVVAR_NS_ROOT: &str = "PATH=/.dash/tools/bin:/pkg/bin:/.dash/bin:";
+// Tools binaries will added to the path under .dash/tools/<package_name>/bin if present.
+const PATH_ENVVAR_NS_ROOT: &str = "/pkg/bin:/.dash/bin";
 
 /// Returns directory handles + paths for a nested layout using the given directories.
 /// In this layout, all instance directories are nested as subdirectories of the root.
@@ -82,8 +80,9 @@ pub fn nest_all_instance_dirs(
 /// own namespace.
 ///
 /// To make the shell work correctly, we need to inject the following into the layout:
-/// * fuchsia.process.Launcher into `/svc`
-/// * dash launcher binaries into `/.dash/bin` and tools package into `/.dash/tools`
+/// * fuchsia.process.Resolver and fuchsia.process.Launcher into `/svc`
+/// * dash launcher binaries into `/.dash/bin`
+/// * tools packages, if given, into `/.dash/tools`
 ///
 /// Also returns the corresponding PATH envvar that must be set for the dash shell.
 pub async fn instance_namespace_is_root(
@@ -104,7 +103,7 @@ pub async fn instance_namespace_is_root(
 
         if path == "/svc" {
             let svc_dir = directory.into_proxy().unwrap();
-            let svc_dir = inject_process_launcher(svc_dir).await;
+            let svc_dir = inject_process_launcher_and_resolver(svc_dir).await;
             name_infos.push(to_name_info(&path, svc_dir));
         } else {
             name_infos.push(fproc::NameInfo { path, directory });
@@ -114,16 +113,17 @@ pub async fn instance_namespace_is_root(
     (name_infos, PATH_ENVVAR_NS_ROOT)
 }
 
-/// Serves a VFS that only contains `fuchsia.process.Launcher`. This is used by the Nested
-/// filesystem layout.
-pub fn serve_process_launcher_svc_dir() -> Result<fio::DirectoryProxy, LauncherError> {
+/// Serves a VFS that contains `fuchsia.process.Launcher` and `fuchsia.process.Resolver`. This is
+/// used by the Nested filesystem layout.
+pub fn serve_process_launcher_and_resolver_svc_dir() -> Result<fio::DirectoryProxy, LauncherError> {
     // Serve a directory that only provides fuchsia.process.Launcher to dash.
     let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
         .map_err(|_| LauncherError::Internal)?;
 
     let mut fs = ServiceFs::new();
     fs.add_proxy_service::<fproc::LauncherMarker, ()>();
-    fs.serve_connection(server_end).map_err(|_| LauncherError::Internal)?;
+    fs.add_proxy_service::<fproc::ResolverMarker, ()>();
+    fs.serve_connection(server_end).map_err(|_| LauncherError::ProcessResolver)?;
 
     fasync::Task::spawn(async move {
         fs.collect::<()>().await;
@@ -135,10 +135,8 @@ pub fn serve_process_launcher_svc_dir() -> Result<fio::DirectoryProxy, LauncherE
 
 /// Gets the list of all protocols available in the given svc directory and serves a new VFS
 /// that injects `fuchsia.process.Launcher` from the launcher namespace and forwards the calls
-/// for the other protocols.
-///
-/// If the svc directory already contains `fuchsia.process.Launcher`, we will not inject it here.
-async fn inject_process_launcher(svc_dir: fio::DirectoryProxy) -> fio::DirectoryProxy {
+/// for the other protocols. Also adds the `fuchsia.process.Resolver` for tool trampolines.
+async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> fio::DirectoryProxy {
     let vfs = vfs::directory::immutable::simple();
     let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
 
@@ -163,6 +161,7 @@ async fn inject_process_launcher(svc_dir: fio::DirectoryProxy) -> fio::Directory
         .unwrap();
     }
 
+    // Add process launcher.
     if let Err(err) = vfs.add_entry(
         fproc::LauncherMarker::PROTOCOL_NAME,
         endpoint(|_, channel| {
@@ -173,6 +172,16 @@ async fn inject_process_launcher(svc_dir: fio::DirectoryProxy) -> fio::Directory
         warn!(?err, "Could not inject fuchsia.process.Launcher into filesystem layout. Ignoring.");
     }
 
+    // Add process resolver.
+    if let Err(err) = vfs.add_entry(
+        fproc::ResolverMarker::PROTOCOL_NAME,
+        endpoint(|_, channel| {
+            connect_channel_to_protocol::<fproc::ResolverMarker>(channel.into_zx_channel())
+                .unwrap();
+        }),
+    ) {
+        warn!(?err, "Could not inject fuchsia.process.Resolver into filesystem layout. Ignoring.");
+    }
     let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let server_end = server_end.into_channel().into();
     vfs.open(

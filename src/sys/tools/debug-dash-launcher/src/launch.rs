@@ -4,6 +4,7 @@
 
 use crate::layout;
 use crate::socket;
+use crate::trampoline;
 use fidl::{
     endpoints::{ClientEnd, Proxy},
     HandleBased,
@@ -12,7 +13,6 @@ use fidl_fuchsia_dash as fdash;
 use fidl_fuchsia_dash::LauncherError;
 use fidl_fuchsia_hardware_pty as pty;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_pkg as fpkg;
 use fidl_fuchsia_process as fproc;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::connect_to_protocol;
@@ -32,23 +32,23 @@ const DASH_ARGS_FOR_COMMAND: [&[u8]; 2] = ["-v".as_bytes(), "-c".as_bytes()];
 pub async fn launch_with_socket(
     moniker: &str,
     socket: zx::Socket,
-    tools_url: Option<String>,
+    tool_urls: Vec<String>,
     command: Option<String>,
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
     let pty = socket::spawn_pty_forwarder(socket).await?;
-    launch_with_pty(moniker, pty, tools_url, command, ns_layout).await
+    launch_with_pty(moniker, pty, tool_urls, command, ns_layout).await
 }
 
 pub async fn launch_with_pty(
     moniker: &str,
     pty: ClientEnd<pty::DeviceMarker>,
-    tools_url: Option<String>,
+    tool_urls: Vec<String>,
     command: Option<String>,
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
     let (stdin, stdout, stderr) = split_pty_into_handles(pty)?;
-    launch_with_handles(moniker, stdin, stdout, stderr, tools_url, command, ns_layout).await
+    launch_with_handles(moniker, stdin, stdout, stderr, tool_urls, command, ns_layout).await
 }
 
 pub async fn launch_with_handles(
@@ -56,7 +56,7 @@ pub async fn launch_with_handles(
     stdin: zx::Handle,
     stdout: zx::Handle,
     stderr: zx::Handle,
-    tools_url: Option<String>,
+    tool_urls: Vec<String>,
     command: Option<String>,
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
@@ -79,13 +79,7 @@ pub async fn launch_with_handles(
     let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
     let instance_pkg_dir = resolved_dirs.pkg_dir.map(|d| d.into_proxy().unwrap());
 
-    let tools_pkg_dir = if let Some(tools_url) = tools_url {
-        // Use the `fuchsia.pkg.PackageResolver` protocol to get the tools package directory.
-        let tools_pkg_dir = get_tools_pkg_dir(&tools_url).await?;
-        Some(tools_pkg_dir)
-    } else {
-        None
-    };
+    let (tools_pkg_dir, tools_path) = trampoline::get_tools_pkg_dir(tool_urls).await?;
 
     // Get the launcher's /pkg/bin.
     let bin_dir = fuchsia_fs::directory::open_directory(
@@ -102,22 +96,22 @@ pub async fn launch_with_handles(
     let job =
         fuchsia_runtime::job_default().create_child_job().map_err(|_| LauncherError::Internal)?;
 
-    // Create a library loader that loads libraries from 3 sources:
+    // Create a library loader that loads libraries from 2 sources:
     // * the launcher's /pkg/lib dir.
     // * the instance's /pkg/lib dir.
-    // * the tool's /pkg/lib dir.
-    let ldsvc = create_loader_service(&launcher_pkg_dir, &instance_pkg_dir, &tools_pkg_dir).await;
+    let ldsvc = create_loader_service(&launcher_pkg_dir, &instance_pkg_dir).await;
 
     // Add handles for the current job, stdio, library loader and UTC time.
     let mut handle_infos = create_handle_infos(&job, stdin, stdout, stderr, ldsvc)?;
 
     // Add all the necessary entries into the dash namespace.
-    let (mut name_infos, env_vars) = match ns_layout {
+    let (mut name_infos, path_envvar) = match ns_layout {
         fdash::DashNamespaceLayout::NestAllInstanceDirs => {
-            // Add a custom `/svc` directory to dash that contains only `fuchsia.process.Launcher`
-            let svc_dir = layout::serve_process_launcher_svc_dir()?;
+            // Add a custom `/svc` directory to dash that contains
+            // `fuchsia.process.Launcher` and `fuchsia.process.Resolver`.
+            let svc_dir = layout::serve_process_launcher_and_resolver_svc_dir()?;
 
-            let (name_infos, path_envvar) = layout::nest_all_instance_dirs(
+            layout::nest_all_instance_dirs(
                 bin_dir,
                 ns_entries,
                 exposed_dir,
@@ -125,15 +119,10 @@ pub async fn launch_with_handles(
                 out_dir,
                 runtime_dir,
                 tools_pkg_dir,
-            );
-            let env_vars = vec![path_envvar.as_bytes()];
-            (name_infos, env_vars)
+            )
         }
         fdash::DashNamespaceLayout::InstanceNamespaceIsRoot => {
-            let (name_infos, path_envvar) =
-                layout::instance_namespace_is_root(bin_dir, ns_entries, tools_pkg_dir).await;
-            let env_vars = vec![path_envvar.as_bytes()];
-            (name_infos, env_vars)
+            layout::instance_namespace_is_root(bin_dir, ns_entries, tools_pkg_dir).await
         }
     };
 
@@ -162,6 +151,8 @@ pub async fn launch_with_handles(
         .add_handles(&mut handle_infos.iter_mut())
         .map_err(|_| LauncherError::ProcessLauncher)?;
     launcher.add_args(&mut args.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
+    let path_envvar = trampoline::create_env_path(path_envvar, tools_path);
+    let env_vars = vec![path_envvar.as_bytes()];
     launcher.add_environs(&mut env_vars.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
     let (status, process) =
         launcher.launch(&mut info).await.map_err(|_| LauncherError::ProcessLauncher)?;
@@ -227,18 +218,6 @@ fn get_pkg_from_launcher_namespace() -> Result<fio::DirectoryProxy, LauncherErro
     .map_err(|_| LauncherError::Internal)
 }
 
-async fn get_tools_pkg_dir(tools_url: &str) -> Result<fio::DirectoryProxy, LauncherError> {
-    let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
-        .map_err(|_| LauncherError::PackageResolver)?;
-    let (tools_pkg_dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let _subpackage_context = resolver
-        .resolve(tools_url, server)
-        .await
-        .map_err(|_| LauncherError::PackageResolver)?
-        .map_err(|_| LauncherError::ToolsCannotResolve)?;
-    Ok(tools_pkg_dir)
-}
-
 fn create_handle_infos(
     job: &zx::Job,
     stdin: zx::Handle,
@@ -287,7 +266,6 @@ fn create_handle_infos(
 async fn create_loader_service(
     launcher_pkg_dir: &fio::DirectoryProxy,
     instance_pkg_dir: &Option<fio::DirectoryProxy>,
-    tools_pkg_dir: &Option<fio::DirectoryProxy>,
 ) -> zx::Handle {
     let mut lib_dirs = vec![];
     if let Ok(lib_dir) = fuchsia_fs::directory::open_directory(
@@ -301,18 +279,6 @@ async fn create_loader_service(
     }
 
     if let Some(pkg_dir) = instance_pkg_dir {
-        if let Ok(lib_dir) = fuchsia_fs::directory::open_directory(
-            pkg_dir,
-            "lib",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .await
-        {
-            lib_dirs.push(Arc::new(lib_dir));
-        }
-    }
-
-    if let Some(pkg_dir) = tools_pkg_dir {
         if let Ok(lib_dir) = fuchsia_fs::directory::open_directory(
             pkg_dir,
             "lib",

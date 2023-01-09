@@ -7,6 +7,9 @@ using zx;
 using fuchsia.hardware.pty;
 using fuchsia.url;
 
+/// Maximum number of URLs allowed to be sent to the launcher.
+const MAX_URLS uint64 = 20;
+
 /// Standard errors for the Launcher protocol
 type LauncherError = strict enum {
     /// Launcher encountered an unspecified error
@@ -29,6 +32,16 @@ type LauncherError = strict enum {
     PACKAGE_RESOLVER = 9;
     /// Error resolving tools package
     TOOLS_CANNOT_RESOLVE = 10;
+    /// URL could not be parsed by launcher
+    BAD_URL = 11;
+    /// Error reading a binary from a tools package
+    TOOLS_BINARY_READ = 12;
+    /// A package name was repeated
+    NON_UNIQUE_PACKAGE_NAME = 13;
+    /// Error occurred using fuchsia.process.Resolver
+    PROCESS_RESOLVER = 14;
+    /// Error occurred using fuchsia.kernel.VmexResource
+    VMEX_RESOURCE = 15;
 };
 
 /// The namespace layout to create for the dash process.
@@ -51,8 +64,9 @@ protocol Launcher {
         moniker string:MAX;
         /// The PTY device that should be forwarded to the dash process
         pty client_end:fuchsia.hardware.pty.Device;
-        /// A package URL whose directory will also be loaded into the dash namespace
-        tools_url fuchsia.url.Url:optional;
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
         /// A optional inline command to run
         command string:<MAX, optional>;
         /// The namespace layout to create for the dash process
@@ -68,8 +82,9 @@ protocol Launcher {
         moniker string:MAX;
         /// The raw socket to connect to the dash process
         socket zx.handle:SOCKET;
-        /// A package URL whose directory will also be loaded into the dash namespace
-        tools_url fuchsia.url.Url:optional;
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
         /// A optional inline command to run
         command string:<MAX, optional>;
         /// The namespace layout to create for the dash process

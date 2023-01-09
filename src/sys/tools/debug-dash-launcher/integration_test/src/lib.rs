@@ -17,7 +17,7 @@ pub async fn execute_inline_dash_command_that_succeeds() {
         .launch_with_socket(
             ".",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             Some("ls"),
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -48,7 +48,7 @@ pub async fn execute_inline_dash_command_that_succeeds_namespace_layout() {
         .launch_with_socket(
             ".",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             Some("ls"),
             fdash::DashNamespaceLayout::InstanceNamespaceIsRoot,
         )
@@ -76,7 +76,7 @@ pub async fn execute_inline_dash_command_that_errors() {
         .launch_with_socket(
             ".",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             Some("printenv"),
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -100,7 +100,7 @@ pub async fn spawn_dash_namespace_self() {
         .launch_with_socket(
             ".",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             None,
             fdash::DashNamespaceLayout::InstanceNamespaceIsRoot,
         )
@@ -176,70 +176,6 @@ pub async fn spawn_dash_namespace_self() {
 }
 
 #[fuchsia::test]
-pub async fn spawn_dash_with_tools_package() {
-    let (stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
-
-    let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
-    launcher
-        .launch_with_socket(
-            ".",
-            stdio_server,
-            Some("fuchsia-pkg://fuchsia.com/foo"),
-            None,
-            fdash::DashNamespaceLayout::NestAllInstanceDirs,
-        )
-        .await
-        .unwrap()
-        .unwrap();
-
-    let mut stdio = fasync::Socket::from_socket(stdio).unwrap();
-
-    // The dash process prints the interactive prompt "$ ".
-    let mut buf = [0u8; 2];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "$ ".as_bytes());
-
-    // Type a command.
-    stdio.write_all("ls /.dash/tools".as_bytes()).await.unwrap();
-
-    // The dash process prints back the typed characters.
-    let mut buf = [0u8; 15];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "ls /.dash/tools".as_bytes());
-
-    // Press enter
-    stdio.write_all("\r".as_bytes()).await.unwrap();
-
-    // The dash process puts a newline.
-    let mut buf = [0u8; 2];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "\r\n".as_bytes());
-
-    // Note that there is no `ls` binary available to dash.
-    // We are relying on the `ls` functionality built into the dash process.
-
-    // The dash process prints details about the current dir.
-    let mut buf = [0u8; 15];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "d  2        0 .".as_bytes());
-
-    // The dash process puts a newline.
-    let mut buf = [0u8; 2];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "\r\n".as_bytes());
-
-    // The dash process prints details about `foo` (a file provided by mock-resolver).
-    let mut buf = [0u8; 17];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "-  1        6 foo".as_bytes());
-
-    // The dash process puts a newline and the next prompt.
-    let mut buf = [0u8; 4];
-    stdio.read_exact(&mut buf).await.unwrap();
-    assert_eq!(buf, "\r\n$ ".as_bytes());
-}
-
-#[fuchsia::test]
 pub async fn spawn_dash_nested_self() {
     let (stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
 
@@ -248,7 +184,7 @@ pub async fn spawn_dash_nested_self() {
         .launch_with_socket(
             ".",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -275,11 +211,14 @@ pub async fn unknown_tools_package() {
     let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
+
+    let v = vec!["fuchsia-pkg://fuchsia.com/bar".to_string()];
+    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut v.iter().map(|s| s.as_str());
     let err = launcher
         .launch_with_socket(
             ".",
             stdio_server,
-            Some("fuchsia-pkg://fuchsia.com/bar"),
+            urls,
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -287,7 +226,7 @@ pub async fn unknown_tools_package() {
         .unwrap()
         .unwrap_err();
 
-    assert_eq!(err, fdash::LauncherError::ToolsCannotResolve);
+    assert_eq!(err, fdash::LauncherError::ToolsBinaryRead);
 }
 
 #[fuchsia::test]
@@ -301,7 +240,7 @@ pub async fn bad_moniker() {
         .launch_with_socket(
             "!@#$%^&*(",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -322,7 +261,7 @@ pub async fn instance_not_found() {
         .launch_with_socket(
             "./does_not_exist",
             stdio_server,
-            None,
+            &mut std::iter::empty(),
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -330,4 +269,26 @@ pub async fn instance_not_found() {
         .unwrap()
         .unwrap_err();
     assert_eq!(err, fdash::LauncherError::InstanceNotFound);
+}
+
+#[fuchsia::test]
+pub async fn bad_url() {
+    let (_stdio, stdio_server) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
+
+    let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
+
+    let v = vec!["fuchsia-pkg://fuchsia.com/!@#$%^&*(".to_string()];
+    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut v.iter().map(|s| s.as_str());
+    let err = launcher
+        .launch_with_socket(
+            ".",
+            stdio_server,
+            urls,
+            None,
+            fdash::DashNamespaceLayout::NestAllInstanceDirs,
+        )
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(err, fdash::LauncherError::BadUrl);
 }

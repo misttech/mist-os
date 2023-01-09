@@ -265,6 +265,11 @@
                     "/core/test_manager/starnix-tests:**",
                     "/core/test_manager/system-tests:**",
                     "/core/test_manager/chromium-tests:**",
+
+                    // debug-dash-launcher is used in engineering builds to launch dash shells.
+                    // It uses PackageResolver to add tool package directories into the dash
+                    // environment.
+                    "/core/debug-dash-launcher",
                 ],
             },
             {
@@ -409,6 +414,11 @@
                     // it's own capability.
                     "/core/process_resolver",
                     "/core/driver_playground",
+
+                    // debug-dash-launcher is used in engineering builds to launch dash shells. It
+                    // uses ProcessResolver to allow #!resolve scripts to be include in the dash
+                    // environment.
+                    "/core/debug-dash-launcher",
                 ],
             },
             {

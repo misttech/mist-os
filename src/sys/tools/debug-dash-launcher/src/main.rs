@@ -19,6 +19,7 @@ use {
 mod launch;
 mod layout;
 mod socket;
+mod trampoline;
 
 enum IncomingRequest {
     Launcher(LauncherRequestStream),
@@ -46,13 +47,13 @@ async fn main() -> Result<(), anyhow::Error> {
                     LauncherRequest::LaunchWithPty {
                         moniker,
                         pty,
-                        tools_url,
+                        tool_urls,
                         command,
                         ns_layout,
                         responder,
                     } => {
                         let mut result =
-                            launch_with_pty(&moniker, pty, tools_url, command, ns_layout)
+                            launch_with_pty(&moniker, pty, tool_urls, command, ns_layout)
                                 .await
                                 .map(|p| {
                                     info!("launched Dash for instance {}", moniker);
@@ -63,13 +64,13 @@ async fn main() -> Result<(), anyhow::Error> {
                     LauncherRequest::LaunchWithSocket {
                         moniker,
                         socket,
-                        tools_url,
+                        tool_urls,
                         command,
                         ns_layout,
                         responder,
                     } => {
                         let mut result =
-                            launch_with_socket(&moniker, socket, tools_url, command, ns_layout)
+                            launch_with_socket(&moniker, socket, tool_urls, command, ns_layout)
                                 .await
                                 .map(|p| {
                                     info!("launched Dash for instance {}", moniker);
