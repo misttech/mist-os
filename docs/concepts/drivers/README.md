@@ -29,13 +29,20 @@ version of the driver framework (DFv2).
    *  [Node topology][node-topology]
    *  [Node lifecycle][node-lifecycle]
    *  [Composite nodes][composite-nodes]
-* [Driver binding][driver-binding]
+*  [Driver binding][driver-binding]
    *  [Binding sequence][binding-sequence]
    *  [Board driver and USB devices][board-driver-and-usb-devices]
-* [Driver communication][driver-communication]
-   *   [Service discovery (using `devfs`)][service-discovery]
-   *   [FIDL communication][fidl-communication]
-* [Mapping a device's memory in a driver][mapping-memory]
+*  [Driver communication][driver-communication]
+   *  [Service discovery (using `devfs`)][service-discovery]
+   *  [FIDL communication][fidl-communication]
+*  [Mapping a device's memory in a driver][mapping-memory]
+   *  [Accessing a device’s memory from a driver][accessing-driver-memory]
+   *  [Generating a VMO for a device][generating-vmo]
+   *  [Mapping a VMO to a VMAR in a driver][mapping-vmo]
+*  [Driver dispatcher and threads][driver-dispatcher]
+   *  [Dispatcher operations][dispatcher-operations]
+   *  [Threading model][threading-model]
+   *  [Lifetime of a dispatcher][lifetime-of-dispatcher]
 
 <!-- Reference links -->
 
@@ -60,3 +67,11 @@ version of the driver framework (DFv2).
 [service-discovery]: driver_communication.md#service_discovery_using_devfs
 [fidl-communication]: driver_communication.md#fidl_communication
 [mapping-memory]: mapping-a-devices-memory-in-a-driver.md
+[accessing-driver-memory]: mapping-a-devices-memory-in-a-driver.md#accessing-devices
+[generating-vmo]: mapping-a-devices-memory-in-a-driver.md#generating-a-vmo-for-a-device
+[mapping-vmo]: mapping-a-devices-memory-in-a-driver.md#mapping-a-vmo-to-a-vmar-in-a-driver
+[driver-dispatcher]: driver-dispatcher-and-threads.md
+[dispatcher-operations]: driver-dispatcher-and-threads.md#dispatcher-operations
+[threading-model]: driver-dispatcher-and-threads.md#threading-model
+[lifetime-of-dispatcher]: driver-dispatcher-and-threads.md#lifetime-dispatcher
+
