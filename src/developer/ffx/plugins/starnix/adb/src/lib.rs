@@ -52,7 +52,7 @@ pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand
         }
     });
 
-    let address = "127.0.0.1:5556";
+    let address = &format!("127.0.0.1:{}", &command.port);
     let listener = TcpListener::bind(address).await.expect("cannot bind to adb address");
     println!("The adb bridge is listening on {}", address);
     println!("To connect: adb connect {}", address);

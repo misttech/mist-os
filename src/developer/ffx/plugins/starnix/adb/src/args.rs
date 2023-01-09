@@ -17,4 +17,7 @@ pub struct AdbStarnixCommand {
     /// the galaxy in which to connect to adb
     #[argh(option, short = 'g', default = "String::from(\"starbionic\")")]
     pub galaxy: String,
+    /// which port to serve the adb server on
+    #[argh(option, short = 'p', default = "5556")]
+    pub port: u16,
 }
