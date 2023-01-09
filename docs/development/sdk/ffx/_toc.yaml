@@ -55,3 +55,7 @@ toc:
   section:
   - title: Explore the memory usage of a system
     path: /docs/development/sdk/ffx/explore-memory-usage.md
+- title: Testing
+  section:
+  - title: Run tests on a device
+    path: /docs/development/sdk/ffx/run-device-tests.md
