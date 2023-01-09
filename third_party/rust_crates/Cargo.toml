@@ -130,7 +130,7 @@ itertools = "0.10"
 itoa = "0.4"
 json5format = "0.2.6"
 lazy_static = "1.4"
-libc = { version = "0.2.116", features = ["extra_traits"] }
+libc = { version = "0.2.138", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 log = { version = "0.4.11", features = ["std"] }
@@ -499,7 +499,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.js-sys."0.3.40"]
 env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=../../third_party/rust_crates/vendor/js-sys-0.3.40" ]
 
-[gn.package.libc."0.2.116"]
+[gn.package.libc."0.2.138"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -508,11 +508,13 @@ rustflags = [
   "--cfg=libc_core_cvoid",
   "--cfg=libc_packedN",
   "--cfg=libc_cfg_target_vendor",
+  "--cfg=libc_int128",
   "--cfg=libc_non_exhaustive",
   "--cfg=libc_ptr_addr_of",
+  "--cfg=libc_underscore_const_names",
  ]
 
-[gn.package.libc."0.2.116".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.138".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.lock_api."0.4.7"]
@@ -638,7 +640,7 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 [gn.package.tokio."1.19.2".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
-  ":libc-v0_2_116",
+  ":libc-v0_2_138",
   ":memchr-v2_4_0",
   ":mio-v0_8_2",
   ":num_cpus-v1_13_0",
