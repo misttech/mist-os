@@ -99,6 +99,13 @@ pub struct DocCheckerArgs {
     /// do not resolve http(s) links
     #[argh(switch)]
     pub local_links_only: bool,
+
+    /// check reference-links. This enables checking for
+    /// reference links that do not have a definition.
+    /// It is off by default until all the markdown can
+    /// pass this check. fxbug.dev/106059.
+    #[argh(switch)]
+    pub check_reference_links: bool,
 }
 
 #[fuchsia::main]
@@ -206,7 +213,7 @@ async fn do_main(opt: DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
     let mut yaml_checks = yaml::register_yaml_checks(&opt)?;
 
     let markdown_errors: Vec<DocCheckError> =
-        check_markdown(&markdown_files, &mut markdown_checks)?;
+        check_markdown(&markdown_files, &mut markdown_checks, opt.check_reference_links)?;
     errors.extend(markdown_errors);
 
     let yaml_errors = check_yaml(&yaml_files, &mut yaml_checks)?;
@@ -244,12 +251,14 @@ async fn do_main(opt: DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
 pub fn check_markdown<'a>(
     files: &[PathBuf],
     checks: &'a mut [Box<dyn DocCheck + 'static>],
+    check_reference_links: bool,
 ) -> Result<Vec<DocCheckError>> {
     let mut errors: Vec<DocCheckError> = vec![];
 
     for mdfile in files {
         let mdcontent = fs::read_to_string(mdfile).expect("Unable to read file");
-        let doc_context = DocContext::new(mdfile.clone(), &mdcontent);
+        let doc_context =
+            DocContext::new_with_checks(mdfile.clone(), &mdcontent, check_reference_links);
 
         for element in doc_context {
             for c in &mut *checks {
@@ -309,6 +318,7 @@ mod test {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            check_reference_links: false,
         };
 
         // Set the current directory to the executable dir so the relative test paths WAI.

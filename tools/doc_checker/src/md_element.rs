@@ -152,9 +152,38 @@ pub struct DocContext<'a> {
 }
 
 impl<'a> DocContext<'a> {
+    fn link_callback(reference: &str, normalized: &str) -> Option<(String, String)> {
+        // TODO(fxbug.dev/118482): Glossary reference links are hard to validate.
+        if !reference.starts_with("glossary.")  &&  
+       // TODO(fxbug.dev/118522): Consider removing [TOC]
+       reference != "TOC" &&
+       // TODO(fxbug.dev/117520): need to check for anchors and classes.
+       !reference.starts_with("#")
+        {
+            Some((reference.to_string(), normalized.to_string()))
+        } else {
+            None
+        }
+    }
+
+    #[cfg(test)]
     pub fn new(filename: PathBuf, text: &'a str) -> DocContext<'a> {
+        Self::new_with_checks(filename, text, false)
+    }
+
+    pub fn new_with_checks(
+        filename: PathBuf,
+        text: &'a str,
+        check_reference_links: bool,
+    ) -> DocContext<'a> {
         let options = Options::empty();
-        DocContext { file_name: filename, line_num: 1, parser: Parser::new_ext(text, options) }
+        let cb: Option<&'a dyn Fn(&str, &str) -> Option<(String, String)>> =
+            if check_reference_links { Some(&Self::link_callback) } else { None };
+        DocContext {
+            file_name: filename,
+            line_num: 1,
+            parser: Parser::new_with_broken_link_callback(text, options, cb),
+        }
     }
 
     pub fn line(&self) -> DocLine {

@@ -120,7 +120,7 @@ impl LinkChecker {
         // External links that have any query parameters are decoded when parsed by the markdown parser.
         // To make things easier later, parse the URL and use the encoded parameters.
         if link.starts_with("http://") || link.starts_with("https://") {
-            let url: Url = Url::parse(link)?;
+            let url = Url::parse(link).or_else(|e| bail!("Could not parse url {}: {}", link, e))?;
             if let Some(query) = url.query() {
                 // split on ? from the original string, to avoid complexities
                 // to to-stringizing a url without the query params.
@@ -148,7 +148,13 @@ impl LinkChecker {
             // and hope for the best. This usually is something relative like "details-subdir/info.md"
             let uri: Uri = match link.parse() {
                 Ok(u) => u,
-                Err(_e) => format!("{}/{}", relative_parent.to_string_lossy(), link).parse()?,
+                Err(_e) => {
+                    let parent_based_link =
+                        format!("{}/{}", relative_parent.to_string_lossy(), link);
+                    parent_based_link.parse::<Uri>().or_else(|e| {
+                        bail!("Cannot parse parent based uri: {}: {}", parent_based_link, e)
+                    })?
+                }
             };
 
             // Check the scheme. If there is one, use it.
@@ -178,15 +184,89 @@ impl DocCheck for LinkChecker {
         if let Some(links) = element.get_links() {
             for ele in links {
                 let link: &'a CowStr<'a> = match ele {
-                    Element::Link(link_type, link_url, _, _, _) => {
-                        if link_type == &LinkType::Email || link_url.starts_with("mailto:") {
+                    Element::Link(link_type, link_url, link_title, _, _) => {
+                        let link = match link_type {
+                            LinkType::Inline => link_url,
+                            LinkType::Reference => link_url,
+                            LinkType::ReferenceUnknown => {
+                                errors.push(DocCheckError::new_error_helpful(
+                                    ele.doc_line().line_num,
+                                    ele.doc_line().file_name.clone(),
+                                    &format!(
+                                        "Unknown reference link to {} ({})",
+                                        link_url, link_title
+                                    ),
+                                &format!(
+                                    "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
+                                link_url)));
+                                link_url
+                            }
+                            LinkType::Collapsed => link_url,
+                            LinkType::CollapsedUnknown => {
+                                errors.push(DocCheckError::new_error(
+                                    ele.doc_line().line_num,
+                                    ele.doc_line().file_name.clone(),
+                                    &format!(
+                                        "Unknown collapsed link to {} ({})",
+                                        link_url, link_title
+                                    ),
+                                ));
+                                link_url
+                            }
+                            LinkType::Shortcut => link_url,
+                            LinkType::ShortcutUnknown => {
+                                errors.push(DocCheckError::new_error(
+                                    ele.doc_line().line_num,
+                                    ele.doc_line().file_name.clone(),
+                                    &format!(
+                                        "Unknown shortcut link to {} ({})",
+                                        link_url, link_title
+                                    ),
+                                ));
+                                link_url
+                            }
+                            LinkType::Autolink => link_url,
+                            LinkType::Email => return Ok(None),
+                        };
+                        if link.starts_with("mailto:") {
                             // do nothing.
                             return Ok(None);
                         }
-                        link_url
+                        link
                     }
-                    Element::Image(link_type, link_url, _, _, _) => {
-                        if link_type == &LinkType::Email || link_url.starts_with("mailto:") {
+                    Element::Image(link_type, link_url, link_title, _, _) => {
+                        let link = match link_type {
+                            LinkType::Inline => link_url,
+                            LinkType::Reference => link_url,
+                            LinkType::ReferenceUnknown => {
+                                errors.push(DocCheckError::new_error(
+                                    ele.doc_line().line_num,
+                                    ele.doc_line().file_name.clone(),
+                                    &format!(
+                                        "Unknown image reference link to {} ({})",
+                                        link_url, link_title
+                                    ),
+                                ));
+                                link_url
+                            }
+                            LinkType::Collapsed => link_url,
+                            LinkType::CollapsedUnknown => todo!(),
+                            LinkType::Shortcut => link_url,
+                            LinkType::ShortcutUnknown => {
+                                errors.push(DocCheckError::new_error(
+                                    ele.doc_line().line_num,
+                                    ele.doc_line().file_name.clone(),
+                                    &format!(
+                                        "Unknown image shortcut link to {} ({})",
+                                        link_url, link_title
+                                    ),
+                                ));
+                                link_url
+                            }
+                            LinkType::Autolink => link_url,
+                            LinkType::Email => return Ok(None),
+                        };
+                        if link.starts_with("mailto:") {
                             // do nothing.
                             return Ok(None);
                         }
@@ -202,14 +282,28 @@ impl DocCheck for LinkChecker {
                                 ),
                             ))
                         }
-                        link_url
+                        link
                     }
                     _ => {
                         return Ok(None);
                     }
                 };
 
-                let link_to_check = self.make_link_to_check(&element.doc_line().file_name, link)?;
+                let link_to_check =
+                    match self.make_link_to_check(&element.doc_line().file_name, link) {
+                        Ok(link) => link,
+                        Err(e) => {
+                            errors.push(DocCheckError::new_error(
+                                element.doc_line().line_num,
+                                element.doc_line().file_name,
+                                &e.to_string(),
+                            ));
+                            String::from("")
+                        }
+                    };
+                if link_to_check.is_empty() {
+                    continue;
+                }
 
                 let saw_error = do_check_link(&element.doc_line(), &link_to_check, &self.project)?
                     .map(|err| errors.push(err))
@@ -389,7 +483,10 @@ pub(crate) fn is_intree_link(
         (filepath, _) = filepath.split_once('?').unwrap_or((filepath, ""));
         return Ok(Some(PathBuf::from(filepath)));
     } else if link_to_check.starts_with(&format!("https://{}/{}", GERRIT_HOST, project)) {
-        let uri: Uri = link_to_check.parse::<Uri>()?;
+        let uri: Uri = match link_to_check.parse::<Uri>() {
+            Ok(uri) => uri,
+            Err(e) => bail!("Invalid Url {}: {:?}", link_to_check, e),
+        };
         let parts = uri.path().split('/').collect::<Vec<&str>>();
         if parts.len() <= 3 {
             let p = parts.join("/");
@@ -743,6 +840,7 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            check_reference_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -797,6 +895,7 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            check_reference_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;

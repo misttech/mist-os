@@ -57,8 +57,10 @@ fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> 
         Start(Tag::CodeBlock(code)) => read_codeblock(code, doc_context),
         Start(Tag::List(starting)) => read_list(starting, doc_context),
         Start(Tag::Item) => read_block(Tag::Item, doc_context),
-        Start(Tag::FootnoteDefinition(text)) => read_footnote(text, doc_context),
-        Start(Tag::Table(alignment)) => read_table(alignment, doc_context),
+        Start(Tag::FootnoteDefinition(text)) => {
+            read_block(Tag::FootnoteDefinition(text), doc_context)
+        }
+        Start(Tag::Table(alignment)) => read_block(Tag::Table(alignment), doc_context), //read_table(alignment, doc_context),
         Start(Tag::TableCell) => read_block(Tag::TableCell, doc_context),
         Start(Tag::TableHead) => read_block(Tag::TableHead, doc_context),
         Start(Tag::TableRow) => read_block(Tag::TableRow, doc_context),
@@ -132,20 +134,6 @@ fn read_link<'a>(
 
     // This should not happen, so not sure how to handle it happening?
     panic!("{:?} {} {} has no end?", link_type, link_url, title);
-}
-
-fn read_table<'a>(
-    _alignment: Vec<pulldown_cmark::Alignment>,
-    _doc_context: &mut DocContext<'a>,
-) -> Element<'a> {
-    todo!()
-}
-
-fn read_footnote<'a>(
-    _text: pulldown_cmark::CowStr<'a>,
-    _doc_context: &mut DocContext<'a>,
-) -> Element<'a> {
-    todo!()
 }
 
 fn read_list<'a>(starting: Option<u64>, doc_context: &mut DocContext<'a>) -> Element<'a> {
