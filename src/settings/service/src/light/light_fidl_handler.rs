@@ -162,7 +162,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_response_to_vector_empty() {
         let response: Vec<fidl_fuchsia_settings::LightGroup> =
             SettingInfo::into((LightInfo { light_groups: Default::default() }).into());
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(response, vec![]);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_response_to_vector() {
         let light_group_1 = LightGroup {
             name: "test".to_string(),

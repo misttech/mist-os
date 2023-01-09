@@ -103,7 +103,7 @@ mod tests {
     use fidl_fuchsia_settings::{KeyboardMarker, KeyboardRequestStream};
     use futures::StreamExt;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let request = to_request(KeyboardSettings::EMPTY).unwrap();
 
@@ -113,7 +113,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_error() {
         let mut keyboard_settings = KeyboardSettings::EMPTY;
         keyboard_settings.keymap = Some(fidl_fuchsia_input::KeymapId::unknown());
@@ -122,7 +122,7 @@ mod tests {
             .contains("Received an invalid keymap id:"));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings() {
         use crate::keyboard::types::Autorepeat;
 

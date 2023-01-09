@@ -327,7 +327,7 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::FutureExt;
 
-    #[test]
+    #[fuchsia::test]
     fn test_id_generation() {
         let mut generator = IdGenerator::new();
         // Ensure generator is creating unique ids

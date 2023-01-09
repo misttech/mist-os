@@ -98,7 +98,7 @@ mod tests {
     use fidl_fuchsia_settings::{FactoryResetMarker, FactoryResetRequestStream};
     use futures::StreamExt;
 
-    #[test]
+    #[fuchsia::test]
     fn to_request_maps_correctly() {
         let result = to_request(FactoryResetSettings {
             is_local_reset_allowed: Some(true),

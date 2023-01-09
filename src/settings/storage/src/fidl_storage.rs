@@ -531,7 +531,7 @@ mod tests {
         assert_eq!(result.value, VALUE0);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_first_write_syncs_immediately() {
         let written_value = VALUE1;
         let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
@@ -610,7 +610,7 @@ mod tests {
         assert_eq!(data, value_to_write);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_second_write_syncs_after_interval() {
         let written_value = VALUE1;
         let second_value = VALUE2;
@@ -846,7 +846,7 @@ mod tests {
 
     // Test that multiple writes to FidlStorage will cause a write each time, but will only
     // sync to the fs at an interval.
-    #[test]
+    #[fuchsia::test]
     fn test_multiple_write_debounce() {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.

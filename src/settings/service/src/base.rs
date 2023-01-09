@@ -282,7 +282,7 @@ mod tests {
     use super::*;
 
     #[allow(clippy::bool_assert_comparison)]
-    #[test]
+    #[fuchsia::test]
     fn test_dependency_fulfillment() {
         let target_entity = Entity::Handler(SettingType::Unknown);
         let dependency = Dependency::Entity(target_entity);

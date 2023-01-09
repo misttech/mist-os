@@ -17,7 +17,7 @@ mod tests {
     use super::round_volume_level;
 
     // Various tests to verify rounding works as expected.
-    #[test]
+    #[fuchsia::test]
     // We're testing rounding so we want explicit float comparisons.
     #[allow(clippy::float_cmp)]
     fn test_round_volume() {
@@ -30,7 +30,7 @@ mod tests {
     }
 
     // Verifies that values below 0.0 round to 0.0.
-    #[test]
+    #[fuchsia::test]
     // We're testing rounding so we want explicit float comparisons.
     #[allow(clippy::float_cmp)]
     fn test_round_volume_below_range() {
@@ -41,7 +41,7 @@ mod tests {
     }
 
     // Verifies that values above 1.0 round to 1.0.
-    #[test]
+    #[fuchsia::test]
     // We're testing rounding so we want explicit float comparisons.
     #[allow(clippy::float_cmp)]
     fn test_round_volume_above_range() {

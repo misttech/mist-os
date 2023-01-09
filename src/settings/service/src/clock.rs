@@ -53,7 +53,7 @@ pub(crate) mod mock {
 mod tests {
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_inspect_format() {
         mock::set(Time::from_nanos(0));
         assert_eq!(String::from("0.000000000"), mock::inspect_format_now());

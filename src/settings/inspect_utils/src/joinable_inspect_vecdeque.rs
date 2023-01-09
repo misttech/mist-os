@@ -49,7 +49,7 @@ mod tests {
     }
 
     // Tests that adding and removing from JoinableInspectVecDeque updates the inspect tree.
-    #[test]
+    #[fuchsia::test]
     fn test_vec_deque() {
         let inspector = Inspector::new();
 

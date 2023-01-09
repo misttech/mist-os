@@ -28,6 +28,8 @@ rustc_library("settings_inspect_utils") {
     "//src/lib/diagnostics/inspect/rust",
   ]
 
+  test_deps = [ "//src/lib/fuchsia" ]
+
   sources = [
     "src/joinable_inspect_vecdeque.rs",
     "src/lib.rs",

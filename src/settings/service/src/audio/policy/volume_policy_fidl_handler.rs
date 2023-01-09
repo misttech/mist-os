@@ -133,7 +133,7 @@ mod tests {
 
     // Verifies that converting a policy response containing an empty `State` into a vector of
     // `Property` results in an empty vector.
-    #[test]
+    #[fuchsia::test]
     fn test_response_to_property_vector_empty() {
         let response = Ok(response::Payload::PolicyInfo(PolicyInfo::Audio(State {
             properties: Default::default(),
@@ -147,7 +147,7 @@ mod tests {
 
     // Verifies that converting a policy response with several State objects into a vector of
     // `Property` results in a vector with the correct representations of data.
-    #[test]
+    #[fuchsia::test]
     fn test_response_to_property_vector() {
         let property1 = Property::new(AudioStreamType::Background, TransformFlags::TRANSFORM_MAX);
         let property2 = Property::new(AudioStreamType::Media, TransformFlags::TRANSFORM_MIN);

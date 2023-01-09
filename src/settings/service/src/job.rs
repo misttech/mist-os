@@ -487,7 +487,7 @@ mod tests {
     use assert_matches::assert_matches;
     use rand::Rng;
 
-    #[test]
+    #[fuchsia::test]
     fn test_id_generation() {
         let mut generator = IdGenerator::new();
         // Ensure generator creates subsequent ids that don't match.

@@ -664,7 +664,7 @@ mod tests {
     }
 
     // Verifies that stash flush failures are written to inspect.
-    #[test]
+    #[fuchsia::test]
     fn test_flush_fail_writes_to_inspect() {
         let written_value = VALUE2;
         let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
@@ -744,7 +744,7 @@ mod tests {
 
     // Test that an initial write to DeviceStorage causes a SetValue and Flush to Stash
     // without any wait.
-    #[test]
+    #[fuchsia::test]
     fn test_first_write_flushes_immediately() {
         let written_value = VALUE2;
         let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
@@ -850,7 +850,7 @@ mod tests {
 
     // Test that multiple writes to DeviceStorage will cause a SetValue each time, but will only
     // Flush to Stash at an interval.
-    #[test]
+    #[fuchsia::test]
     fn test_multiple_write_debounce() {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
@@ -1002,7 +1002,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_device_compatible_custom_migration() {
         // Create an initial struct based on the first version.
         let initial = test_device_compatible_migration::V1::default_value();

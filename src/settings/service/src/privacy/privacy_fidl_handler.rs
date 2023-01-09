@@ -89,14 +89,14 @@ mod tests {
     use fidl_fuchsia_settings::{PrivacyMarker, PrivacyRequestStream};
     use futures::StreamExt;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let request = to_request(PrivacySettings::EMPTY);
 
         assert_eq!(request, Request::SetUserDataSharingConsent(None));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings() {
         const USER_DATA_SHARING_CONSENT: bool = true;
 

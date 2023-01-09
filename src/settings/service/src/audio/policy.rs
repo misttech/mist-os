@@ -397,7 +397,7 @@ mod tests {
 
     // Verifies that using `TryFrom` to convert a `PolicyParameters` into a `Transform` will fail
     // if the source did not have required parameters specified.
-    #[test]
+    #[fuchsia::test]
     fn parameter_to_transform_missing_arguments() {
         let max_params = PolicyParameters::Max(Volume { volume: None, ..Volume::EMPTY });
         let min_params = PolicyParameters::Min(Volume { volume: None, ..Volume::EMPTY });
@@ -408,7 +408,7 @@ mod tests {
 
     // Verifies that using `TryFrom` to convert a `PolicyParameters` into a `Transform` will fail
     // if the source did not have a finite number.
-    #[test]
+    #[fuchsia::test]
     fn parameter_to_transform_invalid_arguments() {
         let max_params =
             PolicyParameters::Max(Volume { volume: Some(f32::NEG_INFINITY), ..Volume::EMPTY });
@@ -420,7 +420,7 @@ mod tests {
 
     // Verifies that using `TryFrom` to convert a `PolicyParameters` into a `Transform` succeeds
     // and that the result contains the same parameters as the source.
-    #[test]
+    #[fuchsia::test]
     fn parameter_to_transform() {
         let max_volume = 0.5;
         let min_volume = 0.5;
@@ -435,7 +435,7 @@ mod tests {
 
     // Verifies that the audio policy state builder functions correctly for adding targets and
     // transforms.
-    #[test]
+    #[fuchsia::test]
     fn test_state_builder() {
         let properties: HashMap<AudioStreamType, TransformFlags> = [
             (AudioStreamType::Background, TransformFlags::TRANSFORM_MAX),
@@ -472,7 +472,7 @@ mod tests {
     }
 
     // Verifies that the next ID for a new transform is 1 when the state is empty.
-    #[test]
+    #[fuchsia::test]
     fn test_state_next_id_when_empty() {
         let state = StateBuilder::new()
             .add_property(AudioStreamType::Background, TransformFlags::TRANSFORM_MAX)
@@ -482,7 +482,7 @@ mod tests {
     }
 
     // Verifies that the audio policy state produces increasing IDs when adding transforms.
-    #[test]
+    #[fuchsia::test]
     fn test_state_add_transform_ids_increasing() {
         let target = AudioStreamType::Background;
         let mut state =
@@ -502,7 +502,7 @@ mod tests {
     }
 
     // Verifies that the audio policy state rounds volume limit levels.
-    #[test]
+    #[fuchsia::test]
     fn test_state_add_transform_inputs_rounded() {
         // Test various starting volumes to make sure rounding works.
         let mut input_volume_limit = 0.0;
@@ -516,7 +516,7 @@ mod tests {
     }
 
     // Verifies that the audio policy state clamps volume limit levels.
-    #[test]
+    #[fuchsia::test]
     fn test_state_add_transform_inputs_clamped() {
         let min_volume = 0.0;
         let max_volume = 1.0;
@@ -534,7 +534,7 @@ mod tests {
     }
 
     // Verifies that adding transforms to policy properties works.
-    #[test]
+    #[fuchsia::test]
     fn test_property_transforms() {
         let supported_transforms = TransformFlags::TRANSFORM_MAX | TransformFlags::TRANSFORM_MIN;
         let transforms = [Transform::Min(0.1), Transform::Max(0.9)];

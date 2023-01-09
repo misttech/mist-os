@@ -331,7 +331,7 @@ async fn test_watch() {
 }
 
 // Test that a set then watch for the mic is executed correctly.
-#[test]
+#[fuchsia::test]
 fn test_set_watch_mic_mute() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_config_muted(), None);
     let input_proxy = env.input_service.clone();
@@ -390,7 +390,7 @@ fn test_set_watch_mic_mute() {
 }
 
 // Test that a set then watch for the camera is executed correctly.
-#[test]
+#[fuchsia::test]
 fn test_set_watch_camera_disable() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_cam_config(), None);
     let input_proxy = env.input_service.clone();
@@ -443,7 +443,7 @@ fn test_set_watch_camera_disable() {
 }
 
 // Test to ensure mic input change events are received.
-#[test]
+#[fuchsia::test]
 fn test_mic_input() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_config(), None);
     let input_proxy = env.input_service.clone();
@@ -467,7 +467,7 @@ fn test_mic_input() {
 }
 
 // Test to ensure camera input change events are received.
-#[test]
+#[fuchsia::test]
 fn test_camera_input() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_cam_config(), None);
     let input_proxy = env.input_service.clone();
@@ -494,7 +494,7 @@ fn test_camera_input() {
 
 // Test to ensure camera sw state is not changed on camera3 api
 // when the hw state is changed.
-#[test]
+#[fuchsia::test]
 fn test_camera3_hw_change() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_cam_config(), None);
     let mut media_buttons_receptor = create_broker(&mut executor, env.delegate.clone());
@@ -537,7 +537,7 @@ async fn test_camera3_sw_change() {
 
 // Test that when either hardware or software is muted, the service
 // reports the microphone as muted.
-#[test]
+#[fuchsia::test]
 fn test_mic_mute_combinations() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_config(), None);
     let input_proxy = env.input_service.clone();
@@ -609,7 +609,7 @@ fn test_mic_mute_combinations() {
 
 // Test that when either hardware or software is disabled, the service
 // reports the camera as disabled.
-#[test]
+#[fuchsia::test]
 fn test_camera_disable_combinations() {
     let (mut executor, env) = create_env_and_executor_with_config(default_mic_cam_config(), None);
     let input_proxy = env.input_service.clone();
@@ -707,7 +707,7 @@ async fn test_bringup_without_input_registry() {
 }
 
 // Test that cloning works.
-#[test]
+#[fuchsia::test]
 fn test_input_info_copy() {
     let input_info = create_default_input_info();
     let copy_input_info = input_info.clone();

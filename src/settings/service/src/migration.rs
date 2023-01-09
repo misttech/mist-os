@@ -568,7 +568,7 @@ mod tests {
     const COBALT_ID2: u32 = 100;
     const DATA_FILE_NAME: &str = "test_20220130120000.pfidl";
 
-    #[test]
+    #[fuchsia::test]
     fn cannot_register_same_id_twice() {
         let mut builder = MigrationManagerBuilder::new();
         builder
@@ -581,7 +581,7 @@ mod tests {
         assert_eq!(result.unwrap_err(), "migration with id 20220130120000 already registered");
     }
 
-    #[test]
+    #[fuchsia::test]
     #[should_panic(expected = "dir proxy must be provided")]
     fn cannot_build_migration_manager_without_dir_proxy() {
         let builder = MigrationManagerBuilder::new();

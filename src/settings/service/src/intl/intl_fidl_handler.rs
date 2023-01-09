@@ -89,7 +89,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let request = Request::from(IntlSettings::EMPTY);
 
@@ -104,7 +104,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings() {
         const TIME_ZONE_ID: &str = "PDT";
 

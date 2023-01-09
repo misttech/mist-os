@@ -91,7 +91,7 @@ mod tests {
     use crate::keyboard::types::KeymapId;
     use std::convert::TryFrom;
 
-    #[test]
+    #[fuchsia::test]
     fn test_try_from_keymapid() {
         assert!(KeymapId::try_from(fidl_fuchsia_input::KeymapId::UsQwerty).is_ok());
 

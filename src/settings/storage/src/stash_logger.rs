@@ -80,7 +80,7 @@ mod tests {
     use fuchsia_inspect::assert_data_tree;
 
     // Verify that the StashInspectLogger accumulates failure counts to inspect.
-    #[test]
+    #[fuchsia::test]
     fn test_stash_logger() {
         let mut logger = StashInspectLogger::new();
 

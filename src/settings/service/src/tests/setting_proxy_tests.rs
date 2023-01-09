@@ -368,7 +368,7 @@ async fn test_message_hub_presence() {
         .expect("should have result"));
 }
 
-#[test]
+#[fuchsia::test]
 fn test_notify() {
     let mut executor =
         fasync::TestExecutor::new_with_fake_time().expect("Failed to create executor");
@@ -713,7 +713,7 @@ async fn inspect_errors_roll_after_limit() {
     });
 }
 
-#[test]
+#[fuchsia::test]
 fn test_regeneration() {
     let setting_type = SettingType::Unknown;
 
@@ -831,7 +831,7 @@ fn test_regeneration() {
 
 // Exercises the retry flow, ensuring the setting proxy goes through the
 // defined number of tests and correctly reports back activity.
-#[test]
+#[fuchsia::test]
 fn test_retry() {
     let setting_type = SettingType::Unknown;
     async fn run_retries(setting_type: SettingType) -> (TestEnvironment, message::Receptor) {
@@ -1072,7 +1072,7 @@ async fn test_early_exit() {
 }
 
 // Ensures timeouts trigger retry flow.
-#[test]
+#[fuchsia::test]
 fn test_timeout() {
     let mut executor =
         fuchsia_async::TestExecutor::new_with_fake_time().expect("Failed to create executor");
@@ -1179,7 +1179,7 @@ fn test_timeout() {
 }
 
 // Ensures that timeouts cause an error when retry is not enabled for them.
-#[test]
+#[fuchsia::test]
 fn test_timeout_no_retry() {
     let mut executor =
         fuchsia_async::TestExecutor::new_with_fake_time().expect("Failed to create executor");

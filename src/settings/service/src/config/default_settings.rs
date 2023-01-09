@@ -194,7 +194,7 @@ pub(crate) mod testing {
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_config_inspect_write() {
         clock::mock::set(Time::from_nanos(0));
 

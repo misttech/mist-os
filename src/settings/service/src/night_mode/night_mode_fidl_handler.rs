@@ -98,14 +98,14 @@ mod tests {
     use fidl_fuchsia_settings::{NightModeMarker, NightModeRequestStream};
     use futures::StreamExt;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let request = to_request(NightModeSettings::EMPTY);
         let night_mode_info = NightModeInfo::empty();
         assert_eq!(request, Request::SetNightModeInfo(night_mode_info));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings() {
         const NIGHT_MODE_ENABLED: bool = true;
 

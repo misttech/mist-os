@@ -266,7 +266,7 @@ mod tests {
     };
 
     // Verifies that an entirely empty settings request results in an appropriate error.
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let id = ftrace::Id::new();
         let request = to_request(AudioSettings::EMPTY, id);
@@ -275,7 +275,7 @@ mod tests {
     }
 
     // Verifies that a settings request missing user volume info results in an appropriate error.
-    #[test]
+    #[fuchsia::test]
     fn test_request_missing_user_volume() {
         let mut stream = TEST_STREAM.clone();
         stream.user_volume = None;
@@ -289,7 +289,7 @@ mod tests {
     }
 
     // Verifies that a settings request missing the stream type results in an appropriate error.
-    #[test]
+    #[fuchsia::test]
     fn test_request_missing_stream_type() {
         let mut stream = TEST_STREAM.clone();
         stream.stream = None;
@@ -303,7 +303,7 @@ mod tests {
     }
 
     // Verifies that a settings request missing the source results in an appropriate error.
-    #[test]
+    #[fuchsia::test]
     fn test_request_missing_source() {
         let mut stream = TEST_STREAM.clone();
         stream.source = None;
@@ -318,7 +318,7 @@ mod tests {
 
     // Verifies that a settings request missing both the user volume level and mute state results in
     // an appropriate error.
-    #[test]
+    #[fuchsia::test]
     fn test_request_missing_user_volume_level_and_muted() {
         let mut stream = TEST_STREAM.clone();
         stream.user_volume = Some(Volume { level: None, muted: None, ..Volume::EMPTY });

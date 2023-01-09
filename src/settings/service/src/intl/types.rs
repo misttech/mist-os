@@ -162,7 +162,7 @@ mod tests {
     const TIME_ZONE_ID: &str = "PDT";
     const LOCALE_ID: &str = "en_us";
 
-    #[test]
+    #[fuchsia::test]
     fn fidl_storage_convertible_from_storable_empty() {
         let info = IntlInfo::from_storable(IntlSettings::EMPTY);
 
@@ -177,7 +177,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn fidl_storage_convertible_from_storable() {
         let intl_settings = IntlSettings {
             locales: Some(vec![fidl_fuchsia_intl::LocaleId { id: LOCALE_ID.into() }]),
@@ -200,7 +200,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn fidl_storage_convertible_to_storable_empty() {
         let info = IntlInfo {
             locales: None,
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(storable, IntlSettings::EMPTY,);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn fidl_storage_convertible_to_storable() {
         let info = IntlInfo {
             locales: Some(vec![LocaleId { id: LOCALE_ID.into() }]),

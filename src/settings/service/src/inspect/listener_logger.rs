@@ -74,7 +74,7 @@ mod tests {
     use crate::ListenerInspectLogger;
     use fuchsia_inspect::assert_data_tree;
 
-    #[test]
+    #[fuchsia::test]
     fn test_listener_logger() {
         let inspector = inspect::Inspector::new();
 

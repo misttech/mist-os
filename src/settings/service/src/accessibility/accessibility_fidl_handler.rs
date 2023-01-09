@@ -110,7 +110,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_try_from_settings_request_empty() {
         let request = to_request(AccessibilitySettings::EMPTY);
 
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(request, Request::SetAccessibilityInfo(EXPECTED_ACCESSIBILITY_INFO));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_try_from_settings_request() {
         const TEST_COLOR: ColorRgba =
             ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 };

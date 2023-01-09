@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(v2.input.mic_mute, updated_mic_mute_val);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_audio_info_migration_v2_to_current() {
         let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
 
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(current, AudioInfo::default_value());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_audio_info_migration_v1_to_current() {
         let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
 

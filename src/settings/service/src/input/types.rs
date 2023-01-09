@@ -556,7 +556,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_state_manipulation() {
         let mut input_state = InputState::new();
 
@@ -671,7 +671,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_configuration_to_input_state() {
         let config = InputConfiguration {
             devices: vec![
@@ -758,7 +758,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     /// Test that the combination of the input device's source states results
     /// in the correct overall device state.
     fn test_overall_state() {
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!(mic_error.state, DeviceState::ERROR);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_device_to_fidl_input_device() {
         let expected_mic: FidlInputDevice = create_fidl_input_device(
             DEFAULT_MIC_NAME,
@@ -855,13 +855,13 @@ mod tests {
         verify_fidl_input_device_eq(cam_res, expected_cam);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_device_type_to_string() {
         assert_eq!(InputDeviceType::CAMERA.to_string(), DEFAULT_CAMERA_NAME);
         assert_eq!(InputDeviceType::MICROPHONE.to_string(), DEFAULT_MIC_NAME);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_fidl_device_type_to_device_type() {
         let cam_res: FidlDeviceType = InputDeviceType::CAMERA.into();
         let mic_res: FidlDeviceType = InputDeviceType::MICROPHONE.into();
@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(mic_res, FidlDeviceType::Microphone);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_device_type_to_fidl_device_type() {
         let cam_res: InputDeviceType = FidlDeviceType::Camera.into();
         let mic_res: InputDeviceType = FidlDeviceType::Microphone.into();
@@ -877,7 +877,7 @@ mod tests {
         assert_eq!(mic_res, InputDeviceType::MICROPHONE);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_fidl_device_state_source_to_device_state_source() {
         let hw_res: FidlDeviceStateSource = DeviceStateSource::HARDWARE.into();
         let sw_res: FidlDeviceStateSource = DeviceStateSource::SOFTWARE.into();
@@ -885,7 +885,7 @@ mod tests {
         assert_eq!(sw_res, FidlDeviceStateSource::Software);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_device_state_source_to_fidl_device_state_source() {
         let hw_res: DeviceStateSource = FidlDeviceStateSource::Hardware.into();
         let sw_res: DeviceStateSource = FidlDeviceStateSource::Software.into();
@@ -893,7 +893,7 @@ mod tests {
         assert_eq!(sw_res, DeviceStateSource::SOFTWARE);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_device_state_errors() {
         let available_disabled = DeviceState::from_bits(9).unwrap();
         let available_muted = DeviceState::from_bits(5).unwrap();
@@ -905,7 +905,7 @@ mod tests {
         assert!(active_disabled.has_error());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_fidl_device_state_to_device_state() {
         let device_state: DeviceState = FidlDeviceState {
             toggle_flags: FidlToggleFlags::from_bits(MUTED_BITS),
@@ -915,7 +915,7 @@ mod tests {
         assert_eq!(device_state, DeviceState::from_bits(MUTED_BITS).unwrap(),);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_device_state_to_fidl_device_state() {
         let fidl_device_state: FidlDeviceState = DeviceState::from_bits(MUTED_BITS).unwrap().into();
         assert_eq!(

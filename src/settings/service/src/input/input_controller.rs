@@ -503,7 +503,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_migration_v1_to_current() {
         const MUTED_MIC: Microphone = Microphone { muted: true };
         let mut v1 = InputInfoSourcesV1::default_value();
@@ -527,7 +527,7 @@ mod tests {
         assert_eq!(current.input_device_state, expected_input_state);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_migration_v1_to_v2() {
         const MUTED_MIC: Microphone = Microphone { muted: true };
         let mut v1 = InputInfoSourcesV1::default_value();
@@ -541,7 +541,7 @@ mod tests {
         assert_eq!(v2.input_device_state, InputState::new());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_input_migration_v2_to_current() {
         const DEFAULT_CAMERA_NAME: &str = "camera";
         const MUTED_MIC: Microphone = Microphone { muted: true };

@@ -110,7 +110,7 @@ async fn test_camera_agent_proxy() {
 
 // Tests that an error is returned if the camera watcher cannot find a camera device
 // after the timeout is reached.
-#[test]
+#[fuchsia::test]
 fn test_camera_devices_watcher_timeout() {
     // Custom executor for this test so that we can advance the clock arbitrarily and verify the
     // state of the executor at any given point.

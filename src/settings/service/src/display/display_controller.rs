@@ -579,7 +579,7 @@ impl DeviceStorageCompatible for DisplayInfoV5 {
 mod tests {
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v1_to_v2() {
         let v1 = DisplayInfoV1 {
             manual_brightness_value: 0.6,
@@ -601,7 +601,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v2_to_v3() {
         let v2 = DisplayInfoV2 {
             manual_brightness_value: 0.7,
@@ -625,7 +625,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v3_to_v4() {
         let v3 = DisplayInfoV3 {
             manual_brightness_value: 0.7,
@@ -651,7 +651,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v4_to_v5() {
         let v4 = DisplayInfoV4 {
             manual_brightness_value: 0.7,
@@ -676,7 +676,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v1_to_current() {
         let v1 = DisplayInfoV1 {
             manual_brightness_value: 0.6,
@@ -701,7 +701,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v2_to_current() {
         let v2 = DisplayInfoV2 {
             manual_brightness_value: 0.6,
@@ -727,7 +727,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v3_to_current() {
         let v3 = DisplayInfoV3 {
             manual_brightness_value: 0.6,
@@ -754,7 +754,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v4_to_current() {
         let v4 = DisplayInfoV4 {
             manual_brightness_value: 0.6,
@@ -780,7 +780,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_display_migration_v5_to_current() {
         let v5 = DisplayInfoV5 {
             manual_brightness_value: 0.6,

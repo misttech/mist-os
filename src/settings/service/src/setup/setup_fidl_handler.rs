@@ -144,7 +144,7 @@ mod tests {
     use fidl_fuchsia_settings::{SetupMarker, SetupRequestStream};
     use futures::StreamExt;
 
-    #[test]
+    #[fuchsia::test]
     fn test_request_from_settings() {
         const CONFIGURATION_INTERFACES: Option<fidl_fuchsia_settings::ConfigurationInterfaces> =
             Some(fidl_fuchsia_settings::ConfigurationInterfaces::ETHERNET);

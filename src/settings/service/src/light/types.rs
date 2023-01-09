@@ -239,7 +239,7 @@ mod tests {
     use crate::light::types::ColorRgb;
     use std::convert::TryFrom;
 
-    #[test]
+    #[fuchsia::test]
     fn test_try_from_rgb() {
         assert!(fidl_fuchsia_hardware_light::Rgb::try_from(ColorRgb {
             red: -0.0,
