@@ -16,6 +16,7 @@ driver_bind_rules("metadata-test-bind") {
 
 fidl("fuchsia.device.manager.test") {
   sources = [ "metadata.test.fidl" ]
+  enable_c = true
 }
 
 fuchsia_driver("isolateddevmgr-test-driver-driver") {

@@ -8,4 +8,5 @@ fidl("fuchsia.hardware.ethernet") {
   sdk_category = "internal"
   sources = [ "ethernet.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

@@ -8,4 +8,5 @@ fidl("fuchsia.hardware.temperature") {
   sdk_category = "partner"
   sources = [ "temperature.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

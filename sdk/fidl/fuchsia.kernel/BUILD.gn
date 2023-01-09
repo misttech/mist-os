@@ -31,4 +31,5 @@ fidl("fuchsia.kernel") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+  enable_c = true
 }

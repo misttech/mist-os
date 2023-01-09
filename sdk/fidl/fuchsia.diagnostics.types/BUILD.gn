@@ -8,4 +8,5 @@ fidl("fuchsia.diagnostics.types") {
   sdk_category = "partner"
   sources = [ "component.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

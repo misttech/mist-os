@@ -8,4 +8,5 @@ fidl("fuchsia.data") {
   sdk_category = "partner"
 
   sources = [ "data.fidl" ]
+  enable_c = true
 }

@@ -30,6 +30,7 @@ test("fidl-utils") {
 fidl("fidl.test.fidlutils") {
   visibility = [ ":*" ]
   sources = [ "binding_tests.fidl" ]
+  enable_c = true
 }
 
 fuchsia_unittest_package("fidl-utils-test-pkg") {

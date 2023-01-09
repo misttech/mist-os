@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.usb.virtual.bus") {
 
   sources = [ "usb-virtual-bus.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

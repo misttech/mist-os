@@ -12,4 +12,5 @@ fidl("fuchsia.hardware.bluetooth") {
   ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

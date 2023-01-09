@@ -13,4 +13,5 @@ fidl("fuchsia.mem") {
     "range.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.usb.peripheral.block") {
 
   sources = [ "usb-peripheral-block.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

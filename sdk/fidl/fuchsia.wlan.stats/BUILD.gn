@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.wlan.stats") {
   sources = [ "wlan_stats.fidl" ]
   enable_banjo = true
+  enable_c = true
 }

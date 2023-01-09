@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.usb.fwloader") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+  enable_c = true
 }

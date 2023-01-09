@@ -43,10 +43,12 @@ fidl("fidl.test.echo") {
   visibility = [ ":*" ]
   sources = [ "echo.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }
 
 fidl("fidl.test.spaceship") {
   visibility = [ ":*" ]
   sources = [ "spaceship.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_c = true
 }

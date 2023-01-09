@@ -19,4 +19,5 @@ fidl("fuchsia.component.runner") {
   ]
 
   sources = [ "component_runner.fidl" ]
+  enable_c = true
 }

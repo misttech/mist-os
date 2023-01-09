@@ -26,4 +26,5 @@ fidl("fuchsia.component") {
 
   # TODO(fxbug.dev/109747): Re-enable.
   excluded_checks = [ "invalid-case-for-decl-name" ]
+  enable_c = true
 }
