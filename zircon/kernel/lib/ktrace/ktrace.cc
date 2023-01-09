@@ -21,6 +21,7 @@
 #include <arch/user_copy.h>
 #include <fbl/alloc_checker.h>
 #include <hypervisor/ktrace.h>
+#include <kernel/koid.h>
 #include <ktl/atomic.h>
 #include <ktl/iterator.h>
 #include <lk/init.h>
@@ -91,12 +92,24 @@ void ktrace_report_cpu_pseudo_threads() {
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    fxt_kernel_object(kKernelPseudoCpuBase + i, ZX_OBJ_TYPE_THREAD, fxt::StringRef(name),
-                      fxt::Argument{"process"_intern, fxt::Koid{kNoProcess}});
+    fxt_kernel_object(ktrace::CpuContextMap::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD,
+                      fxt::StringRef(name), fxt::Argument{"process"_intern, fxt::Koid{kNoProcess}});
   }
 }
 
 }  // namespace
+
+namespace ktrace {
+
+zx_koid_t CpuContextMap::cpu_koid_base_{ZX_KOID_INVALID};
+
+void CpuContextMap::Init() {
+  if (cpu_koid_base_ == ZX_KOID_INVALID) {
+    cpu_koid_base_ = KernelObjectId::GenerateRange(arch_max_num_cpus());
+  }
+}
+
+}  // namespace ktrace
 
 namespace internal {
 
@@ -650,6 +663,9 @@ static void ktrace_init(unsigned level) {
     dprintf(INFO, "ktrace: disabled\n");
     return;
   }
+
+  // Allocate koids for each CPU.
+  ktrace::CpuContextMap::Init();
 
   fxt::InternedString::SetMapStringCallback(fxt_string_record);
   fxt::InternedString::PreRegister();

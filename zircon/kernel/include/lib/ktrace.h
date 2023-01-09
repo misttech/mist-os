@@ -97,10 +97,36 @@ void fxt_string_record(uint16_t index, const char* string, size_t string_length)
 
 }  // namespace ktrace_thunks
 
-// TODO(fxbug.dev/112751)
-constexpr zx_koid_t kKernelPseudoKoidBase = 0x00000000'70000000u;
-constexpr zx_koid_t kKernelPseudoCpuBase = kKernelPseudoKoidBase + 0x00000000'01000000u;
 constexpr fxt::Koid kNoProcess{0u};
+
+// TODO(fxbug.dev/118873): Move ktrace interfaces into ktrace namespace.
+namespace ktrace {
+
+// Maintains the mapping from CPU numbers to pre-allocated KOIDs.
+class CpuContextMap {
+ public:
+  // Returns the pre-allocated KOID for the given CPU.
+  static zx_koid_t GetCpuKoid(cpu_num_t cpu_num) { return cpu_koid_base_ + cpu_num; }
+
+  // Returns a ThreadRef for the given CPU.
+  static fxt::ThreadRef<fxt::RefType::kInline> GetCpuRef(cpu_num_t cpu_num) {
+    return {kNoProcess, fxt::Koid{GetCpuKoid(cpu_num)}};
+  }
+
+  // Returns a ThreadRef for the current CPU.
+  static fxt::ThreadRef<fxt::RefType::kInline> GetCurrentCpuRef() {
+    return GetCpuRef(arch_curr_cpu_num());
+  }
+
+  // Initializes the CPU KOID base value.
+  static void Init();
+
+ private:
+  // The KOID of CPU 0. Valid CPU KOIDs are in the range [base, base + max_cpus).
+  static zx_koid_t cpu_koid_base_;
+};
+
+}  // namespace ktrace
 
 // Specifies whether the trace applies to the current thread or cpu.
 enum class TraceContext {
@@ -114,7 +140,7 @@ inline fxt::ThreadRef<fxt::RefType::kInline> ThreadRefFromContext(TraceContext c
     case TraceContext::Thread:
       return Thread::Current::Get()->fxt_ref();
     case TraceContext::Cpu:
-      return {kNoProcess, fxt::Koid{kKernelPseudoCpuBase + arch_curr_cpu_num()}};
+      return ktrace::CpuContextMap::GetCurrentCpuRef();
     default:
       return {kNoProcess, fxt::Koid{0}};
   }
