@@ -565,9 +565,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113842): Remove.
       "power-sensor",
 
-      // TODO(https://fxbug.dev/113838): Remove.
-      "radar",
-
       // TODO(https://fxbug.dev/113839): Remove.
       "securemem",
 
