@@ -191,3 +191,114 @@ func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
 		})
 	}
 }
+
+func newNetstackAndEndpoint(t *testing.T, transProto tcpip.TransportProtocolNumber) (*Netstack, *waiter.Queue, tcpip.Endpoint) {
+	t.Helper()
+
+	ns, _ := newNetstack(t, netstackTestOptions{})
+	wq := new(waiter.Queue)
+	ep := func() tcpip.Endpoint {
+		ep, err := ns.stack.NewEndpoint(transProto, ipv4.ProtocolNumber, wq)
+		if err != nil {
+			t.Fatalf("NewEndpoint(%d, %d, _): %s", transProto, ipv4.ProtocolNumber, err)
+		}
+		return ep
+	}()
+	return ns, wq, ep
+}
+
+func addEndpoint(t *testing.T, ns *Netstack, ep *endpoint) {
+	t.Helper()
+
+	ns.onAddEndpoint(ep)
+	ep.incRef()
+}
+
+func verifyZirconSocketClosed(t *testing.T, e *endpointWithSocket) {
+	t.Helper()
+
+	if e.local.Handle().IsValid() {
+		t.Error("got e.local.Handle().IsValid() = true, want = false")
+	}
+	if e.peer.Handle().IsValid() {
+		t.Error("got e.peer.Handle().IsValid() = true, want = false")
+	}
+}
+
+func TestCloseDatagramSocketClosesHandles(t *testing.T) {
+	addGoleakCheck(t)
+
+	ns, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
+	s, err := newDatagramSocketImpl(ns, header.UDPProtocolNumber, ipv4.ProtocolNumber, ep, wq)
+	if err != nil {
+		t.Fatalf("newDatagramSocketImpl(_, %d, %d, _, _): %s", header.UDPProtocolNumber, ipv4.ProtocolNumber, err)
+	}
+	addEndpoint(t, ns, &s.endpoint)
+	// Provide a cancel callback so the endpoint can be closed below.
+	s.cancel = func() {}
+
+	if _, err := s.Close(context.Background()); err != nil {
+		t.Fatalf("s.Close(): %s", err)
+	}
+
+	// Verify that the handles associated with the socket have been closed.
+	verifyZirconSocketClosed(t, s.endpointWithSocket)
+	if s.sharedState.destinationCacheMu.destinationCache.local.IsValid() {
+		t.Error("got s.sharedState.destinationCacheMu.destinationCache.local.IsValid() = true, want = false")
+	}
+	if s.sharedState.destinationCacheMu.destinationCache.peer.IsValid() {
+		t.Error("got s.sharedState.destinationCacheMu.destinationCache.peer.IsValid() = true, want = false")
+	}
+	if s.sharedState.cmsgCacheMu.cmsgCache.local.IsValid() {
+		t.Error("got s.sharedState.cmsgCacheMu.cmsgCache.local.IsValid() = true, want = false")
+	}
+	if s.sharedState.cmsgCacheMu.cmsgCache.peer.IsValid() {
+		t.Error("got s.sharedState.cmsgCacheMu.cmsgCache.peer.IsValid() = true, want = false")
+	}
+}
+
+func TestCloseSynchronousDatagramSocketClosesHandles(t *testing.T) {
+	addGoleakCheck(t)
+
+	ns, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
+	s, err := makeSynchronousDatagramSocket(ep, ipv4.ProtocolNumber, header.UDPProtocolNumber, wq, ns)
+	if err != nil {
+		t.Fatalf("makeSynchronousDatagramSocket(_, %d, %d, _, _): %s", ipv4.ProtocolNumber, header.UDPProtocolNumber, err)
+	}
+	addEndpoint(t, ns, &s.endpoint)
+	// Provide a cancel callback so the endpoint can be closed below.
+	s.cancel = func() {}
+
+	if _, err := s.Close(context.Background()); err != nil {
+		t.Fatalf("s.Close(): %s", err)
+	}
+
+	// Verify that the handles associated with the socket have been closed.
+	if s.endpointWithEvent.local.IsValid() {
+		t.Error("got s.endpointWithEvent.local.IsValid() = true, want = false")
+	}
+	if s.endpointWithEvent.peer.IsValid() {
+		t.Error("got s.endpointWithEvent.peer.IsValid() = true, want = false")
+	}
+}
+
+func TestCloseStreamSocketClosesHandles(t *testing.T) {
+	addGoleakCheck(t)
+
+	ns, wq, ep := newNetstackAndEndpoint(t, header.TCPProtocolNumber)
+	socketEp, err := newEndpointWithSocket(ep, wq, header.TCPProtocolNumber, ipv4.ProtocolNumber, ns, zx.SocketStream)
+	if err != nil {
+		t.Fatalf("newEndpointWithSocket(_, _, %d, %d, _, _): %s", header.TCPProtocolNumber, ipv4.ProtocolNumber, err)
+	}
+	s := makeStreamSocketImpl(socketEp)
+	addEndpoint(t, ns, &s.endpoint)
+	// Provide a cancel callback so the endpoint can be closed below.
+	s.cancel = func() {}
+
+	if _, err := s.Close(context.Background()); err != nil {
+		t.Fatalf("s.Close(): %s", err)
+	}
+
+	// Verify that the handles associated with the socket have been closed.
+	verifyZirconSocketClosed(t, s.endpointWithSocket)
+}

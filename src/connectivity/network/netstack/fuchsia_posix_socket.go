@@ -2594,6 +2594,8 @@ func (s *datagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWi
 func (s *datagramSocketImpl) close() {
 	if s.decRef() {
 		s.wq.EventUnregister(&s.sharedState.entry)
+		s.sharedState.destinationCacheMu.destinationCache.clear()
+		s.sharedState.cmsgCacheMu.cmsgCache.clear()
 		s.endpointWithSocket.close()
 		if err := s.peer.Close(); err != nil {
 			panic(err)
