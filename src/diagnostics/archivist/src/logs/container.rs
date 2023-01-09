@@ -150,7 +150,7 @@ impl LogsArtifactsContainer {
                 .cursor(mode)
                 .scan(
                     (earliest_timestamp, 0u64),
-                    move |(last_timestamp, dropped_messages), item| {
+                    move |(last_timestamp, rolled_out_messages), item| {
                         futures::future::ready(match item {
                             LazyItem::Next(m) => {
                                 let trace_id = ftrace::Id::random();
@@ -166,12 +166,12 @@ impl LogsArtifactsContainer {
                                 *last_timestamp = m.timestamp();
                                 match m.parse(&identity) {
                                     Ok(m) => Some(Some(Arc::new(maybe_add_rolled_out_error(
-                                        dropped_messages,
+                                        rolled_out_messages,
                                         m,
                                     )))),
                                     Err(err) => {
                                         let data = maybe_add_rolled_out_error(
-                                            dropped_messages,
+                                            rolled_out_messages,
                                             LogsDataBuilder::new(BuilderArgs {
                                                 moniker: identity.to_string(),
                                                 timestamp_nanos: (*last_timestamp).into(),
@@ -189,8 +189,8 @@ impl LogsArtifactsContainer {
                                     }
                                 }
                             }
-                            LazyItem::ItemsRolledOut(drop_count) => {
-                                *dropped_messages += drop_count;
+                            LazyItem::ItemsRolledOut(rolled_out_count) => {
+                                *rolled_out_messages += rolled_out_count;
                                 Some(None)
                             }
                         })
@@ -522,15 +522,15 @@ impl LogsArtifactsContainer {
     }
 }
 
-fn maybe_add_rolled_out_error(dropped_messages: &mut u64, mut msg: Data<Logs>) -> Data<Logs> {
-    if *dropped_messages != 0 {
+fn maybe_add_rolled_out_error(rolled_out_messages: &mut u64, mut msg: Data<Logs>) -> Data<Logs> {
+    if *rolled_out_messages != 0 {
         // Add rolled out metadata
         msg.metadata
             .errors
             .get_or_insert(vec![])
-            .push(LogError::RolledOutLogs { count: *dropped_messages });
+            .push(LogError::RolledOutLogs { count: *rolled_out_messages });
     }
-    *dropped_messages = 0;
+    *rolled_out_messages = 0;
     msg
 }
 
