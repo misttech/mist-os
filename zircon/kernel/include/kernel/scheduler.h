@@ -7,7 +7,7 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_
 
 #include <lib/fit/function.h>
-#include <lib/ktrace/string_ref.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -456,7 +456,8 @@ class Scheduler {
                                      Predicate&& predicate) TA_REQ(queue_lock_);
 
   // Emits queue event tracers for trace-based scheduler performance analysis.
-  inline void TraceThreadQueueEvent(StringRef& name, Thread* thread) const TA_REQ(queue_lock_);
+  inline void TraceThreadQueueEvent(const fxt::InternedString& name, Thread* thread) const
+      TA_REQ(queue_lock_);
 
   // Protects run queues and associated metadata for this Scheduler instance.
   // The queue lock is the bottom most lock in the system for the CPU it is

@@ -268,8 +268,8 @@ static void gic_handle_irq(iframe_t* frame) {
 
   if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
     fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                       fxt::Argument{"irq #"_stringref, vector});
+                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                       fxt::Argument{"irq #"_intern, vector});
   }
 
   LTRACEF_LEVEL(2, "iar 0x%x cpu %u currthread %p vector %u pc %#" PRIxPTR "\n", iar,
@@ -283,8 +283,8 @@ static void gic_handle_irq(iframe_t* frame) {
 
   if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
     fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                     fxt::Argument{"irq #"_stringref, vector});
+                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                     fxt::Argument{"irq #"_intern, vector});
   }
 }
 

@@ -28,7 +28,6 @@
 #include <kernel/lockdep.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
-#include <kernel/scheduler.h>
 #include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
 #include <kernel/thread_lock.h>
@@ -63,23 +62,23 @@ using ffl::Round;
 
 #define LOCAL_KTRACE(level, string, args...)                                     \
   ktrace_probe(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, TraceContext::Cpu, \
-               KTRACE_STRING_REF(string), ##args)
+               KTRACE_INTERN_STRING(string), ##args)
 
 #define LOCAL_KTRACE_FLOW_BEGIN(level, string, flow_id, args...)                            \
   ktrace_flow_begin(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
-                    TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
+                    TraceContext::Cpu, KTRACE_INTERN_STRING(string), flow_id, ##args)
 
 #define LOCAL_KTRACE_FLOW_END(level, string, flow_id, args...)                            \
   ktrace_flow_end(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
-                  TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
+                  TraceContext::Cpu, KTRACE_INTERN_STRING(string), flow_id, ##args)
 
 #define LOCAL_KTRACE_FLOW_STEP(level, string, flow_id, args...)                            \
   ktrace_flow_step(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
-                   TraceContext::Cpu, KTRACE_STRING_REF(string), flow_id, ##args)
+                   TraceContext::Cpu, KTRACE_INTERN_STRING(string), flow_id, ##args)
 
 #define LOCAL_KTRACE_COUNTER(level, string, value, args...)                              \
   ktrace_counter(LocalTrace<LOCAL_KTRACE_LEVEL_ENABLED(level)>, "kernel:sched"_category, \
-                 KTRACE_STRING_REF(string), value, ##args)
+                 KTRACE_INTERN_STRING(string), value, ##args)
 
 template <size_t level>
 using LocalTraceDuration = TraceDuration<TraceEnabled<LOCAL_KTRACE_LEVEL_ENABLED(level)>,
@@ -219,7 +218,8 @@ inline uint64_t Scheduler::NextFlowId() {
 // CPUs, as well as which task on each CPU is currently active. These events are
 // used for trace analysis to compute statistics about overall utilization,
 // taking CPU affinity into account.
-inline void Scheduler::TraceThreadQueueEvent(StringRef& name, Thread* thread) const {
+inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
+                                             Thread* thread) const {
   // Traces marking the end of a queue/dequeue operation have arguments encoded
   // as follows:
   //
@@ -565,7 +565,7 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
 // queues. Returns a pointer to the stolen thread that is now associated with
 // the local Scheduler instance, or nullptr is no work was stolen.
 Thread* Scheduler::StealWork(SchedTime now) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"steal_work"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"steal_work"_intern};
 
   const cpu_num_t current_cpu = this_cpu();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
@@ -607,7 +607,7 @@ Thread* Scheduler::StealWork(SchedTime now) {
         DEBUG_ASSERT(check_affinity(*thread));
         queue->deadline_run_queue_.erase(*thread);
         queue->Remove(thread);
-        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_stringref, thread);
+        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_intern, thread);
         break;
       }
 
@@ -632,7 +632,7 @@ Thread* Scheduler::StealWork(SchedTime now) {
         DEBUG_ASSERT(check_affinity(*thread));
         queue->fair_run_queue_.erase(*thread);
         queue->Remove(thread);
-        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_stringref, thread);
+        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_intern, thread);
         break;
       }
     }
@@ -650,7 +650,7 @@ Thread* Scheduler::StealWork(SchedTime now) {
 // Dequeues the eligible thread with the earliest virtual finish time. The
 // caller must ensure that there is at least one thread in the queue.
 Thread* Scheduler::DequeueFairThread() {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_fair_thread"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_fair_thread"_intern};
 
   // Snap the virtual clock to the earliest start time.
   const auto& earliest_thread = fair_run_queue_.front();
@@ -676,14 +676,14 @@ Thread* Scheduler::DequeueFairThread() {
 
   virtual_time_ = eligible_time;
   fair_run_queue_.erase(*eligible_thread);
-  TraceThreadQueueEvent("tqe_deque_fair"_stringref, eligible_thread);
+  TraceThreadQueueEvent("tqe_deque_fair"_intern, eligible_thread);
   return eligible_thread;
 }
 
 // Dequeues the eligible thread with the earliest deadline. The caller must
 // ensure that there is at least one eligible thread in the queue.
 Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_deadline_thread"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_deadline_thread"_intern};
 
   Thread* const eligible_thread = FindEarliestEligibleThread(&deadline_run_queue_, eligible_time);
   DEBUG_ASSERT_MSG(eligible_thread != nullptr,
@@ -695,7 +695,7 @@ Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
                    eligible_thread->scheduler_state().min_finish_time_.raw_value());
 
   deadline_run_queue_.erase(*eligible_thread);
-  TraceThreadQueueEvent("tqe_deque_deadline"_stringref, eligible_thread);
+  TraceThreadQueueEvent("tqe_deque_deadline"_intern, eligible_thread);
 
   const SchedulerState& state = eligible_thread->scheduler_state();
   trace.End(Round<uint64_t>(state.start_time_), Round<uint64_t>(state.finish_time_));
@@ -723,12 +723,12 @@ SchedTime Scheduler::GetNextEligibleTime() {
 // than the given deadline. Returns nullptr if no threads meet the criteria or
 // the run queue is empty.
 Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_earlier_deadline_thread"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"dequeue_earlier_deadline_thread"_intern};
   Thread* const eligible_thread = FindEarlierDeadlineThread(eligible_time, finish_time);
 
   if (eligible_thread != nullptr) {
     deadline_run_queue_.erase(*eligible_thread);
-    TraceThreadQueueEvent("tqe_deque_earlier_deadline"_stringref, eligible_thread);
+    TraceThreadQueueEvent("tqe_deque_earlier_deadline"_intern, eligible_thread);
   }
 
   return eligible_thread;
@@ -739,7 +739,7 @@ Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTi
 Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
                                       SchedDuration total_runtime_ns,
                                       Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"find_thread"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"find_thread"_intern};
 
   const bool is_idle = current_thread->IsIdle();
   const bool is_active = current_thread->state() == THREAD_READY;
@@ -870,7 +870,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
 }
 
 cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"find_target: cpu,avail"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"find_target: cpu,avail"_intern};
 
   const cpu_num_t current_cpu = arch_curr_cpu_num();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
@@ -918,7 +918,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   const auto compare = [thread](const Scheduler* queue_a, const Scheduler* queue_b) {
     const SchedDuration a_predicted_queue_time_ns = queue_a->predicted_queue_time_ns();
     const SchedDuration b_predicted_queue_time_ns = queue_b->predicted_queue_time_ns();
-    LocalTraceDuration<KTRACE_DETAILED> trace_compare{"compare: qtime,qtime"_stringref,
+    LocalTraceDuration<KTRACE_DETAILED> trace_compare{"compare: qtime,qtime"_intern,
                                                       Round<uint64_t>(a_predicted_queue_time_ns),
                                                       Round<uint64_t>(b_predicted_queue_time_ns)};
     if (IsFairThread(thread)) {
@@ -952,7 +952,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   const auto is_sufficient = [thread](const Scheduler* queue) {
     const SchedDuration candidate_queue_time_ns = queue->predicted_queue_time_ns();
 
-    LocalTraceDuration<KTRACE_DETAILED> sufficient_trace{"is_sufficient: thresh,qtime"_stringref,
+    LocalTraceDuration<KTRACE_DETAILED> sufficient_trace{"is_sufficient: thresh,qtime"_intern,
                                                          Round<uint64_t>(kIntraClusterThreshold),
                                                          Round<uint64_t>(candidate_queue_time_ns)};
 
@@ -1006,7 +1006,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
 }
 
 void Scheduler::UpdateTimeline(SchedTime now) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"update_vtime"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"update_vtime"_intern};
 
   const auto runtime_ns = now - last_update_time_ns_;
   last_update_time_ns_ = now;
@@ -1019,7 +1019,7 @@ void Scheduler::UpdateTimeline(SchedTime now) {
 }
 
 void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"reschedule_common"_stringref, Round<uint64_t>(now), 0};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"reschedule_common"_intern, Round<uint64_t>(now), 0};
 
   const cpu_num_t current_cpu = arch_curr_cpu_num();
   Thread* const current_thread = Thread::Current::Get();
@@ -1056,7 +1056,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   // to weights changing in the current or enqueued threads.
   if (IsThreadAdjustable(current_thread) && weight_total_ != scheduled_weight_total_ &&
       total_runtime_ns < current_state->time_slice_ns_) {
-    LocalTraceDuration<KTRACE_DETAILED> trace_adjust_rate{"adjust_rate"_stringref};
+    LocalTraceDuration<KTRACE_DETAILED> trace_adjust_rate{"adjust_rate"_intern};
     scheduled_weight_total_ = weight_total_;
 
     const SchedDuration time_slice_ns = CalculateTimeslice(current_thread);
@@ -1141,7 +1141,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
 
   // Trace the activation of the next thread before context switching.
   if (current_thread != next_thread) {
-    TraceThreadQueueEvent("tqe_activate"_stringref, next_thread);
+    TraceThreadQueueEvent("tqe_activate"_intern, next_thread);
   }
 
   // Handle any pending migration work.
@@ -1154,7 +1154,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
       !current_state->active() || current_state->curr_cpu_ == current_cpu;
   if (!current_thread->IsIdle() && current_is_associated &&
       (timeslice_expired || current_thread != next_thread)) {
-    LocalTraceDuration<KTRACE_DETAILED> update_ema_trace{"update_expected_runtime"_stringref};
+    LocalTraceDuration<KTRACE_DETAILED> update_ema_trace{"update_expected_runtime"_intern};
 
     // Adjust the runtime for the relative performance of the CPU to account for
     // different performance levels in the estimate. The relative performance
@@ -1208,7 +1208,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   }
 
   if (next_thread->IsIdle()) {
-    LocalTraceDuration<KTRACE_DETAILED> trace_stop_preemption{"idle"_stringref};
+    LocalTraceDuration<KTRACE_DETAILED> trace_stop_preemption{"idle"_intern};
     next_state->last_started_running_ = now;
 
     // If there are no tasks to run in the future, disable the preemption timer.
@@ -1216,7 +1216,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     target_preemption_time_ns_ = GetNextEligibleTime();
     percpu::Get(current_cpu).timer_queue.PreemptReset(target_preemption_time_ns_.raw_value());
   } else if (timeslice_expired || next_thread != current_thread) {
-    LocalTraceDuration<KTRACE_DETAILED> trace_start_preemption{"next_slice: preempt,abs"_stringref};
+    LocalTraceDuration<KTRACE_DETAILED> trace_start_preemption{"next_slice: preempt,abs"_intern};
 
     // Re-compute the time slice and deadline for the new thread based on the
     // latest state.
@@ -1254,7 +1254,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     // came from the run queue (and is not the idle thread).
     LOCAL_KTRACE_FLOW_END(KTRACE_FLOW, "sched_latency", next_state->flow_id(), next_thread->tid());
   } else {
-    LocalTraceDuration<KTRACE_DETAILED> trace_continue{"continue: preempt,abs"_stringref};
+    LocalTraceDuration<KTRACE_DETAILED> trace_continue{"continue: preempt,abs"_intern};
     DEBUG_ASSERT(current_thread == next_thread);
 
     // Update the target preemption time for consistency with the updated CPU
@@ -1365,7 +1365,7 @@ void Scheduler::LockHandoff() {
 }
 
 void Scheduler::UpdatePeriod() {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"update_period"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"update_period"_intern};
 
   DEBUG_ASSERT(runnable_fair_task_count_ >= 0);
   DEBUG_ASSERT(minimum_granularity_ns_ > 0);
@@ -1382,7 +1382,7 @@ void Scheduler::UpdatePeriod() {
 }
 
 SchedDuration Scheduler::CalculateTimeslice(Thread* thread) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"calculate_timeslice: w,wt"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"calculate_timeslice: w,wt"_intern};
   SchedulerState* const state = &thread->scheduler_state();
 
   // Calculate the relative portion of the scheduling period.
@@ -1411,7 +1411,7 @@ SchedTime Scheduler::ClampToEarlierDeadline(SchedTime completion_time, SchedTime
 }
 
 SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"next_timeslice: t,abs"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"next_timeslice: t,abs"_intern};
 
   SchedulerState* const state = &thread->scheduler_state();
   SchedTime target_preemption_time_ns;
@@ -1455,7 +1455,7 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
 
 void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
                             SchedDuration total_runtime_ns) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"queue_thread: s,f"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"queue_thread: s,f"_intern};
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
@@ -1502,9 +1502,9 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     // Both a new insertion into the run queue or a re-insertion due to
     // preemption can happen after the time slice and/or deadline expires.
     if (placement == Placement::Insertion || placement == Placement::Preemption) {
-      StringRef& string_ref = placement == Placement::Insertion
-                                  ? "insert_deadline: r,c"_stringref
-                                  : "preemption_deadline: r,c"_stringref;
+      const fxt::InternedString& string_ref = placement == Placement::Insertion
+                                                  ? "insert_deadline: r,c"_intern
+                                                  : "preemption_deadline: r,c"_intern;
       LocalTraceDuration<KTRACE_DETAILED> deadline_trace{string_ref};
 
       // Determine how much time is left before the deadline. This might be less
@@ -1556,12 +1556,12 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
   } else {
     deadline_run_queue_.insert(thread);
   }
-  TraceThreadQueueEvent("tqe_enque"_stringref, thread);
+  TraceThreadQueueEvent("tqe_enque"_intern, thread);
   trace.End(Round<uint64_t>(state->start_time_), Round<uint64_t>(state->finish_time_));
 }
 
 void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"insert"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"insert"_intern};
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
@@ -1602,7 +1602,7 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
 }
 
 void Scheduler::Remove(Thread* thread) {
-  LocalTraceDuration<KTRACE_DETAILED> trace{"remove"_stringref};
+  LocalTraceDuration<KTRACE_DETAILED> trace{"remove"_intern};
 
   DEBUG_ASSERT(!thread->IsIdle());
 
@@ -1676,7 +1676,7 @@ inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
 }
 
 void Scheduler::Block() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_block"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_block"_intern};
 
   Thread* const current_thread = Thread::Current::Get();
   current_thread->canary().Assert();
@@ -1688,7 +1688,7 @@ void Scheduler::Block() {
 }
 
 void Scheduler::Unblock(Thread* thread) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_unblock"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_unblock"_intern};
 
   thread->canary().Assert();
 
@@ -1707,7 +1707,7 @@ void Scheduler::Unblock(Thread* thread) {
 }
 
 void Scheduler::Unblock(Thread::UnblockList list) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_unblock_list"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_unblock_list"_intern};
 
   const SchedTime now = CurrentTime();
 
@@ -1744,7 +1744,7 @@ void Scheduler::UnblockIdle(Thread* thread) {
 }
 
 void Scheduler::Yield() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_yield"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_yield"_intern};
 
   Thread* const current_thread = Thread::Current::Get();
   current_thread->get_lock().AssertHeld();
@@ -1780,7 +1780,7 @@ void Scheduler::Yield() {
 }
 
 void Scheduler::Preempt() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_preempt"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_preempt"_intern};
 
   Thread* const current_thread = Thread::Current::Get();
   current_thread->get_lock().AssertHeld();
@@ -1796,7 +1796,7 @@ void Scheduler::Preempt() {
 }
 
 void Scheduler::Reschedule() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_reschedule"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_reschedule"_intern};
 
   Thread* const current_thread = Thread::Current::Get();
   current_thread->get_lock().AssertHeld();
@@ -1822,12 +1822,12 @@ void Scheduler::Reschedule() {
 }
 
 void Scheduler::RescheduleInternal() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_resched_internal"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_resched_internal"_intern};
   Get()->RescheduleCommon(CurrentTime(), trace.Completer());
 }
 
 void Scheduler::Migrate(Thread* thread) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_migrate"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_migrate"_intern};
 
   thread->get_lock().AssertHeld();
 
@@ -1879,7 +1879,7 @@ void Scheduler::Migrate(Thread* thread) {
 }
 
 void Scheduler::MigrateUnpinnedThreads() {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_migrate_unpinned"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_migrate_unpinned"_intern};
 
   const cpu_num_t current_cpu = arch_curr_cpu_num();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
@@ -1903,7 +1903,7 @@ void Scheduler::MigrateUnpinnedThreads() {
         pinned_threads.insert(thread);
       } else {
         // Move unpinned threads to another available CPU.
-        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_fair"_stringref, thread);
+        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_fair"_intern, thread);
         current->Remove(thread);
 
         queue_guard.CallUnlocked([&] {
@@ -1933,7 +1933,7 @@ void Scheduler::MigrateUnpinnedThreads() {
         pinned_threads.insert(thread);
       } else {
         // Move unpinned threads to another available CPU.
-        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_deadline"_stringref, thread);
+        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_deadline"_intern, thread);
         current->Remove(thread);
 
         queue_guard.CallUnlocked([&] {
@@ -1990,7 +1990,7 @@ void Scheduler::UpdateWeightCommon(Thread* thread, int original_priority, SchedW
       if (thread->state() == THREAD_READY) {
         DEBUG_ASSERT(state->active());
         current->EraseFromQueue(thread);
-        current->TraceThreadQueueEvent("tqe_deque_update_weight"_stringref, thread);
+        current->TraceThreadQueueEvent("tqe_deque_update_weight"_intern, thread);
       }
 
       if (IsDeadlineThread(thread)) {
@@ -2153,7 +2153,7 @@ void Scheduler::UpdateDeadlineCommon(Thread* thread, int original_priority,
 }
 
 void Scheduler::ChangeWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_reschedule_mask) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_change_weight"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_change_weight"_intern};
 
   thread->get_lock().AssertHeld();
   SchedulerState* const state = &thread->scheduler_state();
@@ -2181,7 +2181,7 @@ void Scheduler::ChangeWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_r
 
 void Scheduler::ChangeDeadline(Thread* thread, const SchedDeadlineParams& params,
                                cpu_mask_t* cpus_to_reschedule_mask) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_change_deadline"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_change_deadline"_intern};
 
   thread->get_lock().AssertHeld();
   SchedulerState* const state = &thread->scheduler_state();
@@ -2209,7 +2209,7 @@ void Scheduler::ChangeDeadline(Thread* thread, const SchedDeadlineParams& params
 }
 
 void Scheduler::InheritWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_reschedule_mask) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_inherit_weight"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_inherit_weight"_intern};
 
   thread->get_lock().AssertHeld();
   SchedulerState* const state = &thread->scheduler_state();
@@ -2234,7 +2234,7 @@ void Scheduler::InheritWeight(Thread* thread, int priority, cpu_mask_t* cpus_to_
 }
 
 void Scheduler::TimerTick(SchedTime now) {
-  LocalTraceDuration<KTRACE_COMMON> trace{"sched_timer_tick"_stringref};
+  LocalTraceDuration<KTRACE_COMMON> trace{"sched_timer_tick"_intern};
   Thread::Current::preemption_state().PreemptSetPending();
 }
 

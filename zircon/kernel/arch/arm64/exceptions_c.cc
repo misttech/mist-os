@@ -531,16 +531,16 @@ extern "C" void arm64_serror_exception(iframe_t* iframe, uint exception_flags) {
 
   if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
     fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                       fxt::Argument{"irq #"_stringref, 0xaa55});
+                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                       fxt::Argument{"irq #"_intern, 0xaa55});
   }
 
   exceptions_serror.Add(1);
 
   if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
     fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                     fxt::Argument{"irq #"_stringref, 0xaa55});
+                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                     fxt::Argument{"irq #"_intern, 0xaa55});
   }
 }
 

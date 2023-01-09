@@ -184,11 +184,11 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Constructs an ObjectCache with the given slab reservation value. Reserve
   // slabs are not immediately allocated.
   explicit ObjectCache(size_t reserve_slabs) : reserve_slabs_{reserve_slabs} {
-    LocalTraceDuration<Detail> trace{"ObjectCache::ObjectCache"_stringref};
+    LocalTraceDuration<Detail> trace{"ObjectCache::ObjectCache"_intern};
   }
 
   ~ObjectCache() {
-    LocalTraceDuration<Detail> trace{"ObjectCache::~ObjectCache"_stringref};
+    LocalTraceDuration<Detail> trace{"ObjectCache::~ObjectCache"_intern};
 
     {
       Guard<Mutex> guard{&lock_};
@@ -227,7 +227,7 @@ class ObjectCache<T, Option::Single, Allocator> {
   // If the object is ref counted it is not yet adopted.
   template <typename... Args>
   EnableIfConstructible<zx::result<PtrType>, Args...> Allocate(Args&&... args) TA_EXCL(lock_) {
-    LocalTraceDuration<Basic> trace{"ObjectCache::Allocate"_stringref};
+    LocalTraceDuration<Basic> trace{"ObjectCache::Allocate"_intern};
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
     AutoPreemptDisabler preempt_disable;
 
@@ -268,7 +268,7 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Returns the given object that has already been destroyed to the slab it was
   // allocated from.
   static void Delete(void* pointer) {
-    LocalTraceDuration<Basic> trace{"ObjectCache::Release"_stringref};
+    LocalTraceDuration<Basic> trace{"ObjectCache::Release"_intern};
     AutoPreemptDisabler preempt_disable;
     SlabPtr slab = Slab::FromAllocatedPointer(pointer);
     Entry* entry = Entry::ToListNode(pointer);
@@ -295,7 +295,7 @@ class ObjectCache<T, Option::Single, Allocator> {
     // dependencies.
     template <typename... Args>
     T* ToObject(Args&&... args) {
-      LocalTraceDuration<Detail> trace{"Entry::ToObject"_stringref};
+      LocalTraceDuration<Detail> trace{"Entry::ToObject"_intern};
       list_node.~NodeState();
       new (&object) T(ktl::forward<Args>(args)...);
       return &object;
@@ -303,7 +303,7 @@ class ObjectCache<T, Option::Single, Allocator> {
 
     // Converts this entry to a list node. The object must already be destroyed.
     static Entry* ToListNode(void* pointer) {
-      LocalTraceDuration<Detail> trace{"Entry::ToListNode"_stringref};
+      LocalTraceDuration<Detail> trace{"Entry::ToListNode"_intern};
       Entry* entry = static_cast<Entry*>(pointer);
       new (&entry->list_node) NodeState{};
       return entry;
@@ -347,14 +347,14 @@ class ObjectCache<T, Option::Single, Allocator> {
   // of two aligned memory.
   struct Slab {
     explicit Slab(ObjectCache* object_cache) : control{object_cache} {
-      LocalTraceDuration<Detail> trace{"Slab::Slab"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::Slab"_intern};
       for (Entry& entry : entries) {
         control.free_list.push_front(&entry);
       }
     }
 
     ~Slab() {
-      LocalTraceDuration<Detail> trace{"Slab::~Slab"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::~Slab"_intern};
       DEBUG_ASSERT(is_empty());
       if constexpr (kEntryNodeOptions & fbl::NodeOptions::AllowClearUnsafe) {
         control.free_list.clear_unsafe();
@@ -370,7 +370,7 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Returns the raw memory for the slab to the allocator when the last
     // reference is released.
     static void operator delete(void* slab, size_t size) {
-      LocalTraceDuration<Detail> trace{"Slab::delete"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::delete"_intern};
       DEBUG_ASSERT(size == sizeof(Slab));
       Allocator::CountSlabFree();
       Allocator::Release(slab);
@@ -388,7 +388,7 @@ class ObjectCache<T, Option::Single, Allocator> {
     static auto& node_state(Slab& slab) { return slab.control.list_node; }
 
     void SetOrphan() {
-      LocalTraceDuration<Detail> trace{"Slab::SetOrphan"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::SetOrphan"_intern};
       control.orphan_flag = true;
     }
 
@@ -410,7 +410,7 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Allocates an entry from the slab and moves the slab to the appropriate
     // list in the cache. The caller must hold a reference to this slab.
     zx::result<Entry*> Allocate() {
-      LocalTraceDuration<Detail> trace{"Slab::Allocate"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::Allocate"_intern};
 
       Guard<Mutex> slab_guard{&control.lock};
       DEBUG_ASSERT(!is_orphan());
@@ -455,7 +455,7 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Returns the given entry to the free list. The caller must hold a
     // reference to the slab.
     void Free(void* pointer) {
-      LocalTraceDuration<Detail> trace{"Slab::Free"_stringref};
+      LocalTraceDuration<Detail> trace{"Slab::Free"_intern};
       Entry* entry = reinterpret_cast<Entry*>(pointer);
       DEBUG_ASSERT(entry >= entries.begin() && entry < entries.end());
 
@@ -512,7 +512,7 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Returns a reference to a slab with at least one available entry. Allocates
   // a new slab if no slabs have available entries.
   zx::result<SlabPtr> GetSlab() TA_EXCL(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::GetSlab"_stringref};
+    LocalTraceDuration<Detail> trace{"ObjectCache::GetSlab"_intern};
     Guard<Mutex> guard{&lock_};
 
     if (partial_list_.is_empty() && empty_list_.is_empty()) {
@@ -525,7 +525,7 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   // Allocates a new slab and adds it to the empty list.
   zx::result<Slab*> AllocateSlab() TA_REQ(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::AllocateSlab"_stringref};
+    LocalTraceDuration<Detail> trace{"ObjectCache::AllocateSlab"_intern};
 
     zx::result<void*> result = Allocator::Allocate();
     if (result.is_ok()) {
@@ -547,7 +547,7 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   // Removes the given slab from this cache.
   void RemoveSlab(Slab* slab) TA_REQ(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::RemoveSlab"_stringref};
+    LocalTraceDuration<Detail> trace{"ObjectCache::RemoveSlab"_intern};
     empty_list_.erase(*slab);
     slab_count_--;
   }

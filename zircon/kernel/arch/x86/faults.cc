@@ -508,8 +508,8 @@ void x86_exception_handler(iframe_t* frame) {
     // Hence page fault events are emitted in the thread context, not the cpu context like other
     // irq's. See TAG_PAGE_FAULT in vmm_page_fault_handler().
     fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                       fxt::Argument{"irq #"_stringref, entry_vector});
+                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                       fxt::Argument{"irq #"_intern, entry_vector});
   }
 
   // deliver the interrupt
@@ -518,8 +518,8 @@ void x86_exception_handler(iframe_t* frame) {
   if (entry_vector != X86_INT_PAGE_FAULT &&
       unlikely(ktrace_category_enabled("kernel:irq"_category))) {
     fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_stringref},
-                     fxt::Argument{"irq #"_stringref, entry_vector});
+                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
+                     fxt::Argument{"irq #"_intern, entry_vector});
   }
 
   bool do_preempt = int_handler_finish(&state);

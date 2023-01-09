@@ -197,8 +197,8 @@ zx_status_t sys_ktrace_write(zx_handle_t handle, uint32_t event_id, uint32_t arg
 
   ktrace_thunks::fxt_instant(
       "kernel:probe"_category, ktrace_timestamp(), ThreadRefFromContext(TraceContext::Cpu),
-      fxt::StringRef{static_cast<uint16_t>(event_id | 0x4000)},
-      fxt::Argument{"arg0"_stringref, arg0}, fxt::Argument{"arg1"_stringref, arg1});
+      fxt::StringRef{static_cast<uint16_t>(event_id | 0x4000)}, fxt::Argument{"arg0"_intern, arg0},
+      fxt::Argument{"arg1"_intern, arg1});
   return ZX_OK;
 }
 

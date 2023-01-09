@@ -94,22 +94,21 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
  private:
   void KernelMutexTrace(uint32_t tag, const Mutex* mutex, const Thread* t, uint32_t waiter_count) {
     if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
-      auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_stringref
-                                      : t->user_thread() == nullptr ? "kernel_mode"_stringref
-                                                                    : "user_mode"_stringref)};
+      auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_intern
+                                      : t->user_thread() == nullptr ? "kernel_mode"_intern
+                                                                    : "user_mode"_intern)};
 
-      fxt::Argument mutex_id_arg{"mutex_id"_stringref,
+      fxt::Argument mutex_id_arg{"mutex_id"_intern,
                                  fxt::Pointer(reinterpret_cast<uintptr_t>(mutex))};
-      fxt::Argument tid_name_arg{"tid"_stringref,
+      fxt::Argument tid_name_arg{"tid"_intern,
                                  fxt::Koid(t == nullptr ? ZX_KOID_INVALID : t->tid())};
-      fxt::Argument tid_type_arg{"tid_type"_stringref, tid_type};
-      fxt::Argument wait_count_arg{"waiter_count"_stringref, waiter_count};
+      fxt::Argument tid_type_arg{"tid_type"_intern, tid_type};
+      fxt::Argument wait_count_arg{"waiter_count"_intern, waiter_count};
 
-      auto event_name =
-          fxt::StringRef{(tag == TAG_KERNEL_MUTEX_ACQUIRE   ? "mutex_acquire"_stringref
-                          : tag == TAG_KERNEL_MUTEX_RELEASE ? "mutex_release"_stringref
-                          : tag == TAG_KERNEL_MUTEX_BLOCK   ? "mutex_block"_stringref
-                                                            : "unknown"_stringref)};
+      auto event_name = fxt::StringRef{(tag == TAG_KERNEL_MUTEX_ACQUIRE   ? "mutex_acquire"_intern
+                                        : tag == TAG_KERNEL_MUTEX_RELEASE ? "mutex_release"_intern
+                                        : tag == TAG_KERNEL_MUTEX_BLOCK   ? "mutex_block"_intern
+                                                                          : "unknown"_intern)};
 
       fxt_duration_complete("kernel:sched"_category, ts_, t->fxt_ref(), event_name, ts_ + 50,
                             mutex_id_arg, tid_name_arg, tid_type_arg, wait_count_arg);

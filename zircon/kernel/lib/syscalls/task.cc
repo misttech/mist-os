@@ -119,7 +119,7 @@ zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char
   if (ktrace_thunks::category_enabled("kernel:meta"_category)) {
     const zx_koid_t tid = handle.dispatcher()->get_koid();
     fxt_kernel_object(tid, ZX_OBJ_TYPE_THREAD, fxt::StringRef(buf),
-                      fxt::Argument{"process"_stringref, fxt::Koid(pid)});
+                      fxt::Argument{"process"_intern, fxt::Koid(pid)});
   }
 
   return out->make(ktl::move(handle), thread_rights);

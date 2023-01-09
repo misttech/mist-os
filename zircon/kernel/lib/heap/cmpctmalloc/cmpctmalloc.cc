@@ -137,7 +137,7 @@ using LocalTraceDuration =
     TraceDuration<TraceEnabled<false>, "kernel:sched"_category, TraceContext::Thread>;
 
 #define LOCAL_TRACE_DURATION(label, name, ...) \
-  LocalTraceDuration name { KTRACE_STRING_REF(label), ##__VA_ARGS__ }
+  LocalTraceDuration name { KTRACE_INTERN_STRING(label), ##__VA_ARGS__ }
 
 #define LOCAL_TRACE_DURATION_END(name) name.End()
 

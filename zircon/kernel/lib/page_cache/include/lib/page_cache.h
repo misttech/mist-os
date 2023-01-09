@@ -109,7 +109,7 @@ class PageCache {
   // Allocates the given number of pages from the page cache. Falls back to the
   // PMM if the cache is insufficient to fulfill the request.
   zx::result<AllocateResult> Allocate(size_t page_count, uint alloc_flags = 0) {
-    LocalTraceDuration trace{"PageCache::Allocate"_stringref};
+    LocalTraceDuration trace{"PageCache::Allocate"_intern};
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
     DEBUG_ASSERT(per_cpu_caches_ != nullptr);
 
@@ -132,7 +132,7 @@ class PageCache {
   // Returns the given pages to the page cache. Excess pages are returned to the
   // PMM.
   void Free(PageList page_list) {
-    LocalTraceDuration trace{"PageCache::Free"_stringref};
+    LocalTraceDuration trace{"PageCache::Free"_intern};
     DEBUG_ASSERT(per_cpu_caches_ != nullptr);
 
     if (!page_list.is_empty()) {
@@ -242,7 +242,7 @@ class PageCache {
   zx::result<AllocateResult> AllocatePagesAndFillCache(CpuCache& entry, size_t requested_pages,
                                                        uint alloc_flags) const
       TA_EXCL(entry.fill_lock, entry.cache_lock) {
-    LocalTraceDuration trace{"PageCache::AllocatePagesAndFillCache"_stringref};
+    LocalTraceDuration trace{"PageCache::AllocatePagesAndFillCache"_intern};
 
     // Serialize cache fill + allocate operations on this cache. Contention
     // means another thread tried to allocate from the PMM and blocked on the

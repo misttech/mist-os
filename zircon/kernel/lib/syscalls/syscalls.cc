@@ -35,12 +35,12 @@
 namespace {
 
 struct SyscallNameEntry {
-  fxt::StringRef<fxt::RefType::kId> name{"[unknown]"_stringref};
+  fxt::StringRef<fxt::RefType::kId> name{"[unknown]"_intern};
 };
 
 #define VDSO_SYSCALL(...)
 #define KERNEL_SYSCALL(name, type, attrs, nargs, arglist, prototype) \
-  [ZX_SYS_##name] = {#name##_stringref},
+  [ZX_SYS_##name] = {#name##_intern},
 #define INTERNAL_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 #define BLOCKING_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 
@@ -71,7 +71,7 @@ inline fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) 
   if (syscall_num < ktl::size(kSyscallNames)) {
     return kSyscallNames[syscall_num].name;
   }
-  return "[out of range]"_stringref;
+  return "[out of range]"_intern;
 }
 
 // N.B. Interrupts must be disabled on entry and they will be disabled on exit.

@@ -49,8 +49,8 @@
 /* ktraces just local to this file */
 #define LOCAL_KTRACE_ENABLE 0
 
-#define LOCAL_KTRACE(string, args...)                                                         \
-  ktrace_probe(LocalTrace<LOCAL_KTRACE_ENABLE>, TraceContext::Cpu, KTRACE_STRING_REF(string), \
+#define LOCAL_KTRACE(string, args...)                                                            \
+  ktrace_probe(LocalTrace<LOCAL_KTRACE_ENABLE>, TraceContext::Cpu, KTRACE_INTERN_STRING(string), \
                ##args)
 
 using LocalTraceDuration =
@@ -1053,7 +1053,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
   size_t harvested_size = 0;
 
   while (size > 0 && *entry_limit > 0) {
-    LocalTraceDuration trace{"page_table_loop"_stringref};
+    LocalTraceDuration trace{"page_table_loop"_intern};
 
     const vaddr_t vaddr_rem = vaddr_rel & block_mask;
     const vaddr_t index = vaddr_rel >> index_shift;
@@ -1586,7 +1586,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   vaddr_t current_vaddr_rel = vaddr_rel;
 
   while (remaining_size) {
-    LocalTraceDuration trace{"harvest_loop"_stringref};
+    LocalTraceDuration trace{"harvest_loop"_intern};
     size_t entry_limit = kMaxEntriesPerIteration;
     const size_t harvested_size = HarvestAccessedPageTable(
         &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,

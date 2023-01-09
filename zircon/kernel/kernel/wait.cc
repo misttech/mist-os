@@ -32,7 +32,7 @@
 
 static inline void WqTraceDepth(const WaitQueueCollection* collection, uint32_t depth) {
   if constexpr (WAIT_QUEUE_DEPTH_TRACING_ENABLED) {
-    ktrace_probe(TraceEnabled<true>{}, TraceContext::Cpu, "wq_depth"_stringref,
+    ktrace_probe(TraceEnabled<true>{}, TraceContext::Cpu, "wq_depth"_intern,
                  reinterpret_cast<uint64_t>(collection), static_cast<uint64_t>(depth));
   }
 }

@@ -1627,7 +1627,7 @@ void ktrace_report_live_threads() {
   for (Thread& t : thread_list.Get()) {
     t.canary().Assert();
     fxt_kernel_object(t.tid(), ZX_OBJ_TYPE_THREAD, fxt::StringRef(t.name()),
-                      fxt::Argument("process"_stringref, fxt::Koid(t.pid())));
+                      fxt::Argument("process"_intern, fxt::Koid(t.pid())));
   }
 }
 

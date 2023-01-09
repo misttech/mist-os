@@ -59,8 +59,8 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
   if (unlikely(ktrace_category_enabled("kernel:vm"_category))) {
     fxt_duration_complete("kernel:vm"_category, start_time,
                           ThreadRefFromContext(TraceContext::Thread),
-                          fxt::StringRef{"access_fault"_stringref}, current_ticks(),
-                          fxt::Argument{"vaddr"_stringref, addr});
+                          fxt::StringRef{"access_fault"_intern}, current_ticks(),
+                          fxt::Argument{"vaddr"_intern, addr});
   }
 
   return status;
@@ -105,8 +105,8 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   if (unlikely(ktrace_category_enabled("kernel:vm"_category))) {
     fxt_duration_complete(
         "kernel:vm"_category, start_time, ThreadRefFromContext(TraceContext::Thread),
-        fxt::StringRef{"page_fault"_stringref}, current_ticks(),
-        fxt::Argument{"vaddr"_stringref, addr}, fxt::Argument{"flags"_stringref, flags});
+        fxt::StringRef{"page_fault"_intern}, current_ticks(), fxt::Argument{"vaddr"_intern, addr},
+        fxt::Argument{"flags"_intern, flags});
   }
 
   return status;

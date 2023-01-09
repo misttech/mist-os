@@ -10,7 +10,6 @@
 #include <lib/fxt/interned_category.h>
 #include <lib/ktrace.h>
 #include <lib/ktrace/ktrace_internal.h>
-#include <lib/ktrace/string_ref.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <platform.h>
@@ -68,23 +67,21 @@ void SetupCategoryBits() {
   }
 }
 
-const StringRef* ktrace_find_probe(const char* name) {
-  for (const StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
-    if (!strcmp(name, ref->string)) {
-      return ref;
+const fxt::InternedString* ktrace_find_probe(const char* name) {
+  for (const fxt::InternedString& interned_string : fxt::InternedString::IterateList) {
+    if (!strcmp(name, interned_string.string)) {
+      return &interned_string;
     }
   }
   return nullptr;
 }
 
-void ktrace_add_probe(StringRef* string_ref) {
-  // Register and emit the string ref.
-  string_ref->GetId();
-}
+void ktrace_add_probe(const fxt::InternedString& interned_string) { interned_string.GetId(); }
 
 void ktrace_report_probes() {
-  for (const StringRef* ref = StringRef::head(); ref != nullptr; ref = ref->next) {
-    fxt_string_record(ref->id, ref->string, strnlen(ref->string, ZX_MAX_NAME_LEN - 1));
+  for (const fxt::InternedString& interned_string : fxt::InternedString::IterateList) {
+    fxt_string_record(interned_string.id, interned_string.string,
+                      strnlen(interned_string.string, ZX_MAX_NAME_LEN - 1));
   }
 }
 
@@ -95,7 +92,7 @@ void ktrace_report_cpu_pseudo_threads() {
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
     fxt_kernel_object(kKernelPseudoCpuBase + i, ZX_OBJ_TYPE_THREAD, fxt::StringRef(name),
-                      fxt::Argument{"process"_stringref, fxt::Koid{kNoProcess}});
+                      fxt::Argument{"process"_intern, fxt::Koid{kNoProcess}});
   }
 }
 
@@ -591,7 +588,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
 
       zx_status_t res = KTRACE_STATE.Start(options ? options : KTRACE_GRP_ALL, start_mode);
       if (res == ZX_OK) {
-        ktrace_probe(TraceAlways, TraceContext::Thread, "ktrace_ready"_stringref);
+        ktrace_probe(TraceAlways, TraceContext::Thread, "ktrace_ready"_intern);
       }
 
       return res;
@@ -606,7 +603,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
     case KTRACE_ACTION_NEW_PROBE: {
       const char* const string_in = static_cast<const char*>(ptr);
 
-      const StringRef* ref = ktrace_find_probe(string_in);
+      const fxt::InternedString* ref = ktrace_find_probe(string_in);
       if (ref != nullptr) {
         return ref->id;
       }
@@ -615,7 +612,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
         explicit DynamicStringRef(const char* string) { memcpy(storage, string, sizeof(storage)); }
 
         char storage[ZX_MAX_NAME_LEN];
-        StringRef string_ref{storage};
+        fxt::InternedString string_ref{storage};
       };
 
       // TODO(eieio,dje): Figure out how to constrain this to prevent abuse by
@@ -626,7 +623,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
         return ZX_ERR_NO_MEMORY;
       }
 
-      ktrace_add_probe(&dynamic_ref->string_ref);
+      ktrace_add_probe(dynamic_ref->string_ref);
       return dynamic_ref->string_ref.id;
     }
 
@@ -654,8 +651,8 @@ static void ktrace_init(unsigned level) {
     return;
   }
 
-  StringRef::SetMapStringCallback(fxt_string_record);
-  StringRef::PreRegister();
+  fxt::InternedString::SetMapStringCallback(fxt_string_record);
+  fxt::InternedString::PreRegister();
 
   SetupCategoryBits();
   fxt::InternedCategory::PreRegister();

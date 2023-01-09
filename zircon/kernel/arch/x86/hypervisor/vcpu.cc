@@ -964,7 +964,7 @@ zx_status_t Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
 
     if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
       fxt_duration_begin("kernel:vcpu"_category, current_ticks(), current_thread->fxt_ref(),
-                         fxt::StringRef{"vcpu"_stringref});
+                         fxt::StringRef{"vcpu"_intern});
     }
 
     GUEST_STATS_INC(vm_entries);

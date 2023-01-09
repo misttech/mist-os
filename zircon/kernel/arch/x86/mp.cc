@@ -382,7 +382,7 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
       while (*percpu->monitor && !preemption_state.preempts_pending()) {
         X86IdleState* next_state = percpu->idle_states->PickIdleState();
         rsb_maybe_empty |= x86_intel_idle_state_may_empty_rsb(next_state);
-        LocalTraceDuration trace{"idle"_stringref, next_state->MwaitHint(), 0u};
+        LocalTraceDuration trace{"idle"_intern, next_state->MwaitHint(), 0u};
 
         // 1) Disable interrupts
         // 2) Arm the monitor
@@ -435,7 +435,7 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
       // Set the halt_interlock flag and spin for a little bit, in case a wakeup happens very
       // shortly before we decide to go to sleep. If the halt_interlock flag is changed, another CPU
       // has woken us, avoid the halt instruction.
-      LocalTraceDuration trace{"idle"_stringref};
+      LocalTraceDuration trace{"idle"_intern};
       constexpr int kPauseIterations = 3000;
       uint32_t halt_interlock_spinning = 1;
       percpu->halt_interlock.store(1, ktl::memory_order_relaxed);
