@@ -40,6 +40,10 @@ class BindDriverManager {
   // Find matching node group nodes for |dev| and then bind them.
   zx_status_t MatchAndBindNodeGroups(const fbl::RefPtr<Device>& dev);
 
+  // Finds a matching driver for |composite|.
+  zx::result<MatchedDriverInfo> MatchCompositeDevice(CompositeDevice& composite,
+                                                     const DriverLoader::MatchDeviceConfig& config);
+
  private:
   zx_status_t BindDriverToDevice(const MatchedDriver& driver, const fbl::RefPtr<Device>& dev);
 
@@ -58,6 +62,10 @@ class BindDriverManager {
   // Find matching drivers for |dev| and then bind them.
   zx_status_t MatchAndBind(const fbl::RefPtr<Device>& dev,
                            const DriverLoader::MatchDeviceConfig& config);
+
+  // Finds and binds a matching driver to |composite|.
+  zx::result<> MatchAndBindCompositeDevice(CompositeDevice& composite,
+                                           const DriverLoader::MatchDeviceConfig& config);
 
   // Binds the matched fragment in |driver| to |dev|. If a CompositeDevice for |driver| doesn't
   // exists in |driver_index_composite_devices_|, this function creates and adds it.

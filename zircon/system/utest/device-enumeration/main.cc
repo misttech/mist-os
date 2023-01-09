@@ -633,7 +633,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp/arm-isp/camera-controller",
       "sys/platform/05:04:e/aml-video",
       "sys/platform/05:04:23/aml-video-enc",
-      "sys/platform/05:04:25/aml-hevc-enc",
       "sys/platform/05:04:17/mali/aml-gpu",
       "sys/platform/05:04:13/sherlock-audio-pdm-in",
       "sys/platform/05:04:12:1/sherlock-i2s-audio-out",

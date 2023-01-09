@@ -223,6 +223,10 @@ void DeviceState::CheckResumeReceivedAndReply(SystemPowerState target_state,
 }
 
 void MultipleDeviceTestCase::SetUp() {
+  coordinator_for_test_ = std::make_unique<CoordinatorForTest>(
+      CreateConfig(mock_server_loop_.dispatcher(), &boot_args_, &args_client_),
+      coordinator_loop_.dispatcher());
+
   // Start the mock server thread.
   ASSERT_OK(mock_server_loop_.StartThread("mock-admin-server"));
 

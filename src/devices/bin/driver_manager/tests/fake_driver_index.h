@@ -96,6 +96,10 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     node_group_match_[std::string(name)] = result;
   }
 
+  void set_match_callback(MatchCallback match_callback) {
+    match_callback_ = std::move(match_callback);
+  }
+
  private:
   static fuchsia_driver_index::wire::MatchedDriver GetMatchedDriver(fidl::AnyArena& arena,
                                                                     MatchResult match) {
