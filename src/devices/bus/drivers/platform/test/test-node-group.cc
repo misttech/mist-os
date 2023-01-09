@@ -10,6 +10,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/component/cpp/node_group.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <bind/fuchsia/test/platform/cpp/bind.h>
 
@@ -28,17 +29,17 @@ zx_status_t TestBoard::NodeGroupInit() {
   fdf::Arena arena('DVGP');
 
   auto bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-      fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_PID,
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
       fdf::MakeAcceptBindRule(
-          BIND_PLATFORM_DEV_DID,
+          bind_fuchsia::PLATFORM_DEV_DID,
           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_NODE_REPRESENTATION),
   };
 
   auto properties = std::vector{
-      fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
   };
 
   auto nodes = std::vector{

@@ -681,7 +681,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
 
     std::vector<device_bind_prop_t> properties;
     properties.reserve(node.properties().size());
-    for (auto property : node.properties()) {
+    for (const auto& property : node.properties()) {
       if (!property.key() || !property.value()) {
         zxlogf(ERROR, "Node representation properties must contain a key and value");
         completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
