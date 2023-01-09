@@ -40,7 +40,7 @@ protocol GraphCreator {
         /// Deadline profile for the FIDL thread.
         ///
         /// This is to ensure time-sensitive requests are handled properly. For
-        /// example, packets sent on a `[fuchsia.audio.StreamSink`] channel must
+        /// example, packets sent on a [`fuchsia.audio.StreamSink`] channel must
         /// be read immediately, otherwise the caller may miss their deadline.
         ///
         /// Optional. If not specified, the FIDL thread runs at a normal priority.
@@ -674,13 +674,13 @@ protocol Graph {
     }) -> () error BindProducerLeadTimeWatcherError;
 };
 
-/// Type of errors return by [`CreateGraph`].
+/// Type of errors returned by [`CreateGraph`].
 type CreateGraphError = flexible enum {
     /// The provided `server_end:Graph` was invalid.
     INVALID_GRAPH_CHANNEL = 1;
 };
 
-/// Type of errors return by CreateNode methods.
+/// Type of errors returned by CreateNode methods.
 type CreateNodeError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -694,13 +694,13 @@ type CreateNodeError = flexible enum {
     INVALID_PARAMETER = 3;
 };
 
-/// Type of errors return by [`DeleteNode`].
+/// Type of errors returned by [`DeleteNode`].
 type DeleteNodeError = flexible enum {
     /// The given `id` is invalid.
     DOES_NOT_EXIST = 1;
 };
 
-/// Type of errors return by [`CreateEdge`].
+/// Type of errors returned by [`CreateEdge`].
 type CreateEdgeError = flexible enum {
     /// The given `dest_id` is invalid.
     INVALID_DEST_ID = 1;
@@ -736,7 +736,7 @@ type CreateEdgeError = flexible enum {
     INVALID_GAIN_CONTROL = 10;
 };
 
-/// Type of errors return by [`DeleteEdge`].
+/// Type of errors returned by [`DeleteEdge`].
 type DeleteEdgeError = flexible enum {
     /// The given `dest_id` is invalid.
     INVALID_DEST_ID = 1;
@@ -748,7 +748,7 @@ type DeleteEdgeError = flexible enum {
     EDGE_NOT_FOUND = 3;
 };
 
-/// Type of errors return by [`CreateThread`].
+/// Type of errors returned by [`CreateThread`].
 type CreateThreadError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -757,7 +757,7 @@ type CreateThreadError = flexible enum {
     INVALID_PARAMETER = 2;
 };
 
-/// Type of errors return by [`DeleteThread`].
+/// Type of errors returned by [`DeleteThread`].
 type DeleteThreadError = flexible enum {
     /// The given `id` is invalid.
     INVALID_ID = 1;
@@ -767,7 +767,7 @@ type DeleteThreadError = flexible enum {
     STILL_IN_USE = 2;
 };
 
-/// Type of errors return by [`CreateGainControl`].
+/// Type of errors returned by [`CreateGainControl`].
 type CreateGainControlError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -776,7 +776,7 @@ type CreateGainControlError = flexible enum {
     INVALID_PARAMETER = 2;
 };
 
-/// Type of errors return by [`DeleteGainControl`].
+/// Type of errors returned by [`DeleteGainControl`].
 type DeleteGainControlError = flexible enum {
     /// The given `id` is invalid.
     INVALID_ID = 1;
@@ -786,7 +786,7 @@ type DeleteGainControlError = flexible enum {
     STILL_IN_USE = 2;
 };
 
-/// Type of errors return by [`Start`].
+/// Type of errors returned by [`Start`].
 type StartError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -803,7 +803,7 @@ type StartError = flexible enum {
     CANCELED = 4;
 };
 
-/// Type of errors return by [`Stop`].
+/// Type of errors returned by [`Stop`].
 type StopError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -823,7 +823,7 @@ type StopError = flexible enum {
     ALREADY_STOPPED = 5;
 };
 
-/// Type of errors return by [`CancelStartOrStop`]
+/// Type of errors returned by [`CancelStartOrStop`]
 type CancelStartOrStopError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
@@ -832,7 +832,7 @@ type CancelStartOrStopError = flexible enum {
     INVALID_ID = 2;
 };
 
-/// Type of errors return by [`BindProducerLeadTimeWatcher`].
+/// Type of errors returned by [`BindProducerLeadTimeWatcher`].
 type BindProducerLeadTimeWatcherError = flexible enum {
     /// A required field was not provided.
     MISSING_REQUIRED_FIELD = 1;
