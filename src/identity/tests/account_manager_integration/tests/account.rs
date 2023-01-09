@@ -13,8 +13,8 @@ use {
         AccountMetadata, AccountProxy, Error as ApiError, Lifetime,
     },
     fidl_fuchsia_identity_authentication::{
-        Empty, InteractionWatchStateResponse, Mechanism, Mode, TestAuthenticatorCondition,
-        TestInteractionWatchStateResponse,
+        Empty, InteractionMarker, InteractionWatchStateResponse, Mechanism, Mode,
+        TestAuthenticatorCondition, TestInteractionMarker, TestInteractionWatchStateResponse,
     },
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
@@ -68,7 +68,7 @@ async fn provision_new_account_with_metadata(
     let (interaction_proxy_opt, interaction_server_end_opt) = match lifetime {
         Lifetime::Persistent => {
             let (interaction_proxy, interaction_server_end) =
-                create_proxy().expect("Failed to create interaction proxy");
+                create_proxy::<InteractionMarker>().expect("Failed to create interaction proxy");
             (Some(interaction_proxy), Some(interaction_server_end))
         }
         Lifetime::Ephemeral => (None, None),
@@ -93,7 +93,7 @@ async fn provision_new_account_with_metadata(
         let state = interaction_proxy.watch_state().await.expect("Failed to get interaction state");
         assert_eq!(state, InteractionWatchStateResponse::Enrollment(vec![Mechanism::Test]));
 
-        let (_, test_interaction_server_end) = create_proxy().unwrap();
+        let (_, test_interaction_server_end) = create_proxy::<TestInteractionMarker>().unwrap();
         interaction_proxy.start_test(test_interaction_server_end, Mode::Enroll).unwrap();
     }
 
@@ -132,7 +132,7 @@ async fn get_account(
 ) -> Result<Result<(), ApiError>, fidl::Error> {
     let account_manager_clone = Arc::clone(account_manager);
     let (interaction_proxy, interaction_server_end) =
-        create_proxy().expect("Failed to create interaction proxy");
+        create_proxy::<InteractionMarker>().expect("Failed to create interaction proxy");
     let get_account_task = Task::local(async move {
         account_manager_clone
             .lock()
@@ -154,7 +154,8 @@ async fn get_account(
 
         // Specify that we need to interact with the TestInteraction server to
         // successfully authenticate.
-        let (test_interaction_proxy, test_interaction_server_end) = create_proxy().unwrap();
+        let (test_interaction_proxy, test_interaction_server_end) =
+            create_proxy::<TestInteractionMarker>().unwrap();
         interaction_proxy
             .start_test(test_interaction_server_end, Mode::Authenticate)
             .expect("Failed to complete the StartTest operation");
@@ -757,7 +758,8 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
 
     // Fail if there is no metadata
     let account_manager_clone = Arc::clone(&account_manager);
-    let (_, interaction_server_end) = create_proxy().expect("Failed to create interaction proxy");
+    let (_, interaction_server_end) =
+        create_proxy::<InteractionMarker>().expect("Failed to create interaction proxy");
     let account_without_metadata_task = Task::local(async move {
         account_manager_clone
             .lock()
@@ -774,7 +776,8 @@ async fn test_account_metadata_failures() -> Result<(), Error> {
     assert_eq!(account_without_metadata_task.await, Err(ApiError::InvalidRequest));
 
     // Fail if metadata is invalid
-    let (_, interaction_server_end) = create_proxy().expect("Failed to create interaction proxy");
+    let (_, interaction_server_end) =
+        create_proxy::<InteractionMarker>().expect("Failed to create interaction proxy");
     let account_with_empty_metadata_task = Task::local(async move {
         account_manager
             .lock()
