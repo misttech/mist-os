@@ -4,6 +4,7 @@
 
 use fuchsia_zircon::cprng_draw;
 
+use crate::auth::FsCred;
 use crate::device::DeviceOps;
 use crate::fs::*;
 use crate::logging::*;
@@ -12,6 +13,17 @@ use crate::task::*;
 use crate::types::*;
 
 struct DevNull;
+
+pub fn new_null_file(kernel: &Kernel, flags: OpenFlags) -> FileHandle {
+    Anon::new_file_extended(
+        kernel,
+        Box::new(DevNull),
+        FileMode::from_bits(0o666),
+        FsCred::root(),
+        flags,
+    )
+}
+
 impl FileOps for DevNull {
     fileops_impl_seekless!();
     fileops_impl_nonblocking!();

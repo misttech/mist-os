@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::auth::Credentials;
+use crate::device::mem::new_null_file;
 use crate::device::DeviceOps;
 use crate::dynamic_thread_pool::DynamicThreadPool;
 use crate::fs::devtmpfs::dev_tmp_fs;
@@ -2032,6 +2033,20 @@ impl RemoteBinderTask {
     fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
         errno_from_code!(e.into_primitive() as i16)
     }
+
+    fn run_file_request(
+        &self,
+        request: fbinder::FileRequest,
+    ) -> Result<fbinder::FileResponse, Errno> {
+        if let Some(process_accessor) = self.process_accessor.as_ref() {
+            let result = process_accessor
+                .file_request(request, zx::Time::INFINITE)
+                .map_err(|_| errno!(ENOENT))?;
+            result.map_err(|e| errno_from_code!(e.into_primitive() as i16))
+        } else {
+            error!(ENOTSUP)
+        }
+    }
 }
 
 impl std::fmt::Debug for RemoteBinderTask {
@@ -2110,14 +2125,45 @@ impl BinderTask for RemoteBinderTask {
         // TODO(qsr): uid/gid should be set in the configuration
         Credentials::root()
     }
-    fn close_fd(&self, _fd: FdNumber) -> Result<(), Errno> {
-        error!(ENOTSUP)
+
+    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
+        self.run_file_request(fbinder::FileRequest {
+            close_requests: Some(vec![fd.raw()]),
+            ..fbinder::FileRequest::EMPTY
+        })
+        .map(|_| ())
     }
-    fn get_file_with_flags(&self, _fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        error!(ENOTSUP)
+
+    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+        let response = self.run_file_request(fbinder::FileRequest {
+            get_requests: Some(vec![fd.raw()]),
+            ..fbinder::FileRequest::EMPTY
+        })?;
+        if let Some(files) = response.get_responses {
+            if files.len() == 1 {
+                // TODO(qsr) Convert file.file into a file descriptor.
+                let file = &files[0];
+                return Ok((new_null_file(&self.kernel, file.flags.into()), FdFlags::empty()));
+            }
+        }
+        error!(ENOENT)
     }
-    fn add_file_with_flags(&self, _file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
-        error!(ENOTSUP)
+
+    fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
+        let flags: fbinder::FileFlags = file.flags().into();
+        // TODO(qsr): The handle should be minted to proxy file here. For now, send an invalid
+        // handle that will be interpreted as an empty (/dev/null like) file.
+        let response = self.run_file_request(fbinder::FileRequest {
+            add_requests: Some(vec![fbinder::FileHandle { file: None, flags }]),
+            ..fbinder::FileRequest::EMPTY
+        })?;
+        if let Some(fds) = response.add_responses {
+            if fds.len() == 1 {
+                let fd = fds[0];
+                return Ok(FdNumber::from_raw(fd));
+            }
+        }
+        error!(ENOENT)
     }
 }
 
@@ -3380,6 +3426,42 @@ impl From<Errno> for TransactionError {
     }
 }
 
+impl From<OpenFlags> for fbinder::FileFlags {
+    fn from(flags: OpenFlags) -> Self {
+        let mut result = Self::empty();
+        if flags.can_read() {
+            result |= Self::RIGHT_READABLE;
+        }
+        if flags.can_write() {
+            result |= Self::RIGHT_WRITABLE;
+        }
+        if flags.contains(OpenFlags::DIRECTORY) {
+            result |= Self::DIRECTORY;
+        }
+
+        result
+    }
+}
+
+impl From<fbinder::FileFlags> for OpenFlags {
+    fn from(flags: fbinder::FileFlags) -> Self {
+        let readable = flags.contains(fbinder::FileFlags::RIGHT_READABLE);
+        let writable = flags.contains(fbinder::FileFlags::RIGHT_WRITABLE);
+        let mut result = Self::empty();
+        if readable && writable {
+            result = Self::RDWR;
+        } else if writable {
+            result = Self::WRONLY;
+        } else if readable {
+            result = Self::RDONLY;
+        }
+        if flags.contains(fbinder::FileFlags::DIRECTORY) {
+            result |= Self::DIRECTORY;
+        }
+        result
+    }
+}
+
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
     fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
@@ -3525,6 +3607,25 @@ mod tests {
         let object = BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr });
         owner.lock().objects.insert(weak_ref_addr, object.clone());
         object
+    }
+
+    fn assert_flags_are_equivalent(f1: fbinder::FileFlags, f2: OpenFlags) {
+        assert_eq!(f1, f2.into());
+        assert_eq!(f2, f1.into());
+    }
+
+    #[::fuchsia::test]
+    fn test_flags_conversion() {
+        assert_flags_are_equivalent(
+            fbinder::FileFlags::RIGHT_READABLE | fbinder::FileFlags::RIGHT_WRITABLE,
+            OpenFlags::RDWR,
+        );
+        assert_flags_are_equivalent(fbinder::FileFlags::RIGHT_READABLE, OpenFlags::RDONLY);
+        assert_flags_are_equivalent(fbinder::FileFlags::RIGHT_WRITABLE, OpenFlags::WRONLY);
+        assert_flags_are_equivalent(
+            fbinder::FileFlags::RIGHT_READABLE | fbinder::FileFlags::DIRECTORY,
+            OpenFlags::DIRECTORY,
+        );
     }
 
     #[fuchsia::test]
@@ -6039,18 +6140,25 @@ mod tests {
             .expect("binder dev open failed");
     }
 
-    /// Spawn a new thread that will run a test implementation of the ProcessAccessor protocol.
-    /// The thread will stop when the client is disconnected.
+    type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;
+    /// Spawn a new thread that will run a test implementation of the ProcessAccessor
+    /// protocol.
+    /// The test implementation starts with an empty fd table, and updates it depending
+    /// on the client calls. The thread will stop when the client is disconnected.
+    /// This function will then return the current fd table at that point.
     fn spawn_new_process_accessor_thread(
         server_end: ServerEnd<fbinder::ProcessAccessorMarker>,
-    ) -> std::thread::JoinHandle<Result<(), anyhow::Error>> {
+    ) -> std::thread::JoinHandle<Result<TestFdTable, anyhow::Error>> {
         std::thread::spawn(move || {
             let mut executor = LocalExecutor::new()?;
             executor.run_singlethreaded(async move {
                 let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
                     fasync::Channel::from_channel(server_end.into_channel())?,
                 );
-                while let Some(event) = stream.try_next().await? {
+                // The fd table is per connection.
+                let mut next_fd = 0;
+                let mut fds: TestFdTable = Default::default();
+                'event_loop: while let Some(event) = stream.try_next().await? {
                     match event {
                         fbinder::ProcessAccessorRequest::WriteMemory {
                             address,
@@ -6079,9 +6187,33 @@ mod tests {
                             vmo.set_content_size(&length)?;
                             responder.send(&mut Ok(vmo))?;
                         }
+                        fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
+                            let mut response = fbinder::FileResponse::EMPTY;
+                            for fd in payload.close_requests.unwrap_or(vec![]) {
+                                if fds.remove(&fd).is_none() {
+                                    responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                                    continue 'event_loop;
+                                }
+                            }
+                            for fd in payload.get_requests.unwrap_or(vec![]) {
+                                if let Some(file) = fds.remove(&fd) {
+                                    response.get_responses.get_or_insert_with(Vec::new).push(file);
+                                } else {
+                                    responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                                    continue 'event_loop;
+                                }
+                            }
+                            for file in payload.add_requests.unwrap_or(vec![]) {
+                                let fd = next_fd;
+                                next_fd += 1;
+                                fds.insert(fd, file);
+                                response.add_responses.get_or_insert_with(Vec::new).push(fd);
+                            }
+                            responder.send(&mut Ok(response))?;
+                        }
                     }
                 }
-                Ok(())
+                Ok(fds)
             })
         })
     }
@@ -6150,7 +6282,8 @@ mod tests {
         ));
 
         let (kernel, _task) = create_kernel_and_task();
-        let remote_binder_task = RemoteBinderTask { process: None, process_accessor, kernel };
+        let remote_binder_task =
+            RemoteBinderTask { process: None, process_accessor, kernel: kernel.clone() };
         let mut vector = Vec::with_capacity(vector_size);
         for i in 0..vector_size {
             vector.push((i & 255) as u8);
@@ -6170,8 +6303,33 @@ mod tests {
         assert_eq!(vector[1], 1);
         assert_eq!(vector, other_vector);
 
+        let fd0 = remote_binder_task
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::RDWR), FdFlags::empty())
+            .expect("add_file_with_flags");
+        assert_eq!(fd0.raw(), 0);
+        let fd1 = remote_binder_task
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::WRONLY), FdFlags::empty())
+            .expect("add_file_with_flags");
+        assert_eq!(fd1.raw(), 1);
+        let fd2 = remote_binder_task
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::RDONLY), FdFlags::empty())
+            .expect("add_file_with_flags");
+        assert_eq!(fd2.raw(), 2);
+
+        assert_eq!(remote_binder_task.close_fd(fd1), Ok(()));
+        let (handle, flags) =
+            remote_binder_task.get_file_with_flags(fd0).expect("get_file_with_flags");
+        assert_eq!(flags, FdFlags::empty());
+        assert_eq!(handle.flags(), OpenFlags::RDWR);
+
+        assert_eq!(
+            remote_binder_task.get_file_with_flags(FdNumber::from_raw(3)).expect_err("bad fd"),
+            errno!(EBADF)
+        );
+
         std::mem::drop(remote_binder_task);
-        process_accessor_thread.join().expect("join").expect("success");
+        let fds = process_accessor_thread.join().expect("join").expect("fds");
+        assert_eq!(fds.len(), 1);
     }
 }
 

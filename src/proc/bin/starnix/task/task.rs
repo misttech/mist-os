@@ -543,8 +543,7 @@ impl Task {
     }
 
     pub fn as_fscred(&self) -> FsCred {
-        let creds = self.creds();
-        FsCred { uid: creds.euid, gid: creds.egid }
+        self.creds().as_fscred()
     }
 
     pub fn can_signal(&self, target: &Task, unchecked_signal: &UncheckedSignal) -> bool {
@@ -1006,6 +1005,12 @@ impl cmp::PartialEq for Task {
 }
 
 impl cmp::Eq for Task {}
+
+impl From<&Task> for FsCred {
+    fn from(t: &Task) -> FsCred {
+        t.creds().into()
+    }
+}
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`] that also stores

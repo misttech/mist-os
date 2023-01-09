@@ -7,6 +7,36 @@ using zx;
 using fuchsia.posix;
 
 const MAX_PATH_LENGTH uint64 = 4095;
+const MAX_REQUEST_COUNT uint64 = 16;
+
+alias Fd = int32;
+
+/// The flags associated with an opened file.
+type FileFlags = flexible bits : uint64 {
+    // Permissions
+    /// The owner can read the file.
+    RIGHT_READABLE = 0b1;
+    /// The owner can write to fhe file.
+    RIGHT_WRITABLE = 0b10;
+    // Skipping bits for exec and suid bits and for group and other mode if
+    // they are needed in the future.
+
+    // File type
+    /// The file is a directory.
+    DIRECTORY = 0b1000000000000;
+};
+
+/// The representation of an open file that can be transferred between the
+/// binder device driver and the client.
+type FileHandle = resource struct {
+    /// The handle connecting to the file protocol. If not present, the file
+    /// should behave as it is was a null file: all read must succeed with empty
+    /// content and all write must succeed. See `fdio_fd_create_null()`.
+    file zx.handle:<optional>;
+
+    /// The flags associated with the opened file.
+    flags FileFlags;
+};
 
 /// Protocol that gives the binder driver access to the client process'
 /// resources.
@@ -26,6 +56,30 @@ protocol ProcessAccessor {
         length uint64;
     }) -> (resource struct {
         content zx.handle:VMO;
+    }) error fuchsia.posix.Errno;
+
+    /// Execute the given `request` and returns the associated `response`. Any
+    /// failure will interrupt further processing and fail this operation and
+    /// the associated errno will be then returned.
+    /// The implementator of this protocol should handle these requests as best
+    /// it can so that a failure doesn't have visible side-effects.
+    @transitional
+    FileRequest(@generated_name("FileRequest") resource table {
+        /// The list of file descriptor the client must close.
+        1: close_requests vector<Fd>:MAX_REQUEST_COUNT;
+        /// The list of file descriptor the client must duplicate and transfer to
+        /// the binder driver.
+        2: get_requests vector<Fd>:MAX_REQUEST_COUNT;
+        /// The list of open file the client must add to its fd table, returning
+        /// the new minted file descriptors.
+        3: add_requests vector<FileHandle>:MAX_REQUEST_COUNT;
+    }) -> (@generated_name("FileResponse") resource table {
+        /// No response for the close operation.
+        1: reserved;
+        /// The list of open file retriever for the `get_requests`.
+        2: get_responses vector<FileHandle>:MAX_REQUEST_COUNT;
+        /// The list of file descriptors minted for the `add_requests`.
+        3: add_responses vector<Fd>:MAX_REQUEST_COUNT;
     }) error fuchsia.posix.Errno;
 };
 

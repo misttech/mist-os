@@ -187,6 +187,10 @@ impl Credentials {
 
         self.securebits.remove(SecureBits::KEEP_CAPS);
     }
+
+    pub fn as_fscred(&self) -> FsCred {
+        FsCred { uid: self.euid, gid: self.egid }
+    }
 }
 
 /// The owner and group of a file. Used as a parameter for functions that create files.
@@ -199,5 +203,11 @@ pub struct FsCred {
 impl FsCred {
     pub fn root() -> Self {
         Self { uid: 0, gid: 0 }
+    }
+}
+
+impl From<Credentials> for FsCred {
+    fn from(c: Credentials) -> Self {
+        c.as_fscred()
     }
 }
