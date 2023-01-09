@@ -1,0 +1,48 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.fsrealm;
+
+using zx;
+using fuchsia.hardware.block;
+using fuchsia.io;
+
+type MountOptions = resource table {
+    1: read_only bool;
+    2: verbose bool;
+    3: write_compression_algorithm string:32;
+};
+
+type FormatOptions = resource table {
+    1: verbose bool;
+    2: fvm_data_slices uint32;
+};
+
+@discoverable
+protocol FsRealm {
+    /// Mounts a filesystem on a block device.
+    Mount(resource struct {
+        device client_end:fuchsia.hardware.block.Block;
+        name string:fuchsia.io.MAX_FILENAME;
+        options MountOptions;
+    }) -> () error zx.status;
+
+    /// Unmounts a previously mounted filesystem.
+    Unmount(struct {
+        name string:fuchsia.io.MAX_FILENAME;
+    }) -> () error zx.status;
+
+    /// Formats a block device with a particular filesystem format
+    Format(resource struct {
+        device client_end:fuchsia.hardware.block.Block;
+        name string:fuchsia.io.MAX_FILENAME;
+        options FormatOptions;
+    }) -> () error zx.status;
+
+    /// Checks the consistency of the filesystem formatted on
+    /// the block device
+    Check(resource struct {
+        device client_end:fuchsia.hardware.block.Block;
+        name string:fuchsia.io.MAX_FILENAME;
+    }) -> () error zx.status;
+};
