@@ -39,7 +39,7 @@ namespace fnet = fuchsia_net;
 /* Socket class hierarchy
  *
  *  Wrapper structs for supported FIDL protocols used to template socket_with_event.
-
+ *
  *   +-------------------------+  +---------------------+  +-------------------------------------+
  *   |   struct PacketSocket   |  |  struct RawSocket   |  |  struct SynchronousDatagramSocket   |
  *   |  fpacketsocket::Socket  |  |  frawsocket:Socket  |  |  fsocket:SynchronousDatagramSocket  |
@@ -47,43 +47,43 @@ namespace fnet = fuchsia_net;
  *
  *  Socket class helpers for common socket operations.
  *
- *   +----------------------------------------------------+
- *   |                socket_with_event                   |
- *   |                                                    |
- *   |                   Used by:                         |
- *   |     zxio_packet_socket (PacketSocket)              |
- *   |        zxio_raw_socket (RawSocket)                 |
- *   | zxio_sync_dgram_socket (SynchronousDatagramSocket) |
- *   |                                                    |
- *   |                   Implements:                      |
- *   |         Overrides for sockets using FIDL           |
- *   |           over channel as a data plane             |
- *   +----------------------------------------------------+
+ *   +------------------------------------+
+ *   | socket_with_event                  |
+ *   |                                    |
+ *   | Used by:                           |
+ *   |              PacketSocket::Storage |
+ *   |                 RawSocket::Storage |
+ *   | SynchronousDatagramSocket::Storage |
+ *   |                                    |
+ *   | Implements:                        |
+ *   |   Overrides for sockets using FIDL |
+ *   |   over channel as a data plane.    |
+ *   +------------------------------------+
  *
- *   +------------+-----------+        +----------+---------+ +-----------+----------+
- *   |     network_socket     |        |    stream_socket   | |    datagram_socket   |
- *   |                        |        |                    | |                      |
- *   |        Used by:        |        |      Used by:      | |       Used by:       |
- *   |  zxio_datagram_socket  |        | zxio_stream_socket | | zxio_datagram_socket |
- *   |     zxio_raw_socket    |        |                    | |                      |
- *   | zxio_sync_dgram_socket |        |     Implements:    | |      Implements:     |
- *   |   zxio_stream_socket   |        |    Overrides for   | |     Overrides for    |
- *   |                        |        |     SOCK_STREAM    | |      SOCK_DGRAM      |
- *   |       Implements:      |        |    sockets using   | |     sockets using    |
-     |  Overrides for network |        |    a zx::socket    | |     a zx::socket     |
- *   |      layer sockets     |        |     data plane     | |      data plane      |
- *   +-----------+------------+        +---------+----------+ +------------+---------+
- *               |                               |                         |
- *               |                               +-----------+-------------+
- *               |                                           |
- *   +-----------+------------+                  +-----------+-------------+
- *   |      base_socket       |                  |  socket_with_zx_socket  |
- *   |                        |                  |                         |
- *   |      Used by: All      |                  |       Implements:       |
- *   |                        |                  |      Overrides for      |
- *   |      Implements:       |                  |     sockets using a     |
- *   |   Overrides for all    |                  |  zx::socket data plane  |
- *   |      socket types      |                  +-------------------------+
+ *   +------------------------------------+     +----------------------+ +------------------------+
+ *   | network_socket                     |     | stream_socket        | | datagram_socket        |
+ *   |                                    |     |                      | |                        |
+ *   | Used by:                           |     | Used by:             | | Used by:               |
+ *   |             zxio_datagram_socket_t |     | zxio_stream_socket_t | | zxio_datagram_socket_t |
+ *   |               zxio_stream_socket_t |     |                      | |                        |
+ *   |                 RawSocket::Storage |     | Implements:          | | Implements:            |
+ *   | SynchronousDatagramSocket::Storage |     |   Overrides for      | |   Overrides for        |
+ *   |                                    |     |   SOCK_STREAM        | |   SOCK_DGRAM           |
+ *   | Implements:                        |     |   sockets using      | |   sockets using        |
+ *   |   Overrides for network layer      |     |   a zx::socket       | |   a zx::socket         |
+ *   |   sockets.                         |     |   data plane.        | |   data plane.          |
+ *   +-----------+------------------------+     +---------+------------+ +------------+-----------+
+ *               |                                        |                           |
+ *               |                                        +-----------+---------------+
+ *               |                                                    |
+ *   +-----------+------------+                           +-----------+-------------+
+ *   |      base_socket       |                           |  socket_with_zx_socket  |
+ *   |                        |                           |                         |
+ *   |      Used by: All      |                           |       Implements:       |
+ *   |                        |                           |      Overrides for      |
+ *   |      Implements:       |                           |     sockets using a     |
+ *   |   Overrides for all    |                           |  zx::socket data plane  |
+ *   |      socket types      |                           +-------------------------+
  *   +------------------------+
  */
 
@@ -1467,7 +1467,15 @@ class PacketInfo {
 struct SynchronousDatagramSocket {
   using FidlSockAddr = SocketAddress;
   using FidlSendControlData = fsocket::wire::DatagramSocketSendControlData;
-  using Storage = zxio_synchronous_datagram_socket_t;
+  struct Storage {
+    using FidlProtocol = fuchsia_posix_socket::SynchronousDatagramSocket;
+
+    zxio_t io;
+    zx::eventpair event;
+    fidl::WireSyncClient<FidlProtocol> client;
+  };
+
+  static_assert(sizeof(Storage) <= sizeof(zxio_storage_t), "must fit inside zxio_storage_t.");
 
   static void recvmsg_populate_msgname(
       const fsocket::wire::SynchronousDatagramSocketRecvMsgResponse& response, void* addr,
@@ -1488,7 +1496,15 @@ struct SynchronousDatagramSocket {
 struct RawSocket {
   using FidlSockAddr = SocketAddress;
   using FidlSendControlData = fsocket::wire::NetworkSocketSendControlData;
-  using Storage = zxio_raw_socket_t;
+  struct Storage {
+    using FidlProtocol = fuchsia_posix_socket_raw::Socket;
+
+    zxio_t io;
+    zx::eventpair event;
+    fidl::WireSyncClient<FidlProtocol> client;
+  };
+
+  static_assert(sizeof(Storage) <= sizeof(zxio_storage_t), "must fit inside zxio_storage_t.");
 
   static void recvmsg_populate_msgname(const frawsocket::wire::SocketRecvMsgResponse& response,
                                        void* addr, socklen_t& addr_len) {
@@ -1505,7 +1521,15 @@ struct RawSocket {
 struct PacketSocket {
   using FidlSockAddr = PacketInfo;
   using FidlSendControlData = fpacketsocket::wire::SendControlData;
-  using Storage = zxio_packet_socket_t;
+  struct Storage {
+    using FidlProtocol = fuchsia_posix_socket_packet::Socket;
+
+    zxio_t io;
+    zx::eventpair event;
+    fidl::WireSyncClient<FidlProtocol> client;
+  };
+
+  static_assert(sizeof(Storage) <= sizeof(zxio_storage_t), "must fit inside zxio_storage_t.");
 
   static void recvmsg_populate_msgname(const fpacketsocket::wire::SocketRecvMsgResponse& response,
                                        void* addr, socklen_t& addr_len) {
@@ -2154,19 +2178,19 @@ static constexpr zxio_ops_t zxio_default_socket_ops = []() {
   return ops;
 }();
 
-static zxio_synchronous_datagram_socket_t& zxio_synchronous_datagram_socket(zxio_t* io) {
-  return *reinterpret_cast<zxio_synchronous_datagram_socket_t*>(io);
+static SynchronousDatagramSocket::Storage& zxio_synchronous_datagram_socket(zxio_t* io) {
+  return *reinterpret_cast<SynchronousDatagramSocket::Storage*>(io);
 }
 
 static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.close = [](zxio_t* io) {
-    zxio_synchronous_datagram_socket_t& zs = zxio_synchronous_datagram_socket(io);
+    SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~zxio_synchronous_datagram_socket_t();
+    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -2183,7 +2207,7 @@ static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
     return ZX_OK;
   };
   ops.clone = [](zxio_t* io, zx_handle_t* out_handle) {
-    zxio_synchronous_datagram_socket_t& zs = zxio_synchronous_datagram_socket(io);
+    SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = base_socket(zs.client).CloneSocket(out_handle);
     return status;
   };
@@ -2244,17 +2268,13 @@ static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
 zx_status_t zxio_synchronous_datagram_socket_init(
     zxio_storage_t* storage, zx::eventpair event,
     fidl::ClientEnd<fsocket::SynchronousDatagramSocket> client) {
-  auto zs = new (storage) zxio_synchronous_datagram_socket_t{
+  auto zs = new (storage) SynchronousDatagramSocket::Storage{
       .io = storage->io,
       .event = std::move(event),
       .client = fidl::WireSyncClient(std::move(client)),
   };
   zxio_init(&zs->io, &zxio_synchronous_datagram_socket_ops);
   return ZX_OK;
-}
-
-static zxio_datagram_socket_t& zxio_datagram_socket(zxio_t* io) {
-  return *reinterpret_cast<zxio_datagram_socket_t*>(io);
 }
 
 namespace {
@@ -2333,6 +2353,23 @@ class socket_with_zx_socket {
  private:
   Client& client_;
 };
+
+// A |zxio_t| backend that uses a fuchsia.posix.socket.DatagramSocket object.
+using zxio_datagram_socket_t = struct zxio_datagram_socket {
+  zxio_t io;
+  zxio_pipe_t pipe;
+  const zxio_datagram_prelude_size_t prelude_size;
+  RouteCache route_cache;
+  RequestedCmsgCache cmsg_cache;
+  fidl::WireSyncClient<fuchsia_posix_socket::DatagramSocket> client;
+};
+
+static_assert(sizeof(zxio_datagram_socket_t) <= sizeof(zxio_storage_t),
+              "zxio_datagram_socket_t must fit inside zxio_storage_t.");
+
+static zxio_datagram_socket_t& zxio_datagram_socket(zxio_t* io) {
+  return *reinterpret_cast<zxio_datagram_socket_t*>(io);
+}
 
 struct datagram_socket
     : public socket_with_zx_socket<fidl::WireSyncClient<fsocket::DatagramSocket>> {
@@ -2757,6 +2794,25 @@ zx_status_t zxio_datagram_socket_init(zxio_storage_t* storage, zx::socket socket
   zxio_init(&zs->io, &zxio_datagram_socket_ops);
   return zxio_pipe_init(reinterpret_cast<zxio_storage_t*>(&zs->pipe), std::move(socket), info);
 }
+
+enum class zxio_stream_socket_state_t {
+  UNCONNECTED,
+  LISTENING,
+  CONNECTING,
+  CONNECTED,
+};
+
+// A |zxio_t| backend that uses a fuchsia.posix.socket.StreamSocket object.
+using zxio_stream_socket_t = struct zxio_stream_socket {
+  zxio_t io;
+  zxio_pipe_t pipe;
+  std::mutex state_lock;
+  zxio_stream_socket_state_t state __TA_GUARDED(state_lock);
+  fidl::WireSyncClient<fuchsia_posix_socket::StreamSocket> client;
+};
+
+static_assert(sizeof(zxio_stream_socket_t) <= sizeof(zxio_storage_t),
+              "zxio_stream_socket_t must fit inside zxio_storage_t.");
 
 static zxio_stream_socket_t& zxio_stream_socket(zxio_t* io) {
   return *reinterpret_cast<zxio_stream_socket_t*>(io);
@@ -3220,19 +3276,19 @@ zx_status_t zxio_stream_socket_init(zxio_storage_t* storage, zx::socket socket,
   return zxio_pipe_init(reinterpret_cast<zxio_storage_t*>(&zs->pipe), std::move(socket), info);
 }
 
-static zxio_raw_socket_t& zxio_raw_socket(zxio_t* io) {
-  return *reinterpret_cast<zxio_raw_socket_t*>(io);
+static RawSocket::Storage& zxio_raw_socket(zxio_t* io) {
+  return *reinterpret_cast<RawSocket::Storage*>(io);
 }
 
 static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.close = [](zxio_t* io) {
-    zxio_raw_socket_t& zs = zxio_raw_socket(io);
+    RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~zxio_raw_socket_t();
+    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -3247,7 +3303,7 @@ static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
     return ZX_OK;
   };
   ops.clone = [](zxio_t* io, zx_handle_t* out_handle) {
-    zxio_raw_socket_t& zs = zxio_raw_socket(io);
+    RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = base_socket(zs.client).CloneSocket(out_handle);
     return status;
   };
@@ -3415,7 +3471,7 @@ static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
 
 zx_status_t zxio_raw_socket_init(zxio_storage_t* storage, zx::eventpair event,
                                  fidl::ClientEnd<frawsocket::Socket> client) {
-  auto zs = new (storage) zxio_raw_socket_t{
+  auto zs = new (storage) RawSocket::Storage{
       .io = storage->io,
       .event = std::move(event),
       .client = fidl::WireSyncClient(std::move(client)),
@@ -3424,19 +3480,19 @@ zx_status_t zxio_raw_socket_init(zxio_storage_t* storage, zx::eventpair event,
   return ZX_OK;
 }
 
-static zxio_packet_socket_t& zxio_packet_socket(zxio_t* io) {
-  return *reinterpret_cast<zxio_packet_socket_t*>(io);
+static PacketSocket::Storage& zxio_packet_socket(zxio_t* io) {
+  return *reinterpret_cast<PacketSocket::Storage*>(io);
 }
 
 static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.close = [](zxio_t* io) {
-    zxio_packet_socket_t& zs = zxio_packet_socket(io);
+    PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~zxio_packet_socket_t();
+    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -3451,7 +3507,7 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
     return ZX_OK;
   };
   ops.clone = [](zxio_t* io, zx_handle_t* out_handle) {
-    zxio_packet_socket_t& zs = zxio_packet_socket(io);
+    PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = base_socket(zs.client).CloneSocket(out_handle);
     return status;
   };
@@ -3593,7 +3649,7 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
 
 zx_status_t zxio_packet_socket_init(zxio_storage_t* storage, zx::eventpair event,
                                     fidl::ClientEnd<fpacketsocket::Socket> client) {
-  auto zs = new (storage) zxio_packet_socket_t{
+  auto zs = new (storage) PacketSocket::Storage{
       .io = storage->io,
       .event = std::move(event),
       .client = fidl::WireSyncClient(std::move(client)),

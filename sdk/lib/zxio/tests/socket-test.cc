@@ -16,6 +16,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/zxio/dgram_cache.h"
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/tests/test_socket_server.h"
 
