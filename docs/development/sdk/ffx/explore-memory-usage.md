@@ -1,17 +1,39 @@
-# Explore the memory usage
+# Measure the memory usage on a device
 
-`ffx profile memory` is a tool to explore the RAM usage of a Fuchsia system.
-It works by evaluating how much commited memory is used by VMOs on the system, regardless of whether these VMOs are mapped or not (unlike `ps`).
+The `ffx profile memory` command can measure the RAM (Random Access Memory) usage of
+a Fuchsia system.
 
-### Getting the raw data
+## Concepts
 
-Under the hood, this tool uses the component `memory_monitor` to capture information on all the VMOs of the system.
+The `ffx profile memory` command evaluates how much memory is used by VMOs
+([Virtual Memory Objects][vmo]) in a Fuchsia system. Unlike Linux's `ps` command,
+this command evaluates all VMOs whether they are mapped or not.
 
-You can get the raw data exported by `memory_monitor` with the option `--debug-json`
+Under the hood, the `ffx profile memory` command uses the `memory_monitor` component
+to capture the memory information of all VMOs in the system.
 
-### Measuring data over time
+## Measure the memory usage over a time interval {:#measure-the-memory-usage-over-a-time-interval}
 
-You can track the memory usage over time by combining the `--csv` and  `--interval` options, for example:
+To track the memory usage over a specific time interval, run the following command:
+
+```posix-terminal
+ffx profile memory --interval {{ '<var>' }}SECONDS{{ '</var>' }}
 ```
-ffx profile memory --csv --interval 1
+
+Replace <var>SECONDS</var> with a time interval in seconds.
+
+The example command below checks the memory usage of the target Fuchsia device
+every 3 seconds until the command is terminated (usually by pressing `CTRL+C`
+in the terminal):
+
+```none {:.devsite-disable-click-to-copy}
+$ ffx profile memory --csv --interval 3
 ```
+
+Notice that the example command prints the output in the CSV format (`--csv`).
+For debugging purposes, to obtain the raw data exported by the `memory_monitor`
+component, you can run the command with the `--debug-json` option.
+
+<!-- Reference links -->
+
+[vmo]: /docs/reference/kernel_objects/vm_object.md

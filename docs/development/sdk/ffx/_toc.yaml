@@ -51,9 +51,7 @@ toc:
   section:
   - title: Record traces for performance analysis
     path: /docs/development/sdk/ffx/record-traces.md
-- title: Memory
-  section:
-  - title: Explore the memory usage of a system
+  - title: Measure the memory usage on a device
     path: /docs/development/sdk/ffx/explore-memory-usage.md
 - title: Testing
   section:
