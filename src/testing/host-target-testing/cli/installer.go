@@ -38,20 +38,21 @@ const (
 )
 
 type InstallerConfig struct {
-	installerMode   InstallerMode
-	avbToolPath     string
-	zbiToolPath     string
-	keyPath         string
-	keyMetadataPath string
-	avbTool         *avb.AVBTool
-	zbiTool         *zbi.ZBITool
-	updater         updater.Updater
-	omahaTool       *omaha_tool.OmahaTool
-	omahaToolPath   string
-	privateKeyId    string
-	privateKeyPath  string
-	omahaAddress    string
-	omahaRequireCup bool
+	installerMode               InstallerMode
+	avbToolPath                 string
+	zbiToolPath                 string
+	keyPath                     string
+	keyMetadataPath             string
+	avbTool                     *avb.AVBTool
+	zbiTool                     *zbi.ZBITool
+	updater                     updater.Updater
+	omahaTool                   *omaha_tool.OmahaTool
+	omahaToolPath               string
+	privateKeyId                string
+	privateKeyPath              string
+	omahaAddress                string
+	omahaRequireCup             bool
+	workaroundOtaNoRewriteRules bool
 }
 
 func NewInstallerConfig(fs *flag.FlagSet, testDataPath string) (*InstallerConfig, error) {
@@ -70,6 +71,7 @@ func NewInstallerConfig(fs *flag.FlagSet, testDataPath string) (*InstallerConfig
 	fs.StringVar(&c.privateKeyPath, "omaha-key-path", filepath.Join(testDataPath, "test_private_key.pem"), "the path of the private key .pem to use for CUP within Omaha requests.")
 	fs.StringVar(&c.zbiToolPath, "zbitool-path", filepath.Join(testDataPath, "zbi"), "path to the zbi binary")
 	fs.BoolVar(&c.omahaRequireCup, "require-cup", false, "if true, mock-omaha-server will assert that all incoming requests have CUP enabled.")
+	fs.BoolVar(&c.workaroundOtaNoRewriteRules, "workaround-downgrade-ota-no-rewrite-rules", false, "if true, omaha updater will not set workaround downgrade ota rewrite rules.")
 
 	return c, nil
 }
@@ -166,7 +168,7 @@ func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL st
 			return nil, err
 		}
 
-		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool)
+		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool, c.workaroundOtaNoRewriteRules)
 
 	case SystemUpdateChecker:
 		// TODO: The e2e tests only support using the system-update-checker

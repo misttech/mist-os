@@ -177,11 +177,12 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 }
 
 type OmahaUpdater struct {
-	repo             *packages.Repository
-	updatePackageURL *url.URL
-	omahaTool        *omaha_tool.OmahaTool
-	avbTool          *avb.AVBTool
-	zbiTool          *zbi.ZBITool
+	repo                        *packages.Repository
+	updatePackageURL            *url.URL
+	omahaTool                   *omaha_tool.OmahaTool
+	avbTool                     *avb.AVBTool
+	zbiTool                     *zbi.ZBITool
+	workaroundOtaNoRewriteRules bool
 }
 
 func NewOmahaUpdater(
@@ -190,6 +191,7 @@ func NewOmahaUpdater(
 	omahaTool *omaha_tool.OmahaTool,
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
+	workaroundOtaNoRewriteRules bool,
 ) (*OmahaUpdater, error) {
 	u, err := url.Parse(updatePackageURL)
 	if err != nil {
@@ -205,11 +207,12 @@ func NewOmahaUpdater(
 	}
 
 	return &OmahaUpdater{
-		repo:             repo,
-		updatePackageURL: u,
-		omahaTool:        omahaTool,
-		avbTool:          avbTool,
-		zbiTool:          zbiTool,
+		repo:                        repo,
+		updatePackageURL:            u,
+		omahaTool:                   omahaTool,
+		avbTool:                     avbTool,
+		zbiTool:                     zbiTool,
+		workaroundOtaNoRewriteRules: workaroundOtaNoRewriteRules,
 	}, nil
 }
 

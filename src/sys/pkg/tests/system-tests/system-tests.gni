@@ -94,6 +94,11 @@ _environment_service_account =
 #     system time becomes accurate.
 #   - Type: boolean, default false
 #
+#   workaround_downgrade_ota_no_rewrite_rules
+#   - Optional: omaha updater will not set workaround downgrade ota rewrite
+#     rules.
+#   - Type: boolean, default false
+#
 #   require_cup
 #   - Optional: whether or not mock-omaha-server should require that all
 #     incoming requests have CUP enabled.
@@ -238,6 +243,11 @@ template("system_test_upgrade_suite") {
     if (defined(invoker.workaround_broken_time_skip) &&
         invoker.workaround_broken_time_skip) {
       _args += [ "-workaround-broken-time-skip" ]
+    }
+
+    if (defined(invoker.workaround_downgrade_ota_no_rewrite_rules) &&
+        invoker.workaround_downgrade_ota_no_rewrite_rules) {
+      _args += [ "-workaround-downgrade-ota-no-rewrite-rules" ]
     }
 
     if (defined(invoker.require_cup) && invoker.require_cup) {
