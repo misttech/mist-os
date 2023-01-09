@@ -130,7 +130,7 @@ struct ControlGroupFile {
 
 impl ControlGroupFile {
     fn new(control_group: ControlGroupHandle) -> Self {
-        ControlGroupFile { control_group, file_state: Mutex::new(SeqFileState::new()) }
+        ControlGroupFile { control_group, file_state: Default::default() }
     }
 }
 

@@ -19,13 +19,9 @@ use crate::types::*;
 ///
 /// Simple example:
 /// ```
+/// [#derive(Default)]
 /// struct IntegersFile {
 ///     seq: Mutex<SeqFileState<i32>>,
-/// }
-/// impl IntegerFile {
-///     fn new() -> Self {
-///         Self { seq: Mutex::new(SeqFileState::new()) }
-///     }
 /// }
 /// impl FileOps for IntegersFile {
 ///     fn read_at(
@@ -60,13 +56,16 @@ pub struct SeqFileState<C: Default> {
     /// starts from the beginning until it reaches the requested offset.
     byte_offset: usize,
 }
-impl<C: Default> SeqFileState<C> {
-    pub fn new() -> Self {
+
+impl<C: Default> Default for SeqFileState<C> {
+    fn default() -> Self {
         Self { cursor: Some(C::default()), buf: SeqFileBuf::default(), byte_offset: 0 }
     }
+}
 
+impl<C: Default> SeqFileState<C> {
     fn reset(&mut self) {
-        *self = Self::new();
+        *self = Self::default();
     }
 
     pub fn read_at<'a>(
@@ -154,13 +153,9 @@ mod test {
     /// A test FileOps implementation that returns 256 bytes. Each byte is equal to its offset in
     /// the file.
     #[cfg(test)]
+    #[derive(Default)]
     struct TestSeqFile {
         seq: Mutex<SeqFileState<u8>>,
-    }
-    impl TestSeqFile {
-        pub fn new() -> Self {
-            Self { seq: Mutex::new(SeqFileState::new()) }
-        }
     }
 
     impl FileOps for TestSeqFile {
@@ -200,7 +195,7 @@ mod test {
     fn test_stuff() -> Result<(), Errno> {
         let (_kern, current_task) = create_kernel_and_task();
         let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        let file = Anon::new_file(&current_task, Box::new(TestSeqFile::new()), OpenFlags::RDONLY);
+        let file = Anon::new_file(&current_task, Box::<TestSeqFile>::default(), OpenFlags::RDONLY);
 
         let read_test = |offset: usize, length: usize| -> Result<Vec<u8>, Errno> {
             let size = file.read_at(&current_task, offset, &[UserBuffer { address, length }])?;

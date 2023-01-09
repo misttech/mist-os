@@ -399,7 +399,7 @@ impl CmdlineFile {
     fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(CmdlineFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(CmdlineFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }
@@ -448,7 +448,7 @@ impl CommFile {
     fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(CommFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(CommFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }

@@ -1461,7 +1461,7 @@ impl ProcMapsFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(ProcMapsFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(ProcMapsFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }
@@ -1531,7 +1531,7 @@ impl ProcStatFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(ProcStatFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(ProcStatFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }
@@ -1586,7 +1586,7 @@ impl ProcStatusFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(ProcStatusFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(ProcStatusFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }

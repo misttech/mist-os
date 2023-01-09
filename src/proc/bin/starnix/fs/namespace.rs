@@ -511,13 +511,14 @@ pub fn create_filesystem(
     Ok(WhatToMount::Fs(fs))
 }
 
+#[derive(Default)]
 pub struct ProcMountsFile {
     seq: Mutex<SeqFileState<()>>,
 }
 
 impl ProcMountsFile {
     pub fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(move || Ok(ProcMountsFile { seq: Mutex::new(SeqFileState::new()) }))
+        SimpleFileNode::new(|| Ok(ProcMountsFile::default()))
     }
 }
 
@@ -576,7 +577,7 @@ impl ProcMountinfoFile {
     pub fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
         let task = Arc::clone(task);
         SimpleFileNode::new(move || {
-            Ok(ProcMountinfoFile { task: Arc::clone(&task), seq: Mutex::new(SeqFileState::new()) })
+            Ok(ProcMountinfoFile { task: Arc::clone(&task), seq: Default::default() })
         })
     }
 }
