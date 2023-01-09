@@ -29,7 +29,8 @@
 
 # The generated documentation is laid out with all commands in /cmd/<cmd>.md is to make the URL predictable and stable. Categories
 # are arbitrary texts and used to change often, it is undesirable that a category change invalidates the previous command help URL.
-# Since the table of contents for each category needs to be in a file named _toc.yaml, these files are generated in the per-category directory along with a README.md, which links to the markdown in ../cmd.
+# Since the table of contents for each category needs to be in a file named _toc.yaml, these files are generated in the per-category
+# directory along with a README.md, which links to the markdown in ../cmd.
 
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
@@ -385,10 +386,9 @@ function get-category-title {
 function maybe-add-category {
   local cat_base category norm_cat toc
   category="$1"
-  cat_base="${base_out}/${norm_cat}/README.md"
   norm_cat="$(normalize "${category}")"
+  cat_base="${base_out}/${norm_cat}/README.md"
   toc="${base_out}/${norm_cat}/_toc.yaml"
-
   # Make the category sub-dir to hold the toc.
   mkdir -p "${base_out}/${norm_cat}"
   if [[ ! -f "${toc}" ]]; then
