@@ -58,8 +58,7 @@ class HasIo {
     static_assert(std::is_base_of<HasIo, T>::value);
     static_assert(sizeof(T) <= sizeof(zxio_storage_t),
                   "C++ implementation class must fit inside zxio_storage_t.");
-    static_assert(!std::is_polymorphic_v<T>,
-                  "C++ implementation class must be not contain vtables.");
+    static_assert(!std::is_polymorphic_v<T>, "C++ implementation class must not contain vtables.");
 
     // Converts a member function in the implementation C++ class to a signature
     // compatible with the definition in the ops table.
