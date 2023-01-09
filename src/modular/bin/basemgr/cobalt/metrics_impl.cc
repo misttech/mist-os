@@ -67,6 +67,12 @@ void MetricsImpl::ConnectToService(fidl::Client<MetricEventLoggerFactory>& facto
                 fidl::Result<MetricEventLoggerFactory::CreateMetricEventLogger>& response) mutable {
         if (response.is_ok()) {
           resolver.resolve(std::move(client_end));
+        } else if (response.error_value().is_domain_error() &&
+                   response.error_value().domain_error() == fuchsia_metrics::Error::kShutDown) {
+          FX_LOGS(INFO) << "Stopping sending Cobalt events";
+          resolver.resolve(std::nullopt);
+        } else {
+          FX_LOGS(WARNING) << "Failed to set up Cobalt: " << response.error_value();
         }
       });
 }
