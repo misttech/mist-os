@@ -13,6 +13,7 @@
 #include <future>
 #include <thread>
 
+#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
 #include "src/connectivity/bluetooth/hci/virtual/log.h"
 
@@ -142,6 +143,8 @@ zx_status_t EmulatorDevice::Bind(std::string_view name) {
     logf(ERROR, "could not add bt-emulator device: %s\n", zx_status_get_string(status));
     return status;
   }
+
+  bt::set_random_generator(&rng_);
 
   auto init_complete_cb = [](pw::Status status) {
     if (!status.ok()) {

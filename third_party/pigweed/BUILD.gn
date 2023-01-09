@@ -21,6 +21,11 @@ source_set("pw_random") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_random_fuzzer_generator") {
+  public_deps = [ "src/pw_random:fuzzer_generator" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
 source_set("pw_span") {
   public_deps = [ "src/pw_span" ]
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]

@@ -25,6 +25,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 #include "src/connectivity/bluetooth/lib/fidl/hanging_getter.h"
+#include "third_party/pigweed/backends/pw_random/zircon_random_generator.h"
 
 namespace bt_hci_virtual {
 
@@ -128,6 +129,8 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator {
 
   // The device that implements the bt-emulator protocol.
   zx_device_t* emulator_dev_;
+
+  pw_random_zircon::ZirconRandomGenerator rng_;
 
   // All objects below are only accessed on the |loop_| dispatcher.
   bt::testing::FakeController fake_device_;
