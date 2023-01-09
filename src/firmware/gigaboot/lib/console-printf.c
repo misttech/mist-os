@@ -45,14 +45,20 @@ static int _printf_console_out(const char* str, size_t len, void* _state) {
   return len;
 }
 
-int _printf(const char* fmt, ...) {
+int printf(const char* fmt, ...) {
   va_list ap;
+  int r;
+  va_start(ap, fmt);
+  r = vprintf(fmt, ap);
+  va_end(ap);
+  return r;
+}
+
+int vprintf(const char* fmt, va_list ap) {
   _pcstate state;
   int r;
   state.off = 0;
-  va_start(ap, fmt);
   r = _printf_engine(_printf_console_out, &state, fmt, ap);
-  va_end(ap);
   if (state.off) {
     state.buf[state.off] = 0;
     write_to_serial(state.buf, state.off);

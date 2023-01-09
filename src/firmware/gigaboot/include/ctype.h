@@ -8,5 +8,6 @@
 int isdigit(int c);
 int isspace(int c);
 int tolower(int c);
+int isprint(int c);
 
 #endif  // SRC_FIRMWARE_GIGABOOT_INCLUDE_CTYPE_H_

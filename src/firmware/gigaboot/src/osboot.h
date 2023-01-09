@@ -76,6 +76,48 @@ typedef enum {
 BootAction get_boot_action(efi_runtime_services* runtime, bool have_network, bool have_fb,
                            bool* use_dfv2);
 
+// 'printf' signature for output testing.
+typedef int (*print_function)(const char* fmt, ...);
+
+// Print buffer as hex string.
+void uefi_var_print_hex(const uint8_t* buf, size_t size, print_function printer);
+
+// Print buf as UTF8 string.
+void uefi_var_print_str(const uint8_t* buf, size_t size, print_function printer);
+
+// Get UCS-2 string length.
+//
+// str      : UCS-2 string, not necessarily null-terminated.
+// buf_size : str buffer size in bytes.
+size_t ucs2_len(const char16_t* str, size_t buf_size);
+
+// Convert UCS-2 string to UTF8 and print it to printer.
+//
+// variable_name          : UCS-2 null-terminated string
+// variable_name_buf_size : variable_name buffer size, can be bigger than actual string. If there is
+//                          no nullptr termination this will be considered input string length.
+// printer                : printf() style function for outputting result c-string
+//
+// Returns 0 on success, and -1 on error;
+int print_ucs2(const char16_t* variable_name, size_t variable_name_buf_size,
+               print_function printer);
+
+// Formatted print of buffer
+void uefi_print_var(const uint8_t* buf, size_t size, print_function printer);
+
+// Print UEFI variable information
+void dump_var_info(print_function printer);
+
+// Dump verbosity
+typedef enum {
+  kEfiVarDumpVerbosityFull,
+  kEfiVarDumpVerbosityShort,
+  kEfiVarDumpVerbosityNameOnly,
+} EfiVarDumpVerbosity;
+
+// Print all UEFI variables
+void dump_uefi_vars_custom_printer(print_function printer, EfiVarDumpVerbosity verbosity);
+
 __END_CDECLS
 
 #endif  // SRC_FIRMWARE_GIGABOOT_SRC_OSBOOT_H_

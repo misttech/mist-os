@@ -15,13 +15,8 @@
 
 __BEGIN_CDECLS
 
-#if !DISABLE_DEBUG_OUTPUT
-#define printf(x...) _printf(x)
-#else
-static inline int __PRINTFLIKE(1, 2) printf(const char *fmt, ...) { return 0; }
-#endif
-
-int _printf(const char *fmt, ...) __PRINTFLIKE(1, 2);
+int printf(const char *fmt, ...) __PRINTFLIKE(1, 2);
+int vprintf(const char *fmt, va_list ap);
 int sprintf(char *str, const char *fmt, ...) __PRINTFLIKE(2, 3);
 int snprintf(char *str, size_t len, const char *fmt, ...) __PRINTFLIKE(3, 4);
 int vsprintf(char *str, const char *fmt, va_list ap);

@@ -6,6 +6,7 @@
 
 #include <bootbyte.h>
 #include <cmdline.h>
+#include <ctype.h>
 #include <device_id.h>
 #include <fastboot.h>
 #include <framebuffer.h>
@@ -15,8 +16,10 @@
 #include <limits.h>
 #include <log.h>
 #include <netifc.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <uchar.h>
 #include <utf_conversion.h>
 #include <xefi.h>
 #include <zircon/compiler.h>
@@ -26,6 +29,7 @@
 #include <efi/protocol/device-path.h>
 #include <efi/protocol/graphics-output.h>
 #include <efi/protocol/simple-text-input.h>
+#include <efi/runtime-services.h>
 #include <efi/system-table.h>
 
 #include "abr.h"
@@ -33,12 +37,15 @@
 #include "diskio.h"
 #include "mdns.h"
 #include "netboot.h"
+#include "util.h"
 #include "variable.h"
 
 #define DEFAULT_TIMEOUT 10
 
 #define KBUFSIZE (32 * 1024 * 1024)
 #define RBUFSIZE (512 * 1024 * 1024)
+
+#define EFI_DUMP_BYTES_IN_LINE 16
 
 static const char16_t kDfv2VariableName[] = L"use_dfv2";
 
@@ -164,6 +171,237 @@ void list_abr_info(void) {
   }
 }
 
+void dump_var_info(print_function printer) {
+  efi_status status;
+  uint64_t max_var_storage_size = 0;
+  uint64_t remaining_var_storage_size = 0;
+  uint64_t max_var_size = 0;
+
+  status = gSys->RuntimeServices->QueryVariableInfo(0, &max_var_storage_size,
+                                                    &remaining_var_storage_size, &max_var_size);
+  if (EFI_ERROR(status)) {
+    ELOG_S(status, "QueryVariableInfo failed");
+    return;
+  }
+
+  printer(
+      "VariableInfo:\n"
+      "  Max Storage Size: %" PRIu64
+      "\n"
+      "  Remaining Variable Storage Size: %" PRIu64
+      "\n"
+      "  Max Variable Size: %" PRIu64 "\n",
+      max_var_storage_size, remaining_var_storage_size, max_var_size);
+}
+
+// Print hex representation of the buffer of UEFI variable
+void uefi_var_print_hex(const uint8_t* buf, size_t size, print_function printer) {
+  if (!buf)
+    return;
+
+  for (const uint8_t* cur = buf; cur < &buf[size]; cur++) {
+    printer("%02x ", *cur);
+  }
+}
+
+// Print only visible characters from the buffer. Not printable characters are replaced with '.'
+void uefi_var_print_str(const uint8_t* buf, size_t size, print_function printer) {
+  if (!buf)
+    return;
+
+  for (const uint8_t* cur = buf; cur < &buf[size]; cur++) {
+    if (isprint(*cur)) {
+      printer("%c", *cur);
+    } else {
+      printer(".");
+    }
+  }
+}
+
+// Print hexdump-style representation of variable: 16 bytes per line, hex representatian followed by
+// symbolic representation.
+void uefi_print_var(const uint8_t* buf, size_t size, print_function printer) {
+  const size_t last_line_length = size % EFI_DUMP_BYTES_IN_LINE;
+
+  if (!buf)
+    return;
+
+  size_t cur_line_len = EFI_DUMP_BYTES_IN_LINE;
+  for (size_t pos = 0; pos < size; pos += cur_line_len) {
+    const uint8_t* cur = &buf[pos];
+    cur_line_len = size - pos >= EFI_DUMP_BYTES_IN_LINE ? EFI_DUMP_BYTES_IN_LINE : last_line_length;
+
+    printer("    ");
+    uefi_var_print_hex(cur, cur_line_len, printer);
+    // padding
+    const size_t padding_chars = EFI_DUMP_BYTES_IN_LINE - cur_line_len;
+    for (size_t i = 0; i < padding_chars; i++) {
+      printer("   ");  // 2 hex digits + space
+    }
+
+    printer("  |");
+    uefi_var_print_str(cur, cur_line_len, printer);
+    printer("|");
+
+    printer("\n");
+  }
+}
+
+size_t ucs2_len(const char16_t* str, size_t buf_size) {
+  size_t len = 0;
+  for (; len < buf_size / sizeof(char16_t) && str[len] != u'\0'; len++)
+    continue;
+  return len;
+}
+
+int print_ucs2(const char16_t* variable_name, size_t variable_name_buf_size,
+               print_function printer) {
+  uint8_t* variable_name_utf8 = NULL;
+  size_t dst_len = 0;
+
+  size_t variable_name_length = ucs2_len(variable_name, variable_name_buf_size);
+  if (variable_name_length == 0)
+    return 0;
+
+  // Get required length for dst buffer
+  zx_status_t res =
+      utf16_to_utf8(variable_name, variable_name_length, variable_name_utf8, &dst_len);
+  if (res != ZX_OK) {
+    LOG("UCS-2 to UTF8 dst buffer length detection failed");
+    return -1;
+  }
+  // Take into account terminating null character.
+  dst_len += 1;
+
+  efi_status status =
+      gSys->BootServices->AllocatePool(EfiLoaderData, dst_len, (void**)&variable_name_utf8);
+  if (EFI_ERROR(status)) {
+    ELOG_S(status, "Memory allocation for utf8 variable name failed");
+    return -1;
+  }
+  // Make sure we always have '\0' character at the end
+  variable_name_utf8[dst_len - 1] = '\0';
+  --dst_len;
+
+  res = utf16_to_utf8(variable_name, variable_name_length, variable_name_utf8, &dst_len);
+  if (res == ZX_OK) {
+    printer("%s", variable_name_utf8);
+  } else {
+    LOG("UCS-2 to UTF8 convertion failed");
+  }
+
+  status = gSys->BootServices->FreePool(variable_name_utf8);
+  if (EFI_ERROR(status)) {
+    ELOG_S(status, "Freeing utf8 variable memory failed");
+  }
+
+  return 0;
+}
+
+// Print UEFI variables information including names and values using provided printer.
+// This is needed for testing.
+void dump_uefi_vars_custom_printer(print_function printer, EfiVarDumpVerbosity verbosity) {
+  efi_status status;
+  char16_t* variable_name = NULL;
+  size_t variable_name_buffer_size = 1 * sizeof(*variable_name);
+  size_t variable_name_size = variable_name_buffer_size;
+  efi_guid vendor_guid __attribute__((aligned(8))) = {0};
+  uint8_t* variable = NULL;
+  size_t variable_buffer_size = 0;
+  size_t variable_size = variable_buffer_size;
+
+  dump_var_info(printer);
+
+  printer("\nUEFI variables:\n");
+
+  // GetNextVariableName() requires variable_name to be a valid empty NULL-terminated UCS-2 string
+  // to start with first variable
+  status = gSys->BootServices->AllocatePool(EfiLoaderData, variable_name_buffer_size,
+                                            (void*)&variable_name);
+  if (EFI_ERROR(status)) {
+    ELOG_S(status, "Memory allocation for variable name failed");
+    return;
+  }
+  variable_name[0] = 0;
+
+  while (true) {
+    // Get next variable name
+    variable_name_size = variable_name_buffer_size;
+    status = gSys->RuntimeServices->GetNextVariableName(&variable_name_size, variable_name,
+                                                        &vendor_guid);
+    if (EFI_BUFFER_TOO_SMALL == status) {
+      // Bigger buffer is needed, try resizing
+      if (!uefi_realloc((void**)&variable_name, variable_name_buffer_size, variable_name_size)) {
+        break;
+      }
+      variable_name_buffer_size = variable_name_size;
+      // Retry with bigger buffer
+      continue;
+    } else if (EFI_NOT_FOUND == status) {
+      printer("\nNo more variables left.\n");
+      break;
+    }
+    if (EFI_ERROR(status)) {
+      ELOG_S(status, "GetNextVariableName failed.");
+      break;
+    }
+
+    print_ucs2(variable_name, variable_name_buffer_size, printer);
+
+    // Get variable length first
+    variable_size = variable_buffer_size;
+    status = gSys->RuntimeServices->GetVariable(variable_name, &vendor_guid, NULL, &variable_size,
+                                                variable);
+    printer(": (%zu)\n", variable_size);
+
+    if (verbosity == kEfiVarDumpVerbosityNameOnly)
+      continue;
+
+    // Resize buffer and try reading again
+    if (EFI_BUFFER_TOO_SMALL == status && variable_size > variable_buffer_size) {
+      if (!uefi_realloc((void**)&variable, variable_buffer_size, variable_size)) {
+        ELOG_S(status, "GetVariable reallocation failed: %zu -> %zu", variable_buffer_size,
+               variable_size);
+        break;
+      }
+      variable_buffer_size = variable_size;
+
+      status = gSys->RuntimeServices->GetVariable(variable_name, &vendor_guid, NULL, &variable_size,
+                                                  variable);
+    }
+
+    if (EFI_ERROR(status)) {
+      ELOG_S(status, "GetVariable failed");
+      continue;
+    }
+
+    if (verbosity == kEfiVarDumpVerbosityShort && variable_size > 16)
+      variable_size = EFI_DUMP_BYTES_IN_LINE;
+
+    uefi_print_var(variable, variable_size, printer);
+  }
+
+  // Release used buffers
+  if (variable) {
+    status = gSys->BootServices->FreePool(variable);
+    if (EFI_ERROR(status)) {
+      ELOG_S(status, "Freeing variable memory failed");
+    }
+  }
+
+  if (variable_name) {
+    status = gSys->BootServices->FreePool(variable_name);
+    if (EFI_ERROR(status)) {
+      ELOG_S(status, "Freeing variable name memory failed");
+    }
+  }
+}
+
+// Print UEFI variables information including names and values.
+void dump_uefi_vars(EfiVarDumpVerbosity verbosity) {
+  dump_uefi_vars_custom_printer(printf, verbosity);
+}
+
 void do_select_fb(void) {
   uint32_t cur_mode = get_gfx_mode();
   uint32_t max_mode = get_gfx_max_mode();
@@ -220,9 +458,9 @@ void do_fastboot(efi_handle img, efi_system_table* sys, uint32_t namegen) {
 void do_bootmenu(bool have_fb) {
   const char* menukeys;
   if (have_fb) {
-    menukeys = "rfax";
+    menukeys = "rfalvwx";
   } else {
-    menukeys = "rax";
+    menukeys = "ralvwx";
   }
 
   while (true) {
@@ -231,6 +469,9 @@ void do_bootmenu(bool have_fb) {
     if (have_fb)
       printf("  (f) list framebuffer modes\n");
     printf("  (a) List abr info\n");
+    printf("  (l) List all UEFI variables' names\n");
+    printf("  (v) Dump all UEFI variables (short value: 1 line only)\n");
+    printf("  (w) Dump all UEFI variables (full value)\n");
     printf("  (r) reset\n");
     printf("  (x) exit menu\n");
     printf("\n");
@@ -242,6 +483,15 @@ void do_bootmenu(bool have_fb) {
       }
       case 'a':
         list_abr_info();
+        break;
+      case 'l':
+        dump_uefi_vars(kEfiVarDumpVerbosityNameOnly);
+        break;
+      case 'v':
+        dump_uefi_vars(kEfiVarDumpVerbosityShort);
+        break;
+      case 'w':
+        dump_uefi_vars(kEfiVarDumpVerbosityFull);
         break;
       case 'r':
         gSys->RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);

@@ -106,6 +106,7 @@ if (!is_mac) {
       "//src/firmware/gigaboot/lib:bootbyte",
       "//src/firmware/lib/abr",
       "//src/firmware/lib/zbi",
+      "//src/lib/fxl",
       "//src/lib/fxl/test:gtest_main",
       "//third_party/android/platform/external/avb",
       "//third_party/googletest:gmock",
