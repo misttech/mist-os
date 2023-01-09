@@ -14,7 +14,8 @@ categories="memory_profile"
 pprof_path="pprof"
 output_dir="${HOME}/memory_traces"
 fuchsia_dir="${FUCHSIA_DIR:-${HOME}/fuchsia}"
-readonly default_build_id_dir="${fuchsia_dir}/out/default/.build-id"
+fuchsia_build_dir="$(fx get-build-dir)"
+readonly default_build_id_dir="${fuchsia_build_dir}/.build-id"
 build_id_input_dir="$default_build_id_dir"
 circular=false
 buffer_size=70
@@ -31,7 +32,7 @@ function usage() {
   echo "               Default: ${default_build_id_dir}"
   echo "  --output-dir directory where to write profiles."
   echo "               Default: ${output_dir}"
-  echo "  --pprof      path to the ppfor tool."
+  echo "  --pprof      path to the pprof tool."
   echo "               Default: ${pprof_path}"
 }
 
@@ -83,7 +84,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-readonly fxt_to_pprof="${fuchsia_dir}/out/default/host_x64/fxt_to_pprof"
+readonly fxt_to_pprof="${fuchsia_build_dir}/host_x64/fxt_to_pprof"
 if [[ ! -f "${fxt_to_pprof}" ]]; then
   echo "ERROR: fxt_to_pprof tool not found at ${fxt_to_pprof}"
   echo "Consider to add the following option to fx set: --with-host //src/performance/memory/profile:fxt_to_pprof"
