@@ -229,8 +229,18 @@ hermetic if the package contains all the dependencies of any tests in it.
 That is to say, any code changes that affect the outcome of this test should
 require rebuilding that test's package as well.
 
+## Inspect artifacts from test components
+
+Component tests may produce additional artifacts that cannot be displayed to
+stdout, such as [custom artifacts][custom-artifacts] and coverage profile. By
+default, `fx test` will silently discard these artifacts. To see these
+artifacts, specify an output directory to `fx test` using
+`--ffx-output-directory`. The artifacts will be pulled out of the test and
+saved to the specified directory.
+
 <!-- Reference links -->
 
+[custom-artifacts]: /docs/development/testing/components/test_runner_framework.md#custom-artifacts
 [tests-as-components]: /docs/development/testing/components/README.md
 [scripting-layer-for-fuchsia]: /docs/development/drivers/concepts/driver_development/sl4f.md
 [component-uri]: /docs/reference/components/url.md

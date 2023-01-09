@@ -430,6 +430,41 @@ fuchsia_unittest_package("foo-tests") {
 }
 ```
 
+## Exporting custom files {#custom-artifacts}
+
+To export custom files from your test, use the *custom_artifacts* storage
+capability. The contents of *custom_artifacts* are copied out at the conclusion
+of a test.
+
+To use *custom_artifacts* in your test, add the following to your component
+manifest:
+
+```json5
+{
+    use: [
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
+    ],
+}
+```
+
+At runtime, your test will have read/write access to `/custom_artifacts`.
+The contents of this directory will be empty when the test starts, and will be
+deleted after the test finishes.
+
+See the [custom artifact test example][custom-artifact-example]. To run it, add
+`//examples/tests/rust:tests` to your build, then run:
+
+```posix-terminal
+fx test --ffx-output-directory <output-dir> custom_artifact_user
+```
+
+After the test concludes, `<output-dir>` will contain the `artifact.txt` file
+produced by the test.
+
 ## Hermeticity
 
 A test is *hermetic* if it:
@@ -782,6 +817,7 @@ offer: [
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [component-unit-tests]: /docs/development/components/build.md#unit-tests
 [CTF test realm]: /docs/development/testing/ctf/test_collection.md
+[custom-artifact-example]: /examples/tests/rust/custom_artifact_test.rs
 [fidl-test-manager]: /sdk/fidl/fuchsia.test.manager/test_manager.fidl
 [fidl-test-suite]: /sdk/fidl/fuchsia.test/suite.fidl
 [ffx]: /docs/development/tools/ffx/overview.md
