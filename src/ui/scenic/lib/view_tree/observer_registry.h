@@ -20,7 +20,7 @@ namespace view_tree {
 class Registry : public fuchsia::ui::observation::test::Registry {
  public:
   // Sets up forwarding of geometry requests to the geometry provider manager.
-  Registry(std::shared_ptr<view_tree::GeometryProvider> geometry_provider);
+  explicit Registry(view_tree::GeometryProvider& geometry_provider);
 
   // |fuchsia.ui.observation.test.Registry.RegisterGlobalViewTreeWatcher|.
   void RegisterGlobalViewTreeWatcher(
@@ -32,7 +32,7 @@ class Registry : public fuchsia::ui::observation::test::Registry {
  private:
   fidl::BindingSet<fuchsia::ui::observation::test::Registry> bindings_;
 
-  std::shared_ptr<view_tree::GeometryProvider> geometry_provider_;
+  view_tree::GeometryProvider& geometry_provider_;
 };
 
 }  // namespace view_tree

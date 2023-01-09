@@ -118,19 +118,18 @@ class App {
   scheduling::DefaultFrameScheduler frame_scheduler_;
 
   gfx::Sysmem sysmem_;
-  std::unique_ptr<display::DisplayManager> display_manager_;
-  std::unique_ptr<display::SingletonDisplayService> singleton_display_service_;
-  std::unique_ptr<DisplayInfoDelegate> display_info_delegate_;
-  // DisplayPowerManager has a raw pointer to |display_manager_|, so it should
-  // be destroyed before |display_manager_|.
-  std::unique_ptr<display::DisplayPowerManager> display_power_manager_;
+  std::optional<display::DisplayManager> display_manager_;
+  std::optional<display::SingletonDisplayService> singleton_display_service_;
+  std::optional<DisplayInfoDelegate> display_info_delegate_;
+  // DisplayPowerManager has a reference to |display_manager_|, so it should be
+  // destroyed before |display_manager_|.
+  std::optional<display::DisplayPowerManager> display_power_manager_;
   escher::EscherUniquePtr escher_;
 
   std::shared_ptr<gfx::ImagePipeUpdater> image_pipe_updater_;
-  std::unique_ptr<gfx::Engine> engine_;
-  std::unique_ptr<Scenic> scenic_;
+  std::optional<gfx::Engine> engine_;
+  Scenic scenic_;
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
-  std::unique_ptr<async_watchdog::Watchdog> watchdog_;
 
   std::shared_ptr<allocation::Allocator> allocator_;
 
@@ -143,24 +142,25 @@ class App {
 
   display::ColorConverter color_converter_;
 
-  std::unique_ptr<input::InputSystem> input_;
-  std::unique_ptr<focus::FocusManager> focus_manager_;
-  std::unique_ptr<view_tree::ViewTreeSnapshotter> view_tree_snapshotter_;
-  std::unique_ptr<screen_capture::ScreenCaptureManager> screen_capture_manager_;
-  std::unique_ptr<screen_capture2::ScreenCapture2Manager> screen_capture2_manager_;
-  std::unique_ptr<screenshot::ScreenshotManager> screenshot_manager_;
+  std::optional<input::InputSystem> input_;
+  focus::FocusManager focus_manager_;
+  std::optional<view_tree::ViewTreeSnapshotter> view_tree_snapshotter_;
+  std::optional<screen_capture::ScreenCaptureManager> screen_capture_manager_;
+  std::optional<screen_capture2::ScreenCapture2Manager> screen_capture2_manager_;
+  std::optional<screenshot::ScreenshotManager> screenshot_manager_;
 
   view_tree::ViewRefInstalledImpl view_ref_installed_impl_;
 
-  std::unique_ptr<view_tree::Registry> observer_registry_;
-  std::unique_ptr<view_tree::ScopedRegistry> scoped_observer_registry_;
-
-  std::shared_ptr<view_tree::GeometryProvider> geometry_provider_;
+  view_tree::GeometryProvider geometry_provider_;
+  view_tree::Registry observer_registry_;
+  view_tree::ScopedRegistry scoped_observer_registry_;
 
   uint64_t gfx_frame_count_ = 0;
   uint64_t flatland_frame_count_ = 0;
 
   AnnotationRegistry annotation_registry_;
+
+  async_watchdog::Watchdog watchdog_;
 
   LifecycleControllerImpl lifecycle_controller_impl_;
 

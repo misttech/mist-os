@@ -18,14 +18,12 @@ using SetDisplayPowerResult = fuchsia::ui::display::internal::DisplayPower_SetDi
 
 }  // namespace
 
-DisplayPowerManager::DisplayPowerManager(DisplayManager* display_manager)
-    : display_manager_(display_manager) {
-  FX_DCHECK(display_manager_);
-}
+DisplayPowerManager::DisplayPowerManager(DisplayManager& display_manager)
+    : display_manager_(display_manager) {}
 
 void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) {
   // No display
-  if (!display_manager_->default_display()) {
+  if (!display_manager_.default_display()) {
     callback(SetDisplayPowerResult::WithErr(ZX_ERR_NOT_FOUND));
     return;
   }
@@ -34,11 +32,11 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
   // the DisplayPowerManager will only control power of the default display.
   // Once Scenic and DisplayManager supports multiple displays, this needs to
   // be updated to control power of all available displays.
-  FX_DCHECK(display_manager_->default_display_controller());
-  auto id = display_manager_->default_display()->display_id();
+  FX_DCHECK(display_manager_.default_display_controller());
+  auto id = display_manager_.default_display()->display_id();
 
   fuchsia::hardware::display::Controller_SetDisplayPower_Result set_display_power_result;
-  auto status = (*display_manager_->default_display_controller())
+  auto status = (*display_manager_.default_display_controller())
                     ->SetDisplayPower(id, power_on, &set_display_power_result);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to call FIDL SetDisplayPower(): " << zx_status_get_string(status);

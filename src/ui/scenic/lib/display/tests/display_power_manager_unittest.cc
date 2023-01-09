@@ -40,7 +40,7 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
  public:
   DisplayPowerManagerMockTest() {
     display_manager_ = std::make_unique<display::DisplayManager>([] {});
-    display_power_manager_ = std::make_unique<display::DisplayPowerManager>(display_manager_.get());
+    display_power_manager_ = std::make_unique<display::DisplayPowerManager>(*display_manager_);
   }
 
   display::DisplayManager* display_manager() { return display_manager_.get(); }

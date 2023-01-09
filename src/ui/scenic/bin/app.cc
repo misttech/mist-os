@@ -98,8 +98,7 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
   async::Loop stash_loop(&kAsyncLoopConfigNeverAttachToThread);
   fuchsia::stash::StorePtr store;
   fuchsia::stash::StoreAccessorPtr accessor;
-  zx_status_t status = app_context->svc()->Connect(store.NewRequest(stash_loop.dispatcher()));
-  if (status == ZX_OK) {
+  if (app_context->svc()->Connect(store.NewRequest(stash_loop.dispatcher())) == ZX_OK) {
     store->Identify("stash_ctl");
     store->CreateAccessor(true, accessor.NewRequest(stash_loop.dispatcher()));
   } else {
@@ -186,6 +185,21 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
   return values;
 }
 
+#ifdef NDEBUG
+// TODO(fxbug.dev/48596): Scenic sometimes gets stuck for consecutive 60 seconds.
+// Here we set up a Watchdog polling Scenic status every 15 seconds.
+constexpr uint32_t kWatchdogWarningIntervalMs = 15000u;
+// On some devices, the time to start up Scenic may exceed 15 seconds.
+// In that case we should only send a warning, and we should only crash
+// Scenic if the main thread is blocked for longer time.
+constexpr uint32_t kWatchdogTimeoutMs = 45000u;
+#else   // !defined(NDEBUG)
+// We set a higher warning interval and timeout length for debug builds,
+// since these builds could be slower than the default release ones.
+constexpr uint32_t kWatchdogWarningIntervalMs = 30000u;
+constexpr uint32_t kWatchdogTimeoutMs = 90000u;
+#endif  // NDEBUG
+
 }  // namespace
 
 namespace scenic_impl {
@@ -244,14 +258,14 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                            scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
                        inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
       image_pipe_updater_(std::make_shared<gfx::ImagePipeUpdater>(frame_scheduler_)),
-      scenic_(std::make_unique<Scenic>(
+      scenic_(
           app_context_.get(), inspect_node_, frame_scheduler_,
           [weak = std::weak_ptr<ShutdownManager>(shutdown_manager_)] {
             if (auto strong = weak.lock()) {
               strong->Shutdown(LifecycleControllerImpl::kShutdownTimeout);
             }
           },
-          config_values_.i_can_haz_flatland)),
+          config_values_.i_can_haz_flatland),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),
       link_system_(
           std::make_shared<flatland::LinkSystem>(uber_struct_system_->GetNextInstanceId())),
@@ -296,11 +310,20 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                                  }
                                }
                              })),
+      focus_manager_(inspect_node_.CreateChild("FocusManager"),
+                     /*legacy_focus_listener*/
+                     [this](zx_koid_t old_focus, zx_koid_t new_focus) {
+                       FX_DCHECK(engine_);
+                       engine_->scene_graph()->OnNewFocusedView(old_focus, new_focus);
+                     }),
+      geometry_provider_(),
+      observer_registry_(geometry_provider_),
+      scoped_observer_registry_(geometry_provider_),
       annotation_registry_(app_context_.get()),
+      watchdog_("Scenic main thread", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
+                async_get_default_dispatcher()),
       lifecycle_controller_impl_(app_context_.get(),
                                  std::weak_ptr<ShutdownManager>(shutdown_manager_)) {
-  FX_DCHECK(!device_watcher_);
-
   fpromise::bridge<escher::EscherUniquePtr> escher_bridge;
   fpromise::bridge<std::shared_ptr<display::Display>> display_bridge;
 
@@ -310,14 +333,17 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                                      dir.NewRequest().TakeChannel());
 
   fdio_ns_t* ns;
-  zx_status_t status = fdio_ns_get_installed(&ns);
-  FX_DCHECK(status == ZX_OK);
-  status = fdio_ns_bind(ns, kDependencyPath, dir.TakeChannel().release());
-  FX_DCHECK(status == ZX_OK);
+  FX_CHECK(fdio_ns_get_installed(&ns) == ZX_OK);
+  FX_CHECK(fdio_ns_bind(ns, kDependencyPath, dir.TakeChannel().release()) == ZX_OK);
 
+  // Publish all protocols that are ready.
   view_ref_installed_impl_.Publish(app_context_.get());
+  observer_registry_.Publish(app_context_.get());
+  scoped_observer_registry_.Publish(app_context_.get());
+  focus_manager_.Publish(*app_context_);
 
   // Wait for a Vulkan ICD to become advertised before trying to launch escher.
+  FX_DCHECK(!device_watcher_);
   device_watcher_ = fsl::DeviceWatcher::Create(
       kDependencyPath,
       [this, vulkan_loader = std::move(vulkan_loader),
@@ -333,16 +359,15 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
         completer.complete_ok(std::move(escher));
         device_watcher_.reset();
       });
-
   FX_DCHECK(device_watcher_);
 
   // Instantiate DisplayManager and schedule a task to inject the display controller into it, once
   // it becomes available.
-  display_manager_ = std::make_unique<display::DisplayManager>(
-      config_values_.i_can_haz_display_id, config_values_.i_can_haz_display_mode,
-      [this, completer = std::move(display_bridge.completer)]() mutable {
-        completer.complete_ok(display_manager_->default_display_shared());
-      });
+  display_manager_.emplace(config_values_.i_can_haz_display_id,
+                           config_values_.i_can_haz_display_mode,
+                           [this, completer = std::move(display_bridge.completer)]() mutable {
+                             completer.complete_ok(display_manager_->default_display_shared());
+                           });
   executor_.schedule_task(dc_handles_promise.then(
       [this](fpromise::result<ui_display::DisplayControllerHandles>& handles) {
         display_manager_->BindDefaultDisplayController(std::move(handles.value().controller));
@@ -350,39 +375,20 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
 
   // Schedule a task to finish initialization once all promises have been completed.
   // This closure is placed on |executor_|, which is owned by App, so it is safe to use |this|.
-  auto p =
-      fpromise::join_promises(escher_bridge.consumer.promise(), display_bridge.consumer.promise())
-          .and_then(
-              [this](std::tuple<fpromise::result<escher::EscherUniquePtr>,
-                                fpromise::result<std::shared_ptr<display::Display>>>& results) {
-                InitializeServices(std::move(std::get<0>(results).value()),
-                                   std::move(std::get<1>(results).value()));
-                // Should be run after all outgoing services are published.
-                app_context_->outgoing()->ServeFromStartupInfo();
-              });
+  {
+    auto p =
+        fpromise::join_promises(escher_bridge.consumer.promise(), display_bridge.consumer.promise())
+            .and_then(
+                [this](std::tuple<fpromise::result<escher::EscherUniquePtr>,
+                                  fpromise::result<std::shared_ptr<display::Display>>>& results) {
+                  InitializeServices(std::move(std::get<0>(results).value()),
+                                     std::move(std::get<1>(results).value()));
+                  // Should be run after all outgoing services are published.
+                  app_context_->outgoing()->ServeFromStartupInfo();
+                });
 
-  executor_.schedule_task(std::move(p));
-
-#ifdef NDEBUG
-  // TODO(fxbug.dev/48596): Scenic sometimes gets stuck for consecutive 60 seconds.
-  // Here we set up a Watchdog polling Scenic status every 15 seconds.
-  constexpr uint32_t kWatchdogWarningIntervalMs = 15000u;
-  // On some devices, the time to start up Scenic may exceed 15 seconds.
-  // In that case we should only send a warning, and we should only crash
-  // Scenic if the main thread is blocked for longer time.
-  constexpr uint32_t kWatchdogTimeoutMs = 45000u;
-
-#else  // !defined(NDEBUG)
-  // We set a higher warning interval and timeout length for debug builds,
-  // since these builds could be slower than the default release ones.
-  constexpr uint32_t kWatchdogWarningIntervalMs = 30000u;
-  constexpr uint32_t kWatchdogTimeoutMs = 90000u;
-
-#endif  // NDEBUG
-
-  watchdog_ = std::make_unique<async_watchdog::Watchdog>(
-      "Scenic main thread", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-      async_get_default_dispatcher());
+    executor_.schedule_task(std::move(p));
+  }
 }
 
 void App::InitializeServices(escher::EscherUniquePtr escher,
@@ -410,10 +416,8 @@ void App::InitializeServices(escher::EscherUniquePtr escher,
 
 App::~App() {
   fdio_ns_t* ns;
-  zx_status_t status = fdio_ns_get_installed(&ns);
-  FX_DCHECK(status == ZX_OK);
-  status = fdio_ns_unbind(ns, kDependencyPath);
-  FX_DCHECK(status == ZX_OK);
+  FX_CHECK(fdio_ns_get_installed(&ns) == ZX_OK);
+  FX_CHECK(fdio_ns_unbind(ns, kDependencyPath) == ZX_OK);
 }
 
 void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
@@ -454,29 +458,32 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
       std::make_shared<gfx::GfxBufferCollectionImporter>(escher_->GetWeakPtr());
   {
     TRACE_DURATION("gfx", "App::InitializeServices[engine]");
-    engine_ = std::make_unique<gfx::Engine>(escher_->GetWeakPtr(), gfx_buffer_collection_importer,
-                                            inspect_node_.CreateChild("Engine"));
+    engine_.emplace(escher_->GetWeakPtr(), gfx_buffer_collection_importer,
+                    inspect_node_.CreateChild("Engine"));
   }
 
   annotation_registry_.InitializeWithGfxAnnotationManager(engine_->annotation_manager());
 
-  auto gfx = scenic_->RegisterSystem<gfx::GfxSystem>(engine_.get(), &sysmem_,
-                                                     display_manager_.get(), image_pipe_updater_);
+  auto gfx = scenic_.RegisterSystem<gfx::GfxSystem>(&engine_.value(), &sysmem_,
+                                                    &display_manager_.value(), image_pipe_updater_);
   FX_DCHECK(gfx);
 
-  scenic_->SetScreenshotDelegate(gfx.get());
-  singleton_display_service_ = std::make_unique<display::SingletonDisplayService>(display);
-  singleton_display_service_->AddPublicService(scenic_->app_context()->outgoing().get());
-  display_info_delegate_ = std::make_unique<DisplayInfoDelegate>(display);
-  scenic_->SetDisplayInfoDelegate(display_info_delegate_.get());
+  scenic_.SetScreenshotDelegate(gfx.get());
+
+  {
+    singleton_display_service_.emplace(display);
+    singleton_display_service_->AddPublicService(scenic_.app_context()->outgoing().get());
+    display_info_delegate_.emplace(display);
+    scenic_.SetDisplayInfoDelegate(&display_info_delegate_.value());
+  }
 
   // Create the snapshotter and pass it to scenic.
   auto snapshotter =
       std::make_unique<gfx::InternalSnapshotImpl>(engine_->scene_graph(), escher_->GetWeakPtr());
-  scenic_->InitializeSnapshotService(std::move(snapshotter));
-  scenic_->SetRegisterViewFocuser(
+  scenic_.InitializeSnapshotService(std::move(snapshotter));
+  scenic_.SetRegisterViewFocuser(
       [this](zx_koid_t view_ref_koid, fidl::InterfaceRequest<fuchsia::ui::views::Focuser> focuser) {
-        focus_manager_->RegisterViewFocuser(view_ref_koid, std::move(focuser));
+        focus_manager_.RegisterViewFocuser(view_ref_koid, std::move(focuser));
       });
   auto flatland_renderer = std::make_shared<flatland::VkRenderer>(escher_->GetWeakPtr());
   // TODO(fxbug.dev/78186): flatland::VkRenderer hardcodes the framebuffer pixel format.
@@ -515,12 +522,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
         /*register_view_focuser*/
         [this](fidl::InterfaceRequest<fuchsia::ui::views::Focuser> focuser,
                zx_koid_t view_ref_koid) {
-          focus_manager_->RegisterViewFocuser(view_ref_koid, std::move(focuser));
+          focus_manager_.RegisterViewFocuser(view_ref_koid, std::move(focuser));
         },
         /*register_view_ref_focused*/
         [this](fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused> vrf,
                zx_koid_t view_ref_koid) {
-          focus_manager_->RegisterViewRefFocused(view_ref_koid, std::move(vrf));
+          focus_manager_.RegisterViewRefFocused(view_ref_koid, std::move(vrf));
         },
         /*register_touch_source*/
         [this](fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource> touch_source,
@@ -537,19 +544,17 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     {
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland>)> handler =
           fit::bind_member(flatland_manager_.get(), &flatland::FlatlandManager::CreateFlatland);
-      zx_status_t status = app_context_->outgoing()->AddPublicService(std::move(handler));
-      FX_DCHECK(status == ZX_OK);
+      FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
     }
     {
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::FlatlandDisplay>)>
           handler = fit::bind_member(flatland_manager_.get(),
                                      &flatland::FlatlandManager::CreateFlatlandDisplay);
-      zx_status_t status = app_context_->outgoing()->AddPublicService(std::move(handler));
-      FX_DCHECK(status == ZX_OK);
+      FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
     }
   }
 
-  auto screen_capture_buffer_collection_importer =
+  const auto screen_capture_buffer_collection_importer =
       std::make_shared<screen_capture::ScreenCaptureBufferCollectionImporter>(
           utils::CreateSysmemAllocatorSyncPtr("ScreenCaptureBufferCollectionImporter"),
           flatland_renderer);
@@ -592,12 +597,11 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
-    screen_capture_manager_ = std::make_unique<screen_capture::ScreenCaptureManager>(
-        flatland_engine_, flatland_renderer, flatland_manager_,
-        std::move(screen_capture_importers));
+    screen_capture_manager_.emplace(flatland_engine_, flatland_renderer, flatland_manager_,
+                                    std::move(screen_capture_importers));
 
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture>)> handler =
-        fit::bind_member(screen_capture_manager_.get(),
+        fit::bind_member(&screen_capture_manager_.value(),
                          &screen_capture::ScreenCaptureManager::CreateClient);
     FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
   }
@@ -607,7 +611,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     TRACE_DURATION("gfx", "App::InitializeServices[screen_capture2_manager]");
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
-    screen_capture2_manager_ = std::make_unique<screen_capture2::ScreenCapture2Manager>(
+    screen_capture2_manager_.emplace(
         flatland_renderer, screen_capture_buffer_collection_importer, [this]() {
           FX_DCHECK(flatland_manager_);
           FX_DCHECK(flatland_engine_);
@@ -619,7 +623,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
         });
 
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::internal::ScreenCapture>)>
-        handler = fit::bind_member(screen_capture2_manager_.get(),
+        handler = fit::bind_member(&screen_capture2_manager_.value(),
                                    &screen_capture2::ScreenCapture2Manager::CreateClient);
     FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
   }
@@ -632,75 +636,58 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
     // Capture flatland_manager since the primary display may not have been initialized yet.
-    screenshot_manager_ = std::make_unique<screenshot::ScreenshotManager>(
+    screenshot_manager_.emplace(
         config_values_.i_can_haz_flatland, allocator_, flatland_renderer,
         [this]() {
           auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
           return flatland_engine_->GetRenderables(*display);
         },
         [this](fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
-          gfx::Screenshotter::TakeScreenshot(engine_.get(), std::move(callback));
+          gfx::Screenshotter::TakeScreenshot(&engine_.value(), std::move(callback));
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
         config_values_.display_rotation);
 
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot>)> handler =
-        fit::bind_member(screenshot_manager_.get(), &screenshot::ScreenshotManager::CreateBinding);
-    zx_status_t status = app_context_->outgoing()->AddPublicService(std::move(handler));
-    FX_DCHECK(status == ZX_OK);
+        fit::bind_member(&screenshot_manager_.value(),
+                         &screenshot::ScreenshotManager::CreateBinding);
+    FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
   }
 
   {
     TRACE_DURATION("gfx", "App::InitializeServices[display_power]");
-    display_power_manager_ = std::make_unique<display::DisplayPowerManager>(display_manager_.get());
-    zx_status_t status =
-        app_context_->outgoing()->AddPublicService(display_power_manager_->GetHandler());
-    FX_DCHECK(status == ZX_OK);
+    display_power_manager_.emplace(display_manager_.value());
+    FX_CHECK(app_context_->outgoing()->AddPublicService(display_power_manager_->GetHandler()) ==
+             ZX_OK);
   }
-
-  geometry_provider_ = std::make_shared<view_tree::GeometryProvider>();
-
-  observer_registry_ = std::make_unique<view_tree::Registry>(geometry_provider_);
-  observer_registry_->Publish(app_context_.get());
-
-  scoped_observer_registry_ = std::make_unique<view_tree::ScopedRegistry>(geometry_provider_);
-  scoped_observer_registry_->Publish(app_context_.get());
 }
 
 void App::InitializeInput() {
   TRACE_DURATION("gfx", "App::InitializeInput");
-  input_ = std::make_unique<input::InputSystem>(
-      app_context_.get(), inspect_node_,
-      /*request_focus*/
-      [this, use_auto_focus = config_values_.pointer_auto_focus_on](zx_koid_t koid) {
-        if (!use_auto_focus)
-          return;
+  input_.emplace(app_context_.get(), inspect_node_,
+                 /*request_focus*/
+                 [this, use_auto_focus = config_values_.pointer_auto_focus_on](zx_koid_t koid) {
+                   if (!use_auto_focus)
+                     return;
 
-        const auto& focus_chain = focus_manager_->focus_chain();
-        if (!focus_chain.empty()) {
-          const zx_koid_t requestor = focus_chain[0];
-          const zx_koid_t request = koid != ZX_KOID_INVALID ? koid : requestor;
-          focus_manager_->RequestFocus(requestor, request);
-        }
-      });
-  FX_DCHECK(input_);
-  scenic_->SetRegisterTouchSource(
+                   const auto& focus_chain = focus_manager_.focus_chain();
+                   if (!focus_chain.empty()) {
+                     const zx_koid_t requestor = focus_chain[0];
+                     const zx_koid_t request = koid != ZX_KOID_INVALID ? koid : requestor;
+                     focus_manager_.RequestFocus(requestor, request);
+                   }
+                 });
+  scenic_.SetRegisterTouchSource(
       [this](fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource> touch_source,
              zx_koid_t vrf) { input_->RegisterTouchSource(std::move(touch_source), vrf); });
-  scenic_->SetRegisterMouseSource(
+  scenic_.SetRegisterMouseSource(
       [this](fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
              zx_koid_t vrf) { input_->RegisterMouseSource(std::move(mouse_source), vrf); });
 
-  focus_manager_ = std::make_unique<focus::FocusManager>(
-      inspect_node_.CreateChild("FocusManager"),
-      /*legacy_focus_listener*/ [this](zx_koid_t old_focus, zx_koid_t new_focus) {
-        engine_->scene_graph()->OnNewFocusedView(old_focus, new_focus);
-      });
-  scenic_->SetViewRefFocusedRegisterFunction(
+  scenic_.SetViewRefFocusedRegisterFunction(
       [this](zx_koid_t koid, fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused> vrf) {
-        focus_manager_->RegisterViewRefFocused(koid, std::move(vrf));
+        focus_manager_.RegisterViewRefFocused(koid, std::move(vrf));
       });
-  focus_manager_->Publish(*app_context_);
 }
 
 void App::InitializeHeartbeat(display::Display& display) {
@@ -737,7 +724,7 @@ void App::InitializeHeartbeat(display::Display& display) {
 
     subscribers.push_back(
         {.on_new_view_tree =
-             [this](auto snapshot) { focus_manager_->OnNewViewTreeSnapshot(std::move(snapshot)); },
+             [this](auto snapshot) { focus_manager_.OnNewViewTreeSnapshot(std::move(snapshot)); },
          .dispatcher = async_get_default_dispatcher()});
 
     subscribers.push_back({.on_new_view_tree =
@@ -749,7 +736,7 @@ void App::InitializeHeartbeat(display::Display& display) {
 
     subscribers.push_back({.on_new_view_tree =
                                [this](auto snapshot) {
-                                 geometry_provider_->OnNewViewTreeSnapshot(std::move(snapshot));
+                                 geometry_provider_.OnNewViewTreeSnapshot(std::move(snapshot));
                                },
                            .dispatcher = async_get_default_dispatcher()});
 
@@ -762,8 +749,7 @@ void App::InitializeHeartbeat(display::Display& display) {
                              .dispatcher = async_get_default_dispatcher()});
     }
 
-    view_tree_snapshotter_ = std::make_unique<view_tree::ViewTreeSnapshotter>(
-        std::move(subtrees_generator_callbacks), std::move(subscribers));
+    view_tree_snapshotter_.emplace(std::move(subtrees_generator_callbacks), std::move(subscribers));
   }
 
   // Set up what to do each time a FrameScheduler event fires.
@@ -781,7 +767,7 @@ void App::InitializeHeartbeat(display::Display& display) {
         }
 
         const scheduling::SessionsWithFailedUpdates failed_sessions =
-            scenic_->UpdateSessions(sessions_to_update, trace_id);
+            scenic_.UpdateSessions(sessions_to_update, trace_id);
         image_pipe_updater_->UpdateSessions(sessions_to_update);
         flatland_manager_->UpdateInstances(sessions_to_update);
         flatland_presenter_->AccumulateReleaseFences(sessions_to_update);
@@ -795,7 +781,7 @@ void App::InitializeHeartbeat(display::Display& display) {
       },
       /*on_frame_presented*/
       [this](auto latched_times, auto present_times) {
-        scenic_->OnFramePresented(latched_times, present_times);
+        scenic_.OnFramePresented(latched_times, present_times);
         image_pipe_updater_->OnFramePresented(latched_times, present_times);
         flatland_manager_->OnFramePresented(latched_times, present_times);
       },

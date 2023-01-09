@@ -23,7 +23,7 @@ namespace scenic_impl::display {
 // display devices through this protocol.
 class DisplayPowerManager : public fuchsia::ui::display::internal::DisplayPower {
  public:
-  explicit DisplayPowerManager(DisplayManager* display_manager);
+  explicit DisplayPowerManager(DisplayManager& display_manager);
 
   // |fuchsia::ui::display::internal::DisplayPower|
   void SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) override;
@@ -31,7 +31,7 @@ class DisplayPowerManager : public fuchsia::ui::display::internal::DisplayPower 
   fidl::InterfaceRequestHandler<DisplayPower> GetHandler() { return bindings_.GetHandler(this); }
 
  private:
-  DisplayManager* display_manager_ = nullptr;
+  DisplayManager& display_manager_;
   fidl::BindingSet<fuchsia::ui::display::internal::DisplayPower> bindings_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(DisplayPowerManager);
