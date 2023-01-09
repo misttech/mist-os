@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
 use argh::FromArgs;
 use ffx_command::{
     argh_to_ffx_err, Ffx, FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite,
 };
 use ffx_command::{FfxContext, Result};
-use ffx_config::EnvironmentContext;
+use ffx_config::{EnvironmentContext, Sdk};
 use std::{
     collections::HashMap,
     fs::File,
@@ -18,7 +19,7 @@ use std::{
 use crate::{FhoDetails, FhoToolMetadata, Only};
 
 /// Path information about a subtool
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct SubToolLocation {
     source: FfxToolSource,
     name: String,
@@ -37,7 +38,7 @@ pub struct ExternalSubTool {
 #[derive(Clone)]
 pub struct ExternalSubToolSuite {
     context: EnvironmentContext,
-    available_commands: HashMap<String, SubToolLocation>,
+    workspace_tools: HashMap<String, SubToolLocation>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -66,18 +67,13 @@ impl ExternalSubToolSuite {
         context: EnvironmentContext,
         subtool_paths: &[impl AsRef<Path>],
     ) -> Result<Self> {
-        let available_commands =
-            find_tools(subtool_paths).map(|tool| (tool.name.to_owned(), tool)).collect();
-        Ok(Self { context, available_commands })
+        let workspace_tools =
+            find_workspace_tools(subtool_paths).map(|tool| (tool.name.to_owned(), tool)).collect();
+        Ok(Self { context, workspace_tools })
     }
 
-    fn extract_external_subtool(
-        &self,
-        ffx_cmd: &FfxCommandLine,
-        args: &[&str],
-    ) -> Option<ExternalSubTool> {
-        let name = args.first().copied()?;
-        let cmd = match self.available_commands.get(name).and_then(SubToolLocation::validate_tool) {
+    fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine, name: &str) -> Option<ExternalSubTool> {
+        let cmd = match self.workspace_tools.get(name).and_then(SubToolLocation::validate_tool) {
             Some(FfxToolInfo { path: Some(path), .. }) => {
                 let context = self.context.clone();
                 let cmd_line = ffx_cmd.clone();
@@ -87,6 +83,25 @@ impl ExternalSubToolSuite {
             _ => return None,
         };
         Some(cmd)
+    }
+
+    fn find_sdk_tool(
+        &self,
+        sdk: &Sdk,
+        ffx_cmd: &FfxCommandLine,
+        name: &str,
+    ) -> Option<ExternalSubTool> {
+        let name = "ffx-".to_owned() + name;
+        let ffx_tool = sdk.get_ffx_tool(&name)?;
+        let location = SubToolLocation::from_path(
+            FfxToolSource::Sdk,
+            &ffx_tool.executable,
+            &ffx_tool.metadata,
+        )?;
+        let Some(FfxToolInfo { path: Some(path), .. }) = location.validate_tool() else { return None };
+        let context = self.context.clone();
+        let cmd_line = ffx_cmd.clone();
+        Some(ExternalSubTool { cmd_line, context, path })
     }
 }
 
@@ -100,24 +115,43 @@ impl ToolSuite for ExternalSubToolSuite {
         &[]
     }
 
-    fn command_list(&self) -> Vec<FfxToolInfo> {
-        self.available_commands.values().filter_map(SubToolLocation::validate_tool).collect()
+    async fn command_list(&self) -> Vec<FfxToolInfo> {
+        let mut tools: Vec<_> = self.workspace_tools.values().cloned().collect();
+        if let Ok(sdk) = self.context.get_sdk().await {
+            for ffx_tool in sdk.get_ffx_tools() {
+                SubToolLocation::from_path(
+                    FfxToolSource::Sdk,
+                    &ffx_tool.executable,
+                    &ffx_tool.metadata,
+                )
+                .map(|loc| tools.push(loc));
+            }
+        }
+        tools.iter().filter_map(SubToolLocation::validate_tool).collect()
     }
 
-    fn try_from_args(
+    async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
         args: &[&str],
-    ) -> Result<Option<Box<(dyn ToolRunner + 'static)>>> {
-        let cmd = match self.extract_external_subtool(ffx_cmd, args) {
-            Some(c) => c,
-            None => return Ok(None),
-        };
-        Ok(Some(Box::new(cmd)))
+    ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
+        let name = args.first().copied().context("parsing command name")?;
+        // look in the workspace first
+        if let Some(cmd) = self.find_workspace_tool(ffx_cmd, name) {
+            return Ok(Some(Box::new(cmd)));
+        }
+        // then try the sdk
+        let sdk = self.context.get_sdk().await?;
+        if let Some(cmd) = self.find_sdk_tool(&sdk, ffx_cmd, name) {
+            return Ok(Some(Box::new(cmd)));
+        }
+        // and we're done
+        Ok(None)
     }
 
     fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine, args: &[&str]) -> Result<Vec<String>> {
-        if self.extract_external_subtool(ffx_cmd, args).is_none() {
+        let name = args.first().copied().context("parsing command name")?;
+        if self.find_workspace_tool(ffx_cmd, name).is_none() {
             return Ok(Vec::new());
         }
         // This will likely double-report if this is given to analytics.
@@ -145,7 +179,7 @@ impl FhoToolMetadata {
 
 /// Searches a set of directories for tools matching the path `ffx-<name>`
 /// and returns information about them based on known abis
-fn find_tools<P>(subtool_paths: &[P]) -> impl Iterator<Item = SubToolLocation> + '_
+fn find_workspace_tools<P>(subtool_paths: &[P]) -> impl Iterator<Item = SubToolLocation> + '_
 where
     P: AsRef<Path>,
 {
@@ -153,7 +187,12 @@ where
         .iter()
         .filter_map(|path| {
             Some(std::fs::read_dir(path.as_ref()).ok()?.filter_map(move |entry| {
-                SubToolLocation::from_path(FfxToolSource::Workspace, &entry.ok()?.path())
+                let entry = entry.ok()?;
+                SubToolLocation::from_path(
+                    FfxToolSource::Workspace,
+                    &entry.path(),
+                    &entry.path().with_extension("json"),
+                )
             }))
         })
         .flatten()
@@ -162,14 +201,18 @@ where
 impl SubToolLocation {
     /// Evaluate the given path for if it looks like a subtool based on filename and the
     /// presence of a metadata file.
-    fn from_path(source: FfxToolSource, tool_path: &Path) -> Option<SubToolLocation> {
+    fn from_path(
+        source: FfxToolSource,
+        tool_path: &Path,
+        metadata_path: &Path,
+    ) -> Option<SubToolLocation> {
         let file_name = tool_path.file_name()?.to_str()?;
         if let Some(suffix) = file_name.strip_prefix("ffx-") {
-            let metadata_path = tool_path.with_extension("json");
             let name = suffix.to_lowercase();
             // require the presence of a metadata file
             if metadata_path.exists() {
                 let tool_path = tool_path.to_owned();
+                let metadata_path = metadata_path.to_owned();
                 return Some(SubToolLocation { source, name, tool_path, metadata_path });
             }
         }
@@ -214,7 +257,9 @@ mod tests {
     use MockMetadata::*;
 
     fn check_ffx_tool(source: FfxToolSource, path: &Path) -> Option<FfxToolInfo> {
-        SubToolLocation::from_path(source, path).as_ref().and_then(SubToolLocation::validate_tool)
+        SubToolLocation::from_path(source, path, &path.with_extension("json"))
+            .as_ref()
+            .and_then(SubToolLocation::validate_tool)
     }
 
     // Sets up a mock subtool in `dir` with the name `subtool_name` and, adjacent metadata based on the
@@ -320,8 +365,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scan_workspace_subtool_directory() {
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn scan_workspace_subtool_directory() {
         let tempdir = tempfile::tempdir().expect("tempdir");
         create_mock_subtool(
             tempdir.path(),
@@ -389,7 +434,7 @@ mod tests {
             .into_iter(),
         );
         assert_eq!(
-            HashSet::from_iter(suite.command_list().into_iter()),
+            HashSet::from_iter(suite.command_list().await.into_iter()),
             expected_commands,
             "subtools we created should exist"
         );
@@ -402,6 +447,7 @@ mod tests {
                 },
                 &["whatever"],
             )
+            .await
             .expect("should be able to find mock subtool in suite");
     }
 }

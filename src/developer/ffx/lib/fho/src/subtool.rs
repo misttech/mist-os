@@ -161,6 +161,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl<M: FfxTool> ToolSuite for FhoSuite<M> {
     fn from_env(ffx: &Ffx, context: &EnvironmentContext) -> Result<Self> {
         let ffx = ffx.clone();
@@ -172,7 +173,7 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
         FhoHandler::<M>::COMMANDS
     }
 
-    fn try_from_args(
+    async fn try_from_args(
         &self,
         cmd: &FfxCommandLine,
         args: &[&str],

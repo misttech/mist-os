@@ -57,6 +57,7 @@ pub trait ToolRunner {
 
 /// Implements discovering and loading the subtools a particular ffx binary
 /// is capable of running.
+#[async_trait::async_trait(?Send)]
 pub trait ToolSuite: Sized {
     /// Initializes the tool suite from the ffx invocation's environment.
     fn from_env(app: &Ffx, env: &EnvironmentContext) -> Result<Self, Error>;
@@ -67,13 +68,13 @@ pub trait ToolSuite: Sized {
 
     /// Lists all commands reachable from the current context. Defaults to just
     /// the same set of commands as in [`Self::global_command_list`].
-    fn command_list(&self) -> Vec<FfxToolInfo> {
+    async fn command_list(&self) -> Vec<FfxToolInfo> {
         Self::global_command_list().iter().copied().map(|cmd| cmd.into()).collect()
     }
 
     /// Parses the given command line information into a runnable command
     /// object.
-    fn try_from_args(
+    async fn try_from_args(
         &self,
         cmd: &FfxCommandLine,
         args: &[&str],
@@ -86,8 +87,12 @@ pub trait ToolSuite: Sized {
     /// Parses the given command line information into a runnable command
     /// object, exiting and printing the early exit output if help is requested
     /// or an error occurs.
-    fn from_args(&self, cmd: &FfxCommandLine, args: &[&str]) -> Option<Box<dyn ToolRunner + '_>> {
-        self.try_from_args(cmd, args).unwrap_or_else(|early_exit| {
+    async fn from_args(
+        &self,
+        cmd: &FfxCommandLine,
+        args: &[&str],
+    ) -> Option<Box<dyn ToolRunner + '_>> {
+        self.try_from_args(cmd, args).await.unwrap_or_else(|early_exit| {
             print!("{}", early_exit);
 
             std::process::exit(early_exit.exit_code())
@@ -95,11 +100,11 @@ pub trait ToolSuite: Sized {
     }
 
     /// Prints out a list of the commands this suite has available
-    fn print_command_list(&self, w: &mut impl Write) -> Result<(), std::fmt::Error> {
+    async fn print_command_list(&self, w: &mut impl Write) -> Result<(), std::fmt::Error> {
         let mut built_in = None;
         let mut workspace = None;
         let mut sdk = None;
-        for cmd in &self.command_list() {
+        for cmd in &self.command_list().await {
             use FfxToolSource::*;
             let kind = match cmd.source {
                 BuiltIn => built_in.get_or_insert_with(String::new),
@@ -122,7 +127,7 @@ pub trait ToolSuite: Sized {
     }
 
     /// Finds the given tool by name in the available command list
-    fn find_tool_by_name(&self, name: &str) -> Option<FfxToolInfo> {
-        self.command_list().into_iter().find(|cmd| cmd.name == name)
+    async fn find_tool_by_name(&self, name: &str) -> Option<FfxToolInfo> {
+        self.command_list().await.into_iter().find(|cmd| cmd.name == name)
     }
 }

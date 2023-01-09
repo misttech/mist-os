@@ -30,6 +30,7 @@ struct FfxSuite {
 
 const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_millis(500);
 
+#[async_trait::async_trait(?Send)]
 impl ToolSuite for FfxSuite {
     fn from_env(app: &Ffx, env: &EnvironmentContext) -> Result<Self> {
         let app = app.clone();
@@ -44,13 +45,13 @@ impl ToolSuite for FfxSuite {
         SubCommand::COMMANDS
     }
 
-    fn command_list(&self) -> Vec<FfxToolInfo> {
+    async fn command_list(&self) -> Vec<FfxToolInfo> {
         let builtin_commands = SubCommand::COMMANDS.iter().copied().map(FfxToolInfo::from);
 
-        builtin_commands.chain(self.external_commands.command_list().into_iter()).collect()
+        builtin_commands.chain(self.external_commands.command_list().await.into_iter()).collect()
     }
 
-    fn try_from_args(
+    async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
         args: &[&str],
@@ -60,7 +61,7 @@ impl ToolSuite for FfxSuite {
         match args.first().copied() {
             Some("commands") => {
                 let mut output = String::new();
-                self.print_command_list(&mut output).ok();
+                self.print_command_list(&mut output).await.ok();
                 let code = 0;
                 Err(Error::Help { output, code })
             }
@@ -69,25 +70,28 @@ impl ToolSuite for FfxSuite {
                     .map_err(argh_to_ffx_err)?;
                 Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
             }
-            Some(name) => match self.external_commands.try_from_args(ffx_cmd, args)? {
+            Some(name) => match self.external_commands.try_from_args(ffx_cmd, args).await? {
                 Some(tool) => Ok(Some(tool)),
                 _ => {
                     let mut output = format!(
                         "Unknown ffx tool `{name}`. Did you mean one of the following?\n\n"
                     );
-                    self.print_command_list(&mut output).ok();
+                    self.print_command_list(&mut output).await.ok();
                     let code = 1;
                     return Err(Error::Help { output, code });
                 }
             },
             None => {
                 let help_res = Ffx::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), &["help"]);
-                help_res.map(|_| None).map_err(|help_err| {
-                    let mut output = help_err.output;
-                    let code = help_err.status.map_or(1, |_| 0);
-                    self.print_command_list(&mut output).ok();
-                    Error::Help { output, code }
-                })
+                match help_res {
+                    Ok(_) => Ok(None),
+                    Err(help_err) => {
+                        let mut output = help_err.output;
+                        let code = help_err.status.map_or(1, |_| 0);
+                        self.print_command_list(&mut output).await.ok();
+                        Err(Error::Help { output, code })
+                    }
+                }
             }
         }
     }

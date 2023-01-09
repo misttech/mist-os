@@ -82,7 +82,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     let tools = T::from_env(&app, &context)?;
 
     let args_ref = Vec::from_iter(app.subcommand.iter().map(|arg| &**arg));
-    let tool = tools.from_args(&cmd, &args_ref);
+    let tool = tools.from_args(&cmd, &args_ref).await;
     // If the line above succeeds, then this will succeed as well.
     let sanitized_args = match tools.redact_arg_values(&cmd, &args_ref) {
         Ok(a) => format!("{} {}", cmd.redact_args_flags_only(), a[1..].join(" ")).trim().to_owned(),
