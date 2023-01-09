@@ -45,6 +45,10 @@
                 "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
                 "ChrootTest.ProcMountsMountinfoNoEscape",
 
+                // chown_test
+                "ChownKinds/ChownParamTest.ChownFilePermissionDenied/*",
+                "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
+
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
                 "Sleepers/WallClockNanosleepTest.SleepOneSecond/0",
@@ -190,6 +194,7 @@
                 "FcntlSignalTest.SetSigDupUnregisterOld",
                 "FcntlSignalTest.SetSigDupUnregisterNew",
                 "FifoTest.OpenBlockedAndInterrupted",
+                "FcntlLockTest.GetLockRespectsPIDNamespace",
 
                 // flock_test
                 "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
@@ -332,6 +337,9 @@
                 "LseekTest.SysDir",
                 "LseekTest.ProcStatTwice",
                 "LseekTest.EtcPasswdDup",
+
+                // link_test
+                "LinkTest.PermissionDenied",
 
                 // madvise_test
                 "MadviseDontneedTest.CleansPrivateFilePage",
@@ -618,6 +626,10 @@
                 "PrctlTest.PDeathSig",
                 "PrctlTest.RootDumpability",
 
+                // priority_test
+                "GetpriorityTest.CloneMaintainsPriority",
+                "SetpriorityTest.NicenessExposedViaProcfs",
+
                 // processes_test
                 "Processes.ExecSwapThreadGroupLeader",
                 "Processes.SetPGIDOfZombie",
@@ -683,7 +695,10 @@
                 "ProcSelfMounts.ContainsProcfsEntry",
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
-                "ProcPid.RootDumpableOwner",
+                "ProcPidMem.DifferentUserAttached",
+                "ProcPidMem.DifferentUser",
+                "ProcCpuinfo.DeniesWriteNonRoot",
+                "ProcCpuinfo.DeniesWriteRoot",
                 "SelfAndNumericPid/ProcPidStatTest.HasBasicFields/*",
                 "SelfAndNumericPid/ProcPidStatmTest.HasBasicFields/*",
 
