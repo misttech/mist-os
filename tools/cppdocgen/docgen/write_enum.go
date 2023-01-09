@@ -11,7 +11,6 @@ import (
 )
 
 func enumHtmlId(e *clangdoc.EnumInfo) string {
-	// TODO include namespace information in this for proper scoping.
 	return getScopeQualifier(e.Namespace, true) + e.Name
 }
 
@@ -67,7 +66,6 @@ func writeEnumDeclaration(e *clangdoc.EnumInfo, f io.Writer) {
 func writeEnumSection(settings WriteSettings, index *Index, e *clangdoc.EnumInfo, f io.Writer) {
 	headingLine, _ := extractCommentHeading1(e.Description)
 	if headingLine == "" {
-		// TODO include namespace information.
 		fmt.Fprintf(f, "## %s Enum {:#%s}\n\n", e.Name, enumHtmlId(e))
 	} else {
 		// Explicit title. Add a "#" to make it "level 2".

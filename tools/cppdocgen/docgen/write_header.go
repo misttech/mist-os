@@ -50,10 +50,10 @@ func HeaderReferenceFile(h string) string {
 	// lead to collisions as in libasync "lib/async-loop/loop.h" and
 	// "lib/async-loop/cpp/loop.h".
 	//
-	// I think we should instead base the header reference file name on the include path that
-	// users will use, in this case "lib_async-loop_loop.h" or something. This seems better than
-	// a disambiguation scheme when there are collisions because the header file name is always
-	// stable (good for external references to the file).
+	// TODO(fxbug.dev/119107): Instead we should base the header reference file name on the
+	// include path that users will use, in this case "lib/async-loop/loop.h.md". This seems
+	// better than a disambiguation scheme when there are collisions because the header file
+	// name is always stable (good for external references to the file).
 	return filepath.Base(h) + ".md"
 }
 

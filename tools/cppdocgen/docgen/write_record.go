@@ -159,7 +159,8 @@ func writeRecordReference(settings WriteSettings, index *Index, h *Header, r *cl
 		// class/struct code declaration includes all data members and our code often
 		// doesn't have documentation for obvious ones.
 		if len(d.Description) > 0 && !commentContains(d.Description, NoDocTag) {
-			// TODO needs anchor ref.
+			// TODO we can consider adding an anchor ref here if we ever need to
+			// be able to link to members (currently there is no need for this).
 			fmt.Fprintf(f, "### %s\n\n", d.Name)
 			writeComment(index, d.Description, markdownHeading3, f)
 		}
@@ -172,9 +173,6 @@ func writeRecordReference(settings WriteSettings, index *Index, h *Header, r *cl
 				false, f)
 		}
 	}
-
-	// TODO output child records with docstrings and enums.
-	// Data member docstrings are not currently emitted by clang-doc.
 
 	// Tracks whether we have seen a given function so we don't duplicate it. Functions can
 	// appear multiple times, one for each base class they appear in and once for the class'
@@ -228,7 +226,7 @@ func recordFullName(r *clangdoc.RecordInfo) string {
 func recordHtmlId(index *Index, r *clangdoc.RecordInfo) string {
 	// Use the fully-qualified type name as the ID.
 	//
-	// TODO it would be nice to allow links to template specializations (the same name). If this
+	// TODO(fxbug.dev/119085) Allow links to template specializations (the same name). If this
 	// function took an Index parameter, it could check for this case and use the USR id for all
 	// but the first instance.
 	fullRecord := index.RecordUsrs[r.USR]

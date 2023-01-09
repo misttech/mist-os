@@ -257,7 +257,7 @@ type RecordInfo struct {
 	DefLocation Location      `yaml:"DefLocation"`
 	Description []CommentInfo `yaml:"Description"`
 
-	TagType string           `yaml:"TagType"` // TODO(brettw) missing in current clang-doc output.
+	TagType string           `yaml:"TagType"`
 	Members []MemberTypeInfo `yaml:"Members"`
 
 	Template *TemplateInfo `yaml:"Template"` // Null for non-templates.
