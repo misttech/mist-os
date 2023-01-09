@@ -14,6 +14,8 @@
 #include <perfetto/ext/ipc/host.h>
 #include <perfetto/tracing.h>
 
+#include "src/lib/fxl/memory/weak_ptr.h"
+
 namespace perfetto {
 class ServiceIPCHost;
 }  // namespace perfetto
@@ -68,6 +70,7 @@ class ProducerConnectorImpl : public fidl::Server<fuchsia_tracing_perfetto::Prod
   perfetto::ipc::Host* perfetto_producer_host_;
 
   std::map<ReceiverId, std::unique_ptr<BufferReceiverClient>> buffer_receivers_;
+  fxl::WeakPtrFactory<ProducerConnectorImpl> weak_factory_{this};
 };
 
 #endif  // SRC_PERFORMANCE_PERFETTO_BRIDGE_PRODUCER_CONNECTOR_IMPL_H_

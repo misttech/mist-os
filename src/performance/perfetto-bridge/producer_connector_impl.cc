@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.tracing.perfetto/cpp/markers.h>
 #include <fidl/fuchsia.tracing.perfetto/cpp/natural_types.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
@@ -19,7 +20,6 @@
 #include <memory>
 
 #include <fbl/unique_fd.h>
-#include <src/lib/fxl/memory/weak_ptr.h>
 
 ProducerConnectorImpl::ProducerConnectorImpl(async_dispatcher_t* dispatcher,
                                              perfetto::base::TaskRunner* perfetto_task_runner,
@@ -90,14 +90,20 @@ bool ProducerConnectorImpl::SendSharedMemoryToProducer(ReceiverId receiver_id, i
   status = fdio_fd_clone(fd, request.buffer().channel().reset_and_get_address());
   FX_CHECK(status == ZX_OK) << "fdio_fd_clone " << status;
 
-  (*buffer_receivers_[receiver_id]->client())
-      ->ProvideBuffer(std::move(request))
-      .Then([](fidl::Result<::fuchsia_tracing_perfetto::BufferReceiver::ProvideBuffer>& result) {
-        if (result.is_error()) {
-          FX_LOGS(ERROR) << "Error sending shared memory buffer to producer: "
-                         << result.error_value().FormatDescription();
-        }
-      });
+  async::PostTask(fidl_dispatcher_, [weak_this = weak_factory_.GetWeakPtr(), receiver_id,
+                                     request = std::move(request)]() mutable {
+    if (!weak_this) {
+      return;
+    }
+    (*(weak_this->buffer_receivers_)[receiver_id]->client())
+        ->ProvideBuffer(std::move(request))
+        .Then([](fidl::Result<::fuchsia_tracing_perfetto::BufferReceiver::ProvideBuffer>& result) {
+          if (result.is_error()) {
+            FX_LOGS(ERROR) << "Error sending shared memory buffer to producer: "
+                           << result.error_value().FormatDescription();
+          }
+        });
+  });
 
   return true;
 }
