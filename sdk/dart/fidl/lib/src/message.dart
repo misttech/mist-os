@@ -9,11 +9,13 @@ import 'package:zircon/zircon.dart';
 
 import 'codec.dart';
 import 'error.dart';
+import 'struct.dart';
 import 'types.dart';
 import 'wire_format.dart';
 // ignore_for_file: public_member_api_docs
 
 const int kMessageHeaderSize = 16;
+const int kLargeMessageInfoSize = 16;
 const int kMessageTxidOffset = 0;
 const int kMessageFlagOffset = 4;
 const int kMessageDynamicFlagOffset = 6;
@@ -24,10 +26,16 @@ const int kMagicNumberInitial = 1;
 const int kWireFormatV2FlagMask = 2;
 
 const int _kDynamicFlagsFlexible = 0x80;
+const int _kDynamicFlagsByteOverflow = 0x40;
 
 enum CallStrictness {
   strict,
   flexible,
+}
+
+enum CallOverflowing {
+  large,
+  small,
 }
 
 /// Convert CallStrictness to a byte that can be inserted into the dynamic flags
@@ -50,6 +58,17 @@ CallStrictness strictnessFromFlags(int dynamicFlags) {
   return CallStrictness.strict;
 }
 
+// TODO(fxbug.dev/114263): Add `overflowingToFlags`.
+
+/// Extract the CallOverflowing from the dynamic flags byte of the message
+/// header.
+CallOverflowing overflowingFromFlags(int dynamicFlags) {
+  if ((dynamicFlags & _kDynamicFlagsByteOverflow) != 0) {
+    return CallOverflowing.large;
+  }
+  return CallOverflowing.small;
+}
+
 class _BaseMessage {
   _BaseMessage(this.data);
 
@@ -68,6 +87,9 @@ class _BaseMessage {
 
   CallStrictness get strictness =>
       strictnessFromFlags(data.getUint8(kMessageDynamicFlagOffset));
+
+  CallOverflowing get overflowing =>
+      overflowingFromFlags(data.getUint8(kMessageDynamicFlagOffset));
 
   bool isCompatible() => magic == kMagicNumberInitial;
 
@@ -209,6 +231,15 @@ T decodeMessage<T>(IncomingMessage message, int inlineSize, MemberType typ) {
   });
 }
 
+/// Decodes a (possibly large) FIDL message that contains a single parameter.
+T decodeMaybeLargeMessage<T>(
+    IncomingMessage message, int inlineSize, MemberType typ) {
+  return decodeMaybeLargeMessageWithCallback(message, inlineSize,
+      (Decoder decoder, int offset) {
+    return typ.decode(decoder, offset, 1);
+  });
+}
+
 /// Decodes a FIDL message with multiple parameters.  The callback parameter
 /// provides a decoder that is initialized on the provided Message, which
 /// callers can use to decode specific types.  The return result of the callback
@@ -226,6 +257,92 @@ T decodeMessageWithCallback<T>(
   T out = f(decoder, kMessageHeaderSize);
   final int padding = align(size) - size;
   decoder.checkPadding(size, padding);
+  _validateDecoding(decoder);
+  return out;
+}
+
+/// This is a special-case of [Struct], which, unlike other codegen-created instances, does not have
+/// a static [_structDecode] method, as this type is only every meant to be decoded as a top-level
+/// payload body.
+class LargeMessageInfo extends Struct {
+  const LargeMessageInfo({
+    required this.flags,
+    required this.reserved,
+    required this.msgByteCount,
+  });
+
+  final int flags;
+  final int reserved;
+  final int msgByteCount;
+
+  @override
+  List<Object?> get $fields {
+    return <Object?>[
+      flags,
+      reserved,
+      msgByteCount,
+    ];
+  }
+
+  static const $fieldType0 = Uint32Type();
+  static const $fieldType1 = Uint32Type();
+  static const $fieldType2 = Uint64Type();
+
+  // TODO(fxbug.dev/114263): currently untested/unimplemented encode logic.
+  @override
+  void $encode(Encoder $encoder, int $offset, int $depth) {
+    $fieldType0.encode($encoder, flags, $offset + 0, $depth);
+    $fieldType1.encode($encoder, reserved, $offset + 4, $depth);
+    $fieldType2.encode($encoder, msgByteCount, $offset + 8, $depth);
+  }
+}
+
+const kLargeMessageInfoFlagsType =
+    MemberType<int>(type: Uint32Type(), offset: 0);
+const kLargeMessageInfoReservedType =
+    MemberType<int>(type: Uint32Type(), offset: 4);
+const kLargeMessageInfoMsgByteCountType =
+    MemberType<int>(type: Uint64Type(), offset: 8);
+
+T decodeMaybeLargeMessageWithCallback<T>(
+    IncomingMessage message, int inlineSize, DecodeMessageCallback<T> f) {
+  if (message.overflowing == CallOverflowing.small) {
+    return decodeMessageWithCallback<T>(message, inlineSize, f);
+  }
+
+  // Perform a bit of surgery - remove the handles array attached to the original
+  // [IncomingMessage], and create a new [IncomingMessage] with only the original's bytes. This
+  // will be used to decode the outer [LargeMessageInfo] struct, which we can then use to properly
+  // read the VMO containing the remainder of the data.
+  IncomingMessage handlesStrippedMessage = IncomingMessage(message.data, []);
+  LargeMessageInfo largeMessageInfo =
+      decodeMessageWithCallback<LargeMessageInfo>(
+          handlesStrippedMessage, kLargeMessageInfoSize,
+          (Decoder decoder, int offset) {
+    return LargeMessageInfo(
+        flags: kLargeMessageInfoFlagsType.decode(decoder, offset, 1),
+        reserved: kLargeMessageInfoReservedType.decode(decoder, offset, 1),
+        msgByteCount:
+            kLargeMessageInfoMsgByteCountType.decode(decoder, offset, 1));
+  });
+
+  // Read the overflow bytes from the overflow buffer containing VMO, then combine those bytes
+  // with the handles from the original message to make the arguments passed to the decoder
+  // callback.
+  SizedVmo overflowVmo =
+      SizedVmo(message.handleInfos.last.handle, largeMessageInfo.msgByteCount);
+  ReadResult result = overflowVmo.read(largeMessageInfo.msgByteCount);
+
+  // Decode the body bytes only - no need to redo the header.
+  final Decoder decoder = Decoder.fromRawArgs(
+      ByteData.view(
+          result.bytes.buffer, result.bytes.offsetInBytes, result.numBytes),
+      message.handleInfos.sublist(0, message.handleInfos.length - 1),
+      WireFormat.v2)
+    ..claimBytes(inlineSize, 0);
+  T out = f(decoder, 0);
+  final int padding = align(inlineSize) - inlineSize;
+  decoder.checkPadding(inlineSize, padding);
   _validateDecoding(decoder);
   return out;
 }

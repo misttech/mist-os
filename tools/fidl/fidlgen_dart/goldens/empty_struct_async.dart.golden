@@ -170,11 +170,15 @@ class EmptyProtocolProxy extends $fidl.AsyncProxy<EmptyProtocol>
               _kEmptyProtocol_Receive_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kEmptyProtocol_Receive_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kEmptyProtocol_Receive_Type.responseInlineSize($wireFormat),
               $types[0]);
-
           _receiveEventStreamController.add($response);
         });
         break;
@@ -206,12 +210,16 @@ class EmptyProtocolProxy extends $fidl.AsyncProxy<EmptyProtocol>
               _kEmptyProtocol_SendAndReceive_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kEmptyProtocol_SendAndReceive_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kEmptyProtocol_SendAndReceive_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -326,6 +334,10 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
               _kEmptyProtocol_Send_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kEmptyProtocol_Send_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kEmptyProtocol_Send_Type.requestInlineSize($wireFormat),
@@ -343,6 +355,10 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
               _kEmptyProtocol_SendAndReceive_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kEmptyProtocol_SendAndReceive_Ordinal');
+          }
           final $async.Future<Empty> $future = $fidl
               .decodeMessageWithCallback<$async.Future<Empty>>(
                   $message,

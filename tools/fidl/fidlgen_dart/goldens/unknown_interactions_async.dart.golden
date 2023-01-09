@@ -12416,7 +12416,6 @@ class UnknownInteractionsAjarProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _strictEventEventStreamController.add($response);
         });
         break;
@@ -12430,12 +12429,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictEventFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventFieldsEventStreamController.add($response);
         });
         break;
@@ -12448,12 +12451,16 @@ class UnknownInteractionsAjarProtocolProxy
               _kUnknownInteractionsAjarProtocol_StrictEventUnion_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictEventUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventUnionEventStreamController.add($response);
         });
         break;
@@ -12466,12 +12473,16 @@ class UnknownInteractionsAjarProtocolProxy
               _kUnknownInteractionsAjarProtocol_StrictEventTable_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictEventTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventTableEventStreamController.add($response);
         });
         break;
@@ -12485,13 +12496,17 @@ class UnknownInteractionsAjarProtocolProxy
               _kUnknownInteractionsAjarProtocol_StrictEventErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictEventErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictEventErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictEventErrResultTag.response) {
             _strictEventErrEventStreamController.add(null);
@@ -12511,13 +12526,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictEventFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictEventFieldsErrResultTag
                   .response) {
@@ -12539,13 +12558,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictEventUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictEventUnionErrResultTag
                   .response) {
@@ -12566,13 +12589,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictEventTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictEventTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictEventTableErrResultTag
                   .response) {
@@ -12594,7 +12621,6 @@ class UnknownInteractionsAjarProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _flexibleEventEventStreamController.add($response);
         });
         break;
@@ -12608,12 +12634,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_FlexibleEventFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventFieldsEventStreamController.add($response);
         });
         break;
@@ -12627,12 +12657,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_FlexibleEventUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventUnionEventStreamController.add($response);
         });
         break;
@@ -12646,12 +12680,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_FlexibleEventTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventTableEventStreamController.add($response);
         });
         break;
@@ -12664,13 +12702,17 @@ class UnknownInteractionsAjarProtocolProxy
               _kUnknownInteractionsAjarProtocol_FlexibleEventErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolFlexibleEventErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_FlexibleEventErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolFlexibleEventErrResultTag
                   .response) {
@@ -12691,13 +12733,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResultTag
                   .response) {
@@ -12719,13 +12765,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolFlexibleEventUnionErrResultTag
                   .response) {
@@ -12747,13 +12797,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolFlexibleEventTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolFlexibleEventTableErrResultTag
                   .response) {
@@ -12809,7 +12863,6 @@ class UnknownInteractionsAjarProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           $completer.complete($response);
         });
         break;
@@ -12823,12 +12876,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictTwoWayFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -12842,12 +12899,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -12861,12 +12922,16 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsAjarProtocol_StrictTwoWayTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -12879,13 +12944,17 @@ class UnknownInteractionsAjarProtocolProxy
               _kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictTwoWayErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictTwoWayErrResultTag
                   .response) {
@@ -12905,13 +12974,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResultTag
                   .response) {
@@ -12931,13 +13004,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResultTag
                   .response) {
@@ -12957,13 +13034,17 @@ class UnknownInteractionsAjarProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsAjarProtocolStrictTwoWayTableErrResultTag
                   .response) {
@@ -13939,6 +14020,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_StrictOneWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictOneWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -13957,6 +14042,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_FlexibleOneWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_FlexibleOneWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -13975,6 +14064,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_StrictTwoWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -14005,6 +14098,10 @@ class UnknownInteractionsAjarProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -14043,6 +14140,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -14084,6 +14185,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_StrictTwoWayTable_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -14125,6 +14230,10 @@ class UnknownInteractionsAjarProtocolBinding
               _kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -14175,6 +14284,10 @@ class UnknownInteractionsAjarProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -14226,6 +14339,10 @@ class UnknownInteractionsAjarProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -14278,6 +14395,10 @@ class UnknownInteractionsAjarProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -14691,7 +14812,6 @@ class UnknownInteractionsClosedProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _strictEventEventStreamController.add($response);
         });
         break;
@@ -14705,12 +14825,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictEventFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventFieldsEventStreamController.add($response);
         });
         break;
@@ -14724,12 +14848,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictEventUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventUnionEventStreamController.add($response);
         });
         break;
@@ -14743,12 +14871,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictEventTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventTableEventStreamController.add($response);
         });
         break;
@@ -14762,13 +14894,17 @@ class UnknownInteractionsClosedProtocolProxy
               _kUnknownInteractionsClosedProtocol_StrictEventErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictEventErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictEventErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictEventErrResultTag
                   .response) {
@@ -14789,13 +14925,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictEventFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictEventFieldsErrResultTag
                   .response) {
@@ -14817,13 +14957,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictEventUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictEventUnionErrResultTag
                   .response) {
@@ -14844,13 +14988,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictEventTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictEventTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictEventTableErrResultTag
                   .response) {
@@ -14891,7 +15039,6 @@ class UnknownInteractionsClosedProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           $completer.complete($response);
         });
         break;
@@ -14905,12 +15052,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictTwoWayFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -14924,12 +15075,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictTwoWayUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -14943,12 +15098,16 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsClosedProtocol_StrictTwoWayTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -14962,13 +15121,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictTwoWayErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictTwoWayErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictTwoWayErrResultTag
                   .response) {
@@ -14988,13 +15151,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResultTag
                   .response) {
@@ -15014,13 +15181,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResultTag
                   .response) {
@@ -15040,13 +15211,17 @@ class UnknownInteractionsClosedProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsClosedProtocolStrictTwoWayTableErrResultTag
                   .response) {
@@ -15635,6 +15810,10 @@ class UnknownInteractionsClosedProtocolBinding
               _kUnknownInteractionsClosedProtocol_StrictOneWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictOneWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -15653,6 +15832,10 @@ class UnknownInteractionsClosedProtocolBinding
               _kUnknownInteractionsClosedProtocol_StrictTwoWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -15683,6 +15866,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -15722,6 +15909,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -15764,6 +15955,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -15805,6 +16000,10 @@ class UnknownInteractionsClosedProtocolBinding
               _kUnknownInteractionsClosedProtocol_StrictTwoWayErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayErr_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -15855,6 +16054,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -15906,6 +16109,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -15958,6 +16165,10 @@ class UnknownInteractionsClosedProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -16615,7 +16826,6 @@ class UnknownInteractionsProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _strictEventEventStreamController.add($response);
         });
         break;
@@ -16628,12 +16838,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventFields_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictEventFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventFieldsEventStreamController.add($response);
         });
         break;
@@ -16646,12 +16860,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventUnion_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictEventUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventUnionEventStreamController.add($response);
         });
         break;
@@ -16664,12 +16882,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventTable_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictEventTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _strictEventTableEventStreamController.add($response);
         });
         break;
@@ -16683,13 +16905,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictEventErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictEventErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictEventErrResultTag.response) {
             _strictEventErrEventStreamController.add(null);
@@ -16708,13 +16934,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventFieldsErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictEventFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictEventFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictEventFieldsErrResultTag
                   .response) {
@@ -16735,13 +16965,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventUnionErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictEventUnionErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictEventUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictEventUnionErrResultTag
                   .response) {
@@ -16761,13 +16995,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictEventTableErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictEventTableErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictEventTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictEventTableErrResultTag
                   .response) {
@@ -16789,7 +17027,6 @@ class UnknownInteractionsProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _flexibleEventEventStreamController.add($response);
         });
         break;
@@ -16802,12 +17039,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleEventFields_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_FlexibleEventFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventFieldsEventStreamController.add($response);
         });
         break;
@@ -16820,12 +17061,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleEventUnion_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_FlexibleEventUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventUnionEventStreamController.add($response);
         });
         break;
@@ -16838,12 +17083,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleEventTable_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_FlexibleEventTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           _flexibleEventTableEventStreamController.add($response);
         });
         break;
@@ -16856,13 +17105,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleEventErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleEventErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleEventErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleEventErrResultTag.response) {
             _flexibleEventErrEventStreamController.add(null);
@@ -16882,13 +17135,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleEventFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleEventFieldsErrResultTag
                   .response) {
@@ -16910,13 +17167,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleEventUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleEventUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleEventUnionErrResultTag
                   .response) {
@@ -16938,13 +17199,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleEventTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleEventTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleEventTableErrResultTag
                   .response) {
@@ -16999,7 +17264,6 @@ class UnknownInteractionsProtocolProxy
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           $completer.complete($response);
         });
         break;
@@ -17012,12 +17276,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayFields_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictTwoWayFields_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -17030,12 +17298,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayUnion_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictTwoWayUnion_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -17048,12 +17320,16 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayTable_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $response = $fidl.decodeMessage(
               $message,
               _kUnknownInteractionsProtocol_StrictTwoWayTable_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -17066,13 +17342,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictTwoWayErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictTwoWayErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictTwoWayErrResultTag.response) {
             $completer.complete(null);
@@ -17091,13 +17371,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictTwoWayFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictTwoWayFieldsErrResultTag
                   .response) {
@@ -17116,13 +17400,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictTwoWayUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictTwoWayUnionErrResultTag
                   .response) {
@@ -17141,13 +17429,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_StrictTwoWayTableErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final UnknownInteractionsProtocolStrictTwoWayTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_StrictTwoWayTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolStrictTwoWayTableErrResultTag
                   .response) {
@@ -17166,13 +17458,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleTwoWay_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWay_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayResultTag.response) {
             $completer.complete(null);
@@ -17191,13 +17487,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleTwoWayFields_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayFieldsResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayFields_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayFieldsResultTag
                   .response) {
@@ -17217,13 +17517,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayUnionResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayUnionResultTag
                   .response) {
@@ -17243,13 +17547,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleTwoWayTable_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayTable_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayTableResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayTable_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayTableResultTag
                   .response) {
@@ -17269,13 +17577,17 @@ class UnknownInteractionsProtocolProxy
               _kUnknownInteractionsProtocol_FlexibleTwoWayErr_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayErrResult $response =
               $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayErrResultTag.response) {
             $completer.complete(null);
@@ -17298,13 +17610,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResultTag
                   .response) {
@@ -17328,13 +17644,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayUnionErrResultTag
                   .response) {
@@ -17358,13 +17678,17 @@ class UnknownInteractionsProtocolProxy
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayTableErr_Ordinal');
+          }
           final UnknownInteractionsProtocolFlexibleTwoWayTableErrResult
               $response = $fidl.decodeMessage(
                   $message,
                   _kUnknownInteractionsProtocol_FlexibleTwoWayTableErr_Type
                       .responseInlineSize($wireFormat),
                   $types[0]);
-
           if ($response.$tag ==
               UnknownInteractionsProtocolFlexibleTwoWayTableErrResultTag
                   .response) {
@@ -18481,6 +18805,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictOneWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictOneWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -18499,6 +18827,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleOneWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleOneWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -18517,6 +18849,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -18546,6 +18882,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayFields_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayFields_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -18583,6 +18923,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayUnion_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayUnion_Ordinal');
+          }
           final $async
                   .Future<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -18623,6 +18967,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayTable_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayTable_Ordinal');
+          }
           final $async
                   .Future<UnknownInteractionsProtocolStrictTwoWayTableResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -18663,6 +19011,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayErr_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -18711,6 +19063,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -18761,6 +19117,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -18812,6 +19172,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_StrictTwoWayTableErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_StrictTwoWayTableErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolStrictTwoWayTableErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -18863,6 +19227,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleTwoWay_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -18903,6 +19271,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleTwoWayFields_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -18946,6 +19318,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -18990,6 +19366,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleTwoWayTable_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayTable_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolFlexibleTwoWayTableResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -19034,6 +19414,10 @@ class UnknownInteractionsProtocolBinding
               _kUnknownInteractionsProtocol_FlexibleTwoWayErr_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -19083,6 +19467,10 @@ class UnknownInteractionsProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal');
+          }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
                   $message,
@@ -19134,6 +19522,10 @@ class UnknownInteractionsProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
               $future = $fidl.decodeMessageWithCallback<
@@ -19186,6 +19578,10 @@ class UnknownInteractionsProtocolBinding
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kUnknownInteractionsProtocol_FlexibleTwoWayTableErr_Ordinal');
+          }
           final $async.Future<
                   UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse>
               $future = $fidl.decodeMessageWithCallback<

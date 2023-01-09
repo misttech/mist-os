@@ -140,6 +140,10 @@ class FirstProtocolBinding extends $fidl.AsyncBinding<FirstProtocol> {
               _kFirstProtocol_MethodOnFirst_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kFirstProtocol_MethodOnFirst_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,
@@ -257,6 +261,10 @@ class SecondProtocolBinding extends $fidl.AsyncBinding<SecondProtocol> {
               _kSecondProtocol_MethodOnSecond_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kSecondProtocol_MethodOnSecond_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
                   $message,

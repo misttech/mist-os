@@ -307,12 +307,12 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
               _kProtocol_RequestStrictResponseFlexible_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-          final $response = $fidl.decodeMessage(
+
+          final $response = $fidl.decodeMaybeLargeMessage(
               $message,
               _kProtocol_RequestStrictResponseFlexible_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -324,12 +324,12 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
               _kProtocol_RequestFlexibleResponseStrict_Type.response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
-          final $response = $fidl.decodeMessage(
+
+          final $response = $fidl.decodeMaybeLargeMessage(
               $message,
               _kProtocol_RequestFlexibleResponseStrict_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
-
           $completer.complete($response);
         });
         break;
@@ -409,7 +409,7 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<FlexibleFoo> $future = $fidl
-              .decodeMessageWithCallback<$async.Future<FlexibleFoo>>(
+              .decodeMaybeLargeMessageWithCallback<$async.Future<FlexibleFoo>>(
                   $message,
                   _kProtocol_RequestStrictResponseFlexible_Type
                       .requestInlineSize($wireFormat),
@@ -447,7 +447,7 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           // ignore: prefer_const_declarations
           final _impl = impl!;
           final $async.Future<StrictFoo> $future = $fidl
-              .decodeMessageWithCallback<$async.Future<StrictFoo>>(
+              .decodeMaybeLargeMessageWithCallback<$async.Future<StrictFoo>>(
                   $message,
                   _kProtocol_RequestFlexibleResponseStrict_Type
                       .requestInlineSize($wireFormat),

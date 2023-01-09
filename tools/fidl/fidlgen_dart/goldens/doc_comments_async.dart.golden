@@ -621,7 +621,6 @@ class InterfaceProxy extends $fidl.AsyncProxy<Interface> implements Interface {
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
           final $response = null;
-
           _onEventEventStreamController.add($response);
         });
         break;
@@ -729,6 +728,10 @@ class InterfaceBinding extends $fidl.AsyncBinding<Interface> {
               _kInterface_Method_Type.request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for method _kInterface_Method_Ordinal');
+          }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
                   _kInterface_Method_Type.requestInlineSize($wireFormat),

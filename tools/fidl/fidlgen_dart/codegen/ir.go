@@ -271,6 +271,7 @@ type Method struct {
 	TypeSymbol         string
 	TypeExpr           string
 	Transitional       bool
+	Overflowable       fidlgen.Overflowable
 	Documented
 }
 
@@ -663,6 +664,7 @@ func libraryPrefix(library fidlgen.LibraryIdentifier) string {
 type compiler struct {
 	Root
 	decls          fidlgen.DeclInfoMap
+	experiments    fidlgen.Experiments
 	library        fidlgen.LibraryIdentifier
 	typesRoot      fidlgen.Root
 	paramableTypes map[fidlgen.EncodedCompoundIdentifier]Parameterizer
@@ -1188,6 +1190,7 @@ func (c *compiler) compileMethod(val fidlgen.Method, protocol Protocol, fidlProt
 		TypeExpr:           c.typeExprForMethod(val, request, response.WireParameters, fmt.Sprintf("%s.%s", protocol.Name, val.Name)),
 		Transitional:       transitional,
 		Documented:         docString(val),
+		Overflowable:       val.GetOverflowable(fidlProtocol, c.experiments),
 	}
 }
 
@@ -1417,6 +1420,7 @@ func Compile(r fidlgen.Root) Root {
 	r = r.ForBindings("dart")
 	c := compiler{
 		decls:          r.DeclInfo(),
+		experiments:    r.Experiments,
 		library:        r.Name.Parse(),
 		typesRoot:      r,
 		paramableTypes: map[fidlgen.EncodedCompoundIdentifier]Parameterizer{},

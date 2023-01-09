@@ -327,13 +327,6 @@ class RunnerImpl extends Runner {
       //   have the rights specified in the handle dispositions list.
       case Test.serverSendsTooFewRights:
         return false;
-      case Test.goodDecodeBoundedMaybeLargeMessage:
-      case Test.goodDecodeSemiBoundedUnknowableLargeMessage:
-      case Test.goodDecodeSemiBoundedMaybeLargeMessage:
-      case Test.goodDecodeUnboundedLargeMessage:
-      case Test.goodDecode63HandleLargeMessage:
-      case Test.goodDecodeUnknownLargeMessage:
-      case Test.badDecodeByteOverflowFlagSetOnBoundedSmallMessage:
       case Test.badDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
       case Test.badDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage:
       case Test.badDecodeLargeMessageInfoOmitted:
