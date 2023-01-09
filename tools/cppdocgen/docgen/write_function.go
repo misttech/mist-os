@@ -28,11 +28,20 @@ func functionGroupEllipsesParens(g *FunctionGroup) string {
 	return "()"
 }
 
-// If linkDest is nonempty this will make the function name a link.
-func writeFunctionDeclaration(fn *clangdoc.FunctionInfo, namePrefix string, includeReturnType bool, linkDest string, f io.Writer) {
+// If linkDest is nonempty this will make the function name a link. The number of visible characters
+// in this prefix is supplied, which allows the caller to include HTML tags and escaped characters
+// while keeping things aligned.
+func writeFunctionDeclaration(fn *clangdoc.FunctionInfo, namePrefix string,
+	namePrefixVisibleCharLen int, includeReturnType bool, linkDest string,
+	f io.Writer) {
+	if fn.Template != nil {
+		writeTemplateDeclaration(*fn.Template, f)
+		fmt.Fprintf(f, "\n")
+	}
+
 	retTypeLen := 0
 	if includeReturnType {
-		qualType, n := getEscapedTypeName(fn.ReturnType.Type)
+		qualType, n := getEscapedTypeName(fn.ReturnType.Reference.QualName)
 		fmt.Fprintf(f, "<span class=\"typ\">%s</span> ", qualType)
 		retTypeLen = n + 1 // Include space after.
 	}
@@ -46,17 +55,26 @@ func writeFunctionDeclaration(fn *clangdoc.FunctionInfo, namePrefix string, incl
 		fmt.Fprintf(f, "</a>")
 	}
 
+	// Template specializations.
+	templateSpecCharLen := 0
+	if fn.Template != nil && fn.Template.Specialization != nil {
+		templateParams := ""
+		templateParams, templateSpecCharLen = getTemplateParameterList(
+			fn.Template.Specialization.Params, true)
+		fmt.Fprintf(f, "%s", templateParams)
+	}
+
 	fmt.Fprintf(f, "(")
 
 	// Indent is type + space + prefix + name + paren.
-	indent := makeIndent(retTypeLen + len(namePrefix) + len(fn.Name) + 1)
+	indent := makeIndent(retTypeLen + namePrefixVisibleCharLen + len(fn.Name) + templateSpecCharLen + 1)
 	for i, param := range fn.Params {
 		if i > 0 {
 			fmt.Fprintf(f, ",\n")
 			f.Write(indent)
 		}
 
-		tn, _ := getEscapedTypeName(param.Type)
+		tn, _ := getEscapedTypeName(param.TypeRef.QualName)
 		if len(param.Name) == 0 {
 			// Unnamed parameter.
 			fmt.Fprintf(f, "<span class=\"typ\">%s</span>", tn)
@@ -78,19 +96,23 @@ func writeFunctionDeclaration(fn *clangdoc.FunctionInfo, namePrefix string, incl
 //
 // The |namePrefix| is prepended to the definition for defining class or namespace information.
 // This could be extracted from the function but this lets the caller decide which information to
-// include.
-func writeFunctionGroupBody(settings WriteSettings, index *Index, g *FunctionGroup, namePrefix string, includeReturnType bool, f io.Writer) {
+// include. The number of visible characters in this prefix is supplied, which allows the caller to
+// include HTML tags and escaped characters while keeping things aligned.
+func writeFunctionGroupBody(settings WriteSettings, index *Index, g *FunctionGroup,
+	namePrefix string, namePrefixVisibleCharLen int,
+	includeReturnType bool, f io.Writer) {
 	// Use the first function's location for the definition location link.
-	if len(g.Funcs[0].Location) > 0 && g.Funcs[0].Location[0].Filename != "" {
+	if g.Funcs[0].GetLocation().Filename != "" {
 		fmt.Fprintf(f, "[Declaration source code](%s)\n\n",
-			settings.locationSourceLink(g.Funcs[0].Location[0]))
+			settings.locationSourceLink(g.Funcs[0].GetLocation()))
 	}
 
 	if !commentContains(g.Funcs[0].Description, NoDeclTag) {
 		// Write the declaration.
 		writePreHeader(f)
 		for _, fn := range g.Funcs {
-			writeFunctionDeclaration(fn, namePrefix, includeReturnType, "", f)
+			writeFunctionDeclaration(fn, namePrefix, namePrefixVisibleCharLen,
+				includeReturnType, "", f)
 		}
 		writePreFooter(f)
 	}
@@ -115,11 +137,14 @@ func writeFunctionGroupSection(settings WriteSettings, index *Index, g *Function
 		fmt.Fprintf(f, "## %s {:#%s}\n\n", g.ExplicitTitle, functionGroupHtmlId(g))
 	} else {
 		fullName := functionFullName(g.Funcs[0])
-		fmt.Fprintf(f, "## %s%s {:#%s}\n\n", fullName, functionGroupEllipsesParens(g), functionGroupHtmlId(g))
+		fmt.Fprintf(f, "## %s {:#%s}\n\n",
+			titleWithTemplateSpecializations(fullName, g.Funcs[0].Template, functionGroupEllipsesParens(g), ""),
+			functionGroupHtmlId(g))
 	}
 
 	// Include the qualified namespaces as a prefix.
-	writeFunctionGroupBody(settings, index, g, getScopeQualifier(g.Funcs[0].Namespace, true), true, f)
+	namespacePrefix := getScopeQualifier(g.Funcs[0].Namespace, true)
+	writeFunctionGroupBody(settings, index, g, namespacePrefix, len(namespacePrefix), true, f)
 }
 
 // Interface for sorting a function list by function name.
@@ -146,25 +171,26 @@ func (f functionByLocation) Swap(i, j int) {
 }
 func (f functionByLocation) Less(i, j int) bool {
 	// This assumes the file names are the same (since we're normally processing by file).
-	if len(f[i].Location) == 0 || len(f[j].Location) == 0 {
-		return len(f[i].Location) < len(f[j].Location)
-	}
-	return f[i].Location[0].LineNumber < f[j].Location[0].LineNumber
+	return f[i].GetLocation().LineNumber < f[j].GetLocation().LineNumber
 }
 
 func functionHtmlId(f *clangdoc.FunctionInfo) string {
 	// Use the fully-qualified function name. This can still produce collisions due to
 	// overloading but we don't have a way to differentiate this other than making all
 	// references by USR, which makes manual linking impossible.
+	//
+	// TODO(fxbug.dev/119085) it would be nice to allow links to functions overloads and
+	// template specializations (the same name). If this function took an Index parameter, it
+	// could check for this case and use the USR id for all but the first instance.
 	return getScopeQualifier(f.Namespace, true) + f.Name
 }
 
 func functionLink(f *clangdoc.FunctionInfo) string {
-	return HeaderReferenceFile(f.Location[0].Filename) + "#" + functionHtmlId(f)
+	return HeaderReferenceFile(f.GetLocation().Filename) + "#" + functionHtmlId(f)
 }
 
 func functionGroupLink(g *FunctionGroup) string {
-	return HeaderReferenceFile(g.Funcs[0].Location[0].Filename) + "#" + functionGroupHtmlId(g)
+	return HeaderReferenceFile(g.Funcs[0].GetLocation().Filename) + "#" + functionGroupHtmlId(g)
 }
 
 // Returns the fully-qualified name of a function.

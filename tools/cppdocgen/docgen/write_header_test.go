@@ -27,7 +27,7 @@ func TestWriteHeaderReference(t *testing.T) {
 	fn := &clangdoc.FunctionInfo{
 		Name:       "MyFunction",
 		USR:        "SomeUSR",
-		ReturnType: clangdoc.ReturnType{Type: clangdoc.Type{Name: "void"}}}
+		ReturnType: clangdoc.MakeGlobalType("void")}
 	index.FunctionUsrs[fn.USR] = fn
 	index.FunctionNames[fn.Name] = fn
 
@@ -59,7 +59,7 @@ func TestWriteHeaderReference(t *testing.T) {
 [Declaration source code](http://example.com/main/src/lib/test/myheader.h#99)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">MyClass</span> { <span class="com">...</span> };
+<span class="kwd">class</span> MyClass { <span class="com">...</span> };
 </pre>
 
 ## MyFunction() {:#MyFunction}

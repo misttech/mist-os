@@ -76,7 +76,7 @@ This enum should have the declaration omitted because of the  annotation.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#29)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">struct</span> <span class="typ">SimpleTestStructure</span> {
+<span class="kwd">struct</span> SimpleTestStructure {
     <span class="typ">int</span> a;
     <span class="typ">char</span> b;
     <span class="typ">double</span> c;
@@ -100,7 +100,7 @@ Some documentation for the `b` member of the `SimpleTestStructure`.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#38)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">union</span> <span class="typ">StandaloneUnion</span> {
+<span class="kwd">union</span> StandaloneUnion {
     <span class="typ">int</span> i;
     <span class="typ">double</span> d;
 };
@@ -111,7 +111,7 @@ Some documentation for the `b` member of the `SimpleTestStructure`.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#71)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">struct</span> <span class="typ">UnnamedStructTypedef</span> {
+<span class="kwd">struct</span> UnnamedStructTypedef {
     <span class="typ">int</span> a;
 };
 </pre>

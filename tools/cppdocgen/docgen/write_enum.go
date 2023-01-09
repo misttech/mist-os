@@ -38,9 +38,9 @@ func writeEnumDeclaration(e *clangdoc.EnumInfo, f io.Writer) {
 	// Only include nested class scopes in the name, since the namespaces were already
 	// included.
 	fmt.Fprintf(f, "<span class=\"typ\">%s%s</span>", getScopeQualifier(e.Namespace, false), e.Name)
-	if e.BaseType.Type.Name != "" {
+	if e.BaseType.Reference.QualName != "" {
 		// Has an enum base.
-		typeName, _ := getEscapedTypeName(e.BaseType.Type)
+		typeName, _ := getEscapedTypeName(e.BaseType.Reference.QualName)
 		fmt.Fprintf(f, " : <span class=\"typ\">%s</span>", typeName)
 	}
 	fmt.Fprintf(f, " {\n")

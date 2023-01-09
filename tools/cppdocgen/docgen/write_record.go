@@ -69,7 +69,7 @@ func writeBaseClassFunctions(index *Index, r *clangdoc.RecordInfo, headingLevel 
 		// Write out the functions as declarations.
 		writePreHeader(f)
 		for _, fn := range funcs {
-			writeFunctionDeclaration(fn, "", true, memberFunctionLink(index, r, fn), f)
+			writeFunctionDeclaration(fn, "", 0, true, memberFunctionLink(index, r, fn), f)
 		}
 		writePreFooter(f)
 	} else {
@@ -88,12 +88,34 @@ func writeBaseClassFunctions(index *Index, r *clangdoc.RecordInfo, headingLevel 
 func writeRecordReference(settings WriteSettings, index *Index, h *Header, r *clangdoc.RecordInfo, f io.Writer) {
 	fullName := recordFullName(r)
 	// Devsite uses {:#htmlId} to give the title a custom ID.
-	fmt.Fprintf(f, "## %s %s {:#%s}\n\n", fullName, recordKind(r), recordHtmlId(index, r))
+	fmt.Fprintf(f, "## %s {:#%s}\n\n",
+		titleWithTemplateSpecializations(fullName, r.Template, "", recordKind(r)),
+		recordHtmlId(index, r))
 
 	// This prefix is used for function names. Don't include the full scope (like namespaces)
 	// because this will be printed as a declaration where namespaces are not used. This will
-	// look weird. There should be enough context with just the class name for it to make sense.
-	namePrefix := r.Name + "::"
+	// look weird. There should be enough context with just the class name (and template
+	// specialization parameters) for it to make sense.
+	//
+	// This is used for titles (needs non-syntax highlighted version) and code (wants syntax
+	// highlighting). The namePrefixCharLen is the length not counting escaping and HTML tags
+	// which is used for function parameter alignment.
+	namePrefix := ""
+	namePrefixWithSyntax := ""
+	namePrefixCharLen := 0
+	if r.Template != nil && r.Template.Specialization != nil {
+		templateParams, templateParamsCharLen := getTemplateParameterList(r.Template.Specialization.Params, false)
+		namePrefix = r.Name + templateParams + "::"
+		namePrefixCharLen = len(r.Name) + templateParamsCharLen + 2 // Extra 2 for "::".
+
+		// Get syntax-highlighted version (should have the same # visible chars).
+		templateParams, templateParamsCharLen = getTemplateParameterList(r.Template.Specialization.Params, true)
+		namePrefixWithSyntax = r.Name + templateParams + "::"
+	} else {
+		namePrefix = r.Name + "::"
+		namePrefixCharLen = len(r.Name) + 2 // Extra 2 for "::".
+		namePrefixWithSyntax = r.Name + "::"
+	}
 
 	fmt.Fprintf(f, "[Declaration source code](%s)\n\n", settings.locationSourceLink(r.DefLocation))
 
@@ -146,7 +168,8 @@ func writeRecordReference(settings WriteSettings, index *Index, h *Header, r *cl
 	if len(groupedCtors) > 0 {
 		fmt.Fprintf(f, "### Constructor{:#%s}\n\n", functionHtmlId(ctors[0]))
 		for _, g := range groupedCtors {
-			writeFunctionGroupBody(settings, index, g, namePrefix, false, f)
+			writeFunctionGroupBody(settings, index, g, namePrefix, namePrefixCharLen,
+				false, f)
 		}
 	}
 
@@ -186,10 +209,13 @@ func writeRecordReference(settings WriteSettings, index *Index, h *Header, r *cl
 			if len(g.ExplicitTitle) != 0 {
 				fmt.Fprintf(f, "### %s {:#%s}\n\n", g.ExplicitTitle, functionGroupHtmlId(g))
 			} else {
-				fmt.Fprintf(f, "### %s::%s%s {:#%s}\n\n", r.Name, g.Funcs[0].Name, functionGroupEllipsesParens(g), functionGroupHtmlId(g))
+				fmt.Fprintf(f, "### %s%s%s {:#%s}\n\n",
+					namePrefix, g.Funcs[0].Name,
+					functionGroupEllipsesParens(g), functionGroupHtmlId(g))
 			}
 
-			writeFunctionGroupBody(settings, index, g, namePrefix, true, f)
+			writeFunctionGroupBody(settings, index, g, namePrefixWithSyntax,
+				namePrefixCharLen, true, f)
 		}
 	}
 }
@@ -200,7 +226,11 @@ func recordFullName(r *clangdoc.RecordInfo) string {
 
 // Returns the empty string if the record does not have emitted documentation.
 func recordHtmlId(index *Index, r *clangdoc.RecordInfo) string {
-	// Use the fully-qualified type name as the ID (may need disambiguating in the future).
+	// Use the fully-qualified type name as the ID.
+	//
+	// TODO it would be nice to allow links to template specializations (the same name). If this
+	// function took an Index parameter, it could check for this case and use the USR id for all
+	// but the first instance.
 	fullRecord := index.RecordUsrs[r.USR]
 	if fullRecord == nil {
 		return ""
@@ -240,13 +270,28 @@ func writeRecordDeclarationBlock(index *Index, r *clangdoc.RecordInfo, data []cl
 	nsBegin, nsEnd := getNamespaceDecl(r.Namespace)
 	fmt.Fprintf(f, "%s", nsBegin)
 
+	// Template definition.
+	if r.Template != nil {
+		writeTemplateDeclaration(*r.Template, f)
+		fmt.Fprintf(f, "\n")
+	}
+
 	kind := recordKind(r)
 	scopeQualifier := getScopeQualifier(r.Namespace, false)
-	fmt.Fprintf(f, "<span class=\"kwd\">%s</span> <span class=\"typ\">%s%s</span>", kind, scopeQualifier, r.Name)
+	fmt.Fprintf(f, "<span class=\"kwd\">%s</span> %s%s", kind, scopeQualifier, r.Name)
+
+	// Template specializations.
+	templateSpecCharLen := 0
+	if r.Template != nil && r.Template.Specialization != nil {
+		templateParams, templateParamsCharLen := getTemplateParameterList(
+			r.Template.Specialization.Params, true)
+		fmt.Fprintf(f, "%s", templateParams)
+		templateSpecCharLen = templateParamsCharLen
+	}
 
 	// Rendered character width of the class declaration. This is used to horizontally align the
 	// derived class references below.
-	declCharLen := len(kind) + 1 + len(scopeQualifier) + len(r.Name)
+	declCharLen := len(kind) + 1 + len(scopeQualifier) + len(r.Name) + templateSpecCharLen
 
 	// Base and virtual base class records. The direct base classes are in Parents and
 	// VirtualParents but this does not have the access record on it (public/private/protected).
@@ -281,8 +326,7 @@ func writeRecordDeclarationBlock(index *Index, r *clangdoc.RecordInfo, data []cl
 			fmt.Fprintf(f, "<span class=\"kwd\">virtual</span>")
 		}
 
-		baseType := clangdoc.Type{Name: b.Name, Path: b.Path}
-		baseName, _ := getEscapedTypeName(baseType)
+		baseName, _ := getEscapedTypeName(clangdoc.PathNameToFullyQualified(b.Path, b.Name))
 
 		url := recordLink(index, b)
 		if len(url) == 0 {
@@ -309,7 +353,7 @@ func writeRecordDeclarationBlock(index *Index, r *clangdoc.RecordInfo, data []cl
 
 		for _, d := range data {
 			if !commentContains(d.Description, NoDocTag) && !commentContains(d.Description, NoDeclTag) {
-				tn, _ := getEscapedTypeName(d.Type)
+				tn, _ := getEscapedTypeName(d.TypeRef.QualName)
 				fmt.Fprintf(f, "    <span class=\"typ\">%s</span> %s;\n", tn, d.Name)
 			}
 		}

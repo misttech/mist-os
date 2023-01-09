@@ -53,6 +53,13 @@ func writeFunctionIndex(index *Index, f io.Writer) {
 	fmt.Fprintf(f, "## Functions\n\n")
 
 	// Collect function info by group.
+	//
+	// TODO(fxbug.dev/119085) this can generate duplicate link texts for functions with
+	// overrides or template specializations. It would be nice to check for this case and
+	// disambiguate the link text with template parameters and/or function parameters.
+	//
+	// See similar TODO in functionHtmlId() for a similar issue around the link href, and
+	// structures have the same problem with template overrides.
 	allFuncs := make([]indexLink, 0, len(index.FunctionUsrs))
 	for _, header := range index.Headers {
 		for _, g := range header.FunctionGroups {
@@ -121,6 +128,12 @@ func WriteIndex(settings WriteSettings, index *Index, f io.Writer) {
 	fmt.Fprintf(f, "\n")
 
 	if len(index.RecordUsrs) > 0 {
+		// TODO this can generate duplicate link texts for structures with template
+		// specializations. It would be nice to check for this case and disambiguate the
+		// link text with template parameters.
+		//
+		// See similar TODO in recordHtmlId() for a similar issue around the link href, and
+		// functions have the same problem with template overrides.
 		fmt.Fprintf(f, "## Classes and structures\n\n")
 		for _, r := range index.AllRecords() {
 			fmt.Fprintf(f, "  - [%s](%s) %s\n", recordFullName(r), recordLink(index, r),

@@ -38,7 +38,7 @@ Not grouped defines.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/grouping.h#34)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">MyClass</span> { <span class="com">...</span> };
+<span class="kwd">class</span> MyClass { <span class="com">...</span> };
 </pre>
 
 ### Constructor{:#MyClass::MyClass}

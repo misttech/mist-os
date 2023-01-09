@@ -14,13 +14,18 @@ The contents of this README file will comprise the top of the generated index.md
   - [e2e_test/functions.h](functions.h.md)
   - [e2e_test/grouping.h](grouping.h.md)
   - [e2e_test/namespace.h](namespace.h.md)
+  - [e2e_test/templates.h](templates.h.md)
 
 ## Classes and structures
 
   - [BaseClass1](classes.h.md#BaseClass1) class
   - [BaseClass2](classes.h.md#BaseClass2) class
+  - [BaseTemplate](templates.h.md#BaseTemplate) class
+  - [BaseTemplate](templates.h.md#BaseTemplate) class
+  - [BaseTemplate](templates.h.md#BaseTemplate) class
   - [myns::ClassInsideNamespace](namespace.h.md#myns::ClassInsideNamespace) class
   - [DerivedClass](classes.h.md#DerivedClass) class
+  - [DerivesFromTemplate](templates.h.md#DerivesFromTemplate) class
   - [MyClass](grouping.h.md#MyClass) class
   - [NoDeclarationClass](classes.h.md#NoDeclarationClass) class
   - [SimpleTestClass](classes.h.md#SimpleTestClass) class
@@ -37,6 +42,7 @@ The contents of this README file will comprise the top of the generated index.md
   - [GroupedExplicitlyTwo(…)](grouping.h.md#GroupedExplicitlyOne)
   - [GroupedImplicitly(…)](grouping.h.md#GroupedImplicitly)
   - [myns::FunctionInsideNamespace()](namespace.h.md#myns::FunctionInsideNamespace)
+  - [TemplateFunction(…)](templates.h.md#TemplateFunction)
   - [ThisShouldHaveNoDeclaration()](functions.h.md#ThisShouldHaveNoDeclaration)
   - [UndocumentedFunction()](functions.h.md#UndocumentedFunction)
   - [UngroupedOne()](grouping.h.md#UngroupedOne)

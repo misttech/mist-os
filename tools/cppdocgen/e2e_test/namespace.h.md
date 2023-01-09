@@ -30,7 +30,7 @@ Here is a link to <code><a href="namespace.h.md#myns::StructInsideNamespace">myn
 <pre class="devsite-disable-click-to-copy">
 <span class="kwd">namespace</span> myns {
 
-<span class="kwd">class</span> <span class="typ">ClassInsideNamespace</span> { <span class="com">...</span> };
+<span class="kwd">class</span> ClassInsideNamespace { <span class="com">...</span> };
 
 }  <span class="com">// namespace myns</span>
 </pre>
@@ -62,7 +62,7 @@ ClassInsideNamespace::<b>ClassInsideNamespace</b>();
 <pre class="devsite-disable-click-to-copy">
 <span class="kwd">namespace</span> myns {
 
-<span class="kwd">struct</span> <span class="typ">StructInsideNamespace</span> {
+<span class="kwd">struct</span> StructInsideNamespace {
     <span class="typ">int</span> a;
 };
 

@@ -26,17 +26,15 @@ type Location struct {
 	Filename   string `yaml:"Filename"`
 }
 
-type Type struct {
-	Name string `yaml:"Name"`
-
-	// Namespace info. This uses slash separators?!?!
-	Path string `yaml:"Path"`
-}
-
 // PathNameToFullyQualified converts a Path + Name that is used for types and references into a
 // fully-qualified C++ name.
+//
+// TODO(fxbug.dev/119082): This will skip template parameters which are not encoded in the path.
+// Implementing this properly will require looking up each USR in the index and getting the template
+// parameters. If you can get a QualName (on a Reference) it will contain the template parameters
+// and should be used instead.
 func PathNameToFullyQualified(path, name string) string {
-	// The Path seems to use slash separators?!?!?
+	// The Path uses slash separators.
 	if len(path) == 0 {
 		// No scoping.
 		return name
@@ -51,9 +49,38 @@ func PathNameToFullyQualified(path, name string) string {
 	return strings.ReplaceAll(path, "/", "::") + "::" + name
 }
 
-// QualifiedName returns a fully-qualified name for the type that takes into account the Path.
-func (t Type) QualifiedName() string {
-	return PathNameToFullyQualified(t.Path, t.Name)
+type Reference struct {
+	Type                string `yaml:"Type"` // e.g. "class", "struct", "union".
+	Name                string `yaml:"Name"`
+	QualName            string `yaml:"QualName"`
+	USR                 string `yaml:"USR"`
+	Path                string `yaml:"Path"`
+	IsInGlobalNamespace bool   `yaml:"IsInGlobalNamespace"`
+}
+
+// Makes a simple reference with no USR (useful for tests).
+func MakeReference(name string, qualName string, path string) Reference {
+	return Reference{
+		Name:                name,
+		QualName:            qualName,
+		Path:                path,
+		IsInGlobalNamespace: len(path) == 0,
+	}
+}
+func MakeGlobalReference(name string) Reference {
+	return MakeReference(name, name, "")
+}
+
+type Type struct {
+	Reference Reference `yaml:"Type"`
+}
+
+func MakeType(name string, qualName string, path string) Type {
+	return Type{Reference: MakeReference(name, qualName, path)}
+}
+
+func MakeGlobalType(name string) Type {
+	return MakeType(name, name, "")
 }
 
 type CommentInfo struct {
@@ -71,18 +98,35 @@ type CommentInfo struct {
 	Children    []CommentInfo `yaml:"Children"`
 }
 
+type TemplateParamInfo struct {
+	Contents string `yaml:"Contents"`
+}
+
+type TemplateSpecializationInfo struct {
+	SpecializationOf string              `yaml:"SpecializationOf"`
+	Params           []TemplateParamInfo `yaml:"Params"`
+}
+
+type TemplateInfo struct {
+	Params []TemplateParamInfo `yaml:"Params"`
+
+	// Will be null if this is not a specialization.
+	Specialization *TemplateSpecializationInfo `yaml:"Specialization"`
+}
+
 // FieldTypeInfo is a field with a name and a type. It is used for function parameters. See also
 // MemberTypeInfo which adds an access tag (basically inheritance).
 type FieldTypeInfo struct {
-	Name         string `yaml:"Name"`
-	Type         Type   `yaml:"Type"`
-	DefaultValue string `yaml:"DefaultValue"`
+	Name         string    `yaml:"Name"`
+	TypeRef      Reference `yaml:"Type"`
+	DefaultValue string    `yaml:"DefaultValue"`
 }
 
 type MemberTypeInfo struct {
-	Name   string `yaml:"Name"`
-	Type   Type   `yaml:"Type"`
-	Access string `yaml:"Access"`
+	Name         string    `yaml:"Name"`
+	TypeRef      Reference `yaml:"Type"`
+	FullTypeName string    `yaml:"FullTypeName"`
+	Access       string    `yaml:"Access"`
 
 	// This being present depends on Brett's unlanded clang-doc change.
 	Description []CommentInfo `yaml:"Description"`
@@ -99,25 +143,24 @@ func (m MemberTypeInfo) IsProtected() bool {
 	return m.Access == "Protected"
 }
 
-// ReturnType is a struct which clang-doc doesn't have but it inserts another layer of indirection
-// in the YAML file which is modeled with this struct.
-type ReturnType struct {
-	Type Type `yaml:"Type"`
-}
-
 type FunctionInfo struct {
 	USR  string `yaml:"USR"`
 	Name string `yaml:"Name"`
 
 	// See RecordInfo.Namespace for documentation.
-	Namespace   []Reference     `yaml:"Namespace"`
-	DefLocation Location        `yaml:"DefLocation"` // Definition location
+	Namespace []Reference `yaml:"Namespace"`
+
+	// The declaration location will be empty if there is no separate definition location
+	// (inlined functions or functions not forward-defined). See GetLocation() below.
+	DeclLocations []Location `yaml:"Location"`
+	DefLocation   Location   `yaml:"DefLocation"`
+
 	Description []CommentInfo   `yaml:"Description"`
-	Location    []Location      `yaml:"Location"` // Declaration locations.
 	Params      []FieldTypeInfo `yaml:"Params"`
-	ReturnType  ReturnType      `yaml:"ReturnType"`
+	ReturnType  Type            `yaml:"ReturnType"`
 	IsMethod    bool            `yaml:"IsMethod"`
-	Access      string          `yaml:"Access"` // Public, Private, Protected.
+	Access      string          `yaml:"Access"`   // Public, Private, Protected.
+	Template    *TemplateInfo   `yaml:"Template"` // Null for non-templates.
 }
 
 func (f FunctionInfo) IsPublic() bool {
@@ -131,6 +174,15 @@ func (f FunctionInfo) IsProtected() bool {
 	return f.Access == "Protected"
 }
 
+// Used for getting the canonical location of the function, returns the first declaration location
+// or the definition location.
+func (f FunctionInfo) GetLocation() Location {
+	if len(f.DeclLocations) == 0 {
+		return f.DefLocation
+	}
+	return f.DeclLocations[0]
+}
+
 // IdentityKey returns a string which represents the function identity, such that string comparisons
 // between functions on their identity keys is sufficient for determining whether two functions are
 // the same.
@@ -139,40 +191,29 @@ func (f FunctionInfo) IsProtected() bool {
 // member information (this is used to see if a a function has been covered by a base class so
 // we explicitly don't want the enclosing class information).
 func (f FunctionInfo) IdentityKey() string {
-	var result string
-	if len(f.ReturnType.Type.Path) > 0 {
-		result += f.ReturnType.Type.Path + "::"
+	result := f.ReturnType.Reference.QualName + " " + f.Name
+
+	// Template specialization args.
+	if f.Template != nil && f.Template.Specialization != nil {
+		for i, param := range f.Template.Specialization.Params {
+			if i > 0 {
+				result += ", "
+			}
+			result += param.Contents
+		}
 	}
-	result += f.ReturnType.Type.Name + " "
 
-	result += f.Name + "("
-
+	// Parameter types.
+	result += "("
 	for i, param := range f.Params {
 		if i >= 1 {
 			result += ", "
 		}
-		if len(param.Type.Path) > 0 {
-			result += param.Type.Path + "::"
-		}
-		result += param.Type.Name
+		result += param.TypeRef.QualName
 	}
-
 	result += ")"
+
 	return result
-}
-
-type Reference struct {
-	Type                string `yaml:"Type"`
-	Name                string `yaml:"Name"`
-	USR                 string `yaml:"USR"`
-	Path                string `yaml:"Path"`
-	IsInGlobalNamespace bool   `yaml:"IsInGlobalNamespace"`
-}
-
-// Like ReturnType, this is a struct which clang-doc doesn't have but it inserts another layer of
-// indirection in the YAML file which is modeled with this struct.
-type BaseType struct {
-	Type Type `yaml:"Type"`
 }
 
 type EnumValueInfo struct {
@@ -188,7 +229,7 @@ type EnumInfo struct {
 	DefLocation Location        `yaml:"DefLocation"`
 	Description []CommentInfo   `yaml:"Description"`
 	Scoped      bool            `yaml:"Scoped"`   // True for an enum class.
-	BaseType    BaseType        `yaml:"BaseType"` // Defined for explicitly typed enums.
+	BaseType    Type            `yaml:"BaseType"` // Defined for explicitly typed enums.
 	Members     []EnumValueInfo `yaml:"Members"`
 }
 
@@ -218,6 +259,8 @@ type RecordInfo struct {
 
 	TagType string           `yaml:"TagType"` // TODO(brettw) missing in current clang-doc output.
 	Members []MemberTypeInfo `yaml:"Members"`
+
+	Template *TemplateInfo `yaml:"Template"` // Null for non-templates.
 
 	// |Bases| recursively lists all base classes as a way to list the inherited functions.
 	// See also |Parents| and |VirtualParents|.

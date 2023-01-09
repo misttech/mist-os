@@ -24,9 +24,9 @@ func TestFixupLinks(t *testing.T) {
 
 	// Functions are indexed by both name and USR.
 	indexedFunction := clangdoc.FunctionInfo{
-		USR:      "SOME_FUNCTION_USR",
-		Name:     "indexed_symbol",
-		Location: []clangdoc.Location{{LineNumber: 16, Filename: header1Name}},
+		USR:           "SOME_FUNCTION_USR",
+		Name:          "indexed_symbol",
+		DeclLocations: []clangdoc.Location{{LineNumber: 16, Filename: header1Name}},
 	}
 	indexFunction(settings, &index, &indexedFunction)
 

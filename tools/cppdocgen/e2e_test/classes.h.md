@@ -7,7 +7,7 @@
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#52)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">BaseClass1</span> { <span class="com">...</span> };
+<span class="kwd">class</span> BaseClass1 { <span class="com">...</span> };
 </pre>
 
 ### BaseClass1::BaseClass1Function() {:#BaseClass1::BaseClass1Function}
@@ -26,7 +26,7 @@ Complicated documentation for BaseClass1Function.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#58)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">BaseClass2</span> { <span class="com">...</span> };
+<span class="kwd">class</span> BaseClass2 { <span class="com">...</span> };
 </pre>
 
 ### BaseClass2::BaseClass2Function() {:#BaseClass2::BaseClass2Function}
@@ -45,7 +45,7 @@ Insightful documentation for BaseClass2Function.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#64)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">DerivedClass</span> : <span class="kwd">public</span> <span class="typ"><a href="classes.h.md#BaseClass1">GlobalNamespace::BaseClass1</a></span>,
+<span class="kwd">class</span> DerivedClass : <span class="kwd">public</span> <span class="typ"><a href="classes.h.md#BaseClass1">GlobalNamespace::BaseClass1</a></span>,
                      <span class="kwd">private</span> <span class="typ"><a href="classes.h.md#BaseClass2">GlobalNamespace::BaseClass2</a></span> { <span class="com">...</span> };
 </pre>
 
@@ -86,7 +86,7 @@ This class should not have a generated declaration becaose of the  annotation.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#8)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> <span class="typ">SimpleTestClass</span> {
+<span class="kwd">class</span> SimpleTestClass {
   <span class="kwd">public</span>:
     <span class="com">// Public data members:</span>
     <span class="typ">int</span> public_value;
@@ -135,6 +135,8 @@ This is a documented pure virtual function.
 
 
 ### SimpleTestClass::value() {:#SimpleTestClass::value}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#15)
 
 <pre class="devsite-disable-click-to-copy">
 <span class="typ">int</span> SimpleTestClass::<b>value</b>();

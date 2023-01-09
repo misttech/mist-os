@@ -13,3 +13,5 @@ toc:
   path: /reference/e2e_test/grouping.h.md
 - title: "Namespace testing"
   path: /reference/e2e_test/namespace.h.md
+- title: "e2e_test/templates.h"
+  path: /reference/e2e_test/templates.h.md

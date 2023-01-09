@@ -37,7 +37,7 @@ func TestWriteRecordDeclarationBlock(t *testing.T) {
 <span class="kwd">namespace</span> outer {
 <span class="kwd">namespace</span> ns {
 
-<span class="kwd">class</span> <span class="typ">Saucemaster::AwesomeSauce</span> { <span class="com">...</span> };
+<span class="kwd">class</span> Saucemaster::AwesomeSauce { <span class="com">...</span> };
 
 }  <span class="com">// namespace ns</span>
 }  <span class="com">// namespace outer</span>

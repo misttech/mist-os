@@ -171,16 +171,18 @@ func (f defineGroupByTitle) Less(i, j int) bool {
 }
 
 func indexFunction(settings IndexSettings, index *Index, f *clangdoc.FunctionInfo) {
-	if len(f.Location) == 0 {
-		fmt.Printf("WARNING: Function %s does not have a declaration location.\n", f.Name)
-	} else if settings.ShouldIndexInHeader(f.Location[0].Filename) &&
+	// When the function has no separate declaration location, use the definition location.
+	var loc = f.GetLocation()
+	if len(loc.Filename) == 0 {
+		fmt.Printf("WARNING: Function %s does not have a location.\n", f.Name)
+	} else if settings.ShouldIndexInHeader(loc.Filename) &&
 		!commentContains(f.Description, NoDocTag) {
 		// TODO(brettw) there can be multiple locations! I think this might be for every
 		// forward declaration. In this case we will want to pick the "best" one.
 		index.FunctionUsrs[f.USR] = f
 		index.FunctionNames[functionFullName(f)] = f
 
-		decl := f.Location[0].Filename
+		decl := loc.Filename
 
 		header := index.HeaderForFileName(decl)
 		header.Functions = append(header.Functions, f)
@@ -271,9 +273,8 @@ func (h *Header) groupFunctions(f []*clangdoc.FunctionInfo) []*FunctionGroup {
 	curGroup := makeNewGroup(byLoc[0])
 
 	for i := 1; i < len(byLoc); i++ {
-		// Assume if there's no location info there is no separator.
-		hasSeparators := len(byLoc[i-1].Location) == 0 || len(byLoc[i].Location) == 0 ||
-			h.hasSeparatorsBetweenLocations(byLoc[i-1].Location[0], byLoc[i].Location[0])
+		hasSeparators := h.hasSeparatorsBetweenLocations(
+			byLoc[i-1].GetLocation(), byLoc[i].GetLocation())
 		nameMatches := curGroup.Funcs[0].Name == f[i].Name
 
 		if !hasSeparators && (nameMatches || len(curGroup.ExplicitTitle) > 0) {

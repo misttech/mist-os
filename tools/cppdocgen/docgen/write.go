@@ -79,6 +79,52 @@ func writePreFooter(f io.Writer) {
 	fmt.Fprintf(f, "</pre>\n\n")
 }
 
+// Returns the string and the number of non-formatting unescaped characters (for alignment).
+func getTemplateParameterList(params []clangdoc.TemplateParamInfo, highlightSyntax bool) (string, int) {
+	result := "&lt;"
+	chars := 1
+
+	for i, param := range params {
+		if i > 0 {
+			result += ", "
+			chars += 2
+		}
+
+		chars += len(param.Contents)
+
+		// We don't have the template parameter parsed out, so this does simple syntax
+		// highlighting for "class" and "typename" keywords, and assumes the rest of the
+		// template parameter is a type.
+		contents := param.Contents
+		if !highlightSyntax {
+			// Keep contents the same.
+		} else if strings.HasPrefix(contents, "class ") {
+			result += "<span class=\"kwd\">class</span>"
+			contents = strings.TrimPrefix(contents, "class")
+		} else if strings.HasPrefix(contents, "typename ") {
+			result += "<span class=\"kwd\">typename</span>"
+			contents = strings.TrimPrefix(contents, "typename")
+		}
+
+		if highlightSyntax {
+			result += "<span class=\"typ\">"
+		}
+		result += escapeHtml(contents)
+		if highlightSyntax {
+			result += "</span>"
+		}
+	}
+	result += "&gt;"
+	chars += 1
+
+	return result, chars
+}
+
+func writeTemplateDeclaration(t clangdoc.TemplateInfo, f io.Writer) {
+	params, _ := getTemplateParameterList(t.Params, true)
+	fmt.Fprintf(f, "<span class=\"kwd\">template</span>%s", params)
+}
+
 func stripPathLeftElements(path string, stripElts int) string {
 	if stripElts == 0 {
 		return path
@@ -140,14 +186,12 @@ var typeRenames = map[string]string{
 
 // Handles some name rewriting and escaping for type names. Returns the escaped string and the
 // number of bytes in the unescaped version.
-func getEscapedTypeName(t clangdoc.Type) (string, int) {
-	tn := t.QualifiedName()
-
-	rewritten := typeRenames[tn]
+func getEscapedTypeName(t string) (string, int) {
+	rewritten := typeRenames[t]
 	if len(rewritten) > 0 {
 		return escapeHtml(rewritten), len(rewritten)
 	} else {
-		return escapeHtml(tn), len(tn)
+		return escapeHtml(t), len(t)
 	}
 }
 
@@ -202,4 +246,30 @@ func getScopeQualifier(n []clangdoc.Reference, includeNamespaces bool) (result s
 		}
 	}
 	return
+}
+
+// Constructs part of a title given the name of the function/class/etc, template information,
+// and the object type "function"/"class"/etc.
+//
+// When there are no template specializations, this will be like "Foo() function".
+// But if there are specializations, this will be like "Foo<int>() function specialization"
+//
+// The nameSuffix is applied immediately after the template parameters (if any). This will normally
+// be "()" or some variation thereof for functions, and empty for classes.
+func titleWithTemplateSpecializations(name string, t *clangdoc.TemplateInfo, nameSuffix string, objectType string) string {
+	result := name
+	if t != nil && t.Specialization != nil {
+		params, _ := getTemplateParameterList(t.Specialization.Params, false)
+		result += params
+	}
+	result += nameSuffix
+
+	if objectType != "" {
+		result += " " + objectType
+	}
+	if t != nil && t.Specialization != nil {
+		result += " specialization"
+	}
+
+	return result
 }
