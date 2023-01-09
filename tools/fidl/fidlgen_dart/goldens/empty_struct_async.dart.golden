@@ -173,7 +173,8 @@ class EmptyProtocolProxy extends $fidl.AsyncProxy<EmptyProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kEmptyProtocol_Receive_Ordinal');
+                r'Unexpected byte overflow for _kEmptyProtocol_Receive_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -213,7 +214,8 @@ class EmptyProtocolProxy extends $fidl.AsyncProxy<EmptyProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kEmptyProtocol_SendAndReceive_Ordinal');
+                r'Unexpected byte overflow for _kEmptyProtocol_SendAndReceive_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -336,7 +338,8 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kEmptyProtocol_Send_Ordinal');
+                r'Unexpected byte overflow for _kEmptyProtocol_Send_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
@@ -357,7 +360,8 @@ class EmptyProtocolBinding extends $fidl.AsyncBinding<EmptyProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kEmptyProtocol_SendAndReceive_Ordinal');
+                r'Unexpected byte overflow for _kEmptyProtocol_SendAndReceive_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<Empty> $future = $fidl
               .decodeMessageWithCallback<$async.Future<Empty>>(

@@ -1067,7 +1067,8 @@ class ChannelProtocolProxy extends $fidl.AsyncProxy<ChannelProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_EventA_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_EventA_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final ChannelProtocol$EventA$Response $response = $fidl
               .decodeMessageWithCallback<ChannelProtocol$EventA$Response>(
@@ -1113,7 +1114,8 @@ class ChannelProtocolProxy extends $fidl.AsyncProxy<ChannelProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_MethodB_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_MethodB_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1145,7 +1147,8 @@ class ChannelProtocolProxy extends $fidl.AsyncProxy<ChannelProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_MutateSocket_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_MutateSocket_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1324,7 +1327,8 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_MethodA_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_MethodA_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
@@ -1346,7 +1350,8 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_MethodB_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_MethodB_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
@@ -1385,7 +1390,8 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_TakeHandle_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_TakeHandle_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -1416,7 +1422,8 @@ class ChannelProtocolBinding extends $fidl.AsyncBinding<ChannelProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChannelProtocol_MutateSocket_Ordinal');
+                r'Unexpected byte overflow for _kChannelProtocol_MutateSocket_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<$zircon.Socket> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Socket>>(
@@ -1561,7 +1568,8 @@ class DiscoverableProtocolBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDiscoverableProtocol_Method_Ordinal');
+                r'Unexpected byte overflow for _kDiscoverableProtocol_Method_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -1670,7 +1678,8 @@ class HandleRightsProtocolProxy extends $fidl.AsyncProxy<HandleRightsProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kHandleRightsProtocol_AnEvent_Ordinal');
+                r'Unexpected byte overflow for _kHandleRightsProtocol_AnEvent_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1711,7 +1720,8 @@ class HandleRightsProtocolProxy extends $fidl.AsyncProxy<HandleRightsProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kHandleRightsProtocol_ResponseMethod_Ordinal');
+                r'Unexpected byte overflow for _kHandleRightsProtocol_ResponseMethod_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1842,7 +1852,8 @@ class HandleRightsProtocolBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kHandleRightsProtocol_NoResponseMethod_Ordinal');
+                r'Unexpected byte overflow for _kHandleRightsProtocol_NoResponseMethod_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -1865,7 +1876,8 @@ class HandleRightsProtocolBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kHandleRightsProtocol_ResponseMethod_Ordinal');
+                r'Unexpected byte overflow for _kHandleRightsProtocol_ResponseMethod_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<$zircon.Socket> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Socket>>(
@@ -2074,7 +2086,8 @@ class ManyParametersBinding extends $fidl.AsyncBinding<ManyParameters> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kManyParameters_Fifteen_Ordinal');
+                r'Unexpected byte overflow for _kManyParameters_Fifteen_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
@@ -2364,7 +2377,8 @@ class TransitionalProxy extends $fidl.AsyncProxy<Transitional>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTransitional_Event_Ordinal');
+                r'Unexpected byte overflow for _kTransitional_Event_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2404,7 +2418,8 @@ class TransitionalProxy extends $fidl.AsyncProxy<Transitional>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTransitional_Request_Ordinal');
+                r'Unexpected byte overflow for _kTransitional_Request_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2522,7 +2537,8 @@ class TransitionalBinding extends $fidl.AsyncBinding<Transitional> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTransitional_Request_Ordinal');
+                r'Unexpected byte overflow for _kTransitional_Request_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,
@@ -2560,7 +2576,8 @@ class TransitionalBinding extends $fidl.AsyncBinding<Transitional> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTransitional_OneWay_Ordinal');
+                r'Unexpected byte overflow for _kTransitional_OneWay_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,
@@ -2762,7 +2779,8 @@ class WithAndWithoutRequestResponseProxy
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithAndWithoutRequestResponse_OnWithResponse_Ordinal');
+                r'Unexpected byte overflow for _kWithAndWithoutRequestResponse_OnWithResponse_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2819,7 +2837,8 @@ class WithAndWithoutRequestResponseProxy
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithAndWithoutRequestResponse_NoRequestWithResponse_Ordinal');
+                r'Unexpected byte overflow for _kWithAndWithoutRequestResponse_NoRequestWithResponse_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -3100,7 +3119,8 @@ class WithAndWithoutRequestResponseBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithAndWithoutRequestResponse_NoRequestNoResponse_Ordinal');
+                r'Unexpected byte overflow for _kWithAndWithoutRequestResponse_NoRequestNoResponse_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -3123,7 +3143,8 @@ class WithAndWithoutRequestResponseBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithAndWithoutRequestResponse_NoRequestEmptyResponse_Ordinal');
+                r'Unexpected byte overflow for _kWithAndWithoutRequestResponse_NoRequestEmptyResponse_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -3157,7 +3178,8 @@ class WithAndWithoutRequestResponseBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithAndWithoutRequestResponse_NoRequestWithResponse_Ordinal');
+                r'Unexpected byte overflow for _kWithAndWithoutRequestResponse_NoRequestWithResponse_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<String> $future = $fidl
               .decodeMessageWithCallback<$async.Future<String>>(
@@ -3418,7 +3440,8 @@ class WithErrorSyntaxProxy extends $fidl.AsyncProxy<WithErrorSyntax>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ResponseAsStruct_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ResponseAsStruct_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final WithErrorSyntaxResponseAsStructResult $response =
               $fidl.decodeMessage(
@@ -3449,7 +3472,8 @@ class WithErrorSyntaxProxy extends $fidl.AsyncProxy<WithErrorSyntax>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ErrorAsPrimitive_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ErrorAsPrimitive_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final WithErrorSyntaxErrorAsPrimitiveResult $response =
               $fidl.decodeMessage(
@@ -3476,7 +3500,8 @@ class WithErrorSyntaxProxy extends $fidl.AsyncProxy<WithErrorSyntax>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ErrorAsEnum_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ErrorAsEnum_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final WithErrorSyntaxErrorAsEnumResult $response =
               $fidl.decodeMessage(
@@ -3502,7 +3527,8 @@ class WithErrorSyntaxProxy extends $fidl.AsyncProxy<WithErrorSyntax>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_HandleInResult_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_HandleInResult_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final WithErrorSyntaxHandleInResultResult $response =
               $fidl.decodeMessage(
@@ -3608,7 +3634,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ResponseAsStruct_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ResponseAsStruct_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<WithErrorSyntax$ResponseAsStruct$Response>
               $future = $fidl.decodeMessageWithCallback<
@@ -3662,7 +3689,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ErrorAsPrimitive_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ErrorAsPrimitive_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -3711,7 +3739,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_ErrorAsEnum_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_ErrorAsEnum_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -3757,7 +3786,8 @@ class WithErrorSyntaxBinding extends $fidl.AsyncBinding<WithErrorSyntax> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithErrorSyntax_HandleInResult_Ordinal');
+                r'Unexpected byte overflow for _kWithErrorSyntax_HandleInResult_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<$zircon.Handle> $future = $fidl
               .decodeMessageWithCallback<$async.Future<$zircon.Handle>>(
@@ -3917,7 +3947,8 @@ class WithProtocolEndsProxy extends $fidl.AsyncProxy<WithProtocolEnds>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_ClientEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_ClientEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -3938,7 +3969,8 @@ class WithProtocolEndsProxy extends $fidl.AsyncProxy<WithProtocolEnds>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_ServerEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_ServerEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -3959,7 +3991,8 @@ class WithProtocolEndsProxy extends $fidl.AsyncProxy<WithProtocolEnds>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_StructContainingEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_StructContainingEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -4072,7 +4105,8 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_ClientEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_ClientEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<$fidl.InterfaceHandle<DiscoverableProtocol>?>
               $future = $fidl.decodeMessageWithCallback<
@@ -4113,7 +4147,8 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_ServerEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_ServerEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<$fidl.InterfaceRequest<DiscoverableProtocol>>
               $future = $fidl.decodeMessageWithCallback<
@@ -4154,7 +4189,8 @@ class WithProtocolEndsBinding extends $fidl.AsyncBinding<WithProtocolEnds> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kWithProtocolEnds_StructContainingEnds_Ordinal');
+                r'Unexpected byte overflow for _kWithProtocolEnds_StructContainingEnds_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<ProtocolEnds> $future = $fidl
               .decodeMessageWithCallback<$async.Future<ProtocolEnds>>(

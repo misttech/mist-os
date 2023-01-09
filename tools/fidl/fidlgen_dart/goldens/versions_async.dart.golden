@@ -478,7 +478,8 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kProtocol_Foo_Ordinal');
+                r'Unexpected byte overflow for _kProtocol_Foo_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(

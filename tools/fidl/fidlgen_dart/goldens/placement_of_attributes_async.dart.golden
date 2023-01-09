@@ -497,7 +497,8 @@ class ExampleProtocolBinding extends $fidl.AsyncBinding<ExampleProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kExampleProtocol_Method_Ordinal');
+                r'Unexpected byte overflow for _kExampleProtocol_Method_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>($message,

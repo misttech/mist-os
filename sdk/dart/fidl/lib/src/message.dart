@@ -16,6 +16,12 @@ import 'wire_format.dart';
 
 const int kMessageHeaderSize = 16;
 const int kLargeMessageInfoSize = 16;
+const int kLargeMessageVmoRights = ZX.RIGHT_GET_PROPERTY |
+    ZX.RIGHT_INSPECT |
+    ZX.RIGHT_READ |
+    ZX.RIGHT_TRANSFER |
+    ZX.RIGHT_WAIT;
+
 const int kMessageTxidOffset = 0;
 const int kMessageFlagOffset = 4;
 const int kMessageDynamicFlagOffset = 6;
@@ -310,11 +316,33 @@ T decodeMaybeLargeMessageWithCallback<T>(
     return decodeMessageWithCallback<T>(message, inlineSize, f);
   }
 
+  // Ensure that the handle for the overflow buffer containing VMO exists and is well-formed before
+  // attempting to read from it.
+  if (message.handleInfos.isEmpty) {
+    throw FidlError(
+        'Large FIDL messages must have at least 1 handle pointing to the overflow VMO',
+        FidlErrorCode.fidlLargeMessageMissingHandles);
+  }
+  HandleInfo overflowHandleInfo = message.handleInfos.last;
+  if (overflowHandleInfo.type != ZX.OBJ_TYPE_VMO ||
+      overflowHandleInfo.rights != kLargeMessageVmoRights) {
+    throw FidlError(
+        'Large FIDL messages must have properly formed overflow buffer handles',
+        FidlErrorCode.fidlLargeMessageInvalidOverflowBufferHandle);
+  }
+
   // Perform a bit of surgery - remove the handles array attached to the original
   // [IncomingMessage], and create a new [IncomingMessage] with only the original's bytes. This
   // will be used to decode the outer [LargeMessageInfo] struct, which we can then use to properly
   // read the VMO containing the remainder of the data.
   IncomingMessage handlesStrippedMessage = IncomingMessage(message.data, []);
+  if (handlesStrippedMessage.data.lengthInBytes !=
+      kMessageHeaderSize + kLargeMessageInfoSize) {
+    throw FidlError(
+        'Large FIDL messages must have a well-formed 16-byte info struct',
+        FidlErrorCode.fidlLargeMessageInfoMissized);
+  }
+
   LargeMessageInfo largeMessageInfo =
       decodeMessageWithCallback<LargeMessageInfo>(
           handlesStrippedMessage, kLargeMessageInfoSize,
@@ -325,12 +353,23 @@ T decodeMaybeLargeMessageWithCallback<T>(
         msgByteCount:
             kLargeMessageInfoMsgByteCountType.decode(decoder, offset, 1));
   });
+  if (largeMessageInfo.flags != 0 || largeMessageInfo.reserved != 0) {
+    throw FidlError(
+        'Large FIDL messages must have a properly formed info struct',
+        FidlErrorCode.fidlLargeMessageInfoMalformed);
+  }
+  if (largeMessageInfo.msgByteCount <=
+      Channel.MAX_MSG_BYTES - kLargeMessageInfoSize) {
+    throw FidlError(
+        'Large FIDL messages must have a properly formed info struct',
+        FidlErrorCode.fidlLargeMessageTooSmall);
+  }
 
   // Read the overflow bytes from the overflow buffer containing VMO, then combine those bytes
   // with the handles from the original message to make the arguments passed to the decoder
   // callback.
   SizedVmo overflowVmo =
-      SizedVmo(message.handleInfos.last.handle, largeMessageInfo.msgByteCount);
+      SizedVmo(overflowHandleInfo.handle, largeMessageInfo.msgByteCount);
   ReadResult result = overflowVmo.read(largeMessageInfo.msgByteCount);
 
   // Decode the body bytes only - no need to redo the header.

@@ -113,7 +113,8 @@ class TopProxy extends $fidl.AsyncProxy<Top> implements Top {
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTop_GetFoo_Ordinal');
+                r'Unexpected byte overflow for _kTop_GetFoo_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage($message,
               _kTop_GetFoo_Type.responseInlineSize($wireFormat), $types[0]);
@@ -160,7 +161,8 @@ class TopBinding extends $fidl.AsyncBinding<Top> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTop_GetFoo_Ordinal');
+                r'Unexpected byte overflow for _kTop_GetFoo_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<lib$test_bottom.Foo> $future = $fidl
               .decodeMessageWithCallback<$async.Future<lib$test_bottom.Foo>>(

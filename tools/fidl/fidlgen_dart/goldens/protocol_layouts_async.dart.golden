@@ -1712,7 +1712,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnAnonComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnAnonComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1733,7 +1734,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnAnonComposedWithError_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnAnonComposedWithError_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final lib$test_protocollayouts_imported
                   .ComposedProtocolOnAnonComposedWithErrorResult $response =
@@ -1764,7 +1766,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnNamedComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnNamedComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1785,7 +1788,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnNamedComposedWithError_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnNamedComposedWithError_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final lib$test_protocollayouts_imported
                   .ComposedProtocolOnNamedComposedWithErrorResult $response =
@@ -1816,7 +1820,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnImport_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnImport_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1836,7 +1841,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnImportWithError_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnImportWithError_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final MainProtocolOnImportWithErrorResult $response =
               $fidl.decodeMessage(
@@ -1864,7 +1870,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnLocal_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnLocal_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1884,7 +1891,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnLocalWithError_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnLocalWithError_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final MainProtocolOnLocalWithErrorResult $response =
               $fidl.decodeMessage(
@@ -1912,7 +1920,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnAnon_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnAnon_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -1932,7 +1941,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_OnAnonWithError_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_OnAnonWithError_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final MainProtocolOnAnonWithErrorResult $response =
               $fidl.decodeMessage(
@@ -1979,7 +1989,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayAnonComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayAnonComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2027,7 +2038,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayNamedComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayNamedComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2075,7 +2087,8 @@ class MainProtocolProxy extends $fidl.AsyncProxy<MainProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayImport_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayImport_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -3051,7 +3064,8 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayAnonComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayAnonComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<
               lib$test_protocollayouts_imported
@@ -3169,7 +3183,8 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayNamedComposed_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayNamedComposed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportTablePayload>
@@ -3287,7 +3302,8 @@ class MainProtocolBinding extends $fidl.AsyncBinding<MainProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kMainProtocol_TwoWayImport_Ordinal');
+                r'Unexpected byte overflow for _kMainProtocol_TwoWayImport_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async
                   .Future<lib$test_protocollayouts_imported.ImportTablePayload>

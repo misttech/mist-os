@@ -1136,7 +1136,8 @@ class DenyEachBindingProxy extends $fidl.AsyncProxy<DenyEachBinding>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyCpp_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyCpp_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final DenyEachBindingOnlyDenyCppResult $response =
               $fidl.decodeMessage(
@@ -1162,7 +1163,8 @@ class DenyEachBindingProxy extends $fidl.AsyncProxy<DenyEachBinding>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyGo_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyGo_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final DenyEachBindingOnlyDenyGoResult $response = $fidl.decodeMessage(
               $message,
@@ -1186,7 +1188,8 @@ class DenyEachBindingProxy extends $fidl.AsyncProxy<DenyEachBinding>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final DenyEachBindingOnlyDenyLibfuzzerResult $response =
               $fidl.decodeMessage(
@@ -1213,7 +1216,8 @@ class DenyEachBindingProxy extends $fidl.AsyncProxy<DenyEachBinding>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyRust_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyRust_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final DenyEachBindingOnlyDenyRustResult $response =
               $fidl.decodeMessage(
@@ -1239,7 +1243,8 @@ class DenyEachBindingProxy extends $fidl.AsyncProxy<DenyEachBinding>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenySyzkaller_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenySyzkaller_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final DenyEachBindingOnlyDenySyzkallerResult $response =
               $fidl.decodeMessage(
@@ -1400,7 +1405,8 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyCpp_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyCpp_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
@@ -1448,7 +1454,8 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyGo_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyGo_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
@@ -1496,7 +1503,8 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
@@ -1547,7 +1555,8 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenyRust_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenyRust_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
@@ -1595,7 +1604,8 @@ class DenyEachBindingBinding extends $fidl.AsyncBinding<DenyEachBinding> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kDenyEachBinding_OnlyDenySyzkaller_Ordinal');
+                r'Unexpected byte overflow for _kDenyEachBinding_OnlyDenySyzkaller_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>(
@@ -1781,7 +1791,8 @@ class ImportsSameNameContextBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kImportsSameNameContext_Unattributed_Ordinal');
+                r'Unexpected byte overflow for _kImportsSameNameContext_Unattributed_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -1803,7 +1814,8 @@ class ImportsSameNameContextBinding
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Ordinal');
+                r'Unexpected byte overflow for _kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(

@@ -1820,6 +1820,34 @@
               "name": "fidlInvalidPresenceIndicator",
               "type": "EnumConstantDeclarationImpl"
             },
+            "fidlLargeMessage64Handles": {
+              "name": "fidlLargeMessage64Handles",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageImpossible": {
+              "name": "fidlLargeMessageImpossible",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageInfoMalformed": {
+              "name": "fidlLargeMessageInfoMalformed",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageInfoMissized": {
+              "name": "fidlLargeMessageInfoMissized",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageInvalidOverflowBufferHandle": {
+              "name": "fidlLargeMessageInvalidOverflowBufferHandle",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageMissingHandles": {
+              "name": "fidlLargeMessageMissingHandles",
+              "type": "EnumConstantDeclarationImpl"
+            },
+            "fidlLargeMessageTooSmall": {
+              "name": "fidlLargeMessageTooSmall",
+              "type": "EnumConstantDeclarationImpl"
+            },
             "fidlMissingRequiredHandleRights": {
               "name": "fidlMissingRequiredHandleRights",
               "type": "EnumConstantDeclarationImpl"
@@ -4486,6 +4514,14 @@
           "isFinal": false,
           "isLate": false,
           "name": "kLargeMessageInfoSize",
+          "type": "VariableDeclarationImpl",
+          "varType": "int"
+        },
+        "kLargeMessageVmoRights": {
+          "isConst": true,
+          "isFinal": false,
+          "isLate": false,
+          "name": "kLargeMessageVmoRights",
           "type": "VariableDeclarationImpl",
           "varType": "int"
         },

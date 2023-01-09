@@ -39,7 +39,7 @@ $async.Future<void>
         = $fidl.decodeMaybeLargeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
     {{- else }}
     if ($message.overflowing == $fidl.CallOverflowing.large) {
-      throw $fidl.FidlError(r'Unexpected byte overflow for method {{ .OrdinalName }}');
+      throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
     }
     final {{ .ResponseMessageType }} $response
         = $fidl.decodeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
@@ -51,7 +51,7 @@ $async.Future<void>
           = $fidl.decodeMaybeLargeMessageWithCallback<{{ .AsyncResponseClass }}>(
       {{- else }}
       if ($message.overflowing == $fidl.CallOverflowing.large) {
-        throw $fidl.FidlError(r'Unexpected byte overflow for method {{ .OrdinalName }}');
+        throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
       }
       final {{ .ResponseMessageType }} $response =
           $fidl.decodeMessageWithCallback<{{ .AsyncResponseClass }}>(
@@ -73,7 +73,7 @@ $async.Future<void>
             $fidl.decodeMaybeLargeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
         {{- else }}
         if ($message.overflowing == $fidl.CallOverflowing.large) {
-          throw $fidl.FidlError(r'Unexpected byte overflow for method {{ .OrdinalName }}');
+          throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
         }
         final {{ .ResponseMessageType }} $response =
             $fidl.decodeMessage($message, {{ .TypeSymbol }}.responseInlineSize($wireFormat), $types[0])
@@ -446,7 +446,7 @@ class {{ .BindingName }} extends $fidl.AsyncBinding<{{ .ServerName }}> {
               final {{ template "AsyncReturn" . }} $future = $fidl.decodeMaybeLargeMessageWithCallback<{{ template "AsyncReturn" . }}>(
               {{- else }}
               if ($message.overflowing == $fidl.CallOverflowing.large) {
-                throw $fidl.FidlError(r'Unexpected byte overflow for method {{ .OrdinalName }}');
+                throw $fidl.FidlError(r'Unexpected byte overflow for {{ .OrdinalName }}', $fidl.FidlErrorCode.fidlLargeMessageImpossible);
               }
               final {{ template "AsyncReturn" . }} $future = $fidl.decodeMessageWithCallback<{{ template "AsyncReturn" . }}>(
               {{- end }}

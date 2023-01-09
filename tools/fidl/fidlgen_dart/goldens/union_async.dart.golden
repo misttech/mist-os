@@ -2523,7 +2523,8 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal');
+                r'Unexpected byte overflow for _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2547,7 +2548,8 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal');
+                r'Unexpected byte overflow for _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -2623,7 +2625,8 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal');
+                r'Unexpected byte overflow for _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<
               StrictBoundedXUnion> $future = $fidl.decodeMessageWithCallback<
@@ -2668,7 +2671,8 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal');
+                r'Unexpected byte overflow for _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<
               OlderSimpleUnion> $future = $fidl.decodeMessageWithCallback<

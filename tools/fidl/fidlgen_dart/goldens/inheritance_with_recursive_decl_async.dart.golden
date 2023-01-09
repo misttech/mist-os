@@ -183,7 +183,8 @@ class ChildBinding extends $fidl.AsyncBinding<Child> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChild_First_Ordinal');
+                r'Unexpected byte overflow for _kChild_First_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -203,7 +204,8 @@ class ChildBinding extends $fidl.AsyncBinding<Child> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kChild_Second_Ordinal');
+                r'Unexpected byte overflow for _kChild_Second_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(
@@ -330,7 +332,8 @@ class ParentBinding extends $fidl.AsyncBinding<Parent> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kParent_First_Ordinal');
+                r'Unexpected byte overflow for _kParent_First_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<void> $future = $fidl
               .decodeMessageWithCallback<$async.Future<void>>(

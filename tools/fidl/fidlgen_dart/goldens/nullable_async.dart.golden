@@ -677,7 +677,8 @@ class SimpleProtocolProxy extends $fidl.AsyncProxy<SimpleProtocol>
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kSimpleProtocol_Add_Ordinal');
+                r'Unexpected byte overflow for _kSimpleProtocol_Add_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
@@ -733,7 +734,8 @@ class SimpleProtocolBinding extends $fidl.AsyncBinding<SimpleProtocol> {
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for method _kSimpleProtocol_Add_Ordinal');
+                r'Unexpected byte overflow for _kSimpleProtocol_Add_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<int> $future = $fidl
               .decodeMessageWithCallback<$async.Future<int>>($message,

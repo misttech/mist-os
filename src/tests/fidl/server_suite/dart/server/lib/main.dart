@@ -327,24 +327,9 @@ class RunnerImpl extends Runner {
       //   have the rights specified in the handle dispositions list.
       case Test.serverSendsTooFewRights:
         return false;
-      case Test.badDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
-      case Test.badDecodeByteOverflowFlagUnsetOnUnboundedLargeMessage:
-      case Test.badDecodeLargeMessageInfoOmitted:
-      case Test.badDecodeLargeMessageInfoTooSmall:
-      case Test.badDecodeLargeMessageInfoTooLarge:
-      case Test.badDecodeLargeMessageInfoTopHalfUnzeroed:
-      case Test.badDecodeLargeMessageInfoByteCountIsZero:
-      case Test.badDecodeLargeMessageInfoByteCountBelowMinimum:
-      case Test.badDecodeLargeMessageNoHandles:
-      case Test.badDecodeLargeMessageTooFewHandles:
-      case Test.badDecodeLargeMessage64Handles:
-      case Test.badDecodeLargeMessageLastHandleNotVmo:
-      case Test.badDecodeLargeMessageLastHandleInsufficientRights:
-      case Test.badDecodeLargeMessageLastHandleExcessiveRights:
+      // TODO(fxbug.dev/118083): Attempting to read more bytes than are present in the VMO crashes
+      // the Dart runner.
       case Test.badDecodeLargeMessageVmoTooSmall:
-      case Test.badDecodeLargeMessageInfoByteCountTooSmall:
-      case Test.badDecodeLargeMessageInfoByteCountTooLarge:
-        // TODO(fxbug.dev/114261): Test decoding large messages.
         return false;
       case Test.goodEncodeBoundedMaybeLargeMessage:
       case Test.goodEncodeSemiBoundedMaybeLargeMessage:
