@@ -511,6 +511,62 @@ pub fn create_filesystem(
     Ok(WhatToMount::Fs(fs))
 }
 
+pub struct ProcMountsFile {
+    seq: Mutex<SeqFileState<()>>,
+}
+
+impl ProcMountsFile {
+    pub fn new_node() -> impl FsNodeOps {
+        SimpleFileNode::new(move || Ok(ProcMountsFile { seq: Mutex::new(SeqFileState::new()) }))
+    }
+}
+
+impl FileOps for ProcMountsFile {
+    fileops_impl_seekable!();
+    fileops_impl_nonblocking!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &[UserBuffer],
+    ) -> Result<usize, Errno> {
+        // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
+        // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
+        // Also has the benefit of correct (i.e. chronological) ordering. But then we have to do
+        // extra work to maintain it.
+        let ns = current_task.fs().namespace();
+        let iter = move |_cursor, sink: &mut SeqFileBuf| {
+            for_each_mount(&ns.root_mount, &mut |mount| {
+                let mountpoint = mount.mountpoint().unwrap_or_else(|| mount.root());
+                let origin = NamespaceNode {
+                    mount: mount.origin_mount.clone(),
+                    entry: Arc::clone(&mount.root),
+                };
+                let fs_spec = String::from_utf8_lossy(&origin.path()).into_owned();
+                let fs_file = String::from_utf8_lossy(&mountpoint.path()).into_owned();
+                let fs_vfstype = "TODO";
+                let fs_mntopts = "TODO";
+                writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
+                Ok(())
+            })?;
+            Ok(None)
+        };
+        self.seq.lock().read_at(current_task, iter, offset, data)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &[UserBuffer],
+    ) -> Result<usize, Errno> {
+        error!(ENOSYS)
+    }
+}
+
 pub struct ProcMountinfoFile {
     task: Arc<Task>,
     seq: Mutex<SeqFileState<()>>,
