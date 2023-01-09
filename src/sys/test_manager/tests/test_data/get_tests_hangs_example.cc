@@ -6,7 +6,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "test_suite.h"
+#include "examples/tests/test_suite.h"
 
 int main(int /*unused*/, const char** /*unused*/) {
   std::vector<example::TestInput> inputs = {
@@ -17,7 +17,8 @@ int main(int /*unused*/, const char** /*unused*/) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  example::TestSuite suite(&loop, std::move(inputs));
+  example::TestSuite suite(&loop, std::move(inputs),
+                           example::Options{.dont_service_get_tests = true});
   context->outgoing()->AddPublicService(suite.GetHandler());
 
   loop.Run();

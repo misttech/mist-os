@@ -5,6 +5,158 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+executable("passing-test-example-bin") {
+  output_name = "passing-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "passing_test_example.cc" ]
+}
+
+executable("test-with-stderr-bin") {
+  output_name = "test-with-stderr"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "test_with_stderr.cc" ]
+}
+
+executable("no-onfinished-after-test-example-bin") {
+  output_name = "no-onfinished-after-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "no_onfinished_after_test_example.cc" ]
+}
+
+executable("disabled-test-example-bin") {
+  output_name = "disabled-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "disabled_test_example.cc" ]
+}
+
+executable("failing-test-example-bin") {
+  output_name = "failing-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "failing_test_example.cc" ]
+}
+
+executable("incomplete-test-example-bin") {
+  output_name = "incomplete-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "incomplete_test_example.cc" ]
+}
+
+executable("invalid-test-example-bin") {
+  output_name = "invalid-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "invalid_test_example.cc" ]
+}
+
+executable("no-test-example-bin") {
+  output_name = "no-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "no_test_example.cc" ]
+}
+
+executable("huge-test-example-bin") {
+  output_name = "huge-test-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "huge_test_example.cc" ]
+}
+
+executable("get-tests-hangs-example-bin") {
+  output_name = "get-tests-hangs-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "get_tests_hangs_example.cc" ]
+}
+
+executable("get-tests-closes-channel-example-bin") {
+  output_name = "get-tests-closes-channel-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "get_tests_closes_channel_example.cc" ]
+}
+
+executable("run-hangs-example-bin") {
+  output_name = "run-hangs-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "run_hangs_example.cc" ]
+}
+
+executable("run-closes-channel-example-bin") {
+  output_name = "run-closes-channel-example"
+  deps = [ "//examples/tests:test_suite_lib" ]
+  sources = [ "run_closes_channel_example.cc" ]
+}
+
+fuchsia_component("disabled-test-example") {
+  deps = [ ":disabled-test-example-bin" ]
+  manifest = "meta/disabled-test-example.cml"
+}
+
+fuchsia_component("failing-test-example") {
+  deps = [ ":failing-test-example-bin" ]
+  manifest = "meta/failing-test-example.cml"
+}
+
+fuchsia_component("get-tests-closes-channel-example") {
+  deps = [ ":get-tests-closes-channel-example-bin" ]
+  manifest = "meta/get-tests-closes-channel-example.cml"
+}
+
+fuchsia_component("get-tests-hangs-example") {
+  deps = [ ":get-tests-hangs-example-bin" ]
+  manifest = "meta/get-tests-hangs-example.cml"
+}
+
+fuchsia_component("huge-test-example") {
+  deps = [ ":huge-test-example-bin" ]
+  manifest = "meta/huge-test-example.cml"
+}
+
+fuchsia_component("incomplete-test-example") {
+  deps = [ ":incomplete-test-example-bin" ]
+  manifest = "meta/incomplete-test-example.cml"
+}
+
+fuchsia_component("invalid-test-example") {
+  deps = [ ":invalid-test-example-bin" ]
+  manifest = "meta/invalid-test-example.cml"
+}
+
+fuchsia_component("no-onfinished-after-test-example") {
+  deps = [ ":no-onfinished-after-test-example-bin" ]
+  manifest = "meta/no-onfinished-after-test-example.cml"
+}
+
+fuchsia_component("no-test-example") {
+  deps = [ ":no-test-example-bin" ]
+  manifest = "meta/no-test-example.cml"
+}
+
+fuchsia_component("passing-test-example") {
+  deps = [ ":passing-test-example-bin" ]
+  manifest = "meta/passing-test-example.cml"
+}
+
+fuchsia_component("test-with-stderr") {
+  deps = [ ":test-with-stderr-bin" ]
+  manifest = "meta/test-with-stderr.cml"
+}
+
+fuchsia_component("run-closes-channel-example") {
+  deps = [ ":run-closes-channel-example-bin" ]
+  manifest = "meta/run-closes-channel-example.cml"
+}
+
+fuchsia_component("run-hangs-example") {
+  deps = [ ":run-hangs-example-bin" ]
+  manifest = "meta/run-hangs-example.cml"
+}
+
+fuchsia_component("echo_test_client") {
+  deps = [ ":echo_test_client_bin" ]
+  manifest = "meta/echo_test_client.cml"
+}
+
+fuchsia_component("echo_test_realm") {
+  manifest = "meta/echo_test_realm.cml"
+}
+
 rustc_binary("no_suite_service_bin") {
   testonly = true
   name = "no_suite_service"
@@ -57,6 +209,25 @@ rustc_test("noop_test_bin") {
   source_root = "noop_test.rs"
 
   sources = [ "noop_test.rs" ]
+}
+
+rustc_binary("echo_test_client_bin") {
+  edition = "2021"
+  source_root = "echo_test_client.rs"
+  name = "echo_test_client"
+
+  deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.test:fuchsia.test_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ "echo_test_client.rs" ]
 }
 
 fuchsia_component("no_suite_service") {
@@ -244,11 +415,27 @@ group("test_data") {
     ":debug-data-test",
     ":debug_data_spam_test",
     ":debug_data_write_test",
+    ":disabled-test-example",
+    ":echo_test_client",
+    ":echo_test_realm",
+    ":failing-test-example",
+    ":get-tests-closes-channel-example",
+    ":get-tests-hangs-example",
     ":hanging_test",
+    ":huge-test-example",
+    ":incomplete-test-example",
+    ":invalid-test-example",
+    ":no-onfinished-after-test-example",
+    ":no-test-example",
     ":no_suite_service",
     ":nonhermetic_capability_test",
+    ":passing-test-example",
+    ":run-closes-channel-example",
+    ":run-hangs-example",
     ":simple_chromium_realm_test",
     ":simple_system_realm_test",
+    ":test-with-stderr",
+    "//examples/components/routing/rust/echo_server:echo_server_cmp",
     "//examples/tests/rust:custom_artifact_user_cmp",
   ]
 }

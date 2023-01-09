@@ -1,4 +1,4 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,19 +6,14 @@
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include <sstream>
-
-#include "test_suite.h"
+#include "examples/tests/test_suite.h"
 
 int main(int /*unused*/, const char** /*unused*/) {
-  std::vector<example::TestInput> inputs;
-  for (int i = 1; i <= 1000; i++) {
-    std::ostringstream name;
-    name << "FooTest" << i;
-    example::TestInput ti = {.name = name.str(), .status = fuchsia::test::Status::PASSED};
-    inputs.push_back(ti);
-  }
-
+  std::vector<example::TestInput> inputs = {
+      {.name = "Example.Test1", .status = fuchsia::test::Status::PASSED, .write_stderr_logs = true},
+      {.name = "Example.Test2", .status = fuchsia::test::Status::PASSED},
+      {.name = "Example.Test3", .status = fuchsia::test::Status::PASSED, .write_stderr_logs = true},
+  };
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 

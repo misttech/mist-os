@@ -6,18 +6,18 @@
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "test_suite.h"
+#include "examples/tests/test_suite.h"
 
 int main(int /*unused*/, const char** /*unused*/) {
   std::vector<example::TestInput> inputs = {
       {.name = "Example.Test1", .status = fuchsia::test::Status::PASSED},
-      {.name = "Example.Test2", .status = fuchsia::test::Status::PASSED},
+      {.name = "Example.Test2", .status = fuchsia::test::Status::FAILED},
       {.name = "Example.Test3", .status = fuchsia::test::Status::PASSED}};
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  example::TestSuite suite(&loop, std::move(inputs), example::Options{.close_channel_run = true});
+  example::TestSuite suite(&loop, std::move(inputs));
   context->outgoing()->AddPublicService(suite.GetHandler());
 
   loop.Run();

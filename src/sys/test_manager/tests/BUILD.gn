@@ -130,11 +130,6 @@ group("legacy_tests") {
     # although these tests don't use test_manager itself, this group includes test_manager's
     # dependencies (such as test runners).
     "//src/sys/test_manager",
-
-    # test_manager_test launches these tests.
-    # TODO(fxbug.dev/104764): consider reorganizing these tests so that these dependencies
-    # are not necessary.
-    "//examples/tests:example-tests",
     "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
   ]
 }
@@ -160,7 +155,6 @@ group("tests") {
     # TODO(fxbug.dev/104764): consider reorganizing these tests so that these dependencies
     # are not necessary.
     "//examples/components/routing/integration_tests:tests",
-    "//examples/tests:example-tests",
     "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
   ]
 }

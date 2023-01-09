@@ -6,7 +6,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "test_suite.h"
+#include "examples/tests/test_suite.h"
 
 /// Demonstrates a incomplete test where executor never gets OnFinished event for a test case.
 int main() {

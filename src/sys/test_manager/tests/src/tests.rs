@@ -246,7 +246,7 @@ async fn launch_and_test_subpackaged_test() {
 
 #[fuchsia::test]
 async fn launch_and_test_echo_test() {
-    let test_url = "fuchsia-pkg://fuchsia.com/example-tests#meta/echo_test_realm.cm";
+    let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm";
     let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
 
     let expected_events = vec![
@@ -265,7 +265,7 @@ async fn launch_and_test_echo_test() {
 #[fuchsia::test]
 async fn launch_and_test_no_on_finished() {
     let test_url =
-        "fuchsia-pkg://fuchsia.com/example-tests#meta/no-onfinished-after-test-example.cm";
+        "fuchsia-pkg://fuchsia.com/test_manager_test#meta/no-onfinished-after-test-example.cm";
 
     let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
     let events = events.into_iter().group_by_test_case_unordered();
@@ -717,7 +717,10 @@ async fn enumerate_echo_test() {
     let proxy = connect_query_server().await.unwrap();
     let (iterator, server_end) = endpoints::create_proxy().unwrap();
     proxy
-        .enumerate("fuchsia-pkg://fuchsia.com/example-tests#meta/echo_test_realm.cm", server_end)
+        .enumerate(
+            "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
+            server_end,
+        )
         .await
         .unwrap()
         .expect("This should not fail");
