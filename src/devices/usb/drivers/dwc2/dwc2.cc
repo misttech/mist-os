@@ -1053,15 +1053,31 @@ int Dwc2::IrqThread() {
     // but without it we miss interrupts on some versions of the IP.
     while (1) {
 
+      auto gintsts = GINTSTS::Get().ReadFrom(mmio);
+
+      // After experiencing a diepint.timeout interrupt, this (inner) loop whips back seemingly one
+      // more time. To determine why (and figure out why the timeout isn't being handled correctly),
+      // we need to know what pending interrupt(s) is/are remaining after servicing the interrupt
+      // handlers below.
       if (timeout_recovering_) {
         // TODO(105382) remove logging once timeout recovery has stabilized.
         zxlogf(ERROR, "(diepint.timeout) interrupt with timeout_recovering_ = true in loop");
       }
 
-      auto gintsts = GINTSTS::Get().ReadFrom(mmio);
       auto gintmsk = GINTMSK::Get().ReadFrom(mmio);
       gintsts.WriteTo(mmio);
+
+      if (timeout_recovering_) {
+        // TODO(105382) remove logging once timeout recovery has stabilized.
+        zxlogf(ERROR, "(diepint.timeout) GINTSTS=0x%08x (pre-mask)", gintsts.reg_value());
+      }
+
       gintsts.set_reg_value(gintsts.reg_value() & gintmsk.reg_value());
+
+      if (timeout_recovering_) {
+        // TODO(105382) remove logging once timeout recovery has stabilized.
+        zxlogf(ERROR, "(diepint.timeout) GINTSTS=0x%08x (post-mask)", gintsts.reg_value());
+      }
 
       if (gintsts.reg_value() == 0) {
         break;
