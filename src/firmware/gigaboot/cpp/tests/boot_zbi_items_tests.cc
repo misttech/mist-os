@@ -43,7 +43,7 @@ class BootZbiItemTest : public ::testing::Test {
     stub_service_.AddDevice(&image_device_);
   }
 
-  auto SetupEfiGlobalState(EfiConfigTable const &config_table = kDefaultEfiConfigTable) {
+  auto SetupEfiGlobalState(EfiConfigTable const &config_table = *kDefaultEfiConfigTable) {
     return gigaboot::SetupEfiGlobalState(stub_service_, image_device_, config_table);
   }
 
@@ -186,6 +186,43 @@ TEST_F(BootZbiItemTest, AcpiRsdpV2CorruptTest) {
 TEST_F(BootZbiItemTest, AcpiRsdpNotFoundTest) {
   EfiConfigTable config_table(1);
   config_table.CorruptSignature();
+  auto cleanup = SetupEfiGlobalState(config_table);
+
+  ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  ASSERT_FALSE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
+                                   buffer().size(), kAbrSlotIndexA));
+}
+
+TEST_F(BootZbiItemTest, SmbiosTest) {
+  EfiConfigTable config_table(EfiConfigTable::SmbiosRev::kV1);
+  auto cleanup = SetupEfiGlobalState(config_table);
+
+  ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
+                                  buffer().size(), kAbrSlotIndexA));
+
+  std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_SMBIOS);
+  ASSERT_EQ(items.size(), 1ULL);
+
+  ASSERT_TRUE(memcmp(*reinterpret_cast<uint8_t const *const *>(items[0].data()), "_SM_", 4) == 0);
+}
+
+TEST_F(BootZbiItemTest, SmbiosV3Test) {
+  EfiConfigTable config_table(EfiConfigTable::SmbiosRev::kV3);
+  auto cleanup = SetupEfiGlobalState(config_table);
+
+  ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);
+  ASSERT_TRUE(AddGigabootZbiItems(reinterpret_cast<zbi_header_t *>(buffer().data()),
+                                  buffer().size(), kAbrSlotIndexA));
+
+  std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_SMBIOS);
+  ASSERT_EQ(items.size(), 1ULL);
+
+  ASSERT_TRUE(memcmp(*reinterpret_cast<uint8_t const *const *>(items[0].data()), "_SM3_", 5) == 0);
+}
+
+TEST_F(BootZbiItemTest, SmbiosErrorTest) {
+  EfiConfigTable config_table(EfiConfigTable::SmbiosRev::kNone);
   auto cleanup = SetupEfiGlobalState(config_table);
 
   ASSERT_EQ(zbi_init(buffer().data(), buffer().size()), ZBI_RESULT_OK);

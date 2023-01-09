@@ -7,6 +7,7 @@
 #include <lib/cksum.h>
 #include <lib/stdcompat/span.h>
 
+#include "efi/system-table.h"
 #include "src/lib/utf_conversion/utf_conversion.h"
 
 efi_loaded_image_protocol* gEfiLoadedImage = nullptr;
@@ -279,6 +280,58 @@ void SetGptEntryName(const char* name, gpt_entry_t& entry) {
                 reinterpret_cast<uint16_t*>(entry.name), &dst_len);
 }
 
-const EfiConfigTable kDefaultEfiConfigTable(2);
+EfiConfigTable::EfiConfigTable(uint8_t acpi_revision, SmbiosRev smbios_revision) {
+  rsdp_ = {
+      .checksum = 0,
+      .revision = acpi_revision,
+      .length = sizeof(rsdp_),
+      .extended_checksum = 0,
+  };
+
+  // The signature, in bytes, spells "RSD PTR "
+  memcpy(&rsdp_.signature, kAcpiRsdpSignature, sizeof(rsdp_.signature));
+
+  // The checksum sums all the bytes in the rsdp struct.
+  // It is valid if the sum is zero.
+  cpp20::span<const uint8_t> bytes(reinterpret_cast<const uint8_t*>(&rsdp_), kAcpiRsdpV1Size);
+  rsdp_.checksum = std::accumulate(bytes.begin(), bytes.end(), uint8_t{0}, std::minus());
+  bytes = {bytes.begin(), rsdp_.length};
+  rsdp_.extended_checksum = std::accumulate(bytes.begin(), bytes.end(), uint8_t{0}, std::minus());
+
+  efi_guid guid = ACPI_TABLE_GUID;
+  if (acpi_revision >= 2) {
+    guid = ACPI_20_TABLE_GUID;
+  }
+
+  // Make the table lookups iterate at least once.
+  table_.push_back(efi_configuration_table{});
+
+  table_.push_back(efi_configuration_table{
+      .VendorGuid = guid,
+      .VendorTable = &rsdp_,
+  });
+
+  switch (smbios_revision) {
+    case SmbiosRev::kV3:
+      table_.push_back(efi_configuration_table{
+          .VendorGuid = SMBIOS3_TABLE_GUID,
+          .VendorTable = "_SM3_",
+      });
+      break;
+    case SmbiosRev::kV1:
+      table_.push_back(efi_configuration_table{
+          .VendorGuid = SMBIOS_TABLE_GUID,
+          .VendorTable = "_SM_",
+      });
+      break;
+    case SmbiosRev::kNone:
+      // Deliberately omit on none
+    default:
+      break;
+  }
+}
+
+const fbl::NoDestructor<EfiConfigTable> kDefaultEfiConfigTable(static_cast<uint8_t>(2),
+                                                               EfiConfigTable::SmbiosRev::kV3);
 
 }  // namespace gigaboot

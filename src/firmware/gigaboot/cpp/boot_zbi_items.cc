@@ -29,6 +29,11 @@ const efi_guid kAcpiTableGuid = ACPI_TABLE_GUID;
 const efi_guid kAcpi20TableGuid = ACPI_20_TABLE_GUID;
 const uint8_t kAcpiRsdpSignature[8] = {'R', 'S', 'D', ' ', 'P', 'T', 'R', ' '};
 
+const efi_guid kSmbiosTableGUID = SMBIOS_TABLE_GUID;
+const efi_guid kSmbios3TableGUID = SMBIOS3_TABLE_GUID;
+const uint8_t kSmbiosAnchor[4] = {'_', 'S', 'M', '_'};
+const uint8_t kSmbios3Anchor[5] = {'_', 'S', 'M', '3', '_'};
+
 namespace {
 
 uint8_t scratch_buffer[32 * 1024];
@@ -77,6 +82,29 @@ bool AddMemoryRanges(void* zbi, size_t capacity) {
   }
 
   return true;
+}
+
+bool AppendSmbiosPtr(zbi_header_t* image, size_t capacity) {
+  uint64_t smbios = 0;
+  cpp20::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
+                                                     gEfiSystemTable->NumberOfTableEntries);
+
+  for (const efi_configuration_table& entry : entries) {
+    if ((entry.VendorGuid == kSmbiosTableGUID &&
+         !memcmp(entry.VendorTable, kSmbiosAnchor, sizeof(kSmbiosAnchor))) ||
+        (entry.VendorGuid == kSmbios3TableGUID &&
+         !memcmp(entry.VendorTable, kSmbios3Anchor, sizeof(kSmbios3Anchor)))) {
+      smbios = reinterpret_cast<uint64_t>(entry.VendorTable);
+      break;
+    }
+  }
+
+  if (smbios == 0) {
+    return false;
+  }
+
+  return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_SMBIOS, 0, 0, &smbios,
+                                       sizeof(smbios)) == ZBI_RESULT_OK;
 }
 
 bool AppendAcpiRsdp(zbi_header_t* image, size_t capacity) {
@@ -230,6 +258,10 @@ bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, AbrSlotIndex slot
   }
 
   if (!AddSystemTable(image, capacity)) {
+    return false;
+  }
+
+  if (!AppendSmbiosPtr(image, capacity)) {
     return false;
   }
 

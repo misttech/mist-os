@@ -17,6 +17,12 @@
 // similar function in C++ and remove this.
 extern "C" char key_prompt(const char* valid_keys, int timeout_s);
 
+// This is necessary because the Fastboot class inherits from FastbootBase,
+// which is an abstract class with pure virtual functions.
+// The _purecall definition is not provided in efi compilation, which leads to an
+// 'undefined' error in asan builds.
+extern "C" int _purecall(void) { return 0; }
+
 int main(int argc, char** argv) {
   printf("Gigaboot main\n");
 
@@ -35,10 +41,9 @@ int main(int argc, char** argv) {
   // The following check/initialize network interface and generate ip6 address.
   if (netifc_open()) {
     printf("netifc: Failed to open network interface\n");
-    return 1;
+  } else {
+    printf("netifc: network interface opened\n");
   }
-
-  printf("netifc: network interface opened\n");
 
   // Log TPM info if the device has one.
   if (efi_status res = gigaboot::PrintTpm2Capability(); res != EFI_SUCCESS) {
