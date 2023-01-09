@@ -45,7 +45,6 @@ assembled_system("guest") {
     "//src/power/power-manager:base_config",
     "//src/bringup/bin/virtcon:bootfs",
     "//src/bringup/bundles:bootstrap",
-    "//src/connectivity/ethernet/drivers/ethernet",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
     "//src/connectivity/network/bin/ping",

@@ -139,7 +139,6 @@ fuchsia_unittest_package("usb-cdc-ecm-integration-test") {
   deps = [
     ":usb-cdc-ecm",
     ":usb-cdc-ecm-integration",
-    "//src/connectivity/ethernet/drivers/ethernet",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/ethernet/drivers/usb-cdc-function",
     "//src/connectivity/network/drivers/network-device",

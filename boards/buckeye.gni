@@ -8,7 +8,6 @@ board_name = "buckeye"
 board_description = "speaker platform board"
 
 _common_bootfs_deps = [
-  "//src/connectivity/ethernet/drivers/ethernet",
   "//src/devices/block/drivers/aml-sdmmc",
   "//src/devices/block/drivers/bootpart",
   "//src/devices/board/drivers/buckeye",

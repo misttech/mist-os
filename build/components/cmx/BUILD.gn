@@ -61,7 +61,6 @@ group("cmx_allowlist") {
     "//src/lib/component:lib-component-go-unittests_component_manifest_compile",
     "//src/lib/fuchsia-component-test/tests:echo_client_component_manifest_compile",
     "//src/lib/fuchsia-component-test/tests:echo_server_component_manifest_compile",
-    "//src/lib/isolated_devmgr:ethertap-devmgr_manifest_compile",
     "//src/lib/isolated_devmgr:isolated-devmgr-tests_manifest_compile",
     "//src/lib/isolated_devmgr:virtual-audio-devmgr_manifest_compile",
     "//src/media/codec:codec_runner_sw_aac_component_manifest_compile",

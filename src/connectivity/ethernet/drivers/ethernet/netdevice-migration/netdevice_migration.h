@@ -39,8 +39,8 @@ class NetdeviceMigration
       public ddk::MacAddrProtocol<NetdeviceMigration> {
  public:
   static constexpr uint8_t kPortId = 13;
-  // Equivalent to generic ethernet driver FIFO depth; see
-  // eth::EthDev::kFifoDepth in //src/connectivity/ethernet/drivers/ethernet/ethernet.h.
+  // Equivalent to old ethernet driver FIFO depth; see
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/ethernet/drivers/ethernet/ethernet.h;l=169;drc=bd653b0d513ea6cc0d2ec85d38ae31bf084f0651
   static constexpr uint32_t kFifoDepth = 256;
   static constexpr mode_t kSupportedMacFilteringModes =
       MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS | MODE_PROMISCUOUS;

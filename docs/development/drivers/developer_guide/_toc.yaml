@@ -8,8 +8,6 @@
 toc:
 - title: "Getting started"
   path: /docs/development/drivers/developer_guide/driver-development.md
-- title: "Write an ethernet driver"
-  path: /docs/development/drivers/developer_guide/ethernet.md
 - title: "Write a ramdisk driver"
   path: /docs/development/drivers/developer_guide/ramdisk.md
 - title: "Create a composite node"
