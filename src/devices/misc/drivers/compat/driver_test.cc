@@ -435,7 +435,7 @@ class DriverTest : public testing::Test {
       svc->AddEntry(fidl::DiscoverableProtocolName<fboot::Arguments>,
                     fbl::MakeRefCounted<fs::Service>([this](zx::channel server) {
                       fidl::ServerEnd<fboot::Arguments> server_end(std::move(server));
-                      fidl::BindServer(dispatcher(), std::move(server_end), &boot_args_);
+                      fidl::BindServer(fidl_loop_.dispatcher(), std::move(server_end), &boot_args_);
                       return ZX_OK;
                     }));
 
@@ -450,7 +450,7 @@ class DriverTest : public testing::Test {
           fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
           fbl::MakeRefCounted<fs::Service>([this](zx::channel server) {
             fidl::ServerEnd<fuchsia_scheduler::ProfileProvider> server_end(std::move(server));
-            fidl::BindServer(dispatcher(), std::move(server_end), &profile_provider_);
+            fidl::BindServer(fidl_loop_.dispatcher(), std::move(server_end), &profile_provider_);
             return ZX_OK;
           }));
 
@@ -831,17 +831,8 @@ TEST_F(DriverTest, GetProfile) {
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
 
-  // device_get_profile blocks, so we have to do it in a separate thread.
-  sync_completion_t finished;
-  auto thread = std::thread([&finished, &v1_test]() {
-    zx_handle_t out_profile;
-    ASSERT_EQ(ZX_OK, device_get_profile(v1_test->zxdev, 10, "test-profile", &out_profile));
-    sync_completion_signal(&finished);
-  });
-  do {
-    RunUntilDispatchersIdle();
-  } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
-  thread.join();
+  zx_handle_t out_profile;
+  ASSERT_EQ(ZX_OK, device_get_profile(v1_test->zxdev, 10, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
   ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
@@ -869,18 +860,9 @@ TEST_F(DriverTest, GetDeadlineProfile) {
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
 
-  // device_get_profile blocks, so we have to do it in a separate thread.
-  sync_completion_t finished;
-  auto thread = std::thread([&finished, &v1_test]() {
-    zx_handle_t out_profile;
-    ASSERT_EQ(ZX_OK, device_get_deadline_profile(v1_test->zxdev, 10, 20, 30, "test-profile",
-                                                 &out_profile));
-    sync_completion_signal(&finished);
-  });
-  do {
-    RunUntilDispatchersIdle();
-  } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
-  thread.join();
+  zx_handle_t out_profile;
+  ASSERT_EQ(ZX_OK,
+            device_get_deadline_profile(v1_test->zxdev, 10, 20, 30, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
   ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
@@ -899,32 +881,23 @@ TEST_F(DriverTest, GetVariable) {
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
 
-  // device_get_profile blocks, so we have to do it in a separate thread.
-  sync_completion_t finished;
-  auto thread = std::thread([&finished, &v1_test]() {
-    char variable[20];
-    size_t actual;
-    ASSERT_EQ(ZX_OK, device_get_variable(v1_test->zxdev, "driver.foo", variable, sizeof(variable),
-                                         &actual));
-    ASSERT_EQ(actual, 4u);
-    ASSERT_EQ(strncmp(variable, "true", sizeof(variable)), 0);
-    ASSERT_EQ(ZX_OK, device_get_variable(v1_test->zxdev, "clock.backstop", variable,
-                                         sizeof(variable), &actual));
-    ASSERT_EQ(actual, 1u);
-    ASSERT_EQ(strncmp(variable, "0", sizeof(variable)), 0);
-    // Invalid variable name
-    ASSERT_EQ(ZX_ERR_NOT_FOUND, device_get_variable(v1_test->zxdev, "kernel.shell", variable,
-                                                    sizeof(variable), &actual));
-    // Buffer too small
-    ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL,
-              device_get_variable(v1_test->zxdev, "driver.foo", variable, 1, &actual));
-    ASSERT_EQ(actual, 4u);
-    sync_completion_signal(&finished);
-  });
-  do {
-    RunUntilDispatchersIdle();
-  } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
-  thread.join();
+  char variable[20];
+  size_t actual;
+  ASSERT_EQ(ZX_OK,
+            device_get_variable(v1_test->zxdev, "driver.foo", variable, sizeof(variable), &actual));
+  ASSERT_EQ(actual, 4u);
+  ASSERT_EQ(strncmp(variable, "true", sizeof(variable)), 0);
+  ASSERT_EQ(ZX_OK, device_get_variable(v1_test->zxdev, "clock.backstop", variable, sizeof(variable),
+                                       &actual));
+  ASSERT_EQ(actual, 1u);
+  ASSERT_EQ(strncmp(variable, "0", sizeof(variable)), 0);
+  // Invalid variable name
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, device_get_variable(v1_test->zxdev, "kernel.shell", variable,
+                                                  sizeof(variable), &actual));
+  // Buffer too small
+  ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL,
+            device_get_variable(v1_test->zxdev, "driver.foo", variable, 1, &actual));
+  ASSERT_EQ(actual, 4u);
 
   UnbindAndFreeDriver(std::move(driver));
   ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
@@ -949,21 +922,12 @@ TEST_F(DriverTest, SetProfileByRole) {
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
 
-  // device_get_profile blocks, so we have to do it in a separate thread.
-  sync_completion_t finished;
-  auto thread = std::thread([&finished, &v1_test]() {
-    constexpr char kThreadName[] = "test-thread";
-    zx::thread thread;
-    ASSERT_EQ(ZX_OK, zx::thread::create(*zx::process::self(), kThreadName, sizeof(kThreadName), 0,
-                                        &thread));
-    ASSERT_EQ(ZX_OK, device_set_profile_by_role(v1_test->zxdev, thread.release(), "test-profile",
-                                                strlen("test-profile")));
-    sync_completion_signal(&finished);
-  });
-  do {
-    RunUntilDispatchersIdle();
-  } while (sync_completion_wait(&finished, ZX_TIME_INFINITE_PAST) == ZX_ERR_TIMED_OUT);
-  thread.join();
+  constexpr char kThreadName[] = "test-thread";
+  zx::thread thread;
+  ASSERT_EQ(ZX_OK,
+            zx::thread::create(*zx::process::self(), kThreadName, sizeof(kThreadName), 0, &thread));
+  ASSERT_EQ(ZX_OK, device_set_profile_by_role(v1_test->zxdev, thread.release(), "test-profile",
+                                              strlen("test-profile")));
 
   UnbindAndFreeDriver(std::move(driver));
   ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
