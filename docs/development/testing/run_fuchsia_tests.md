@@ -15,9 +15,9 @@ fx test <TEST_NAME>
 
 If `TEST_NAME` is a test component, `fx test` connects to your Fuchsia device to
 load and run the test component. That is, the command finds the component's
-corresponding [component URI][component-uri] and calls `run-test-suite` on
-the target device. However, if `TEST_NAME` is a host test, `fx test` directly
-invokes that test binary to run on the host machine.
+corresponding [component URI][component-uri] and calls
+[`ffx test run`][ffx-test]. However, if `TEST_NAME` is a host test, `fx test`
+directly invokes that test binary to run on the host machine.
 
 Similar to a host test, an end-to-end test also runs on a host machine. The test
 then may interact with various services on a Fuchsia device for testing purposes
@@ -70,10 +70,16 @@ Use the `--` flag to pass additional arguments to test components.
 Note: `fx test` passes these arguments to all selected tests. When you target
 many test components in a single command, this option may not be ideal.
 
-The following example passes a `timeout` flag to a test:
+The following example passes an `arg` flag to a test:
 
 ```none
-fx test <TEST_NAME> -- --timeout=5
+$ fx test <TEST_NAME> -- --arg=5
+```
+
+For example, the command above internally calls the following command:
+
+```none
+$ fx ffx test run <TEST_COMPONENT_URI> -- --arg=5
 ```
 
 ## Specify a test in multiple ways {#specify-a-test-in-multiple-ways}
@@ -231,3 +237,4 @@ require rebuilding that test's package as well.
 [fuchsia-package-name]: /docs/concepts/packages/package_url.md#package-name
 [resource-path]: /docs/concepts/packages/package_url.md#resource-paths
 [fx-test-flags]: https://fuchsia.dev/reference/tools/fx/cmd/test
+[ffx-test]: /docs/development/sdk/ffx/run-device-tests.md
