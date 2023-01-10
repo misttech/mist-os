@@ -40,6 +40,16 @@ async fn test_mouse_event_without_device_info() {
 }
 
 #[fuchsia::test]
+async fn test_mouse_event_for_view_exited() {
+    // Mouse event for MouseEventStreamInfo::Exited should be a Phase::Cancel event.
+    let mouse_event = InputEvent::mouse().status(fptr::MouseViewStatus::Exited);
+    let (sender, mut receiver) = pointer_fusion(1.0);
+    sender.unbounded_send(mouse_event).unwrap();
+    let pointer_event = receiver.next().await.unwrap();
+    assert!(matches!(pointer_event.phase, Phase::Cancel));
+}
+
+#[fuchsia::test]
 async fn test_pixel_ratio() {
     // Touch.
     {
@@ -321,6 +331,7 @@ trait TestPointerEvent {
     fn interaction(self, interaction_id: u32, device_id: u32, pointer_id: u32) -> Self;
     fn phase(self, phase: fptr::EventPhase) -> Self;
     fn scroll(self, offset_x: Option<f64>, offset_y: Option<f64>) -> Self;
+    fn status(self, status: fptr::MouseViewStatus) -> Self;
 }
 
 impl TestPointerEvent for InputEvent {
@@ -457,7 +468,21 @@ impl TestPointerEvent for InputEvent {
                     pointer_sample.scroll_v_physical_pixel = offset_y;
                 }
             }
-            _ => {}
+            _ => {
+                panic!("Scroll only applies to mouse events")
+            }
+        }
+        self
+    }
+
+    fn status(mut self, status: fptr::MouseViewStatus) -> Self {
+        match self {
+            InputEvent::MouseEvent(ref mut event) => {
+                event.stream_info = Some(fptr::MouseEventStreamInfo { device_id: 42, status });
+            }
+            _ => {
+                panic!("Stream info only applies to mouse events")
+            }
         }
         self
     }

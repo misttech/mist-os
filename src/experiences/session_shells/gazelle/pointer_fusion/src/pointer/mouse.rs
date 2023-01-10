@@ -39,6 +39,20 @@ impl PointerFusionState {
                 let sanitized_events = self.sanitize_pointer(pointer_event);
                 return sanitized_events;
             }
+        } else if let Some(fptr::MouseEventStreamInfo {
+            status: fptr::MouseViewStatus::Exited,
+            device_id,
+        }) = event.stream_info
+        {
+            // Treat MouseViewStatus::Exited as Phase::Cancel.
+            let mut pointer_event = PointerEvent::default();
+            pointer_event.phase = Phase::Cancel;
+            pointer_event.timestamp = zx::Time::from_nanos(event.timestamp.unwrap_or(0));
+            pointer_event.kind = DeviceKind::Mouse;
+            pointer_event.status = Status::Exited;
+            pointer_event.device_id = device_id;
+
+            return vec![pointer_event];
         }
 
         vec![]
@@ -60,6 +74,7 @@ impl PointerFusionState {
         pointer.phase = phase;
         pointer.kind = DeviceKind::Mouse;
         pointer.device_id = sample.device_id.unwrap_or(0);
+        pointer.status = mouse_view_status_from(event.stream_info);
 
         let [x, y] =
             viewport_to_view_coordinates(sample.position_in_viewport.unwrap(), view_parameters);
@@ -126,4 +141,14 @@ fn has_valid_mouse_sample(event: &fptr::MouseEvent) -> bool {
         && sample.position_in_viewport.is_some()
         && (sample.pressed_buttons.is_none()
             || !sample.pressed_buttons.as_ref().unwrap().is_empty())
+}
+
+fn mouse_view_status_from(stream_info: Option<fptr::MouseEventStreamInfo>) -> Status {
+    match stream_info {
+        None => Status::None,
+        Some(fptr::MouseEventStreamInfo { status, .. }) => match status {
+            fptr::MouseViewStatus::Entered => Status::Entered,
+            fptr::MouseViewStatus::Exited => Status::Exited,
+        },
+    }
 }

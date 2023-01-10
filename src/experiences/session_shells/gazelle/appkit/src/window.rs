@@ -709,6 +709,12 @@ async fn serve_touch_source_watcher(
     // Buffers touch events until their `fptr::Interaction` status is granted.
     let mut interactions: HashMap<fptr::TouchInteractionId, Vec<fptr::TouchEvent>> = HashMap::new();
 
+    // Cache fptr::ViewParameter since it is sent only once per view.
+    let mut view_parameters: Option<fptr::ViewParameters> = None;
+
+    // Cache fptr::DeviceInfo since it is sent only once per view.
+    let mut device_info: Option<fptr::TouchDeviceInfo> = None;
+
     loop {
         let events = touch_source.watch(&mut pending_responses.into_iter());
         match events.await {
@@ -717,6 +723,10 @@ async fn serve_touch_source_watcher(
                 pending_responses = events
                     .iter()
                     .map(|event| {
+                        // Cache view_parameters and device_info if set on event.
+                        view_parameters = event.view_parameters.clone().or(view_parameters.clone());
+                        device_info = event.device_info.clone().or(device_info.clone());
+
                         let mut response = fptr::TouchResponse::EMPTY;
                         if let Some(fptr::TouchPointerSample {
                             interaction: Some(interaction),
@@ -730,16 +740,21 @@ async fn serve_touch_source_watcher(
                                 interactions.insert(interaction, vec![]);
                             }
 
+                            let mut event = event.clone();
+                            event.view_parameters = view_parameters.clone();
+                            event.device_info = device_info.clone();
+                            let trace_flow_id = event.trace_flow_id;
+
                             if let Some(interaction) = interactions.get_mut(&interaction) {
-                                interaction.push(event.clone());
+                                interaction.push(event);
                             } else {
                                 input_sender
-                                    .unbounded_send(InputEvent::TouchEvent(event.clone()))
+                                    .unbounded_send(InputEvent::TouchEvent(event))
                                     .expect("Failed to send InputEvent::TouchEvent");
                             }
                             response = fptr::TouchResponse {
                                 response_type: Some(fptr::TouchResponseType::Yes),
-                                trace_flow_id: event.trace_flow_id,
+                                trace_flow_id,
                                 ..response
                             }
                         }

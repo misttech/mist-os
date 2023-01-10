@@ -58,7 +58,7 @@ impl PointerFusionState {
                         events.append(&mut self.sanitize_pointer(up_event));
                         events.append(&mut self.sanitize_pointer(pointer_event));
                     }
-                    _ => events.push(pointer_event),
+                    _ => events.append(&mut self.sanitize_pointer(pointer_event)),
                 }
 
                 return events;

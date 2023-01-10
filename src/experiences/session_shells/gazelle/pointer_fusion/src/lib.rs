@@ -45,6 +45,14 @@ pub enum SignalKind {
     Scroll,
 }
 
+#[derive(Clone, Default, Debug, PartialEq)]
+pub enum Status {
+    #[default]
+    None,
+    Entered,
+    Exited,
+}
+
 pub const POINTER_BUTTON_1: i64 = 1 << 0;
 pub const POINTER_BUTTON_2: i64 = 1 << 1;
 pub const POINTER_BUTTON_3: i64 = 1 << 2;
@@ -102,6 +110,8 @@ pub struct PointerEvent {
     pub logical_scroll_delta_x: f64,
     /// Set if this [PointerEvent] was synthesized for maintaining legal input sequence.
     pub synthesized: bool,
+    /// The status of pointer if it has entered or exited the viewport. None for touch source.
+    pub status: Status,
 }
 
 #[derive(Debug)]
