@@ -280,7 +280,18 @@ void SimpleCodecServerInternal<T>::SetElementState(
   if (!last_gain_state_.has_value() || last_gain_state_->gain != gain_state_.gain ||
       last_gain_state_->muted != gain_state_.muted ||
       last_gain_state_->agc_enabled != gain_state_.agc_enabled) {
-    static_cast<T*>(this)->SetGainState(gain_state_);
+    auto* thiz = static_cast<T*>(this);
+    thiz->SetGainState(gain_state_);
+    if (!thiz->gain_db_) {
+      thiz->gain_db_ = thiz->simple_codec_.CreateDouble("gain_db", gain_state_.gain);
+    } else {
+      thiz->gain_db_.Set(gain_state_.gain);
+    }
+    if (!thiz->muted_) {
+      thiz->muted_ = thiz->simple_codec_.CreateBool("muted", gain_state_.muted);
+    } else {
+      thiz->muted_.Set(gain_state_.muted);
+    }
     last_gain_state_.emplace(gain_state_);
   }
 }
@@ -296,7 +307,18 @@ void SimpleCodecServerInternal<T>::WatchElementState(
   }
 
   if (load_gain_state_first_time_) {
-    gain_state_ = static_cast<T*>(this)->GetGainState();
+    auto* thiz = static_cast<T*>(this);
+    gain_state_ = thiz->GetGainState();
+    if (!thiz->gain_db_) {
+      thiz->gain_db_ = thiz->simple_codec_.CreateDouble("gain_db", gain_state_.gain);
+    } else {
+      thiz->gain_db_.Set(gain_state_.gain);
+    }
+    if (!thiz->muted_) {
+      thiz->muted_ = thiz->simple_codec_.CreateBool("muted", gain_state_.muted);
+    } else {
+      thiz->muted_.Set(gain_state_.muted);
+    }
     last_gain_state_.emplace(gain_state_);
     load_gain_state_first_time_ = false;
   }

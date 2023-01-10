@@ -156,6 +156,8 @@ class SimpleCodecServer : public SimpleCodecServerDeviceType,
   inspect::UintProperty bits_per_sample_;
   inspect::StringProperty sample_format_;
   inspect::StringProperty frame_format_;
+  inspect::DoubleProperty gain_db_;
+  inspect::BoolProperty muted_;
 };
 
 }  // namespace audio

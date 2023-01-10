@@ -202,6 +202,16 @@ TEST_F(SimpleCodecTest, GainState) {
     ASSERT_EQ(state->gain, 0.f);
   }
 
+  // Inspect also set to false/0db.
+  {
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
+    auto* simple_codec = hierarchy().GetByPath({"simple_codec"});
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(simple_codec->node(), "gain_db", inspect::DoublePropertyValue(0.f)));
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(simple_codec->node(), "muted", inspect::BoolPropertyValue(false)));
+  }
+
   // Set gain now.
   client.SetGainState({.gain = 1.23f, .muted = true, .agc_enabled = true});
 
@@ -212,6 +222,16 @@ TEST_F(SimpleCodecTest, GainState) {
     if (state->muted && state->agc_enabled && state->gain == 1.23f) {
       break;
     }
+  }
+
+  // Inspect values updated too.
+  {
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
+    auto* simple_codec = hierarchy().GetByPath({"simple_codec"});
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(simple_codec->node(), "gain_db", inspect::DoublePropertyValue(1.23f)));
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(simple_codec->node(), "muted", inspect::BoolPropertyValue(true)));
   }
 }
 
@@ -400,7 +420,7 @@ TEST_F(SimpleCodecTest, AglStateServerWithClientViaSignalProcessingApi) {
   ASSERT_TRUE(codec->agl_mode());
 }
 
-TEST_F(SimpleCodecTest, Inspect) {
+TEST_F(SimpleCodecTest, InspectDefaultState) {
   auto fake_parent = MockDevice::FakeRootParent();
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<TestCodec>(fake_parent.get()));
