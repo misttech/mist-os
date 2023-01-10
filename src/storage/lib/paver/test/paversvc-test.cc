@@ -2272,7 +2272,7 @@ class PaverServicePinecrestTest : public PaverServiceGptDeviceTest {
   void InitializePinecrestGPTPartitions() {
     constexpr uint8_t kAbrMetaType[GPT_GUID_LEN] = GUID_ABR_META_VALUE;
     const std::vector<PartitionDescription> kStartingPartitions = {
-        {GPT_DURABLE_BOOT_NAME, kAbrMetaType, kDurableBootStart, kDurableBootSize},
+        {GUID_ABR_META_NAME, kAbrMetaType, kDurableBootStart, kDurableBootSize},
     };
     ASSERT_NO_FATAL_FAILURE(InitializeStartingGPTPartitions(kStartingPartitions));
   }

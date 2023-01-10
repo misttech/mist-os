@@ -96,48 +96,7 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::AddPartition(
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartitionByGuid(
-    const PartitionSpec& spec) const {
-  Uuid part_info;
-  switch (spec.partition) {
-    // TODO(fxbug.dev/111512): Also support bootloader partitions.
-    case Partition::kZirconA:
-      part_info = Uuid(GUID_ZIRCON_A_VALUE);
-      break;
-    case Partition::kZirconB:
-      part_info = Uuid(GUID_ZIRCON_B_VALUE);
-      break;
-    case Partition::kZirconR:
-      part_info = Uuid(GUID_ZIRCON_R_VALUE);
-      break;
-    case Partition::kVbMetaA:
-      part_info = Uuid(GUID_VBMETA_A_VALUE);
-      break;
-    case Partition::kVbMetaB:
-      part_info = Uuid(GUID_VBMETA_B_VALUE);
-      break;
-    case Partition::kVbMetaR:
-      part_info = Uuid(GUID_VBMETA_R_VALUE);
-      break;
-    case Partition::kAbrMeta:
-      part_info = Uuid(GUID_ABR_META_VALUE);
-      break;
-    case Partition::kFuchsiaVolumeManager:
-      part_info = Uuid(GUID_FVM_VALUE);
-      break;
-    default:
-      ERROR("Partition type is invalid\n");
-      return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  auto partition = OpenBlockPartition(gpt_->devfs_root(), std::nullopt, part_info, ZX_SEC(5));
-  if (partition.is_error()) {
-    return partition.take_error();
-  }
-  return zx::ok(new BlockPartitionClient(std::move(partition.value())));
-}
-
-zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartitionByName(
+zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition(
     const PartitionSpec& spec) const {
   std::function<bool(const gpt_partition_t&)> filter;
   switch (spec.partition) {
@@ -169,21 +128,6 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition
     return status.take_error();
   }
   return zx::ok(std::move(status->partition));
-}
-
-zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition(
-    const PartitionSpec& spec) const {
-  if (!SupportsPartition(spec)) {
-    ERROR("Unsupported partition %s\n", spec.ToString().c_str());
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  auto partition = FindPartitionByGuid(spec);
-  if (partition.is_ok()) {
-    return partition;
-  } else {
-    return FindPartitionByName(spec);
-  }
 }
 
 zx::result<> PinecrestPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
