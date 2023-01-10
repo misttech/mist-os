@@ -27,40 +27,12 @@ pub mod node;
 // Reexported from fidl_fuchsia_io for convenience
 pub use fio::OpenFlags;
 
-/// Write the given bytes into a file at `path`. The path must be an absolute path.
-/// * If the file already exists, replaces existing contents.
-/// * If the file does not exist, creates the file.
-#[cfg(target_os = "fuchsia")]
-pub async fn write_path_bytes(path: &str, data: &[u8]) -> Result<(), Error> {
-    file::write_in_namespace(path, data).await?;
-    Ok(())
-}
-
 /// Read the given FIDL message from binary form from a file open for reading.
 /// FIDL structure should be provided at a read time.
 /// Incompatible data is populated as per FIDL ABI compatibility guide:
 /// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
 pub async fn read_file_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, Error> {
     Ok(file::read_fidl(file).await?)
-}
-
-/// Read the given FIDL message from binary file at `path` in the current namespace. The path
-/// must be an absolute path.
-/// FIDL structure should be provided at a read time.
-/// Incompatible data is populated as per FIDL ABI compatibility guide:
-/// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
-#[cfg(target_os = "fuchsia")]
-pub async fn read_path_fidl<T: Persistable>(path: &str) -> Result<T, Error> {
-    Ok(file::read_in_namespace_to_fidl(path).await?)
-}
-
-/// Write the given FIDL encoded message into a file at `path`. The path must be an absolute path.
-/// * If the file already exists, replaces existing contents.
-/// * If the file does not exist, creates the file.
-#[cfg(target_os = "fuchsia")]
-pub async fn write_path_fidl<T: Persistable>(path: &str, data: &mut T) -> Result<(), Error> {
-    file::write_fidl_in_namespace(path, data).await?;
-    Ok(())
 }
 
 /// node_to_directory will convert the given NodeProxy into a DirectoryProxy. This is unsafe if the
@@ -215,51 +187,5 @@ mod tests {
             assert_eq!(file_proxy.close().await?, Ok(()));
         }
         Ok(())
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn write_path_bytes_create_test() {
-        // Create temp dir for test, and bind it to our namespace.
-        let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let _dir = crate::directory::open_in_namespace(
-            tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
-        )
-        .expect("could not open tmp dir");
-        let path = tempdir.path().join(Path::new("write_path_bytes_create"));
-        let path_string = path.to_str().expect("converting path to string failed");
-
-        // Write contents.
-        let data = b"\x80"; // Non UTF-8 data: a continuation byte as the first byte.
-        write_path_bytes(&path_string, data).await.expect("could not write to path");
-
-        // Verify contents.
-        let contents = std::fs::read(path).unwrap();
-        assert_eq!(&contents, &data, "Contents did not match");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn write_path_bytes_replace_test() {
-        // Create temp dir for test, and bind it to our namespace.
-        let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let _dir = crate::directory::open_in_namespace(
-            tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
-        )
-        .expect("could not open tmp dir");
-        let path = tempdir.path().join(Path::new("write_path_bytes_replace"));
-        let path_string = path.to_str().expect("converting path to string failed");
-
-        // Write contents.
-        let original_data = b"\x80\x81"; // Non UTF-8 data: a continuation byte as the first byte.
-        write_path_bytes(&path_string, original_data).await.expect("could not write to path");
-
-        // Over-write contents.
-        let new_data = b"\x82"; // Non UTF-8 data: a continuation byte as the first byte.
-        write_path_bytes(&path_string, new_data).await.expect("could not over-write to path");
-
-        // Verify contents.
-        let contents = std::fs::read(path).unwrap();
-        assert_eq!(&contents, &new_data, "Contents did not match");
     }
 }
