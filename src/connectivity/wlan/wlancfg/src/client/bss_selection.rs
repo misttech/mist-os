@@ -115,131 +115,89 @@ pub fn evaluate_current_bss(bss: BssQualityData) -> (u8, Vec<RoamReason>) {
 fn score_signal_data(data: SignalData) -> u8 {
     let ewma_rssi_velocity = data.ewma_rssi_velocity.get();
     let rssi_velocity_score = match data.ewma_rssi.get() {
-        r if (f64::MIN..=-81.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 0,
-            v if (-2.7..-1.8).contains(&v) => 0,
-            v if (-1.8..-0.9).contains(&v) => 0,
-            v if (-0.9..=0.9).contains(&v) => 0,
-            v if (0.9..=1.8).contains(&v) => 20,
-            v if (1.8..=2.7).contains(&v) => 18,
-            v if (2.7..=f64::MAX).contains(&v) => 10,
-            _ => {
-                // This shouldn't happen because all possible values should be matched above. If
-                // there is an error, return 100 so that roaming is not triggered from this error.
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -81.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 0,
+            v if v < -1.8 => 0,
+            v if v < -0.9 => 0,
+            v if v <= 0.9 => 0,
+            v if v <= 1.8 => 20,
+            v if v <= 2.7 => 18,
+            _ => 10,
         },
-        r if (-81.0..=-76.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 0,
-            v if (-2.7..-1.8).contains(&v) => 0,
-            v if (-1.8..-0.9).contains(&v) => 0,
-            v if (-0.9..=0.9).contains(&v) => 15,
-            v if (0.9..=1.8).contains(&v) => 28,
-            v if (1.8..=2.7).contains(&v) => 25,
-            v if (2.7..=f64::MAX).contains(&v) => 15,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -76.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 0,
+            v if v < -1.8 => 0,
+            v if v < -0.9 => 0,
+            v if v <= 0.9 => 15,
+            v if v <= 1.8 => 28,
+            v if v <= 2.7 => 25,
+            _ => 15,
         },
-        r if (-75.0..=-71.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 0,
-            v if (-2.7..-1.8).contains(&v) => 5,
-            v if (-1.8..-0.9).contains(&v) => 15,
-            v if (-0.9..=0.9).contains(&v) => 30,
-            v if (0.9..=1.8).contains(&v) => 45,
-            v if (1.8..=2.7).contains(&v) => 38,
-            v if (2.7..=f64::MAX).contains(&v) => 4,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -71.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 0,
+            v if v < -1.8 => 5,
+            v if v < -0.9 => 15,
+            v if v <= 0.9 => 30,
+            v if v <= 1.8 => 45,
+            v if v <= 2.7 => 38,
+            _ => 4,
         },
-        r if (-70.0..=-66.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 10,
-            v if (-2.7..-1.8).contains(&v) => 18,
-            v if (-1.8..-0.9).contains(&v) => 30,
-            v if (-0.9..=0.9).contains(&v) => 48,
-            v if (0.9..=1.8).contains(&v) => 60,
-            v if (1.8..=2.7).contains(&v) => 50,
-            v if (2.7..=f64::MAX).contains(&v) => 38,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -66.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 10,
+            v if v < -1.8 => 18,
+            v if v < -0.9 => 30,
+            v if v <= 0.9 => 48,
+            v if v <= 1.8 => 60,
+            v if v <= 2.7 => 50,
+            _ => 38,
         },
-        r if (-65.0..=-61.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 20,
-            v if (-2.7..-1.8).contains(&v) => 30,
-            v if (-1.8..-0.9).contains(&v) => 45,
-            v if (-0.9..=0.9).contains(&v) => 70,
-            v if (0.9..=1.8).contains(&v) => 75,
-            v if (1.8..=2.7).contains(&v) => 60,
-            v if (2.7..=f64::MAX).contains(&v) => 55,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -61.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 20,
+            v if v < -1.8 => 30,
+            v if v < -0.9 => 45,
+            v if v <= 0.9 => 70,
+            v if v <= 1.8 => 75,
+            v if v <= 2.7 => 60,
+            _ => 55,
         },
-        r if (-60.0..=-56.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 40,
-            v if (-2.7..-1.8).contains(&v) => 50,
-            v if (-1.8..-0.9).contains(&v) => 63,
-            v if (-0.9..=0.9).contains(&v) => 85,
-            v if (0.9..=1.8).contains(&v) => 85,
-            v if (1.8..=2.7).contains(&v) => 70,
-            v if (2.7..=f64::MAX).contains(&v) => 65,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -56.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 40,
+            v if v < -1.8 => 50,
+            v if v < -0.9 => 63,
+            v if v <= 0.9 => 85,
+            v if v <= 1.8 => 85,
+            v if v <= 2.7 => 70,
+            _ => 65,
         },
-        r if (-55.0..=-51.0).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 55,
-            v if (-2.7..-1.8).contains(&v) => 65,
-            v if (-1.8..-0.9).contains(&v) => 75,
-            v if (-0.9..=0.9).contains(&v) => 95,
-            v if (0.9..=1.8).contains(&v) => 90,
-            v if (1.8..=2.7).contains(&v) => 80,
-            v if (2.7..=f64::MAX).contains(&v) => 75,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        r if r <= -51.0 => match ewma_rssi_velocity {
+            v if v < -2.7 => 55,
+            v if v < -1.8 => 65,
+            v if v < -0.9 => 75,
+            v if v <= 0.9 => 95,
+            v if v <= 1.8 => 90,
+            v if v <= 2.7 => 80,
+            _ => 75,
         },
-        r if (-50.0..=f64::MAX).contains(&r) => match ewma_rssi_velocity {
-            v if (f64::MIN..-2.7).contains(&v) => 60,
-            v if (-2.7..-1.8).contains(&v) => 70,
-            v if (-1.8..-0.9).contains(&v) => 80,
-            v if (-0.9..=0.9).contains(&v) => 100,
-            v if (0.9..=1.8).contains(&v) => 95,
-            v if (1.8..=2.7).contains(&v) => 90,
-            v if (2.7..=f64::MAX).contains(&v) => 80,
-            _ => {
-                error!("Unexpected error occurred scoring RSSI velocity {}", ewma_rssi_velocity);
-                100
-            }
+        _ => match ewma_rssi_velocity {
+            v if v < -2.7 => 60,
+            v if v < -1.8 => 70,
+            v if v < -0.9 => 80,
+            v if v <= 0.9 => 100,
+            v if v <= 1.8 => 95,
+            v if v <= 2.7 => 90,
+            _ => 80,
         },
-        unexpected_rssi => {
-            error!("Unexpected error occurreed scoring EWMA RSSI {}", unexpected_rssi);
-            100
-        }
     };
 
     let snr_score = match data.ewma_snr.get() {
-        s if (f64::MIN..=10.0).contains(&s) => 0,
-        s if (10.0..=15.0).contains(&s) => 15,
-        s if (15.0..=20.0).contains(&s) => 37,
-        s if (20.0..=25.0).contains(&s) => 53,
-        s if (25.0..=3.00).contains(&s) => 68,
-        s if (30.0..=35.0).contains(&s) => 80,
-        s if (35.0..=40.0).contains(&s) => 95,
-        s if (40.0..=f64::MAX).contains(&s) => 100,
-        unexpected_snr => {
-            error!("Unxexpected error occurred scoring EWMA SNR {}", unexpected_snr);
-            100
-        }
+        s if s <= 10.0 => 0,
+        s if s <= 15.0 => 15,
+        s if s <= 20.0 => 37,
+        s if s <= 25.0 => 53,
+        s if s <= 30.0 => 68,
+        s if s <= 35.0 => 80,
+        s if s <= 40.0 => 95,
+        _ => 100,
     };
 
     return ((rssi_velocity_score as f32 * RSSI_AND_VELOCITY_SCORE_WEIGHT)
