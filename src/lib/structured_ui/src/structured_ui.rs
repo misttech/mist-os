@@ -188,6 +188,9 @@ pub struct TableRows {
     /// Often a question for the user, especially if the table shows a menu of
     /// options to choose from.
     prompt: Option<String>,
+
+    /// The highest number of columns in any of the rows/header for this table.
+    max_columns: usize,
 }
 
 impl TableRows {
@@ -213,6 +216,7 @@ impl TableRows {
         S: AsRef<str>,
     {
         let columns = columns.iter().map(|s| s.as_ref().to_string()).collect::<Vec<String>>();
+        self.max_columns = std::cmp::max(self.max_columns, columns.len());
         self.header = RowPresentation { id: None, columns };
         self
     }
@@ -229,6 +233,7 @@ impl TableRows {
         S: AsRef<str>,
     {
         let columns = columns.iter().map(|s| s.as_ref().to_string()).collect::<Vec<String>>();
+        self.max_columns = std::cmp::max(self.max_columns, columns.len());
         self.rows.push(RowPresentation { id: None, columns });
         self
     }
@@ -473,9 +478,18 @@ impl<'a> TextUi<'a> {
         if let Some(message) = &table.message {
             inner.output.write_all(message.as_bytes())?;
         }
+        let mut max_lengths = vec![0; table.max_columns];
+        for (index, column) in table.header.columns.iter().enumerate() {
+            max_lengths[index] = std::cmp::max(0, column.len());
+        }
         for row in &table.rows {
-            for column in &row.columns {
-                write!(inner.output, "{} ", column)?;
+            for (index, column) in row.columns.iter().enumerate() {
+                max_lengths[index] = std::cmp::max(max_lengths[index], column.len());
+            }
+        }
+        for row in &table.rows {
+            for (index, column) in row.columns.iter().enumerate() {
+                write!(inner.output, "{:width$} ", column, width = max_lengths[index])?;
             }
             writeln!(inner.output, "")?;
         }
