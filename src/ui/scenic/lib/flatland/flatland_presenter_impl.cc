@@ -77,7 +77,15 @@ void FlatlandPresenterImpl::RemoveSession(scheduling::SessionId session_id) {
     release_fences_.erase(start, end);
   }
 
+  // Ensure that in case no client is currently rendering we'll still produce a new frame to clean
+  // up any leftovers from the dead one.
+  // The sequencing of RemoveSession() followed by scheduling a new present for the same ID ensures
+  // both that there will be no collisions for the |session_id| used and that we'll schedule exactly
+  // one frame for the shortest possible timeframe.
   frame_scheduler_.RemoveSession(session_id);
+  const auto present_id = frame_scheduler_.RegisterPresent(session_id, {});
+  frame_scheduler_.ScheduleUpdateForSession(zx::time(0), {session_id, present_id},
+                                            /*squashable*/ true);
 }
 
 }  // namespace flatland
