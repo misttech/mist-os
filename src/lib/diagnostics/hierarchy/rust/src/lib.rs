@@ -1197,12 +1197,11 @@ mod tests {
             )],
             vec![],
         );
-        let parsed_hierarchy: DiagnosticsHierarchy =
-            serde_json::from_value(serde_json::from_str(json_string)?)?;
+        let parsed_hierarchy: DiagnosticsHierarchy = serde_json::from_str(json_string)?;
         let missing_hierarchy: Result<DiagnosticsHierarchy, serde_json::Error> =
-            serde_json::from_value(serde_json::from_str(json_bad_missing_field)?);
+            serde_json::from_str(json_bad_missing_field);
         let extra_hierarchy: Result<DiagnosticsHierarchy, serde_json::Error> =
-            serde_json::from_value(serde_json::from_str(json_bad_extra_field)?);
+            serde_json::from_str(json_bad_extra_field);
 
         assert_eq!(expected_hierarchy, parsed_hierarchy);
         assert_matches!(missing_hierarchy, Err(_));

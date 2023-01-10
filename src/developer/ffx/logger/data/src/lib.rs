@@ -56,10 +56,6 @@ impl From<LogsData> for LogData {
     }
 }
 
-fn parse_log_data(value: serde_json::Value) -> Result<LogsData, serde_json::Error> {
-    serde_json::from_value(value.clone())
-}
-
 fn deserialize_target_log<'de, D>(deserializer: D) -> Result<LogsData, D::Error>
 where
     D: de::Deserializer<'de>,
@@ -77,9 +73,8 @@ where
         where
             M: de::MapAccess<'de>,
         {
-            let value: serde_json::Value =
-                serde_json::Value::deserialize(de::value::MapAccessDeserializer::new(v))?;
-            parse_log_data(value).map_err(|e| M::Error::custom(e.to_string()))
+            LogsData::deserialize(de::value::MapAccessDeserializer::new(v))
+                .map_err(|e| M::Error::custom(e.to_string()))
         }
     }
 
@@ -104,13 +99,10 @@ where
         where
             M: de::SeqAccess<'de>,
         {
-            let raw_value: serde_json::Value =
-                serde_json::Value::deserialize(de::value::SeqAccessDeserializer::new(v))?;
-
-            let value: (serde_json::Value, String) =
-                serde_json::from_value(raw_value).map_err(|e| M::Error::custom(e.to_string()))?;
-            let data = parse_log_data(value.0).map_err(|e| M::Error::custom(e.to_string()))?;
-            Ok((data, value.1))
+            let (data, symbolized): (LogsData, String) =
+                Deserialize::deserialize(de::value::SeqAccessDeserializer::new(v))
+                    .map_err(|e| M::Error::custom(e.to_string()))?;
+            Ok((data, symbolized))
         }
     }
 
