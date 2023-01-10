@@ -57,9 +57,11 @@ pub struct StartCommand {
     #[argh(switch)]
     pub debugger: bool,
 
-    /// specify the virtual device specification to use from the product bundle. If no device is
-    /// specified then the first device listed in the PBM is used. A default can be set by running
-    /// `ffx config set emu.device <type>`.
+    /// the virtual device specification used to configure the emulator. This can be the name of a
+    /// device listed in the product bundle, or the path to a custom virtual device file. A default
+    /// for this flag can be set by running `ffx config set emu.device <type>`. If --device is not
+    /// specified and no default is set, then `ffx emu` will attempt to use the first device listed
+    /// in the PBM(v1), or the product bundle's recommended device(v2).
     #[argh(option)]
     #[ffx_config_default(key = "emu.device")]
     pub device: Option<String>,

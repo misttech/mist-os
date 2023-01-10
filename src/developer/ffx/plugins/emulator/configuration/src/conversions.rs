@@ -9,6 +9,7 @@
 use crate::{DeviceConfig, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu};
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_manifest::Image;
+use camino::Utf8PathBuf;
 use pbms::{
     fms_entries_from, get_images_dir, load_product_bundle, select_product_bundle, ListingMode,
 };
@@ -31,7 +32,6 @@ pub async fn convert_bundle_to_configs(
         load_product_bundle(&sdk, &product_bundle_name, ListingMode::ReadyBundlesOnly).await?;
     match &product_bundle {
         ProductBundle::V1(product_bundle) => {
-            // Get the virtual devices.
             let should_print = false;
             let product_url = select_product_bundle(
                 &sdk,
@@ -41,89 +41,134 @@ pub async fn convert_bundle_to_configs(
             )
             .await
             .context("Selecting product bundle")?;
-            let fms_entries = fms_entries_from(&product_url, sdk.get_path_prefix())
-                .await
-                .context("get fms entries")?;
-            let virtual_devices =
-                fms::find_virtual_devices(&fms_entries, &product_bundle.device_refs)
-                    .context("problem with virtual device")?;
 
             // Find the data root, which is used to find the images and template file.
             let data_root =
                 get_images_dir(&product_url, sdk.get_path_prefix()).await.context("images dir")?;
 
-            // Determine the correct device name from the user, or default to the first one listed
-            // in the product bundle.
-            let virtual_device = match device_name.as_deref() {
-                // If no device_name is given, choose the first virtual device listed in the
-                // productbundle.
-                None | Some("") => match &virtual_devices[0] {
-                    VirtualDevice::V1(v) => v,
-                },
+            let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
+                device
+            } else {
+                // Get the virtual device from the bundle.
+                let fms_entries = fms_entries_from(&product_url, sdk.get_path_prefix())
+                    .await
+                    .context("get fms entries")?;
+                let virtual_devices =
+                    fms::find_virtual_devices(&fms_entries, &product_bundle.device_refs)
+                        .context("problem with virtual device")?;
 
-                // Otherwise, find the virtual device by name in the product bundle.
-                Some(device_name) => {
-                    let vd = virtual_devices.iter().find(|vd| vd.name() == device_name).ok_or(
-                        anyhow!("The device '{}' is not found in the product bundle.", device_name),
-                    )?;
-                    match vd {
-                        VirtualDevice::V1(v) => v,
-                    }
-                }
+                // Determine the correct device name from the user, or default to the first one
+                // listed in the product bundle.
+                let device = match device_name.as_deref() {
+                    // If no device_name is given, choose the first virtual device listed in
+                    // the product bundle.
+                    None | Some("") => virtual_devices.get(0).ok_or_else(|| {
+                        anyhow!("There are no virtual devices in this product bundle.")
+                    })?,
+
+                    // Otherwise, find the virtual device by name in the product bundle.
+                    Some(device_name) => virtual_devices
+                        .iter()
+                        .find(|vd| vd.name() == device_name)
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "The device '{}' is not found in the product bundle.",
+                                device_name
+                            )
+                        })?,
+                };
+                device.clone()
             };
-
+            let virtual_device = match virtual_device {
+                VirtualDevice::V1(v) => v,
+            };
             if verbose {
                 println!(
-                    "Found PBM: {:?}, device_refs: {:?}, virtual_device: {:?}",
+                    "Found PBM: {:?}, device_refs: {:?}, virtual_device: {:#?}",
                     &product_bundle.name, &product_bundle.device_refs, &virtual_device
                 );
             }
             convert_v1_bundle_to_configs(product_bundle, &virtual_device, &data_root)
+                .context("problem with internal conversion")
         }
         ProductBundle::V2(product_bundle) => {
-            // Determine the correct device name from the user, or default to the "recommended"
-            // device, if one is provided in the product bundle.
-            let path = product_bundle.get_virtual_devices_path();
-            let manifest = VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
-            let result = match device_name.as_deref() {
-                // If no device_name is given, return the default specified in the manifest.
-                None | Some("") => manifest.default_device(),
+            let virtual_device = if let Some(device) = parse_device_name_as_path(&device_name) {
+                device
+            } else {
+                // Determine the correct device name from the user, or default to the "recommended"
+                // device, if one is provided in the product bundle.
+                let path = product_bundle.get_virtual_devices_path();
+                let manifest =
+                    VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
+                let result = match device_name.as_deref() {
+                    // If no device_name is given, return the default specified in the manifest.
+                    None | Some("") => manifest.default_device(),
 
-                // Otherwise, find the virtual device by name in the product bundle.
-                Some(device_name) => manifest.device(device_name).map(|d| Some(d)),
+                    // Otherwise, find the virtual device by name in the product bundle.
+                    Some(device_name) => manifest.device(device_name).map(|d| Some(d)),
+                }?;
+                match result {
+                    Some(virtual_device) => virtual_device,
+                    None if device_name.is_some() => bail!(
+                        "No virtual device matches '{}'.",
+                        device_name.unwrap_or("<empty>".to_string())
+                    ),
+                    None => {
+                        bail!("No default virtual device is available, please specify one by name.")
+                    }
+                }
             };
-            match result {
-                Ok(Some(virtual_device)) => {
-                    let virtual_device = match virtual_device {
-                        VirtualDevice::V1(v) => v,
-                    };
-                    if verbose {
-                        println!(
-                            "Found PBM: {:#?}\nVirtual Device: {:#?}",
-                            &product_bundle, &virtual_device
-                        );
-                    }
-                    convert_v2_bundle_to_configs(&product_bundle, &virtual_device)
-                }
-                Ok(None) => {
-                    if device_name.is_some() {
-                        bail!(
-                            "No virtual device matches '{}'.",
-                            device_name.unwrap_or("<empty>".to_string())
-                        );
-                    } else {
-                        bail!(
-                            "No default virtual device is available, please specify one by name."
-                        );
-                    }
-                }
-                Err(e) => {
-                    // Just pass the error through
-                    Err(e)
-                }
+            let virtual_device = match virtual_device {
+                VirtualDevice::V1(v) => v,
+            };
+            if verbose {
+                println!(
+                    "Found PBM: {:#?}\nVirtual Device: {:#?}",
+                    &product_bundle, &virtual_device
+                );
             }
+            convert_v2_bundle_to_configs(&product_bundle, &virtual_device)
         }
     }
+}
+
+/// If the user passes in a --device flag with a path to a virtual device file
+/// instead of a device name, we want to use the custom device. If it's not a
+/// file, that's ok, we'll still try it as a device name; so this function
+/// doesn't return an Error, just None.
+fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
+    let cwd = std::env::current_dir().ok()?;
+    path.as_ref().and_then(|name| {
+        // See if the "name" is actually a path to a virtual device file.
+        let path =
+            Utf8PathBuf::from_path_buf(cwd).expect("Current directory is not utf8").join(name);
+        if !path.exists() {
+            tracing::debug!("Value '{}' doesn't appear to be a valid path.", name);
+            return None;
+        }
+        match VirtualDeviceManifest::parse_virtual_device_file(&path) {
+            Ok(VirtualDevice::V1(mut vd)) => {
+                // The template file path is relative to the device file.
+                tracing::debug!("Using file '{}' as a virtual device.", path);
+                let template = vd.start_up_args_template;
+                // The path was successfully used for a device file, so it must
+                // have a parent, and this '.unwrap()' will never fail.
+                let parent = path.parent().unwrap();
+                vd.start_up_args_template = parent.join(template);
+                Some(VirtualDevice::V1(vd))
+            }
+            Err(_) => {
+                println!(
+                    "Attempted to use the file at '{}' to configure the device, but the contents \
+                    of that file are not a valid Virtual Device specification. Checking the \
+                    Product Bundle for a device with that name...",
+                    path
+                );
+                tracing::warn!("Path '{}' doesn't contain a valid virtual device.", path);
+                None
+            }
+        }
+    })
 }
 
 /// - `data_root` is a path to a directory. When working in-tree it's the path
@@ -258,14 +303,16 @@ mod tests {
     use super::*;
     use assembly_manifest::AssemblyManifest;
     use assembly_partitions_config::PartitionsConfig;
-    use camino::Utf8PathBuf;
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, EmuManifest,
         InputDevice, Manifests, PointingDevice, Screen, ScreenUnits,
     };
     use sdk_metadata::{ProductBundleV1, VirtualDeviceV1};
-    use std::collections::HashMap;
+    use std::{collections::HashMap, fs::File, io::Write};
+
+    const VIRTUAL_DEVICE_VALID: &str =
+        include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
 
     #[test]
     fn test_convert_v1_bundle_to_configs() {
@@ -512,5 +559,35 @@ mod tests {
             config.host.port_map.remove("debug").unwrap(),
             PortMapping { host: None, guest: 2345 }
         );
+    }
+
+    #[test]
+    fn test_parse_device_name_as_path_none() {
+        assert_eq!(parse_device_name_as_path(&None), None);
+    }
+
+    #[test]
+    fn test_parse_device_name_as_path_no_file() {
+        assert_eq!(parse_device_name_as_path(&Some("SomeNameThatsNotAFile".to_string())), None);
+    }
+
+    #[test]
+    fn test_parse_device_name_as_path_other_file() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let path = temp_dir.path().join("other_file.json");
+        File::create(&path)?;
+        assert_eq!(parse_device_name_as_path(&Some(path.to_string_lossy().into_owned())), None);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_device_name_as_path_ok() -> Result<()> {
+        let temp_dir = tempfile::TempDir::new().expect("creating temp dir");
+        let path = temp_dir.path().join("device.json");
+        let mut file = File::create(&path).unwrap();
+        file.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
+        let result = parse_device_name_as_path(&Some(path.to_string_lossy().into_owned()));
+        assert!(matches!(result, Some(VirtualDevice::V1(_))));
+        Ok(())
     }
 }
