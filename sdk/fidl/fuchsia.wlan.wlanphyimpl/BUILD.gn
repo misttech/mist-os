@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wlan.wlanphyimpl") {
+  sdk_category = "experimental"
   sources = [ "wlanphyimpl.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common",
