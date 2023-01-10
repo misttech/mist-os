@@ -7,8 +7,8 @@ use crate::pbm::{list_virtual_devices, make_configs};
 use anyhow::{Context, Result};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::get_engine_by_name;
-use ffx_emulator_config::EngineType;
+use ffx_emulator_commands::{get_engine_by_name, EngineOption};
+use ffx_emulator_config::{EmulatorEngine, EngineType};
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -18,12 +18,12 @@ mod editor;
 mod pbm;
 
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()> {
+pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()> {
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
         .await?;
-    // If device name is list, list the available virtual devices and return.
+
     if cmd.device_list {
         match list_virtual_devices(&cmd, &sdk).await {
             Ok(devices) => {
@@ -36,39 +36,38 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
         };
     }
 
-    let mut engine = if cmd.reuse && cmd.config.is_none() {
-        match get_engine_by_name(&mut Some(cmd.name)).await {
-            Ok(engine) => engine,
+    let mut engine = None;
+    if cmd.reuse && cmd.config.is_none() {
+        let mut name = Some(cmd.name.clone());
+        let result = get_engine_by_name(&mut name).await;
+        engine = match result {
+            Ok(EngineOption::DoesExist(engine)) => {
+                cmd.name = name.unwrap();
+                Some(engine)
+            }
+            Ok(EngineOption::DoesNotExist(warning)) => {
+                let name = name.unwrap();
+                tracing::debug!("{}", warning);
+                println!(
+                    "Instance '{}' not found with --reuse flag. \
+                    Creating a new emulator named '{}'.",
+                    name, name
+                );
+                cmd.reuse = false;
+                None
+            }
             Err(e) => {
                 ffx_bail!("{:?}", e);
             }
+        }
+    }
+    let mut engine = if engine.is_none() {
+        match new_engine(&cmd).await {
+            Err(e) => ffx_bail!("{:?}", e),
+            Ok(engine) => engine,
         }
     } else {
-        let emulator_configuration = match make_configs(&cmd).await {
-            Ok(config) => config,
-            Err(e) => {
-                ffx_bail!("{:?}", e);
-            }
-        };
-
-        // Initialize an engine of the requested type with the configuration defined in the manifest.
-        let engine_type =
-            match EngineType::from_str(&cmd.engine().await.unwrap_or("femu".to_string())) {
-                Ok(e) => e,
-                Err(e) => {
-                    ffx_bail!("{:?}", e.context("Couldn't retrieve engine type from ffx config."))
-                }
-            };
-
-        match EngineBuilder::new()
-            .config(emulator_configuration)
-            .engine_type(engine_type)
-            .build()
-            .await
-        {
-            Ok(engine) => engine,
-            Err(e) => ffx_bail!("{:?}", e.context("The emulator could not be configured.")),
-        }
+        engine.unwrap()
     };
 
     // We do an initial build here, because we need an initial configuration before staging.
@@ -118,4 +117,14 @@ pub async fn start(cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()
         Ok(_) => ffx_bail!("Non zero return code"),
         Err(e) => ffx_bail!("{:?}", e.context("The emulator failed to start.")),
     }
+}
+
+async fn new_engine(cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>> {
+    let emulator_configuration = make_configs(&cmd).await?;
+
+    // Initialize an engine of the requested type with the configuration defined in the manifest.
+    let engine_type = EngineType::from_str(&cmd.engine().await.unwrap_or("femu".to_string()))
+        .context("Couldn't retrieve engine type from ffx config.")?;
+
+    EngineBuilder::new().config(emulator_configuration).engine_type(engine_type).build().await
 }

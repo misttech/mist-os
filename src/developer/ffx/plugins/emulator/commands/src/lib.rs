@@ -9,7 +9,12 @@ use ffx_emulator_common::instances::{get_all_instances, get_instance_dir};
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::serialization::read_from_disk;
 
-pub async fn get_engine_by_name(name: &mut Option<String>) -> Result<Box<dyn EmulatorEngine>> {
+pub enum EngineOption {
+    DoesExist(Box<dyn EmulatorEngine>),
+    DoesNotExist(String),
+}
+
+pub async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOption> {
     if name.is_none() {
         let mut all_instances = match get_all_instances().await {
             Ok(list) => list,
@@ -34,12 +39,14 @@ pub async fn get_engine_by_name(name: &mut Option<String>) -> Result<Box<dyn Emu
     let local_name = name.clone().unwrap();
     let instance_dir = get_instance_dir(&local_name, false).await?;
     if !instance_dir.exists() {
-        Err(anyhow!(
+        Ok(EngineOption::DoesNotExist(format!(
             "{:?} isn't a valid instance. Please check your spelling and try again. \
                 You can use `ffx emu list` to see currently available instances.",
             local_name
-        ))
+        )))
     } else {
-        read_from_disk(&instance_dir).context("Couldn't read the emulator information from disk.")
+        read_from_disk(&instance_dir)
+            .map(|engine| EngineOption::DoesExist(engine))
+            .context("Couldn't read the emulator information from disk.")
     }
 }

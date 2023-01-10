@@ -5,7 +5,7 @@
 use anyhow::Result;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::get_engine_by_name;
+use ffx_emulator_commands::{get_engine_by_name, EngineOption};
 use ffx_emulator_common::instances::{clean_up_instance_dir, get_all_instances, get_instance_dir};
 use ffx_emulator_stop_args::StopCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -29,20 +29,23 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
             break;
         }
         let name = some_name.unwrap_or("<unspecified>".to_string());
-        if engine.is_err() {
-            eprintln!(
+        match engine {
+            Err(e) => eprintln!(
                 "{:?}",
-                engine.err().unwrap().context(format!(
+                e.context(format!(
                     "Couldn't deserialize engine '{}' from disk. Continuing stop, \
                     but you may need to terminate the emulator process manually.",
                     name
                 ))
-            );
-        } else {
-            // Unwrap is safe because get_engine_by_name sets the some_name parameter if needed.
-            println!("Stopping emulator '{}'...", name);
-            if let Err(e) = engine.unwrap().stop(&proxy).await {
-                eprintln!("Failed with the following error: {:?}", e);
+            ),
+            Ok(EngineOption::DoesNotExist(message)) => {
+                eprintln!("{}", message);
+            }
+            Ok(EngineOption::DoesExist(mut engine)) => {
+                println!("Stopping emulator '{}'...", name);
+                if let Err(e) = engine.stop(&proxy).await {
+                    eprintln!("Failed with the following error: {:?}", e);
+                }
             }
         }
 

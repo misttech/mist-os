@@ -6,7 +6,8 @@ use anyhow::Result;
 use cfg_if::cfg_if;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_config::{EmulatorEngine, EngineState};
+use ffx_emulator_commands::EngineOption;
+use ffx_emulator_config::EngineState;
 use ffx_emulator_list_args::ListCommand;
 
 #[cfg(test)]
@@ -23,9 +24,7 @@ mod modules {
         ffx_emulator_common::instances::get_all_instances().await
     }
 
-    pub(super) async fn get_engine_by_name(
-        name: &mut Option<String>,
-    ) -> Result<Box<dyn EmulatorEngine>> {
+    pub(super) async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOption> {
         ffx_emulator_commands::get_engine_by_name(name).await
     }
 }
@@ -70,7 +69,7 @@ pub async fn exec_list_impl<W: std::io::Write, E: std::io::Write>(
     let mut broken = false;
     for mut some_name in instance_list {
         match get_engine_by_name(&mut some_name).await {
-            Ok(engine) => {
+            Ok(EngineOption::DoesExist(engine)) => {
                 let name = some_name.unwrap();
                 let state = format!("[{}]", engine.engine_state());
                 if engine.engine_state() != EngineState::Running && cmd.only_running {
@@ -79,7 +78,7 @@ pub async fn exec_list_impl<W: std::io::Write, E: std::io::Write>(
                     writeln!(writer, "{:16}{}", state, name)?;
                 }
             }
-            Err(_) => {
+            Ok(EngineOption::DoesNotExist(_)) | Err(_) => {
                 writeln!(
                     writer,
                     "[Broken]        {}",
@@ -101,7 +100,9 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use async_trait::async_trait;
-    use ffx_emulator_config::{EmulatorConfiguration, EngineConsoleType, EngineType, ShowDetail};
+    use ffx_emulator_config::{
+        EmulatorConfiguration, EmulatorEngine, EngineConsoleType, EngineType, ShowDetail,
+    };
     use fidl_fuchsia_developer_ffx as ffx;
     use lazy_static::lazy_static;
     use std::{
@@ -217,7 +218,10 @@ mod tests {
 
         let engine_ctx = mock_modules::get_engine_by_name_context();
         engine_ctx.expect().returning(|_| {
-            Ok(Box::new(TestEngine { running_flag: false, engine_state: EngineState::New }))
+            Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                running_flag: false,
+                engine_state: EngineState::New,
+            })))
         });
 
         let mut stdout: Vec<u8> = vec![];
@@ -242,7 +246,10 @@ mod tests {
 
         let engine_ctx = mock_modules::get_engine_by_name_context();
         engine_ctx.expect().returning(|_| {
-            Ok(Box::new(TestEngine { running_flag: false, engine_state: EngineState::Configured }))
+            Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                running_flag: false,
+                engine_state: EngineState::Configured,
+            })))
         });
 
         let mut stdout: Vec<u8> = vec![];
@@ -267,7 +274,10 @@ mod tests {
 
         let engine_ctx = mock_modules::get_engine_by_name_context();
         engine_ctx.expect().returning(|_| {
-            Ok(Box::new(TestEngine { running_flag: false, engine_state: EngineState::Staged }))
+            Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                running_flag: false,
+                engine_state: EngineState::Staged,
+            })))
         });
 
         let mut stdout: Vec<u8> = vec![];
@@ -292,7 +302,10 @@ mod tests {
 
         let engine_ctx = mock_modules::get_engine_by_name_context();
         engine_ctx.expect().returning(|_| {
-            Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Running }))
+            Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                running_flag: true,
+                engine_state: EngineState::Running,
+            })))
         });
 
         let mut stdout: Vec<u8> = vec![];
@@ -330,34 +343,46 @@ mod tests {
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::New }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::New,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine {
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
                     running_flag: true,
                     engine_state: EngineState::Configured,
-                }))
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Staged }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Staged,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Running }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Running,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Error }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Error,
+                })))
             })
             .times(1);
 
@@ -375,34 +400,46 @@ mod tests {
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::New }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::New,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine {
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
                     running_flag: true,
                     engine_state: EngineState::Configured,
-                }))
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Staged }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Staged,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Running }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Running,
+                })))
             })
             .times(1);
         engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Error }))
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    running_flag: true,
+                    engine_state: EngineState::Error,
+                })))
             })
             .times(1);
 
@@ -433,7 +470,10 @@ mod tests {
 
         let engine_ctx = mock_modules::get_engine_by_name_context();
         engine_ctx.expect().returning(|_| {
-            Ok(Box::new(TestEngine { running_flag: true, engine_state: EngineState::Error }))
+            Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                running_flag: true,
+                engine_state: EngineState::Error,
+            })))
         });
 
         let mut stdout: Vec<u8> = vec![];
