@@ -14,5 +14,6 @@ dart_library("fuchsia_test_helper") {
     "//third_party/dart-pkg/pub/test",
     "//third_party/dart-pkg/pub/test_api",
     "//third_party/dart-pkg/pub/test_core",
+    "//third_party/dart-pkg/pub/test_core2",
   ]
 }

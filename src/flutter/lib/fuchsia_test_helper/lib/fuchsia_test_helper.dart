@@ -17,14 +17,14 @@ import 'package:test_api/src/backend/invoker.dart';
 import 'package:test_api/src/backend/operating_system.dart';
 import 'package:test_api/src/backend/runtime.dart';
 import 'package:test_api/src/backend/suite_platform.dart';
-import 'package:test_core/src/runner/configuration.dart';
-import 'package:test_core/src/runner/engine.dart';
-import 'package:test_core/src/runner/plugin/environment.dart';
-import 'package:test_core/src/runner/reporter/expanded.dart';
-import 'package:test_core/src/runner/runner_suite.dart';
-import 'package:test_core/src/util/exit_codes.dart' as exit_codes;
-import 'package:test_core/src/util/io.dart';
-import 'package:test_core/src/util/print_sink.dart';
+import 'package:test_core2/src/runner/configuration.dart';
+import 'package:test_core2/src/runner/engine.dart';
+import 'package:test_core2/src/runner/plugin/environment.dart';
+import 'package:test_core2/src/runner/reporter/expanded.dart';
+import 'package:test_core2/src/runner/runner_suite.dart';
+import 'package:test_core2/src/util/exit_codes.dart' as exit_codes;
+import 'package:test_core2/src/util/io.dart';
+import 'package:test_core2/src/util/print_sink.dart';
 
 typedef MainFunction = void Function();
 
