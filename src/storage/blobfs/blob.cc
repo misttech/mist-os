@@ -676,7 +676,8 @@ zx_status_t Blob::WriteData(uint64_t block_count, uint64_t block_offset, BlobDat
           // Pad if necessary.
           const size_t alignment = data->size() % GetBlockSize();
           if (alignment > 0) {
-            memset(const_cast<uint8_t*>(data->end()), 0, GetBlockSize() - alignment);
+            memset(const_cast<uint8_t*>(data->data() + data->size()), 0,
+                   GetBlockSize() - alignment);
             ++op.op.length;
           }
           block_count -= op.op.length;

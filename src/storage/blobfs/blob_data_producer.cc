@@ -43,7 +43,7 @@ zx::result<cpp20::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t m
     if (alignment > 0) {
       // First, add any padding that might be required.
       const size_t to_pad = std::min(padding_, kBlobfsBlockSize - alignment);
-      uint8_t* p = const_cast<uint8_t*>(data->end());
+      uint8_t* p = const_cast<uint8_t*>(data->data() + data->size());
       memset(p, 0, to_pad);
       p += to_pad;
       data.value() = cpp20::span(data->data(), data->size() + to_pad);

@@ -42,7 +42,7 @@ zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
   }
 
   const uint8_t* merkle_tree_data =
-      merkle_data_blocks.begin() + layout.MerkleTreeOffsetWithinBlockOffset();
+      merkle_data_blocks.data() + layout.MerkleTreeOffsetWithinBlockOffset();
   verifier->merkle_data_ = std::make_unique<uint8_t[]>(actual_merkle_length);
   memcpy(verifier->merkle_data_.get(), merkle_tree_data, actual_merkle_length);
 
