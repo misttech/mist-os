@@ -596,7 +596,7 @@ async fn load_base_drivers(
     )?;
 
     let data: String =
-        fuchsia_fs::read_file(&data).await.context("Failed to read base manifest")?;
+        fuchsia_fs::file::read_to_string(&data).await.context("Failed to read base manifest")?;
     let drivers: Vec<JsonDriver> = serde_json::from_str(&data)?;
     let mut resolved_drivers = std::vec::Vec::new();
     for driver in drivers {

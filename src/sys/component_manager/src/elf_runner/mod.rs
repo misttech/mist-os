@@ -831,7 +831,7 @@ mod tests {
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .expect("Failed to open file.");
-        let res = fuchsia_fs::read_file(&file_proxy).await;
+        let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
         res.expect("Unable to read file.")
     }
 

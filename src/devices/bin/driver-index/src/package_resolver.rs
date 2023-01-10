@@ -27,7 +27,7 @@ async fn get_hash(
         fio::OpenFlags::RIGHT_READABLE,
     )
     .with_context(|| format!("Failed to open {:?}", &package_meta_path))?;
-    let merkle_root_str = fuchsia_fs::read_file(&package_meta_file)
+    let merkle_root_str = fuchsia_fs::file::read_to_string(&package_meta_file)
         .await
         .context("Failed to read package meta file")?;
     let merkle_root_hash =

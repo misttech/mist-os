@@ -150,7 +150,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Erro
     // Open the file in read-only mode.
     let result_file_proxy =
         fuchsia_fs::directory::open_file_no_describe(dir, path, fio::OpenFlags::RIGHT_READABLE)?;
-    return fuchsia_fs::read_file(&result_file_proxy).await;
+    return fuchsia_fs::file::read_to_string(&result_file_proxy).await.map_err(Into::into);
 }
 
 /// Implements `fuchsia.test.Suite` and runs provided test.

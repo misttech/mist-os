@@ -256,7 +256,7 @@ mod tests {
         .expect("failed to open file");
         assert_eq!(
             file_contents,
-            &fuchsia_fs::read_file(&file_proxy).await.expect("failed to read file")
+            &fuchsia_fs::file::read_to_string(&file_proxy).await.expect("failed to read file")
         );
     }
 

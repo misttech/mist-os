@@ -19,7 +19,7 @@ async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )
     .expect("Failed to open file.");
-    let res = fuchsia_fs::read_file(&file_proxy).await;
+    let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
     let contents = res.expect("Unable to read file.");
     contents.parse::<u64>().unwrap()
 }

@@ -42,7 +42,7 @@ async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) {
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .expect("could not open testdata");
-        let contents = fuchsia_fs::read_file(&file).await.expect("could not read file");
+        let contents = fuchsia_fs::file::read_to_string(&file).await.expect("could not read file");
         assert_eq!(contents, "Hello world!\n");
 
         responder.send(&out).expect("failed to send trigger response");

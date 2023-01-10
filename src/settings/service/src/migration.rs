@@ -221,7 +221,7 @@ impl MigrationManager {
                     }
                 }
                 Ok(migration_file) => {
-                    let migration_data = fuchsia_fs::read_file(&migration_file)
+                    let migration_data = fuchsia_fs::file::read_to_string(&migration_file)
                         .await
                         .context("failed to read migrations.txt")
                         .map_err(|e| (None, e.into()))?;
@@ -658,8 +658,9 @@ mod tests {
         )
         .await
         .expect("migration file should exist");
-        let migration_number =
-            fuchsia_fs::read_file(&migration_file).await.expect("should be able to read file");
+        let migration_number = fuchsia_fs::file::read_to_string(&migration_file)
+            .await
+            .expect("should be able to read file");
         let migration_number: u64 = dbg!(migration_number).parse().expect("should be a number");
         assert_eq!(migration_number, ID);
     }
@@ -705,8 +706,9 @@ mod tests {
         )
         .await
         .expect("migration file should exist");
-        let migration_number =
-            fuchsia_fs::read_file(&migration_file).await.expect("should be able to read file");
+        let migration_number = fuchsia_fs::file::read_to_string(&migration_file)
+            .await
+            .expect("should be able to read file");
         let migration_number: u64 = dbg!(migration_number).parse().expect("should be a number");
         assert_eq!(migration_number, ID);
     }
@@ -964,7 +966,7 @@ mod tests {
         )
         .await
         .expect("migration file should exist");
-        let migration_number: u64 = fuchsia_fs::read_file(&migration_file)
+        let migration_number: u64 = fuchsia_fs::file::read_to_string(&migration_file)
             .await
             .expect("should be able to read file")
             .parse()
@@ -1032,7 +1034,7 @@ mod tests {
         )
         .await
         .expect("migration file should exist");
-        let migration_number: u64 = fuchsia_fs::read_file(&migration_file)
+        let migration_number: u64 = fuchsia_fs::file::read_to_string(&migration_file)
             .await
             .expect("should be able to read file")
             .parse()

@@ -195,7 +195,7 @@ mod tests {
                 )
                 .await
                 .expect(&format!("failed to open file {:?}", file_path));
-                fuchsia_fs::read_file(&file_proxy)
+                fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect(&format!("failed to read file {:?}", file_path))
             }

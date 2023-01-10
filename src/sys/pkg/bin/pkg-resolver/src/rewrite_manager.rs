@@ -341,8 +341,10 @@ impl<N> RewriteManagerBuilder<N> {
         let file_proxy =
             fuchsia_fs::directory::open_file(dir_proxy, path, fio::OpenFlags::RIGHT_READABLE)
                 .await?;
-        let contents =
-            fuchsia_fs::read_file(&file_proxy).await.map_err(LoadRulesError::ReadFile)?;
+        let contents = fuchsia_fs::file::read_to_string(&file_proxy)
+            .await
+            .map_err(Into::into)
+            .map_err(LoadRulesError::ReadFile)?;
         let RuleConfig::Version1(rules) = serde_json::from_str(&contents)?;
         Ok(rules)
     }

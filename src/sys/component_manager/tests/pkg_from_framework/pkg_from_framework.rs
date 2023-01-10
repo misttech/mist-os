@@ -36,7 +36,7 @@ async fn read_example_config_and_assert_contents(
     )
     .await
     .expect("failed to open example config file");
-    let example_config_contents = fuchsia_fs::read_file(&example_config_file)
+    let example_config_contents = fuchsia_fs::file::read_to_string(&example_config_file)
         .await
         .expect("failed to read example config file");
     assert_eq!(example_config_contents, get_expected_config_contents());

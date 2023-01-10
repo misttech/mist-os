@@ -397,9 +397,11 @@ mod test {
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        fuchsia_fs::read_file(&debug_data.file.unwrap().into_proxy().unwrap())
-                            .await
-                            .expect("read file"),
+                        fuchsia_fs::file::read_to_string(
+                            &debug_data.file.unwrap().into_proxy().unwrap(),
+                        )
+                        .await
+                        .expect("read file"),
                     ))
                 })
                 .try_collect()
@@ -466,9 +468,11 @@ mod test {
                 .and_then(|debug_data| async move {
                     Ok((
                         debug_data.name.unwrap(),
-                        fuchsia_fs::read_file(&debug_data.file.unwrap().into_proxy().unwrap())
-                            .await
-                            .expect("read file"),
+                        fuchsia_fs::file::read_to_string(
+                            &debug_data.file.unwrap().into_proxy().unwrap(),
+                        )
+                        .await
+                        .expect("read file"),
                     ))
                 })
                 .try_collect()

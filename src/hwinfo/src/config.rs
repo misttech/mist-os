@@ -51,7 +51,7 @@ async fn read_factory_file(
         path,
         fio::OpenFlags::RIGHT_READABLE,
     )?;
-    let result = fuchsia_fs::read_file(&file_proxy).await?.trim().to_owned();
+    let result = fuchsia_fs::file::read_to_string(&file_proxy).await?.trim().to_owned();
     return Ok(result);
 }
 

@@ -175,7 +175,7 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
         "file1",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
-    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::read_file(&file).await?);
+    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file).await?);
     Ok(())
 }
 
@@ -204,14 +204,14 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
         "file1",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
-    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::read_file(&file1).await?);
+    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file1).await?);
 
     let file2 = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
         "inner/file2",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
-    assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::read_file(&file2).await?);
+    assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file2).await?);
     Ok(())
 }
 
@@ -241,13 +241,13 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
         "file1",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
-    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::read_file(&file1).await?);
+    assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file1).await?);
 
     let file2 = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
         "inner/file2",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
-    assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::read_file(&file2).await?);
+    assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file2).await?);
     Ok(())
 }

@@ -163,7 +163,7 @@ impl FileLoader for FactoryFileLoader {
             OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE,
         )
         .with_context(|| format!("Failed to open configuration at {:?}", file_path))?;
-        fuchsia_fs::read_file(&file_proxy)
+        fuchsia_fs::file::read_to_string(&file_proxy)
             .await
             .map_err(|e| format_err!("{:?}", e))
             .with_context(|| format!("Failed to read contents of {:?}", file_path))

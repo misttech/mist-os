@@ -27,11 +27,6 @@ pub mod node;
 // Reexported from fidl_fuchsia_io for convenience
 pub use fio::OpenFlags;
 
-pub async fn read_file(file: &fio::FileProxy) -> Result<String, Error> {
-    let string = file::read_to_string(file).await?;
-    Ok(string)
-}
-
 /// Write the given bytes into a file at `path`. The path must be an absolute path.
 /// * If the file already exists, replaces existing contents.
 /// * If the file does not exist, creates the file.
@@ -123,7 +118,7 @@ mod tests {
         .expect("could not open tmp dir");
         let file = directory::open_file_no_describe(&dir, "myfile", OpenFlags::RIGHT_READABLE)
             .expect("could not open file");
-        let contents = read_file(&file).await.expect("could not read file");
+        let contents = file::read_to_string(&file).await.expect("could not read file");
         assert_eq!(&contents, &data, "File contents did not match");
     }
 
@@ -204,7 +199,10 @@ mod tests {
                 }
             }
             if flags.intersects(OpenFlags::RIGHT_READABLE) {
-                assert_eq!(file_name, read_file(&file_proxy).await.expect("failed to read file"));
+                assert_eq!(
+                    file_name,
+                    file::read_to_string(&file_proxy).await.expect("failed to read file")
+                );
             }
             if flags.intersects(OpenFlags::RIGHT_WRITABLE) {
                 let _: u64 = file_proxy

@@ -656,7 +656,7 @@ impl FidlSuiteEventProcessor {
                                 fio::OpenFlags::RIGHT_READABLE,
                             )
                             .unwrap();
-                            let contents = fuchsia_fs::read_file(&file).await.unwrap();
+                            let contents = fuchsia_fs::file::read_to_string(&file).await.unwrap();
                             sender_clone
                                 .send(SuiteEvent::suite_custom(
                                     timestamp,

@@ -952,7 +952,9 @@ pub mod capability_util {
                 )
                 .await
                 .expect("failed to open file");
-                let res = fuchsia_fs::read_file(&file_proxy).await.expect("failed to read file");
+                let res = fuchsia_fs::file::read_to_string(&file_proxy)
+                    .await
+                    .expect("failed to read file");
                 assert_eq!("hello", res);
             }
             ExpectedResult::Err(s) => {
@@ -962,7 +964,7 @@ pub mod capability_util {
                     fio::OpenFlags::RIGHT_READABLE,
                 )
                 .expect("failed to open file");
-                let _ = fuchsia_fs::read_file(&file_proxy)
+                let _ = fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect_err("read file successfully when it should fail");
                 let epitaph = dir_proxy.take_event_stream().next().await.expect("no epitaph");
@@ -980,7 +982,7 @@ pub mod capability_util {
                     fio::OpenFlags::RIGHT_READABLE,
                 )
                 .expect("failed to open file");
-                let _ = fuchsia_fs::read_file(&file_proxy)
+                let _ = fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect_err("read file successfully when it should fail");
                 assert_matches!(dir_proxy.take_event_stream().next().await, None);
@@ -1093,14 +1095,10 @@ pub mod capability_util {
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .await?;
-        let res = fuchsia_fs::read_file(&file_proxy).await;
 
-        if let Ok(contents) = res {
-            assert_eq!("hippos can be stored here".to_string(), contents);
-            Ok(())
-        } else {
-            Err(res.expect_err("failed to read file"))
-        }
+        let contents = fuchsia_fs::file::read_to_string(&file_proxy).await?;
+        assert_eq!(contents, "hippos can be stored here");
+        Ok(())
     }
 
     pub async fn confirm_storage_is_deleted_for_component(
@@ -1255,7 +1253,7 @@ pub mod capability_util {
                 )
                 .await
                 .expect("failed to open file");
-                let res = fuchsia_fs::read_file(&file_proxy).await;
+                let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
                 assert_eq!("hello", res.expect("failed to read file"));
             }
             ExpectedResult::Err(s) => {

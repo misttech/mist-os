@@ -1577,7 +1577,7 @@ async fn route_storage() -> Result<(), Error> {
                     let example_data = "example data";
                     fuchsia_fs::file::write(&example_file, example_data).await?;
                     let _: Result<u64, i32> = example_file.seek(fio::SeekOrigin::Start, 0).await?;
-                    let file_contents = fuchsia_fs::read_file(&example_file).await?;
+                    let file_contents = fuchsia_fs::file::read_to_string(&example_file).await?;
                     assert_eq!(example_data, file_contents.as_str());
                     send_storage_used.send(()).await.expect("failed to send results");
                     Ok(())
@@ -1766,8 +1766,9 @@ async fn read_only_directory() -> Result<(), Error> {
         )
         .await
         .expect("failed to open config.txt");
-        let config_file_contents =
-            fuchsia_fs::read_file(&config_file).await.expect("failed to read config.txt");
+        let config_file_contents = fuchsia_fs::file::read_to_string(&config_file)
+            .await
+            .expect("failed to read config.txt");
         send_file_contents
             .send(config_file_contents)
             .await
@@ -1823,7 +1824,7 @@ async fn read_only_directory() -> Result<(), Error> {
     .await
     .expect("failed to open config.txt");
     let config_file_contents =
-        fuchsia_fs::read_file(&config_file).await.expect("failed to read config.txt");
+        fuchsia_fs::file::read_to_string(&config_file).await.expect("failed to read config.txt");
     assert_eq!("b".to_string(), config_file_contents);
 
     Ok(())

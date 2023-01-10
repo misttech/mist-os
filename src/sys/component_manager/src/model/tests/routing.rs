@@ -1372,7 +1372,7 @@ async fn destroying_instance_blocks_on_routing() {
 
     // Verify the connection to `echo` and `data` was bound by the provider.
     capability_util::call_echo_and_validate_result(echo_proxy, ExpectedResult::Ok).await;
-    assert_eq!(fuchsia_fs::read_file(&file_proxy).await.unwrap(), "hello");
+    assert_eq!(fuchsia_fs::file::read_to_string(&file_proxy).await.unwrap(), "hello");
 }
 
 ///  a

@@ -296,10 +296,11 @@ impl InsecureKeyDirectoryStorageManager {
             AccountManagerError::new(ApiError::Resource)
                 .with_cause(format_err!("Failed to open keyfile: {:?}", e))
         })?;
-        let serialized_correct_key = fuchsia_fs::read_file(&file_proxy).await.map_err(|e| {
-            AccountManagerError::new(ApiError::Resource)
-                .with_cause(format_err!("Failed to read keyfile: {:?}", e))
-        })?;
+        let serialized_correct_key =
+            fuchsia_fs::file::read_to_string(&file_proxy).await.map_err(|e| {
+                AccountManagerError::new(ApiError::Resource)
+                    .with_cause(format_err!("Failed to read keyfile: {:?}", e))
+            })?;
         let correct_key = serde_json::from_str(&serialized_correct_key).map_err(|e| {
             AccountManagerError::new(ApiError::Internal)
                 .with_cause(format_err!("Failed to deserialize correct key: {:?}", e))
@@ -342,7 +343,7 @@ mod test {
         let file =
             fuchsia_fs::directory::open_file_no_describe(dir, path, fio::OpenFlags::RIGHT_READABLE)
                 .unwrap();
-        let file_content = fuchsia_fs::read_file(&file).await.unwrap();
+        let file_content = fuchsia_fs::file::read_to_string(&file).await.unwrap();
         assert_eq!(content, &file_content);
     }
 

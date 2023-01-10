@@ -358,10 +358,11 @@ mod test {
 
         let file_contents: HashSet<_> = futures::stream::iter(all_files)
             .then(|ftest_manager::DebugData { name, file, .. }| async move {
-                let contents =
-                    fuchsia_fs::read_file(&file.expect("has file").into_proxy().unwrap())
-                        .await
-                        .expect("read file");
+                let contents = fuchsia_fs::file::read_to_string(
+                    &file.expect("has file").into_proxy().unwrap(),
+                )
+                .await
+                .expect("read file");
                 (name.unwrap(), contents)
             })
             .collect()
