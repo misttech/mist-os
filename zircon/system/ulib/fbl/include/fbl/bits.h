@@ -92,7 +92,7 @@ class BitFieldMember {
   constexpr operator T() const { return (value_ >> Offset) & Maximum; }
 
   constexpr BitFieldMember& operator=(T new_value) {
-    ZX_DEBUG_ASSERT(new_value <= Maximum);
+    ZX_ASSERT(new_value <= Maximum);
     // Subtle code ahead!
     // In typical usage, the storage for type |value_| will be a member of a
     // union and not necessarily the active union member. C++11 §9.5.1

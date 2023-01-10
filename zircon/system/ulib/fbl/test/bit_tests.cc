@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <zircon/assert.h>
+
 #include <atomic>
 #include <cstdint>
 
@@ -162,6 +164,19 @@ TEST(BitfieldTest, ReadWriteUint8) {
   byte.high_bit = 0;
   byte.low_nibble = 0x05;
   ASSERT_EQ(byte.value, 0x75);
+}
+
+#ifndef ASSERT_DEATH
+#define ASSERT_DEATH(...)  // Not available on host.
+#endif
+
+TEST(BitfieldTest, WriteOverflowCrashes) {
+  ByteBitfield byte;
+  ASSERT_EQ(byte.value, 0);
+
+  ASSERT_DEATH(
+      [&byte]() { byte.low_nibble = 0xFF; },
+      "Assert should have fired after writing a value that is too big into a BitFieldElement\n");
 }
 
 }  // namespace
