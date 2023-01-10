@@ -77,7 +77,6 @@ assembly_input_bundle("common_bringup") {
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/miscsvc:bootfs",
     "//src/bringup/bin/netsvc:bootfs",
-    "//src/bringup/bin/pwrbtn-monitor:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
     "//src/devices/bin/driver_host:bootfs",
     "//src/devices/bin/driver_manager:bootfs",
@@ -90,6 +89,7 @@ assembly_input_bundle("common_bringup") {
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
     "//src/bringup/bin/ptysvc:package",
+    "//src/bringup/bin/pwrbtn-monitor:package",
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver-index:package",
   ]

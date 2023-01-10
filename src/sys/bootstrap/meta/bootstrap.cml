@@ -69,7 +69,7 @@
         },
         {
             name: "pwrbtn-monitor",
-            url: "fuchsia-boot:///#meta/pwrbtn-monitor.cm",
+            url: "fuchsia-boot:///pwrbtn-monitor#meta/pwrbtn-monitor.cm",
 
             // pwrbtn-monitor should start eagerly - the only services it offers may never be called
             // on some builds, so there's no other way to start it.
