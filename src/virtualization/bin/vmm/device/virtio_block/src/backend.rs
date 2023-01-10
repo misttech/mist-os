@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::wire, anyhow::Error, async_trait::async_trait, std::borrow::Cow,
-    virtio_device::mem::DeviceRange,
+    crate::wire, anyhow::Error, async_trait::async_trait, fuchsia_trace as ftrace,
+    std::borrow::Cow, virtio_device::mem::DeviceRange,
 };
 
 /// Represents a 512 byte sector.
@@ -229,20 +229,28 @@ impl<'a, 'b> Request<'a, 'b> {
 #[async_trait(?Send)]
 pub trait BlockBackend {
     /// Query basic attributes about the device.
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error>;
+    async fn get_attrs(&self, trace_id: ftrace::Id) -> Result<DeviceAttrs, Error>;
 
     /// Read bytes from a starting sector into a set of DeviceRanges.
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error>;
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error>;
 
     /// Writes bytes from a starting sector into a set of DeviceRanges.
     ///
     /// Writes will be considered volatile after this operation completes, up until a subsequent
     /// flush command.
-    async fn write<'a, 'b>(&self, requests: Request<'a, 'b>) -> Result<(), Error>;
+    async fn write<'a, 'b>(
+        &self,
+        requests: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error>;
 
     /// Commit any pending writes to non-volatile storage. The driver may consider a write to be
     /// durable after this operation completes.
-    async fn flush(&self) -> Result<(), Error>;
+    async fn flush(&self, trace_id: ftrace::Id) -> Result<(), Error>;
 }
 
 #[cfg(test)]

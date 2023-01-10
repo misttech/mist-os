@@ -7,6 +7,7 @@ use {
     anyhow::{anyhow, Error},
     async_trait::async_trait,
     fidl_fuchsia_hardware_block::BlockMarker,
+    fuchsia_trace as ftrace,
     futures::future::try_join_all,
     remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient},
     virtio_device::mem::DeviceRange,
@@ -36,13 +37,25 @@ impl RemoteBackend {
         Ok(Self { block_client })
     }
 
-    async fn read_range<'a, 'b>(&self, offset: u64, range: DeviceRange<'a>) -> Result<(), Error> {
+    async fn read_range<'a, 'b>(
+        &self,
+        offset: u64,
+        range: DeviceRange<'a>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::read_range", "len" => range.len() as u64);
         let buffer = self.build_mutable_buffer_slice(offset, &range)?;
         self.block_client.read_at(buffer, offset).await?;
         Ok(())
     }
 
-    async fn write_range<'a, 'b>(&self, offset: u64, range: DeviceRange<'a>) -> Result<(), Error> {
+    async fn write_range<'a, 'b>(
+        &self,
+        offset: u64,
+        range: DeviceRange<'a>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::write_range", "len" => range.len() as u64);
         let buffer = self.build_buffer_slice(offset, &range)?;
         self.block_client.write_at(buffer, offset).await?;
         Ok(())
@@ -82,7 +95,8 @@ impl RemoteBackend {
 
 #[async_trait(?Send)]
 impl BlockBackend for RemoteBackend {
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error> {
+    async fn get_attrs(&self, trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::get_attrs");
         let block_size = self.block_client.block_size();
         let block_count = self.block_client.block_count();
         Ok(DeviceAttrs {
@@ -93,11 +107,16 @@ impl BlockBackend for RemoteBackend {
         })
     }
 
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::read");
         let mut offset = request.sector.to_bytes().unwrap();
         try_join_all(request.ranges.iter().cloned().map(|range| {
             let len = range.len() as u64;
-            let result = self.read_range(offset, range);
+            let result = self.read_range(offset, range, trace_id);
             offset = offset.checked_add(len).unwrap();
             result
         }))
@@ -105,11 +124,16 @@ impl BlockBackend for RemoteBackend {
         Ok(())
     }
 
-    async fn write<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn write<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::write");
         let mut offset = request.sector.to_bytes().unwrap();
         try_join_all(request.ranges.iter().cloned().map(|range| {
             let len = range.len() as u64;
-            let result = self.write_range(offset, range);
+            let result = self.write_range(offset, range, trace_id);
             offset = offset.checked_add(len).unwrap();
             result
         }))
@@ -117,7 +141,8 @@ impl BlockBackend for RemoteBackend {
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self, trace_id: ftrace::Id) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "RemoteBackend::flush");
         self.block_client.flush().await
     }
 }

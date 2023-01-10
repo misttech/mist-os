@@ -9,7 +9,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_io::{FileMarker, FileProxy, MAX_BUF},
-    fuchsia_zircon_status as zx_status,
+    fuchsia_trace as ftrace, fuchsia_zircon_status as zx_status,
     futures::future::try_join_all,
     virtio_device::mem::DeviceRange,
 };
@@ -36,7 +36,13 @@ impl FileBackend {
     /// Reads a single DeviceRange from the file.
     ///
     /// The caller must ensure that `DeviceRange` is no longer that `fidl_fuchsia_io::MAX_BUF`.
-    async fn read_range<'a, 'b>(&self, offset: u64, range: DeviceRange<'a>) -> Result<(), Error> {
+    async fn read_range<'a, 'b>(
+        &self,
+        offset: u64,
+        range: DeviceRange<'a>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::read_range", "len" => range.len() as u64);
         assert!(range.len() <= MAX_BUF as usize);
         let bytes = {
             let _ticket = self.semaphore.acquire().await;
@@ -62,7 +68,13 @@ impl FileBackend {
     /// Writes a single DeviceRange to the file.
     ///
     /// The caller must ensure that `DeviceRange` is no longer that `fidl_fuchsia_io::MAX_BUF`.
-    async fn write_range<'a, 'b>(&self, offset: u64, range: DeviceRange<'a>) -> Result<(), Error> {
+    async fn write_range<'a, 'b>(
+        &self,
+        offset: u64,
+        range: DeviceRange<'a>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::write_range", "len" => range.len() as u64);
         assert!(range.len() <= MAX_BUF as usize);
         // SAFETY: the range comes from the virtio chain and alignment is verified by `try_ptr`.
         let slice = unsafe { std::slice::from_raw_parts(range.try_ptr().unwrap(), range.len()) };
@@ -83,7 +95,8 @@ impl FileBackend {
 
 #[async_trait(?Send)]
 impl BlockBackend for FileBackend {
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error> {
+    async fn get_attrs(&self, trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::get_attrs");
         let (status, attrs) = self.file.get_attr().await?;
         zx_status::Status::ok(status)?;
         return Ok(DeviceAttrs {
@@ -92,27 +105,38 @@ impl BlockBackend for FileBackend {
         });
     }
 
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::read");
         try_join_all(
             request
                 .ranges_bounded(MAX_BUF as usize)
-                .map(|(offset, range)| self.read_range(offset, range)),
+                .map(|(offset, range)| self.read_range(offset, range, trace_id)),
         )
         .await?;
         Ok(())
     }
 
-    async fn write<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn write<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::write");
         try_join_all(
             request
                 .ranges_bounded(MAX_BUF as usize)
-                .map(|(offset, range)| self.write_range(offset, range)),
+                .map(|(offset, range)| self.write_range(offset, range, trace_id)),
         )
         .await?;
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self, trace_id: ftrace::Id) -> Result<(), Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "FileBackend::flush");
         let _ticket = self.semaphore.acquire().await;
         self.file.sync().await?.map_err(zx_status::Status::from_raw)?;
         Ok(())

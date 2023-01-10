@@ -6,7 +6,7 @@ use {
     crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
     anyhow::{anyhow, Error},
     async_trait::async_trait,
-    fuchsia_zircon as zx,
+    fuchsia_trace as ftrace, fuchsia_zircon as zx,
     std::io::{Read, Seek},
 };
 
@@ -30,14 +30,18 @@ impl QcowBackend {
 
 #[async_trait(?Send)]
 impl BlockBackend for QcowBackend {
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error> {
+    async fn get_attrs(&self, _trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
         return Ok(DeviceAttrs {
             capacity: Sector::from_bytes_round_down(self.qcow.linear_size()),
             block_size: None,
         });
     }
 
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        _trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         let offset = request.sector.to_bytes().unwrap();
         let length = request.ranges.iter().fold(0, |a, x| a + x.len()) as u64;
         let linear_range = std::ops::Range { start: offset, end: offset + length };
@@ -80,11 +84,15 @@ impl BlockBackend for QcowBackend {
         Ok(())
     }
 
-    async fn write<'a, 'b>(&self, _request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn write<'a, 'b>(
+        &self,
+        _request: Request<'a, 'b>,
+        _trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         Err(anyhow!("Not Implemented"))
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self, _trace_id: ftrace::Id) -> Result<(), Error> {
         // There's nothing to flush since we do not support writes.
         Ok(())
     }
@@ -121,7 +129,7 @@ mod tests {
 
         // Create the backend and process the request.
         let backend = create_backend();
-        backend.read(request).await.expect("Failed to read from the backend");
+        backend.read(request, ftrace::Id::random()).await.expect("Failed to read from the backend");
 
         // Verify the file data was read into the device ranges.
         check_range(&ranges[0], 0x01);
@@ -138,7 +146,7 @@ mod tests {
 
         // Create the backend and process the request.
         let backend = create_backend();
-        backend.read(request).await.expect("Failed to read from the backend");
+        backend.read(request, ftrace::Id::random()).await.expect("Failed to read from the backend");
 
         // Verify the file data was read into the device ranges.
         let (sector0, remain) = range.split_at(wire::VIRTIO_BLOCK_SECTOR_SIZE as usize).unwrap();
@@ -162,7 +170,7 @@ mod tests {
 
         // Create the backend and process the request.
         let backend = create_backend();
-        backend.read(request).await.expect("Failed to read from the backend");
+        backend.read(request, ftrace::Id::random()).await.expect("Failed to read from the backend");
 
         // Verify the correct data is read.
         check_range(&ranges[0], 0x01);

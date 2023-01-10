@@ -6,6 +6,7 @@ use {
     crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
     anyhow::{anyhow, Error},
     async_trait::async_trait,
+    fuchsia_trace as ftrace,
     futures::future::try_join_all,
     std::cell::RefCell,
     std::convert::TryInto,
@@ -67,9 +68,11 @@ impl CopyOnWriteBackend {
     pub async fn new(
         backing: Box<dyn BlockBackend>,
         copied: Box<dyn BlockBackend>,
+        trace_id: ftrace::Id,
     ) -> Result<Self, Error> {
+        let _trace = ftrace::async_enter!(trace_id, "machina", "CopyOnWriteBackend::new");
         let (backing_attrs, copied_attrs) =
-            futures::try_join!(backing.get_attrs(), copied.get_attrs())?;
+            futures::try_join!(backing.get_attrs(trace_id), copied.get_attrs(trace_id))?;
         if backing_attrs.capacity < copied_attrs.capacity {
             return Err(anyhow!(
                 "Copied backend is not large enough {:?} vs {:?} sectors",
@@ -137,20 +140,28 @@ impl CopyOnWriteBackend {
 
 #[async_trait(?Send)]
 impl BlockBackend for CopyOnWriteBackend {
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error> {
-        self.backing.get_attrs().await
+    async fn get_attrs(&self, trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
+        self.backing.get_attrs(trace_id).await
     }
 
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         try_join_all(self.by_backend(request).map(|(target, request)| match target {
-            TargetBackend::Backing => self.backing.read(request),
-            TargetBackend::Copied => self.copied.read(request),
+            TargetBackend::Backing => self.backing.read(request, trace_id),
+            TargetBackend::Copied => self.copied.read(request, trace_id),
         }))
         .await?;
         Ok(())
     }
 
-    async fn write<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn write<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         // Compute the extents of the request. We'll need this to update the bitmap.
         let start = request.sector;
         let len =
@@ -164,7 +175,7 @@ impl BlockBackend for CopyOnWriteBackend {
         // blocks tracked in the dirty bitmap. In that situation we would have to support reading
         // some (512-byte) sectors from the backing backend that are not explicitly in the input
         // request.
-        self.copied.write(request).await?;
+        self.copied.write(request, trace_id).await?;
 
         // Now that we've written the sectors to the backend, we update the bitmap. We do this
         // second such that if the driver does try to race a read with this write it should still
@@ -179,9 +190,9 @@ impl BlockBackend for CopyOnWriteBackend {
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self, trace_id: ftrace::Id) -> Result<(), Error> {
         // There's no need to flush the backing backend since we only read from it.
-        self.copied.flush().await
+        self.copied.flush(trace_id).await
     }
 }
 
@@ -227,8 +238,12 @@ mod tests {
             let (file_backend, file_controller) = FileBackendTest::create_with_size(size).await?;
             let (memory_backend, memory_controller) = MemoryBackend::with_size(size as usize);
 
-            let cow_backend =
-                CopyOnWriteBackend::new(Box::new(file_backend), Box::new(memory_backend)).await?;
+            let cow_backend = CopyOnWriteBackend::new(
+                Box::new(file_backend),
+                Box::new(memory_backend),
+                ftrace::Id::random(),
+            )
+            .await?;
             let cow_controller = CopyOnWriteBackendController {
                 backing: file_controller,
                 copied: memory_controller,

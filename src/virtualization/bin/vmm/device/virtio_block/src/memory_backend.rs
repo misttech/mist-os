@@ -9,6 +9,7 @@ use {
     crate::wire,
     anyhow::{anyhow, Error},
     async_trait::async_trait,
+    fuchsia_trace as ftrace,
     std::cell::RefCell,
     std::convert::TryInto,
     std::rc::Rc,
@@ -70,14 +71,18 @@ impl MemoryBackend {
 
 #[async_trait(?Send)]
 impl BlockBackend for MemoryBackend {
-    async fn get_attrs(&self) -> Result<DeviceAttrs, Error> {
+    async fn get_attrs(&self, _trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
         return Ok(DeviceAttrs {
             capacity: Sector::from_bytes_round_down(self.0.borrow().len() as u64),
             block_size: None,
         });
     }
 
-    async fn read<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn read<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        _trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         let mut offset = request.sector.to_bytes().unwrap() as usize;
         for range in request.ranges.into_iter() {
             let top = offset.checked_add(range.len()).unwrap();
@@ -101,7 +106,11 @@ impl BlockBackend for MemoryBackend {
         Ok(())
     }
 
-    async fn write<'a, 'b>(&self, request: Request<'a, 'b>) -> Result<(), Error> {
+    async fn write<'a, 'b>(
+        &self,
+        request: Request<'a, 'b>,
+        _trace_id: ftrace::Id,
+    ) -> Result<(), Error> {
         let mut offset = request.sector.to_bytes().unwrap() as usize;
         for range in request.ranges.into_iter() {
             let top = offset.checked_add(range.len()).unwrap();
@@ -120,7 +129,7 @@ impl BlockBackend for MemoryBackend {
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self, _trace_id: ftrace::Id) -> Result<(), Error> {
         Ok(())
     }
 }

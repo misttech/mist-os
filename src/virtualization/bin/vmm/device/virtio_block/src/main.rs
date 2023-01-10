@@ -26,6 +26,8 @@ use {
     fidl_fuchsia_virtualization::{BlockFormat, BlockMode, BlockSpec},
     fidl_fuchsia_virtualization_hardware::VirtioBlockRequestStream,
     fuchsia_component::server,
+    fuchsia_trace as ftrace,
+    fuchsia_trace_provider::trace_provider_create_with_fdio,
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     virtio_device::chain::ReadableChain,
 };
@@ -34,6 +36,8 @@ async fn create_backend(
     format: BlockFormat,
     mode: BlockMode,
 ) -> Result<Box<dyn BlockBackend>, anyhow::Error> {
+    let trace_id = ftrace::Id::random();
+    let _trace = ftrace::async_enter!(trace_id, "machina", "create_backend");
     let backend: Box<dyn BlockBackend> = match format {
         BlockFormat::File(file) => Box::new(FileBackend::new(file)?),
         BlockFormat::Block(block) => Box::new(RemoteBackend::new(block).await?),
@@ -46,9 +50,9 @@ async fn create_backend(
         }
     };
     if mode == BlockMode::VolatileWrite {
-        let size = backend.get_attrs().await?.capacity.to_bytes().unwrap();
+        let size = backend.get_attrs(trace_id).await?.capacity.to_bytes().unwrap();
         let (memory_backend, _) = MemoryBackend::with_size(size as usize);
-        Ok(Box::new(CopyOnWriteBackend::new(backend, Box::new(memory_backend)).await?))
+        Ok(Box::new(CopyOnWriteBackend::new(backend, Box::new(memory_backend), trace_id).await?))
     } else {
         Ok(backend)
     }
@@ -107,6 +111,7 @@ async fn run_virtio_block(
 
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), anyhow::Error> {
+    trace_provider_create_with_fdio();
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_fidl_service(|stream: VirtioBlockRequestStream| stream);
     fs.take_and_serve_directory_handle().context("Error starting server")?;
