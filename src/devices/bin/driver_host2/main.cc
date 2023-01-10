@@ -34,6 +34,11 @@ int main(int argc, char** argv) {
             "Failed to redirect stdout to debuglog, assuming test environment and continuing");
   }
 
+  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+    FX_SLOG(ERROR, "Failed to create the initial dispatcher thread");
+    return status;
+  }
+
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
 

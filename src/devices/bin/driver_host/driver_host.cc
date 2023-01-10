@@ -15,6 +15,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/fdf/cpp/env.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fidl/coding.h>
 #include <lib/fit/defer.h>
@@ -855,6 +856,11 @@ int main(int argc, char** argv) {
   };
   zx_status_t status = fx_log_reconfigure(&config);
   if (status != ZX_OK) {
+    return status;
+  }
+
+  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+    LOGF(ERROR, "Failed to create the initial dispatcher thread");
     return status;
   }
 

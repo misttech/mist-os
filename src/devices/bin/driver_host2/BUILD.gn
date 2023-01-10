@@ -117,6 +117,7 @@ executable("unittests") {
     ":lib",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/driver/runtime:testing",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",

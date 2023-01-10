@@ -15,6 +15,9 @@
 
 __EXPORT int main(int argc, char** argv) {
   setlinebuf(stdout);
+  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+    return status;
+  }
   const void* driver = reinterpret_cast<void*>(0x12345678);
   auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
       driver, FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "driver-runtime-test-main",

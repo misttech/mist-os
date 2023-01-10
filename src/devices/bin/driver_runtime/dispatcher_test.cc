@@ -31,6 +31,10 @@
 #include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
 
+namespace driver_runtime {
+extern DispatcherCoordinator& GetDispatcherCoordinator();
+}
+
 class DispatcherTest : public RuntimeTestCase {
  public:
   DispatcherTest() : config_(MakeConfig()), loop_(&config_) {}
@@ -87,6 +91,10 @@ class DispatcherTest : public RuntimeTestCase {
 };
 
 void DispatcherTest::SetUp() {
+  // Make sure each test starts with exactly one thread.
+  driver_runtime::GetDispatcherCoordinator().Reset();
+  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start());
+
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch_, &remote_ch_));
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch2_, &remote_ch2_));
 
@@ -1896,10 +1904,6 @@ TEST_F(DispatcherTest, UnbindIrqRemovesQueuedIrqs) {
   // If not, the irq handler will be called and assert.
 }
 
-namespace driver_runtime {
-extern DispatcherCoordinator& GetDispatcherCoordinator();
-}
-
 // Tests the potential race condition that occurs when an irq is unbound
 // but the port has just read the irq packet from the port.
 TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
@@ -1969,9 +1973,6 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   for (uint32_t i = 0; i < kNumThreads - 1; i++) {
     unused_dispatchers[i].reset();
   }
-
-  // Reset the number of threads to 1.
-  driver_runtime::GetDispatcherCoordinator().Reset();
 }
 
 // Tests that binding irqs to an unsynchronized dispatcher is not allowed.
@@ -2963,7 +2964,7 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
   }
 
   driver_runtime::GetDispatcherCoordinator().Reset();
-  ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 1);
+  ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 0);
 }
 
 TEST_F(DispatcherTest, MaximumTenThreads) {
@@ -2993,8 +2994,6 @@ TEST_F(DispatcherTest, MaximumTenThreads) {
       dispatchers[i]->Destroy();
     }
   }
-
-  driver_runtime::GetDispatcherCoordinator().Reset();
 }
 
 // Tests shutting down and destroying multiple dispatchers concurrently.
@@ -3042,9 +3041,6 @@ TEST_F(DispatcherTest, ConcurrentDispatcherDestroy) {
   // Wait for the driver to be removed from the dispatcher coordinator's |driver_state_| map as
   // |Reset| expects it to be empty.
   fdf_testing_wait_until_all_dispatchers_destroyed();
-
-  // Reset the number of threads to 1.
-  driver_runtime::GetDispatcherCoordinator().Reset();
 }
 
 // Tests that the sequence id retrieved in the driver shutdown callback
@@ -3159,8 +3155,6 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
     blocking_dispatcher->ShutdownAsync();
     ASSERT_OK(completion.Wait());
   }
-  // Reset the number of threads to 1.
-  driver_runtime::GetDispatcherCoordinator().Reset();
 }
 
 TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {

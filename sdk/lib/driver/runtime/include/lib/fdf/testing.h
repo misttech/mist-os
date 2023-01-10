@@ -10,6 +10,10 @@
 
 __BEGIN_CDECLS
 
+// Run all of the driver runtime's dispatchers until everything is idle.
+// This will return ZX_ERR_BAD_STATE if the driver runtime is managing any threads.
+zx_status_t fdf_testing_run_until_idle();
+
 // Adds |driver| to the thread's current call stack.
 void fdf_testing_push_driver(const void* driver);
 

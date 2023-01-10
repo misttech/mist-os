@@ -9,6 +9,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/service_client.h>
+#include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/binding.h>
@@ -127,6 +128,8 @@ struct StartDriverResult {
 
 class DriverHostTest : public testing::Test {
  protected:
+  void SetUp() override { fdf_env_start(); }
+
   async::Loop& loop() { return loop_; }
   async::Loop& second_loop() { return second_loop_; }
   fidl::Server<fdh::DriverHost>& driver_host() { return *driver_host_; }

@@ -52,7 +52,7 @@ zx_status_t fdf_channel_write(fdf_handle_t channel_handle, uint32_t options, fdf
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
   // TODO(fxbug.dev/87046): we may want to consider killing the process.
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Write(options, arena, data, num_bytes, handles, num_handles);
 }
 
@@ -64,7 +64,7 @@ zx_status_t fdf_channel_read(fdf_handle_t channel_handle, uint32_t options, fdf_
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
   // TODO(fxbug.dev/87046): we may want to consider killing the process.
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Read(options, arena, data, num_bytes, handles, num_handles);
 }
 
@@ -78,7 +78,7 @@ zx_status_t fdf_channel_wait_async(struct fdf_dispatcher* dispatcher,
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_read->channel, &channel);
   // TODO(fxbug.dev/87046): we may want to consider killing the process.
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->WaitAsync(dispatcher, channel_read, options);
 }
 
@@ -88,7 +88,7 @@ __EXPORT zx_status_t fdf_channel_call(fdf_handle_t channel_handle, uint32_t opti
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
   // TODO(fxbug.dev/87046): we may want to consider killing the process.
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Call(options, deadline, args);
 }
 
@@ -97,7 +97,7 @@ __EXPORT zx_status_t fdf_channel_cancel_wait(fdf_handle_t channel_handle) {
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
   // TODO(fxbug.dev/87046): we may want to consider killing the process.
-  ZX_ASSERT(status == ZX_OK);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->CancelWait();
 }
 
@@ -171,6 +171,8 @@ __EXPORT zx_status_t fdf_token_transfer(zx_handle_t token, fdf_handle_t handle) 
   return driver_runtime::DispatcherCoordinator::TokenTransfer(token, handle);
 }
 
+__EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordinator::Start(); }
+
 __EXPORT void fdf_env_register_driver_entry(const void* driver) {
   driver_context::PushDriver(driver);
 }
@@ -208,6 +210,10 @@ __EXPORT void fdf_env_destroy_all_dispatchers() {
 
 __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) {
   return dispatcher->HasQueuedTasks();
+}
+
+__EXPORT zx_status_t fdf_testing_run_until_idle() {
+  return driver_runtime::DispatcherCoordinator::RunUntilIdle();
 }
 
 __EXPORT void fdf_testing_push_driver(const void* driver) { driver_context::PushDriver(driver); }

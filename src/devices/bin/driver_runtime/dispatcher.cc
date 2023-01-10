@@ -1356,6 +1356,18 @@ void DispatcherCoordinator::WaitUntilDispatchersDestroyed() {
 }
 
 // static
+zx_status_t DispatcherCoordinator::RunUntilIdle() {
+  auto& coordinator = GetDispatcherCoordinator();
+  {
+    fbl::AutoLock lock(&coordinator.lock_);
+    if (coordinator.number_threads_ > 0) {
+      return ZX_ERR_BAD_STATE;
+    }
+  }
+  return coordinator.loop()->RunUntilIdle();
+}
+
+// static
 zx_status_t DispatcherCoordinator::ShutdownDispatchersAsync(
     const void* driver, fdf_env_driver_shutdown_observer_t* observer) {
   std::vector<fbl::RefPtr<Dispatcher>> dispatchers;
@@ -1568,11 +1580,26 @@ zx_status_t DispatcherCoordinator::AddThread() {
   return status;
 }
 
+zx_status_t DispatcherCoordinator::Start() {
+  DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
+  fbl::AutoLock lock(&coordinator.lock_);
+  if (coordinator.number_threads_ != 0) {
+    return ZX_ERR_BAD_STATE;
+  }
+  if (zx_status_t status = coordinator.loop_.StartThread("fdf-dispatcher-0"); status != ZX_OK) {
+    return status;
+  }
+  coordinator.number_threads_++;
+  coordinator.dispatcher_threads_needed_++;
+  return ZX_OK;
+}
+
 void DispatcherCoordinator::Reset() {
   {
     fbl::AutoLock al(&lock_);
     ZX_ASSERT(drivers_.is_empty());
-    ZX_ASSERT(dispatcher_threads_needed_ == 1);
+    ZX_ASSERT_MSG(dispatcher_threads_needed_ <= 1, "Too many dispatcher threads to reset: %d",
+                  dispatcher_threads_needed_);
   }
 
   loop_.Quit();
@@ -1580,11 +1607,11 @@ void DispatcherCoordinator::Reset() {
   loop_.ResetQuit();
   loop_.RunUntilIdle();
 
-  fbl::AutoLock al(&lock_);
-  number_threads_ = 1;
-  dispatcher_threads_needed_ = 1;
-
-  loop_.StartThread("fdf-dispatcher-thread-0");
+  {
+    fbl::AutoLock al(&lock_);
+    number_threads_ = 0;
+    dispatcher_threads_needed_ = 0;
+  }
 }
 
 void DispatcherCoordinator::CachedIrqs::AddIrq(std::unique_ptr<Dispatcher::AsyncIrq> irq) {

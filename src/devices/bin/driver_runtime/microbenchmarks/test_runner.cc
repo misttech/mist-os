@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fdf/cpp/env.h>
+
 #include <perftest/perftest.h>
 
 int main(int argc, char** argv) {
+  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+    return status;
+  }
   return perftest::PerfTestMain(argc, argv, "driver_runtime.microbenchmarks");
 }

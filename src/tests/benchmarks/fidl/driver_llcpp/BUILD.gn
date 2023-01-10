@@ -39,6 +39,7 @@ executable("bin") {
   testonly = true
   sources = [ "main.cc" ]
   deps = [
+           "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
            "//sdk/lib/driver/runtime:testing",
            "//sdk/lib/fidl_driver",
            "//src/devices/bin/driver_runtime:driver_runtime_impl",
