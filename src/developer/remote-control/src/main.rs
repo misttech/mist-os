@@ -71,7 +71,7 @@ async fn exec_server() -> Result<(), Error> {
 
     #[cfg(feature = "circuit")]
     let onet_circuit_fut = {
-        let (s, p) = fidl::Channel::create().context("creating ServiceProvider zx channel")?;
+        let (s, p) = fidl::Channel::create();
         let chan = fidl::AsyncChannel::from_channel(s)
             .context("creating ServiceProvider async channel")?;
         let stream = ServiceProviderRequestStream::from_channel(chan);

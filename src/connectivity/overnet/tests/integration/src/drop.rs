@@ -77,7 +77,7 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
                         {
                             continue;
                         }
-                        let (s, p) = fidl::Channel::create()?;
+                        let (s, p) = fidl::Channel::create();
                         svc.connect_to_service(&mut peer.id, "test", s)?;
                         break 'retry p;
                     }

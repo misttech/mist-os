@@ -76,7 +76,7 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
             {
                 continue;
             }
-            let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+            let (s, p) = fidl::Channel::create();
             svc.connect_to_service(&mut peer.id, echo::EchoMarker::PROTOCOL_NAME, s).unwrap();
             let proxy =
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
@@ -93,7 +93,7 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
 
 async fn exec_server(overnet: Arc<Overnet>) -> Result<(), Error> {
     let node_id = overnet.node_id();
-    let (s, p) = fidl::Channel::create().context("failed to create zx channel")?;
+    let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
     overnet
         .connect_as_service_publisher()?
