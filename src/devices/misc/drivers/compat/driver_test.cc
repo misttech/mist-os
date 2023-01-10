@@ -352,7 +352,10 @@ class DriverTest : public testing::Test {
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.Start("driver-test-loop").status_value());
+    ASSERT_EQ(ZX_OK,
+              driver_dispatcher_
+                  .Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
+                  .status_value());
 
     fidl_loop_.StartThread("fidl-server-thread");
 
@@ -366,7 +369,7 @@ class DriverTest : public testing::Test {
   }
 
   void TearDown() override {
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 
     libsync::Completion vfs_shutdown_complete;
     vfs_->Shutdown([&vfs_shutdown_complete](auto status) { vfs_shutdown_complete.Signal(); });
@@ -603,7 +606,7 @@ TEST_F(DriverTest, Start) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -633,7 +636,7 @@ TEST_F(DriverTest, Start_WithCreate) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
   {
     const std::lock_guard<std::mutex> lock(v1_test->lock);
@@ -653,7 +656,7 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
   EXPECT_EQ(nullptr, driver->Context());
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 }
 
 TEST_F(DriverTest, Start_DeviceAddNull) {
@@ -664,7 +667,7 @@ TEST_F(DriverTest, Start_DeviceAddNull) {
   WaitForChildDeviceAdded();
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 }
 
 TEST_F(DriverTest, Start_CheckCompatService) {
@@ -693,7 +696,7 @@ TEST_F(DriverTest, Start_CheckCompatService) {
   ASSERT_EQ(metadata, expected_metadata);
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 }
 
 TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
@@ -715,7 +718,7 @@ TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
   // Check that the root resource's value did not change.
   ASSERT_EQ(resource, resource2);
 
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 }
 
 TEST_F(DriverTest, Start_GetBackingMemory) {
@@ -732,7 +735,7 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
   EXPECT_EQ(nullptr, driver->Context());
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
 }
 
 TEST_F(DriverTest, Start_BindFailed) {
@@ -765,7 +768,7 @@ TEST_F(DriverTest, Start_BindFailed) {
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 
   {
@@ -810,7 +813,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
   ASSERT_TRUE(was_called);
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -835,7 +838,7 @@ TEST_F(DriverTest, GetProfile) {
   ASSERT_EQ(ZX_OK, device_get_profile(v1_test->zxdev, 10, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -865,7 +868,7 @@ TEST_F(DriverTest, GetDeadlineProfile) {
             device_get_deadline_profile(v1_test->zxdev, 10, 20, 30, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -900,7 +903,7 @@ TEST_F(DriverTest, GetVariable) {
   ASSERT_EQ(actual, 4u);
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }
 
@@ -930,6 +933,6 @@ TEST_F(DriverTest, SetProfileByRole) {
                                               strlen("test-profile")));
 
   UnbindAndFreeDriver(std::move(driver));
-  ASSERT_EQ(ZX_OK, driver_dispatcher_.Stop().status_value());
+  ASSERT_EQ(ZX_OK, driver_dispatcher_.StopSync().status_value());
   ASSERT_TRUE(RunTestLoopUntilIdle());
 }

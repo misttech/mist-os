@@ -20,23 +20,34 @@ void RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task);
 class TestSynchronizedDispatcher {
  public:
   TestSynchronizedDispatcher() = default;
-  // Destruct the dispatcher. This will ASSERT if the dispatcher has not been stopped.
+
+  // The dispatcher must be completely shutdown before the dispatcher can be closed.
+  // i.e. StopAsync and WaitForStop must be called.
   ~TestSynchronizedDispatcher();
 
   // Start the dispatcher. Once this returns successfully the dispatcher is available to be
   // used for queueing and running tasks.
-  zx::result<> Start(std::string_view dispatcher_name);
+  zx::result<> Start(fdf::SynchronizedDispatcher::Options options,
+                     std::string_view dispatcher_name);
 
   // Stop the dispatcher. This must be called before TestSynchronizedDispatcher is destructed.
   // This will block until the dispatcher is stopped, so this cannot be run on the dispatcher's
   // thread.
-  zx::result<> Stop();
+  zx::result<> StopSync();
 
-  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_.value(); }
-  async_dispatcher_t* dispatcher() { return dispatcher_.value().async_dispatcher(); }
+  // Request that the dispatcher is stopped. This can be called on the dispatcher's thread.
+  // This should be used in conjunction with WaitForStop.
+  void StopAsync();
+
+  // Wait until the dispatcher is stopped. This will block the current thread, so it should not be
+  // called on the dispatcher's thread.
+  zx::result<> WaitForStop();
+
+  const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
+  async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
 
  private:
-  std::optional<fdf::SynchronizedDispatcher> dispatcher_;
+  fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
 };
 
