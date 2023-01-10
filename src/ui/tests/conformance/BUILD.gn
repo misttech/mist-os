@@ -6,9 +6,13 @@ import("//build/components.gni")
 
 group("conformance") {
   testonly = true
-  deps = [ ":touch-conformance-test" ]
+  deps = [
+    ":mouse-conformance-test",
+    ":touch-conformance-test",
+  ]
 }
 
+############# TOUCH CONFORMANCE TEST #############
 executable("touch-validator-bin") {
   testonly = true
   sources = [ "touch-validator.cc" ]
@@ -42,6 +46,57 @@ fuchsia_test_package("touch-conformance-test") {
   test_components = [ ":touch-conformance-test-component" ]
   deps = [
     ":touch-validator",
+    "//src/ui/testing/context:ui-context-factory-component",
+  ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
+
+############# MOUSE CONFORMANCE TEST #############
+executable("mouse-validator-bin") {
+  testonly = true
+  sources = [ "mouse-validator.cc" ]
+  output_name = "mouse-validator"
+  deps = [
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_component("mouse-validator") {
+  testonly = true
+  manifest = "meta/mouse-validator.cml"
+  deps = [ ":mouse-validator-bin" ]
+}
+
+fuchsia_test_component("mouse-conformance-test-component") {
+  testonly = true
+  component_name = "mouse-conformance-test"
+  manifest = "meta/mouse-conformance-test.cml"
+}
+
+fuchsia_test_package("mouse-conformance-test") {
+  test_components = [ ":mouse-conformance-test-component" ]
+  deps = [
+    ":mouse-validator",
     "//src/ui/testing/context:ui-context-factory-component",
   ]
   test_specs = {
