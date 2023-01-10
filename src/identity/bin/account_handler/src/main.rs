@@ -102,12 +102,17 @@ fn get_dev_directory() -> fio::DirectoryProxy {
         .expect("open /dev root for disk manager")
 }
 
+fn get_svc_directory() -> fio::DirectoryProxy {
+    open_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE)
+        .expect("open /svc root for disk manager")
+}
+
 fn get_storage_manager(account_id: &AccountId) -> StorageManagerEnum {
     match &*STORAGE_MANAGER_KIND {
         StorageManagerKind::Fxfs => StorageManagerEnum::Fxfs(FxfsStorageManager::new(
             FxfsStorageManagerArgs::builder()
                 .volume_label(account_id.to_canonical_string())
-                .filesystem_dir(get_dev_directory())
+                .filesystem_dir(get_svc_directory())
                 .build(),
         )),
         StorageManagerKind::Minfs => StorageManagerEnum::Minfs(MinfsStorageManager::new(
