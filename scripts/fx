@@ -434,8 +434,10 @@ monitor_and_run() {
     # Otherwise multiple concurrent fx -i invocations can trigger each other
     # and cause a storm.
     echo "---------------------------------- fx -i ${display_name} ---------------------------------------"
+    local start=$(date +%s)
     "$@"
-    echo "--- Done!"
+    local end=$(date +%s)
+    echo "--- Done in $((end-start)) seconds"
   done
 }
 
