@@ -9,6 +9,7 @@
 #include <lib/trace/event.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/vmo.h>
+#include <zircon/errors.h>
 
 #include <memory>
 #include <optional>
@@ -366,9 +367,9 @@ ParseRealOrStreamTime(const fuchsia_media2::wire::RealOrStreamTime& real_or_stre
 }
 
 template <class ProducerOrConsumerNodeType>
-void StartProducerOrConsumer(const GraphServer::StartRequestView& request,
+void StartProducerOrConsumer(GraphServer& graph_server,
+                             const GraphServer::StartRequestView& request,
                              GraphServer::StartCompleter::Sync& completer,
-                             std::shared_ptr<const FidlThread> fidl_thread,
                              ProducerOrConsumerNodeType& node) {
   const auto start_time = ParseRealTime(request->when());
   if (!start_time.is_ok()) {
@@ -385,14 +386,17 @@ void StartProducerOrConsumer(const GraphServer::StartRequestView& request,
   }
 
   auto callback =
-      [fidl_thread = std::move(fidl_thread), completer = completer.ToAsync()](
+      [fidl_thread = graph_server.thread_ptr(), completer = completer.ToAsync()](
           fpromise::result<StartStopControl::When, StartStopControl::StartError> result) mutable {
         fidl_thread->PostTask(
             [result = std::move(result), completer = std::move(completer)]() mutable {
               if (!result.is_ok()) {
-                FX_LOGS(WARNING) << "Start: canceled";
-                completer.ReplyError(fuchsia_audio_mixer::StartError::kCanceled);
-                return;
+                switch (result.error()) {
+                  case StartStopControl::StartError::kCanceled:
+                    FX_LOGS(WARNING) << "Start: canceled";
+                    completer.ReplyError(fuchsia_audio_mixer::StartError::kCanceled);
+                    return;
+                }
               }
               auto& value = result.value();
               fidl::Arena arena;
@@ -405,17 +409,20 @@ void StartProducerOrConsumer(const GraphServer::StartRequestView& request,
             });
       };
 
-  node.Start(StartStopControl::StartCommand{
-      .start_time = start_time.value(),
-      .stream_time = start_position.value(),
-      .callback = std::move(callback),
-  });
+  if (!node.Start(StartStopControl::StartCommand{
+          .start_time = start_time.value(),
+          .stream_time = start_position.value(),
+          .callback = std::move(callback),
+      })) {
+    FX_LOGS(WARNING) << "Start: another Start or Stop call is pending. Shutting down GraphServer "
+                     << "'" << graph_server.name() << "'";
+    graph_server.Shutdown(ZX_ERR_BAD_STATE);
+  }
 }
 
 template <class ProducerOrConsumerNodeType>
-void StopProducerOrConsumer(const GraphServer::StopRequestView& request,
+void StopProducerOrConsumer(GraphServer& graph_server, const GraphServer::StopRequestView& request,
                             GraphServer::StopCompleter::Sync& completer,
-                            std::shared_ptr<const FidlThread> fidl_thread,
                             ProducerOrConsumerNodeType& node) {
   const auto when = ParseRealOrStreamTime(request->when());
   if (!when.is_ok()) {
@@ -425,19 +432,21 @@ void StopProducerOrConsumer(const GraphServer::StopRequestView& request,
   }
 
   auto callback =
-      [fidl_thread = std::move(fidl_thread), completer = completer.ToAsync()](
+      [fidl_thread = graph_server.thread_ptr(), completer = completer.ToAsync()](
           fpromise::result<StartStopControl::When, StartStopControl::StopError> result) mutable {
         fidl_thread->PostTask(
             [result = std::move(result), completer = std::move(completer)]() mutable {
               if (!result.is_ok()) {
-                if (result.error() == StartStopControl::StopError::kCanceled) {
-                  FX_LOGS(WARNING) << "Stop: canceled";
-                  completer.ReplyError(fuchsia_audio_mixer::StopError::kCanceled);
-                } else {
-                  FX_LOGS(WARNING) << "Stop: already stopped";
-                  completer.ReplyError(fuchsia_audio_mixer::StopError::kAlreadyStopped);
+                switch (result.error()) {
+                  case StartStopControl::StopError::kCanceled:
+                    FX_LOGS(WARNING) << "Stop: canceled";
+                    completer.ReplyError(fuchsia_audio_mixer::StopError::kCanceled);
+                    return;
+                  case StartStopControl::StopError::kAlreadyStopped:
+                    FX_LOGS(WARNING) << "Stop: already stopped";
+                    completer.ReplyError(fuchsia_audio_mixer::StopError::kAlreadyStopped);
+                    return;
                 }
-                return;
               }
               auto& value = result.value();
               fidl::Arena arena;
@@ -450,10 +459,14 @@ void StopProducerOrConsumer(const GraphServer::StopRequestView& request,
             });
       };
 
-  node.Stop(StartStopControl::StopCommand{
-      .when = when.value(),
-      .callback = std::move(callback),
-  });
+  if (!node.Stop(StartStopControl::StopCommand{
+          .when = when.value(),
+          .callback = std::move(callback),
+      })) {
+    FX_LOGS(WARNING) << "Stop: another Start or Stop call is pending. Shutting down GraphServer "
+                     << "'" << graph_server.name() << "'";
+    graph_server.Shutdown(ZX_ERR_BAD_STATE);
+  }
 }
 
 }  // namespace
@@ -1252,10 +1265,10 @@ void GraphServer::Start(StartRequestView request, StartCompleter::Sync& complete
 
   if (const auto producer_it = producer_nodes_.find(request->node_id());
       producer_it != producer_nodes_.end()) {
-    StartProducerOrConsumer(request, completer, thread_ptr(), *producer_it->second);
+    StartProducerOrConsumer(*this, request, completer, *producer_it->second);
   } else if (const auto consumer_it = consumer_nodes_.find(request->node_id());
              consumer_it != consumer_nodes_.end()) {
-    StartProducerOrConsumer(request, completer, thread_ptr(), *consumer_it->second);
+    StartProducerOrConsumer(*this, request, completer, *consumer_it->second);
   } else {
     FX_LOGS(WARNING) << "Start: invalid node id";
     completer.ReplyError(fuchsia_audio_mixer::StartError::kInvalidParameter);
@@ -1274,10 +1287,10 @@ void GraphServer::Stop(StopRequestView request, StopCompleter::Sync& completer) 
 
   if (const auto producer_it = producer_nodes_.find(request->node_id());
       producer_it != producer_nodes_.end()) {
-    StopProducerOrConsumer(request, completer, thread_ptr(), *producer_it->second);
+    StopProducerOrConsumer(*this, request, completer, *producer_it->second);
   } else if (const auto consumer_it = consumer_nodes_.find(request->node_id());
              consumer_it != consumer_nodes_.end()) {
-    StopProducerOrConsumer(request, completer, thread_ptr(), *consumer_it->second);
+    StopProducerOrConsumer(*this, request, completer, *consumer_it->second);
   } else {
     FX_LOGS(WARNING) << "Stop: invalid node id";
     completer.ReplyError(fuchsia_audio_mixer::StopError::kInvalidParameter);
