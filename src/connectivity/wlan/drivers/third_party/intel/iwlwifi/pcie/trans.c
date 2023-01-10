@@ -3089,24 +3089,6 @@ static struct iwl_trans_dump_data* iwl_trans_pcie_dump_data(struct iwl_trans* tr
     return dump_data;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int iwl_trans_pcie_suspend(struct iwl_trans* trans) {
-  if (trans->runtime_pm_mode == IWL_PLAT_PM_MODE_D0I3 &&
-      (trans->system_pm_mode == IWL_PLAT_PM_MODE_D0I3)) {
-    return iwl_pci_fw_enter_d0i3(trans);
-  }
-
-  return 0;
-}
-
-static void iwl_trans_pcie_resume(struct iwl_trans* trans) {
-  if (trans->runtime_pm_mode == IWL_PLAT_PM_MODE_D0I3 &&
-      (trans->system_pm_mode == IWL_PLAT_PM_MODE_D0I3)) {
-    iwl_pci_fw_exit_d0i3(trans);
-  }
-}
-#endif /* CONFIG_PM_SLEEP */
-
 #define IWL_TRANS_COMMON_OPS                                                              \
   .op_mode_leave = iwl_trans_pcie_op_mode_leave, .write8 = iwl_trans_pcie_write8,         \
   .write32 = iwl_trans_pcie_write32, .read32 = iwl_trans_pcie_read32,                     \
@@ -3321,78 +3303,6 @@ struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
   }
 
   IWL_DEBUG_INFO(trans, "HW REV: 0x%0x\n", trans->hw_rev);
-
-#if IS_ENABLED(CPTCFG_IWLMVM) || IS_ENABLED(CPTCFG_IWLFMAC)
-  trans->hw_rf_id = iwl_read32(trans, CSR_HW_RF_ID);
-
-  if (cfg == &iwl22560_2ax_cfg_hr) {
-    if (CSR_HW_RF_ID_TYPE_CHIP_ID(trans->hw_rf_id) ==
-        CSR_HW_RF_ID_TYPE_CHIP_ID(CSR_HW_RF_ID_TYPE_HR)) {
-      trans->cfg = &iwl22560_2ax_cfg_hr;
-    } else if (CSR_HW_RF_ID_TYPE_CHIP_ID(trans->hw_rf_id) ==
-               CSR_HW_RF_ID_TYPE_CHIP_ID(CSR_HW_RF_ID_TYPE_JF)) {
-      trans->cfg = &iwl22000_2ax_cfg_jf;
-    } else if (CSR_HW_RF_ID_TYPE_CHIP_ID(trans->hw_rf_id) ==
-               CSR_HW_RF_ID_TYPE_CHIP_ID(CSR_HW_RF_ID_TYPE_HRCDB)) {
-      IWL_ERR(trans, "RF ID HRCDB is not supported\n");
-      ret = -EINVAL;
-      goto out_no_pci;
-    } else {
-      IWL_ERR(trans, "Unrecognized RF ID 0x%08x\n", CSR_HW_RF_ID_TYPE_CHIP_ID(trans->hw_rf_id));
-      ret = -EINVAL;
-      goto out_no_pci;
-    }
-  } else if (CSR_HW_RF_ID_TYPE_CHIP_ID(trans->hw_rf_id) ==
-                 CSR_HW_RF_ID_TYPE_CHIP_ID(CSR_HW_RF_ID_TYPE_HR) &&
-             (trans->cfg != &iwl22260_2ax_cfg || trans->hw_rev == CSR_HW_REV_TYPE_QNJ_B0)) {
-    uint32_t hw_status;
-
-    hw_status = iwl_read_prph(trans, UMAG_GEN_HW_STATUS);
-    if (CSR_HW_RF_STEP(trans->hw_rf_id) == SILICON_B_STEP) {
-      if (hw_status & UMAG_GEN_HW_IS_FPGA) {
-        trans->cfg = &iwl22000_2ax_cfg_qnj_hr_b0_f0;
-      } else {
-        trans->cfg = &iwl22000_2ax_cfg_qnj_hr_b0;
-      }
-    } else if ((hw_status & UMAG_GEN_HW_IS_FPGA) &&
-               CSR_HW_RF_STEP(trans->hw_rf_id) == SILICON_A_STEP) {
-      trans->cfg = &iwl22000_2ax_cfg_qnj_hr_a0_f0;
-    } else {
-      /*
-       * a step no FPGA
-       */
-      trans->cfg = &iwl22000_2ac_cfg_hr;
-    }
-  }
-
-  /*
-   * The RF_ID is set to zero in blank OTP so read version
-   * to extract the RF_ID.
-   */
-  if (trans->cfg->rf_id && !CSR_HW_RFID_TYPE(trans->hw_rf_id)) {
-    unsigned long flags;
-
-    if (iwl_trans_grab_nic_access(trans, &flags)) {
-      uint32_t val;
-
-      val = iwl_read_prph_no_grab(trans, WFPM_CTRL_REG);
-      val |= ENABLE_WFPM;
-      iwl_write_prph_no_grab(trans, WFPM_CTRL_REG, val);
-      val = iwl_read_prph_no_grab(trans, SD_REG_VER);
-
-      val &= 0xff00;
-      switch (val) {
-        case REG_VER_RF_ID_JF:
-          trans->hw_rf_id = CSR_HW_RF_ID_TYPE_JF;
-          break;
-        /* TODO: get value for REG_VER_RF_ID_HR */
-        default:
-          trans->hw_rf_id = CSR_HW_RF_ID_TYPE_HR;
-      }
-      iwl_trans_release_nic_access(trans, &flags);
-    }
-  }
-#endif
 
   // Setup interrupts.
   status = iwl_pcie_set_interrupt_capa(trans);
