@@ -29,12 +29,14 @@ Commands:
   read | r              Read one byte from an I2C device. Use `i2cutil transact`
                         to read multiple bytes. <device> can be the full path of
                         a devfs node (example: `/dev/class/i2c/031`) or only the
-                        devfs node's index (example: `31`). Use `i2cutil ping` to
-                        get devfs node paths and indexes. <address> is the internal
-                        register of <device> to read from. Use multiple <address>
-                        values to access a multi-byte (little-endian) register address.
-                        For example `i2cutil read 4 0x20 0x3D` to read the register at
-                        `0x203D`.
+                        devfs node's index (example: `31`) or it can simply be the
+                        device's friendly named obtained via `i2cutil list`
+                        (example: `pmic`). Use `i2cutil ping` to get devfs node
+                        paths and indexes. <address> is the internal register of
+                        <device> to read from. Use multiple <address> values to
+                        access a multi-byte (little-endian) register address.
+                        For example `i2cutil read 4 0x20 0x3D` to read the
+                        register at `0x203D`.
   write | w             Write one or more bytes (<data>) to an I2C device. See the
                         `i2cutil read` description for explanations of <device>
                         and <address>.
@@ -54,8 +56,8 @@ Examples:
   $ i2cutil transact 4 w 0x20 r 3
 
   Read one byte from the register at the multi-byte address `0x203D` of the
-  I2C device represented by devfs node index `4`:
-  $ i2cutil read 4 0x20 0x3D
+  I2C device named "temp_sensor":
+  $ i2cutil read temp_sensor 0x20 0x3D
 
   Same as the last example but represent the I2C device with a devfs node path:
   $ i2cutil read /dev/class/i2c/004 0x20 0x3D
@@ -187,6 +189,33 @@ zx_status_t list() {
   return ZX_OK;
 }
 
+zx::result<fidl::ClientEnd<fuchsia_hardware_i2c::Device>> get_device_by_name(
+    const std::string& target) {
+  for (auto& dev_path : std::filesystem::directory_iterator(kI2cDevicePath)) {
+    zx::result device = component::Connect<fuchsia_hardware_i2c::Device>(dev_path.path().c_str());
+    if (device.is_error()) {
+      continue;
+    }
+
+    const fidl::WireResult result = fidl::WireCall(device.value())->GetName();
+    if (!result.ok()) {
+      continue;
+    }
+
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      continue;
+    }
+
+    const std::string name(response.value()->name.get());
+    if (name == target) {
+      return zx::ok(std::move(device.value()));
+    }
+  }
+
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
 }  // namespace
 
 int main(int argc, const char* argv[]) {
@@ -199,7 +228,13 @@ int main(int argc, const char* argv[]) {
 
   if (args->Op() == i2cutil::I2cOp::Read || args->Op() == i2cutil::I2cOp::Write ||
       args->Op() == i2cutil::I2cOp::Transact) {
-    zx::result device = component::Connect<fuchsia_hardware_i2c::Device>(args->Path());
+    zx::result<fidl::ClientEnd<fuchsia_hardware_i2c::Device>> device;
+    if (std::filesystem::exists(args->Path())) {
+      device = component::Connect<fuchsia_hardware_i2c::Device>(args->Path());
+    } else {
+      device = get_device_by_name(args->Path());
+    }
+
     if (device.is_error()) {
       fprintf(stderr, "i2cutil: Failed to connect to device: %s\n", device.status_string());
       return -1;

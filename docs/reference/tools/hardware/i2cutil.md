@@ -30,12 +30,13 @@ i2cutil read <device> <address> [<address>...]
 Read one byte from an I2C device. Use [`transact`](#transact)
 to read multiple bytes. `<device>` can be the full path of
 a devfs node (example: `/dev/class/i2c/031`) or only the
-devfs node's index (example: `31`). Use [`ping`](#ping) to
-get devfs node paths and indexes. `<address>` is the internal
-register of `<device>` to read from. Use multiple `<address>`
-values to access a multi-byte (little-endian) register address.
-For example `i2cutil read 4 0x20 0x3D` to read the register at
-`0x203D`.
+devfs node's index (example: `31`) or it can simply be the
+device's friendly named obtained via `i2cutil list`. Use
+[`ping`](#ping) to get devfs node paths and indexes.
+`<address>` is the internal register of `<device>` to read
+from. Use multiple `<address>` values to access a multi-byte
+(little-endian) register address. For example
+`i2cutil read 4 0x20 0x3D` to read the register at `0x203D`.
 
 ### write {#write}
 
@@ -120,6 +121,20 @@ of the I2C device represented by the devfs node path
 
 ```none
 $ i2cutil read /dev/class/i2c/004 0x20 0x3D
+```
+
+### Read one byte using the device's friendly name
+
+Read one byte from the register at the multi-byte address `0x203D`
+of the I2C device named `temp_sensor`:
+
+```none
+$ i2cutil list
+378: temp_sensor
+379: (ANONYMOUS)
+380: humidity_sensor
+381: pmic
+$ i2cutil read temp_sensor 0x20 0x3D
 ```
 
 ### Write one byte
