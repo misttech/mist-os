@@ -318,6 +318,12 @@ class JobDump : protected DumpBase {
     return wrapper.error_or("DumpHeaders"sv, DumpHeadersImpl(wrapper.callback(), mtime));
   }
 
+  // This writes out the header at the beginning of an archive file.
+  template <typename Dump>
+  static auto DumpArchiveHeader(Dump&& dump) {
+    return dump(0, ArchiveMagic());
+  }
+
   // This begins a new file of the archive by streaming out its archive member
   // file header, which has a small fixed size.  The format requires that this
   // come after everything DumpHeaders writes.  The size of the member file
@@ -375,6 +381,8 @@ class JobDump : protected DumpBase {
   static fit::result<Error, size_t> DumpMemberHeaderImpl(DumpCallback dump, size_t offset,
                                                          std::string_view name, size_t size,
                                                          time_t mtime);
+
+  static ByteView ArchiveMagic();
 
   std::unique_ptr<Collector> collector_;
 };

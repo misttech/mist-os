@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/layout.h>
+#include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/string_view.h>
 #include <zircon/types.h>
@@ -42,6 +43,7 @@ constexpr const char* kRemarksSwitch = "--remarks=";
 constexpr const char* kRawRemarksSwitch = "--remarks-raw=";
 constexpr const char* kJsonRemarksSwitch = "--remarks-json=";
 constexpr const char* kLiveSwitch = "--live";
+constexpr const char* kStreamingSwitch = "--streaming";
 
 constexpr std::string_view kArchiveSuffix = ".a";
 
@@ -710,6 +712,114 @@ TEST(ZxdumpTests, GcoreProcessDumpViaLiveSwitch) {
   auto read_result = holder.Insert(std::move(fd));
   ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
   ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, false));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpStreamingToPipe) {
+  zxdump::testing::TestProcessForPropertiesAndInfo process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  std::vector<std::string> args({
+      kStreamingSwitch,
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      std::to_string(process.koid()),
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+
+  // Inserting the stdout pipe fd below will read from the pipe until EOF.
+  // After that, check and report the child status and stderr even if reading
+  // or checking the dump fails.
+  auto finish = fit::defer([&child]() {
+    int status;
+    ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+    EXPECT_EQ(status, EXIT_SUCCESS);
+    EXPECT_EQ(child.collected_stderr(), "");
+  });
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(child.tool_stdout()));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, false));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpStreamingToFile) {
+  zxdump::testing::TestProcessForPropertiesAndInfo process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  auto& dump_file = child.MakeFile("process-dump-streaming-to-file");
+  std::vector<std::string> args({
+      kStreamingSwitch,
+      kOutputSwitch,
+      dump_file.name(),
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      std::to_string(process.koid()),
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStdout());
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+  int status;
+  ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+  EXPECT_EQ(status, EXIT_SUCCESS);
+  EXPECT_EQ(child.collected_stdout(), "");
+  EXPECT_EQ(child.collected_stderr(), "");
+
+  fbl::unique_fd fd = dump_file.OpenOutput();
+  ASSERT_TRUE(fd) << dump_file.name() << ": " << strerror(errno);
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(fd));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder, false));
+}
+
+TEST(ZxdumpTests, GcoreProcessDumpStreamingArchive) {
+  zxdump::testing::TestProcessForPropertiesAndInfo process1, process2;
+  ASSERT_NO_FATAL_FAILURE(process1.StartChild());
+  ASSERT_NO_FATAL_FAILURE(process2.StartChild());
+
+  zxdump::testing::TestToolProcess child;
+  ASSERT_NO_FATAL_FAILURE(child.Init());
+  std::vector<std::string> args({
+      kStreamingSwitch,
+      // Don't include threads.
+      kNoThreadsSwitch,
+      // Don't dump memory since we don't need it and it is large.
+      kExcludeMemorySwitch,
+      std::to_string(process1.koid()),
+      std::to_string(process2.koid()),
+  });
+  ASSERT_NO_FATAL_FAILURE(child.Start("gcore", args));
+  ASSERT_NO_FATAL_FAILURE(child.CollectStderr());
+
+  // Inserting the stdout pipe fd below will read from the pipe until EOF.
+  // After that, check and report the child status and stderr even if reading
+  // or checking the dump fails.
+  auto finish = fit::defer([&child]() {
+    int status;
+    ASSERT_NO_FATAL_FAILURE(child.Finish(status));
+    EXPECT_EQ(status, EXIT_SUCCESS);
+    EXPECT_EQ(child.collected_stderr(), "");
+  });
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(std::move(child.tool_stdout()));
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+
+  // Both processes were dumped but no jobs, so there should be a fake root.
+  EXPECT_EQ(holder.root_job().koid(), ZX_KOID_INVALID);
+
+  ASSERT_NO_FATAL_FAILURE(process1.CheckDump(holder, false));
+  ASSERT_NO_FATAL_FAILURE(process2.CheckDump(holder, false));
 }
 
 #endif  // __Fuchsia__

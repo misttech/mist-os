@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -45,6 +46,8 @@ struct Remarks {
   std::unique_ptr<rapidjson::StringBuffer> data{new rapidjson::StringBuffer};
 };
 
+class Writer;  // Forward declaration.
+
 // Command-line flags controlling the dump are parsed into this object, which
 // is passed around to the methods affected by policy choices.
 struct Flags {
@@ -62,6 +65,7 @@ struct Flags {
 
   std::vector<Remarks> remarks;
   std::string_view output_prefix = kOutputPrefix;
+  std::unique_ptr<Writer> streaming;
   size_t limit = zxdump::DefaultLimit();
   bool dump_memory = true;
   bool collect_system = false;
@@ -75,6 +79,7 @@ struct Flags {
   bool record_date = true;
   bool repeat_remarks = false;
   bool zstd = false;
+  bool streaming_archive = false;
 };
 
 // This handles writing a single output file, and removing that output file if
@@ -142,6 +147,24 @@ class Writer {
     return ok;
   }
 
+  bool StartArchive() {
+    auto result = zxdump::JobDump::DumpArchiveHeader(WriteCallback());
+    if (result.is_error()) {
+      Error(result.error_value());
+    }
+    return result.is_ok();
+  }
+
+  bool DumpMemberHeader(std::string_view name, size_t size, time_t mtime) {
+    // File offset calculations start fresh with each member.
+    ResetOffset();
+    auto result = zxdump::JobDump::DumpMemberHeader(WriteCallback(), 0, name, size, mtime);
+    if (result.is_error()) {
+      Error(*result.error_value().dump_error_);
+    }
+    return result.is_ok();
+  }
+
   ~Writer() {
     if (!filename_.empty()) {
       remove(filename_.c_str());
@@ -154,6 +177,8 @@ class Writer {
   WhichWriter writer_;
   std::string filename_;
 };
+
+size_t MemberHeaderSize() { return zxdump::JobDump::MemberHeaderSize(); }
 
 // This is the base class of ProcessDumper and JobDumper; the object
 // handles collecting and producing the dump for one process or one job.
@@ -397,8 +422,6 @@ class JobDumper : public DumperBase {
     return true;
   }
 
-  static size_t MemberHeaderSize() { return zxdump::JobDump::MemberHeaderSize(); }
-
   static bool DumpMemberHeader(Writer& writer, std::string_view name, size_t size, time_t mtime) {
     // File offset calculations start fresh with each member.
     writer.ResetOffset();
@@ -464,7 +487,7 @@ class JobDumper::CollectedJob {
   bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
     // First dump the member header for this archive as a member of its parent.
     // Then dump the "stub archive" describing the job itself.
-    if (!DumpMemberHeader(writer, dumper_.OutputFile(flags, false), content_size_, date()) ||
+    if (!writer.DumpMemberHeader(dumper_.OutputFile(flags, false), content_size_, date()) ||
         !dumper_.DumpHeaders(writer, flags)) {
       ok_ = false;
     } else {
@@ -499,7 +522,7 @@ class JobDumper::CollectedJob {
 
     // Dump the member header and then the ET_CORE file contents.
     bool Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolder& holder) {
-      return DumpMemberHeader(writer, dumper_.OutputFile(flags, false), content_size_, date()) &&
+      return writer.DumpMemberHeader(dumper_.OutputFile(flags, false), content_size_, date()) &&
              dumper_.Dump(writer, flags, holder);
     }
 
@@ -552,8 +575,8 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolde
       time_t process_dump_date = process_dump.ClockIn(flags);
       if (auto collected_size = process_dump.Collect(flags, false, holder)) {
         // Dump the member header, now complete with size.
-        if (!DumpMemberHeader(writer, process_dump.OutputFile(flags, false),  //
-                              *collected_size, process_dump_date)) {
+        if (!writer.DumpMemberHeader(process_dump.OutputFile(flags, false),  //
+                                     *collected_size, process_dump_date)) {
           // Bail early for a write error, since later writes would fail too.
           return false;
         }
@@ -571,8 +594,8 @@ bool JobDumper::Dump(Writer& writer, const Flags& flags, const zxdump::TaskHolde
         auto collected_job_size = child.Collect(flags, false, holder);
         ok = collected_job_size &&
              // Stream out the member header for just the stub archive alone.
-             DumpMemberHeader(writer, child.OutputFile(flags, false),  //
-                              *collected_job_size, child.date()) &&
+             writer.DumpMemberHeader(child.OutputFile(flags, false),  //
+                                     *collected_job_size, child.date()) &&
              // Now recurse to dump the stub archive followed by process and
              // child members.  Since the member header for the inner archive
              // only covers the stub archive, these become members in the outer
@@ -603,6 +626,19 @@ fbl::unique_fd CreateOutputFile(const std::string& outfile) {
 // Phase 3: Profit!
 template <typename Dumper>
 bool WriteDump(Dumper dumper, const Flags& flags, const zxdump::TaskHolder& holder) {
+  time_t date = dumper.ClockIn(flags);
+
+  if (flags.streaming) {
+    Writer& writer = *flags.streaming;
+    if (auto size = dumper.Collect(flags, true, holder)) {
+      if (!flags.streaming_archive ||
+          writer.DumpMemberHeader(dumper.OutputFile(flags, false), *size, date)) {
+        return writer.Ok(dumper.Dump(writer, flags, holder));
+      }
+    }
+    return false;
+  }
+
   std::string outfile = dumper.OutputFile(flags);
   fbl::unique_fd fd = CreateOutputFile(outfile);
   if (!fd) {
@@ -737,11 +773,12 @@ std::optional<Remarks> ParseRemarks(const char* arg, RemarksType type) {
   return result;
 }
 
-constexpr const char kOptString[] = "hlo:zamtcpJjfDUsSkKr:q:B:Rd:L";
+constexpr const char kOptString[] = "hlo:OzamtcpJjfDUsSkKr:q:B:Rd:L";
 constexpr const option kLongOpts[] = {
     {"help", no_argument, nullptr, 'h'},                 //
     {"limit", required_argument, nullptr, 'l'},          //
     {"output-prefix", required_argument, nullptr, 'o'},  //
+    {"streaming", no_argument, nullptr, 'O'},            //
     {"zstd", no_argument, nullptr, 'z'},                 //
     {"exclude-memory", no_argument, nullptr, 'm'},       //
     {"no-threads", no_argument, nullptr, 't'},           //
@@ -770,7 +807,10 @@ constexpr const option kLongOpts[] = {
 
 int main(int argc, char** argv) {
   Flags flags;
+  bool streaming = false;
+  const char* output_argument = nullptr;
   bool allow_jobs = false;
+  constexpr auto handle_process = WriteDump<ProcessDumper>;
   auto handle_job = WriteManyCoreFiles;
   CommandLineHelper cli;
 
@@ -779,6 +819,7 @@ int main(int argc, char** argv) {
 
     --help, -h                         print this message
     --output-prefix=PREFIX, -o PREFIX  write <PREFIX><PID>, not core.<PID>
+    --streaming, -O                    write streaming output
     --zstd, -z                         compress output files with zstd -11
     --limit=BYTES, -l BYTES            truncate output to BYTES per process
     --exclude-memory, -M               exclude all process memory from dumps
@@ -854,6 +895,18 @@ every process on the system.  Doing this without --no-threads may deadlock
 essential services.  PID arguments are not allowed with --root-job unless
 --no-children is also given, since they would always be redundant.
 
+With --streaming (-O), a single contiguous output stream is written, usually to
+stdout.  If --output=FILE (-o FILE) is given along with --streaming (-O), then
+it names a single output file to write in place of stdout rather than a prefix.
+When there is a single PID argument or just the --root-job (-a) switch, then
+the output stream is a single ELF core file or a single job archive file.  When
+there are multiple PID arguments, or multiple separate single-process dumps
+under --jobs (-J), or a fake root job from postportem data that doesn't form a
+single job tree, the output stream is a simple archive that contains the
+individual ELF core file or job archive file for each PID argument as member
+files with the names used by default (core.<PID> or core.<PID>.a).  Readers
+treat such an archive just like the collection of separate dump files.
+
 By default, data for dumps is drawn from the running system.  Of course, this
 only works on Fuchsia.  One or more --dump-file (-d) switches can be given to
 read old postmortem data instead.  This allows, for example, extracting a
@@ -884,6 +937,11 @@ task found in the postmortem data is also still alive on the running system.
 
       case 'o':
         flags.output_prefix = optarg;
+        output_argument = optarg;
+        continue;
+
+      case 'O':
+        streaming = true;
         continue;
 
       case 'l': {
@@ -998,22 +1056,58 @@ task found in the postmortem data is also still alive on the running system.
     return usage();
   }
 
-  for (auto tasks = cli.take_tasks(); !tasks.empty(); tasks.pop()) {
-    zxdump::Task& task = tasks.front();
+  constexpr auto is_job = [](zxdump::Task& task) { return task.type() == ZX_OBJ_TYPE_JOB; };
 
-    switch (task.type()) {
-      case ZX_OBJ_TYPE_PROCESS:
-        cli.Ok(WriteDump(ProcessDumper{static_cast<zxdump::Process&>(task)}, flags, cli.holder()));
-        break;
+  auto call_dumper = [&](auto&& handle_task, auto dumper) {
+    cli.Ok(handle_task(std::move(dumper), flags, cli.holder()));
+  };
 
-      case ZX_OBJ_TYPE_JOB:
-        cli.Ok(handle_job(JobDumper{static_cast<zxdump::Job&>(task)}, flags, cli.holder()));
-        break;
-
-      default:
-        ZX_PANIC("impossible task type %u", task.type());
-        break;
+  auto dump_one_task = [&](zxdump::Task& task) {
+    if (is_job(task)) {
+      auto& job = static_cast<zxdump::Job&>(task);
+      call_dumper(handle_job, JobDumper{job});
+    } else {
+      ZX_DEBUG_ASSERT(task.type() == ZX_OBJ_TYPE_PROCESS);
+      auto& process = static_cast<zxdump::Process&>(task);
+      call_dumper(handle_process, ProcessDumper{process});
     }
+  };
+
+  auto tasks = cli.take_tasks();
+
+  if (streaming) {
+    // There will be just one output stream with just one writer.
+    fbl::unique_fd fd;
+    std::string outname;
+    if (output_argument) {
+      outname = output_argument;
+      fd = CreateOutputFile(outname);
+      if (!fd) {
+        return EXIT_FAILURE;
+      }
+    } else {
+      fd.reset(STDOUT_FILENO);
+    }
+
+    // This gets the single writer passed down to all the dumpers.
+    // When not streaming, each dumper makes its own writer.
+    flags.streaming = std::make_unique<Writer>(std::move(fd), std::move(outname), flags.zstd);
+
+    // If there will be more than one separate dump, switch to "streaming
+    // archive" mode.  That is, if there are multiple separate KOID arguments
+    // or the sole KOID is a job but under -J rather than -j.
+    flags.streaming_archive =
+        tasks.size() > 1 || (is_job(tasks.front()) && handle_job == WriteManyCoreFiles);
+
+    if (flags.streaming_archive && !flags.streaming->StartArchive()) {
+      return EXIT_FAILURE;
+    }
+  }
+
+  while (!tasks.empty()) {
+    zxdump::Task& task = tasks.front();
+    tasks.pop();
+    dump_one_task(task);
   }
 
   return cli.exit_status();

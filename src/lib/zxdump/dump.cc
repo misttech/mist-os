@@ -1437,10 +1437,7 @@ class JobDump::Collector : public CollectorBase<JobRemarkClass> {
     };
 
     // Generate the archive header.
-    if (append({
-            reinterpret_cast<const std::byte*>(kArchiveMagic.data()),
-            kArchiveMagic.size(),
-        })) {
+    if (append(ArchiveMagic())) {
       return fit::ok(offset);
     }
     ZX_DEBUG_ASSERT(offset % 2 == 0);
@@ -1554,6 +1551,8 @@ class JobDump::Collector : public CollectorBase<JobRemarkClass> {
   ArchiveMemberHeader name_table_;
   JobNotes notes_;
 };
+
+ByteView JobDump::ArchiveMagic() { return cpp20::as_bytes(cpp20::span(kArchiveMagic)); }
 
 JobDump::JobDump(JobDump&&) noexcept = default;
 JobDump& JobDump::operator=(JobDump&&) noexcept = default;
