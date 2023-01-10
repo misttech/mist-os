@@ -163,7 +163,7 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
   }
 
   if (size_or.is_error()) {
-    FX_LOGS(ERROR) << "Failed to read a VMO at " << offset << " + " << length << ", "
+    FX_LOGS(ERROR) << "failed to feed paged vmo at " << offset << " + " << length << ", "
                    << size_or.status_string();
     ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
     return;
@@ -173,9 +173,9 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
   ZX_ASSERT(vfs.has_value());
   if (auto ret = vfs.value().get().SupplyPages(paged_vmo(), offset, *size_or, std::move(vmo), 0);
       ret.is_error()) {
-    FX_LOGS(ERROR) << "Failed to supply a VMO to " << offset << " + " << *size_or << ", "
+    FX_LOGS(ERROR) << "failed to supply vmo at " << offset << " + " << *size_or << ", "
                    << ret.status_string();
-    ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
+    ReportPagerError(offset, *size_or, ZX_ERR_BAD_STATE);
   }
 }
 
@@ -212,8 +212,7 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
     return zx::error(ret);
   }
 
-  // It tries read IOs only for valid block addrs unless regarding pages are not subject to
-  // writeback.
+  // It tries read IOs only for valid block addrs unless regarding pages are subject to writeback.
   if (block_bitmap.size()) {
     size_t block_length = vmo_size / kBlockSize;
     auto addrs =
@@ -232,7 +231,6 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
         ++read_blocks;
       }
     }
-    ZX_ASSERT((*addrs)[0] != kNullAddr);
     if (read_blocks) {
       if (auto status = fs()->MakeReadOperations(vmo, *addrs, PageType::kData); status.is_error()) {
         return status.take_error();

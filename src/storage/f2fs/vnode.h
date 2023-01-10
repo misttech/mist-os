@@ -7,6 +7,8 @@
 
 namespace f2fs {
 constexpr uint32_t kNullIno = std::numeric_limits<uint32_t>::max();
+constexpr size_t kBlocksPerVmoNode = kDefaultBlocksPerSegment;
+constexpr size_t kVmoNodeSize = safemath::CheckMul(kBlocksPerVmoNode, kBlockSize).ValueOrDie();
 
 class F2fs;
 // for in-memory extent cache entry
@@ -404,6 +406,8 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetReadaheadPagesInfo(index, max_scan);
   }
 
+  void ClearFileCache() { file_cache_->ReleaseInactivePages(); }
+
   pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
     return file_cache_->InvalidatePages(start, end);
@@ -447,14 +451,15 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t Truncate(size_t len) override __TA_EXCLUDES(mutex_) { return ZX_ERR_NOT_SUPPORTED; }
   DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
   zx::result<size_t> WritebackBegin(PagedVfsCallback cb) {
-    return file_cache_->GetVmoManager().WritebackBegin(std::move(cb));
+    return vmo_manager_->WritebackBegin(std::move(cb));
   }
   zx_status_t WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) {
-    return file_cache_->GetVmoManager().WritebackEnd(std::move(cb), size_in_blocks);
+    return vmo_manager_->WritebackEnd(std::move(cb), size_in_blocks);
   }
 
  protected:
   void RecycleNode() override;
+  VmoManager &vmo_manager() const { return *vmo_manager_; }
 
  private:
   zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page);

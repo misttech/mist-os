@@ -289,15 +289,6 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::GetLockedDataPages(const pgoff_t 
     return zx::ok(std::move(addrs_and_pages.pages));
   }
 
-  if (IsReg()) {
-    for (uint32_t i = 0; i < addrs_and_pages.block_addrs.size(); ++i) {
-      if (addrs_and_pages.block_addrs[i] != kNullAddr && !addrs_and_pages.pages[i]->IsUptodate()) {
-        addrs_and_pages.pages[i]->SetUptodate();
-      }
-    }
-    return zx::ok(std::move(addrs_and_pages.pages));
-  }
-
   bool need_read_op = false;
   for (uint32_t i = 0; i < addrs_and_pages.block_addrs.size(); ++i) {
     if (addrs_and_pages.block_addrs[i] != kNullAddr && !addrs_and_pages.pages[i]->IsUptodate()) {

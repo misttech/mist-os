@@ -55,9 +55,15 @@ VmoPaged::VmoPaged(zx::vmo &vmo, pgoff_t index, size_t size, bool zero)
 
 VmoPaged::~VmoPaged() {}
 
-zx::result<bool> VmoPaged::Lock(pgoff_t offset) { return zx::ok(true); }
+zx::result<bool> VmoPaged::Lock(pgoff_t offset) {
+  increase_active_pages();
+  return zx::ok(true);
+}
 
-zx_status_t VmoPaged::Unlock(pgoff_t offset) { return ZX_OK; }
+zx_status_t VmoPaged::Unlock(pgoff_t offset) {
+  decrease_active_pages();
+  return ZX_OK;
+}
 
 zx_status_t VmoPaged::Zero(pgoff_t start, pgoff_t len) {
   ZX_DEBUG_ASSERT(start + len <= get_size());

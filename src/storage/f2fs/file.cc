@@ -293,68 +293,52 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 // }
 #endif
 
-zx_status_t File::Read(void *data, size_t len, size_t off, size_t *out_actual) {
+zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_actual) {
   TRACE_DURATION("f2fs", "File::Read", "event", "File::Read", "ino", Ino(), "offset",
-                 off / kBlockSize, "length", len / kBlockSize);
+                 offset / kBlockSize, "length", length / kBlockSize);
 
-  if (off >= GetSize()) {
+  if (offset >= GetSize()) {
     *out_actual = 0;
     return ZX_OK;
   }
 
+  size_t num_bytes = std::min(length, GetSize() - offset);
   if (TestFlag(InodeInfoFlag::kInlineData)) {
-    return ReadInline(data, len, off, out_actual);
+    return ReadInline(data, num_bytes, offset, out_actual);
   }
 
-  const pgoff_t block_index_start = safemath::CheckDiv<pgoff_t>(off, kBlockSize).ValueOrDie();
-  const size_t offset_end = safemath::CheckAdd<size_t>(off, len).ValueOrDie();
-  const pgoff_t block_index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
+  const pgoff_t vmo_node_start = safemath::CheckDiv<pgoff_t>(offset, kVmoNodeSize).ValueOrDie();
+  const pgoff_t vmo_node_end =
+      CheckedDivRoundUp<pgoff_t>(safemath::CheckAdd(offset, num_bytes).ValueOrDie(), kVmoNodeSize);
+  size_t src_offset = safemath::CheckMod(offset, kVmoNodeSize).ValueOrDie();
+  size_t dst_offset = 0;
 
-  size_t off_in_block = safemath::CheckMod<size_t>(off, kBlockSize).ValueOrDie();
-  size_t off_in_buf = 0;
-  size_t left = std::min(len, GetSize() - off);
+  for (size_t node = vmo_node_start; node < vmo_node_end && num_bytes; ++node) {
+    VmoHolder vmo_node(vmo_manager(), kBlocksPerVmoNode * node);
+    uint8_t *const addr = static_cast<uint8_t *>(vmo_node.GetAddress());
+    size_t num_bytes_in_node = safemath::CheckSub<size_t>(kVmoNodeSize, src_offset).ValueOrDie();
+    num_bytes_in_node = std::min(num_bytes_in_node, num_bytes);
+    // Fill |data| from vmo_node.
+    std::memcpy(static_cast<uint8_t *>(data) + dst_offset, &addr[src_offset], num_bytes_in_node);
 
-  auto pages_or = GetLockedDataPages(block_index_start, block_index_end);
-  if (pages_or.is_error()) {
-    *out_actual = 0;
-    return pages_or.status_value();
-  }
-  auto pages = std::move(pages_or.value());
-
-  for (pgoff_t n = block_index_start; n < block_index_end; ++n) {
-    size_t cur_len = safemath::CheckSub<size_t>(kBlockSize, off_in_block).ValueOrDie();
-    cur_len = std::min(cur_len, left);
-
-    size_t index = n - block_index_start;
-    if (pages[index] && pages[index]->IsUptodate()) {
-      // Copy data from valid Pages.
-      std::memcpy(static_cast<char *>(data) + off_in_buf,
-                  pages[index]->GetAddress<char>() + off_in_block, cur_len);
-    } else {
-      // Zero the range of invalid or truncated Pages.
-      std::memset(static_cast<char *>(data) + off_in_buf, 0, cur_len);
-    }
-
-    off_in_buf += cur_len;
-    left -= cur_len;
-    off_in_block = 0;
-
-    if (left == 0) {
-      break;
-    }
+    dst_offset += num_bytes_in_node;
+    num_bytes -= num_bytes_in_node;
+    src_offset = 0;
   }
 
-  *out_actual = off_in_buf;
+  *out_actual = dst_offset;
 
   return ZX_OK;
 }
 
 zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *out_actual) {
-  if (len == 0)
+  if (len == 0) {
     return ZX_OK;
+  }
 
-  if (offset + len > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))
+  if (offset + len > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize))) {
     return ZX_ERR_INVALID_ARGS;
+  }
 
   if (TestFlag(InodeInfoFlag::kInlineData)) {
     if (offset + len < MaxInlineData()) {
@@ -382,7 +366,7 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
   size_t off_in_buf = 0;
   size_t left = len;
 
-  for (pgoff_t n = block_index_start; n < block_index_end; ++n) {
+  for (pgoff_t n = block_index_start; n < block_index_end && left; ++n) {
     pgoff_t index = n - block_index_start;
     size_t cur_len = safemath::CheckSub<size_t>(kBlockSize, off_in_block).ValueOrDie();
     cur_len = std::min(cur_len, left);
@@ -399,10 +383,6 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     left -= cur_len;
 
     data_page.SetDirty();
-    data_pages[index].reset();
-
-    if (left == 0)
-      break;
   }
 
   if (off_in_buf > 0) {

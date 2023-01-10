@@ -163,6 +163,26 @@ class VmoManager {
   zx::vmo vmo_ __TA_GUARDED(mutex_);
 };
 
+// A utility class to hold a reference to vmo node for |index_| in |manager_|.
+class VmoHolder final {
+ public:
+  VmoHolder() = delete;
+  VmoHolder(VmoManager &manager, const pgoff_t index) : manager_(manager), index_(index) {
+    auto ret = manager_.CreateAndLockVmo(index_);
+    ZX_ASSERT_MSG(ret.is_ok(), "failed to get vmo node at %lu. %s", index_, ret.status_string());
+  }
+  ~VmoHolder() { ZX_ASSERT(manager_.UnlockVmo(index_, true) == ZX_OK); }
+  void *GetAddress() {
+    auto addr_or = manager_.GetAddress(index_);
+    ZX_ASSERT(addr_or.is_ok());
+    return reinterpret_cast<void *>(*addr_or);
+  }
+
+ private:
+  VmoManager &manager_;
+  const pgoff_t index_;
+};
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_VMO_MANAGER_H_

@@ -90,6 +90,8 @@ void F2fs::ScheduleWriteback(size_t num_pages) {
                     },
                     *size_in_blocks_or);
               }
+              // release inactive pages. we don't need to track non-dirty pages with paged vmo.
+              vnode->ClearFileCache();
               return ZX_OK;
             },
             [](fbl::RefPtr<VnodeF2fs> &vnode) {

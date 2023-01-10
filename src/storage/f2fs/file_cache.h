@@ -363,6 +363,9 @@ class FileCache {
   // |vnode_|. (e.g., fbl_recycle()) It assumes that all active Pages are under writeback.
   void Reset() __TA_EXCLUDES(tree_lock_);
   void ClearDirtyPages(pgoff_t start, pgoff_t end) __TA_EXCLUDES(tree_lock_);
+  // Evict and release inactive pages.
+  void ReleaseInactivePages() __TA_EXCLUDES(tree_lock_);
+
   VnodeF2fs &GetVnode() const { return *vnode_; }
   // Only Page::RecyclePage() is allowed to call it.
   void Downgrade(Page *raw_page) __TA_EXCLUDES(tree_lock_);
