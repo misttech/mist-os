@@ -562,6 +562,13 @@ zx_status_t daemon_service_connect(std::string_view name, void* adb_ctxt, asocke
     service_name = kFfxService;
   } else if (name == "sync:") {
     service_name = kFileSyncService;
+  } else if (name.rfind("reboot:", 0) == 0) {
+    service_name = kRebootService;
+    args = name.substr(strlen("reboot:"));
+    if (!args.empty()) {
+      FX_LOGS(DEBUG) << "Requesting reboot" << std::string(args).c_str() << "[" << args.size()
+                     << "]";
+    }
   } else {
     FX_LOGS(ERROR) << "Service " << name << " not supported";
     return ZX_ERR_NOT_SUPPORTED;

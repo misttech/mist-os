@@ -17,6 +17,7 @@ std::unordered_map<std::string_view, std::string_view> services{
     {kShellService, "fuchsia-pkg://fuchsia.com/adb#meta/adb-shell.cm"},
     {kFfxService, "fuchsia-pkg://fuchsia.com/adb#meta/adb-ffx.cm"},
     {kFileSyncService, "fuchsia-pkg://fuchsia.com/adb#meta/adb-file-sync.cm"},
+    {kRebootService, "fuchsia-pkg://fuchsia.com/adb#meta/adb-reboot.cm"},
 };
 
 }  // namespace
