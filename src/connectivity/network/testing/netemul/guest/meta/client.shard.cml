@@ -1,0 +1,47 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    // Required in order to offer system capabilities to Guest Manager.
+    include: [ "sys/testing/system-test.shard.cml" ],
+    children: [
+        {
+            name: "netemul-guest",
+            url: "#meta/netemul-guest.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.netemul.guest.Controller" ],
+            from: "#netemul-guest",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.logger.LogSink",
+                "fuchsia.sysinfo.SysInfo",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: "#netemul-guest",
+        },
+    ],
+    facets: {
+        "fuchsia.test": {
+            "deprecated-allowed-packages": [
+                "debian_guest",
+                "debian_guest_manager",
+                "virtio_block",
+                "virtio_console",
+                "virtio_net",
+                "virtio_net_rs",
+                "virtio_vsock",
+                "vmm",
+            ],
+        },
+    },
+}

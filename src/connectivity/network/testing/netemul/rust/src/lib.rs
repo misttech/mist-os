@@ -6,6 +6,9 @@
 
 //! Netemul utilities.
 
+/// Methods for creating and interacting with virtualized guests in netemul tests.
+pub mod guest;
+
 use std::{borrow::Cow, path::Path};
 
 use fidl_fuchsia_hardware_network as fnetwork;
@@ -640,6 +643,20 @@ impl<'a> TestNetwork<'a> {
     pub fn into_proxy(self) -> fnetemul_network::NetworkProxy {
         let Self { network, name: _, sandbox: _ } = self;
         network
+    }
+
+    /// Gets a FIDL client for the backing network.
+    async fn get_client_end_clone(
+        &self,
+    ) -> Result<fidl::endpoints::ClientEnd<fnetemul_network::NetworkMarker>> {
+        let network_manager =
+            self.sandbox.get_network_manager().context("get_network_manager failed")?;
+        let client = network_manager
+            .get_network(&self.name)
+            .await
+            .context("get_network failed")?
+            .with_context(|| format!("no network found with name {}", self.name))?;
+        Ok(client)
     }
 
     /// Sets the configuration for this network to `config`.

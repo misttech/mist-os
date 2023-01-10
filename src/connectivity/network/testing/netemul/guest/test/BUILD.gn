@@ -1,0 +1,71 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_test.gni")
+
+resource("test_script") {
+  sources = [ "//src/virtualization/lib/guest_interaction/test/test_script.sh" ]
+  outputs = [ "data/test_script.sh" ]
+}
+
+rustc_test("guest") {
+  edition = "2021"
+  output_name = "netemul_guest_self_test"
+  deps = [
+    ":test_script",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/testing/netemul/rust:lib",
+    "//src/lib/fuchsia-async",
+    "//src/lib/network/packet",
+    "//src/virtualization/lib/guest_interaction:fuchsia.virtualization.guest.interaction_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:rand",
+  ]
+  sources = [ "src/lib.rs" ]
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+fuchsia_test_component("netemul-guest-self-test") {
+  manifest = "meta/netemul-guest-self-test.cml"
+  deps = [ ":guest" ]
+}
+
+fuchsia_test_package("netemul-guest-self-tests") {
+  test_components = [ ":netemul-guest-self-test" ]
+
+  deps = [
+    # netemul-sandbox is used to create hermetic test realms.
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+
+    # netemul-guest expose FIDL APIs for creating and controlling guests.
+    "//src/connectivity/network/testing/netemul/guest:netemul-guest",
+
+    # guest-manager is used by netemul-guest to create and interact with guests.
+    "//src/virtualization/bin/guest_manager:debian_guest_manager_cmp",
+  ]
+
+  test_specs = {
+    environments = guest_envs
+
+    # Allow error logs since they are emitted by guest-manager.
+    # TODO(https://fxbug.dev/117767): Remove error logging in clean shutdown paths.
+    log_settings = {
+      max_severity = "ERROR"
+    }
+
+    # Don't run tests in parallel, because the guest sandbox only supports
+    # one guest at a time.
+    # TODO(https://fxbug.dev/118321): Enable parallelized guest tests.
+    parallel = 1
+
+    # Increase test timeout since setting up virtualized debian guests takes
+    # O(minutes).
+    timeout_secs = 1200
+  }
+}

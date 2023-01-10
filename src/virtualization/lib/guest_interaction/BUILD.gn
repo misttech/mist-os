@@ -198,28 +198,42 @@ executable("debian_guest_interaction_daemon") {
   ]
 }
 
-executable("server_daemon_test") {
+source_set("guest_interaction_client") {
   testonly = true
 
   sources = [
     "client/client_impl.h",
     "client/client_operation_state.h",
-    "test/server_integration_test.cc",
   ]
 
   deps = [
     ":common",
-    ":fuchsia.virtualization.guest.interaction_hlcpp",
-    ":integration_test_lib",
     ":platform_interface_posix",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
+    "//src/virtualization/lib/grpc",
+    "//src/virtualization/tests/lib:guest_console",
+  ]
+
+  # Enables thrd_create_with_name in <threads.h>.
+  configs += [ "//build/config:all_source" ]
+}
+
+executable("server_daemon_test") {
+  testonly = true
+
+  sources = [ "test/server_integration_test.cc" ]
+
+  deps = [
+    ":common",
+    ":fuchsia.virtualization.guest.interaction_hlcpp",
+    ":guest_interaction_client",
+    ":integration_test_lib",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/virtualization/lib/grpc",
-    "//src/virtualization/tests/lib:guest_console",
   ]
 
   # Enables thrd_create_with_name in <threads.h>.
