@@ -48,7 +48,7 @@ use fuchsia_fs::OpenFlags;
 use futures::{stream::BoxStream, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v4;
 use net_types::ip::IpAddress as _;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
@@ -169,7 +169,7 @@ pub struct FilterConfig {
     pub rdr_rules: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 enum InterfaceType {
     Ethernet,

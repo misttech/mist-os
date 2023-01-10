@@ -5,21 +5,36 @@
 use {
     anyhow::Context as _,
     serde::{Deserialize, Serialize},
+    std::io::{Seek, SeekFrom},
     std::{fs, io, path},
 };
 
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone)]
 enum PersistentIdentifier {
     MacAddress(fidl_fuchsia_net_ext::MacAddress),
     TopologicalPath(String),
 }
 
+// TODO(https://fxbug.dev/118197): Remove this once we soak for some time to ensure no
+// devices using the iwlwifi driver are using the legacy config format.
 #[derive(Serialize, Deserialize, Debug)]
-struct Config {
+struct LegacyConfig {
     names: Vec<(PersistentIdentifier, String)>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct InterfaceConfig {
+    id: PersistentIdentifier,
+    name: String,
+    device_class: crate::InterfaceType,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct Config {
+    interfaces: Vec<InterfaceConfig>,
 }
 
 impl Config {
@@ -46,15 +61,13 @@ impl Config {
     }
 
     fn lookup_by_identifier(&self, persistent_id: &PersistentIdentifier) -> Option<usize> {
-        self.names.iter().enumerate().find_map(
-            |(i, (key, _value))| {
-                if key == persistent_id {
-                    Some(i)
-                } else {
-                    None
-                }
-            },
-        )
+        self.interfaces.iter().enumerate().find_map(|(i, interface)| {
+            if &interface.id == persistent_id {
+                Some(i)
+            } else {
+                None
+            }
+        })
     }
 
     // We use MAC addresses to identify USB devices; USB devices are those devices whose
@@ -100,9 +113,9 @@ impl Config {
         let last_byte = octets[octets.len() - 1];
         for i in 0u8..255u8 {
             let candidate = ((last_byte as u16 + i as u16) % 256 as u16) as u8;
-            if self.names.iter().any(|(_key, name)| {
-                name.starts_with(&prefix)
-                    && u8::from_str_radix(&name[prefix.len()..], 16) == Ok(candidate)
+            if self.interfaces.iter().any(|interface| {
+                interface.name.starts_with(&prefix)
+                    && u8::from_str_radix(&interface.name[prefix.len()..], 16) == Ok(candidate)
             }) {
                 continue; // if the candidate is used, try next one
             } else {
@@ -192,11 +205,32 @@ impl<'a> FileBackedConfig<'a> {
     pub fn load<P: AsRef<path::Path>>(path: &'a P) -> Result<Self, anyhow::Error> {
         let path = path.as_ref();
         let config = match fs::File::open(path) {
-            Ok(file) => Config::load(file)
-                .with_context(|| format!("could not deserialize config file {}", path.display())),
+            Ok(mut file) => Config::load(&file).or_else(|_| {
+                // Since deserialization as Config failed, try loading the file
+                // as the legacy config format.
+                let _seek = file.seek(SeekFrom::Start(0))?;
+                let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
+                // Transfer the values from the old format to the new format.
+                let new_config = Config {
+                    interfaces: legacy_config
+                        .names
+                        .into_iter()
+                        .map(|(id, name)| InterfaceConfig {
+                            id,
+                            device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
+                                crate::InterfaceType::Wlan
+                            } else {
+                                crate::InterfaceType::Ethernet
+                            },
+                            name,
+                        })
+                        .collect::<Vec<_>>(),
+                };
+                Ok(new_config)
+            }),
             Err(error) => {
                 if error.kind() == io::ErrorKind::NotFound {
-                    Ok(Config { names: vec![] })
+                    Ok(Config { interfaces: vec![] })
                 } else {
                     Err(error)
                         .with_context(|| format!("could not open config file {}", path.display()))
@@ -249,24 +283,31 @@ impl<'a> FileBackedConfig<'a> {
         let persistent_id = self.config.generate_identifier(topological_path, mac_address);
 
         if let Some(index) = self.config.lookup_by_identifier(&persistent_id) {
-            let (_key, name) = &self.config.names[index];
-            if name_matches_interface_type(name, &interface_type) {
+            let InterfaceConfig { name, .. } = &self.config.interfaces[index];
+            if name_matches_interface_type(&name, &interface_type) {
                 // Need to take a new reference to appease the borrow checker.
-                let (_key, name) = &self.config.names[index];
-                return Ok(name);
+                let InterfaceConfig { name, .. } = &self.config.interfaces[index];
+                return Ok(&name);
             }
             // Identifier was found in the vector, but device class does not match interface
             // name. Remove and generate a new name.
-            let (_key, _name) = self.config.names.remove(index);
+            let _interface_config = self.config.interfaces.remove(index);
         }
         let generated_name = self
             .config
             .generate_name(&persistent_id, interface_type)
             .map_err(NameGenerationError::GenerationError)?;
-        let () = self.config.names.push((persistent_id, generated_name));
-        let (_key, name) = &self.config.names[self.config.names.len() - 1];
-        let () = self.store().map_err(|err| NameGenerationError::FileUpdateError { name, err })?;
-        Ok(name)
+        let () = self.config.interfaces.push(InterfaceConfig {
+            id: persistent_id,
+            name: generated_name,
+            device_class: interface_type,
+        });
+        let interface_config = &self.config.interfaces[self.config.interfaces.len() - 1];
+        let () = self.store().map_err(|err| NameGenerationError::FileUpdateError {
+            name: &interface_config.name,
+            err,
+        })?;
+        Ok(&interface_config.name)
     }
 
     /// Returns a temporary name for an interface.
@@ -369,7 +410,7 @@ mod tests {
                 want_name: "wlanx9",
             },
         ];
-        let config = Config { names: vec![] };
+        let config = Config { interfaces: vec![] };
         for TestCase { topological_path, mac, interface_type, want_name } in test_cases.into_iter()
         {
             let persistent_id = config.generate_identifier(
@@ -466,7 +507,7 @@ mod tests {
             // Load the file again to ensure that generate_stable_name saved correctly.
             interface_config =
                 FileBackedConfig::load(&path).expect("failed to load the interface config");
-            assert_eq!(interface_config.config.names.len(), expected_size);
+            assert_eq!(interface_config.config.interfaces.len(), expected_size);
         }
     }
 
@@ -489,7 +530,7 @@ mod tests {
             String::from("/dev/pci-00:14.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet");
 
         // test cases for 256 usb interfaces
-        let mut config = Config { names: vec![] };
+        let mut config = Config { interfaces: vec![] };
         for n in 0u8..255u8 {
             let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
 
@@ -497,13 +538,17 @@ mod tests {
                 config.generate_identifier(&topo_usb, fidl_fuchsia_net_ext::MacAddress { octets });
 
             if let Some(index) = config.lookup_by_identifier(&persistent_id) {
-                assert_eq!(config.names[index].1, format!("{}{:x}", "wlanx", n));
+                assert_eq!(config.interfaces[index].name, format!("{}{:x}", "wlanx", n));
             } else {
                 let name = config
                     .generate_name(&persistent_id, crate::InterfaceType::Wlan)
                     .expect("failed to generate the name");
                 assert_eq!(name, format!("{}{:x}", "wlanx", n));
-                config.names.push((persistent_id, name));
+                config.interfaces.push(InterfaceConfig {
+                    id: persistent_id,
+                    name: name,
+                    device_class: crate::InterfaceType::Ethernet,
+                });
             }
         }
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
@@ -532,12 +577,64 @@ mod tests {
     }
 
     #[test]
-    fn test_store_nonexistant_path() {
+    fn test_store_nonexistent_path() {
         let interface_config = FileBackedConfig::load(&"not/a/real/path")
             .expect("failed to load the interface config");
         assert_eq!(
             interface_config.store().unwrap_err().downcast_ref::<io::Error>().unwrap().kind(),
             io::ErrorKind::NotFound
         );
+    }
+
+    #[test]
+    fn test_load_legacy_config_file() {
+        const ETHERNET_TOPO_PATH: &str =
+            "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
+        const ETHERNET_NAME: &str = "ethx2";
+        const WLAN_TOPO_PATH: &str = "/dev/pci-00:14.0/ethernet";
+        const WLAN_NAME: &str = "wlanp0014";
+        let test_config = LegacyConfig {
+            names: vec![
+                (
+                    PersistentIdentifier::TopologicalPath(ETHERNET_TOPO_PATH.to_string()),
+                    ETHERNET_NAME.to_string(),
+                ),
+                (
+                    PersistentIdentifier::TopologicalPath(WLAN_TOPO_PATH.to_string()),
+                    WLAN_NAME.to_string(),
+                ),
+            ],
+        };
+
+        let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
+        let path = temp_dir.path().join("net.config.json");
+        {
+            let file = fs::File::create(&path).expect("failed to open file for writing");
+
+            serde_json::to_writer_pretty(file, &test_config)
+                .expect("could not serialize config into temporary file");
+
+            let new_config =
+                FileBackedConfig::load(&path).expect("failed to load the interface config");
+            assert_eq!(
+                new_config.config,
+                Config {
+                    interfaces: vec![
+                        InterfaceConfig {
+                            id: PersistentIdentifier::TopologicalPath(
+                                ETHERNET_TOPO_PATH.to_string()
+                            ),
+                            name: ETHERNET_NAME.to_string(),
+                            device_class: crate::InterfaceType::Ethernet
+                        },
+                        InterfaceConfig {
+                            id: PersistentIdentifier::TopologicalPath(WLAN_TOPO_PATH.to_string()),
+                            name: WLAN_NAME.to_string(),
+                            device_class: crate::InterfaceType::Wlan
+                        },
+                    ]
+                }
+            )
+        }
     }
 }
