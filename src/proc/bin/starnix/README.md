@@ -15,6 +15,10 @@ fx set core.x64 --with //src/proc,//src/proc:tests
 fx build
 ```
 
+> Note: If you have `//vendor/google` in your source tree, you might want to add
+> `//vendor/google/starnix:tests` to the `fx set` command above to include some
+> additional, non-public tests.
+
 ### Run Fuchsia
 
 Run Fuchsia as normal, for example using `fx serve` and `ffx emu start --net user --headless`.
