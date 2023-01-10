@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::format_err,
-    fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev, fuchsia_async as fasync,
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    log::{error, warn},
+    anyhow::Context as _,
+    fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev,
+    fuchsia_vfs_watcher::{WatchEvent, WatchMessage, Watcher},
+    futures::{
+        future::TryFutureExt as _,
+        stream::{Stream, TryStreamExt as _},
+    },
+    log::error,
     std::str::FromStr as _,
 };
 
@@ -18,76 +20,54 @@ pub struct NewPhyDevice {
     pub device_path: String,
 }
 
-pub fn watch_phy_devices(
-    device_directory: &str,
-) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>>, anyhow::Error> {
-    Ok(watch_new_devices(device_directory)?.try_filter_map(|device_path| {
-        future::ready(Ok(handle_open_error(new_phy(device_path.clone()), "phy", &device_path)))
-    }))
-}
-
-fn handle_open_error<T>(
-    r: Result<T, anyhow::Error>,
-    device_type: &'static str,
-    device_path: &str,
-) -> Option<T> {
-    if let Err(ref e) = &r {
-        if let Some(&zx::Status::ALREADY_BOUND) = e.downcast_ref::<zx::Status>() {
-            warn!("Cannot open already-bound device: {} '{}'", device_type, device_path)
-        } else {
-            error!("Error opening {} '{}': {}", device_type, device_path, e)
-        }
-    }
-    r.ok()
-}
-
-/// Watches a specified device directory for new WLAN PHYs.
-///
-/// When new entries are discovered in the specified directory the paths to the new devices are
-/// sent along the stream that is returned by this function.
-///
-/// Note that a `DeviceEnv` trait is required in order for this function to work.  This enables
-/// wlandevicemonitor to function in real and in simulated environments where devices are presented
-/// differently.
-fn watch_new_devices(
-    device_directory: &str,
-) -> Result<impl Stream<Item = Result<String, anyhow::Error>>, anyhow::Error> {
+pub fn watch_phy_devices<'a>(
+    device_directory: &'a str,
+) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>> + 'a, anyhow::Error> {
     let directory =
         fuchsia_fs::directory::open_in_namespace(device_directory, fio::OpenFlags::RIGHT_READABLE)?;
     Ok(async move {
         let watcher = Watcher::new(&directory).await?;
-        Ok(watcher
-            .try_filter_map(move |msg| {
-                future::ready(Ok(match msg.event {
-                    WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
-                        Some(String::from(msg.filename.to_string_lossy()))
+        Ok(watcher.err_into().try_filter_map(move |WatchMessage { event, filename }| {
+            futures::future::ready((|| {
+                let filename = match event {
+                    WatchEvent::ADD_FILE | WatchEvent::EXISTING => filename,
+                    _ => return Ok(None),
+                };
+                let filename = match filename.as_path().to_str() {
+                    Some(filename) => filename,
+                    None => return Ok(None),
+                };
+                if filename == "." {
+                    return Ok(None);
+                }
+                let (proxy, server_end) = fidl::endpoints::create_proxy()?;
+                let connector = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                    fidl_fuchsia_wlan_device::ConnectorMarker,
+                >(&directory, filename)?;
+                let () = match connector.connect(server_end) {
+                    Ok(()) => (),
+                    Err(e) => {
+                        return match e {
+                            fidl::Error::ClientChannelClosed { .. } => {
+                                error!("Error opening '{}': {}", filename, e);
+                                Ok(None)
+                            }
+                            e => Err(e.into()),
+                        }
                     }
-                    _ => None,
+                };
+                let id = u16::from_str(filename).with_context(|| {
+                    format!("Failed to parse device filename '{}' as a numeric ID", filename)
+                })?;
+                Ok(Some(NewPhyDevice {
+                    id,
+                    proxy,
+                    device_path: format!("{}/{}", device_directory, filename),
                 }))
-            })
-            .err_into())
+            })())
+        }))
     }
     .try_flatten_stream())
-}
-
-fn new_phy(device_filename: String) -> Result<NewPhyDevice, anyhow::Error> {
-    let device_path = format!("{}/{}", crate::PHY_PATH, device_filename);
-    let device = std::fs::File::open(&device_path)?;
-
-    let (local, remote) = zx::Channel::create();
-    let connector_channel = fdio::clone_channel(&device)?;
-    let connector = fidl_fuchsia_wlan_device::ConnectorProxy::new(fasync::Channel::from_channel(
-        connector_channel,
-    )?);
-    connector.connect(fidl::endpoints::ServerEnd::new(remote))?;
-    let proxy = fidl_fuchsia_wlan_device::PhyProxy::new(fasync::Channel::from_channel(local)?);
-
-    Ok(NewPhyDevice {
-        id: u16::from_str(&device_filename)
-            .map_err(|e| format_err!("Failed to parse device filename as a numeric ID: {}", e))?,
-        proxy,
-        device_path,
-    })
 }
 
 #[cfg(test)]
@@ -98,10 +78,10 @@ mod tests {
         fidl_fuchsia_wlan_common as fidl_wlan_common,
         fidl_fuchsia_wlan_device::{self as fidl_wlan_dev},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as fidl_wlantap,
-        fuchsia_zircon::prelude::*,
-        futures::{poll, task::Poll},
-        pin_utils::pin_mut,
-        std::convert::TryInto,
+        fuchsia_async as fasync,
+        fuchsia_zircon::DurationNum as _,
+        futures::{pin_mut, poll, stream::StreamExt as _, task::Poll},
+        std::convert::TryInto as _,
         wlan_common::{ie::*, test_utils::ExpectWithin},
         wlantap_client,
         zerocopy::AsBytes,
@@ -131,18 +111,6 @@ mod tests {
         }
 
         let () = wlantap_phy.shutdown().await.expect("shutdown operation failed");
-    }
-
-    #[test]
-    fn handle_open_succeeds() {
-        assert!(handle_open_error(Ok(()), "phy", "/phy/path").is_some())
-    }
-
-    #[test]
-    fn handle_open_fails() {
-        assert!(
-            handle_open_error::<()>(Err(format_err!("test failure")), "phy", "/phy/path").is_none()
-        )
     }
 
     fn create_wlantap_config() -> fidl_wlantap::WlantapPhyConfig {

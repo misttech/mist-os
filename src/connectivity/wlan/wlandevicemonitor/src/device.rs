@@ -8,11 +8,10 @@ use {
     fuchsia_inspect_contrib::inspect_log,
     futures::{
         future::FutureExt,
-        select,
+        pin_mut, select,
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
     },
     log::{error, info},
-    pin_utils::pin_mut,
     std::{convert::Infallible, sync::Arc},
 };
 

@@ -34,7 +34,6 @@ wlandevicemonitor_deps = [
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
-  "//src/lib/fdio/rust:fdio",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
@@ -46,7 +45,6 @@ wlandevicemonitor_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:parking_lot",
-  "//third_party/rust_crates:pin-utils",
 ]
 
 wlandevicemonitor_srcs = [

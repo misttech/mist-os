@@ -221,8 +221,7 @@ mod tests {
     use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use futures::task::Poll;
-    use pin_utils::pin_mut;
+    use futures::{pin_mut, task::Poll};
     use std::mem;
 
     #[test]
