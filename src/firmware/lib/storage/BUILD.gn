@@ -1,0 +1,19 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+config("includes") {
+  include_dirs = [ "." ]
+}
+
+sdk_source_set("storage") {
+  sdk_name = "firwmare_storage"
+  category = "experimental"
+  sources = [
+    "storage.c",
+    "storage.h",
+  ]
+  public_configs = [ ":includes" ]
+}

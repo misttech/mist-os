@@ -13,6 +13,7 @@ group("tests") {
     "gigaboot/cpp/tests:tests",
     "lib/abr/test",
     "lib/fastboot/test",
+    "lib/storage/test",
     "lib/zbi/test",
     "lib/zircon_boot/test",
     "tools:tests",
