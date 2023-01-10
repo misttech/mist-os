@@ -30,14 +30,14 @@ use {
 
 const MOUNT_PATH: &str = "/benchmark";
 
-struct FsmFilesystem<FSC: FSConfig + Send + Sync> {
-    fs: fs_management::filesystem::Filesystem<FSC>,
+struct FsmFilesystem {
+    fs: fs_management::filesystem::Filesystem,
     serving_filesystem: Option<Either<ServingSingleVolumeFilesystem, ServingMultiVolumeFilesystem>>,
     _block_device: Box<dyn BlockDevice>,
 }
 
-impl<FSC: FSConfig + Send + Sync> FsmFilesystem<FSC> {
-    pub async fn new(config: FSC, block_device: Box<dyn BlockDevice>) -> Self {
+impl FsmFilesystem {
+    pub async fn new<FSC: FSConfig>(config: FSC, block_device: Box<dyn BlockDevice>) -> Self {
         let mut fs = fs_management::filesystem::Filesystem::from_path(
             block_device.get_path().to_str().unwrap(),
             config,
@@ -63,7 +63,7 @@ impl<FSC: FSConfig + Send + Sync> FsmFilesystem<FSC> {
 }
 
 #[async_trait]
-impl<FSC: FSConfig + Send + Sync> Filesystem for FsmFilesystem<FSC> {
+impl Filesystem for FsmFilesystem {
     async fn clear_cache(&mut self) {
         // Remount the filesystem to guarantee that all cached data from reads and write is cleared.
         let serving_filesystem = self.serving_filesystem.take().unwrap();

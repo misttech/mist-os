@@ -340,7 +340,23 @@ impl FilesystemLauncher {
         inside_zxcrypt: bool,
         copied_data: Option<copier::CopiedData>,
     ) -> Result<Filesystem, Error> {
-        let format = config.disk_format();
+        let fs = fs_management::filesystem::Filesystem::from_channel(
+            device.proxy()?.into_channel().unwrap().into(),
+            config,
+        )?;
+        self.serve_data_from(device, fs, inside_zxcrypt, copied_data).await
+    }
+
+    // NB: keep these larger functions monomorphized, otherwise they cause significant code size
+    // increases.
+    async fn serve_data_from(
+        &self,
+        device: &mut dyn Device,
+        mut fs: fs_management::filesystem::Filesystem,
+        inside_zxcrypt: bool,
+        copied_data: Option<copier::CopiedData>,
+    ) -> Result<Filesystem, Error> {
+        let format = fs.config().disk_format();
         tracing::info!(
             path = %device.path(),
             expected_format = ?format,
@@ -351,10 +367,6 @@ impl FilesystemLauncher {
         let volume_proxy = fidl_fuchsia_hardware_block_volume::VolumeProxy::from_channel(
             device.proxy()?.into_channel().unwrap(),
         );
-        let mut fs = fs_management::filesystem::Filesystem::from_channel(
-            device.proxy()?.into_channel().unwrap().into(),
-            config,
-        )?;
 
         if detected_format != format {
             tracing::info!(
@@ -417,9 +429,9 @@ impl FilesystemLauncher {
         }
     }
 
-    async fn format_data<FSC: FSConfig>(
+    async fn format_data(
         &self,
-        fs: &mut fs_management::filesystem::Filesystem<FSC>,
+        fs: &mut fs_management::filesystem::Filesystem,
         volume_proxy: fidl_fuchsia_hardware_block_volume::VolumeProxy,
         inside_zxcrypt: bool,
         copied_data: Option<copier::CopiedData>,

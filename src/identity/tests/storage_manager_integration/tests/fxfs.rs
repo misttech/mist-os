@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_io as fio,
     fs_management::{
         filesystem::{Filesystem, ServingMultiVolumeFilesystem},
-        FSConfig, Fxfs as FxfsConfig,
+        Fxfs as FxfsConfig,
     },
     fuchsia_zircon::Status,
     ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
@@ -30,24 +30,20 @@ async fn ramdisk() -> RamdiskClient {
         .expect("Could not create ramdisk")
 }
 
-fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem<FSC> {
-    Filesystem::from_channel(ramdisk.open().unwrap().into_channel(), config).unwrap()
-}
-
-async fn make_ramdisk_and_filesystem(
-) -> Result<(RamdiskClient, Filesystem<FxfsConfig>, ServingMultiVolumeFilesystem), Error> {
+async fn make_ramdisk_and_filesystem() -> (RamdiskClient, Filesystem, ServingMultiVolumeFilesystem)
+{
     let ramdisk = ramdisk().await;
 
-    let mut fxfs: Filesystem<_> = new_fs(&ramdisk, FxfsConfig::default());
+    let mut fxfs =
+        Filesystem::from_channel(ramdisk.open().unwrap().into_channel(), FxfsConfig::default())
+            .unwrap();
 
     fxfs.format().await.expect("failed to format fxfs");
 
     let fs: ServingMultiVolumeFilesystem =
         fxfs.serve_multi_volume().await.expect("failed to serve fxfs");
 
-    Ok::<(RamdiskClient, Filesystem<FxfsConfig>, ServingMultiVolumeFilesystem), Error>((
-        ramdisk, fxfs, fs,
-    ))
+    (ramdisk, fxfs, fs)
 }
 
 fn new_key() -> [u8; 32] {
@@ -96,7 +92,7 @@ async fn read_file(root_dir: &fio::DirectoryProxy) -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_lifecycle() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let fxfs_storage_manager = new_storage_manager(&mut fs);
 
     let key = new_key();
@@ -148,7 +144,7 @@ async fn test_lifecycle() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_get_root_dir_before_provision() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let fxfs_storage_manager = new_storage_manager(&mut fs);
 
     // Calling .get_root_dir() before .provision() fails, since the root
@@ -161,7 +157,7 @@ async fn test_get_root_dir_before_provision() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_get_root_dir_while_locked() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let fxfs_storage_manager = new_storage_manager(&mut fs);
     let key = new_key();
 
@@ -177,7 +173,7 @@ async fn test_get_root_dir_while_locked() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_file_should_not_persist_across_destruction_new_sm() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let key = new_key();
 
     {
@@ -219,7 +215,7 @@ async fn test_file_should_not_persist_across_destruction_reuse_sm() -> Result<()
     // manager instead of creating a new one. We want to demonstrate that the
     // file is destroyed no matter what.
 
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let key = new_key();
 
     let sm = new_storage_manager(&mut fs);
@@ -246,7 +242,7 @@ async fn test_file_should_not_persist_across_destruction_reuse_sm() -> Result<()
 
 #[fuchsia::test]
 async fn test_repeated_unlock_and_lock() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let sm = new_storage_manager(&mut fs);
     let key = new_key();
 
@@ -263,7 +259,7 @@ async fn test_repeated_unlock_and_lock() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_repeated_provision_and_destroy() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let sm = new_storage_manager(&mut fs);
     let key = new_key();
 
@@ -278,7 +274,7 @@ async fn test_repeated_provision_and_destroy() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_get_root_dir_twice() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let sm = new_storage_manager(&mut fs);
     let key = new_key();
 
@@ -305,7 +301,7 @@ async fn test_get_root_dir_twice() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn test_wrong_key() -> Result<(), Error> {
-    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await?;
+    let (_ramdisk, _filesystem, mut fs): (_, _, _) = make_ramdisk_and_filesystem().await;
     let sm = new_storage_manager(&mut fs);
     let key = new_key();
 

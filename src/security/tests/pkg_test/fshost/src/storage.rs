@@ -28,12 +28,12 @@ const FVM_BLOBFS_BLOCK_SUBDIR: &str = "blobfs-p-1/block";
 
 const DEV_PATH: &str = "/dev/";
 
-/// Wrapper around `fs_management::Filesystem<Blobfs>` that retains objects for
+/// Wrapper around `fs_management::Filesystem` that retains objects for
 /// instantiating blobfs loaded from an in-memory copy of an FVM image.
 pub struct BlobfsInstance {
     _fvm_vmo: Vmo,
     _fvm: FvmInstance,
-    blobfs: Filesystem<Blobfs>,
+    blobfs: Filesystem,
     serving_blobfs: Option<ServingSingleVolumeFilesystem>,
 }
 

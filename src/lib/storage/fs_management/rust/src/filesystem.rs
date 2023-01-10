@@ -42,8 +42,14 @@ use {
 };
 
 /// Asynchronously manages a block device for filesystem operations.
-pub struct Filesystem<FSC> {
-    config: FSC,
+pub struct Filesystem {
+    /// The filesystem struct keeps the FSConfig in a Box<dyn> instead of holding it directly for
+    /// code size reasons. Using a type parameter instead would make monomorphized versions of the
+    /// Filesystem impl block for each filesystem type, which duplicates several multi-kilobyte
+    /// functions (get_component_exposed_dir and serve in particular) that are otherwise quite
+    /// generic over config. Clients that want to be generic over filesystem type also pay the
+    /// monomorphization cost, with some, like fshost, paying a lot.
+    config: Box<dyn FSConfig>,
     block_device: fio::NodeProxy,
     component: Option<Arc<DynamicComponentInstance>>,
 }
@@ -51,24 +57,27 @@ pub struct Filesystem<FSC> {
 // Used to disambiguate children in our component collection.
 static COLLECTION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-impl<FSC: FSConfig> Filesystem<FSC> {
-    pub fn config(&self) -> &FSC {
-        &self.config
+impl Filesystem {
+    pub fn config(&self) -> &dyn FSConfig {
+        self.config.as_ref()
     }
 
     /// Creates a new `Filesystem` with the block device represented by `node_proxy`.
-    pub fn from_node(node_proxy: fio::NodeProxy, config: FSC) -> Self {
-        Self { config, block_device: node_proxy, component: None }
+    pub fn from_node<FSC: FSConfig + 'static>(node_proxy: fio::NodeProxy, config: FSC) -> Self {
+        Self { config: Box::new(config), block_device: node_proxy, component: None }
     }
 
     /// Creates a new `Filesystem` from the block device at the given path.
-    pub fn from_path(path: &str, config: FSC) -> Result<Self, Error> {
+    pub fn from_path<FSC: FSConfig + 'static>(path: &str, config: FSC) -> Result<Self, Error> {
         let proxy = connect_to_protocol_at_path::<fio::NodeMarker>(path)?;
         Ok(Self::from_node(proxy, config))
     }
 
     /// Creates a new `Filesystem` with the block device represented by `channel`.
-    pub fn from_channel(channel: Channel, config: FSC) -> Result<Self, Error> {
+    pub fn from_channel<FSC: FSConfig + 'static>(
+        channel: Channel,
+        config: FSC,
+    ) -> Result<Self, Error> {
         Ok(Self::from_node(ClientEnd::<fio::NodeMarker>::new(channel).into_proxy()?, config))
     }
 
@@ -758,7 +767,7 @@ mod tests {
         RamdiskClient::create(block_size, 1 << 16).await.unwrap()
     }
 
-    fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem<FSC> {
+    fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem {
         Filesystem::from_channel(ramdisk.open().unwrap().into_channel(), config).unwrap()
     }
 

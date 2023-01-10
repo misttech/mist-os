@@ -151,7 +151,7 @@ pub struct LegacyConfig<'a> {
 }
 
 /// Describes the configuration for a particular filesystem.
-pub trait FSConfig {
+pub trait FSConfig: Send + Sync + 'static {
     /// Returns the mode in which to run this filesystem.
     fn mode(&self) -> Mode<'_>;
 
@@ -220,13 +220,13 @@ pub struct Blobfs {
 impl Blobfs {
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 
@@ -304,13 +304,13 @@ pub struct Minfs {
 impl Minfs {
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 
@@ -369,13 +369,13 @@ pub struct MinfsLegacy {
 impl MinfsLegacy {
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 }
@@ -431,13 +431,13 @@ impl Fxfs {
 
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 
@@ -499,13 +499,13 @@ pub struct F2fs {
 impl F2fs {
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 
@@ -562,13 +562,13 @@ pub struct Factoryfs {
 impl Factoryfs {
     /// Manages a block device at a given path using
     /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_path(path, Self::default())
     }
 
     /// Manages a block device at a given channel using
     /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem<Self>, Error> {
+    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
         filesystem::Filesystem::from_channel(channel, Self::default())
     }
 }
