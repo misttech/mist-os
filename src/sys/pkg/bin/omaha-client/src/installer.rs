@@ -425,7 +425,16 @@ fn try_create_install_plan_impl(
         };
 
         update_package_urls.push(if app.id == system_app_id {
-            urgent_update = update_check.urgent_update.unwrap_or(false);
+            urgent_update = match update_check.urgent_update {
+                Some(update_value) => {
+                    info!("urgent_update set as {:?} in the response", update_value);
+                    update_value
+                }
+                None => {
+                    info!("No urgent_update attribute set. Defaulting to false.");
+                    false
+                }
+            };
 
             UpdatePackageUrl::System(pkg_url)
         } else {
