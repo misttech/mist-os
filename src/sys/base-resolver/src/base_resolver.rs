@@ -5,7 +5,7 @@
 use {
     anyhow::{self, Context},
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::{
         self as fresolution, ResolverRequest, ResolverRequestStream,
     },
@@ -164,9 +164,10 @@ async fn resolve_component_async(
     } else {
         None
     };
-    let abi_revision = fabi::read_abi_revision_optional(&package.dir, AbiRevision::PATH)
-        .await
-        .map_err(crate::ResolverError::AbiRevision)?;
+    let abi_revision =
+        fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&package.dir, AbiRevision::PATH)
+            .await
+            .map_err(crate::ResolverError::AbiRevision)?;
     let package_dir = ClientEnd::new(
         package.dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
     );

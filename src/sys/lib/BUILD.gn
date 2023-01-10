@@ -16,7 +16,7 @@ group("tests") {
     "component_id_index:tests",
     "config_encoder:tests",
     "fidl-connector:tests",
-    "fidl-fuchsia-component-abi:tests",
+    "fidl-fuchsia-component-abi-ext:tests",
     "fidl-fuchsia-pkg-ext:tests",
     "fidl-fuchsia-pkg-rewrite-ext:tests",
     "fuchsia-bootfs:fuchsia-bootfs-tests",

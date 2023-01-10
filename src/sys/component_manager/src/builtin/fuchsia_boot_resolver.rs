@@ -11,8 +11,8 @@ use {
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_io as fio,
     fuchsia_pkg::PackagePath,
     fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
     futures::TryStreamExt,
@@ -119,8 +119,11 @@ impl FuchsiaBootResolver {
                     boot_package_resolver.setup_package_dir(canonicalized_package_path).await?;
                 // TODO(97517): when all bootfs components are packaged, abi_revision setting can be moved
                 // into `construct_component()`.
-                let abi_revision =
-                    fabi::read_abi_revision_optional(&package_dir_proxy, AbiRevision::PATH).await?;
+                let abi_revision = fidl_fuchsia_component_abi_ext::read_abi_revision_optional(
+                    &package_dir_proxy,
+                    AbiRevision::PATH,
+                )
+                .await?;
                 self.construct_component(package_dir_proxy, boot_url, abi_revision).await
             }
             _ => {

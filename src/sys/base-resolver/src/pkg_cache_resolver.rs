@@ -5,7 +5,7 @@
 use {
     anyhow::{self, Context},
     fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::{
         self as fresolution, ResolverRequest, ResolverRequestStream,
     },
@@ -154,9 +154,10 @@ async fn resolve_pkg_cache(
     } else {
         None
     };
-    let abi_revision = fabi::read_abi_revision_optional(&proxy, AbiRevision::PATH)
-        .await
-        .map_err(crate::ResolverError::AbiRevision)?;
+    let abi_revision =
+        fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&proxy, AbiRevision::PATH)
+            .await
+            .map_err(crate::ResolverError::AbiRevision)?;
     Ok(fresolution::Component {
         url: Some(fuchsia_pkg_cache_component_url().clone().into()),
         decl: Some(data),

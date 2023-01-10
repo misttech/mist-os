@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution as fresolution, fuchsia_pkg::PackageName,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fuchsia_pkg::PackageName,
 };
 
 mod base_resolver;
@@ -87,7 +87,7 @@ enum ResolverError {
     Internal,
 
     #[error("failed to read abi revision")]
-    AbiRevision(#[source] fabi::AbiRevisionFileError),
+    AbiRevision(#[source] fidl_fuchsia_component_abi_ext::AbiRevisionFileError),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {

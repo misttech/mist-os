@@ -9,9 +9,9 @@ use {
     cm_rust::NativeIntoFidl,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::Vmo,
-    fidl_fuchsia_component_abi as fabi, fidl_fuchsia_component_config as fconfig,
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
+    fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     futures::{
         lock::{Mutex, MutexGuard},
         TryStreamExt,
@@ -228,8 +228,11 @@ impl Registry {
             config_override_policy,
         } = resolveable_component;
 
-        let abi_revision =
-            fabi::read_abi_revision_optional(&package_dir, AbiRevision::PATH).await?;
+        let abi_revision = fidl_fuchsia_component_abi_ext::read_abi_revision_optional(
+            &package_dir,
+            AbiRevision::PATH,
+        )
+        .await?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()?;
         package_dir
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
@@ -326,8 +329,11 @@ impl Registry {
         )
         .await
         .map_err(|_| fresolution::ResolverError::ConfigValuesNotFound)?;
-        let abi_revision =
-            fabi::read_abi_revision_optional(&component.package_dir, AbiRevision::PATH).await?;
+        let abi_revision = fidl_fuchsia_component_abi_ext::read_abi_revision_optional(
+            &component.package_dir,
+            AbiRevision::PATH,
+        )
+        .await?;
         Ok(fresolution::Component {
             url: Some(component_url.clone()),
             resolution_context: None,
