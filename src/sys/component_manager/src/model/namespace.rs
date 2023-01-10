@@ -106,7 +106,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
     for use_ in &decl.uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
-                add_directory_helper(&mut ns, &mut directory_waiters, use_, component.clone())?;
+                add_directory_helper(&mut ns, &mut directory_waiters, use_, component.clone());
             }
             cm_rust::UseDecl::Protocol(s) => {
                 add_service_or_protocol_use(
@@ -114,7 +114,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     UseDecl::Protocol(s.clone()),
                     &s.target_path,
                     component.clone(),
-                )?;
+                );
                 if s.source_name.0 == LogSinkMarker::PROTOCOL_NAME {
                     log_sink_decl = Some(s.clone());
                 }
@@ -125,7 +125,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     UseDecl::Service(s.clone()),
                     &s.target_path,
                     component.clone(),
-                )?;
+                );
             }
             cm_rust::UseDecl::Storage(_) => {
                 add_storage_use(&mut ns, &mut directory_waiters, use_, component.clone()).await?;
@@ -141,13 +141,13 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     UseDecl::EventStream(s.clone()),
                     &s.target_path,
                     component.clone(),
-                )?;
+                );
             }
         }
     }
 
     // Start hosting the services directories and add them to the namespace
-    serve_and_install_svc_dirs(&mut ns, svc_dirs)?;
+    serve_and_install_svc_dirs(&mut ns, svc_dirs);
     let component = component.upgrade()?;
     // The directory waiter will run in the component's nonblocking task scope, but
     // when it gets a readable signal it will spawn the routing task in the blocking scope as
@@ -257,7 +257,8 @@ async fn add_storage_use(
         _ => unreachable!("unexpected storage decl"),
     }
 
-    add_directory_helper(ns, waiters, use_, component)
+    add_directory_helper(ns, waiters, use_, component);
+    Ok(())
 }
 
 /// Adds a directory waiter to `waiters` and updates `ns` to contain a handle for the
@@ -269,7 +270,7 @@ fn add_directory_helper(
     waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: WeakComponentInstance,
-) -> Result<(), ModelError> {
+) {
     let target_path =
         use_.path().expect("use decl without path used in add_directory_helper").to_string();
     let flags = match use_ {
@@ -318,7 +319,6 @@ fn add_directory_helper(
         directory: Some(client_end),
         ..fcrunner::ComponentNamespaceEntry::EMPTY
     });
-    Ok(())
 }
 
 async fn route_directory(
@@ -374,7 +374,7 @@ fn add_service_or_protocol_use(
     use_: UseDecl,
     capability_path: &CapabilityPath,
     component: WeakComponentInstance,
-) -> Result<(), ModelError> {
+) {
     let not_found_component_copy = component.clone();
     let use_clone = use_.clone();
     let route_open_fn = move |scope: ExecutionScope,
@@ -466,7 +466,6 @@ fn add_service_or_protocol_use(
             .add_entry(&capability_path.basename, remote(route_open_fn))
             .expect("could not add service to directory");
     }
-    Ok(())
 }
 
 /// Determines if the `full` is a subpath of the `stem`. Returns the
@@ -498,7 +497,7 @@ fn is_subpath_of(full: String, stem: String) -> Result<String, ()> {
 fn serve_and_install_svc_dirs(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
     svc_dirs: HashMap<String, Directory>,
-) -> Result<(), ModelError> {
+) {
     for (target_dir_path, pseudo_dir) in svc_dirs {
         let (client_end, server_end) =
             create_endpoints::<fio::NodeMarker>().expect("could not create node proxy endpoints");
@@ -516,7 +515,6 @@ fn serve_and_install_svc_dirs(
             ..fcrunner::ComponentNamespaceEntry::EMPTY
         });
     }
-    Ok(())
 }
 
 /// Given a Directory, connect to the LogSink protocol at the default
