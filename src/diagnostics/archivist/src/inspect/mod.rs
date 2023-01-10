@@ -400,7 +400,6 @@ mod tests {
         futures::{FutureExt, StreamExt},
         selectors::{self, VerboseError},
         serde_json::json,
-        std::path::PathBuf,
     };
 
     const TEST_URL: &str = "fuchsia-pkg://test";
@@ -414,7 +413,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn inspect_data_collector() {
-        let path = PathBuf::from("/test-bindings");
+        let path = "/test-bindings/out";
         // Make a ServiceFs containing two files.
         // One is an inspect file, and one is not.
         let mut fs = ServiceFs::new();
@@ -431,23 +430,22 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
 
         let (done0, done1) = zx::Channel::create();
 
-        let thread_path = path.join("out/diagnostics");
-
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
 
             executor.run_singlethreaded(async {
-                let extra_data = collector::collect(path).await.expect("collector missing data");
+                let extra_data = collector::collect(&format!("{path}/diagnostics"))
+                    .await
+                    .expect("collector missing data");
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
@@ -475,12 +473,12 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
-        let path = PathBuf::from("/test-bindings2");
+        let path = "/test-bindings2/out";
 
         // Make a ServiceFs serving an inspect tree.
         let mut fs = ServiceFs::new();
@@ -501,22 +499,22 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
 
         let (done0, done1) = zx::Channel::create();
-        let thread_path = path.join("out/diagnostics");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
 
             executor.run_singlethreaded(async {
-                let extra_data = collector::collect(path).await.expect("collector missing data");
+                let extra_data = collector::collect(&format!("{path}/diagnostics"))
+                    .await
+                    .expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
                 let extra = extra_data.get(TreeMarker::PROTOCOL_NAME);
@@ -544,12 +542,12 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
     async fn reader_server_formatting() {
-        let path = PathBuf::from("/test-bindings3");
+        let path = "/test-bindings3/out";
 
         // Make a ServiceFs containing two files.
         // One is an inspect file, and one is not.
@@ -566,16 +564,14 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
         let (done0, done1) = zx::Channel::create();
-        let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
             executor.run_singlethreaded(async {
@@ -585,12 +581,12 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
     async fn read_server_formatting_tree() {
-        let path = PathBuf::from("/test-bindings4");
+        let path = "/test-bindings4/out";
 
         // Make a ServiceFs containing two files.
         // One is an inspect file, and one is not.
@@ -603,16 +599,14 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
         let (done0, done1) = zx::Channel::create();
-        let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
             executor.run_singlethreaded(async {
@@ -621,12 +615,12 @@ mod tests {
             });
         });
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
     async fn reader_server_reports_errors() {
-        let path = PathBuf::from("/test-bindings-errors-01");
+        let path = "/test-bindings-errors-01/out";
 
         // Make a ServiceFs containing something that looks like an inspect file but is not.
         let mut fs = ServiceFs::new();
@@ -638,16 +632,14 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
         let (done0, done1) = zx::Channel::create();
-        let thread_path = path.join("out");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
             executor.run_singlethreaded(async {
@@ -657,7 +649,7 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
@@ -694,7 +686,7 @@ mod tests {
         directory_vmo_counts: Vec<usize>,
         expected_batch_results: Vec<usize>,
     ) {
-        let path = PathBuf::from("/stress_test_root_directory");
+        let path = "/stress_test_root_directory";
 
         let dir_name_and_filecount: Vec<(String, usize)> = directory_vmo_counts
             .into_iter()
@@ -722,13 +714,12 @@ mod tests {
         // stress_test_root_dir. Now each directory can be found at
         // stress_test_root_dir/diagnostics_<i>
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
 
         let (done0, done1) = zx::Channel::create();
 
-        let cloned_path = path.clone();
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
@@ -737,17 +728,14 @@ mod tests {
 
             executor.run_singlethreaded(async {
                 let id_and_directory_proxy =
-                    join_all(dir_name_and_filecount.iter().map(|(dir, _)| {
-                        let new_async_clone = cloned_path.clone();
-                        async move {
-                            let full_path = new_async_clone.join(dir);
-                            let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
-                            let unique_cid = ComponentIdentifier::Legacy {
-                                instance_id: "1234".into(),
-                                moniker: vec![format!("component_{dir}.cmx")].into(),
-                            };
-                            (unique_cid, proxy)
-                        }
+                    join_all(dir_name_and_filecount.iter().map(|(dir, _)| async move {
+                        let full_path = format!("{path}/{dir}");
+                        let proxy = collector::find_directory_proxy(&full_path).await.unwrap();
+                        let unique_cid = ComponentIdentifier::Legacy {
+                            instance_id: "1234".into(),
+                            moniker: vec![format!("component_{dir}.cmx")].into(),
+                        };
+                        (unique_cid, proxy)
                     }))
                     .await;
 
@@ -790,7 +778,7 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     fn inspector_for_reader_test() -> Inspector {
@@ -814,11 +802,11 @@ mod tests {
         ExpectComponentFailure,
     }
 
-    async fn verify_reader(path: PathBuf) {
+    async fn verify_reader(path: &str) {
         verify_reader_with_mode(path, VerifyMode::ExpectSuccess).await;
     }
 
-    async fn verify_reader_with_mode(path: PathBuf, mode: VerifyMode) {
+    async fn verify_reader_with_mode(path: &str, mode: VerifyMode) {
         let child_1_1_selector =
             selectors::parse_selector::<VerboseError>(r#"*:root/child_1/*:some-int"#).unwrap();
         let child_2_selector =
@@ -830,7 +818,7 @@ mod tests {
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
 
-        let out_dir_proxy = collector::find_directory_proxy(&path).await.unwrap();
+        let out_dir_proxy = collector::find_directory_proxy(path).await.unwrap();
 
         // The absolute moniker here is made up since the selector is a glob
         // selector, so any path would match.

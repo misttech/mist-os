@@ -39,7 +39,6 @@ use {
     moniker::{AbsoluteMoniker, ChildMoniker},
     std::collections::HashSet,
     std::default::Default,
-    std::path::Path,
     std::sync::Arc,
     vfs::{directory::entry::DirectoryEntry, service},
 };
@@ -214,17 +213,20 @@ pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -
 }
 
 pub async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
-    let file_proxy =
-        fuchsia_fs::open_file(&root_proxy, &Path::new(path), fio::OpenFlags::RIGHT_READABLE)
-            .expect("Failed to open file.");
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+        &root_proxy,
+        path,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("Failed to open file.");
     let res = fuchsia_fs::read_file(&file_proxy).await;
     res.expect("Unable to read file.")
 }
 
 pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, contents: &'a str) {
-    let file_proxy = fuchsia_fs::open_file(
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         &root_proxy,
-        &Path::new(path),
+        path,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
     )
     .expect("Failed to open file.");

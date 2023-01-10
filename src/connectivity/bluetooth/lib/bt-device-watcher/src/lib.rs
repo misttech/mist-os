@@ -215,9 +215,9 @@ impl DeviceWatcher {
     }
 
     fn open_device_file(&self, relative_path: PathBuf) -> Result<DeviceFile, Error> {
-        let file = fuchsia_fs::open_file(
+        let file = fuchsia_fs::directory::open_file_no_describe(
             &self.watched_dir,
-            relative_path.as_path(),
+            relative_path.to_str().unwrap(),
             fio::OpenFlags::RIGHT_READABLE,
         )?;
         let file = fdio::create_fd(

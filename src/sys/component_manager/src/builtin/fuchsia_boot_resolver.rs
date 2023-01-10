@@ -483,9 +483,13 @@ mod tests {
         assert_eq!(package_url, "fuchsia-boot:///");
 
         let dir_proxy = package_dir.into_proxy().unwrap();
-        let path = Path::new("meta/hello-world-rust.cm");
-        let file_proxy = fuchsia_fs::open_file(&dir_proxy, path, fio::OpenFlags::RIGHT_READABLE)
-            .expect("could not open cm");
+        let path = "meta/hello-world-rust.cm";
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+            &dir_proxy,
+            path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .expect("could not open cm");
 
         let decl = fuchsia_fs::read_file_fidl::<fdecl::Component>(&file_proxy)
             .await

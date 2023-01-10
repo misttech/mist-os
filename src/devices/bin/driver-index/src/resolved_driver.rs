@@ -224,13 +224,11 @@ pub async fn load_driver(
     package_type: DriverPackageType,
     package_hash: Option<fpkg::BlobId>,
 ) -> Result<Option<ResolvedDriver>, Error> {
-    let component = fuchsia_fs::open_file(
+    let component = fuchsia_fs::directory::open_file_no_describe(
         &dir,
-        std::path::Path::new(
-            component_url
-                .fragment()
-                .ok_or(anyhow!("{}: URL is missing fragment", component_url.as_str()))?,
-        ),
+        component_url
+            .fragment()
+            .ok_or(anyhow!("{}: URL is missing fragment", component_url.as_str()))?,
         fio::OpenFlags::RIGHT_READABLE,
     )
     .with_context(|| {
@@ -252,9 +250,9 @@ pub async fn load_driver(
 
     let bind_path = get_rules_string_value(&component, "bind")
         .ok_or(anyhow!("{}: Missing bind path", component_url.as_str()))?;
-    let bind = fuchsia_fs::open_file(
+    let bind = fuchsia_fs::directory::open_file_no_describe(
         &dir,
-        std::path::Path::new(&bind_path),
+        &bind_path,
         fio::OpenFlags::RIGHT_READABLE,
     )
     .with_context(|| format!("{}: Failed to open bind", component_url.as_str()))?;

@@ -31,7 +31,7 @@ use {
     fuchsia_fs, fuchsia_syslog as syslog, fuchsia_zircon as zx,
     futures::{lock::Mutex, StreamExt as _, TryFutureExt as _, TryStreamExt as _},
     remote_block_device::BlockClient as _,
-    std::{io, path::PathBuf, sync::Arc},
+    std::{io, sync::Arc},
     vfs::{
         directory::{self, entry::DirectoryEntry},
         execution_scope::ExecutionScope,
@@ -113,9 +113,9 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::open_file(
+    let file = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
-        &PathBuf::from(file_path),
+        file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     fuchsia_fs::file::read(&file).await.map_err(Into::into)

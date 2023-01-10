@@ -18,7 +18,6 @@ use {
     fidl::encoding::Persistable,
     fidl::endpoints::Proxy,
     fidl_fuchsia_io as fio,
-    std::path::Path,
 };
 
 pub mod directory;
@@ -27,18 +26,6 @@ pub mod node;
 
 // Reexported from fidl_fuchsia_io for convenience
 pub use fio::OpenFlags;
-
-/// open_file will open a NodeProxy at the given path relative to the given directory, and convert
-/// it into a FileProxy. This function will not block.
-pub fn open_file<'a>(
-    dir: &'a fio::DirectoryProxy,
-    path: &'a Path,
-    flags: fio::OpenFlags,
-) -> Result<fio::FileProxy, Error> {
-    let path = check_path(path)?;
-    let node = directory::open_file_no_describe(dir, path, flags)?;
-    Ok(node)
-}
 
 pub async fn read_file(file: &fio::FileProxy) -> Result<String, Error> {
     let string = file::read_to_string(file).await?;
@@ -107,26 +94,13 @@ pub fn canonicalize_path(path: &str) -> &str {
     path
 }
 
-/// Verifies path is relative, utf-8, and non-empty.
-fn check_path(path: &Path) -> Result<&str, Error> {
-    if path.is_absolute() {
-        return Err(format_err!("path must be relative"));
-    }
-    let path = path.to_str().ok_or(format_err!("path contains invalid UTF-8"))?;
-    if path.is_empty() {
-        return Err(format_err!("path must not be empty"));
-    }
-
-    Ok(path)
-}
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
         fidl::endpoints::ServerEnd,
         fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-        std::fs,
+        std::{fs, path::Path},
         tempfile::TempDir,
         vfs::{
             directory::entry::DirectoryEntry,
@@ -147,8 +121,8 @@ mod tests {
             OpenFlags::RIGHT_READABLE,
         )
         .expect("could not open tmp dir");
-        let path = Path::new("myfile");
-        let file = open_file(&dir, &path, OpenFlags::RIGHT_READABLE).expect("could not open file");
+        let file = directory::open_file_no_describe(&dir, "myfile", OpenFlags::RIGHT_READABLE)
+            .expect("could not open file");
         let contents = read_file(&file).await.expect("could not read file");
         assert_eq!(&contents, &data, "File contents did not match");
     }
@@ -166,23 +140,17 @@ mod tests {
         // Write contents.
         let file_name = Path::new("myfile");
         let data = "abc".repeat(10000);
-        let file = open_file(&dir, &file_name, OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE)
-            .expect("could not open file");
+        let file = directory::open_file_no_describe(
+            &dir,
+            file_name.to_str().unwrap(),
+            OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        )
+        .expect("could not open file");
         file::write(&file, &data).await.expect("could not write file");
 
         // Verify contents.
         let contents = std::fs::read_to_string(tempdir.path().join(file_name)).unwrap();
         assert_eq!(&contents, &data, "File contents did not match");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn open_checks_path_validity() {
-        let dir = crate::directory::open_in_namespace("/pkg", OpenFlags::RIGHT_READABLE)
-            .expect("could not open /pkg");
-
-        assert!(open_file(&dir, Path::new(""), OpenFlags::RIGHT_READABLE).is_err());
-        assert!(open_file(&dir, Path::new("/"), OpenFlags::RIGHT_READABLE).is_err());
-        assert!(open_file(&dir, Path::new("/foo"), OpenFlags::RIGHT_READABLE).is_err());
     }
 
     #[test]
@@ -223,7 +191,8 @@ mod tests {
             ("read_write", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, true),
             ("read_write", OpenFlags::RIGHT_WRITABLE, true),
         ] {
-            let file_proxy = open_file(&example_dir_proxy, &Path::new(file_name), flags)?;
+            let file_proxy =
+                directory::open_file_no_describe(&example_dir_proxy, file_name, flags)?;
             match (should_succeed, file_proxy.query().await) {
                 (true, Ok(_)) => (),
                 (false, Err(_)) => continue,

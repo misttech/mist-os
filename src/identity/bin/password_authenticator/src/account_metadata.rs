@@ -404,29 +404,25 @@ pub mod test {
             AccountMetadata::test_new_weak_pinweaver(TEST_NAME.into());
     }
 
-    async fn write_test_file_in_dir(
-        dir: &fio::DirectoryProxy,
-        path: &std::path::Path,
-        data: &[u8],
-    ) {
-        let file = fuchsia_fs::open_file(
+    async fn write_test_file_in_dir(dir: &fio::DirectoryProxy, path: &str, data: &[u8]) {
+        let file = fuchsia_fs::directory::open_file_no_describe(
             dir,
             path,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::CREATE,
         )
-        .expect(&format!("create file {}", path.display()));
+        .expect(&format!("create file {path}"));
         file.write(data)
             .await
-            .expect(&format!("write file {}", path.display()))
+            .expect(&format!("write file {path}"))
             .map_err(zx::Status::from_raw)
-            .expect(&format!("write file {}", path.display()));
+            .expect(&format!("write file {path}"));
         file.close()
             .await
-            .expect(&format!("close file {}", path.display()))
+            .expect(&format!("close file {path}"))
             .map_err(zx::Status::from_raw)
-            .expect(&format!("close file {}", path.display()));
+            .expect(&format!("close file {path}"));
     }
 
     #[fuchsia::test]
@@ -588,8 +584,8 @@ pub mod test {
         .expect("could not open temp dir");
 
         // Prepare tmp_dir with two files, one with valid data and one with invalid data.
-        write_test_file_in_dir(&dir, std::path::Path::new("1"), SCRYPT_KEY_AND_NAME_DATA).await;
-        write_test_file_in_dir(&dir, std::path::Path::new("2"), INVALID_METADATA).await;
+        write_test_file_in_dir(&dir, "1", SCRYPT_KEY_AND_NAME_DATA).await;
+        write_test_file_in_dir(&dir, "2", INVALID_METADATA).await;
 
         let metadata_store = DataDirAccountMetadataStore::new(dir);
 
@@ -633,7 +629,7 @@ pub mod test {
         .expect("open second connection to temp dir");
 
         // Prepare tmp_dir with an account for ID 1
-        write_test_file_in_dir(&dir, std::path::Path::new("1"), SCRYPT_KEY_AND_NAME_DATA).await;
+        write_test_file_in_dir(&dir, "1", SCRYPT_KEY_AND_NAME_DATA).await;
 
         let mut metadata_store = DataDirAccountMetadataStore::new(dir);
 
@@ -707,9 +703,8 @@ pub mod test {
         // matches the "temp-" prefix used when creating and cleaning up
         // |StagedFile|s.
         let temp_filename = "temp-12345-9876";
-        write_test_file_in_dir(&dir, std::path::Path::new("1"), SCRYPT_KEY_AND_NAME_DATA).await;
-        write_test_file_in_dir(&dir, std::path::Path::new(temp_filename), SCRYPT_KEY_AND_NAME_DATA)
-            .await;
+        write_test_file_in_dir(&dir, "1", SCRYPT_KEY_AND_NAME_DATA).await;
+        write_test_file_in_dir(&dir, temp_filename, SCRYPT_KEY_AND_NAME_DATA).await;
 
         // Expect cleanup to remove the uncommitted file but retain the "1"
         let mut metadata_store = DataDirAccountMetadataStore::new(dir);

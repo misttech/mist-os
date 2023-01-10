@@ -8,7 +8,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_url::{PackageVariant, UnpinnedAbsolutePackageUrl},
     futures::{StreamExt, TryStreamExt},
-    std::{path::PathBuf, str::FromStr},
+    std::str::FromStr,
 };
 
 async fn get_hash(
@@ -16,15 +16,17 @@ async fn get_hash(
     packages: &fio::DirectoryProxy,
 ) -> Result<fpkg::BlobId> {
     let package_url = UnpinnedAbsolutePackageUrl::parse(&package_url.url)?;
-    let package_meta_path: PathBuf = format!(
+    let package_meta_path = format!(
         "{}/{}/meta",
         package_url.name(),
         package_url.variant().cloned().unwrap_or_else(|| PackageVariant::zero())
+    );
+    let package_meta_file = fuchsia_fs::directory::open_file_no_describe(
+        packages,
+        &package_meta_path,
+        fio::OpenFlags::RIGHT_READABLE,
     )
-    .into();
-    let package_meta_file =
-        fuchsia_fs::open_file(packages, &package_meta_path, fio::OpenFlags::RIGHT_READABLE)
-            .with_context(|| format!("Failed to open {:?}", &package_meta_path))?;
+    .with_context(|| format!("Failed to open {:?}", &package_meta_path))?;
     let merkle_root_str = fuchsia_fs::read_file(&package_meta_file)
         .await
         .context("Failed to read package meta file")?;

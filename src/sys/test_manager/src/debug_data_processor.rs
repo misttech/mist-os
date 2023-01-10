@@ -288,9 +288,9 @@ mod test {
         }
 
         for ftest_debug::DebugVmo { data_sink, test_url, .. } in collected_vmos {
-            let file = fuchsia_fs::open_file(
+            let file = fuchsia_fs::directory::open_file_no_describe(
                 &dir,
-                data_sink.as_ref(),
+                &data_sink,
                 OpenFlags::CREATE | OpenFlags::RIGHT_WRITABLE,
             )
             .expect("open file");

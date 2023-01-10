@@ -9,7 +9,6 @@ use {
     fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream},
     fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
     futures::{TryFutureExt, TryStreamExt},
-    std::path::Path,
     std::sync::Arc,
     tracing::*,
 };
@@ -103,9 +102,9 @@ pub async fn load_vmo<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     object_name: &'a str,
 ) -> Result<zx::Vmo, Error> {
-    let file_proxy = fuchsia_fs::open_file(
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         dir_proxy,
-        &Path::new(object_name),
+        object_name,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )?;
     // TODO(fxbug.dev/52468): This does not ask or wait for a Describe event, which means a failure to

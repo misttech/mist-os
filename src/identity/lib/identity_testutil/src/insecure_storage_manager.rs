@@ -10,7 +10,6 @@ use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{DirEntry, DirentKind};
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
-use std::path::Path;
 use storage_manager::{Key, StorageManager};
 use tempfile::TempDir;
 use typed_builder::TypedBuilder;
@@ -271,9 +270,9 @@ impl InsecureKeyDirectoryStorageManager {
             AccountManagerError::new(ApiError::Internal)
                 .with_cause(format_err!("Failed to serialize correct key: {:?}", e))
         })?;
-        let key_file = fuchsia_fs::open_file(
+        let key_file = fuchsia_fs::directory::open_file_no_describe(
             &self.managed_dir,
-            Path::new(KEY_FILE_PATH),
+            KEY_FILE_PATH,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
         )
         .map_err(|e| {
@@ -288,9 +287,9 @@ impl InsecureKeyDirectoryStorageManager {
 
     /// Verify if the given key is the correct key needed for unlock.
     async fn check_unlock_key(&self, key: &Key) -> Result<(), AccountManagerError> {
-        let file_proxy = fuchsia_fs::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
             &self.managed_dir,
-            Path::new(KEY_FILE_PATH),
+            KEY_FILE_PATH,
             fio::OpenFlags::RIGHT_READABLE,
         )
         .map_err(|e| {
@@ -325,9 +324,9 @@ mod test {
     }
 
     async fn create_file_with_content(dir: &fio::DirectoryProxy, path: &str, content: &str) {
-        let file = fuchsia_fs::open_file(
+        let file = fuchsia_fs::directory::open_file_no_describe(
             dir,
-            Path::new(path),
+            path,
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
         )
         .unwrap();
@@ -341,7 +340,8 @@ mod test {
 
     async fn assert_file_contents(dir: &fio::DirectoryProxy, path: &str, content: &str) {
         let file =
-            fuchsia_fs::open_file(dir, Path::new(path), fio::OpenFlags::RIGHT_READABLE).unwrap();
+            fuchsia_fs::directory::open_file_no_describe(dir, path, fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
         let file_content = fuchsia_fs::read_file(&file).await.unwrap();
         assert_eq!(content, &file_content);
     }

@@ -9,7 +9,7 @@ use {
     fuchsia_fs,
     futures::lock::Mutex,
     futures::{future::BoxFuture, TryStreamExt},
-    std::{collections::HashMap, path::Path, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::*,
 };
 
@@ -248,9 +248,9 @@ mod tests {
         let data_dir_clone =
             mock_handles.clone_from_namespace("data").expect("failed to clone from namespace");
 
-        let file_proxy = fuchsia_fs::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
             &data_dir_clone,
-            Path::new(file_name),
+            file_name,
             fio::OpenFlags::RIGHT_READABLE,
         )
         .expect("failed to open file");

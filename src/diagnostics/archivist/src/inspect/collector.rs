@@ -11,12 +11,11 @@ use {
     futures::stream::StreamExt,
     pin_utils::pin_mut,
     std::collections::HashMap,
-    std::path::Path,
     tracing::error,
 };
 
 #[cfg(test)]
-use futures::FutureExt;
+use anyhow::Context as _;
 
 /// Mapping from a diagnostics filename to the underlying encoding of that
 /// diagnostics data.
@@ -92,9 +91,9 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
             continue;
         }
 
-        let file_proxy = match fuchsia_fs::open_file(
+        let file_proxy = match fuchsia_fs::directory::open_file_no_describe(
             inspect_proxy,
-            Path::new(&entry.name),
+            &entry.name,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         ) {
             Ok(proxy) => proxy,
@@ -146,33 +145,17 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
 /// Convert a fully-qualified path to a directory-proxy in the executing namespace.
 #[cfg(test)]
 pub async fn find_directory_proxy(
-    path: &Path,
+    path: &str,
 ) -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
-    fuchsia_fs::directory::open_in_namespace(
-        &path.to_string_lossy(),
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
+    fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
 }
 
 #[cfg(test)]
-pub fn collect(
-    path: std::path::PathBuf,
-) -> futures::future::BoxFuture<'static, Result<DataMap, anyhow::Error>> {
-    async move {
-        let inspect_proxy = match find_directory_proxy(&path).await {
-            Ok(proxy) => proxy,
-            Err(e) => {
-                return Err(anyhow::format_err!(
-                    "Failed to open out directory at {:?}: {}",
-                    path,
-                    e
-                ));
-            }
-        };
-
-        Ok(populate_data_map(&inspect_proxy).await)
-    }
-    .boxed()
+pub async fn collect(path: &str) -> Result<DataMap, anyhow::Error> {
+    let inspect_proxy = find_directory_proxy(path)
+        .await
+        .with_context(|| format!("Failed to open out directory at {path}"))?;
+    Ok(populate_data_map(&inspect_proxy).await)
 }
 
 #[cfg(test)]
@@ -188,7 +171,6 @@ mod tests {
         fuchsia_zircon as zx,
         fuchsia_zircon::Peered,
         futures::{FutureExt, StreamExt},
-        std::path::PathBuf,
     };
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
@@ -199,7 +181,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn inspect_data_collector() {
-        let path = PathBuf::from("/test-bindings");
+        let path = "/test-bindings/out";
         // Make a ServiceFs containing two files.
         // One is an inspect file, and one is not.
         let mut fs = ServiceFs::new();
@@ -216,23 +198,21 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
 
         let (done0, done1) = zx::Channel::create();
 
-        let thread_path = path.join("out/diagnostics");
-
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
 
             executor.run_singlethreaded(async {
-                let extra_data = collect(path).await.expect("collector missing data");
+                let extra_data =
+                    collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
@@ -260,12 +240,12 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
-        let path = PathBuf::from("/test-bindings2");
+        let path = "/test-bindings2/out";
 
         // Make a ServiceFs serving an inspect tree.
         let mut fs = ServiceFs::new();
@@ -286,22 +266,21 @@ mod tests {
         fs.serve_connection(h1).unwrap();
 
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind(path.join("out").to_str().unwrap(), h0).unwrap();
+        ns.bind(path, h0).unwrap();
 
         fasync::Task::spawn(fs.collect()).detach();
 
         let (done0, done1) = zx::Channel::create();
-        let thread_path = path.join("out/diagnostics");
 
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
-            let path = thread_path;
             let done = done1;
             let mut executor = fasync::LocalExecutor::new().unwrap();
 
             executor.run_singlethreaded(async {
-                let extra_data = collect(path).await.expect("collector missing data");
+                let extra_data =
+                    collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
                 let extra = extra_data.get(TreeMarker::PROTOCOL_NAME);
@@ -329,6 +308,6 @@ mod tests {
         });
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
-        ns.unbind(path.join("out").to_str().unwrap()).unwrap();
+        ns.unbind(path).unwrap();
     }
 }

@@ -589,9 +589,9 @@ async fn load_base_drivers(
     let res =
         resolver.resolve("fuchsia-pkg://fuchsia.com/driver-manager-base-config", dir_server_end);
     res.await?.map_err(|e| anyhow::anyhow!("Failed to resolve package: {:?}", e))?;
-    let data = fuchsia_fs::open_file(
+    let data = fuchsia_fs::directory::open_file_no_describe(
         &dir,
-        std::path::Path::new("config/base-driver-manifest.json"),
+        "config/base-driver-manifest.json",
         fio::OpenFlags::RIGHT_READABLE,
     )?;
 

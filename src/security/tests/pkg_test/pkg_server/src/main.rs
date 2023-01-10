@@ -10,7 +10,7 @@ use {
     fidl_test_security_pkg::{PackageServer_Request, PackageServer_RequestStream},
     fuchsia_async::{net::TcpListener, Task},
     fuchsia_component::server::ServiceFs,
-    fuchsia_fs::{file, open_file},
+    fuchsia_fs::{directory, file},
     fuchsia_hyper::{Executor, TcpStream},
     futures::{
         channel::oneshot::{channel, Receiver},
@@ -25,7 +25,6 @@ use {
     rustls::{Certificate, NoClientAuth, ServerConfig},
     std::{
         net::{IpAddr, Ipv4Addr, SocketAddr},
-        path::Path,
         pin::Pin,
         sync::Arc,
     },
@@ -104,12 +103,16 @@ impl RequestHandler {
         path_chars.next();
         let path = path_chars.as_str();
 
-        match open_file(&self.repository_dir, Path::new(path), fio::OpenFlags::RIGHT_READABLE) {
+        match directory::open_file_no_describe(
+            &self.repository_dir,
+            path,
+            fio::OpenFlags::RIGHT_READABLE,
+        ) {
             Ok(file) => match file::read(&file).await {
                 Ok(bytes) => Self::ok(path, bytes),
                 Err(err) => Self::not_found(path, Some(err.into())),
             },
-            Err(err) => Self::not_found(path, Some(err)),
+            Err(err) => Self::not_found(path, Some(err.into())),
         }
     }
 }

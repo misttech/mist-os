@@ -115,11 +115,12 @@ impl AssetLoader for AssetLoaderImpl {
             cause,
         };
 
-        let file_proxy = fuchsia_fs::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
             &directory_proxy,
-            Path::new(&file_name),
+            &file_name,
             io::OpenFlags::RIGHT_READABLE,
         )
+        .map_err(Into::into)
         .map_err(|e| packaged_file_error(e))?;
 
         let vmo = file_proxy

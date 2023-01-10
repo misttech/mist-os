@@ -272,7 +272,6 @@ impl Calibration {
     }
 
     async fn parse_file(path: &str, file_loader: &impl FileLoader) -> Result<Parameters, Error> {
-        let path = path.as_ref();
         let cal_contents = file_loader
             .load_file(path)
             .await

@@ -21,7 +21,6 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         num::NonZeroUsize,
-        path::Path,
         str::from_utf8,
         sync::{Arc, Weak},
     },
@@ -147,9 +146,10 @@ struct TestOutput {
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
 
 /// Opens and reads file defined by `path` in `dir`.
-async fn read_file(dir: &fio::DirectoryProxy, path: &Path) -> Result<String, Error> {
+async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {
     // Open the file in read-only mode.
-    let result_file_proxy = fuchsia_fs::open_file(dir, path, fio::OpenFlags::RIGHT_READABLE)?;
+    let result_file_proxy =
+        fuchsia_fs::directory::open_file_no_describe(dir, path, fio::OpenFlags::RIGHT_READABLE)?;
     return fuchsia_fs::read_file(&result_file_proxy).await;
 }
 
@@ -382,12 +382,12 @@ impl TestServer {
         let names = vec![self.test_data_namespace()?];
         let my_uuid = uuid::Uuid::new_v4();
         let file_name = format!("test_result-{}.json", my_uuid);
-        let test_list_file = Path::new(&file_name);
-        let test_list_path = Path::new("/test_data").join(test_list_file);
+        let test_list_file = &file_name;
+        let test_list_path = format!("/test_data/{test_list_file}");
 
         let mut args = vec![
             format!(test_flag!("filter={}"), test),
-            format!(test_flag!("output=json:{}"), test_list_path.display()),
+            format!(test_flag!("output=json:{}"), test_list_path),
         ];
 
         if run_options.include_disabled_tests.unwrap_or(false) {
@@ -514,7 +514,7 @@ impl TestServer {
 
         debug!("Opening output file for {}", test);
         // read test result file.
-        let result_str = match read_file(&self.output_dir_proxy, &test_list_file).await {
+        let result_str = match read_file(&self.output_dir_proxy, test_list_file).await {
             Ok(b) => b,
             Err(e) => {
                 // TODO(fxbug.dev/45857): Introduce Status::InternalError.
@@ -605,12 +605,12 @@ async fn get_tests(
 ) -> Result<Vec<TestCaseInfo>, EnumerationError> {
     let names = vec![test_data_namespace];
 
-    let test_list_file = Path::new("test_list.json");
-    let test_list_path = Path::new("/test_data").join(test_list_file);
+    let test_list_file = "test_list.json";
+    let test_list_path = format!("/test_data/{test_list_file}");
 
     let args = vec![
         test_flag!("list_tests").to_owned(),
-        format!(test_flag!("output=json:{}"), test_list_path.display()),
+        format!(test_flag!("output=json:{}"), test_list_path),
     ];
 
     // Load bearing to hold job guard.
@@ -634,14 +634,14 @@ async fn get_tests(
         error!("Failed getting list of tests:\n{}", output);
         return Err(EnumerationError::ListTest);
     }
-    let result_str = match read_file(&output_dir_proxy, &test_list_file).await {
+    let result_str = match read_file(&output_dir_proxy, test_list_file).await {
         Ok(b) => b,
         Err(e) => {
             let logs = std_reader.get_logs().await?;
 
             // TODO(fxbug.dev/4610): logs might not be utf8, fix the code.
             let output = from_utf8(&logs)?;
-            error!("Failed getting list of tests from {}:\n{}", test_list_file.display(), output);
+            error!("Failed getting list of tests from {}:\n{}", test_list_file, output);
             return Err(IoError::File(e).into());
         }
     };

@@ -650,9 +650,9 @@ impl FidlSuiteEventProcessor {
                                 .await
                                 .expect("read custom artifact directory");
                         for entry in entries.into_iter() {
-                            let file = fuchsia_fs::open_file(
+                            let file = fuchsia_fs::directory::open_file_no_describe(
                                 &directory,
-                                entry.name.as_ref(),
+                                &entry.name,
                                 fio::OpenFlags::RIGHT_READABLE,
                             )
                             .unwrap();

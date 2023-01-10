@@ -19,7 +19,6 @@ use fuchsia_fs;
 use fuchsia_fs::directory::{readdir_recursive, DirentKind};
 use futures::stream::TryStreamExt;
 use serde_json::{from_value, to_value, Value};
-use std::path::Path;
 
 /// Facade providing access to FactoryStoreProvider interfaces.
 #[derive(Debug)]
@@ -75,9 +74,9 @@ impl FactoryStoreFacade {
         let req: ReadFileRequest = from_value(args)?;
         let dir_proxy = self.get_directory_for_provider(req.provider)?;
 
-        let file = fuchsia_fs::open_file(
+        let file = fuchsia_fs::directory::open_file_no_describe(
             &dir_proxy,
-            &Path::new(&req.filename),
+            &req.filename,
             fio::OpenFlags::RIGHT_READABLE,
         )?;
         let contents = fuchsia_fs::file::read(&file).await?;

@@ -14,7 +14,7 @@ use {
     fuchsia_fs::file::{AsyncFile, AsyncGetSizeExt},
     fuchsia_syslog as syslog,
     std::fs,
-    std::path::{Path, PathBuf},
+    std::path::Path,
     std::vec::Vec,
 };
 
@@ -37,9 +37,9 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::open_file(
+    let file = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
-        &PathBuf::from(file_path),
+        file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     fuchsia_fs::file::read(&file).await.map_err(Into::into)
@@ -249,9 +249,9 @@ async fn read_factory_files_from_alpha_store_reports_correct_size() -> Result<()
     let expected_contents =
         fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
 
-    let file = fuchsia_fs::open_file(
+    let file = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
-        &PathBuf::from("alpha"),
+        "alpha",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     let mut async_file = AsyncFile::from_proxy(file);

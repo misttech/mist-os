@@ -16,7 +16,7 @@ use {
         lock::{Mutex, MutexGuard},
         TryStreamExt,
     },
-    std::{collections::HashMap, path::Path, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::*,
     url::Url,
     version_history::AbiRevision,
@@ -289,9 +289,9 @@ impl Registry {
         let component = component_decls_guard
             .get(&parsed_url)
             .ok_or(fresolution::ResolverError::ManifestNotFound)?;
-        let manifest_file = fuchsia_fs::open_file(
+        let manifest_file = fuchsia_fs::directory::open_file_no_describe(
             &component.package_dir,
-            Path::new(&fragment),
+            &fragment,
             fio::OpenFlags::RIGHT_READABLE,
         )
         .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;

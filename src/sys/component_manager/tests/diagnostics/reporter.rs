@@ -5,7 +5,6 @@
 use {
     diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect},
     fidl_fuchsia_sys2 as fsys, fuchsia_fs,
-    std::path::Path,
 };
 
 async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64 {
@@ -14,9 +13,9 @@ async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64
     let execution = resolved.execution.unwrap();
     let runtime_dir = execution.runtime_dir.unwrap();
     let runtime_dir = runtime_dir.into_proxy().unwrap();
-    let file_proxy = fuchsia_fs::open_file(
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         &runtime_dir,
-        &Path::new("elf/job_id"),
+        "elf/job_id",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )
     .expect("Failed to open file.");

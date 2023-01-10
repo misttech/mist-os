@@ -12,7 +12,6 @@ use {
         WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    std::path::PathBuf,
 };
 
 macro_rules! connect_to_factory_store_provider {
@@ -30,9 +29,9 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::open_file(
+    let file = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
-        &PathBuf::from(file_path),
+        file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     fuchsia_fs::file::read(&file).await.map_err(Into::into)

@@ -11,7 +11,6 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_factory::MiscFactoryStoreProviderProxy;
 use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy, OpenFlags};
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::Rc;
 
 /// Represents the types of LEDs that are tracked.
@@ -158,9 +157,9 @@ impl FactoryFileLoader {
 #[async_trait(?Send)]
 impl FileLoader for FactoryFileLoader {
     async fn load_file(&self, file_path: &str) -> Result<String, Error> {
-        let file_proxy = fuchsia_fs::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
             &self.directory_proxy,
-            Path::new(file_path),
+            file_path,
             OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE,
         )
         .with_context(|| format!("Failed to open configuration at {:?}", file_path))?;

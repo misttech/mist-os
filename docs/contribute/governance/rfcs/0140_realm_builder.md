@@ -642,7 +642,7 @@ let component_storage_proxy = builder.host_storage(
     &echo_server,
     "data",
 ).await?;
-let file_proxy = fuchsia_fs::open_file(
+let file_proxy = fuchsia_fs::directory::open_file_no_describe(
     &component_storage_proxy,
     "config-file.json",
     fio::OpenFlags::RIGHT_WRITABLE|fio::OpenFlags::CREATE,

@@ -644,7 +644,6 @@ mod tests {
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         runner::component::Controllable,
         scoped_task,
-        std::path::Path,
         std::{
             convert::TryFrom,
             ffi::CString,
@@ -826,9 +825,9 @@ mod tests {
     // TODO(fsamuel): A variation of this is used in a couple of places. We should consider
     // refactoring this into a test util file.
     async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
-        let file_proxy = fuchsia_fs::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
             &root_proxy,
-            &Path::new(path),
+            path,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .expect("Failed to open file.");

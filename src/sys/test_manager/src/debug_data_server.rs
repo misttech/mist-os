@@ -36,7 +36,7 @@ async fn copy_kernel_debug_data(
     futures::stream::iter(files)
         .map(Ok)
         .try_for_each_concurrent(None, move |DebugDataFile { name, contents }| {
-            let rel_file_path = PathBuf::from(name);
+            let rel_file_path = PathBuf::from(&name);
             async move {
                 if let Some(parent) = rel_file_path.parent() {
                     if !parent.as_os_str().is_empty() {
@@ -49,9 +49,12 @@ async fn copy_kernel_debug_data(
                         .context("create subdirectories")?;
                     }
                 }
-                let file =
-                    fuchsia_fs::open_file(tmp_dir_root_ref, &rel_file_path, overwite_file_flag)
-                        .context("open file")?;
+                let file = fuchsia_fs::directory::open_file_no_describe(
+                    tmp_dir_root_ref,
+                    &name,
+                    overwite_file_flag,
+                )
+                .context("open file")?;
                 fuchsia_fs::file::write(&file, &contents).await.context("write file")?;
                 Result::<_, Error>::Ok(())
             }

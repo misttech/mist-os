@@ -16,7 +16,6 @@ use {
     fuchsia_fs::directory::DirentKind,
     futures::stream::TryStreamExt,
     nom::HexDisplay,
-    std::path::PathBuf,
     structopt::StructOpt,
 };
 
@@ -82,9 +81,9 @@ where
     let out = match cmd {
         FactoryStoreCmd::List => list_files(&dir_proxy).await?,
         FactoryStoreCmd::Dump { name } => {
-            let file = fuchsia_fs::open_file(
+            let file = fuchsia_fs::directory::open_file_no_describe(
                 &dir_proxy,
-                &PathBuf::from(name),
+                &name,
                 fio::OpenFlags::RIGHT_READABLE,
             )?;
             let contents = fuchsia_fs::file::read(&file).await?;
