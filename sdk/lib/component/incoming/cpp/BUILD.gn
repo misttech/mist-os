@@ -10,10 +10,14 @@ sdk_source_set("cpp") {
   include_base = "//sdk"
 
   sources = [
+    "clone.h",
     "constants.h",
     "internal.cc",
     "internal.h",
-    "service_client.cc",
+    "protocol.cc",
+    "protocol.h",
+    "service.cc",
+    "service.h",
     "service_client.h",
   ]
 

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.unknown/cpp/wire.h>
 #include <lib/component/incoming/cpp/constants.h>
-#include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 

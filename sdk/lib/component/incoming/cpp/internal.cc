@@ -5,10 +5,8 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/internal.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl/cpp/wire/array.h>
 
 namespace component {
-
 namespace internal {
 
 zx::result<zx::channel> ConnectRaw(std::string_view path) {
