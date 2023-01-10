@@ -750,10 +750,10 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
       ::bt::hci_spec::kInquiryResultEventCode, std::move(inquiry_result_cb)));
 
   // The callback invoked for an Inquiry Complete response.
-  auto inquiry_complete_cb = [cleanup_cb =
-                                  cleanup_cb.share()](const ::bt::hci::EventPacket& event) mutable {
-    auto params = event.params<::bt::hci_spec::InquiryCompleteEventParams>();
-    std::cout << fxl::StringPrintf("  Inquiry Complete - status: 0x%02hhx\n", params.status);
+  auto inquiry_complete_cb = [cleanup_cb = cleanup_cb.share()](
+                                 const ::bt::hci::EmbossEventPacket& event) mutable {
+    auto view = event.view<::bt::hci_spec::InquiryCompleteEventView>();
+    std::cout << fxl::StringPrintf("  Inquiry Complete - status: 0x%02hhx\n", view.status().Read());
     cleanup_cb();
     return ::bt::hci::CommandChannel::EventCallbackResult::kContinue;
   };
