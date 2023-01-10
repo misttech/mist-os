@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
                 ErrorLevel::Warning => warning_count += 1,
                 ErrorLevel::Error => error_count += 1,
             }
-            println!("{}", e);
+            println!("{}\n", e);
         }
         // Only bail if there are errors, warnings should return OK.
         if error_count > 0 {

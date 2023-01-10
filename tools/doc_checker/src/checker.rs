@@ -109,15 +109,19 @@ impl DocCheckError {
 
 impl fmt::Display for DocCheckError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.help_suggestion {
-            Some(help) => f.write_fmt(format_args!(
-                "{} {}: {}. Consider using {}.",
-                self.doc_line, self.level, self.message, help
-            )),
-            None => {
-                f.write_fmt(format_args!("{} {}: {}.", self.doc_line, self.level, self.message))
-            }
-        }
+        let suggestion = self
+            .help_suggestion
+            .as_ref()
+            .map(|suggestion| format!("\nConsider using {}", suggestion))
+            .unwrap_or(String::new());
+
+        f.write_fmt(format_args!(
+            "{level}\n{doc_line}\n{message}{suggestion}",
+            level = self.level,
+            doc_line = self.doc_line,
+            message = self.message,
+            suggestion = suggestion
+        ))
     }
 }
 
