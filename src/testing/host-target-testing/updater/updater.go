@@ -317,5 +317,5 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	}
 
 	// Trigger an update
-	return updateCheckNow(ctx, c, u.repo, false)
+	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules)
 }
