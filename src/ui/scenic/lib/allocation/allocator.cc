@@ -22,6 +22,20 @@ using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 
 namespace allocation {
 
+namespace {
+
+RegisterBufferCollectionUsages UsageToUsages(
+    fuchsia::ui::composition::RegisterBufferCollectionUsage usage) {
+  switch (usage) {
+    case fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT:
+      return fuchsia::ui::composition::RegisterBufferCollectionUsages::DEFAULT;
+    case fuchsia::ui::composition::RegisterBufferCollectionUsage::SCREENSHOT:
+      return fuchsia::ui::composition::RegisterBufferCollectionUsages::SCREENSHOT;
+  }
+}
+
+}  // namespace
+
 Allocator::Allocator(sys::ComponentContext* app_context,
                      const std::vector<std::shared_ptr<BufferCollectionImporter>>&
                          default_buffer_collection_importers,
@@ -63,9 +77,15 @@ void Allocator::RegisterBufferCollection(
 
   auto export_token = std::move(*args.mutable_export_token());
   auto buffer_collection_token = std::move(*args.mutable_buffer_collection_token());
-  auto usage = args.has_usage() ? args.usage()
-                                : fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT;
-  auto usages = args.has_usages() ? args.usages() : RegisterBufferCollectionUsages::DEFAULT;
+
+  // If no usages are set we default to DEFAULT. Otherwise the newer "usages" value takes precedence
+  // over the deprecated "usage" variant.
+  RegisterBufferCollectionUsages usages = RegisterBufferCollectionUsages::DEFAULT;
+  if (args.has_usages()) {
+    usages = args.usages();
+  } else if (args.has_usage()) {
+    usages = UsageToUsages(args.usage());
+  }
 
   if (!buffer_collection_token.is_valid()) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer collection token";
@@ -108,32 +128,7 @@ void Allocator::RegisterBufferCollection(
   fuchsia::sysmem::BufferCollectionTokenSyncPtr sync_token = buffer_collection_token.BindSync();
   std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> tokens;
 
-  // Case on whether or not it is a default or screenshot BufferCollection.
-  bool used_for_default = false;
-  bool used_for_screenshot = false;
-  std::vector<std::pair<std::shared_ptr<BufferCollectionImporter>, BufferCollectionUsage>>
-      importers;
-  if (args.has_usages()) {
-    used_for_default = usages & RegisterBufferCollectionUsages::DEFAULT ? true : false;
-    used_for_screenshot = usages & RegisterBufferCollectionUsages::SCREENSHOT ? true : false;
-  } else {
-    used_for_default = usage == fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT;
-    used_for_screenshot =
-        usage == fuchsia::ui::composition::RegisterBufferCollectionUsage::SCREENSHOT;
-  }
-
-  if (used_for_default) {
-    for (uint32_t i = 0; i < default_buffer_collection_importers_.size(); i++) {
-      importers.push_back(
-          {default_buffer_collection_importers_[i], BufferCollectionUsage::kClientImage});
-    }
-  }
-  if (used_for_screenshot) {
-    for (uint32_t i = 0; i < screenshot_buffer_collection_importers_.size(); i++) {
-      importers.push_back(
-          {screenshot_buffer_collection_importers_[i], BufferCollectionUsage::kRenderTarget});
-    }
-  }
+  const auto importers = GetImporters(usages);
 
   for (uint32_t i = 0; i < importers.size(); i++) {
     fuchsia::sysmem::BufferCollectionTokenSyncPtr extra_token;
@@ -177,9 +172,9 @@ void Allocator::RegisterBufferCollection(
   // fails.
   uint32_t i = 0;
   for (i = 0; i < importers.size(); i++) {
-    auto importer = (importers)[i];
-    auto result = importer.first->ImportBufferCollection(
-        koid, sysmem_allocator_.get(), std::move(tokens[i]), importer.second, std::nullopt);
+    auto& [importer, usage] = importers.at(i);
+    auto result = importer.ImportBufferCollection(koid, sysmem_allocator_.get(),
+                                                  std::move(tokens[i]), usage, std::nullopt);
     // Exit the loop early if a importer fails to import the buffer collection.
     if (!result) {
       break;
@@ -192,18 +187,15 @@ void Allocator::RegisterBufferCollection(
     // We have to clean up the buffer collection from the importers where importation was
     // successful.
     for (uint32_t j = 0; j < i; j++) {
-      auto importer = (importers)[j];
-      importer.first->ReleaseBufferCollection(koid, importer.second);
+      auto& [importer, usage] = importers.at(j);
+      importer.ReleaseBufferCollection(koid, usage);
     }
     FX_LOGS(ERROR) << "Failed to import the buffer collection to the BufferCollectionimporter.";
     callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
     return;
   }
 
-  buffer_collections_[koid] = usage;
-  if (args.has_usages()) {
-    buffer_collection_usages_[koid] = usages;
-  }
+  buffer_collections_[koid] = usages;
 
   // Use a self-referencing async::WaitOnce to deregister buffer collections when all
   // BufferCollectionImportTokens are used, i.e. peers of eventpair are closed. Note that the
@@ -227,44 +219,33 @@ void Allocator::RegisterBufferCollection(
   callback(fpromise::ok());
 }
 
+std::vector<std::pair<BufferCollectionImporter&, BufferCollectionUsage>> Allocator::GetImporters(
+    const RegisterBufferCollectionUsages usages) const {
+  std::vector<std::pair<BufferCollectionImporter&, BufferCollectionUsage>> importers;
+  if (usages & RegisterBufferCollectionUsages::DEFAULT) {
+    for (const auto& importer : default_buffer_collection_importers_) {
+      importers.emplace_back(*importer, BufferCollectionUsage::kClientImage);
+    }
+  }
+  if (usages & RegisterBufferCollectionUsages::SCREENSHOT) {
+    for (const auto& importer : screenshot_buffer_collection_importers_) {
+      importers.emplace_back(*importer, BufferCollectionUsage::kRenderTarget);
+    }
+  }
+
+  return importers;
+}
+
 void Allocator::ReleaseBufferCollection(GlobalBufferCollectionId collection_id) {
   TRACE_DURATION("gfx", "allocation::Allocator::ReleaseBufferCollection");
   FX_DCHECK(dispatcher_ == async_get_default_dispatcher());
 
-  auto usage = buffer_collections_[collection_id];
+  const auto usages = buffer_collections_.at(collection_id);
   buffer_collections_.erase(collection_id);
 
-  bool used_for_default = false;
-  bool used_for_screenshot = false;
-  std::vector<std::pair<std::shared_ptr<BufferCollectionImporter>, BufferCollectionUsage>>
-      importers;
-  if (buffer_collection_usages_.find(collection_id) != buffer_collection_usages_.end()) {
-    auto usages = buffer_collection_usages_[collection_id];
-    buffer_collection_usages_.erase(collection_id);
-
-    used_for_default = usages & RegisterBufferCollectionUsages::DEFAULT ? true : false;
-    used_for_screenshot = usages & RegisterBufferCollectionUsages::SCREENSHOT ? true : false;
-  } else {
-    used_for_default = usage == fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT;
-    used_for_screenshot =
-        usage == fuchsia::ui::composition::RegisterBufferCollectionUsage::SCREENSHOT;
-  }
-
-  if (used_for_default) {
-    for (uint32_t i = 0; i < default_buffer_collection_importers_.size(); i++) {
-      importers.push_back(
-          {default_buffer_collection_importers_[i], BufferCollectionUsage::kClientImage});
-    }
-  }
-  if (used_for_screenshot) {
-    for (uint32_t i = 0; i < screenshot_buffer_collection_importers_.size(); i++) {
-      importers.push_back(
-          {screenshot_buffer_collection_importers_[i], BufferCollectionUsage::kRenderTarget});
-    }
-  }
-
-  for (auto importer : importers) {
-    importer.first->ReleaseBufferCollection(collection_id, importer.second);
+  for (auto& [importer, usage] : GetImporters(usages)) {
+    importer.ReleaseBufferCollection(collection_id, usage);
   }
 }
+
 }  // namespace allocation

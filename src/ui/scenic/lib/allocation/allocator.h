@@ -38,6 +38,10 @@ class Allocator : public fuchsia::ui::composition::Allocator {
  private:
   void ReleaseBufferCollection(GlobalBufferCollectionId collection_id);
 
+  // Returns a list of references to all importers to be used for a buffer collection with |usages|.
+  std::vector<std::pair<BufferCollectionImporter&, allocation::BufferCollectionUsage>> GetImporters(
+      fuchsia::ui::composition::RegisterBufferCollectionUsages usages) const;
+
   // Dispatcher where this class runs on. Currently points to scenic main thread's dispatcher.
   async_dispatcher_t* dispatcher_;
 
@@ -57,13 +61,8 @@ class Allocator : public fuchsia::ui::composition::Allocator {
 
   // Keep track of buffer collection Ids for garbage collection.
   std::unordered_map<GlobalBufferCollectionId,
-                     fuchsia::ui::composition::RegisterBufferCollectionUsage>
-      buffer_collections_;
-
-  // Keep track of buffer collection id usage types for garbage collection.
-  std::unordered_map<GlobalBufferCollectionId,
                      fuchsia::ui::composition::RegisterBufferCollectionUsages>
-      buffer_collection_usages_;
+      buffer_collections_;
 
   // Should be last.
   fxl::WeakPtrFactory<Allocator> weak_factory_;
