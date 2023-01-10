@@ -61,6 +61,33 @@ impl<'a> HandleRef<'a> {
         Self(INVALID_HANDLE, std::marker::PhantomData)
     }
 
+    /// Duplicate this handle. The new handle will have the given `rights`, which must be a subset
+    /// of the rights the existing handle has.
+    pub fn duplicate(&self, mut rights: Rights) -> Result<Handle, Status> {
+        let mut new_entry = HANDLE_TABLE
+            .lock()
+            .unwrap()
+            .get(&self.raw_handle())
+            .cloned()
+            .ok_or(Status::BAD_HANDLE)?;
+        if rights == Rights::SAME_RIGHTS {
+            rights = new_entry.rights;
+        }
+
+        if !new_entry.rights.contains(rights) {
+            return Err(Status::INVALID_ARGS);
+        }
+        if !new_entry.rights.contains(Rights::DUPLICATE) {
+            return Err(Status::ACCESS_DENIED);
+        }
+        new_entry.rights = rights;
+        let new_handle = alloc_handle();
+        let side = new_entry.side;
+        new_entry.object.lock().unwrap().increment_open_count(side);
+        let _ = HANDLE_TABLE.lock().unwrap().insert(new_handle, new_entry);
+        Ok(Handle(new_handle))
+    }
+
     /// Signal an object
     pub fn signal(&self, clear_mask: Signals, set_mask: Signals) -> Result<(), Status> {
         if self.is_invalid() {
@@ -241,6 +268,11 @@ impl AsHandleRef for HandleRef<'_> {
 
 /// A trait implemented by all handle-based types.
 pub trait HandleBased: AsHandleRef + From<Handle> + Into<Handle> {
+    /// Duplicate a handle, possibly reducing the rights available.
+    fn duplicate_handle(&self, rights: Rights) -> Result<Self, Status> {
+        self.as_handle_ref().duplicate(rights).map(|handle| Self::from(handle))
+    }
+
     /// Creates an instance of this type from a handle.
     ///
     /// This is a convenience function which simply forwards to the `From` trait.
@@ -421,7 +453,7 @@ impl Channel {
         };
 
         let object = object.lock().unwrap();
-        !object.liveness().is_open()
+        !object.is_open()
     }
 
     /// Read a message from a channel.
@@ -458,7 +490,7 @@ impl Channel {
                             .status_for_self()?;
                     }
                     Poll::Ready(Ok(()))
-                } else if obj.liveness.is_open() {
+                } else if obj.is_open() {
                     obj.wakers.side_mut(side).pending_readable(cx)
                 } else {
                     Poll::Ready(Err(zx_status::Status::PEER_CLOSED))
@@ -516,7 +548,7 @@ impl Channel {
                         .for_each(|(i, hdl)| handles[i] = MaybeUninit::new(hdl));
                     Poll::Ready(Ok((Ok(()), msg_bytes_len, msg_handles_len)))
                 }
-            } else if obj.liveness.is_open() {
+            } else if obj.is_open() {
                 obj.wakers.side_mut(side).pending_readable(cx)
             } else {
                 Poll::Ready(Ok((Err(zx_status::Status::PEER_CLOSED), 0, 0)))
@@ -569,7 +601,7 @@ impl Channel {
         }
         with_handle(self.0, |h, side| {
             if let HdlRef::Channel(obj) = h {
-                if !obj.liveness.is_open() {
+                if !obj.is_open() {
                     return Err(zx_status::Status::PEER_CLOSED);
                 }
                 obj.q
@@ -609,7 +641,7 @@ impl Channel {
         }
         with_handle(self.0, |h, side| {
             if let HdlRef::Channel(obj) = h {
-                if !obj.liveness.is_open() {
+                if !obj.is_open() {
                     // Move the handles outside this closure before dropping them.  If any are
                     // channels in the same shard as this channel, dropping them will attempt to
                     // re-acquire the lock held by with_handle.
@@ -676,12 +708,7 @@ impl Socket {
     pub fn create(sock_opts: SocketOpts) -> Result<(Socket, Socket), zx_status::Status> {
         match sock_opts {
             SocketOpts::STREAM => {
-                let rights = Rights::TRANSFER
-                    | Rights::WRITE
-                    | Rights::READ
-                    | Rights::WAIT
-                    | Rights::SIGNAL
-                    | Rights::SIGNAL_PEER;
+                let rights = Rights::SOCKET_DEFAULT;
                 let (left, right, obj) = new_handle_pair(HdlType::StreamSocket, rights);
 
                 let mut obj = obj.lock().unwrap();
@@ -700,11 +727,7 @@ impl Socket {
                 Ok((Socket(left), Socket(right)))
             }
             SocketOpts::DATAGRAM => {
-                let rights = Rights::TRANSFER
-                    | Rights::WRITE
-                    | Rights::READ
-                    | Rights::SIGNAL
-                    | Rights::SIGNAL_PEER;
+                let rights = Rights::SOCKET_DEFAULT;
                 let (left, right, obj) = new_handle_pair(HdlType::DatagramSocket, rights);
 
                 let mut obj = obj.lock().unwrap();
@@ -731,7 +754,7 @@ impl Socket {
         with_handle(self.0, |h, side| {
             match h {
                 HdlRef::StreamSocket(obj) => {
-                    if !obj.liveness.is_open() {
+                    if !obj.is_open() {
                         return Err(zx_status::Status::PEER_CLOSED);
                     }
                     obj.q.side_mut(side).extend(bytes);
@@ -739,7 +762,7 @@ impl Socket {
                         .status_for_peer()?;
                 }
                 HdlRef::DatagramSocket(obj) => {
-                    if !obj.liveness.is_open() {
+                    if !obj.is_open() {
                         return Err(zx_status::Status::PEER_CLOSED);
                     }
                     obj.q.side_mut(side).push_back(bytes.to_vec());
@@ -755,12 +778,10 @@ impl Socket {
     /// Return how many bytes are buffered in the socket
     pub fn outstanding_read_bytes(&self) -> Result<usize, zx_status::Status> {
         let (len, open) = with_handle(self.0, |h, side| match h {
-            HdlRef::StreamSocket(obj) => {
-                (obj.q.side(side.opposite()).len(), obj.liveness.is_open())
-            }
+            HdlRef::StreamSocket(obj) => (obj.q.side(side.opposite()).len(), obj.is_open()),
             HdlRef::DatagramSocket(obj) => (
                 obj.q.side(side.opposite()).front().map(|frame| frame.len()).unwrap_or(0),
-                obj.liveness.is_open(),
+                obj.is_open(),
             ),
             _ => panic!("Non socket passed to Socket::outstanding_read_bytes"),
         });
@@ -781,7 +802,7 @@ impl Socket {
         with_handle(self.0, |h, side| match h {
             HdlRef::StreamSocket(obj) => {
                 if bytes.is_empty() {
-                    if obj.liveness.is_open() {
+                    if obj.is_open() {
                         return Poll::Ready(Ok(0));
                     } else {
                         return Poll::Ready(Err(zx_status::Status::PEER_CLOSED));
@@ -790,7 +811,7 @@ impl Socket {
                 let read = obj.q.side_mut(side.opposite());
                 let copy_bytes = std::cmp::min(bytes.len(), read.len());
                 if copy_bytes == 0 {
-                    if obj.liveness.is_open() {
+                    if obj.is_open() {
                         return obj.wakers.side_mut(side).pending_readable(ctx);
                     } else {
                         return Poll::Ready(Err(zx_status::Status::PEER_CLOSED));
@@ -813,7 +834,7 @@ impl Socket {
                             .status_for_self()?;
                     }
                     Poll::Ready(Ok(n))
-                } else if !obj.liveness.is_open() {
+                } else if !obj.is_open() {
                     Poll::Ready(Err(zx_status::Status::PEER_CLOSED))
                 } else {
                     obj.wakers.side_mut(side).pending_readable(ctx)
@@ -1155,7 +1176,7 @@ pub mod on_signals {
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
             with_handle(self.h, |mut h, side| {
                 let h = h.as_hdl_data();
-                if self.koid != h.koids(side).0 || !h.liveness().is_side_open(side) {
+                if self.koid != h.koids(side).0 || !h.is_side_open(side) {
                     if self.signals.contains(Signals::HANDLE_CLOSED) {
                         Poll::Ready(Signals::HANDLE_CLOSED)
                     } else {
@@ -1341,6 +1362,11 @@ bitflags! {
         /// IO related rights
         const IO = Rights::WRITE.bits() |
                    Rights::READ.bits();
+        /// Rights of a new socket.
+        const SOCKET_DEFAULT = Rights::BASIC_RIGHTS.bits() |
+                                Rights::IO.bits() |
+                                Rights::SIGNAL.bits() |
+                                Rights::SIGNAL_PEER.bits();
         /// Rights of a new channel.
         const CHANNEL_DEFAULT = (Rights::BASIC_RIGHTS.bits() & !Rights::DUPLICATE.bits()) |
                                 Rights::IO.bits() |
@@ -1490,43 +1516,6 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Liveness {
-    Open,
-    Left,
-    Right,
-}
-
-impl Liveness {
-    fn close(self, side: Side) -> Option<Liveness> {
-        match (self, side) {
-            (Liveness::Open, Side::Left) => Some(Liveness::Right),
-            (Liveness::Open, Side::Right) => Some(Liveness::Left),
-            (Liveness::Left, Side::Right) => unreachable!(),
-            (Liveness::Right, Side::Left) => unreachable!(),
-            (Liveness::Left, Side::Left) => None,
-            (Liveness::Right, Side::Right) => None,
-        }
-    }
-
-    fn is_open(self) -> bool {
-        match self {
-            Liveness::Open => true,
-            _ => false,
-        }
-    }
-
-    fn is_side_open(self, side: Side) -> bool {
-        match (self, side) {
-            (Liveness::Open, _) => true,
-            (Liveness::Left, Side::Left) => true,
-            (Liveness::Right, Side::Right) => true,
-            (Liveness::Left, Side::Right) => false,
-            (Liveness::Right, Side::Left) => false,
-        }
-    }
-}
-
 #[derive(Default)]
 struct WakerSlot(Vec<Waker>);
 
@@ -1615,31 +1604,37 @@ trait HdlData {
         signals: Signals,
     ) -> Poll<Signals>;
     fn koids(&self, side: Side) -> (u64, u64);
-    fn liveness(&self) -> Liveness;
+    fn is_side_open(&self, side: Side) -> bool;
 }
 
 struct KObject<Q> {
     two_sided: bool,
     q: Sided<Q>,
     wakers: Sided<Wakers>,
-    liveness: Liveness,
+    open_count: Sided<usize>,
     koid_left: u64,
     signals: Sided<Signals>,
 }
 
 impl<Q> KObject<Q> {
+    fn is_open(&self) -> bool {
+        *self.open_count.side(Side::Left) != 0
+            && (!self.two_sided || *self.open_count.side(Side::Right) != 0)
+    }
+
     fn do_close(&mut self, side: Side) {
-        match self.liveness.close(side) {
-            None => {
-                self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
-            }
-            Some(liveness) => {
-                self.liveness = liveness;
+        let open_count = self.open_count.side_mut(side);
+        *open_count = open_count.saturating_sub(1);
+
+        if *open_count == 0 {
+            self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
+
+            if *self.open_count.side(side.opposite()) != 0 {
                 self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
                 self.signal(side.opposite(), Signals::empty(), Signals::OBJECT_PEER_CLOSED)
                     .expect("Close reported other side was open but we could not signal it.");
             }
-        };
+        }
     }
 }
 
@@ -1650,7 +1645,7 @@ impl<Q> HdlData for KObject<Q> {
         clear_mask: Signals,
         set_mask: Signals,
     ) -> Result<(), SignalError> {
-        if !self.liveness.is_side_open(side) {
+        if *self.open_count.side(side) == 0 {
             return Err(SignalError::HandleInvalid);
         }
         let signals = self.signals.side_mut(side);
@@ -1658,10 +1653,6 @@ impl<Q> HdlData for KObject<Q> {
         signals.insert(set_mask);
         self.wakers.side_mut(side).wake(*signals);
         Ok(())
-    }
-
-    fn liveness(&self) -> Liveness {
-        self.liveness
     }
 
     fn poll_signals(
@@ -1688,6 +1679,10 @@ impl<Q> HdlData for KObject<Q> {
             Side::Right => (self.koid_left + 1, self.koid_left),
         }
     }
+
+    fn is_side_open(&self, side: Side) -> bool {
+        *self.open_count.side(side) != 0
+    }
 }
 
 enum KObjectEntry {
@@ -1699,13 +1694,23 @@ enum KObjectEntry {
 }
 
 impl KObjectEntry {
-    fn liveness(&self) -> Liveness {
+    fn is_open(&self) -> bool {
         match self {
-            KObjectEntry::Channel(k) => k.liveness,
-            KObjectEntry::StreamSocket(k) => k.liveness,
-            KObjectEntry::DatagramSocket(k) => k.liveness,
-            KObjectEntry::EventPair(k) => k.liveness,
-            KObjectEntry::Event(k) => k.liveness,
+            KObjectEntry::Channel(k) => k.is_open(),
+            KObjectEntry::StreamSocket(k) => k.is_open(),
+            KObjectEntry::DatagramSocket(k) => k.is_open(),
+            KObjectEntry::EventPair(k) => k.is_open(),
+            KObjectEntry::Event(k) => k.is_open(),
+        }
+    }
+
+    fn increment_open_count(&mut self, side: Side) {
+        match self {
+            KObjectEntry::Channel(k) => *k.open_count.side_mut(side) += 1,
+            KObjectEntry::StreamSocket(k) => *k.open_count.side_mut(side) += 1,
+            KObjectEntry::DatagramSocket(k) => *k.open_count.side_mut(side) += 1,
+            KObjectEntry::EventPair(k) => *k.open_count.side_mut(side) += 1,
+            KObjectEntry::Event(k) => *k.open_count.side_mut(side) += 1,
         }
     }
 
@@ -1720,6 +1725,7 @@ impl KObjectEntry {
     }
 }
 
+#[derive(Clone)]
 struct HandleTableEntry {
     object: Arc<Mutex<KObjectEntry>>,
     rights: Rights,
@@ -1734,7 +1740,7 @@ fn new_handle_pair(hdl_type: HdlType, rights: Rights) -> (u32, u32, Arc<Mutex<KO
             two_sided: true,
             q: Default::default(),
             wakers: Default::default(),
-            liveness: Liveness::Open,
+            open_count: Sided { left: 1, right: 1 },
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
         }
@@ -1769,7 +1775,7 @@ fn new_handle(hdl_type: HdlType, rights: Rights) -> (u32, Arc<Mutex<KObjectEntry
             two_sided: false,
             q: Default::default(),
             wakers: Default::default(),
-            liveness: Liveness::Open,
+            open_count: Sided { left: 1, right: 0 },
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
         }
@@ -2094,6 +2100,39 @@ mod test {
         let mut buf = [0u8; 128];
         assert_eq!(b.read(&mut buf).unwrap(), 3);
         assert_eq!(&buf[0..3], &[1, 2, 3]);
+    }
+
+    #[test]
+    fn socket_dup_write_read() {
+        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let c = a.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+        a.write(&[1, 2, 3]).unwrap();
+        c.write(&[4, 5, 6]).unwrap();
+        drop(c);
+        a.write(&[7, 8, 9]).unwrap();
+        let mut buf = [0u8; 128];
+        assert_eq!(b.read(&mut buf).unwrap(), 9);
+        assert_eq!(&buf[0..9], &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn socket_write_dup_read() {
+        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let c = b.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+        a.write(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let mut buf = [0u8; 3];
+        assert_eq!(b.read(&mut buf).unwrap(), 3);
+        assert_eq!(&buf[0..3], &[1, 2, 3]);
+        drop(b);
+        assert_eq!(c.read(&mut buf).unwrap(), 3);
+        assert_eq!(&buf[0..3], &[4, 5, 6]);
+    }
+
+    #[test]
+    fn socket_dup_requires_right() {
+        let (_a, b) = Socket::create(SocketOpts::STREAM).unwrap();
+        let c = b.duplicate_handle(Rights::SOCKET_DEFAULT & !Rights::DUPLICATE).unwrap();
+        assert!(matches!(c.duplicate_handle(Rights::SAME_RIGHTS), Err(Status::ACCESS_DENIED)));
     }
 
     #[test]
