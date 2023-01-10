@@ -119,15 +119,16 @@ void Namespace::ProcessIoCompletions() {
 
 int Namespace::IoLoop() {
   while (true) {
-    if (sync_completion_wait(&io_signal_, ZX_TIME_INFINITE)) {
-      break;
-    }
-    if (driver_shutdown_) {
-      // TODO: cancel out pending IO
+    if (driver_shutdown_) {  // Check this outside of io_signal_ wait-reset below to avoid deadlock.
       zxlogf(DEBUG, "IO thread exiting.");
       break;
     }
 
+    zx_status_t status = sync_completion_wait(&io_signal_, ZX_TIME_INFINITE);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
+      break;
+    }
     sync_completion_reset(&io_signal_);
 
     // process completion messages
@@ -164,8 +165,7 @@ void Namespace::DdkRelease() {
   driver_shutdown_ = true;
   if (io_thread_started_) {
     sync_completion_signal(&io_signal_);
-    int unused;
-    thrd_join(io_thread_, &unused);
+    thrd_join(io_thread_, nullptr);
   }
 
   // Error out any pending commands
