@@ -3,7 +3,6 @@
 Below is the list of workflows you can perform in the Fuchsia SDK development environment to
 interact with Fuchsia systems, devices, and software.
 
-
 ## Table of contents
 
 * Devices
@@ -16,6 +15,7 @@ interact with Fuchsia systems, devices, and software.
 
 * Components
 
+  * [Explore components][explore-components]
   * [View component information][view-component-info]
   * [Start a component during development][start-a-component]
   * [Copy files to and from a component][copy-files]
@@ -35,6 +35,11 @@ interact with Fuchsia systems, devices, and software.
 * Performance
 
   * [Record traces for performance analysis][record-traces]
+  * [Measure the memory usage on a device][measure-memory-usage]
+
+* Testing
+
+  * [Run tests on a device][run-tests]
 
 <!-- Reference links -->
 
@@ -56,3 +61,6 @@ interact with Fuchsia systems, devices, and software.
 [start-zxdb]: start-the-fuchsia-debugger.md
 [monitor-fidl]: monitor-fidl-messages-on-a-device.md
 [record-traces]: record-traces.md
+[explore-components]: explore-components.md
+[measure-memory-usage]: explore-memory-usage.md
+[run-tests]: run-device-tests.md
