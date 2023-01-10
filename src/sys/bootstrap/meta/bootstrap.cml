@@ -18,7 +18,7 @@
         },
         {
             name: "driver_index",
-            url: "fuchsia-boot:///#meta/driver-index.cm",
+            url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
             on_terminate: "reboot",
         },
         {
