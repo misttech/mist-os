@@ -940,6 +940,9 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                 }
                             });
                         }
+                        if let Some(x) = telemetry_data.uptime {
+                            inspector.root().record_int("uptime", x.into());
+                        }
                     }
                     Err(e) => {
                         fx_log_warn!("Error in logging telemetry. Error: {}", e);

@@ -103,6 +103,9 @@ pub use state::*;
 mod radio;
 pub use radio::*;
 
+mod uptime;
+pub use uptime::*;
+
 mod udp;
 pub use udp::*;
 
@@ -155,6 +158,7 @@ pub trait InstanceInterface:
     + MessageBuffer
     + Radio
     + Joiner
+    + Uptime
     + Udp
     + Trel
     + BorderAgent

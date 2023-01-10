@@ -365,4 +365,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    17: leader_data LeaderData;
+
+    /// The uptime of the current instance.
+    ///
+    /// Required.
+   18: uptime zx.duration;
 };

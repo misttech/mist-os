@@ -918,6 +918,7 @@ where
             }),
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),
             leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
+            uptime: Some(ot.get_uptime().into_nanos()),
             ..Telemetry::EMPTY
         })
     }
