@@ -552,6 +552,7 @@ impl FilesystemLauncher {
         let path = "/minfs-for-copying";
         fs.bind_to_path(path).context("binding minfs to path")?;
         let copied_data = copier::read_from(path).await.context("reading minfs data")?;
+        fs.shutdown().await.context("shutting down minfs")?;
         Ok(copied_data)
     }
 }
