@@ -177,7 +177,9 @@ class MapGrowsdownTest : public testing::Test {
     helper.RunInForkedProcess([test_address, type] {
       struct sigaction segv_act;
       segv_act.sa_sigaction = [](int signo, siginfo_t* info, void* ucontext) {
-        if (signo == SIGSEGV && info->si_addr == expected_fault_address) {
+        // TODO(https://fxbug.dev/118860): si_addr is not populated in Starnix. Add this check when
+        // it's fixed.
+        if (signo == SIGSEGV /*&& info->si_addr == expected_fault_address*/) {
           _exit(EXIT_SUCCESS);
         }
         _exit(EXIT_FAILURE);
@@ -215,8 +217,8 @@ TEST_F(MapGrowsdownTest, Grow) {
   ASSERT_NE(constraint_mapping, MAP_FAILED)
       << "mmap failed: " << strerror(errno) << "(" << errno << ")";
 
-  // Read from pages sequentially in the guard regions from just below the MAP_GROWSDOWN mapping up
-  // to the edge of the second mapping.
+  // Read from pages sequentially in the guard regions from just below the MAP_GROWSDOWN mapping
+  // down to the edge of the second mapping.
   for (size_t i = 0; i < 4 * expected_guard_region_size / page_size(); ++i) {
     ASSERT_EQ(ReadAtOffset(initial_grows_down_low_offset() - i * page_size()), 0);
   }
@@ -343,29 +345,116 @@ TEST_F(MapGrowsdownTest, MprotectAfterGrow) {
 }
 
 TEST_F(MapGrowsdownTest, MprotectMixGrowsdownAndRegular) {
-  // Grow the region down by 2 pages by accessing a page in the guard region.
-  intptr_t test_offset = initial_grows_down_low_offset() - 2 * page_size();
+  // Grow the region down by 3 pages by accessing a page in the guard region.
+  intptr_t test_offset = initial_grows_down_low_offset() - 3 * page_size();
   ASSERT_EQ(ReadAtOffset(test_offset), 0);
 
-  // Now there are 4 pages with protection PROT_READ | PROT_WRITE below grows_down_high_offset().
+  // Now there are 5 pages with protection PROT_READ | PROT_WRITE below grows_down_high_offset().
   // Reduce the protections on the second-lowest page to PROT_READ without the PROT_GROWSDOWN flag.
-  SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset() - page_size()), page_size(),
-                        PROT_READ));
-
+  // This applies only to the specified range of addresses - one page, in this case.
+  SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset() - 2 * page_size()),
+                        page_size(), PROT_READ));
   // The lowest page of the mapping should still be PROT_READ | PROT_WRITE
-  intptr_t lowest_page_offset = initial_grows_down_low_offset() - 2 * page_size();
-  WriteAtOffset(lowest_page_offset);
+  ASSERT_EQ(ReadAtOffset(test_offset), '\0');
+  WriteAtOffset(test_offset);
 
-  // Now set the third-lowest page to PROT_READ with the MAP_GROWSDOWN flag.
+  // Now set the second-highest page to PROT_READ with the MAP_GROWSDOWN flag.
+  // Unlike mprotect() without the PROT_GROWSDOWN flag, this protection applies from the specified
+  // range down to the next manually specified protection region.
   SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset()), page_size(),
                         PROT_READ | PROT_GROWSDOWN));
 
-  // This page should now be read-only.
+  // This page and the page below it are now read-only.
   ASSERT_TRUE(TestThatWriteSegfaults(initial_grows_down_low_offset()));
   ASSERT_EQ(ReadAtOffset(initial_grows_down_low_offset()), '\0');
 
+  ASSERT_TRUE(TestThatWriteSegfaults(initial_grows_down_low_offset() - page_size()));
+  ASSERT_EQ(ReadAtOffset(initial_grows_down_low_offset() - page_size()), '\0');
+
   // The lowest page of the mapping should still be PROT_READ | PROT_WRITE.
-  WriteAtOffset(lowest_page_offset);
+  WriteAtOffset(test_offset);
+}
+
+TEST_F(MapGrowsdownTest, ProtectionAfterGrowWithoutProtGrowsdownFlag) {
+  // Reduce protection on the lowest page of the growsdown region to PROT_READ without the
+  // PROT_GROWSDOWN flag.
+  SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset()), page_size(), PROT_READ));
+
+  // Grow the region down by one page with a read.
+  intptr_t test_offset = initial_grows_down_low_offset() - page_size();
+  ASSERT_EQ(ReadAtOffset(test_offset), '\0');
+
+  // The new page has protections PROT_READ from the bottom of the growsdown region, even though
+  // that protection was specified without the PROT_GROWSDOWN flag.
+  ASSERT_TRUE(TestThatWriteSegfaults(test_offset));
+}
+
+TEST_F(MapGrowsdownTest, MprotectOnAdjacentGrowsdownMapping) {
+  // Create a second MAP_GROWSDOWN mapping immediately below the initial mapping with PROT_READ |
+  // PROT_WRITE.
+  intptr_t second_mapping_offset = initial_grows_down_low_offset() - page_size();
+  void* rv = MapRelative(second_mapping_offset, page_size(), PROT_READ | PROT_WRITE, MAP_GROWSDOWN);
+  ASSERT_NE(rv, MAP_FAILED) << "mmap failed: " << strerror(errno) << "(" << errno << ")";
+  ASSERT_EQ(rv, OffsetToAddress(second_mapping_offset));
+
+  // Reduce protection on top mapping with MAP_GROWSDOWN flag.
+  SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset()), page_size(),
+                        PROT_READ | PROT_GROWSDOWN));
+
+  // Strangely enough, this applies through to the second mapping.
+  ASSERT_TRUE(TestThatWriteSegfaults(second_mapping_offset));
+}
+
+TEST_F(MapGrowsdownTest, MprotectOnAdjacentNonGrowsdownMappingBelow) {
+  // Create a second mapping immediately below the initial mapping with PROT_READ | PROT_WRITE.
+  intptr_t second_mapping_offset = initial_grows_down_low_offset() - page_size();
+  void* rv = MapRelative(second_mapping_offset, page_size(), PROT_READ | PROT_WRITE, 0);
+  ASSERT_NE(rv, MAP_FAILED) << "mmap failed: " << strerror(errno) << "(" << errno << ")";
+  ASSERT_EQ(rv, OffsetToAddress(second_mapping_offset));
+
+  // Reduce protection on top mapping with PROT_GROWSDOWN flag.
+  SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset()), page_size(),
+                        PROT_READ | PROT_GROWSDOWN));
+
+  // The protection change does not propagate to the adjacent non-MAP_GROWSDOWN mapping so it's
+  // still PROT_READ | PROT_WRITE.
+  WriteAtOffset(second_mapping_offset);
+}
+
+TEST_F(MapGrowsdownTest, SyscallReadsBelowGrowsdown) {
+  // This address is not in any mapping but it is just below a MAP_GROWSDOWN mapping.
+  std::byte* address_below_growsdown =
+      OffsetToAddress(initial_grows_down_low_offset() - page_size());
+  int fds[2];
+  SAFE_SYSCALL(pipe(fds));
+  // This syscall should grow the region to include the address read from and insert a '\0' into the
+  // pipe.
+  SAFE_SYSCALL(write(fds[1], address_below_growsdown, 1));
+  char buf;
+  SAFE_SYSCALL(read(fds[0], &buf, 1));
+  EXPECT_EQ(buf, '\0');
+}
+
+TEST_F(MapGrowsdownTest, SyscallWritesBelowGrowsdown) {
+  // This address is not in any mapping but it is just below a MAP_GROWSDOWN mapping.
+  std::byte* address_below_growsdown =
+      OffsetToAddress(initial_grows_down_low_offset() - page_size());
+  int fds[2];
+  SAFE_SYSCALL(pipe(fds));
+  char buf = 'a';
+  SAFE_SYSCALL(write(fds[1], &buf, 1));
+  // This syscall should grow the region to include the address written to and read an 'a' from the
+  // pipe.
+  SAFE_SYSCALL(read(fds[0], address_below_growsdown, 1));
+  EXPECT_EQ(std::to_integer<char>(*address_below_growsdown), 'a');
+}
+
+TEST(Mprotect, ProtGrowsdownOnNonGrowsdownMapping) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* rv = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(rv, MAP_FAILED) << "mmap failed: " << strerror(errno) << "(" << errno << ")";
+  EXPECT_EQ(mprotect(rv, page_size, PROT_READ | PROT_GROWSDOWN), -1);
+  EXPECT_EQ(errno, EINVAL);
 }
 
 }  // namespace

@@ -16,9 +16,9 @@ use crate::execution::*;
 use crate::fs::*;
 use crate::loader::*;
 use crate::lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::{not_implemented, set_zx_name};
+use crate::logging::{log_warn, not_implemented, set_zx_name};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::types::*;
+use crate::signals::{types::*, SignalInfo};
 use crate::syscalls::SyscallResult;
 use crate::task::*;
 use crate::types::*;
@@ -129,6 +129,17 @@ pub struct TaskMutableState {
     /// Whether the executor should dump the stack of this task when it exits. Currently used to
     /// implement ExitStatus::CoreDump.
     pub dump_on_exit: bool,
+}
+
+pub enum ExceptionResult {
+    /// The exception was handled and no further action is required.
+    Handled,
+
+    // The exception generated a signal that should be delivered.
+    Signal(SignalInfo),
+
+    // The exception was not understood or could not be handled.
+    Unhandled,
 }
 
 pub struct Task {
@@ -598,6 +609,65 @@ impl Task {
         } else {
             name
         };
+    }
+
+    /// Processes a Zircon exception associated with this task.
+    ///
+    /// If the exception is fully handled, returns Ok(None)
+    /// If the exception produces a signal, returns Ok(Some(SigInfo)).
+    /// If the exception could not be handled returns Err(())
+    // TODO(https://fxbug.dev/117302): Move to CurrentTask when the restricted executor's flow allows the exception handler to
+    // access CurrentTask. It does not make sense to handle a Zircon exception for another task.
+    pub fn process_exception(
+        &self,
+        info: &zx::sys::zx_exception_info_t,
+        exception: &zx::Exception,
+        report: &zx::sys::zx_exception_report_t,
+    ) -> ExceptionResult {
+        if info.type_ == zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
+            // A page fault may be resolved by extending a growsdown mapping to cover the faulting
+            // address. Ask the memory manager if it can extend a mapping to cover the faulting
+            // address and if says that it's found a mapping that exists or that can be extended to
+            // cover this address mark the exception as handled so that the instruction can try
+            // again. Otherwise let the regular handling proceed.
+
+            // We should only attempt growth on a not-present fault and we should only extend if the
+            // access type matches the protection on the GROWSDOWN mapping.
+            #[cfg(target_arch = "x86_64")]
+            let (faulting_address, not_present, is_write) = {
+                // Safety: The union contains x86_64 data when building for the x86_64 architecture.
+                let x86_64_data = unsafe { report.context.arch.x86_64 };
+                // [intel/vol3]: 6.15: Interrupt 14--Page-Fault Exception (#PF)
+                let faulting_address = x86_64_data.cr2;
+                let not_present = x86_64_data.err_code & 0x01 == 0; // Low bit means "present"
+                let is_write = x86_64_data.err_code & 0x02 != 0;
+                (faulting_address, not_present, is_write)
+            };
+            if not_present {
+                match self.mm.extend_growsdown_mapping_to_address(
+                    UserAddress::from(faulting_address),
+                    is_write,
+                ) {
+                    Ok(true) => {
+                        exception
+                            .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED)
+                            .unwrap();
+                        return ExceptionResult::Handled;
+                    }
+                    Err(e) => {
+                        log_warn!("Error handling page fault: {e}")
+                    }
+                    _ => {}
+                }
+            }
+        }
+        match info.type_ {
+            zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => {
+                ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
+            }
+            zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
+            _ => ExceptionResult::Unhandled,
+        }
     }
 }
 

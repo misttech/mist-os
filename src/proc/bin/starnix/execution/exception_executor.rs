@@ -131,8 +131,9 @@ fn run_exception_loop(
                 error_context = Some(new_error_context);
             }
         } else {
-            match signal_for_exception(&info) {
-                Some(signal) => {
+            match current_task.process_exception(&info, &exception, &report) {
+                ExceptionResult::Handled => {}
+                ExceptionResult::Signal(signal) => {
                     if info.type_ == ZX_EXCP_FATAL_PAGE_FAULT {
                         #[cfg(target_arch = "x86_64")]
                         let fault_addr = unsafe { report.context.arch.x86_64.cr2 };
@@ -146,7 +147,7 @@ fn run_exception_loop(
                     }
                     force_signal(current_task, signal);
                 }
-                None => {
+                ExceptionResult::Unhandled => {
                     log_warn!(current_task, "unhandled exception. info={:?} report.header={:?} synth_code={:?} synth_data={:?}", info, report.header, report.context.synth_code, report.context.synth_data);
                     exception.set_exception_state(&ZX_EXCEPTION_STATE_TRY_NEXT)?;
                     continue;

@@ -90,12 +90,24 @@ pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> CurrentTask {
 ///
 /// Returns the address returned by `sys_mmap`.
 pub fn map_memory(current_task: &CurrentTask, address: UserAddress, length: u64) -> UserAddress {
+    map_memory_with_flags(current_task, address, length, MAP_ANONYMOUS | MAP_PRIVATE)
+}
+
+/// Maps `length` at `address` with `PROT_READ | PROT_WRITE` and the specified flags.
+///
+/// Returns the address returned by `sys_mmap`.
+pub fn map_memory_with_flags(
+    current_task: &CurrentTask,
+    address: UserAddress,
+    length: u64,
+    flags: u32,
+) -> UserAddress {
     sys_mmap(
         current_task,
         address,
         length as usize,
         PROT_READ | PROT_WRITE,
-        MAP_ANONYMOUS | MAP_PRIVATE,
+        flags,
         FdNumber::from_raw(-1),
         0,
     )

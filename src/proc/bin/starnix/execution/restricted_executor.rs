@@ -11,16 +11,15 @@ use fuchsia_zircon::{AsHandleRef, Task as zxTask};
 use std::sync::Arc;
 
 use super::shared::{
-    as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync,
-    signal_for_exception, TaskInfo,
+    as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync, TaskInfo,
 };
 use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::syscalls::decls::SyscallDecl;
 use crate::task::{
-    CurrentTask, ExitStatus, Kernel, ProcessGroup, RegisterState, Task, ThreadGroup,
-    ThreadGroupWriteGuard,
+    CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, RegisterState, Task,
+    ThreadGroup, ThreadGroupWriteGuard,
 };
 use crate::types::*;
 
@@ -215,11 +214,14 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
             let info = as_exception_info(&buffer);
             assert!(buffer.n_handles() == 1);
             let exception = zx::Exception::from(buffer.take_handle(0).unwrap());
+            let thread = exception.get_thread().unwrap();
+            let report = thread.get_exception_report().unwrap();
 
-            match signal_for_exception(&info) {
-                Some(signal) => {
+            match task.process_exception(&info, &exception, &report) {
+                ExceptionResult::Handled => {}
+                ExceptionResult::Signal(signal) => {
+                    log_warn!("delivering signal {signal:?}");
                     // TODO: Verify that the rip is actually in restricted code.
-                    let thread = exception.get_thread().unwrap();
 
                     let mut registers: RegisterState =
                         thread.read_state_general_regs().unwrap().into();
@@ -261,7 +263,7 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                             .unwrap();
                     }
                 }
-                None => {
+                ExceptionResult::Unhandled => {
                     log_error!(task, "Unhandled exception {:?}", info);
                     exception
                         .set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_THREAD_EXIT)

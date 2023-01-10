@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use lazy_static::lazy_static;
@@ -28,6 +29,7 @@ bitflags! {
       const SHARED = 1;
       const ANONYMOUS = 2;
       const LOWER_32BIT = 4;
+      const GROWSDOWN = 8;
     }
 }
 
@@ -209,6 +211,9 @@ impl MemoryManagerState {
         let end = (addr + length).round_up(*PAGE_SIZE)?;
         self.mappings.insert(addr..end, mapping);
 
+        // TODO(https://fxbug.dev/97514): Create a guard region below this mapping if GROWSDOWN is
+        // in |options|.
+
         Ok(addr)
     }
 
@@ -342,9 +347,12 @@ impl MemoryManagerState {
                 zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
             };
 
+        let vmar_offset =
+            self.user_address_to_vmar_offset(original_range.start).map_err(|_| errno!(EINVAL))?;
+
         // Re-map the original range, which may include pages before the requested range.
         Ok(Some(self.map(
-            (original_range.start - self.user_vmar_info.base).ptr(),
+            vmar_offset,
             original_mapping.vmo,
             original_mapping.vmo_offset,
             final_length,
@@ -407,7 +415,7 @@ impl MemoryManagerState {
         // Get the destination address, which may be 0 if we are letting the kernel choose for us.
         let (vmar_offset, vmar_flags) = if let Some(dst_addr) = &dst_addr {
             (
-                (*dst_addr - self.user_vmar_info.base).ptr(),
+                self.user_address_to_vmar_offset(*dst_addr).map_err(|_| errno!(EINVAL))?,
                 src_mapping.permissions | zx::VmarFlags::SPECIFIC,
             )
         } else {
@@ -555,8 +563,10 @@ impl MemoryManagerState {
                 child_vmo =
                     child_vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
             }
+            let vmar_offset =
+                self.user_address_to_vmar_offset(range.start).map_err(|_| errno!(EINVAL))?;
             self.map(
-                (range.start - self.user_vmar_info.base).ptr(),
+                vmar_offset,
                 Arc::new(child_vmo),
                 0,
                 child_length,
@@ -582,6 +592,10 @@ impl MemoryManagerState {
         length: usize,
         flags: zx::VmarFlags,
     ) -> Result<(), Errno> {
+        // TODO(https://fxbug.dev/97514): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
+        // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
+        // compute the potentially extended range before modifying the Zircon protections or metadata.
+
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
         unsafe { self.user_vmar.protect(addr.ptr(), length, flags) }.map_err(|s| match s {
@@ -675,6 +689,15 @@ impl MemoryManagerState {
         UserAddress::from_ptr(self.user_vmar_info.base + self.user_vmar_info.len)
     }
 
+    fn user_address_to_vmar_offset(&self, addr: UserAddress) -> Result<usize, ()> {
+        if !(self.user_vmar_info.base..self.user_vmar_info.base + self.user_vmar_info.len)
+            .contains(&addr.ptr())
+        {
+            return Err(());
+        }
+        Ok((addr - self.user_vmar_info.base).ptr())
+    }
+
     /// Returns all the mappings starting at `addr`, and continuing until either `length` bytes have
     /// been covered or an unmapped page is reached.
     ///
@@ -727,6 +750,63 @@ impl MemoryManagerState {
         });
 
         Ok(result)
+    }
+
+    /// Determines if an access at a given address could be covered by extending a growsdown mapping and
+    /// extends it if possible. Returns true if the given address is covered by a mapping.
+    pub fn extend_growsdown_mapping_to_address(
+        &mut self,
+        addr: UserAddress,
+        is_write: bool,
+    ) -> Result<bool, Error> {
+        let (mapping_to_grow, mapping_low_addr) = match self.mappings.iter_starting_at(&addr).next()
+        {
+            Some((range, mapping)) => {
+                if range.contains(&addr) {
+                    // |addr| is already contained within a mapping, nothing to grow.
+                    return Ok(false);
+                }
+                if !mapping.options.contains(MappingOptions::GROWSDOWN) {
+                    return Ok(false);
+                }
+                (mapping, range.start)
+            }
+            None => return Ok(false),
+        };
+        if is_write && !mapping_to_grow.permissions.contains(zx::VmarFlags::PERM_WRITE) {
+            // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
+            return Ok(false);
+        }
+        // TODO(https://fxbug.dev/97514): Once we add a guard region below a growsdown mapping we will need to move that
+        // before attempting to map the grown area.
+        let low_addr = addr - (addr.ptr() as u64 % *PAGE_SIZE);
+        let high_addr = mapping_low_addr;
+        let length = high_addr
+            .ptr()
+            .checked_sub(low_addr.ptr())
+            .ok_or_else(|| anyhow!("Invalid growth range"))?;
+        // TODO(https://fxbug.dev/97514): - Instead of making a new VMO, perhaps a growsdown mapping should be oversized to start with the end mapped.
+        // Then on extension we could map further down in the VMO for as long as we had space.
+        let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|s| match s {
+            zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
+                anyhow!("Could not allocate VMO for mapping growth")
+            }
+            _ => anyhow!("Unexpected error creating VMO: {s}"),
+        })?);
+        let flags = mapping_to_grow.permissions | zx::VmarFlags::SPECIFIC;
+        let mapping = Mapping::new(low_addr, vmo.clone(), 0, flags, mapping_to_grow.options);
+        let vmar_offset = self
+            .user_address_to_vmar_offset(low_addr)
+            .map_err(|_| anyhow!("Address outside of user range"))?;
+        let mapped_address = self
+            .user_vmar
+            .map(vmar_offset, &vmo, 0, length, flags)
+            .map_err(MemoryManager::get_errno_for_map_err)?;
+        if mapped_address != low_addr.ptr() {
+            return Err(anyhow!("Could not map extension of mapping to desired location."));
+        }
+        self.mappings.insert(low_addr..high_addr, mapping);
+        Ok(true)
     }
 
     /// Reads exactly `bytes.len()` bytes of memory.
@@ -1385,6 +1465,14 @@ impl MemoryManager {
         unsafe { temp_vmar.destroy().unwrap() };
         UserAddress::from_ptr(base)
     }
+
+    pub fn extend_growsdown_mapping_to_address(
+        &self,
+        addr: UserAddress,
+        is_write: bool,
+    ) -> Result<bool, Error> {
+        self.state.write().extend_growsdown_mapping_to_address(addr, is_write)
+    }
 }
 
 /// Allows for sequential reading of a task's userspace memory.
@@ -1630,7 +1718,9 @@ impl FileOps for ProcStatusFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mm::syscalls::sys_mmap;
     use crate::testing::*;
+    use assert_matches::assert_matches;
     use itertools::assert_equal;
 
     #[::fuchsia::test]
@@ -2249,5 +2339,114 @@ mod tests {
         assert!(mm.write_memory(addr, &bytes).is_ok());
         mm.state.write().protect(second_map, *PAGE_SIZE as usize, zx::VmarFlags::empty()).unwrap();
         assert_eq!(mm.state.read().read_memory_partial(addr, &mut bytes), Ok(*PAGE_SIZE as usize));
+    }
+
+    fn map_memory_growsdown(current_task: &CurrentTask, length: u64) -> UserAddress {
+        map_memory_with_flags(
+            current_task,
+            UserAddress::default(),
+            length,
+            MAP_ANONYMOUS | MAP_PRIVATE | MAP_GROWSDOWN,
+        )
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_mapping_empty_mm() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = UserAddress::from(0x100000);
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_inside_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_write_fault_inside_read_only_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = sys_mmap(
+            &current_task,
+            UserAddress::default(),
+            *PAGE_SIZE as usize,
+            PROT_READ,
+            MAP_ANONYMOUS | MAP_PRIVATE,
+            FdNumber::from_raw(-1),
+            0,
+        )
+        .expect("Could not map memory");
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, true), Ok(false));
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_fault_inside_prot_none_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = sys_mmap(
+            &current_task,
+            UserAddress::default(),
+            *PAGE_SIZE as usize,
+            PROT_NONE,
+            MAP_ANONYMOUS | MAP_PRIVATE,
+            FdNumber::from_raw(-1),
+            0,
+        )
+        .expect("Could not map memory");
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, true), Ok(false));
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_below_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) - *PAGE_SIZE;
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(true));
+
+        // Should see two mappings
+        assert_eq!(mm.get_mapping_count(), 2);
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_above_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) + *PAGE_SIZE;
+
+        assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
+    }
+
+    #[::fuchsia::test]
+    fn test_grow_write_fault_below_read_only_mapping() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let mapped_addr = map_memory_growsdown(&current_task, *PAGE_SIZE);
+
+        mm.protect(mapped_addr, *PAGE_SIZE as usize, zx::VmarFlags::PERM_READ).unwrap();
+
+        assert_matches!(
+            mm.extend_growsdown_mapping_to_address(mapped_addr - *PAGE_SIZE, true),
+            Ok(false)
+        );
+
+        assert_eq!(mm.get_mapping_count(), 1);
     }
 }

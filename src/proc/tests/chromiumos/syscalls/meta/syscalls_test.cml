@@ -7,7 +7,7 @@
         binary: "data/tests/syscalls_test_bin",
 
         // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
-        args: [ "--gtest_filter=-MapGrowsdownTest.*" ],
+        args: [ "--gtest_filter=-Mprotect.*:MapGrowsdownTest.Mprotect*:MapGrowsdownTest.Syscall*:MapGrowsdownTest.Protection*:MapGrowsdownTest.MapNoreplaceInGuardRegion" ],
         user: "fuchsia:x:0:0",
         environ: [ "TEST_TMPDIR=/data/tmp" ],
     },

@@ -51,7 +51,8 @@ pub fn sys_mmap(
             | MAP_POPULATE
             | MAP_NORESERVE
             | MAP_STACK
-            | MAP_DENYWRITE)
+            | MAP_DENYWRITE
+            | MAP_GROWSDOWN)
         != 0
     {
         not_implemented!(current_task, "mmap: flags: 0x{:x}", flags);
@@ -100,6 +101,9 @@ pub fn sys_mmap(
     if flags & MAP_FIXED == 0 && flags & MAP_32BIT != 0 {
         options |= MappingOptions::LOWER_32BIT;
     }
+    if flags & MAP_GROWSDOWN != 0 {
+        options |= MappingOptions::GROWSDOWN;
+    }
 
     let MappedVmo { vmo, user_address } = if flags & MAP_ANONYMOUS != 0 {
         // mremap can grow memory regions, so make sure the VMO is resizable.
@@ -137,6 +141,11 @@ pub fn sys_mprotect(
     length: usize,
     prot: u32,
 ) -> Result<(), Errno> {
+    // These are the flags that are currently supported.
+    if prot & !(PROT_READ | PROT_WRITE | PROT_EXEC) != 0 {
+        not_implemented!(current_task, "mmap: prot: 0x{:x}", prot);
+        return error!(EINVAL);
+    }
     current_task.mm.protect(addr, length, mmap_prot_to_vm_opt(prot))?;
     Ok(())
 }
