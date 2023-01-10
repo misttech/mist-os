@@ -109,7 +109,7 @@ where
         let persona_id = PersonaId::new(rand::random::<u64>());
         if let AccountLifetime::Persistent { ref account_dir } = lifetime {
             if StoredAccount::path(account_dir).exists() {
-                info!("Attempting to create account twice");
+                warn!("Attempting to create account twice");
                 return Err(AccountManagerError::new(ApiError::Internal));
             }
             let stored_account = StoredAccount::new(persona_id);
@@ -310,7 +310,10 @@ where
                 info!("Received account lock request while existing request in progress");
                 Ok(())
             }
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                info!("Account lock succeeded");
+                Ok(())
+            }
         }
     }
 

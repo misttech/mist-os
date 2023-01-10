@@ -261,7 +261,7 @@ where
                     pre_auth_state,
                 };
                 self.inspect.lifecycle.set("unlocked");
-                info!("CreateAccount operation successfully completed");
+                info!("CreateAccount successfully completed");
                 Ok(pre_auth_state_bytes)
             }
             ref invalid_state => {
@@ -333,7 +333,7 @@ where
                 )
                 .await
                 .map_err(|err| {
-                    warn!("Authentication error: {:?}", err);
+                    warn!("UnlockAccount: Authentication error: {:?}", err);
                     err.api_error
                 })?;
 
@@ -341,7 +341,7 @@ where
                     .create_lock_request_sender(&pre_auth_state_ref.enrollment_state)
                     .await
                     .map_err(|err| {
-                        warn!("Error constructing lock request sender: {:?}", err);
+                        warn!("UnlockAccount: Error constructing lock request sender: {:?}", err);
                         err.api_error
                     })?;
                 let account: Account<SM> = Account::load(
@@ -375,6 +375,12 @@ where
                     storage_manager: Arc::clone(storage_manager),
                 };
                 self.inspect.lifecycle.set("unlocked");
+                match pre_auth_state_bytes {
+                    None => {
+                        info!("UnlockAccount successfully completed without changing PreAuthState")
+                    }
+                    Some(_) => info!("UnlockAccount successfully completed with new PreAuthState"),
+                }
                 Ok(pre_auth_state_bytes)
             }
             ref invalid_state => {
@@ -389,10 +395,13 @@ where
     ///
     /// Optionally returns a serialized PreAuthState if it has changed.
     async fn lock_account(&self) -> Result<Option<Vec<u8>>, ApiError> {
-        Self::lock_now(Arc::clone(&self.state), Arc::clone(&self.inspect)).await.map_err(|err| {
-            warn!("LockAccount call failed: {:?}", err);
-            err.api_error
-        })
+        let lock_result = Self::lock_now(Arc::clone(&self.state), Arc::clone(&self.inspect)).await;
+        match &lock_result {
+            Ok(None) => info!("LockAccount successfully completed without changing PreAuthState"),
+            Ok(Some(_)) => info!("LockAccount successfully completed with new PreAuthState"),
+            Err(err) => warn!("LockAccount operation failed: {:?}", err),
+        }
+        lock_result.map_err(|err| err.api_error)
     }
 
     /// Remove the active account. This method should not be retried on failure.
@@ -410,13 +419,13 @@ where
                 ..
             } => {
                 storage_manager.lock().await.destroy().await.map_err(|err| {
-                    warn!("remove_account failed to destroy StorageManager: {:?}", err);
+                    warn!("RemoveAccount failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
                 })?;
                 // If this account was once unlocked but is now locked, it must
                 // have passed through the Self::lock_now(..) method, which
                 // fetches the task group and cancels it.
-                info!("Deleted account");
+                info!("RemoveAccount successfully deleted storage-locked account");
                 Ok(())
             }
             Lifecycle::Initialized {
@@ -425,7 +434,7 @@ where
                 ..
             } => {
                 storage_manager.lock().await.destroy().await.map_err(|err| {
-                    warn!("remove_account failed to destroy StorageManager: {:?}", err);
+                    warn!("RemoveAccount failed to destroy StorageManager: {:?}", err);
                     ApiError::Resource
                 })?;
                 let account_arc = account;
@@ -434,23 +443,23 @@ where
                 if let Err(TaskGroupError::AlreadyCancelled) =
                     account_arc.task_group().cancel().await
                 {
-                    warn!("Task group was already cancelled prior to account removal.");
+                    warn!("RemoveAccount: Task group already cancelled prior to account removal.");
                 }
                 // At this point we have exclusive access to the account, so we
                 // move it out of the Arc to destroy it.
                 let account = Arc::try_unwrap(account_arc).map_err(|_| {
-                    warn!("Could not acquire exclusive access to account");
+                    warn!("RemoveAccount: Could not acquire exclusive access to account");
                     ApiError::Internal
                 })?;
                 account.remove().map_err(|(_account, err)| {
-                    warn!("Could not delete account: {:?}", err);
+                    warn!("RemoveAccount: Could not delete account: {:?}", err);
                     err.api_error
                 })?;
-                info!("Deleted account");
+                info!("RemoveAccount successfully deleted storage-unlocked account");
                 Ok(())
             }
             _ => {
-                warn!("No account is initialized");
+                warn!("RemoveAccount: No account is initialized");
                 Err(ApiError::FailedPrecondition)
             }
         }
@@ -467,14 +476,14 @@ where
                 Arc::clone(account)
             }
             _ => {
-                warn!("AccountHandler is not unlocked");
+                warn!("GetAccount: AccountHandler is not unlocked");
                 return Err(ApiError::FailedPrecondition);
             }
         };
 
         let context = AccountContext {};
         let stream = account_server_end.into_stream().map_err(|err| {
-            warn!("Error opening Account channel {:?}", err);
+            warn!("GetAccount: Error opening Account channel {:?}", err);
             ApiError::Resource
         })?;
 
@@ -493,6 +502,8 @@ where
                 // inconsistent state rather than a conflict
                 ApiError::Internal
             })
+        // Potentially there will be several GetAccount calls without user interaction so don't log
+        // the success case to avoid log spam.
     }
 
     async fn terminate(&self) {
