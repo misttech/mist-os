@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.ethernet/cpp/wire.h>
-
 #include <array>
 
 #include <fbl/auto_lock.h>
@@ -384,8 +382,7 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, EthernetIfcStatus) {
                       ETH_MTU_SIZE, static_cast<uint32_t>(
                                         fuchsia_hardware_network::wire::StatusFlags::kOnline)))))
       .Times(1);
-  Device().EthernetIfcStatus(
-      static_cast<uint32_t>(fuchsia_hardware_ethernet::wire::DeviceStatus::kOnline));
+  Device().EthernetIfcStatus(ETHERNET_STATUS_ONLINE);
   Device().NetworkPortGetStatus(&status);
   EXPECT_EQ(status.mtu, ETH_MTU_SIZE);
   EXPECT_EQ(status.flags,
@@ -398,8 +395,7 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, EthernetIfcStatusCalledFromEthernetIm
   EXPECT_CALL(MockEthernet(), EthernetImplStart(&proto))
       .WillOnce([](const ethernet_ifc_protocol_t* proto) -> zx_status_t {
         auto client = ddk::EthernetIfcProtocolClient(proto);
-        client.Status(
-            static_cast<uint32_t>(fuchsia_hardware_ethernet::wire::DeviceStatus::kOnline));
+        client.Status(ETHERNET_STATUS_ONLINE);
         return ZX_OK;
       });
   EXPECT_CALL(MockNetworkDevice(),

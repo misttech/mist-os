@@ -10,7 +10,6 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/fpromise/promise.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
-#include <zircon/device/ethernet.h>
 
 #include <memory>
 

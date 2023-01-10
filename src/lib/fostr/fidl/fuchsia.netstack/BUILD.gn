@@ -8,7 +8,6 @@ fostr_fidl("fuchsia.netstack") {
   fidl_target = "//sdk/fidl/fuchsia.netstack"
 
   deps = [
-    "//src/lib/fostr/fidl/fuchsia.hardware.ethernet",
     "//src/lib/fostr/fidl/fuchsia.io",
     "//src/lib/fostr/fidl/fuchsia.net",
   ]

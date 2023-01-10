@@ -7,7 +7,6 @@
 package eth
 
 import (
-	// #include <zircon/device/ethernet.h>
 	// #include <zircon/types.h>
 	"C"
 )

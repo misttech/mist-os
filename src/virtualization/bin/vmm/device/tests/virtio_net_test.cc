@@ -14,7 +14,6 @@
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/trace-provider/provider.h>
-#include <zircon/device/ethernet.h>
 
 #include <virtio/net.h>
 

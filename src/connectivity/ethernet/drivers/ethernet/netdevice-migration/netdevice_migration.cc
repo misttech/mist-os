@@ -4,7 +4,6 @@
 
 #include "netdevice_migration.h"
 
-#include <fidl/fuchsia.hardware.ethernet/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/system/public/zircon/assert.h>
@@ -19,8 +18,7 @@ namespace {
 
 fuchsia_hardware_network::wire::StatusFlags ToStatusFlags(uint32_t ethernet_status) {
   fuchsia_hardware_network::wire::StatusFlags flags;
-  if (fuchsia_hardware_ethernet::wire::DeviceStatus(ethernet_status) &
-      fuchsia_hardware_ethernet::wire::DeviceStatus::kOnline) {
+  if (ethernet_status & ETHERNET_STATUS_ONLINE) {
     flags |= fuchsia_hardware_network::wire::StatusFlags::kOnline;
   }
   return flags;

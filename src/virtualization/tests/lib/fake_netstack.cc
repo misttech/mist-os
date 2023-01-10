@@ -24,7 +24,6 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-#include <zircon/device/ethernet.h>
 #include <zircon/status.h>
 
 #include <future>

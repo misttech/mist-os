@@ -33,9 +33,9 @@ developers understand when changes to a FIDL definition break downstream code.
 
 The Connectivity team is actively exploring how to migrate existing Fuchsia
 drivers and clients from
-[fuchsia.hardware.ethernet](/sdk/fidl/fuchsia.hardware.ethernet/) to
-[fuchsia.hardware.network](/sdk/fidl/fuchsia.hardware.network/) in order to
-improve network performance.
+[`fuchsia.hardware.ethernet`](/sdk/banjo/fuchsia.hardware.ethernet) to
+[fuchsia.hardware.network](/sdk/banjo/fuchsia.hardware.network.device) in order
+to improve network performance.
 
 ## Components v2
 

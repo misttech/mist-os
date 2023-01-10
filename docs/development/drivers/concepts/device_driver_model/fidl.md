@@ -12,4 +12,3 @@ the `message()` operation in the base device interface.
 Examples:
 
 * [GPIO interface](https://fuchsia.dev/reference/fidl/fuchsia.hardware.gpio)
-* [Ethernet interface](https://fuchsia.dev/reference/fidl/fuchsia.hardware.ethernet)
