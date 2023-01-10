@@ -6,7 +6,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 int main(int /*unused*/, const char** /*unused*/) {
   std::vector<example::TestInput> inputs = {

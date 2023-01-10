@@ -8,7 +8,7 @@
 
 #include <sstream>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 int main(int /*unused*/, const char** /*unused*/) {
   std::vector<example::TestInput> inputs;

@@ -12,7 +12,7 @@ group("tests") {
 executable("bin") {
   output_name = "security-policy-next-vdso-test"
   sources = [ "main.cc" ]
-  deps = [ "//examples/tests:test_suite_lib" ]
+  deps = [ "//src/lib/test-suite:test_suite_lib" ]
 }
 
 fuchsia_unittest_package("security-policy-next-vdso-test") {

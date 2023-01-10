@@ -8,7 +8,7 @@
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 fuchsia::test::Status run_test() {
   zx::vmo vdso_vmo(zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 1)));

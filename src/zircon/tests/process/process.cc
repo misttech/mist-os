@@ -16,7 +16,7 @@
 
 #include <mini-process/mini-process.h>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 #define ASSERT_OK(e)                      \
   if (e != ZX_OK) {                       \

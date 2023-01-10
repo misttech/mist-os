@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef EXAMPLES_TESTS_TEST_SUITE_H_
-#define EXAMPLES_TESTS_TEST_SUITE_H_
+#ifndef SRC_LIB_TEST_SUITE_TEST_SUITE_H_
+#define SRC_LIB_TEST_SUITE_TEST_SUITE_H_
 
 #include <fuchsia/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -79,4 +79,4 @@ class TestSuite : public fuchsia::test::Suite {
 
 }  // namespace example
 
-#endif  // EXAMPLES_TESTS_TEST_SUITE_H_
+#endif  // SRC_LIB_TEST_SUITE_TEST_SUITE_H_

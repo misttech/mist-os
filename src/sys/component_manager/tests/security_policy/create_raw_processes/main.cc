@@ -11,7 +11,7 @@
 #include <zircon/status.h>
 #include <zircon/syscalls-next.h>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 fuchsia::test::Status run_test() {
   zx::process process;

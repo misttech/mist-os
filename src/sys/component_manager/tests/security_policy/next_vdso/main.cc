@@ -8,7 +8,7 @@
 #include <zircon/status.h>
 #include <zircon/syscalls-next.h>
 
-#include "examples/tests/test_suite.h"
+#include "src/lib/test-suite/test_suite.h"
 
 int main(int argc, const char** argv) {
   fuchsia::test::Status result = fuchsia::test::Status::PASSED;
