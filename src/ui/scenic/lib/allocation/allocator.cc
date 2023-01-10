@@ -34,6 +34,36 @@ RegisterBufferCollectionUsages UsageToUsages(
   }
 }
 
+bool BufferCollectionTokenIsValid(
+    fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
+    const fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>& token) {
+  bool is_known = false;
+  const auto status = sysmem_allocator->ValidateBufferCollectionToken(
+      fsl::GetRelatedKoid(token.channel().get()), &is_known);
+  return status == ZX_OK && is_known;
+}
+
+// Creates a vector of |num_tokens| duplicates of BufferCollectionTokenSyncPtr.
+// Returns an empty vector if creation failed.
+std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> CreateVectorOfTokens(
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token, const size_t num_tokens) {
+  FX_DCHECK(num_tokens > 0);
+  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> tokens;
+  tokens.emplace_back(token.BindSync());
+
+  std::vector<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> dup_tokens;
+  if (tokens.front()->DuplicateSync(std::vector<zx_rights_t>(num_tokens - 1, ZX_RIGHT_SAME_RIGHTS),
+                                    &dup_tokens) == ZX_OK) {
+    for (auto& token : dup_tokens) {
+      tokens.emplace_back(token.BindSync());
+    }
+  } else {
+    tokens.clear();
+  }
+
+  return tokens;
+}
+
 }  // namespace
 
 Allocator::Allocator(sys::ComponentContext* app_context,
@@ -123,46 +153,20 @@ void Allocator::RegisterBufferCollection(
     return;
   }
 
-  // Create a token for each of the buffer collection importers and stick all of the tokens into
-  // a std::vector.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr sync_token = buffer_collection_token.BindSync();
-  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> tokens;
-
   const auto importers = GetImporters(usages);
 
-  for (uint32_t i = 0; i < importers.size(); i++) {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr extra_token;
-    zx_status_t status =
-        sync_token->Duplicate(std::numeric_limits<uint32_t>::max(), extra_token.NewRequest());
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "RegisterBufferCollection called with a buffer collection token where "
-                        "Duplicate() failed";
-      callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-      return;
-    }
-    tokens.push_back(std::move(extra_token));
-  }
-  // Sync to ensure that Duplicate() calls are received on the sysmem server side.
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(sync_token),
-                                                               buffer_collection.NewRequest());
-  if (status != ZX_OK) {
+  if (!BufferCollectionTokenIsValid(sysmem_allocator_, buffer_collection_token)) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with a buffer collection token where "
-                      "BindSharedCollection() failed";
+                      "ValidateBufferCollectionToken() failed";
     callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
     return;
   }
-  status = buffer_collection->Sync();
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR)
-        << "RegisterBufferCollection called with a buffer collection token where Sync() failed";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-  status = buffer_collection->Close();
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR)
-        << "RegisterBufferCollection called with a buffer collection token where Close() failed";
+
+  // Create a token for each of the buffer collection importers.
+  auto tokens = CreateVectorOfTokens(std::move(buffer_collection_token), importers.size());
+  if (tokens.empty()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with a buffer collection token where "
+                      "Duplicate() failed";
     callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
     return;
   }
@@ -202,18 +206,19 @@ void Allocator::RegisterBufferCollection(
   // ownership of |export_token| is also passed, so that GetRelatedKoid() calls return valid koid.
   auto wait =
       std::make_shared<async::WaitOnce>(export_token.value.release(), ZX_EVENTPAIR_PEER_CLOSED);
-  status = wait->Begin(async_get_default_dispatcher(),
-                       [copy_ref = wait, weak_ptr = weak_factory_.GetWeakPtr(), koid](
-                           async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-                           const zx_packet_signal_t* /*signal*/) mutable {
-                         FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
-                         if (!weak_ptr)
-                           return;
-                         // Because Flatland::CreateImage() holds an import token, this
-                         // is guaranteed to be called after all images are created, so
-                         // it is safe to release buffer collection.
-                         weak_ptr->ReleaseBufferCollection(koid);
-                       });
+  const zx_status_t status =
+      wait->Begin(async_get_default_dispatcher(),
+                  [copy_ref = wait, weak_ptr = weak_factory_.GetWeakPtr(), koid](
+                      async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                      const zx_packet_signal_t* /*signal*/) mutable {
+                    FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
+                    if (!weak_ptr)
+                      return;
+                    // Because Flatland::CreateImage() holds an import token, this
+                    // is guaranteed to be called after all images are created, so
+                    // it is safe to release buffer collection.
+                    weak_ptr->ReleaseBufferCollection(koid);
+                  });
   FX_DCHECK(status == ZX_OK);
 
   callback(fpromise::ok());
