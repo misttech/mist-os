@@ -214,7 +214,7 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
         )
         .await
         .expect("Failed adding LogSink route to test components");
-    let _test_topology = builder.build().await.unwrap();
+    let test_topology = builder.build().await.unwrap();
 
     // If the routing is correctly configured, we expect four events: `bt-avrcp-target` connecting
     // to the PeerManager, Discovery, & BatteryManager services and the fake client connecting to
@@ -225,6 +225,7 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
         let msg = format!("Unexpected error waiting for {:?} event", i);
         events.push(receiver.next().await.expect(&msg));
     }
+    test_topology.destroy().await.unwrap();
     assert_eq!(events.len(), expected_number_of_events);
 
     let discriminants: HashSet<_> = HashSet::from_iter(events.iter().map(std::mem::discriminant));

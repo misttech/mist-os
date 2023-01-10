@@ -281,7 +281,7 @@ async fn a2dp_v2_component_topology() {
         )
         .await
         .expect("Failed adding LogSink route to test components");
-    let _test_topology = builder.build().await.unwrap();
+    let test_topology = builder.build().await.unwrap();
 
     // If the routing is correctly configured, we expect 17 events:
     //   - `bt-a2dp` connecting to the 11 services specified in its manifest.
@@ -314,6 +314,8 @@ async fn a2dp_v2_component_topology() {
     // Total unique requests = Total requests minus the two duplicate requests.
     let discriminant_set: HashSet<_> = HashSet::from_iter(discriminants.iter());
     assert_eq!(discriminant_set.len(), 15);
+
+    test_topology.destroy().await.unwrap();
 
     info!("Finished A2DP smoke test");
 }
