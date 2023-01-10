@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_audio_ffxdaemon::{
-    AudioDaemonRecordRequest, AudioDaemonRecordResponder, RecordLocation,
-};
-
 use {
     anyhow::{self, Context, Error},
-    async_lock as _, audio_daemon_utils,
+    async_lock as _, audio_daemon_utils, fdio,
+    fidl::endpoints::Proxy,
     fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonPlayRequest, AudioDaemonPlayResponder, AudioDaemonPlayResponse,
-        AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation,
+        AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse, AudioDaemonPlayRequest,
+        AudioDaemonPlayResponder, AudioDaemonPlayResponse, AudioDaemonRecordRequest,
+        AudioDaemonRecordResponder, AudioDaemonRecordResponse, AudioDaemonRequest,
+        AudioDaemonRequestStream, DeviceInfo, PlayLocation, RecordLocation,
     },
+    fidl_fuchsia_hardware_audio as _, fidl_fuchsia_io as fio,
     fidl_fuchsia_media::{AudioRendererProxy, AudioStreamType},
     fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
@@ -33,20 +33,20 @@ use {
 enum IncomingRequest {
     AudioDaemon(AudioDaemonRequestStream),
 }
-struct AudioDaemon<'a> {
-    // Keep daemon and audio proxy around with same lifetime. Avoid dangling reference
-    audio: &'a fidl_fuchsia_media::AudioProxy,
-}
-
-impl<'a> AudioDaemon<'a> {
-    pub fn new(audio_component: &'a fidl_fuchsia_media::AudioProxy) -> Self {
-        Self { audio: audio_component }
+struct AudioDaemon {}
+impl AudioDaemon {
+    pub fn new() -> Self {
+        Self {}
     }
     async fn record_capturer(
         &self,
         request: AudioDaemonRecordRequest,
         responder: AudioDaemonRecordResponder,
     ) -> Result<(), anyhow::Error> {
+        let audio_component =
+            fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
+                .context("Failed to connect to fuchsia.media.Audio")?;
+
         let location = request.location.ok_or(anyhow::anyhow!("Input missing."))?;
 
         let (capturer_usage, loopback) = match location {
@@ -73,9 +73,10 @@ impl<'a> AudioDaemon<'a> {
 
         let spec = audio_daemon_utils::spec_from_stream_type(stream_type);
 
+        // TODO(fxbug.dev/109807): Support capture until stop.
         let frames_to_capture = {
             let duration_nanos =
-                request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64; // TODO(camlloyd): Support capture until stop.
+                request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64;
             let duration = std::time::Duration::from_nanos(duration_nanos);
 
             (stream_type.frames_per_second as f64 * duration.as_secs_f64()).ceil() as u64
@@ -128,7 +129,7 @@ impl<'a> AudioDaemon<'a> {
             header_bytes_written += stdout_local.write(&header)?;
         }
 
-        self.audio.create_audio_capturer(server_end, loopback)?;
+        audio_component.create_audio_capturer(server_end, loopback)?;
 
         let capturer_proxy = client_end.into_proxy()?;
 
@@ -239,6 +240,9 @@ impl<'a> AudioDaemon<'a> {
         request: AudioDaemonPlayRequest,
         responder: AudioDaemonPlayResponder,
     ) -> Result<(), anyhow::Error> {
+        let audio_component =
+            fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
+                .context("Failed to connect to fuchsia.media.Audio")?;
         let num_packets = 4;
         let (stdout_remote, stdout_local) = zx::Socket::create(zx::SocketOpts::STREAM)?;
 
@@ -251,7 +255,7 @@ impl<'a> AudioDaemon<'a> {
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media_audio::GainControlMarker>()?;
         let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
-        self.audio.create_audio_renderer(server_end)?;
+        audio_component.create_audio_renderer(server_end)?;
         let audio_renderer_proxy = Rc::new(client_end.into_proxy()?);
 
         let response = AudioDaemonPlayResponse {
@@ -388,6 +392,110 @@ impl<'a> AudioDaemon<'a> {
                         None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
                     }?;
                 }
+                AudioDaemonRequest::ListDevices { responder } => {
+                    async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
+                        let (control_client, control_server) = zx::Channel::create()?;
+
+                        // Creates a connection to a FIDL service at path.
+                        fdio::service_connect(path, control_server)
+                            .context(format!("failed to connect to {:?}", path))?;
+
+                        let directory_proxy = fio::DirectoryProxy::from_channel(
+                            fasync::Channel::from_channel(control_client).unwrap(),
+                        );
+
+                        let (status, mut buf) = directory_proxy
+                            .read_dirents(fio::MAX_BUF)
+                            .await
+                            .expect("Failure calling read dirents");
+
+                        if status != 0 {
+                            return Err(anyhow::anyhow!(
+                                "Unable to call read dirents, status returned: {}",
+                                status
+                            ));
+                        }
+
+                        let entry_names = fuchsia_fs::directory::parse_dir_entries(&mut buf);
+                        let full_paths: Vec<String> = entry_names
+                            .into_iter()
+                            .filter_map(|s| Some(path.to_owned() + &s.ok().unwrap().name))
+                            .collect();
+
+                        Ok(full_paths)
+                    }
+
+                    let mut input_entries = get_entries("/dev/class/audio-input/").await?;
+                    let mut output_entries = get_entries("/dev/class/audio-output/").await?;
+                    input_entries.append(&mut output_entries);
+
+                    let response = AudioDaemonListDevicesResponse {
+                        devices: Some(input_entries),
+                        ..AudioDaemonListDevicesResponse::EMPTY
+                    };
+                    responder.send(&mut Ok(response))?;
+                }
+
+                AudioDaemonRequest::DeviceInfo { payload, responder } => {
+                    let device_selector =
+                        payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
+
+                    // Create StreamConfigConnector channel, will be used to give device the server
+                    // end of a StreamConfig channel.
+                    let (connector_client, connector_server) = fidl::endpoints::create_proxy::<
+                        fidl_fuchsia_hardware_audio::StreamConfigConnectorMarker,
+                    >()
+                    .expect("failed to create streamconfig");
+
+                    // Create StreamConfig channel which will get info about device.
+                    let (stream_config_client, stream_config_connector) =
+                        fidl::endpoints::create_proxy::<
+                            fidl_fuchsia_hardware_audio::StreamConfigMarker,
+                        >()
+                        .expect("failed to create streamconfig ");
+
+                    let is_input_device = device_selector
+                        .is_input
+                        .ok_or(anyhow::anyhow!("Input/output not specified"))?;
+
+                    // Connect to either /dev/class/audio-output/{id} or /dev/class/audio-input/{id}
+                    // depending on args.
+                    let id = device_selector.id.ok_or(anyhow::anyhow!("No device ID provided"))?;
+
+                    let device_path = if is_input_device {
+                        format!("/dev/class/audio-input/{}", id)
+                    } else {
+                        format!("/dev/class/audio-output/{}", id)
+                    };
+
+                    // Creates a connection to a FIDL service at "/dev/class/audio-output/" or
+                    // "/dev/class/audio-input/", passing the server end of StreamConfigConnector
+                    // channel.
+                    fdio::service_connect(&device_path, connector_server.into_channel())
+                        .context(format!("failed to connect to {}", &device_path))?;
+
+                    // Using StreamConfigConnector client, pass the server end of StreamConfig
+                    // channel to the device so that device can respond to StreamConfig requests.
+                    connector_client.connect(stream_config_connector)?;
+
+                    let stream_properties = stream_config_client.get_properties().await?;
+                    let supported_formats = stream_config_client.get_supported_formats().await?;
+                    let gain_state = stream_config_client.watch_gain_state().await?;
+                    let plug_state = stream_config_client.watch_plug_state().await?;
+
+                    let response = AudioDaemonDeviceInfoResponse {
+                        device_info: Some(DeviceInfo {
+                            stream_properties: Some(stream_properties),
+                            supported_formats: Some(supported_formats),
+                            gain_state: Some(gain_state),
+                            plug_state: Some(plug_state),
+                            ..DeviceInfo::EMPTY
+                        }),
+                        ..AudioDaemonDeviceInfoResponse::EMPTY
+                    };
+
+                    responder.send(&mut Ok(response))?
+                }
             }
         }
         Ok(())
@@ -397,9 +505,6 @@ impl<'a> AudioDaemon<'a> {
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut service_fs = ServiceFs::new_local();
-    let audio_component =
-        fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
-            .context("Failed to connect to fuchsia.media.Audio")?;
 
     // Initialize inspect
     inspect_runtime::serve(component::inspector(), &mut service_fs)?;
@@ -414,12 +519,12 @@ async fn main() -> Result<(), anyhow::Error> {
     service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
             // match on `request` and handle each protocol.
-            let mut audio_daemon = AudioDaemon::new(&audio_component);
+            let mut audio_daemon = AudioDaemon::new();
 
             match request {
                 IncomingRequest::AudioDaemon(stream) => {
                     audio_daemon.serve(stream).await.unwrap_or_else(|e: Error| {
-                        panic!("Couldn't serve audio daemon requests{:?}", e)
+                        panic!("Couldn't serve audio daemon requests: {:?}", e)
                     })
                 }
             }

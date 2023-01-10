@@ -7,6 +7,8 @@
 library fuchsia.audio.ffxdaemon;
 
 using fuchsia.media;
+using fuchsia.hardware.audio;
+using fuchsia.io;
 using zx;
 
 /// Where to route incoming audio data.
@@ -45,6 +47,37 @@ type GainSettings = table {
 
     /// Gain level in dB.
     2: gain float32;
+};
+
+/// Device target info.
+type DeviceInfo = table {
+    /// Top level static properties of the stream.
+    /// Required.
+    1: stream_properties fuchsia.hardware.audio.StreamProperties;
+
+    /// Supported formats.
+    /// Required.
+    2: supported_formats
+            vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
+
+    /// Gain state.
+    /// Required.
+    3: gain_state fuchsia.hardware.audio.GainState;
+
+    /// Plug state.
+    /// Required.
+    4: plug_state fuchsia.hardware.audio.PlugState;
+};
+
+/// Identifies which device to retrieve information about.
+type DeviceSelector = table {
+    /// Whether device is input or output.
+    /// Required.
+    1: is_input bool;
+
+    /// ID of device.
+    /// Required.
+    2: id string:fuchsia.io.MAX_PATH;
 };
 
 /// The main entry point for ffx audio.
@@ -94,5 +127,24 @@ protocol AudioDaemon {
         /// Errors from daemon component for ffx plugin to display.
         /// Required.
         2: stderr zx.handle:SOCKET;
+    }) error zx.status;
+
+
+    /// Lists all available audio devices on target.
+    ListDevices() -> (resource table {
+        /// List of available devices, sorted by name.
+        /// Required.
+        1: devices vector<string:fuchsia.io.MAX_PATH>:MAX;
+    }) error zx.status;
+
+    /// Returns details about a specific audio device.
+    DeviceInfo(resource table {
+        /// Id of device to retrieve information about, and
+        /// whether it is an input or output device.
+        /// Required.
+        1: device DeviceSelector;
+    }) -> (resource table {
+        /// Information about device.
+        1: device_info DeviceInfo;
     }) error zx.status;
 };

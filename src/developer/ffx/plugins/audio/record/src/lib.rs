@@ -63,7 +63,7 @@ pub async fn record_capture(
                 }))
             },
             stream_type: Some(stream_type),
-            duration: Some(record_command.duration.as_nanos() as i64), // TODO(camlloyd)
+            duration: Some(record_command.duration.as_nanos() as i64),
             ..AudioDaemonRecordRequest::EMPTY
         };
 
