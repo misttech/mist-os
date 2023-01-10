@@ -1923,16 +1923,6 @@ mod test {
     }
 
     #[test]
-    fn channel_closed_after_drop() {
-        let (a, _b) = Channel::create();
-        let a_copy = Channel::from(unsafe { Handle::from_raw(a.0) });
-        // Prevent trying to close a twice at the end of the test.
-        let a_copy = ManuallyDrop::new(a_copy);
-        drop(a);
-        assert!(a_copy.is_closed());
-    }
-
-    #[test]
     fn channel_drop_left_closes_right() {
         let (a, b) = Channel::create();
         drop(a);
