@@ -62,7 +62,7 @@ static constexpr uint8_t INT_MASK0_TDM_CLOCK_ERROR = (1 << 2);
 static constexpr uint8_t INT_MASK0_OVER_CURRENT_ERROR = (1 << 1);
 static constexpr uint8_t INT_MASK0_OVER_TEMP_ERROR = (1 << 0);
 
-static constexpr GainState kDefaultGainState = {.gain = -30.f, .muted = true};
+static constexpr GainState kDefaultGainState = {.gain = 0.f, .muted = true};
 
 class Tas27xx : public SimpleCodecServer {
  public:

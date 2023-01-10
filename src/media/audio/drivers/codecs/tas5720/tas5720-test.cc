@@ -53,8 +53,8 @@ struct Tas5720Test : public inspect::InspectTestHelper, public zxtest::Test {
         .ExpectWrite({0x01})
         .ExpectReadStop({0xfe})
         .ExpectWriteStop({0x01, 0xff})  // exit shutdown (part of start).
-        .ExpectWriteStop({0x06, 0x51})  // Default gain.
-        .ExpectWriteStop({0x04, 0xa1})  // Default gain.
+        .ExpectWriteStop({0x06, 0x5d})  // Default gain.
+        .ExpectWriteStop({0x04, 0xcf})  // Default gain.
         .ExpectWrite({0x03})
         .ExpectReadStop({0x80})
         .ExpectWriteStop({0x03, 0x90});  // Muted.
@@ -186,8 +186,8 @@ TEST_F(Tas5720Test, CodecReset) {
       .ExpectWrite({0x01})
       .ExpectReadStop({0xfe})
       .ExpectWriteStop({0x01, 0xff})  // exit shutdown (part of start).
-      .ExpectWriteStop({0x06, 0x51})  // Default gain.
-      .ExpectWriteStop({0x04, 0xa1})  // Default gain.
+      .ExpectWriteStop({0x06, 0x5d})  // Default gain.
+      .ExpectWriteStop({0x04, 0xcf})  // Default gain.
       .ExpectWrite({0x03})
       .ExpectReadStop({0x80})
       .ExpectWriteStop({0x03, 0x90});  // Muted.
@@ -459,8 +459,8 @@ TEST(Tas5720Test, InstanceCount) {
       .ExpectWrite({0x01})
       .ExpectReadStop({0xfe})
       .ExpectWriteStop({0x01, 0xff})  // exit shutdown (part of start).
-      .ExpectWriteStop({0x06, 0x51})  // Default gain.
-      .ExpectWriteStop({0x04, 0xa1})  // Default gain.
+      .ExpectWriteStop({0x06, 0x5d})  // Default gain.
+      .ExpectWriteStop({0x04, 0xcf})  // Default gain.
       .ExpectWrite({0x03})
       .ExpectReadStop({0x80})
       .ExpectWriteStop({0x03, 0x90});  // Muted.

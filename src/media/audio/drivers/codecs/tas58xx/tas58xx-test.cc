@@ -1411,7 +1411,7 @@ TEST(Tas58xxTest, Reset) {
         .ExpectWriteStop({0x00, 0x00})  // Page 0.
         .ExpectWriteStop({0x7f, 0x00})  // book 0.
         .ExpectWriteStop({0x78, 0x80})  // Clear analog fault.
-        .ExpectWriteStop({0x4c, 0x6c})  // digital vol -30dB.
+        .ExpectWriteStop({0x4c, 0x30})  // digital vol 0dB.
         .ExpectWrite({0x03})
         .ExpectReadStop({0x00})
         .ExpectWriteStop({0x03, 0x08});  // Muted = true.
@@ -1494,7 +1494,7 @@ TEST(Tas58xxTest, Bridged) {
         .ExpectWriteStop({0x00, 0x00})  // Page 0.
         .ExpectWriteStop({0x7f, 0x00})  // book 0.
         .ExpectWriteStop({0x78, 0x80})  // Clear analog fault.
-        .ExpectWriteStop({0x4c, 0x6c})  // digital vol -30dB.
+        .ExpectWriteStop({0x4c, 0x30})  // digital vol 0dB.
         .ExpectWrite({0x03})
         .ExpectReadStop({0x00})
         .ExpectWriteStop({0x03, 0x08});  // Muted = true.
@@ -1605,7 +1605,7 @@ TEST(Tas58xxTest, ExternalConfig) {
         .ExpectWriteStop({0x00, 0x00})  // Page 0.
         .ExpectWriteStop({0x7f, 0x00})  // book 0.
         .ExpectWriteStop({0x78, 0x80})  // Clear analog fault.
-        .ExpectWriteStop({0x4c, 0x6c})  // digital vol -30dB.
+        .ExpectWriteStop({0x4c, 0x30})  // digital vol 0dB.
         .ExpectWrite({0x03})
         .ExpectReadStop({0x00})
         .ExpectWriteStop({0x03, 0x08});  // Muted = true.
@@ -1630,7 +1630,7 @@ TEST(Tas58xxTest, ExternalConfig) {
     mock_i2c.ExpectWriteStop({0x00, 0x00});  // Page 0.
     mock_i2c.ExpectWriteStop({0x7f, 0x00});  // book 0.
     // Restore gain state.
-    mock_i2c.ExpectWriteStop({0x4c, 0x6c});  // digital vol -30dB.
+    mock_i2c.ExpectWriteStop({0x4c, 0x30});  // digital vol 0dB.
     // Restore mute state.
     mock_i2c.ExpectWrite({0x03}).ExpectReadStop({0x33}).ExpectWriteStop(
         {0x03, 0x3b});  // Muted = true.

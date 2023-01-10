@@ -184,7 +184,7 @@ zx_status_t Tas58xx::Reset() {
       return status;
     }
   }
-  constexpr float kDefaultGainDb = -30.f;
+  constexpr float kDefaultGainDb = 0.f;
   status = SetGain(kDefaultGainDb);
   if (status != ZX_OK) {
     return status;

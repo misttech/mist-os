@@ -183,7 +183,7 @@ zx_status_t Tas5720::Reinitialize() {
   if (status != ZX_OK) {
     return status;
   }
-  constexpr float kDefaultGainDb = -30.f;
+  constexpr float kDefaultGainDb = -0.f;
   GainState gain_state = {.gain = kDefaultGainDb, .muted = true};
   SetGainState(std::move(gain_state));
   return ZX_OK;

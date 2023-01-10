@@ -142,7 +142,7 @@ TEST_F(Tas27xxTest, CodecReset) {
       .ExpectWriteStop({0x20, 0xf8})   // INT_MASK0.
       .ExpectWriteStop({0x21, 0xff})   // INT_MASK1.
       .ExpectWriteStop({0x30, 0x01})   // INT_CFG.
-      .ExpectWriteStop({0x05, 0x3c})   // -30dB.
+      .ExpectWriteStop({0x05, 0x00})   // 0dB.
       .ExpectWriteStop({0x02, 0x0e});  // PWR_CTL stopped.
 
   ddk::MockGpio mock_fault;
@@ -219,7 +219,7 @@ TEST_F(Tas27xxTest, DISABLED_CodecResetDueToErrorState) {
       .ExpectWriteStop({0x20, 0xf8})   // INT_MASK0.
       .ExpectWriteStop({0x21, 0xff})   // INT_MASK1.
       .ExpectWriteStop({0x30, 0x01})   // INT_CFG.
-      .ExpectWriteStop({0x05, 0x3c})   // -30dB, default.
+      .ExpectWriteStop({0x05, 0x00})   // 0dB, default.
       .ExpectWriteStop({0x02, 0x0d});  // PWR_CTL stopped.
 
   // Set gain state.
@@ -316,7 +316,7 @@ TEST_F(Tas27xxTest, ExternalConfig) {
       .ExpectWriteStop({0x20, 0xf8})   // INT_MASK0.
       .ExpectWriteStop({0x21, 0xff})   // INT_MASK1.
       .ExpectWriteStop({0x30, 0x01})   // INT_CFG.
-      .ExpectWriteStop({0x05, 0x3c})   // -30dB.
+      .ExpectWriteStop({0x05, 0x00})   // 0dB.
       .ExpectWriteStop({0x02, 0x0e});  // PWR_CTL stopped.
 
   ddk::MockGpio mock_fault;
@@ -505,7 +505,7 @@ TEST_F(Tas27xxTest, CodecGain) {
       .ExpectWriteStop({0x20, 0xf8})   // INT_MASK0.
       .ExpectWriteStop({0x21, 0xff})   // INT_MASK1.
       .ExpectWriteStop({0x30, 0x01})   // INT_CFG.
-      .ExpectWriteStop({0x05, 0x3c})   // -30dB.
+      .ExpectWriteStop({0x05, 0x00})   // 0dB.
       .ExpectWriteStop({0x02, 0x0e});  // PWR_CTL stopped.
 
   // Start but muted.
