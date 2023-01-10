@@ -43,7 +43,7 @@ fbl::Array<StrProperty> ConvertStringProperties(
 CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_prop_t> properties,
                                  fbl::Array<const StrProperty> str_properties,
                                  uint32_t fragments_count, uint32_t primary_fragment_index,
-                                 bool spawn_colocated,
+                                 std::optional<bool> legacy_colocate_flag,
                                  fbl::Array<std::unique_ptr<Metadata>> metadata,
                                  bool from_driver_index)
     : name_(std::move(name)),
@@ -51,7 +51,7 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
       str_properties_(std::move(str_properties)),
       fragments_count_(fragments_count),
       primary_fragment_index_(primary_fragment_index),
-      spawn_colocated_(spawn_colocated),
+      legacy_colocate_flag_(legacy_colocate_flag),
       metadata_(std::move(metadata)),
       from_driver_index_(from_driver_index) {}
 
@@ -125,8 +125,7 @@ std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromDriverIndex(
   fbl::String name(driver.composite.name);
   auto dev = std::make_unique<CompositeDevice>(
       std::move(name), fbl::Array<const zx_device_prop_t>(), fbl::Array<const StrProperty>(),
-      driver.composite.num_nodes, primary_index, driver.driver_info.colocate, std::move(metadata),
-      true);
+      driver.composite.num_nodes, primary_index, std::nullopt, std::move(metadata), true);
 
   for (uint32_t i = 0; i < driver.composite.num_nodes; ++i) {
     std::string name = driver.composite.node_names[i];
@@ -233,14 +232,27 @@ zx_status_t CompositeDevice::BindFragment(size_t index, const fbl::RefPtr<Device
 }
 
 zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
+  ZX_ASSERT(driver_.has_value());
+
   // We already have a driver host so return it.
   if (driver_host_) {
     return zx::ok(driver_host_);
   }
 
-  // If |spawn_colocated_| is true, set the |driver_host_| to be the same as the primary fragment
-  // and return it.
-  if (spawn_colocated_) {
+  // The composite should be colocated if both its colocate flags from device_add_composite()
+  // and the driver CML are set to true. If the CompositeDevice isn't created from
+  // device_add_composite(), we will only use the colocate flag from the driver CML.
+  bool should_colocate = driver_->colocate;
+  if (legacy_colocate_flag_.has_value()) {
+    if (driver_->colocate != legacy_colocate_flag_.value()) {
+      LOGF(WARNING, "Inconsistent colocation flags in driver: %s", driver_.value().name());
+    }
+    should_colocate = driver_->colocate && legacy_colocate_flag_.value();
+  }
+
+  // If the composite should be spawn colocated, set the |driver_host_| to be the same as the
+  // primary fragment and return it.
+  if (should_colocate) {
     if (const CompositeDeviceFragment* fragment = GetPrimaryFragment(); fragment) {
       driver_host_ = fragment->bound_device()->host();
     }

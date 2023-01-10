@@ -37,7 +37,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // Only public because of make_unique.  You probably want Create().
   CompositeDevice(fbl::String name, fbl::Array<const zx_device_prop_t> properties,
                   fbl::Array<const StrProperty> str_properties, uint32_t fragments_count,
-                  uint32_t primary_fragment_index, bool spawn_colocated,
+                  uint32_t primary_fragment_index, std::optional<bool> legacy_colocate_flag,
                   fbl::Array<std::unique_ptr<Metadata>> metadata, bool from_driver_index);
 
   CompositeDevice(CompositeDevice&&) = delete;
@@ -115,7 +115,10 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   const uint32_t fragments_count_;
   const uint32_t primary_fragment_index_;
 
-  const bool spawn_colocated_;
+  // The colocate flag set by device_add_composite(). std::nullopt if CompositeDevice
+  // is created from the driver index.
+  const std::optional<bool> legacy_colocate_flag_;
+
   const fbl::Array<std::unique_ptr<Metadata>> metadata_;
 
   // Driver index variables. |driver_index_driver_| is set by CreateFromDriverIndex().
