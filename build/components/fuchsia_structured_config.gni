@@ -134,10 +134,22 @@ template("fuchsia_structured_config_values") {
       component_name = get_path_info(compiled_manifest, "name")
     }
 
-    manifest_resource_target = "${target_name}_manifest_resource"
-
     # compile the value file
-    cvf(target_name) {
+    resource_target = "${target_name}"
+    cvf_target = "${target_name}_cvf"
+    cvf(cvf_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      cm = compiled_manifest
+      value_file = _value_file
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += [ "${invoker.cm_label}" ] + _value_file_deps
+      visibility = [ ":${resource_target}" ]
+    }
+
+    # package the value file
+    resource(resource_target) {
       forward_variables_from(invoker,
                              [
                                "data_deps",
@@ -145,31 +157,26 @@ template("fuchsia_structured_config_values") {
                                "testonly",
                                "visibility",
                              ])
-      cm = compiled_manifest
-      value_file = _value_file
+      sources = get_target_outputs(":${cvf_target}")
       if (!defined(deps)) {
         deps = []
       }
-      deps += [
-                ":$manifest_resource_target",
-                "${invoker.cm_label}",
-              ] + _value_file_deps
+      deps += [ ":${cvf_target}" ]
+
+      # NOTE: must be kept in sync with path in fuchsia_component.gni
+      outputs = [ "meta/$component_name.cvf" ]
+
       if (defined(visibility)) {
         # The group we create below for the non-default toolchains needs to depend on this target.
         # We can't explicitly list all of the toolchain suffixes that might dep on this, because not
         # all of them have variable shortcuts defined.
-        visibility += [ ":${target_name}" ]
+        visibility += [ ":${resource_target}" ]
       }
-    }
 
-    # package the value file
-    resource(manifest_resource_target) {
-      forward_variables_from(invoker, [ "testonly" ])
-      sources = get_target_outputs(":${invoker.target_name}")
-
-      # NOTE: must be kept in sync with path in fuchsia_component.gni
-      outputs = [ "meta/$component_name.cvf" ]
-      visibility = [ ":*" ]
+      # Avoid picking up transitive dependencies in the cm_label.
+      metadata = {
+        distribution_entries_barrier = []
+      }
     }
   } else {
     # need to have a nop target that can be depended upon by host toolchain targets
