@@ -84,7 +84,10 @@ type RegisterBufferCollectionArgs = resource table {
     /// # Deprecation
     ///
     /// This arg is deprecated at API version 9 with addition of |usages|.
-    @available(deprecated=9, note="use usages")
+    ///
+    /// If both the `usages` and `usage` fields are set, `usages` takes precedence and `usage` is
+    /// ignored.
+    @available(deprecated=9, note="use usages. Deletion tracking bug: fxbug.dev/105226")
     3: usage RegisterBufferCollectionUsage;
 
     /// The client can register a buffer collection for various uses and has the ability to
