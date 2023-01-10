@@ -46,7 +46,7 @@ template("generate_chromium_targets") {
     ]
   }
 
-  # TODO(fxbug.dev/70573): Remove when use_chromium_canary is deprecated.
+  # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
   # TODO(fxbug.dev/81925): Remove else condition when release chrome is
   # available.
   if (use_chromium_canary) {
@@ -172,8 +172,8 @@ template("generate_chromium_targets") {
     }
   }
 
-  # TODO(fxbug.dev/71642): Migrate the uses of this variable below to
-  # generate_pkg_and_config.gni. A simple function with a Boolean could be sufficient.
+  # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
+  # Consider alternatives to use of `flavor_suffix` in this file.
   if (use_chromium_canary) {
     flavor_suffix = "_latest"
   } else {
