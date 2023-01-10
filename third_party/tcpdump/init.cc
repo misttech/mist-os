@@ -84,30 +84,40 @@ __attribute__((constructor)) void init_packet_socket_provider() {
   // to make packet socket provider available to the program and start serving
   // requests to the composed service directory.
   {
-    zx_status_t status;
     zx::channel client, server;
-    ZX_ASSERT_MSG((status = zx::channel::create(0, &client, &server)) == ZX_OK,
-                  "Failed to create channels: %s", zx_status_get_string(status));
+    {
+      zx_status_t status = zx::channel::create(0, &client, &server);
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to create channels: %s", zx_status_get_string(status));
+    }
 
     // TODO(https://fxbug.dev/77059): Drop writable right.
-    ZX_ASSERT_MSG(
-        (status = composed_svc_dir.Serve(
-             fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                 fuchsia::io::OpenFlags::DIRECTORY,
-             std::move(server), composed_svc_dir_loop.dispatcher())) == ZX_OK,
-        "Failed to start serving requsts for composed service directory: %s",
-        zx_status_get_string(status));
+    {
+      zx_status_t status = composed_svc_dir.Serve(
+          fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
+              fuchsia::io::OpenFlags::DIRECTORY,
+          std::move(server), composed_svc_dir_loop.dispatcher());
+      ZX_ASSERT_MSG(status == ZX_OK,
+                    "Failed to start serving requsts for composed service directory: %s",
+                    zx_status_get_string(status));
+    }
 
     fdio_ns_t* ns;
-    ZX_ASSERT_MSG((status = fdio_ns_get_installed(&ns)) == ZX_OK,
-                  "Failed to get installed namespace: %s", zx_status_get_string(status));
-    ZX_ASSERT_MSG((status = fdio_ns_unbind(ns, kServiceDirectory)) == ZX_OK,
-                  "Failed to unbind svc: %s", zx_status_get_string(status));
-    ZX_ASSERT_MSG((status = fdio_ns_bind(ns, kServiceDirectory, client.release())) == ZX_OK,
-                  "Failed to bind svc: %s", zx_status_get_string(status));
+    {
+      zx_status_t status = status = fdio_ns_get_installed(&ns);
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to get installed namespace: %s",
+                    zx_status_get_string(status));
+    }
+    {
+      zx_status_t status = fdio_ns_unbind(ns, kServiceDirectory);
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to unbind svc: %s", zx_status_get_string(status));
+    }
+    {
+      zx_status_t status = status = fdio_ns_bind(ns, kServiceDirectory, client.release());
+      ZX_ASSERT_MSG(status == ZX_OK, "Failed to bind svc: %s", zx_status_get_string(status));
+    }
   }
 
-  zx_status_t status;
-  ZX_ASSERT_MSG((status = composed_svc_dir_loop.StartThread()) == ZX_OK,
-                "Failed to start async loop thread: %s", zx_status_get_string(status));
+  zx_status_t status = composed_svc_dir_loop.StartThread();
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to start async loop thread: %s",
+                zx_status_get_string(status));
 }
