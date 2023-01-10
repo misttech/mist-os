@@ -6,6 +6,7 @@ import("//build/zircon/zx_library.gni")
 
 zx_library("fzl") {
   sdk = "source"
+  sdk_publishable = "internal"
   sdk_headers = [
     "lib/fzl/fifo.h",
     "lib/fzl/memory-probe.h",

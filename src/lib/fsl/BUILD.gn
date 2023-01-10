@@ -3,8 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/cpp/sdk_static_library.gni")
 
-static_library("fsl") {
+sdk_static_library("fsl") {
+  no_headers = true
+  category = "internal"
+
   output_name = "fsl"
 
   public_deps = [
@@ -14,6 +18,11 @@ static_library("fsl") {
     "//src/lib/fsl/tasks",
     "//src/lib/fsl/types",
     "//src/lib/fsl/vmo",
+  ]
+
+  runtime_deps = [
+    "//sdk/lib/fdio:fdio_sdk",
+    "//zircon/system/ulib/async-default:async-default_sdk",
   ]
 }
 
