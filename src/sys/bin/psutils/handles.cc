@@ -45,15 +45,22 @@ zx_status_t get_handles(zx_handle_t process, std::vector<zx_info_handle_extended
 
 void print_help(FILE* f) {
   fprintf(f, "Usage: handles [options] <pid>\n");
-  fprintf(f, "  Prints the handle table of a process.\n");
+  fprintf(f, "  Displays the handle table of a process. Unless a filter\n");
+  fprintf(f, "  option is specified, information for all handles will be \n");
+  fprintf(f, "  included. If filter options are specified - and --reverse\n");
+  fprintf(f, "  is not - then only the handles associated with those\n");
+  fprintf(f, "  objects will be displayed; if --reverse is specified, then\n");
+  fprintf(f, "  filter options specify exclusions from the display.\n");
+  fprintf(f, "\n");
   fprintf(f, "Options:\n");
-  fprintf(f, " -t|--task     Only include process|thread|job in the output\n");
-  fprintf(f, " -v|--vmo      Only include vmos in the output\n");
-  fprintf(f, " -p|--port     Only include ports in the output\n");
-  fprintf(f, " -c|--channel  Only include threads in the output\n");
-  fprintf(f, " -e|--event    Only include events | eventpairs in the output\n");
-  fprintf(f, " -s|--socket   Only include sockets in the output\n");
-  fprintf(f, " -r|--reverse  Exclude objects specified in the filter\n");
+  fprintf(f, " -t|--task     Filter for processes, threads, and jobs\n");
+  fprintf(f, " -v|--vmo      Filter for VMOs\n");
+  fprintf(f, " -p|--port     Filter for ports\n");
+  fprintf(f, " -c|--channel  Filter for channels\n");
+  fprintf(f, " -e|--event    Filter for events and eventpairs\n");
+  fprintf(f, " -s|--socket   Filter for sockets\n");
+  fprintf(f, " -r|--reverse  Reverse the filter; objects specified in the\n");
+  fprintf(f, "               filter are excluded\n");
   fprintf(f, " -h|--help     Display this message\n");
 }
 
