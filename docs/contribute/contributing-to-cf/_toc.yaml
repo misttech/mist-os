@@ -10,3 +10,5 @@ toc:
   path: /docs/contribute/contributing-to-cf
 - title: "Original principles"
   path: /docs/contribute/contributing-to-cf/original_principles.md
+- title: "Error style guide"
+  path: /docs/contribute/contributing-to-cf/error_style_guide.md
