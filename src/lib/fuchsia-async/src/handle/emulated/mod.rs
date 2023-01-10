@@ -13,19 +13,17 @@ use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use futures::ready;
 use futures::task::noop_waker_ref;
-use slab::Slab;
 #[cfg(debug_assertions)]
 use std::cell::Cell;
+use std::collections::{HashMap, VecDeque};
+use std::future::Future;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::sync::Mutex;
-use std::{
-    collections::VecDeque,
-    future::Future,
-    marker::PhantomData,
-    pin::Pin,
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
-    task::{Context, Poll, Waker},
-};
+use std::task::{Context, Poll, Waker};
 use zx_status::Status;
 
 /// Invalid handle value
@@ -72,7 +70,7 @@ impl<'a> HandleRef<'a> {
         clear_mask.validate_user_signals()?;
         set_mask.validate_user_signals()?;
 
-        let rights = with_handle(self.raw_handle(), |mut h, side| h.as_hdl_data().rights(side));
+        let rights = get_hdl_rights(self.raw_handle()).ok_or(zx_status::Status::BAD_HANDLE)?;
 
         if !rights.contains(Rights::SIGNAL) {
             Err(Status::ACCESS_DENIED)
@@ -140,11 +138,12 @@ pub trait AsHandleRef {
         if self.is_invalid() {
             return Err(zx_status::Status::BAD_HANDLE);
         }
-        let (koids, rights) = with_handle(self.raw_handle(), |mut h, side| {
+        let koids = with_handle(self.raw_handle(), |mut h, side| {
             let h = h.as_hdl_data();
-            (h.koids(side), h.rights(side))
+            h.koids(side)
         });
-        let (_, _, ty, _) = unpack_handle(self.raw_handle());
+        let ty = get_hdl_type(self.raw_handle()).ok_or(zx_status::Status::BAD_HANDLE)?;
+        let rights = get_hdl_rights(self.raw_handle()).ok_or(zx_status::Status::BAD_HANDLE)?;
         Ok(HandleBasicInfo {
             koid: Koid(koids.0),
             rights,
@@ -168,7 +167,7 @@ pub trait Peered: HandleBased {
         clear_mask.validate_user_signals()?;
         set_mask.validate_user_signals()?;
 
-        let rights = with_handle(self.raw_handle(), |mut h, side| h.as_hdl_data().rights(side));
+        let rights = get_hdl_rights(self.raw_handle()).ok_or(zx_status::Status::BAD_HANDLE)?;
 
         if !rights.contains(Rights::SIGNAL_PEER) {
             Err(Status::ACCESS_DENIED)
@@ -187,7 +186,7 @@ pub trait EmulatedHandleRef: AsHandleRef {
         if self.is_invalid() {
             ObjectType::NONE
         } else {
-            let (_, _, ty, _) = unpack_handle(self.as_handle_ref().0);
+            let ty = get_hdl_type(self.raw_handle()).expect("Bad handle");
             ty.object_type()
         }
     }
@@ -197,12 +196,17 @@ pub trait EmulatedHandleRef: AsHandleRef {
         if self.is_invalid() {
             HandleRef(INVALID_HANDLE, std::marker::PhantomData)
         } else {
-            let (shard, slot, ty, side) = unpack_handle(self.as_handle_ref().0);
-            if ty.two_sided() {
-                HandleRef(pack_handle(shard, slot, ty, side.opposite()), std::marker::PhantomData)
-            } else {
-                HandleRef(INVALID_HANDLE, std::marker::PhantomData)
+            let table = HANDLE_TABLE.lock().unwrap();
+            if let Some((target, side)) =
+                table.get(&self.raw_handle()).map(|x| (Arc::clone(&x.object), x.side))
+            {
+                for (&handle, entry) in table.iter() {
+                    if side == entry.side.opposite() && Arc::ptr_eq(&target, &entry.object) {
+                        return HandleRef(handle, std::marker::PhantomData);
+                    }
+                }
             }
+            HandleRef(INVALID_HANDLE, std::marker::PhantomData)
         }
     }
 
@@ -222,15 +226,7 @@ pub trait EmulatedHandleRef: AsHandleRef {
         if self.is_invalid() {
             false
         } else {
-            let (shard, slot, ty, side) = unpack_handle(self.as_handle_ref().0);
-            let present = match ty {
-                HdlType::Channel => table_contains(&CHANNELS, shard, slot, side),
-                HdlType::StreamSocket => table_contains(&STREAM_SOCKETS, shard, slot, side),
-                HdlType::DatagramSocket => table_contains(&DATAGRAM_SOCKETS, shard, slot, side),
-                HdlType::EventPair => table_contains(&EVENT_PAIRS, shard, slot, side),
-                HdlType::Event => table_contains(&EVENTS, shard, slot, side),
-            };
-            !present
+            !HANDLE_TABLE.lock().unwrap().contains_key(&self.raw_handle())
         }
     }
 }
@@ -340,30 +336,23 @@ impl Handle {
         if self.is_invalid() {
             return Err(zx_status::Status::BAD_HANDLE);
         }
-        let (shard, slot, ty, side) = unpack_handle(self.raw_handle());
-        let result = match ty {
-            HdlType::Channel => table_replace(&CHANNELS, shard, slot, side, target_rights),
-            HdlType::StreamSocket => {
-                table_replace(&STREAM_SOCKETS, shard, slot, side, target_rights)
-            }
-            HdlType::DatagramSocket => {
-                table_replace(&DATAGRAM_SOCKETS, shard, slot, side, target_rights)
-            }
-            HdlType::EventPair => table_replace(&EVENT_PAIRS, shard, slot, side, target_rights),
-            HdlType::Event => table_replace(&EVENTS, shard, slot, side, target_rights),
+
+        let mut table = HANDLE_TABLE.lock().unwrap();
+        let std::collections::hash_map::Entry::Occupied(entry) =
+            table.entry(self.raw_handle())
+        else {
+            return Err(zx_status::Status::BAD_HANDLE);
         };
-        let (new_shard, new_slot) = match result {
-            Ok(val) => val,
-            Err(zx_status::Status::BAD_HANDLE) => {
-                std::mem::forget(self);
-                return Err(zx_status::Status::BAD_HANDLE);
-            }
-            Err(status) => {
-                return Err(status);
-            }
-        };
-        std::mem::forget(self);
-        unsafe { Ok(Handle::from_raw(pack_handle(new_shard, new_slot, ty, side))) }
+
+        if !entry.get().rights.contains(target_rights) {
+            return Err(zx_status::Status::INVALID_ARGS);
+        }
+
+        let new_handle = alloc_handle();
+        let mut entry = entry.remove_entry().1;
+        entry.rights = target_rights;
+        let _ = table.insert(new_handle, entry);
+        Ok(Handle(new_handle))
     }
 }
 
@@ -405,12 +394,13 @@ impl Channel {
     /// sides of the channel. Messages written into one maybe read from the opposite.
     pub fn create() -> (Channel, Channel) {
         let rights = Rights::CHANNEL_DEFAULT;
-        let (shard, slot) = CHANNELS.new_two_sided_slot(rights);
-        let left = pack_handle(shard, slot, HdlType::Channel, Side::Left);
-        let right = pack_handle(shard, slot, HdlType::Channel, Side::Right);
+        let (left, right, obj) = new_handle_pair(HdlType::Channel, rights);
 
-        let mut shard = CHANNELS.shards[shard].lock().unwrap();
-        let mut hdl_ref = HdlRef::Channel(&mut shard[slot]);
+        let mut obj = obj.lock().unwrap();
+        let KObjectEntry::Channel(obj) = &mut *obj else {
+            unreachable!("Channel we just allocated wasn't present or wasn't a channel");
+        };
+        let mut hdl_ref = HdlRef::Channel(obj);
         hdl_ref
             .as_hdl_data()
             .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
@@ -426,9 +416,12 @@ impl Channel {
     /// Returns true if the channel is closed (i.e. other side was dropped).
     pub fn is_closed(&self) -> bool {
         assert!(!self.is_invalid());
-        let (shard, slot, _, _) = unpack_handle(self.0);
-        let tbl = CHANNELS.shards[shard].lock().unwrap();
-        !tbl[slot].liveness.is_open()
+        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object)) else {
+            return true;
+        };
+
+        let object = object.lock().unwrap();
+        !object.liveness().is_open()
     }
 
     /// Read a message from a channel.
@@ -560,8 +553,8 @@ impl Channel {
         handle_infos.clear();
         handle_infos.extend(handles.into_iter().map(|handle| {
             let h_raw = handle.raw_handle();
-            let (_, _, ty, _) = unpack_handle(h_raw);
-            let rights = with_handle(h_raw, |mut href, side| href.as_hdl_data().rights(side));
+            let ty = get_hdl_type(h_raw).expect("Bad handle");
+            let rights = get_hdl_rights(h_raw).expect("Bad handle");
             HandleInfo { handle, object_type: ty.object_type(), rights }
         }));
         Poll::Ready(Ok(()))
@@ -603,7 +596,7 @@ impl Channel {
             let op: HandleOp<'a> =
                 std::mem::replace(&mut hd.handle_op, HandleOp::Move(Handle::invalid()));
             if let HandleOp::Move(handle) = op {
-                let (_, _, ty, _) = unpack_handle(handle.raw_handle());
+                let ty = get_hdl_type(handle.raw_handle()).ok_or(zx_status::Status::BAD_HANDLE)?;
                 if ty.object_type() != handle.object_type()
                     && handle.object_type() != ObjectType::NONE
                 {
@@ -689,11 +682,13 @@ impl Socket {
                     | Rights::WAIT
                     | Rights::SIGNAL
                     | Rights::SIGNAL_PEER;
-                let (shard, slot) = STREAM_SOCKETS.new_two_sided_slot(rights);
-                let left = pack_handle(shard, slot, HdlType::StreamSocket, Side::Left);
-                let right = pack_handle(shard, slot, HdlType::StreamSocket, Side::Right);
-                let mut shard = STREAM_SOCKETS.shards[shard].lock().unwrap();
-                let mut hdl_ref = HdlRef::StreamSocket(&mut shard[slot]);
+                let (left, right, obj) = new_handle_pair(HdlType::StreamSocket, rights);
+
+                let mut obj = obj.lock().unwrap();
+                let KObjectEntry::StreamSocket(obj) = &mut *obj else {
+                    unreachable!("Channel we just allocated wasn't present or wasn't a channel");
+                };
+                let mut hdl_ref = HdlRef::StreamSocket(obj);
                 hdl_ref
                     .as_hdl_data()
                     .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
@@ -710,11 +705,13 @@ impl Socket {
                     | Rights::READ
                     | Rights::SIGNAL
                     | Rights::SIGNAL_PEER;
-                let (shard, slot) = DATAGRAM_SOCKETS.new_two_sided_slot(rights);
-                let left = pack_handle(shard, slot, HdlType::DatagramSocket, Side::Left);
-                let right = pack_handle(shard, slot, HdlType::DatagramSocket, Side::Right);
-                let mut shard = DATAGRAM_SOCKETS.shards[shard].lock().unwrap();
-                let mut hdl_ref = HdlRef::DatagramSocket(&mut shard[slot]);
+                let (left, right, obj) = new_handle_pair(HdlType::DatagramSocket, rights);
+
+                let mut obj = obj.lock().unwrap();
+                let KObjectEntry::DatagramSocket(obj) = &mut *obj else {
+                    unreachable!("Channel we just allocated wasn't present or wasn't a channel");
+                };
+                let mut hdl_ref = HdlRef::DatagramSocket(obj);
                 hdl_ref
                     .as_hdl_data()
                     .signal(Side::Left, Signals::NONE, Signals::OBJECT_WRITABLE)
@@ -878,9 +875,7 @@ impl EventPair {
     /// Create an event pair.
     pub fn try_create() -> Result<(EventPair, EventPair), Status> {
         let rights = Rights::EVENTPAIR_DEFAULT;
-        let (shard, slot) = EVENT_PAIRS.new_two_sided_slot(rights);
-        let left = pack_handle(shard, slot, HdlType::EventPair, Side::Left);
-        let right = pack_handle(shard, slot, HdlType::EventPair, Side::Right);
+        let (left, right, _) = new_handle_pair(HdlType::EventPair, rights);
         Ok((EventPair(left), EventPair(right)))
     }
 }
@@ -919,9 +914,7 @@ impl Drop for Event {
 impl Event {
     /// Create an event .
     pub fn create() -> Event {
-        let rights = Rights::EVENT_DEFAULT;
-        let (shard, slot) = EVENTS.new_one_sided_slot(rights);
-        Event(pack_handle(shard, slot, HdlType::Event, Side::Left))
+        Event(new_handle(HdlType::Event, Rights::EVENT_DEFAULT).0)
     }
 }
 
@@ -1480,16 +1473,6 @@ impl HdlType {
             HdlType::Event => ObjectType::EVENT,
         }
     }
-
-    fn two_sided(&self) -> bool {
-        match self {
-            HdlType::Channel => true,
-            HdlType::StreamSocket => true,
-            HdlType::DatagramSocket => true,
-            HdlType::EventPair => true,
-            HdlType::Event => false,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1633,20 +1616,34 @@ trait HdlData {
     ) -> Poll<Signals>;
     fn koids(&self, side: Side) -> (u64, u64);
     fn liveness(&self) -> Liveness;
-    fn rights(&self, side: Side) -> Rights;
 }
 
-struct Hdl<Q> {
+struct KObject<Q> {
     two_sided: bool,
     q: Sided<Q>,
     wakers: Sided<Wakers>,
     liveness: Liveness,
     koid_left: u64,
-    rights: Sided<Rights>,
     signals: Sided<Signals>,
 }
 
-impl<Q> HdlData for Hdl<Q> {
+impl<Q> KObject<Q> {
+    fn do_close(&mut self, side: Side) {
+        match self.liveness.close(side) {
+            None => {
+                self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
+            }
+            Some(liveness) => {
+                self.liveness = liveness;
+                self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
+                self.signal(side.opposite(), Signals::empty(), Signals::OBJECT_PEER_CLOSED)
+                    .expect("Close reported other side was open but we could not signal it.");
+            }
+        };
+    }
+}
+
+impl<Q> HdlData for KObject<Q> {
     fn signal(
         &mut self,
         side: Side,
@@ -1691,18 +1688,121 @@ impl<Q> HdlData for Hdl<Q> {
             Side::Right => (self.koid_left + 1, self.koid_left),
         }
     }
+}
 
-    fn rights(&self, side: Side) -> Rights {
-        *self.rights.side(side)
+enum KObjectEntry {
+    Channel(KObject<VecDeque<ChannelMessage>>),
+    StreamSocket(KObject<VecDeque<u8>>),
+    DatagramSocket(KObject<VecDeque<Vec<u8>>>),
+    EventPair(KObject<()>),
+    Event(KObject<()>),
+}
+
+impl KObjectEntry {
+    fn liveness(&self) -> Liveness {
+        match self {
+            KObjectEntry::Channel(k) => k.liveness,
+            KObjectEntry::StreamSocket(k) => k.liveness,
+            KObjectEntry::DatagramSocket(k) => k.liveness,
+            KObjectEntry::EventPair(k) => k.liveness,
+            KObjectEntry::Event(k) => k.liveness,
+        }
+    }
+
+    fn do_close(&mut self, side: Side) {
+        match self {
+            KObjectEntry::Channel(k) => k.do_close(side),
+            KObjectEntry::StreamSocket(k) => k.do_close(side),
+            KObjectEntry::DatagramSocket(k) => k.do_close(side),
+            KObjectEntry::EventPair(k) => k.do_close(side),
+            KObjectEntry::Event(k) => k.do_close(side),
+        }
     }
 }
 
+struct HandleTableEntry {
+    object: Arc<Mutex<KObjectEntry>>,
+    rights: Rights,
+    side: Side,
+}
+
+/// Allocate two new handles which point to the peered sides of a single object. The `hdl_type` must
+/// be a handle type that refers to a paired object, e.g. it should not be `HdlType::Event`.
+fn new_handle_pair(hdl_type: HdlType, rights: Rights) -> (u32, u32, Arc<Mutex<KObjectEntry>>) {
+    fn new_kobject<T: Default>() -> KObject<T> {
+        KObject {
+            two_sided: true,
+            q: Default::default(),
+            wakers: Default::default(),
+            liveness: Liveness::Open,
+            koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
+            signals: Sided { left: Signals::empty(), right: Signals::empty() },
+        }
+    }
+
+    let kobject_entry = Arc::new(Mutex::new(match hdl_type {
+        HdlType::Channel => KObjectEntry::Channel(new_kobject()),
+        HdlType::StreamSocket => KObjectEntry::StreamSocket(new_kobject()),
+        HdlType::DatagramSocket => KObjectEntry::DatagramSocket(new_kobject()),
+        HdlType::EventPair => KObjectEntry::EventPair(new_kobject()),
+        HdlType::Event => panic!("Can't create a paired handle for the unpaired Event handle type"),
+    }));
+
+    let left = HandleTableEntry { object: Arc::clone(&kobject_entry), rights, side: Side::Left };
+
+    let right = HandleTableEntry { object: Arc::clone(&kobject_entry), rights, side: Side::Right };
+
+    let left_handle = alloc_handle();
+    let right_handle = alloc_handle();
+    let mut handle_table = HANDLE_TABLE.lock().unwrap();
+    let _ = handle_table.insert(left_handle, left);
+    let _ = handle_table.insert(right_handle, right);
+
+    (left_handle, right_handle, kobject_entry)
+}
+
+/// Allocate a new handle which points to a single object. The `hdl_type` must be a handle type that
+/// does not refer to a paired object, i.e. it must be `HdlType::Event`.
+fn new_handle(hdl_type: HdlType, rights: Rights) -> (u32, Arc<Mutex<KObjectEntry>>) {
+    fn new_kobject<T: Default>() -> KObject<T> {
+        KObject {
+            two_sided: false,
+            q: Default::default(),
+            wakers: Default::default(),
+            liveness: Liveness::Open,
+            koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
+            signals: Sided { left: Signals::empty(), right: Signals::empty() },
+        }
+    }
+
+    let kobject_entry = Arc::new(Mutex::new(match hdl_type {
+        HdlType::Event => KObjectEntry::Event(new_kobject()),
+        _ => panic!("Cannot create single handle for paired object"),
+    }));
+
+    let left = HandleTableEntry { object: Arc::clone(&kobject_entry), rights, side: Side::Left };
+
+    let left_handle = alloc_handle();
+    let mut handle_table = HANDLE_TABLE.lock().unwrap();
+    let _ = handle_table.insert(left_handle, left);
+
+    (left_handle, kobject_entry)
+}
+
+fn alloc_handle() -> u32 {
+    FREE_HANDLES
+        .lock()
+        .unwrap()
+        .pop_front()
+        .unwrap_or_else(|| NEXT_HANDLE.fetch_add(1, Ordering::Relaxed))
+}
+
 enum HdlRef<'a> {
-    Channel(&'a mut Hdl<VecDeque<ChannelMessage>>),
-    StreamSocket(&'a mut Hdl<VecDeque<u8>>),
-    DatagramSocket(&'a mut Hdl<VecDeque<Vec<u8>>>),
-    EventPair(&'a mut Hdl<()>),
-    Event(&'a mut Hdl<()>),
+    Channel(&'a mut KObject<VecDeque<ChannelMessage>>),
+    StreamSocket(&'a mut KObject<VecDeque<u8>>),
+    DatagramSocket(&'a mut KObject<VecDeque<Vec<u8>>>),
+    EventPair(&'a mut KObject<()>),
+    Event(&'a mut KObject<()>),
 }
 
 impl<'a> HdlRef<'a> {
@@ -1725,178 +1825,52 @@ std::thread_local! {
 fn with_handle<R>(handle: u32, f: impl FnOnce(HdlRef<'_>, Side) -> R) -> R {
     #[cfg(debug_assertions)]
     IN_WITH_HANDLE.with(|iwh| assert_eq!(iwh.replace(true), false));
-    let (shard, slot, ty, side) = unpack_handle(handle);
-    let r = match ty {
-        HdlType::Channel => {
-            f(HdlRef::Channel(&mut CHANNELS.shards[shard].lock().unwrap()[slot]), side)
-        }
-        HdlType::StreamSocket => {
-            f(HdlRef::StreamSocket(&mut STREAM_SOCKETS.shards[shard].lock().unwrap()[slot]), side)
-        }
-        HdlType::DatagramSocket => f(
-            HdlRef::DatagramSocket(&mut DATAGRAM_SOCKETS.shards[shard].lock().unwrap()[slot]),
-            side,
-        ),
-        HdlType::EventPair => {
-            f(HdlRef::EventPair(&mut EVENT_PAIRS.shards[shard].lock().unwrap()[slot]), side)
-        }
-        HdlType::Event => f(HdlRef::Event(&mut EVENTS.shards[shard].lock().unwrap()[slot]), side),
+    let (side, object) = {
+        let handle_table = HANDLE_TABLE.lock().unwrap();
+        let entry = handle_table.get(&handle).expect("Tried to use dangling handle");
+        (entry.side, Arc::clone(&entry.object))
+    };
+
+    let mut object = object.lock().unwrap();
+    let r = match &mut *object {
+        KObjectEntry::Channel(o) => f(HdlRef::Channel(&mut *o), side),
+        KObjectEntry::StreamSocket(o) => f(HdlRef::StreamSocket(&mut *o), side),
+        KObjectEntry::DatagramSocket(o) => f(HdlRef::DatagramSocket(&mut *o), side),
+        KObjectEntry::EventPair(o) => f(HdlRef::EventPair(&mut *o), side),
+        KObjectEntry::Event(o) => f(HdlRef::Event(&mut *o), side),
     };
     #[cfg(debug_assertions)]
     IN_WITH_HANDLE.with(|iwh| assert_eq!(iwh.replace(false), true));
     r
 }
 
-const SHARD_COUNT: usize = 16;
-
-struct HandleTable<T> {
-    shards: [Mutex<Slab<Hdl<T>>>; SHARD_COUNT],
-    next_shard: AtomicUsize,
-    _t: std::marker::PhantomData<T>,
-}
-
 lazy_static::lazy_static! {
-    static ref CHANNELS: HandleTable<VecDeque<ChannelMessage>> = Default::default();
-    static ref STREAM_SOCKETS: HandleTable<VecDeque<u8>> = Default::default();
-    static ref DATAGRAM_SOCKETS: HandleTable<VecDeque<Vec<u8>>> = Default::default();
-    static ref EVENT_PAIRS: HandleTable<()> = Default::default();
-    static ref EVENTS: HandleTable<()> = Default::default();
+    static ref HANDLE_TABLE: Mutex<HashMap<u32, HandleTableEntry>> = Default::default();
+    static ref FREE_HANDLES: Mutex<VecDeque<u32>> = Default::default();
 }
 
 static NEXT_KOID: AtomicU64 = AtomicU64::new(1);
+static NEXT_HANDLE: AtomicU32 = AtomicU32::new(1);
 
-impl<T> Default for HandleTable<T> {
-    fn default() -> Self {
-        Self {
-            shards: Default::default(),
-            next_shard: Default::default(),
-            _t: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<T: Default> HandleTable<T> {
-    fn new_one_sided_slot(&self, rights: Rights) -> (usize, usize) {
-        self.insert_hdl(Hdl {
-            two_sided: false,
-            q: Default::default(),
-            wakers: Default::default(),
-            liveness: Liveness::Left,
-            koid_left: NEXT_KOID.fetch_add(1, Ordering::Relaxed),
-            rights: Sided { left: rights, right: Rights::NONE },
-            signals: Sided { left: Signals::empty(), right: Signals::empty() },
-        })
-    }
-
-    fn new_two_sided_slot(&self, rights: Rights) -> (usize, usize) {
-        self.insert_hdl(Hdl {
-            two_sided: true,
-            q: Default::default(),
-            wakers: Default::default(),
-            liveness: Liveness::Open,
-            koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
-            rights: Sided { left: rights, right: rights },
-            signals: Sided { left: Signals::empty(), right: Signals::empty() },
-        })
-    }
-
-    fn insert_hdl(&self, hdl: Hdl<T>) -> (usize, usize) {
-        let shard = self.next_shard.fetch_add(1, Ordering::Relaxed) & 0xf;
-        let mut h = self.shards[shard].lock().unwrap();
-        (shard, h.insert(hdl))
-    }
-}
-
-fn pack_handle(shard: usize, slot: usize, ty: HdlType, side: Side) -> u32 {
-    assert!(shard <= SHARD_COUNT);
-    assert!(ty.two_sided() || side == Side::Left);
-    let side_bit = match side {
-        Side::Left => 0,
-        Side::Right => 1,
+fn get_hdl_type(handle: u32) -> Option<HdlType> {
+    let object = {
+        let table = HANDLE_TABLE.lock().unwrap();
+        Arc::clone(&table.get(&handle)?.object)
     };
-    let ty_bits = match ty {
-        HdlType::Channel => 0,
-        HdlType::StreamSocket => 1,
-        HdlType::DatagramSocket => 2,
-        HdlType::EventPair => 3,
-        HdlType::Event => 4,
-    };
-    let shard_bits = shard as u32;
-    let slot_bits = slot as u32;
-    ((slot_bits << 8) | (shard_bits << 4) | (ty_bits << 1) | side_bit) + 1
-}
 
-fn unpack_handle(handle: u32) -> (usize, usize, HdlType, Side) {
-    let handle = handle - 1;
-    let side = if handle & 1 == 0 { Side::Left } else { Side::Right };
-    let ty = match (handle >> 1) & 0x7 {
-        0 => HdlType::Channel,
-        1 => HdlType::StreamSocket,
-        2 => HdlType::DatagramSocket,
-        3 => HdlType::EventPair,
-        4 => HdlType::Event,
-        x => panic!("Bad handle type {}", x),
-    };
-    assert!(ty.two_sided() || side == Side::Left);
-    let shard = ((handle >> 4) & 0xf) as usize;
-    let slot = (handle >> 8) as usize;
-    (shard, slot, ty, side)
-}
-
-fn table_contains<T>(tbl: &HandleTable<T>, shard: usize, slot: usize, side: Side) -> bool {
-    match tbl.shards[shard].lock().unwrap().get(slot) {
-        None => false,
-        Some(h) => match (h.liveness, side) {
-            (Liveness::Open, _) => true,
-            (Liveness::Left, Side::Left) => true,
-            (Liveness::Right, Side::Right) => true,
-            _ => false,
-        },
+    let object = object.lock().unwrap();
+    match &*object {
+        KObjectEntry::Channel(_) => Some(HdlType::Channel),
+        KObjectEntry::StreamSocket(_) => Some(HdlType::StreamSocket),
+        KObjectEntry::DatagramSocket(_) => Some(HdlType::DatagramSocket),
+        KObjectEntry::EventPair(_) => Some(HdlType::EventPair),
+        KObjectEntry::Event(_) => Some(HdlType::Event),
     }
 }
 
-fn table_replace<T>(
-    tbl: &HandleTable<T>,
-    shard: usize,
-    slot: usize,
-    side: Side,
-    target_rights: Rights,
-) -> Result<(usize, usize), zx_status::Status> {
-    let mut tbl_shard = tbl.shards[shard].lock().unwrap();
-    match tbl_shard.get_mut(slot) {
-        None => Err(zx_status::Status::BAD_HANDLE),
-        Some(h) => {
-            let rights = h.rights.side_mut(side);
-            if !rights.contains(target_rights) {
-                return Err(zx_status::Status::INVALID_ARGS);
-            }
-            *rights = target_rights;
-            // zx_handle_replace results in a new handle id. However, because emulated handles
-            // embed the (shard, slot) location in the handle id, doing the same here would
-            // break the other end of the handle pair.
-            Ok((shard, slot))
-        }
-    }
-}
-
-fn close_in_table<T>(tbl: &HandleTable<T>, shard: usize, slot: usize, side: Side) {
-    let mut tbl = tbl.shards[shard].lock().unwrap();
-    let h = &mut tbl[slot];
-    let removed = match h.liveness.close(side) {
-        None => {
-            h.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
-            Some(tbl.remove(slot))
-        }
-        Some(liveness) => {
-            h.liveness = liveness;
-            h.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
-            h.signal(side.opposite(), Signals::empty(), Signals::OBJECT_PEER_CLOSED)
-                .expect("Close reported other side was open but we could not signal it.");
-            None
-        }
-    };
-    drop(tbl);
-    drop(removed);
+fn get_hdl_rights(handle: u32) -> Option<Rights> {
+    let table = HANDLE_TABLE.lock().unwrap();
+    table.get(&handle).map(|x| x.rights)
 }
 
 /// Close the handle: no action if hdl==INVALID_HANDLE
@@ -1904,14 +1878,12 @@ fn hdl_close(hdl: u32) {
     if hdl == INVALID_HANDLE {
         return;
     }
-    let (shard, slot, ty, side) = unpack_handle(hdl);
-    match ty {
-        HdlType::Channel => close_in_table(&CHANNELS, shard, slot, side),
-        HdlType::StreamSocket => close_in_table(&STREAM_SOCKETS, shard, slot, side),
-        HdlType::DatagramSocket => close_in_table(&DATAGRAM_SOCKETS, shard, slot, side),
-        HdlType::EventPair => close_in_table(&EVENT_PAIRS, shard, slot, side),
-        HdlType::Event => close_in_table(&EVENTS, shard, slot, side),
-    }
+    let Some(entry) = HANDLE_TABLE.lock().unwrap().remove(&hdl) else {
+        return;
+    };
+
+    entry.object.lock().unwrap().do_close(entry.side);
+    FREE_HANDLES.lock().unwrap().push_back(hdl);
 }
 
 #[cfg(test)]
@@ -1932,10 +1904,7 @@ mod test {
     /// handle because that too will trigger a panic.
     #[deny(unsafe_op_in_unsafe_fn)]
     unsafe fn mimic_closed_handle() -> std::mem::ManuallyDrop<Handle> {
-        // This corresponds to the last shot in the last shard. We won't produce
-        // enough handles in tests to ever collide with this.
-        let raw_unallocated_handle =
-            pack_handle(SHARD_COUNT, (u32::MAX >> 8) as usize, HdlType::Channel, Side::Left);
+        let raw_unallocated_handle = alloc_handle();
         let unallocated_handle = unsafe { Handle::from_raw(raw_unallocated_handle) };
         std::mem::ManuallyDrop::new(unallocated_handle)
     }
@@ -1954,7 +1923,7 @@ mod test {
         // Prevent trying to close a twice at the end of the test.
         let a_copy = ManuallyDrop::new(a_copy);
         drop(a);
-        assert_eq!(a_copy.is_closed(), true);
+        assert!(a_copy.is_closed());
     }
 
     #[test]
@@ -2119,60 +2088,12 @@ mod test {
     }
 
     #[test]
-    fn channel_write_etc_closes_handles_in_same_shard_on_peer_closed() {
-        // Create 2 channel pairs, ensuring both are allocated in the same shard.
-        let (a, b) = Channel::create();
-        let (a_shard, _, _, _) = unpack_handle(a.0);
-
-        let (c, _d) = loop {
-            let (c, d) = Channel::create();
-            let (c_shard, _, _, _) = unpack_handle(c.0);
-
-            if a_shard == c_shard {
-                break (c, d);
-            }
-        };
-
-        let hd = HandleDisposition {
-            handle_op: HandleOp::Move(c.into()),
-            object_type: ObjectType::NONE,
-            rights: Rights::SAME_RIGHTS,
-            result: Status::OK,
-        };
-
-        // Ensure that write_etc does not deadlock while trying to close c, which is in the same
-        // shard and is guarded by the same mutex as a.
-        drop(b);
-        assert_eq!(a.write_etc(&[1, 2, 3], &mut [hd]), Err(Status::PEER_CLOSED));
-    }
-
-    #[test]
     fn socket_write_read() {
         let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
         a.write(&[1, 2, 3]).unwrap();
         let mut buf = [0u8; 128];
         assert_eq!(b.read(&mut buf).unwrap(), 3);
         assert_eq!(&buf[0..3], &[1, 2, 3]);
-    }
-
-    /// Ensure streaming sockets are waitable by default
-    #[test]
-    fn socket_wait() {
-        let (a, b) = Socket::create(SocketOpts::STREAM).unwrap();
-        with_handle(a.0, |h, _| match h {
-            HdlRef::StreamSocket(obj) => {
-                assert_eq!((obj.rights.left & Rights::WAIT), Rights::WAIT);
-                assert_eq!((obj.rights.right & Rights::WAIT), Rights::WAIT);
-            }
-            _ => unreachable!(),
-        });
-        with_handle(b.0, |h, _| match h {
-            HdlRef::StreamSocket(obj) => {
-                assert_eq!((obj.rights.left & Rights::WAIT), Rights::WAIT);
-                assert_eq!((obj.rights.right & Rights::WAIT), Rights::WAIT);
-            }
-            _ => unreachable!(),
-        })
     }
 
     #[test]
