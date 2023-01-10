@@ -9,9 +9,9 @@
   <string name="role_progressbar">進度列</string>
   <string name="role_slider">滑桿</string>
   <string name="role_tab">分頁</string>
-  <string name="role_toggleswitch">切換按鈕</string>
-  <string name="element_toggled_on">切換按鈕，已設為開啟</string>
-  <string name="element_toggled_off">切換按鈕，已設為關閉</string>
+  <string name="role_toggleswitch">切換鈕</string>
+  <string name="element_toggled_on">切換鈕，已設為開啟</string>
+  <string name="element_toggled_off">切換鈕，已設為關閉</string>
   <string name="role_radiobutton">圓形按鈕</string>
   <string name="radio_button_selected">{name}，已選取這個圓形按鈕</string>
   <string name="radio_button_unselected">{name}，未選取這個圓形按鈕</string>
