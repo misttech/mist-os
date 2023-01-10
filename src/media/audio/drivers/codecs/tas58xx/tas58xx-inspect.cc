@@ -83,4 +83,20 @@ void Tas58xxInspect::ReportFault(zx::time timestamp, uint8_t chan_fault, uint8_t
   ReportEvent(timestamp, state.str());
 }
 
+void Tas58xxInspect::ReportGain(float gain_db) {
+  if (!gain_) {
+    gain_ = driver_inspect_.CreateDouble("gain_db", gain_db);
+  } else {
+    gain_.Set(gain_db);
+  }
+}
+
+void Tas58xxInspect::ReportMuted(bool muted) {
+  if (!muted_) {
+    muted_ = driver_inspect_.CreateBool("muted", muted);
+  } else {
+    muted_.Set(muted);
+  }
+}
+
 }  // namespace audio

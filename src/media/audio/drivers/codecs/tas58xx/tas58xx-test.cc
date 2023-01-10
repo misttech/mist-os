@@ -314,7 +314,7 @@ TEST_F(Tas58xxTest, SetGainDeprecated) {
 }
 
 // Tests that don't use SimpleCodec and make signal processing calls on their own.
-class Tas58xxSignalProcessingTest : public zxtest::Test {
+class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   Tas58xxSignalProcessingTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
   void SetUp() override {
@@ -503,6 +503,12 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     ASSERT_TRUE(state_received.type_specific().is_gain());
     ASSERT_TRUE(state_received.type_specific().gain().has_gain());
     ASSERT_EQ(state_received.type_specific().gain().gain(), -12.0f);
+
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
+    auto* root = hierarchy().GetByPath({"tas58xx"});
+    ASSERT_TRUE(root);
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(root->node(), "gain_db", inspect::DoublePropertyValue(-12.f)));
   }
 
   // If no gain and no enable/disable state is provided, then there should be no change and
@@ -535,6 +541,12 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     ASSERT_TRUE(state_received.type_specific().is_gain());
     ASSERT_TRUE(state_received.type_specific().gain().has_gain());
     ASSERT_EQ(state_received.type_specific().gain().gain(), 0.0f);  // Effectively disables gain.
+
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
+    auto* root = hierarchy().GetByPath({"tas58xx"});
+    ASSERT_TRUE(root);
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(root->node(), "gain_db", inspect::DoublePropertyValue(0.f)));
   }
 
   // Disable gain but provide a gain value, still effectively disables gain (0dB).
@@ -589,6 +601,11 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
         result.response().processing_elements[kMutePeIndex].id(), &state_received);
     ASSERT_TRUE(state_received.has_enabled());
     ASSERT_TRUE(state_received.enabled());
+
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
+    auto* root = hierarchy().GetByPath({"tas58xx"});
+    ASSERT_TRUE(root);
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(root->node(), "muted", inspect::BoolPropertyValue(true)));
   }
 
   // If no enable/disable is provided, then there should be no change and no I2C transaction.
@@ -617,6 +634,12 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
         result.response().processing_elements[kMutePeIndex].id(), &state_received);
     ASSERT_TRUE(state_received.has_enabled());
     ASSERT_FALSE(state_received.enabled());
+
+    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
+    auto* root = hierarchy().GetByPath({"tas58xx"});
+    ASSERT_TRUE(root);
+    ASSERT_NO_FATAL_FAILURE(
+        CheckProperty(root->node(), "muted", inspect::BoolPropertyValue(false)));
   }
 }
 

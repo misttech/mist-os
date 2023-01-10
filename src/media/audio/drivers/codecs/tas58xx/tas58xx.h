@@ -10,6 +10,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>

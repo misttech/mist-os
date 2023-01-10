@@ -842,6 +842,7 @@ zx_status_t Tas58xx::SetGain(float gain) {
     return status;
   }
   gain_state_.gain = clamped_gain;
+  inspect_reporter_.ReportGain(gain_state_.gain);
   return ZX_OK;
 }
 
@@ -851,6 +852,7 @@ zx_status_t Tas58xx::SetMute(bool mute) {
     return status;
   }
   gain_state_.muted = mute;
+  inspect_reporter_.ReportMuted(mute);
   return ZX_OK;
 }
 

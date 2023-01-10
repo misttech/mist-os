@@ -30,6 +30,12 @@ class Tas58xxInspect {
   void ReportFault(zx::time timestamp, uint8_t chan_fault, uint8_t global_fault1,
                    uint8_t global_fault2, uint8_t ot_warning);
 
+  // Called by the driver to report the last gain setting.
+  void ReportGain(float gain_db);
+
+  // Called by the driver to report the last muted setting.
+  void ReportMuted(bool muted);
+
  private:
   // Root for our inspect tree.
   inspect::Node driver_inspect_;
@@ -58,6 +64,9 @@ class Tas58xxInspect {
 
   // The most recent events.
   std::deque<Event> events_;
+
+  inspect::DoubleProperty gain_;  // Inspect node for the last gain set.
+  inspect::BoolProperty muted_;   // Inspect node for the last muted state set.
 
   // Add a new event, ready for use.  If needed, delete the oldest event,
   // which will also delete the associated inspect information.
