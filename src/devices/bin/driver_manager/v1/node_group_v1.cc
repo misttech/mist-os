@@ -29,16 +29,15 @@ zx::result<std::unique_ptr<NodeGroupV1>> NodeGroupV1::Create(
     metadata[i] = std::move(md);
   }
 
-  return zx::ok(std::make_unique<NodeGroupV1>(std::move(create_info), std::move(metadata),
-                                              group_desc.spawn_colocated, driver_loader));
+  return zx::ok(
+      std::make_unique<NodeGroupV1>(std::move(create_info), std::move(metadata), driver_loader));
 }
 
 NodeGroupV1::NodeGroupV1(NodeGroupCreateInfo create_info,
-                         fbl::Array<std::unique_ptr<Metadata>> metadata, bool spawn_colocated,
+                         fbl::Array<std::unique_ptr<Metadata>> metadata,
                          DriverLoader* driver_loader)
     : NodeGroup(std::move(create_info)),
       metadata_(std::move(metadata)),
-      spawn_colocated_(spawn_colocated),
       driver_loader_(driver_loader) {
   ZX_ASSERT(driver_loader_);
 }
@@ -99,7 +98,7 @@ void NodeGroupV1::SetCompositeDevice(fuchsia_driver_index::wire::MatchedNodeGrou
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {
       .driver = driver_loader_->LoadDriverUrl(std::string(fidl_driver_info.driver_url().get())),
-      .colocate = spawn_colocated_,
+      .colocate = fidl_driver_info.has_colocate() && fidl_driver_info.colocate(),
   };
 
   composite_device_ = CompositeDevice::CreateFromDriverIndex(

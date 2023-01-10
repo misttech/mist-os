@@ -518,7 +518,6 @@ TEST_F(CoreTest, AddNodeGroup) {
   const node_group_desc group_desc = {
       .nodes = nodes,
       .nodes_count = std::size(nodes),
-      .spawn_colocated = false,
       .metadata_list = nullptr,
       .metadata_count = 0,
   };

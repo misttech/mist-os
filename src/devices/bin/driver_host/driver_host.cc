@@ -1284,8 +1284,7 @@ zx_status_t DriverHostContext::DeviceAddGroup(const fbl::RefPtr<zx_device_t>& de
             group_desc->metadata_list[i].length)};
   }
 
-  fdm::wire::NodeGroupDescriptor desc = {
-      .nodes = nodes, .spawn_colocated = group_desc->spawn_colocated, .metadata = metadata};
+  fdm::wire::NodeGroupDescriptor desc = {.nodes = nodes, .metadata = metadata};
 
   auto response = client.sync()->AddNodeGroup(fidl::StringView(allocator, name), std::move(desc));
   auto status = response.status();

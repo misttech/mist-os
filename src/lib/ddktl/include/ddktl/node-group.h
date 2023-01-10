@@ -336,11 +336,6 @@ class NodeGroupDesc {
     return *this;
   }
 
-  NodeGroupDesc& set_spawn_colocated(bool spawn_colocated) {
-    desc_.spawn_colocated = spawn_colocated;
-    return *this;
-  }
-
   const node_group_desc_t& get() const { return desc_; }
 
  private:

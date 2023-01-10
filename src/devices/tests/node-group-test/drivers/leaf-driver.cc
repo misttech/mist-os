@@ -70,8 +70,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
   status = dev->DdkAddNodeGroup("node_group",
                                 ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
                                     .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
-                                    .set_metadata(metadata)
-                                    .set_spawn_colocated(true));
+                                    .set_metadata(metadata));
   if (status != ZX_OK) {
     return status;
   }
@@ -80,8 +79,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
                                 ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
                                     .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
                                     .AddNodeRepresentation(node_3_bind_rules, node_3_properties)
-                                    .set_metadata(metadata)
-                                    .set_spawn_colocated(true));
+                                    .set_metadata(metadata));
   if (status != ZX_OK) {
     return status;
   }

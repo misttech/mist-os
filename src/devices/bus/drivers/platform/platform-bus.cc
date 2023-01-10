@@ -696,8 +696,6 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
     node_group_desc.AddNodeRepresentation(rules, properties);
   }
 
-  // TODO(fxb/114235): Resolve the spawn colocated source.
-  node_group_desc.set_spawn_colocated(false);
   auto status = DdkAddNodeGroup(node_group.name()->c_str(), node_group_desc);
 
   if (status != ZX_OK) {

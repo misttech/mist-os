@@ -616,7 +616,6 @@ typedef struct node_group_desc {
   const node_representation_t* nodes;
   size_t nodes_count;
 
-  bool spawn_colocated;
   const device_metadata_t* metadata_list;
   size_t metadata_count;
 } node_group_desc_t;

@@ -27,7 +27,7 @@ class NodeGroupV1 : public NodeGroup {
       DriverLoader* driver_loader);
 
   NodeGroupV1(NodeGroupCreateInfo create_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
-              bool spawn_colocated, DriverLoader* driver_loader);
+              DriverLoader* driver_loader);
 
  private:
   // NodeGroup interface:
@@ -40,10 +40,6 @@ class NodeGroupV1 : public NodeGroup {
 
   // Used to create |composite_device_|. Set to empty once |composite_device_| is created.
   fbl::Array<std::unique_ptr<Metadata>> metadata_;
-
-  // Used to create |composite_device_|. The value is received from a NodeGroupDescriptor,
-  // not the driver index.
-  bool spawn_colocated_;
 
   // Set by SetCompositeDevice() after the first BindNodeImpl() call.
   std::unique_ptr<CompositeDevice> composite_device_;

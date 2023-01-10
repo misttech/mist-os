@@ -76,8 +76,7 @@ zx_status_t Sherlock::TouchInit() {
                                 ddk::NodeGroupDesc(kI2cRules, kI2cProperties)
                                     .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
                                     .AddNodeRepresentation(kResetRules, kResetProperties)
-                                    .set_metadata(ft5726_touch_metadata)
-                                    .set_spawn_colocated(false));
+                                    .set_metadata(ft5726_touch_metadata));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAddNodeGroup failed: %d", __func__, status);
     return status;

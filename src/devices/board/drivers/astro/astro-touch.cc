@@ -100,8 +100,7 @@ zx_status_t Astro::TouchInit() {
     auto status = DdkAddNodeGroup("gt92xx_touch",
                                   ddk::NodeGroupDesc(kGoodixI2cRules, kGoodixI2cProperties)
                                       .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
-                                      .AddNodeRepresentation(kResetRules, kResetProperties)
-                                      .set_spawn_colocated(false));
+                                      .AddNodeRepresentation(kResetRules, kResetProperties));
     if (status != ZX_OK) {
       zxlogf(INFO, "gt92xx: DdkAddNodeGroup failed: %s", zx_status_get_string(status));
       return status;
@@ -111,8 +110,7 @@ zx_status_t Astro::TouchInit() {
                                   ddk::NodeGroupDesc(kFocaltechI2cRules, kFocaltechI2cProperties)
                                       .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
                                       .AddNodeRepresentation(kResetRules, kResetProperties)
-                                      .set_metadata(ft3x27_touch_metadata)
-                                      .set_spawn_colocated(false));
+                                      .set_metadata(ft3x27_touch_metadata));
     if (status != ZX_OK) {
       zxlogf(ERROR, "ft3x27: DdkAddNodeGroup failed: %s", zx_status_get_string(status));
       return status;

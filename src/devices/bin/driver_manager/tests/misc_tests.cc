@@ -487,7 +487,6 @@ TEST(MiscTestCase, AddNodeGroup) {
   fuchsia_device_manager::wire::NodeGroupDescriptor group_desc =
       fuchsia_device_manager::wire::NodeGroupDescriptor{
           .nodes = nodes,
-          .spawn_colocated = false,
           .metadata = metadata,
       };
   const fdi::MatchedNodeGroupInfo match({
