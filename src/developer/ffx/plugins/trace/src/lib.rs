@@ -744,7 +744,7 @@ mod tests {
                 .collect::<Vec<TraceKnownCategory>>(),
         )
         .unwrap();
-        assert_eq!(want, output);
+        assert_eq!(want, output.trim_end());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -800,7 +800,7 @@ mod tests {
         .await;
         let output = writer.test_output().unwrap();
         let want = serde_json::to_string(&fake_trace_provider_infos()).unwrap();
-        assert_eq!(want, output);
+        assert_eq!(want, output.trim_end());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

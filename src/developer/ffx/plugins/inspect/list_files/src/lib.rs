@@ -60,7 +60,7 @@ mod test {
         ])
         .unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -82,7 +82,7 @@ mod test {
         )])
         .unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]

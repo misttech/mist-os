@@ -56,7 +56,7 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = serde_json::to_string(&inspects).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -87,7 +87,7 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = serde_json::to_string(&vec![&inspect_with_file_name]).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -118,7 +118,7 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = serde_json::to_string(&inspects[..2]).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -149,7 +149,7 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = String::from("[]");
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -216,7 +216,7 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = serde_json::to_string(&inspects).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -249,7 +249,7 @@ mod test {
 
         let expected = String::from("[]");
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -284,6 +284,6 @@ mod test {
         inspects.sort_by(|a, b| a.moniker.cmp(&b.moniker));
         let expected = serde_json::to_string(&inspects).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 }

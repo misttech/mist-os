@@ -136,7 +136,7 @@ mod test {
         ])
         .unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
@@ -170,6 +170,6 @@ mod test {
         let expected =
             serde_json::to_string(&vec![String::from("test/moniker1:name:hello_3")]).unwrap();
         let output = writer.test_output().expect("unable to get test output.");
-        assert_eq!(output, expected);
+        assert_eq!(output.trim_end(), expected);
     }
 }

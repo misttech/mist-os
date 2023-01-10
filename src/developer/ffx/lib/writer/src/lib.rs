@@ -75,6 +75,8 @@ impl Writer {
         match self.format {
             Some(Format::Json) => {
                 serde_json::to_writer(self.inner(), output)?;
+                writeln!(self.inner())?;
+                self.inner().flush()?;
             }
             Some(Format::JsonPretty) => {
                 serde_json::to_writer_pretty(self.inner(), output)?;
@@ -221,7 +223,7 @@ mod test {
         let writer = Writer::new_test(Some(Format::Json));
         writer.machine(&"hello").unwrap();
 
-        assert_eq!(writer.test_output().unwrap(), "\"hello\"");
+        assert_eq!(writer.test_output().unwrap(), "\"hello\"\n");
     }
 
     #[test]
