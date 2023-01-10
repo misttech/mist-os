@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
 import("//build/test.gni")
@@ -54,21 +53,7 @@ test("ptysvc-test") {
   ]
 }
 
-# Use this for including ptysvc.cml in bootfs
-component_manifest_resources("meta") {
-  sources = [ "meta/ptysvc.cml" ]
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":meta",
-    ":ptysvc",
-  ]
-}
-
-# Use this for including ptysvc in a test package for integration testing
 fuchsia_component("component") {
-  testonly = true
   component_name = "ptysvc"
   manifest = "meta/ptysvc.cml"
   deps = [ ":ptysvc" ]
@@ -77,6 +62,11 @@ fuchsia_component("component") {
   # The includes checker wants the syslog shard because ptysvc gets the
   # injected dep on the legacy syslog backend.
   check_includes = false
+}
+
+fuchsia_package("package") {
+  package_name = "ptysvc"
+  deps = [ ":component" ]
 }
 
 fuchsia_unittest_package("ptysvc-test-pkg") {

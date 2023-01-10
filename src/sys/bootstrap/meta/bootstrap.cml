@@ -65,7 +65,7 @@
         },
         {
             name: "ptysvc",
-            url: "fuchsia-boot:///#meta/ptysvc.cm",
+            url: "fuchsia-boot:///ptysvc#meta/ptysvc.cm",
         },
         {
             name: "pwrbtn-monitor",
