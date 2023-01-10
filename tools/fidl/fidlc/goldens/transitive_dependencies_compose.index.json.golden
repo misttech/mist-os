@@ -50,8 +50,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/bottom.test.fidl",
         "data": "struct {\n        foo Foo;\n    }",
-        "start_offset": 542,
-        "end_offset": 573
+        "start_offset": 556,
+        "end_offset": 587
       }
     },
     {
@@ -70,8 +70,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/bottom.test.fidl",
         "data": "Bottom",
-        "start_offset": 342,
-        "end_offset": 348
+        "start_offset": 349,
+        "end_offset": 355
       }
     },
     {
@@ -80,8 +80,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/middle.test.fidl",
         "data": "Middle",
-        "start_offset": 188,
-        "end_offset": 194
+        "start_offset": 195,
+        "end_offset": 201
       }
     }
   ],
@@ -97,8 +97,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/top.test.fidl",
         "data": "Top",
-        "start_offset": 211,
-        "end_offset": 214
+        "start_offset": 218,
+        "end_offset": 221
       },
       "methods": [
         {
@@ -107,8 +107,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/bottom.test.fidl",
             "data": "GetFoo",
-            "start_offset": 355,
-            "end_offset": 361
+            "start_offset": 369,
+            "end_offset": 375
           },
           "response_type": {
             "kind": "identifier",
@@ -123,8 +123,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies_compose/top.test.fidl",
             "data": "test.middle.Middle",
-            "start_offset": 229,
-            "end_offset": 247
+            "start_offset": 236,
+            "end_offset": 254
           }
         }
       ]

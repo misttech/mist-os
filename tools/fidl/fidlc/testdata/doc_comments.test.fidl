@@ -109,16 +109,16 @@ type Table = table {
 /// interface comment #1
 ///
 /// interface comment #3
-protocol Interface {
+closed protocol Interface {
     /// method comment #1
     ///
     /// method comment #3
-    Method();
+    strict Method();
 
     /// event comment #1
     ///
     /// event comment #3
-    -> OnEvent();
+    strict -> OnEvent();
 };
 
 /// service comment #1

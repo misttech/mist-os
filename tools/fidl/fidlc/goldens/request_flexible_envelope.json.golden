@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/request_flexible_envelope.test.fidl",
         "line": 13,
-        "column": 10,
+        "column": 17,
         "length": 8
       },
       "openness": "closed",
@@ -30,7 +30,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/request_flexible_envelope.test.fidl",
             "line": 14,
-            "column": 5,
+            "column": 12,
             "length": 29
           },
           "has_request": true,
@@ -95,7 +95,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/request_flexible_envelope.test.fidl",
             "line": 19,
-            "column": 5,
+            "column": 12,
             "length": 29
           },
           "has_request": true,
@@ -168,7 +168,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/request_flexible_envelope.test.fidl",
         "line": 19,
-        "column": 35,
+        "column": 42,
         "length": 37
       },
       "members": [
@@ -326,7 +326,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/request_flexible_envelope.test.fidl",
         "line": 14,
-        "column": 35,
+        "column": 42,
         "length": 35
       },
       "members": [

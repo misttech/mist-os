@@ -121,11 +121,11 @@ type StrictBoundedXUnion = strict union {
     1: v vector<uint8>:10;
 };
 
-protocol TestProtocol {
-    StrictXUnionHenceResponseMayBeStackAllocated() -> (struct {
+closed protocol TestProtocol {
+    strict StrictXUnionHenceResponseMayBeStackAllocated() -> (struct {
         xu StrictBoundedXUnion;
     });
-    FlexibleXUnionHenceResponseMustBeHeapAllocated() -> (struct {
+    strict FlexibleXUnionHenceResponseMustBeHeapAllocated() -> (struct {
         xu OlderSimpleUnion;
     });
 };

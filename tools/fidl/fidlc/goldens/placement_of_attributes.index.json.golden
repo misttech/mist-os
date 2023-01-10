@@ -96,8 +96,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
         "data": "ExampleUnion",
-        "start_offset": 666,
-        "end_offset": 678
+        "start_offset": 680,
+        "end_offset": 692
       },
       "members": [
         {
@@ -107,8 +107,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "variant",
-            "start_offset": 724,
-            "end_offset": 731
+            "start_offset": 738,
+            "end_offset": 745
           },
           "type": {
             "kind": "primitive"
@@ -123,8 +123,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
         "data": "ExampleXUnion",
-        "start_offset": 761,
-        "end_offset": 774
+        "start_offset": 775,
+        "end_offset": 788
       },
       "members": [
         {
@@ -134,8 +134,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "variant",
-            "start_offset": 824,
-            "end_offset": 831
+            "start_offset": 838,
+            "end_offset": 845
           },
           "type": {
             "kind": "primitive"
@@ -152,8 +152,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
         "data": "ExampleTable",
-        "start_offset": 548,
-        "end_offset": 560
+        "start_offset": 562,
+        "end_offset": 574
       },
       "members": [
         {
@@ -163,8 +163,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "member",
-            "start_offset": 599,
-            "end_offset": 605
+            "start_offset": 613,
+            "end_offset": 619
           },
           "type": {
             "kind": "primitive"
@@ -184,8 +184,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "arg",
-            "start_offset": 406,
-            "end_offset": 409
+            "start_offset": 420,
+            "end_offset": 423
           },
           "type": {
             "kind": "identifier",
@@ -195,8 +195,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
               "data": "test.exampleusing.Empty",
-              "start_offset": 410,
-              "end_offset": 433
+              "start_offset": 424,
+              "end_offset": 447
             }
           }
         }
@@ -209,8 +209,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
         "data": "ExampleStruct",
-        "start_offset": 463,
-        "end_offset": 476
+        "start_offset": 477,
+        "end_offset": 490
       },
       "members": [
         {
@@ -219,8 +219,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "member",
-            "start_offset": 514,
-            "end_offset": 520
+            "start_offset": 528,
+            "end_offset": 534
           },
           "type": {
             "kind": "primitive"
@@ -236,8 +236,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
         "data": "ExampleProtocol",
-        "start_offset": 345,
-        "end_offset": 360
+        "start_offset": 352,
+        "end_offset": 367
       },
       "methods": [
         {
@@ -246,8 +246,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
             "data": "Method",
-            "start_offset": 382,
-            "end_offset": 388
+            "start_offset": 396,
+            "end_offset": 402
           },
           "request_type": {
             "kind": "identifier",

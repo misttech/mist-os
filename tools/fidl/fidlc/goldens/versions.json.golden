@@ -528,7 +528,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
         "line": 44,
-        "column": 10,
+        "column": 17,
         "length": 13
       },
       "openness": "closed",
@@ -540,7 +540,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
         "line": 47,
-        "column": 10,
+        "column": 17,
         "length": 8
       },
       "maybe_attributes": [
@@ -669,7 +669,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
             "line": 52,
-            "column": 5,
+            "column": 12,
             "length": 3
           },
           "has_request": true,

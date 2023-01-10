@@ -1,6 +1,6 @@
 library test.experimentalmaybefromalias;
 
-protocol MyProtocol {};
+closed protocol MyProtocol {};
 
 alias AliasOfBytes = vector<uint8>;
 alias AliasOfString = string;

@@ -9,8 +9,8 @@ type Payload = struct {
 };
 
 @transport("Driver")
-protocol OneWay {
-    Send(struct {
+closed protocol OneWay {
+    strict Send(struct {
         payload Payload;
     });
 };

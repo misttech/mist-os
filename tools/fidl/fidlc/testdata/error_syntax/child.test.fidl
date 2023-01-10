@@ -6,9 +6,9 @@ library test.errorsyntax;
 
 using test.errorsyntax.parent;
 
-protocol ExampleUseOfErrorSyntax {
+closed protocol ExampleUseOfErrorSyntax {
     compose test.errorsyntax.parent.ParentUsesErrorSyntax;
-    CallWhichMayFail(struct {
+    strict CallWhichMayFail(struct {
         s string;
     }) -> (struct {
         value int64;

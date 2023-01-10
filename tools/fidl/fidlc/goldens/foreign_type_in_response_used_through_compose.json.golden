@@ -39,7 +39,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/top.test.fidl",
         "line": 8,
-        "column": 10,
+        "column": 17,
         "length": 3
       },
       "maybe_attributes": [
@@ -95,7 +95,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/middle.test.fidl",
             "line": 6,
-            "column": 5,
+            "column": 12,
             "length": 6
           },
           "has_request": true,
@@ -144,7 +144,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/middle.test.fidl",
         "line": 6,
-        "column": 18,
+        "column": 25,
         "length": 43
       },
       "members": [

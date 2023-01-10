@@ -109,7 +109,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
         "line": 55,
-        "column": 10,
+        "column": 17,
         "length": 14
       },
       "maybe_attributes": [
@@ -154,7 +154,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/handles.test.fidl",
         "line": 6,
-        "column": 10,
+        "column": 17,
         "length": 12
       },
       "openness": "closed",

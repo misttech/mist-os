@@ -227,8 +227,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
         "data": "Interface",
-        "start_offset": 2239,
-        "end_offset": 2248
+        "start_offset": 2246,
+        "end_offset": 2255
       },
       "methods": [
         {
@@ -237,8 +237,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
             "data": "Method",
-            "start_offset": 2315,
-            "end_offset": 2321
+            "start_offset": 2329,
+            "end_offset": 2335
           }
         },
         {
@@ -247,8 +247,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
             "data": "OnEvent",
-            "start_offset": 2391,
-            "end_offset": 2398
+            "start_offset": 2412,
+            "end_offset": 2419
           }
         }
       ],

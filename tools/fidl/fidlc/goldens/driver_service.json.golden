@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_service.test.fidl",
         "line": 7,
-        "column": 10,
+        "column": 17,
         "length": 18
       },
       "maybe_attributes": [

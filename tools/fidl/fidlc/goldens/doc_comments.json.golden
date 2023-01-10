@@ -790,7 +790,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
         "line": 112,
-        "column": 10,
+        "column": 17,
         "length": 9
       },
       "maybe_attributes": [
@@ -836,7 +836,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
             "line": 116,
-            "column": 5,
+            "column": 12,
             "length": 6
           },
           "has_request": true,
@@ -884,7 +884,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/doc_comments.test.fidl",
             "line": 121,
-            "column": 8,
+            "column": 15,
             "length": 7
           },
           "has_request": false,

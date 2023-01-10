@@ -14,8 +14,8 @@ type StructWithNullableHandle = resource struct {
     val zx.handle:<VMO, optional>;
 };
 
-protocol SimpleProtocol {
-    Add(struct {
+closed protocol SimpleProtocol {
+    strict Add(struct {
         a int32;
         b int32;
     }) -> (struct {

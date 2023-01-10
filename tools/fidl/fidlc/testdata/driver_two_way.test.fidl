@@ -5,8 +5,8 @@
 library test.drivertwoway;
 
 @transport("Driver")
-protocol TwoWay {
-    Add(struct {
+closed protocol TwoWay {
+    strict Add(struct {
         addend1 uint16;
         addend2 uint16;
     }) -> (struct {

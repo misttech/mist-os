@@ -22,8 +22,8 @@ type Expression = flexible union {
     };
 };
 
-protocol SomeProtocol {
-    SomeMethod(@on_request struct {
+closed protocol SomeProtocol {
+    strict SomeMethod(@on_request struct {
         union_member union {
             1: reserved;
             2: union_data uint8;

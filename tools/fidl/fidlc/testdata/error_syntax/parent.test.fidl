@@ -4,8 +4,8 @@
 
 library test.errorsyntax.parent;
 
-protocol ParentUsesErrorSyntax {
-    ComposedCallWhichMayFail(struct {
+closed protocol ParentUsesErrorSyntax {
+    strict ComposedCallWhichMayFail(struct {
         s string;
     }) -> (struct {
         value int64;

@@ -444,8 +444,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "ErrorEnum",
-        "start_offset": 543,
-        "end_offset": 552
+        "start_offset": 606,
+        "end_offset": 615
       },
       "members": [
         {
@@ -454,8 +454,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ERR_FOO",
-            "start_offset": 573,
-            "end_offset": 580
+            "start_offset": 636,
+            "end_offset": 643
           },
           "value": {
             "type": "literal"
@@ -467,8 +467,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ERR_BAR",
-            "start_offset": 590,
-            "end_offset": 597
+            "start_offset": 653,
+            "end_offset": 660
           },
           "value": {
             "type": "literal"
@@ -485,8 +485,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "TheUnion",
-        "start_offset": 3577,
-        "end_offset": 3585
+        "start_offset": 3850,
+        "end_offset": 3858
       },
       "members": [
         {
@@ -496,8 +496,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "v",
-            "start_offset": 3612,
-            "end_offset": 3613
+            "start_offset": 3885,
+            "end_offset": 3886
           },
           "type": {
             "kind": "primitive"
@@ -533,8 +533,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
               "data": "ErrorEnum",
-              "start_offset": 815,
-              "end_offset": 824
+              "start_offset": 906,
+              "end_offset": 915
             }
           }
         }
@@ -631,8 +631,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 1058,
-            "end_offset": 1059
+            "start_offset": 1177,
+            "end_offset": 1178
           },
           "type": {
             "kind": "primitive"
@@ -644,8 +644,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 1075,
-            "end_offset": 1076
+            "start_offset": 1194,
+            "end_offset": 1195
           },
           "type": {
             "kind": "primitive"
@@ -663,8 +663,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 993,
-            "end_offset": 994
+            "start_offset": 1105,
+            "end_offset": 1106
           },
           "type": {
             "kind": "primitive"
@@ -676,8 +676,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 1010,
-            "end_offset": 1011
+            "start_offset": 1122,
+            "end_offset": 1123
           },
           "type": {
             "kind": "primitive"
@@ -695,8 +695,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 1121,
-            "end_offset": 1122
+            "start_offset": 1247,
+            "end_offset": 1248
           },
           "type": {
             "kind": "primitive"
@@ -708,8 +708,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 1138,
-            "end_offset": 1139
+            "start_offset": 1264,
+            "end_offset": 1265
           },
           "type": {
             "kind": "primitive"
@@ -727,8 +727,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "result",
-            "start_offset": 1175,
-            "end_offset": 1181
+            "start_offset": 1301,
+            "end_offset": 1307
           },
           "type": {
             "kind": "primitive"
@@ -746,8 +746,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 1308,
-            "end_offset": 1309
+            "start_offset": 1448,
+            "end_offset": 1449
           },
           "type": {
             "kind": "handle"
@@ -765,8 +765,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 1365,
-            "end_offset": 1366
+            "start_offset": 1505,
+            "end_offset": 1506
           },
           "type": {
             "kind": "handle"
@@ -784,8 +784,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 1238,
-            "end_offset": 1239
+            "start_offset": 1371,
+            "end_offset": 1372
           },
           "type": {
             "kind": "handle"
@@ -803,8 +803,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 2309,
-            "end_offset": 2310
+            "start_offset": 2540,
+            "end_offset": 2541
           },
           "type": {
             "kind": "handle"
@@ -822,8 +822,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 2000,
-            "end_offset": 2001
+            "start_offset": 2217,
+            "end_offset": 2218
           },
           "type": {
             "kind": "handle"
@@ -841,8 +841,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 2117,
-            "end_offset": 2118
+            "start_offset": 2341,
+            "end_offset": 2342
           },
           "type": {
             "kind": "handle"
@@ -860,8 +860,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 2218,
-            "end_offset": 2219
+            "start_offset": 2442,
+            "end_offset": 2443
           },
           "type": {
             "kind": "handle"
@@ -879,8 +879,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p1",
-            "start_offset": 3307,
-            "end_offset": 3309
+            "start_offset": 3580,
+            "end_offset": 3582
           },
           "type": {
             "kind": "primitive"
@@ -892,8 +892,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p2",
-            "start_offset": 3324,
-            "end_offset": 3326
+            "start_offset": 3597,
+            "end_offset": 3599
           },
           "type": {
             "kind": "primitive"
@@ -905,8 +905,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p3",
-            "start_offset": 3341,
-            "end_offset": 3343
+            "start_offset": 3614,
+            "end_offset": 3616
           },
           "type": {
             "kind": "primitive"
@@ -918,8 +918,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p4",
-            "start_offset": 3358,
-            "end_offset": 3360
+            "start_offset": 3631,
+            "end_offset": 3633
           },
           "type": {
             "kind": "primitive"
@@ -931,8 +931,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p5",
-            "start_offset": 3375,
-            "end_offset": 3377
+            "start_offset": 3648,
+            "end_offset": 3650
           },
           "type": {
             "kind": "primitive"
@@ -944,8 +944,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p6",
-            "start_offset": 3392,
-            "end_offset": 3394
+            "start_offset": 3665,
+            "end_offset": 3667
           },
           "type": {
             "kind": "primitive"
@@ -957,8 +957,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p7",
-            "start_offset": 3409,
-            "end_offset": 3411
+            "start_offset": 3682,
+            "end_offset": 3684
           },
           "type": {
             "kind": "primitive"
@@ -970,8 +970,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p8",
-            "start_offset": 3426,
-            "end_offset": 3428
+            "start_offset": 3699,
+            "end_offset": 3701
           },
           "type": {
             "kind": "primitive"
@@ -983,8 +983,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p9",
-            "start_offset": 3443,
-            "end_offset": 3445
+            "start_offset": 3716,
+            "end_offset": 3718
           },
           "type": {
             "kind": "primitive"
@@ -996,8 +996,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p10",
-            "start_offset": 3460,
-            "end_offset": 3463
+            "start_offset": 3733,
+            "end_offset": 3736
           },
           "type": {
             "kind": "primitive"
@@ -1009,8 +1009,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p11",
-            "start_offset": 3478,
-            "end_offset": 3481
+            "start_offset": 3751,
+            "end_offset": 3754
           },
           "type": {
             "kind": "primitive"
@@ -1022,8 +1022,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p12",
-            "start_offset": 3496,
-            "end_offset": 3499
+            "start_offset": 3769,
+            "end_offset": 3772
           },
           "type": {
             "kind": "primitive"
@@ -1035,8 +1035,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p13",
-            "start_offset": 3514,
-            "end_offset": 3517
+            "start_offset": 3787,
+            "end_offset": 3790
           },
           "type": {
             "kind": "primitive"
@@ -1048,8 +1048,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p14",
-            "start_offset": 3532,
-            "end_offset": 3535
+            "start_offset": 3805,
+            "end_offset": 3808
           },
           "type": {
             "kind": "primitive"
@@ -1061,8 +1061,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "p15",
-            "start_offset": 3550,
-            "end_offset": 3553
+            "start_offset": 3823,
+            "end_offset": 3826
           },
           "type": {
             "kind": "primitive"
@@ -1080,8 +1080,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "u",
-            "start_offset": 3686,
-            "end_offset": 3687
+            "start_offset": 3973,
+            "end_offset": 3974
           },
           "type": {
             "kind": "identifier",
@@ -1091,8 +1091,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
               "data": "TheUnion",
-              "start_offset": 3688,
-              "end_offset": 3696
+              "start_offset": 3975,
+              "end_offset": 3983
             }
           }
         }
@@ -1108,8 +1108,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "u",
-            "start_offset": 3726,
-            "end_offset": 3727
+            "start_offset": 4013,
+            "end_offset": 4014
           },
           "type": {
             "kind": "identifier",
@@ -1119,8 +1119,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
               "data": "TheUnion",
-              "start_offset": 3728,
-              "end_offset": 3736
+              "start_offset": 4015,
+              "end_offset": 4023
             }
           }
         }
@@ -1133,8 +1133,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "ProtocolEnds",
-        "start_offset": 2390,
-        "end_offset": 2402
+        "start_offset": 2621,
+        "end_offset": 2633
       },
       "members": [
         {
@@ -1143,8 +1143,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "client",
-            "start_offset": 2427,
-            "end_offset": 2433
+            "start_offset": 2658,
+            "end_offset": 2664
           },
           "type": {
             "kind": "identifier"
@@ -1156,8 +1156,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "server",
-            "start_offset": 2471,
-            "end_offset": 2477
+            "start_offset": 2702,
+            "end_offset": 2708
           },
           "type": {
             "kind": "request"
@@ -1169,8 +1169,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "client_opt",
-            "start_offset": 2515,
-            "end_offset": 2525
+            "start_offset": 2746,
+            "end_offset": 2756
           },
           "type": {
             "kind": "identifier"
@@ -1182,8 +1182,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "server_opt",
-            "start_offset": 2575,
-            "end_offset": 2585
+            "start_offset": 2806,
+            "end_offset": 2816
           },
           "type": {
             "kind": "request"
@@ -1201,8 +1201,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 1475,
-            "end_offset": 1476
+            "start_offset": 1629,
+            "end_offset": 1630
           },
           "type": {
             "kind": "primitive"
@@ -1214,8 +1214,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 1492,
-            "end_offset": 1493
+            "start_offset": 1646,
+            "end_offset": 1647
           },
           "type": {
             "kind": "primitive"
@@ -1233,8 +1233,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "x",
-            "start_offset": 1751,
-            "end_offset": 1752
+            "start_offset": 1933,
+            "end_offset": 1934
           },
           "type": {
             "kind": "primitive"
@@ -1252,8 +1252,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "x",
-            "start_offset": 1685,
-            "end_offset": 1686
+            "start_offset": 1860,
+            "end_offset": 1861
           },
           "type": {
             "kind": "primitive"
@@ -1271,8 +1271,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "x",
-            "start_offset": 1584,
-            "end_offset": 1585
+            "start_offset": 1752,
+            "end_offset": 1753
           },
           "type": {
             "kind": "primitive"
@@ -1290,8 +1290,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "y",
-            "start_offset": 1621,
-            "end_offset": 1622
+            "start_offset": 1789,
+            "end_offset": 1790
           },
           "type": {
             "kind": "primitive"
@@ -1309,8 +1309,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ret",
-            "start_offset": 189,
-            "end_offset": 192
+            "start_offset": 217,
+            "end_offset": 220
           },
           "type": {
             "kind": "string"
@@ -1328,8 +1328,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ret",
-            "start_offset": 514,
-            "end_offset": 517
+            "start_offset": 577,
+            "end_offset": 580
           },
           "type": {
             "kind": "string"
@@ -1347,8 +1347,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "arg",
-            "start_offset": 318,
-            "end_offset": 321
+            "start_offset": 360,
+            "end_offset": 363
           },
           "type": {
             "kind": "string"
@@ -1366,8 +1366,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "arg",
-            "start_offset": 252,
-            "end_offset": 255
+            "start_offset": 287,
+            "end_offset": 290
           },
           "type": {
             "kind": "string"
@@ -1385,8 +1385,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "arg",
-            "start_offset": 389,
-            "end_offset": 392
+            "start_offset": 438,
+            "end_offset": 441
           },
           "type": {
             "kind": "string"
@@ -1404,8 +1404,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ret",
-            "start_offset": 429,
-            "end_offset": 432
+            "start_offset": 478,
+            "end_offset": 481
           },
           "type": {
             "kind": "string"
@@ -1497,8 +1497,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "h",
-            "start_offset": 877,
-            "end_offset": 878
+            "start_offset": 975,
+            "end_offset": 976
           },
           "type": {
             "kind": "handle"
@@ -1516,8 +1516,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "a",
-            "start_offset": 678,
-            "end_offset": 679
+            "start_offset": 755,
+            "end_offset": 756
           },
           "type": {
             "kind": "primitive"
@@ -1529,8 +1529,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "b",
-            "start_offset": 695,
-            "end_offset": 696
+            "start_offset": 772,
+            "end_offset": 773
           },
           "type": {
             "kind": "primitive"
@@ -1542,8 +1542,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "c",
-            "start_offset": 712,
-            "end_offset": 713
+            "start_offset": 789,
+            "end_offset": 790
           },
           "type": {
             "kind": "primitive"
@@ -1561,8 +1561,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "in",
-            "start_offset": 2704,
-            "end_offset": 2706
+            "start_offset": 2949,
+            "end_offset": 2951
           },
           "type": {
             "kind": "identifier"
@@ -1580,8 +1580,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "out",
-            "start_offset": 2777,
-            "end_offset": 2780
+            "start_offset": 3022,
+            "end_offset": 3025
           },
           "type": {
             "kind": "identifier"
@@ -1599,8 +1599,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "in",
-            "start_offset": 2875,
-            "end_offset": 2877
+            "start_offset": 3127,
+            "end_offset": 3129
           },
           "type": {
             "kind": "request"
@@ -1618,8 +1618,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "out",
-            "start_offset": 2960,
-            "end_offset": 2963
+            "start_offset": 3212,
+            "end_offset": 3215
           },
           "type": {
             "kind": "request"
@@ -1637,8 +1637,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "in",
-            "start_offset": 3056,
-            "end_offset": 3058
+            "start_offset": 3315,
+            "end_offset": 3317
           },
           "type": {
             "kind": "identifier",
@@ -1648,8 +1648,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
               "data": "ProtocolEnds",
-              "start_offset": 3059,
-              "end_offset": 3071
+              "start_offset": 3318,
+              "end_offset": 3330
             }
           }
         }
@@ -1665,8 +1665,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "out",
-            "start_offset": 3110,
-            "end_offset": 3113
+            "start_offset": 3369,
+            "end_offset": 3372
           },
           "type": {
             "kind": "identifier",
@@ -1676,8 +1676,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
               "data": "ProtocolEnds",
-              "start_offset": 3114,
-              "end_offset": 3126
+              "start_offset": 3373,
+              "end_offset": 3385
             }
           }
         }
@@ -1691,8 +1691,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "AnotherDiscoverableProtocol",
-        "start_offset": 1888,
-        "end_offset": 1915
+        "start_offset": 2091,
+        "end_offset": 2118
       },
       "methods": [],
       "composed_protocols": []
@@ -1703,8 +1703,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "ChannelProtocol",
-        "start_offset": 946,
-        "end_offset": 961
+        "start_offset": 1051,
+        "end_offset": 1066
       },
       "methods": [
         {
@@ -1713,8 +1713,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "MethodA",
-            "start_offset": 968,
-            "end_offset": 975
+            "start_offset": 1080,
+            "end_offset": 1087
           },
           "request_type": {
             "kind": "identifier",
@@ -1727,8 +1727,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "EventA",
-            "start_offset": 1034,
-            "end_offset": 1040
+            "start_offset": 1153,
+            "end_offset": 1159
           },
           "response_type": {
             "kind": "identifier",
@@ -1741,8 +1741,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "MethodB",
-            "start_offset": 1096,
-            "end_offset": 1103
+            "start_offset": 1222,
+            "end_offset": 1229
           },
           "request_type": {
             "kind": "identifier",
@@ -1759,8 +1759,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "TakeHandle",
-            "start_offset": 1201,
-            "end_offset": 1211
+            "start_offset": 1334,
+            "end_offset": 1344
           },
           "request_type": {
             "kind": "identifier",
@@ -1773,8 +1773,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "MutateSocket",
-            "start_offset": 1269,
-            "end_offset": 1281
+            "start_offset": 1409,
+            "end_offset": 1421
           },
           "request_type": {
             "kind": "identifier",
@@ -1794,8 +1794,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "DiscoverableProtocol",
-        "start_offset": 1795,
-        "end_offset": 1815
+        "start_offset": 1984,
+        "end_offset": 2004
       },
       "methods": [
         {
@@ -1804,8 +1804,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "Method",
-            "start_offset": 1822,
-            "end_offset": 1828
+            "start_offset": 2018,
+            "end_offset": 2024
           }
         }
       ],
@@ -1817,8 +1817,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "HandleRightsProtocol",
-        "start_offset": 1930,
-        "end_offset": 1950
+        "start_offset": 2140,
+        "end_offset": 2160
       },
       "methods": [
         {
@@ -1827,8 +1827,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "NoResponseMethod",
-            "start_offset": 1957,
-            "end_offset": 1973
+            "start_offset": 2174,
+            "end_offset": 2190
           },
           "request_type": {
             "kind": "identifier",
@@ -1841,8 +1841,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ResponseMethod",
-            "start_offset": 2076,
-            "end_offset": 2090
+            "start_offset": 2300,
+            "end_offset": 2314
           },
           "request_type": {
             "kind": "identifier",
@@ -1859,8 +1859,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "AnEvent",
-            "start_offset": 2275,
-            "end_offset": 2282
+            "start_offset": 2506,
+            "end_offset": 2513
           },
           "response_type": {
             "kind": "identifier",
@@ -1876,8 +1876,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "ManyParameters",
-        "start_offset": 3149,
-        "end_offset": 3163
+        "start_offset": 3415,
+        "end_offset": 3429
       },
       "methods": [
         {
@@ -1886,8 +1886,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "Fifteen",
-            "start_offset": 3282,
-            "end_offset": 3289
+            "start_offset": 3555,
+            "end_offset": 3562
           },
           "request_type": {
             "kind": "identifier",
@@ -1903,8 +1903,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "MethodWithUnion",
-        "start_offset": 3635,
-        "end_offset": 3650
+        "start_offset": 3915,
+        "end_offset": 3930
       },
       "methods": [
         {
@@ -1913,8 +1913,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "UnionMethod",
-            "start_offset": 3657,
-            "end_offset": 3668
+            "start_offset": 3944,
+            "end_offset": 3955
           },
           "request_type": {
             "kind": "identifier",
@@ -1934,8 +1934,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "SyscallProtocol",
-        "start_offset": 1428,
-        "end_offset": 1443
+        "start_offset": 1575,
+        "end_offset": 1590
       },
       "methods": [
         {
@@ -1944,8 +1944,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "MethodC",
-            "start_offset": 1450,
-            "end_offset": 1457
+            "start_offset": 1604,
+            "end_offset": 1611
           },
           "request_type": {
             "kind": "identifier",
@@ -1961,8 +1961,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "Transitional",
-        "start_offset": 1522,
-        "end_offset": 1534
+        "start_offset": 1683,
+        "end_offset": 1695
       },
       "methods": [
         {
@@ -1971,8 +1971,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "Request",
-            "start_offset": 1559,
-            "end_offset": 1566
+            "start_offset": 1727,
+            "end_offset": 1734
           },
           "request_type": {
             "kind": "identifier",
@@ -1989,8 +1989,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "OneWay",
-            "start_offset": 1661,
-            "end_offset": 1667
+            "start_offset": 1836,
+            "end_offset": 1842
           },
           "request_type": {
             "kind": "identifier",
@@ -2003,8 +2003,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "Event",
-            "start_offset": 1728,
-            "end_offset": 1733
+            "start_offset": 1910,
+            "end_offset": 1915
           },
           "response_type": {
             "kind": "identifier",
@@ -2020,8 +2020,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "WithAndWithoutRequestResponse",
-        "start_offset": 45,
-        "end_offset": 74
+        "start_offset": 52,
+        "end_offset": 81
       },
       "methods": [
         {
@@ -2030,8 +2030,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "NoRequestNoResponse",
-            "start_offset": 81,
-            "end_offset": 100
+            "start_offset": 95,
+            "end_offset": 114
           }
         },
         {
@@ -2040,8 +2040,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "NoRequestEmptyResponse",
-            "start_offset": 108,
-            "end_offset": 130
+            "start_offset": 129,
+            "end_offset": 151
           }
         },
         {
@@ -2050,8 +2050,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "NoRequestWithResponse",
-            "start_offset": 144,
-            "end_offset": 165
+            "start_offset": 172,
+            "end_offset": 193
           },
           "response_type": {
             "kind": "identifier",
@@ -2064,8 +2064,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "WithRequestNoResponse",
-            "start_offset": 213,
-            "end_offset": 234
+            "start_offset": 248,
+            "end_offset": 269
           },
           "request_type": {
             "kind": "identifier",
@@ -2078,8 +2078,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "WithRequestEmptyResponse",
-            "start_offset": 276,
-            "end_offset": 300
+            "start_offset": 318,
+            "end_offset": 342
           },
           "request_type": {
             "kind": "identifier",
@@ -2092,8 +2092,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "WithRequestWithResponse",
-            "start_offset": 348,
-            "end_offset": 371
+            "start_offset": 397,
+            "end_offset": 420
           },
           "request_type": {
             "kind": "identifier",
@@ -2110,8 +2110,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "OnEmptyResponse",
-            "start_offset": 456,
-            "end_offset": 471
+            "start_offset": 512,
+            "end_offset": 527
           }
         },
         {
@@ -2120,8 +2120,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "OnWithResponse",
-            "start_offset": 482,
-            "end_offset": 496
+            "start_offset": 545,
+            "end_offset": 559
           },
           "response_type": {
             "kind": "identifier",
@@ -2137,8 +2137,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "WithErrorSyntax",
-        "start_offset": 616,
-        "end_offset": 631
+        "start_offset": 686,
+        "end_offset": 701
       },
       "methods": [
         {
@@ -2147,8 +2147,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ResponseAsStruct",
-            "start_offset": 638,
-            "end_offset": 654
+            "start_offset": 715,
+            "end_offset": 731
           },
           "response_type": {
             "kind": "identifier",
@@ -2161,8 +2161,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ErrorAsPrimitive",
-            "start_offset": 746,
-            "end_offset": 762
+            "start_offset": 830,
+            "end_offset": 846
           },
           "response_type": {
             "kind": "identifier",
@@ -2175,8 +2175,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ErrorAsEnum",
-            "start_offset": 789,
-            "end_offset": 800
+            "start_offset": 880,
+            "end_offset": 891
           },
           "response_type": {
             "kind": "identifier",
@@ -2189,8 +2189,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "HandleInResult",
-            "start_offset": 830,
-            "end_offset": 844
+            "start_offset": 928,
+            "end_offset": 942
           },
           "response_type": {
             "kind": "identifier",
@@ -2206,8 +2206,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
         "data": "WithProtocolEnds",
-        "start_offset": 2644,
-        "end_offset": 2660
+        "start_offset": 2882,
+        "end_offset": 2898
       },
       "methods": [
         {
@@ -2216,8 +2216,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ClientEnds",
-            "start_offset": 2667,
-            "end_offset": 2677
+            "start_offset": 2912,
+            "end_offset": 2922
           },
           "request_type": {
             "kind": "identifier",
@@ -2234,8 +2234,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "ServerEnds",
-            "start_offset": 2838,
-            "end_offset": 2848
+            "start_offset": 3090,
+            "end_offset": 3100
           },
           "request_type": {
             "kind": "identifier",
@@ -2252,8 +2252,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
             "data": "StructContainingEnds",
-            "start_offset": 3009,
-            "end_offset": 3029
+            "start_offset": 3268,
+            "end_offset": 3288
           },
           "request_type": {
             "kind": "identifier",

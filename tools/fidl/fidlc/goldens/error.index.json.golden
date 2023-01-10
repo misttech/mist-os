@@ -54,8 +54,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error.test.fidl",
             "data": "s",
-            "start_offset": 65,
-            "end_offset": 66
+            "start_offset": 79,
+            "end_offset": 80
           },
           "type": {
             "kind": "string"
@@ -89,8 +89,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error.test.fidl",
             "data": "y",
-            "start_offset": 103,
-            "end_offset": 104
+            "start_offset": 117,
+            "end_offset": 118
           },
           "type": {
             "kind": "primitive"
@@ -106,8 +106,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error.test.fidl",
         "data": "Example",
-        "start_offset": 30,
-        "end_offset": 37
+        "start_offset": 37,
+        "end_offset": 44
       },
       "methods": [
         {
@@ -116,8 +116,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error.test.fidl",
             "data": "foo",
-            "start_offset": 44,
-            "end_offset": 47
+            "start_offset": 58,
+            "end_offset": 61
           },
           "request_type": {
             "kind": "identifier",

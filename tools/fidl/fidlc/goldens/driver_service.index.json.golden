@@ -24,8 +24,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_service.test.fidl",
         "data": "SomeDriverProtocol",
-        "start_offset": 223,
-        "end_offset": 241
+        "start_offset": 230,
+        "end_offset": 248
       },
       "methods": [],
       "composed_protocols": []

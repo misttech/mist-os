@@ -41,15 +41,15 @@ type Union = union {
     2: reserved;
 };
 
-protocol OtherProtocol {};
+closed protocol OtherProtocol {};
 
 @available(added=2, deprecated=3)
-protocol Protocol {
+closed protocol Protocol {
     @available(added=2, deprecated=3)
     compose OtherProtocol;
 
     @available(added=2, deprecated=3)
-    Foo();
+    strict Foo();
 };
 
 @available(added=2, deprecated=3)

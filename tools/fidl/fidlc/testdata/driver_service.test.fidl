@@ -4,7 +4,7 @@
 library test.driverservice;
 
 @transport("Driver")
-protocol SomeDriverProtocol {};
+closed protocol SomeDriverProtocol {};
 
 service DriverOnlyService {
     member client_end:SomeDriverProtocol;

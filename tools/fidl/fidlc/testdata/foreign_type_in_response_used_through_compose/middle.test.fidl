@@ -2,8 +2,8 @@ library test.middle;
 
 using test.bottom;
 
-protocol Middle {
-    GetFoo() -> (struct {
+closed protocol Middle {
+    strict GetFoo() -> (struct {
         foo test.bottom.Foo;
     });
 };

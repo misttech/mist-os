@@ -445,8 +445,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "SimpleUnion",
-        "start_offset": 729,
-        "end_offset": 740
+        "start_offset": 743,
+        "end_offset": 754
       },
       "members": [
         {
@@ -456,8 +456,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "a",
-            "start_offset": 765,
-            "end_offset": 766
+            "start_offset": 779,
+            "end_offset": 780
           },
           "type": {
             "kind": "primitive"
@@ -470,8 +470,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "b",
-            "start_offset": 781,
-            "end_offset": 782
+            "start_offset": 795,
+            "end_offset": 796
           },
           "type": {
             "kind": "primitive"
@@ -489,8 +489,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "Int32Wrapper",
-        "start_offset": 609,
-        "end_offset": 621
+        "start_offset": 623,
+        "end_offset": 635
       },
       "members": [
         {
@@ -499,8 +499,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "val",
-            "start_offset": 637,
-            "end_offset": 640
+            "start_offset": 651,
+            "end_offset": 654
           },
           "type": {
             "kind": "primitive"
@@ -518,8 +518,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "a",
-            "start_offset": 322,
-            "end_offset": 323
+            "start_offset": 336,
+            "end_offset": 337
           },
           "type": {
             "kind": "primitive"
@@ -531,8 +531,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "b",
-            "start_offset": 339,
-            "end_offset": 340
+            "start_offset": 353,
+            "end_offset": 354
           },
           "type": {
             "kind": "primitive"
@@ -550,8 +550,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "sum",
-            "start_offset": 376,
-            "end_offset": 379
+            "start_offset": 390,
+            "end_offset": 393
           },
           "type": {
             "kind": "primitive"
@@ -592,8 +592,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "StructWithNullableProtocol",
-        "start_offset": 404,
-        "end_offset": 430
+        "start_offset": 418,
+        "end_offset": 444
       },
       "members": [
         {
@@ -602,8 +602,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "val",
-            "start_offset": 455,
-            "end_offset": 458
+            "start_offset": 469,
+            "end_offset": 472
           },
           "type": {
             "kind": "identifier"
@@ -618,8 +618,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "StructWithNullableRequest",
-        "start_offset": 507,
-        "end_offset": 532
+        "start_offset": 521,
+        "end_offset": 546
       },
       "members": [
         {
@@ -628,8 +628,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "val",
-            "start_offset": 557,
-            "end_offset": 560
+            "start_offset": 571,
+            "end_offset": 574
           },
           "type": {
             "kind": "request"
@@ -670,8 +670,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "StructWithNullableStruct",
-        "start_offset": 657,
-        "end_offset": 681
+        "start_offset": 671,
+        "end_offset": 695
       },
       "members": [
         {
@@ -680,8 +680,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "val",
-            "start_offset": 697,
-            "end_offset": 700
+            "start_offset": 711,
+            "end_offset": 714
           },
           "type": {
             "kind": "identifier"
@@ -696,8 +696,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "StructWithNullableUnion",
-        "start_offset": 801,
-        "end_offset": 824
+        "start_offset": 815,
+        "end_offset": 838
       },
       "members": [
         {
@@ -706,8 +706,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "val",
-            "start_offset": 840,
-            "end_offset": 843
+            "start_offset": 854,
+            "end_offset": 857
           },
           "type": {
             "kind": "identifier",
@@ -717,8 +717,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
               "data": "SimpleUnion",
-              "start_offset": 844,
-              "end_offset": 855
+              "start_offset": 858,
+              "end_offset": 869
             }
           }
         }
@@ -758,8 +758,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
         "data": "SimpleProtocol",
-        "start_offset": 280,
-        "end_offset": 294
+        "start_offset": 287,
+        "end_offset": 301
       },
       "methods": [
         {
@@ -768,8 +768,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/nullable.test.fidl",
             "data": "Add",
-            "start_offset": 301,
-            "end_offset": 304
+            "start_offset": 315,
+            "end_offset": 318
           },
           "request_type": {
             "kind": "identifier",

@@ -3,7 +3,7 @@ library test.handles;
 using zx;
 using fdf;
 
-protocol SomeProtocol {};
+closed protocol SomeProtocol {};
 
 alias aliased_plain_handle = zx.handle;
 alias aliased_subtype_handle = zx.handle:VMO;
@@ -52,7 +52,7 @@ type Handles = resource struct {
 };
 
 @transport("Driver")
-protocol DriverProtocol {};
+closed protocol DriverProtocol {};
 
 @bindings_denylist("hlcpp,dart,go,rust")
 type FdfHandles = resource struct {

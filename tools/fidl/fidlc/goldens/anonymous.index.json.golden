@@ -69,8 +69,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "ERROR_ONE",
-            "start_offset": 1015,
-            "end_offset": 1024
+            "start_offset": 1029,
+            "end_offset": 1038
           },
           "value": {
             "type": "literal"
@@ -82,8 +82,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "ERROR_TWO",
-            "start_offset": 1038,
-            "end_offset": 1047
+            "start_offset": 1052,
+            "end_offset": 1061
           },
           "value": {
             "type": "literal"
@@ -190,8 +190,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "union_data",
-            "start_offset": 681,
-            "end_offset": 691
+            "start_offset": 695,
+            "end_offset": 705
           },
           "type": {
             "kind": "primitive"
@@ -265,8 +265,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "table_data",
-            "start_offset": 779,
-            "end_offset": 789
+            "start_offset": 793,
+            "end_offset": 803
           },
           "type": {
             "kind": "vector"
@@ -350,8 +350,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "union_member",
-            "start_offset": 620,
-            "end_offset": 632
+            "start_offset": 634,
+            "end_offset": 646
           },
           "type": {
             "kind": "identifier",
@@ -364,8 +364,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "table_member",
-            "start_offset": 718,
-            "end_offset": 730
+            "start_offset": 732,
+            "end_offset": 744
           },
           "type": {
             "kind": "identifier",
@@ -400,8 +400,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "bits_member",
-            "start_offset": 892,
-            "end_offset": 903
+            "start_offset": 906,
+            "end_offset": 917
           },
           "type": {
             "kind": "identifier",
@@ -420,8 +420,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "data",
-            "start_offset": 822,
-            "end_offset": 826
+            "start_offset": 836,
+            "end_offset": 840
           },
           "type": {
             "kind": "primitive"
@@ -437,8 +437,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
         "data": "SomeProtocol",
-        "start_offset": 561,
-        "end_offset": 573
+        "start_offset": 568,
+        "end_offset": 580
       },
       "methods": [
         {
@@ -447,8 +447,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/anonymous.test.fidl",
             "data": "SomeMethod",
-            "start_offset": 580,
-            "end_offset": 590
+            "start_offset": 594,
+            "end_offset": 604
           },
           "request_type": {
             "kind": "identifier",

@@ -19,9 +19,9 @@ type ExampleEnum = strict enum {
 };
 
 @on_protocol
-protocol ExampleProtocol {
+closed protocol ExampleProtocol {
     @on_method
-    Method(struct {
+    strict Method(struct {
         arg test.exampleusing.Empty;
     });
 };

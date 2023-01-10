@@ -98,7 +98,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "line": 10,
-        "column": 10,
+        "column": 17,
         "length": 14
       },
       "maybe_attributes": [
@@ -143,7 +143,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "line": 24,
-        "column": 10,
+        "column": 17,
         "length": 17
       },
       "maybe_attributes": [
@@ -220,7 +220,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "line": 25,
-            "column": 5,
+            "column": 12,
             "length": 11
           },
           "has_request": true,
@@ -379,7 +379,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "line": 25,
-        "column": 17,
+        "column": 24,
         "length": 160
       },
       "members": [

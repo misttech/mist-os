@@ -27,8 +27,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
             "data": "payload",
-            "start_offset": 304,
-            "end_offset": 311
+            "start_offset": 318,
+            "end_offset": 325
           },
           "type": {
             "kind": "identifier",
@@ -38,8 +38,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
               "data": "Payload",
-              "start_offset": 312,
-              "end_offset": 319
+              "start_offset": 326,
+              "end_offset": 333
             }
           }
         }
@@ -79,8 +79,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
         "data": "OneWay",
-        "start_offset": 269,
-        "end_offset": 275
+        "start_offset": 276,
+        "end_offset": 282
       },
       "methods": [
         {
@@ -89,8 +89,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
             "data": "Send",
-            "start_offset": 282,
-            "end_offset": 286
+            "start_offset": 296,
+            "end_offset": 300
           },
           "request_type": {
             "kind": "identifier",

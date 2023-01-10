@@ -2,25 +2,25 @@ library test.protocols;
 
 using zx;
 
-protocol WithAndWithoutRequestResponse {
-    NoRequestNoResponse();
-    NoRequestEmptyResponse() -> ();
-    NoRequestWithResponse() -> (struct {
+closed protocol WithAndWithoutRequestResponse {
+    strict NoRequestNoResponse();
+    strict NoRequestEmptyResponse() -> ();
+    strict NoRequestWithResponse() -> (struct {
         ret string;
     });
-    WithRequestNoResponse(struct {
+    strict WithRequestNoResponse(struct {
         arg string;
     });
-    WithRequestEmptyResponse(struct {
+    strict WithRequestEmptyResponse(struct {
         arg string;
     }) -> ();
-    WithRequestWithResponse(struct {
+    strict WithRequestWithResponse(struct {
         arg string;
     }) -> (struct {
         ret string;
     });
-    -> OnEmptyResponse();
-    -> OnWithResponse(struct {
+    strict -> OnEmptyResponse();
+    strict -> OnWithResponse(struct {
         ret string;
     });
 };
@@ -30,39 +30,39 @@ type ErrorEnum = strict enum {
     ERR_BAR = 2;
 };
 
-protocol WithErrorSyntax {
-    ResponseAsStruct() -> (struct {
+closed protocol WithErrorSyntax {
+    strict ResponseAsStruct() -> (struct {
         a int64;
         b int64;
         c int64;
     }) error uint32;
-    ErrorAsPrimitive() -> () error uint32;
-    ErrorAsEnum() -> () error ErrorEnum;
-    HandleInResult() -> (resource struct {
+    strict ErrorAsPrimitive() -> () error uint32;
+    strict ErrorAsEnum() -> () error ErrorEnum;
+    strict HandleInResult() -> (resource struct {
         h zx.handle;
     }) error uint32;
 };
 
 @transport("Channel")
-protocol ChannelProtocol {
-    MethodA(struct {
+closed protocol ChannelProtocol {
+    strict MethodA(struct {
         a int64;
         b int64;
     });
-    -> EventA(struct {
+    strict -> EventA(struct {
         a int64;
         b int64;
     });
-    MethodB(struct {
+    strict MethodB(struct {
         a int64;
         b int64;
     }) -> (struct {
         result int64;
     });
-    TakeHandle(resource struct {
+    strict TakeHandle(resource struct {
         h zx.handle;
     }) -> ();
-    MutateSocket(resource struct {
+    strict MutateSocket(resource struct {
         a zx.handle:SOCKET;
     }) -> (resource struct {
         b zx.handle:SOCKET;
@@ -70,50 +70,50 @@ protocol ChannelProtocol {
 };
 
 @transport("Syscall")
-protocol SyscallProtocol {
-    MethodC(struct {
+closed protocol SyscallProtocol {
+    strict MethodC(struct {
         a int64;
         b int64;
     });
 };
 
-protocol Transitional {
+closed protocol Transitional {
     @transitional
-    Request(struct {
+    strict Request(struct {
         x int64;
     }) -> (struct {
         y int64;
     });
 
     @transitional
-    OneWay(struct {
+    strict OneWay(struct {
         x int64;
     });
 
     @transitional
-    -> Event(struct {
+    strict -> Event(struct {
         x int64;
     });
 };
 
 @discoverable
-protocol DiscoverableProtocol {
-    Method();
+closed protocol DiscoverableProtocol {
+    strict Method();
 };
 
 @discoverable("fake.library.FakeProtocol")
-protocol AnotherDiscoverableProtocol {};
+closed protocol AnotherDiscoverableProtocol {};
 
-protocol HandleRightsProtocol {
-    NoResponseMethod(resource struct {
+closed protocol HandleRightsProtocol {
+    strict NoResponseMethod(resource struct {
         h zx.handle:<SOCKET, zx.rights.TRANSFER | zx.rights.DUPLICATE>;
     });
-    ResponseMethod(resource struct {
+    strict ResponseMethod(resource struct {
         h zx.handle:<SOCKET, zx.rights.TRANSFER | zx.rights.DUPLICATE>;
     }) -> (resource struct {
         h zx.handle:<SOCKET, zx.rights.TRANSFER>;
     });
-    -> AnEvent(resource struct {
+    strict -> AnEvent(resource struct {
         h zx.handle:<SOCKET, zx.rights.TRANSFER | zx.rights.DUPLICATE>;
     });
 };
@@ -125,28 +125,28 @@ type ProtocolEnds = resource struct {
     server_opt server_end:<DiscoverableProtocol, optional>;
 };
 
-protocol WithProtocolEnds {
-    ClientEnds(resource struct {
+closed protocol WithProtocolEnds {
+    strict ClientEnds(resource struct {
         in client_end:DiscoverableProtocol;
     }) -> (resource struct {
         out client_end:<DiscoverableProtocol, optional>;
     });
-    ServerEnds(resource struct {
+    strict ServerEnds(resource struct {
         in server_end:<DiscoverableProtocol, optional>;
     }) -> (resource struct {
         out server_end:DiscoverableProtocol;
     });
-    StructContainingEnds(resource struct {
+    strict StructContainingEnds(resource struct {
         in ProtocolEnds;
     }) -> (resource struct {
         out ProtocolEnds;
     });
 };
 
-protocol ManyParameters {
+closed protocol ManyParameters {
     // TODO(fxbug.dev/76655): Support an arbitrary number of parameters in Rust.
     @bindings_denylist("rust")
-    Fifteen(struct {
+    strict Fifteen(struct {
         p1 bool;
         p2 bool;
         p3 bool;
@@ -169,8 +169,8 @@ type TheUnion = flexible union {
     1: v uint32;
 };
 
-protocol MethodWithUnion {
-    UnionMethod(struct {
+closed protocol MethodWithUnion {
+    strict UnionMethod(struct {
         u TheUnion;
     }) -> (struct {
         u TheUnion:optional;

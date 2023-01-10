@@ -2,14 +2,14 @@ library test.emptystruct;
 
 type Empty = struct {};
 
-protocol EmptyProtocol {
-    Send(struct {
+closed protocol EmptyProtocol {
+    strict Send(struct {
         e Empty;
     });
-    -> Receive(struct {
+    strict -> Receive(struct {
         e Empty;
     });
-    SendAndReceive(struct {
+    strict SendAndReceive(struct {
         e Empty;
     }) -> (struct {
         e Empty;

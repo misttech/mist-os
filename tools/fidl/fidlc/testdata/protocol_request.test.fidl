@@ -1,18 +1,18 @@
 library test.protocolrequest;
 
-protocol Child {};
+closed protocol Child {};
 
-protocol Parent {
-    GetChild() -> (resource struct {
+closed protocol Parent {
+    strict GetChild() -> (resource struct {
         c client_end:Child;
     });
-    GetChildRequest() -> (resource struct {
+    strict GetChildRequest() -> (resource struct {
         r server_end:Child;
     });
-    TakeChild(resource struct {
+    strict TakeChild(resource struct {
         c client_end:Child;
     });
-    TakeChildRequest(resource struct {
+    strict TakeChildRequest(resource struct {
         r server_end:Child;
     });
 };

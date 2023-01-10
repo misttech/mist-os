@@ -10,13 +10,13 @@ type StrictFoo = strict union {
     2: i int32;
 };
 
-protocol Protocol {
-    RequestStrictResponseFlexible(struct {
+closed protocol Protocol {
+    strict RequestStrictResponseFlexible(struct {
         s StrictFoo;
     }) -> (struct {
         f FlexibleFoo;
     });
-    RequestFlexibleResponseStrict(struct {
+    strict RequestFlexibleResponseStrict(struct {
         s FlexibleFoo;
     }) -> (struct {
         f StrictFoo;

@@ -4,10 +4,10 @@ type ImportStructPayload = struct {
     a int32;
 };
 
-protocol ComposedProtocol {
-    OneWayComposed(ImportStructPayload);
-    TwoWayComposed(ImportStructPayload) -> (ImportStructPayload);
-    TwoWayComposedWithError(ImportStructPayload) -> (ImportStructPayload) error uint32;
-    -> OnComposed(ImportStructPayload);
-    -> OnComposedWithError(ImportStructPayload) error uint32;
+closed protocol ComposedProtocol {
+    strict OneWayComposed(ImportStructPayload);
+    strict TwoWayComposed(ImportStructPayload) -> (ImportStructPayload);
+    strict TwoWayComposedWithError(ImportStructPayload) -> (ImportStructPayload) error uint32;
+    strict -> OnComposed(ImportStructPayload);
+    strict -> OnComposedWithError(ImportStructPayload) error uint32;
 };

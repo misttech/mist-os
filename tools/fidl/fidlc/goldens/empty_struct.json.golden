@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
         "line": 5,
-        "column": 10,
+        "column": 17,
         "length": 13
       },
       "openness": "closed",
@@ -30,7 +30,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
             "line": 6,
-            "column": 5,
+            "column": 12,
             "length": 4
           },
           "has_request": true,
@@ -70,7 +70,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
             "line": 9,
-            "column": 8,
+            "column": 15,
             "length": 7
           },
           "has_request": false,
@@ -110,7 +110,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
             "line": 12,
-            "column": 5,
+            "column": 12,
             "length": 14
           },
           "has_request": true,
@@ -217,7 +217,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
         "line": 9,
-        "column": 16,
+        "column": 23,
         "length": 31
       },
       "members": [
@@ -296,7 +296,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
         "line": 12,
-        "column": 20,
+        "column": 27,
         "length": 31
       },
       "members": [
@@ -454,7 +454,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/empty_struct.test.fidl",
         "line": 6,
-        "column": 10,
+        "column": 17,
         "length": 31
       },
       "members": [

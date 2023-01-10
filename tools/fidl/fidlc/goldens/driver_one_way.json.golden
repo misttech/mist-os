@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
         "line": 12,
-        "column": 10,
+        "column": 17,
         "length": 6
       },
       "maybe_attributes": [
@@ -63,7 +63,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
             "line": 13,
-            "column": 5,
+            "column": 12,
             "length": 4
           },
           "has_request": true,
@@ -111,7 +111,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/driver_one_way.test.fidl",
         "line": 13,
-        "column": 10,
+        "column": 17,
         "length": 39
       },
       "members": [

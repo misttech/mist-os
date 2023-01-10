@@ -24,8 +24,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
         "data": "Testing",
-        "start_offset": 414,
-        "end_offset": 421
+        "start_offset": 421,
+        "end_offset": 428
       },
       "members": [
         {
@@ -34,8 +34,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u1",
-            "start_offset": 446,
-            "end_offset": 448
+            "start_offset": 453,
+            "end_offset": 455
           },
           "type": {
             "kind": "primitive"
@@ -47,8 +47,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u2",
-            "start_offset": 458,
-            "end_offset": 460
+            "start_offset": 465,
+            "end_offset": 467
           },
           "type": {
             "kind": "vector"
@@ -60,8 +60,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u3",
-            "start_offset": 480,
-            "end_offset": 482
+            "start_offset": 487,
+            "end_offset": 489
           },
           "type": {
             "kind": "array"
@@ -73,8 +73,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u4",
-            "start_offset": 502,
-            "end_offset": 504
+            "start_offset": 509,
+            "end_offset": 511
           },
           "type": {
             "kind": "vector"
@@ -86,8 +86,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u5",
-            "start_offset": 532,
-            "end_offset": 534
+            "start_offset": 539,
+            "end_offset": 541
           },
           "type": {
             "kind": "vector"
@@ -99,8 +99,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u6",
-            "start_offset": 562,
-            "end_offset": 564
+            "start_offset": 569,
+            "end_offset": 571
           },
           "type": {
             "kind": "array"
@@ -112,8 +112,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "u7",
-            "start_offset": 594,
-            "end_offset": 596
+            "start_offset": 601,
+            "end_offset": 603
           },
           "type": {
             "kind": "array"
@@ -125,8 +125,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "v1",
-            "start_offset": 627,
-            "end_offset": 629
+            "start_offset": 634,
+            "end_offset": 636
           },
           "type": {
             "kind": "vector"
@@ -138,8 +138,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "v2",
-            "start_offset": 642,
-            "end_offset": 644
+            "start_offset": 649,
+            "end_offset": 651
           },
           "type": {
             "kind": "vector"
@@ -151,8 +151,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "v3",
-            "start_offset": 665,
-            "end_offset": 667
+            "start_offset": 672,
+            "end_offset": 674
           },
           "type": {
             "kind": "array"
@@ -164,8 +164,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "a1",
-            "start_offset": 691,
-            "end_offset": 693
+            "start_offset": 698,
+            "end_offset": 700
           },
           "type": {
             "kind": "array"
@@ -177,8 +177,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "a2",
-            "start_offset": 712,
-            "end_offset": 714
+            "start_offset": 719,
+            "end_offset": 721
           },
           "type": {
             "kind": "vector"
@@ -190,8 +190,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "a3",
-            "start_offset": 741,
-            "end_offset": 743
+            "start_offset": 748,
+            "end_offset": 750
           },
           "type": {
             "kind": "array"
@@ -203,8 +203,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "r1",
-            "start_offset": 773,
-            "end_offset": 775
+            "start_offset": 780,
+            "end_offset": 782
           },
           "type": {
             "kind": "request"
@@ -216,8 +216,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "r2",
-            "start_offset": 796,
-            "end_offset": 798
+            "start_offset": 803,
+            "end_offset": 805
           },
           "type": {
             "kind": "vector"
@@ -229,8 +229,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "r3",
-            "start_offset": 827,
-            "end_offset": 829
+            "start_offset": 834,
+            "end_offset": 836
           },
           "type": {
             "kind": "array"
@@ -242,8 +242,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "b1",
-            "start_offset": 861,
-            "end_offset": 863
+            "start_offset": 868,
+            "end_offset": 870
           },
           "type": {
             "kind": "vector"
@@ -255,8 +255,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "b2",
-            "start_offset": 882,
-            "end_offset": 884
+            "start_offset": 889,
+            "end_offset": 891
           },
           "type": {
             "kind": "vector"
@@ -268,8 +268,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "b3",
-            "start_offset": 911,
-            "end_offset": 913
+            "start_offset": 918,
+            "end_offset": 920
           },
           "type": {
             "kind": "array"
@@ -281,8 +281,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "s1",
-            "start_offset": 943,
-            "end_offset": 945
+            "start_offset": 950,
+            "end_offset": 952
           },
           "type": {
             "kind": "string"
@@ -294,8 +294,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "s2",
-            "start_offset": 965,
-            "end_offset": 967
+            "start_offset": 972,
+            "end_offset": 974
           },
           "type": {
             "kind": "vector"
@@ -307,8 +307,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "s3",
-            "start_offset": 995,
-            "end_offset": 997
+            "start_offset": 1002,
+            "end_offset": 1004
           },
           "type": {
             "kind": "array"
@@ -320,8 +320,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "vv1",
-            "start_offset": 1028,
-            "end_offset": 1031
+            "start_offset": 1035,
+            "end_offset": 1038
           },
           "type": {
             "kind": "vector"
@@ -333,8 +333,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "vv2",
-            "start_offset": 1074,
-            "end_offset": 1077
+            "start_offset": 1081,
+            "end_offset": 1084
           },
           "type": {
             "kind": "vector"
@@ -346,8 +346,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "vv3",
-            "start_offset": 1130,
-            "end_offset": 1133
+            "start_offset": 1137,
+            "end_offset": 1140
           },
           "type": {
             "kind": "array"
@@ -359,8 +359,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "aa1",
-            "start_offset": 1187,
-            "end_offset": 1190
+            "start_offset": 1194,
+            "end_offset": 1197
           },
           "type": {
             "kind": "array"
@@ -372,8 +372,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "aa2",
-            "start_offset": 1231,
-            "end_offset": 1234
+            "start_offset": 1238,
+            "end_offset": 1241
           },
           "type": {
             "kind": "vector"
@@ -385,8 +385,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
             "data": "aa3",
-            "start_offset": 1285,
-            "end_offset": 1288
+            "start_offset": 1292,
+            "end_offset": 1295
           },
           "type": {
             "kind": "array"
@@ -402,8 +402,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/experimental_maybe_from_alias.test.fidl",
         "data": "MyProtocol",
-        "start_offset": 51,
-        "end_offset": 61
+        "start_offset": 58,
+        "end_offset": 68
       },
       "methods": [],
       "composed_protocols": []

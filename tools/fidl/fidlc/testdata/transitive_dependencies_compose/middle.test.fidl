@@ -5,6 +5,6 @@ using test.bottom;
 // TODO(fxbug.dev/60240): Unified bindings namespace collies with HLCPP for
 // single component library names.
 @bindings_denylist("cpp")
-protocol Middle {
+closed protocol Middle {
     compose test.bottom.Bottom;
 };

@@ -8,64 +8,64 @@ type UnionPayload = strict union {
     1: b bool;
 };
 
-protocol ComposedProtocol {
-    OneWayAnonComposed(table {
+closed protocol ComposedProtocol {
+    strict OneWayAnonComposed(table {
         1: a uint16;
     });
-    TwoWayAnonComposed(strict union {
+    strict TwoWayAnonComposed(strict union {
         1: b bool;
     }) -> (table {
         1: a uint16;
     });
-    TwoWayAnonComposedWithError(table {
+    strict TwoWayAnonComposedWithError(table {
         1: a uint16;
     }) -> (strict union {
         1: b bool;
     }) error uint32;
-    -> OnAnonComposed(strict union {
+    strict -> OnAnonComposed(strict union {
         1: b bool;
     });
-    -> OnAnonComposedWithError(table {
+    strict -> OnAnonComposedWithError(table {
         1: a uint16;
     }) error uint32;
 
-    OneWayNamedComposed(TablePayload);
-    TwoWayNamedComposed(UnionPayload) -> (TablePayload);
-    TwoWayNamedComposedWithError(TablePayload) -> (UnionPayload) error uint32;
-    -> OnNamedComposed(UnionPayload);
-    -> OnNamedComposedWithError(TablePayload) error uint32;
+    strict OneWayNamedComposed(TablePayload);
+    strict TwoWayNamedComposed(UnionPayload) -> (TablePayload);
+    strict TwoWayNamedComposedWithError(TablePayload) -> (UnionPayload) error uint32;
+    strict -> OnNamedComposed(UnionPayload);
+    strict -> OnNamedComposedWithError(TablePayload) error uint32;
 };
 
 
-protocol MainProtocol {
+closed protocol MainProtocol {
     // Tests composition of protocols with union/table payloads defined in the imported library.
     compose ComposedProtocol;
 
     // Tests union/table payloads referenced without composition.
-    OneWayLocal(TablePayload);
-    TwoWayLocal(UnionPayload) -> (TablePayload);
-    TwoWayLocalWithError(TablePayload) -> (UnionPayload) error uint32;
-    -> OnLocal(UnionPayload);
-    -> OnLocalWithError(TablePayload) error uint32;
+    strict OneWayLocal(TablePayload);
+    strict TwoWayLocal(UnionPayload) -> (TablePayload);
+    strict TwoWayLocalWithError(TablePayload) -> (UnionPayload) error uint32;
+    strict -> OnLocal(UnionPayload);
+    strict -> OnLocalWithError(TablePayload) error uint32;
 
     // Tests anonymous union/table payloads.
-    OneWayAnon(table {
+    strict OneWayAnon(table {
         1: a uint16;
     });
-    TwoWayAnon(flexible union {
+    strict TwoWayAnon(flexible union {
         1: b bool;
     }) -> (table {
         1: a uint16;
     });
-    TwoWayAnonWithError(table {
+    strict TwoWayAnonWithError(table {
         1: a uint16;
     }) -> (flexible union {
         1: b bool;
     }) error uint32;
-    -> OnAnon(flexible union {
+    strict -> OnAnon(flexible union {
         1: b bool;
     });
-    -> OnAnonWithError(table {
+    strict -> OnAnonWithError(table {
         1: a uint16;
     }) error uint32;
 };

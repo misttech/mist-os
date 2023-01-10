@@ -46,7 +46,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 10,
-        "column": 10,
+        "column": 17,
         "length": 12
       },
       "openness": "closed",
@@ -69,7 +69,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
             "line": 8,
-            "column": 5,
+            "column": 12,
             "length": 14
           },
           "has_request": true,
@@ -109,7 +109,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
             "line": 9,
-            "column": 5,
+            "column": 12,
             "length": 14
           },
           "has_request": true,
@@ -174,7 +174,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
             "line": 10,
-            "column": 5,
+            "column": 12,
             "length": 23
           },
           "has_request": true,
@@ -313,7 +313,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
             "line": 11,
-            "column": 8,
+            "column": 15,
             "length": 10
           },
           "has_request": false,
@@ -353,7 +353,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
             "line": 12,
-            "column": 8,
+            "column": 15,
             "length": 19
           },
           "has_request": false,
@@ -467,7 +467,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 15,
-            "column": 5,
+            "column": 12,
             "length": 11
           },
           "has_request": true,
@@ -507,7 +507,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 16,
-            "column": 5,
+            "column": 12,
             "length": 11
           },
           "has_request": true,
@@ -572,7 +572,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 17,
-            "column": 5,
+            "column": 12,
             "length": 20
           },
           "has_request": true,
@@ -711,7 +711,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 18,
-            "column": 8,
+            "column": 15,
             "length": 7
           },
           "has_request": false,
@@ -751,7 +751,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 19,
-            "column": 8,
+            "column": 15,
             "length": 16
           },
           "has_request": false,
@@ -865,7 +865,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 22,
-            "column": 5,
+            "column": 12,
             "length": 12
           },
           "has_request": true,
@@ -905,7 +905,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 23,
-            "column": 5,
+            "column": 12,
             "length": 12
           },
           "has_request": true,
@@ -970,7 +970,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 24,
-            "column": 5,
+            "column": 12,
             "length": 21
           },
           "has_request": true,
@@ -1109,7 +1109,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 25,
-            "column": 8,
+            "column": 15,
             "length": 8
           },
           "has_request": false,
@@ -1149,7 +1149,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 26,
-            "column": 8,
+            "column": 15,
             "length": 17
           },
           "has_request": false,
@@ -1263,7 +1263,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 30,
-            "column": 5,
+            "column": 12,
             "length": 10
           },
           "has_request": true,
@@ -1303,7 +1303,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 34,
-            "column": 5,
+            "column": 12,
             "length": 10
           },
           "has_request": true,
@@ -1368,7 +1368,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 41,
-            "column": 5,
+            "column": 12,
             "length": 19
           },
           "has_request": true,
@@ -1507,7 +1507,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 48,
-            "column": 8,
+            "column": 15,
             "length": 6
           },
           "has_request": false,
@@ -1547,7 +1547,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
             "line": 52,
-            "column": 8,
+            "column": 15,
             "length": 15
           },
           "has_request": false,
@@ -1786,7 +1786,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 48,
-        "column": 15,
+        "column": 22,
         "length": 50
       },
       "members": [
@@ -1905,7 +1905,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 52,
-        "column": 23,
+        "column": 30,
         "length": 52
       },
       "members": [
@@ -1984,7 +1984,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 26,
-        "column": 25,
+        "column": 32,
         "length": 25
       },
       "members": [
@@ -2063,7 +2063,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 19,
-        "column": 24,
+        "column": 31,
         "length": 20
       },
       "members": [
@@ -2142,7 +2142,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 30,
-        "column": 16,
+        "column": 23,
         "length": 50
       },
       "members": [
@@ -2261,7 +2261,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 34,
-        "column": 16,
+        "column": 23,
         "length": 50
       },
       "members": [
@@ -2499,7 +2499,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 41,
-        "column": 25,
+        "column": 32,
         "length": 50
       },
       "members": [
@@ -2697,7 +2697,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 24,
-        "column": 55,
+        "column": 62,
         "length": 25
       },
       "members": [
@@ -2776,7 +2776,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 17,
-        "column": 49,
+        "column": 56,
         "length": 20
       },
       "members": [
@@ -2857,7 +2857,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 52,
-        "column": 24,
+        "column": 31,
         "length": 50
       },
       "members": [
@@ -3099,7 +3099,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
         "line": 12,
-        "column": 27,
+        "column": 34,
         "length": 21
       },
       "members": [
@@ -3178,7 +3178,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/imported.test.fidl",
         "line": 10,
-        "column": 53,
+        "column": 60,
         "length": 21
       },
       "members": [
@@ -3337,7 +3337,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 52,
-        "column": 23,
+        "column": 30,
         "length": 52
       },
       "maybe_attributes": [
@@ -3453,7 +3453,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 26,
-        "column": 25,
+        "column": 32,
         "length": 25
       },
       "maybe_attributes": [
@@ -3569,7 +3569,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 19,
-        "column": 24,
+        "column": 31,
         "length": 20
       },
       "maybe_attributes": [
@@ -3801,7 +3801,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 24,
-        "column": 55,
+        "column": 62,
         "length": 25
       },
       "maybe_attributes": [
@@ -3917,7 +3917,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_payloads/example.test.fidl",
         "line": 17,
-        "column": 49,
+        "column": 56,
         "length": 20
       },
       "maybe_attributes": [

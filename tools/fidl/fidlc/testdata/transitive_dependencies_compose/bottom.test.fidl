@@ -10,8 +10,8 @@ type Foo = struct {
 // TODO(fxbug.dev/60240): Unified bindings namespace collies with HLCPP for
 // single component library names.
 @bindings_denylist("cpp")
-protocol Bottom {
-    GetFoo() -> (
+closed protocol Bottom {
+    strict GetFoo() -> (
             // TODO(fxbug.dev/60240): Unified bindings namespace collies with HLCPP for
             // single component library names.
             @bindings_denylist("cpp") struct {

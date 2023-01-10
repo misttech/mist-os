@@ -42,7 +42,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
         "line": 9,
-        "column": 10,
+        "column": 17,
         "length": 23
       },
       "openness": "closed",
@@ -65,7 +65,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
             "line": 8,
-            "column": 5,
+            "column": 12,
             "length": 24
           },
           "has_request": true,
@@ -204,7 +204,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
             "line": 11,
-            "column": 5,
+            "column": 12,
             "length": 16
           },
           "has_request": true,
@@ -351,7 +351,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
         "line": 11,
-        "column": 22,
+        "column": 29,
         "length": 32
       },
       "members": [
@@ -590,7 +590,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "line": 8,
-        "column": 30,
+        "column": 37,
         "length": 32
       },
       "members": [

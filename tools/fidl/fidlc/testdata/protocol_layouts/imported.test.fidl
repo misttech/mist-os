@@ -8,30 +8,30 @@ type ImportUnionPayload = strict union {
     1: b bool;
 };
 
-protocol ComposedProtocol {
-    OneWayAnonComposed(table {
+closed protocol ComposedProtocol {
+    strict OneWayAnonComposed(table {
         1: a uint16;
     });
-    TwoWayAnonComposed(strict union {
+    strict TwoWayAnonComposed(strict union {
         1: b bool;
     }) -> (table {
         1: a uint16;
     });
-    TwoWayAnonComposedWithError(table {
+    strict TwoWayAnonComposedWithError(table {
         1: a uint16;
     }) -> (strict union {
         1: b bool;
     }) error uint32;
-    -> OnAnonComposed(strict union {
+    strict -> OnAnonComposed(strict union {
         1: b bool;
     });
-    -> OnAnonComposedWithError(table {
+    strict -> OnAnonComposedWithError(table {
         1: a uint16;
     }) error uint32;
 
-    OneWayNamedComposed(ImportTablePayload);
-    TwoWayNamedComposed(ImportUnionPayload) -> (ImportTablePayload);
-    TwoWayNamedComposedWithError(ImportTablePayload) -> (ImportUnionPayload) error uint32;
-    -> OnNamedComposed(ImportUnionPayload);
-    -> OnNamedComposedWithError(ImportTablePayload) error uint32;
+    strict OneWayNamedComposed(ImportTablePayload);
+    strict TwoWayNamedComposed(ImportUnionPayload) -> (ImportTablePayload);
+    strict TwoWayNamedComposedWithError(ImportTablePayload) -> (ImportUnionPayload) error uint32;
+    strict -> OnNamedComposed(ImportUnionPayload);
+    strict -> OnNamedComposedWithError(ImportTablePayload) error uint32;
 };

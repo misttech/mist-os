@@ -16,8 +16,8 @@ type Union = union {
 };
 alias Alias = Struct;
 
-protocol Calculator {
-    Add(struct {
+closed protocol Calculator {
+    strict Add(struct {
         a int32;
         b int32;
     }) -> (struct {

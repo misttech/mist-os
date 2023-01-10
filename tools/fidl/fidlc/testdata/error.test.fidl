@@ -1,7 +1,7 @@
 library test.error;
 
-protocol Example {
-    foo(struct {
+closed protocol Example {
+    strict foo(struct {
         s string;
     }) -> (struct {
         y int64;

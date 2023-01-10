@@ -7,49 +7,49 @@ type LocalStructPayload = struct {
     b uint32;
 };
 
-protocol MainProtocol {
+closed protocol MainProtocol {
     // Tests composition of protocols with named payloads defined in the imported library.
     compose imp.ComposedProtocol;
 
     // Tests named payloads defined locally.
-    OneWayLocal(LocalStructPayload);
-    TwoWayLocal(LocalStructPayload) -> (LocalStructPayload);
-    TwoWayLocalWithError(LocalStructPayload) -> (LocalStructPayload) error uint32;
-    -> OnLocal(LocalStructPayload);
-    -> OnLocalWithError(LocalStructPayload) error uint32;
+    strict OneWayLocal(LocalStructPayload);
+    strict TwoWayLocal(LocalStructPayload) -> (LocalStructPayload);
+    strict TwoWayLocalWithError(LocalStructPayload) -> (LocalStructPayload) error uint32;
+    strict -> OnLocal(LocalStructPayload);
+    strict -> OnLocalWithError(LocalStructPayload) error uint32;
 
     // Tests named payloads imported from another library.
-    OneWayImport(imp.ImportStructPayload);
-    TwoWayImport(imp.ImportStructPayload) -> (imp.ImportStructPayload);
-    TwoWayImportWithError(imp.ImportStructPayload) -> (imp.ImportStructPayload) error uint32;
-    -> OnImport(imp.ImportStructPayload);
-    -> OnImportWithError(imp.ImportStructPayload) error uint32;
+    strict OneWayImport(imp.ImportStructPayload);
+    strict TwoWayImport(imp.ImportStructPayload) -> (imp.ImportStructPayload);
+    strict TwoWayImportWithError(imp.ImportStructPayload) -> (imp.ImportStructPayload) error uint32;
+    strict -> OnImport(imp.ImportStructPayload);
+    strict -> OnImportWithError(imp.ImportStructPayload) error uint32;
 
     // These methods are included so that we can have an anonymous reference point in generated
     // bindings.
-    OneWayAnon(struct {
+    strict OneWayAnon(struct {
         a uint32;
         b uint32;
     });
-    TwoWayAnon(struct {
+    strict TwoWayAnon(struct {
         a uint32;
         b uint32;
     }) -> (struct {
         a uint32;
         b uint32;
     });
-    TwoWayAnonWithError(struct {
+    strict TwoWayAnonWithError(struct {
         a uint32;
         b uint32;
     }) -> (struct {
         a uint32;
         b uint32;
     }) error uint32;
-    -> OnAnon(struct {
+    strict -> OnAnon(struct {
         a uint32;
         b uint32;
     });
-    -> OnAnonWithError(struct {
+    strict -> OnAnonWithError(struct {
         a uint32;
         b uint32;
     }) error uint32;

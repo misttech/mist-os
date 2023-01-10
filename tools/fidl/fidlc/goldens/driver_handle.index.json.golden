@@ -449,8 +449,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "zircon_handle",
-            "start_offset": 726,
-            "end_offset": 739
+            "start_offset": 747,
+            "end_offset": 760
           },
           "type": {
             "kind": "handle"
@@ -463,8 +463,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "fdf_handle",
-            "start_offset": 772,
-            "end_offset": 782
+            "start_offset": 793,
+            "end_offset": 803
           },
           "type": {
             "kind": "identifier"
@@ -481,8 +481,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "data": "ClientEndWrapper",
-        "start_offset": 319,
-        "end_offset": 335
+        "start_offset": 326,
+        "end_offset": 342
       },
       "members": [
         {
@@ -491,8 +491,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "value",
-            "start_offset": 360,
-            "end_offset": 365
+            "start_offset": 367,
+            "end_offset": 372
           },
           "type": {
             "kind": "identifier"
@@ -510,8 +510,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "t",
-            "start_offset": 692,
-            "end_offset": 693
+            "start_offset": 713,
+            "end_offset": 714
           },
           "type": {
             "kind": "identifier",
@@ -527,8 +527,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "data": "ServerEndWrapper",
-        "start_offset": 462,
-        "end_offset": 478
+        "start_offset": 469,
+        "end_offset": 485
       },
       "members": [
         {
@@ -537,8 +537,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "value",
-            "start_offset": 503,
-            "end_offset": 508
+            "start_offset": 510,
+            "end_offset": 515
           },
           "type": {
             "kind": "request"
@@ -554,8 +554,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "data": "DriverProtocol",
-        "start_offset": 234,
-        "end_offset": 248
+        "start_offset": 241,
+        "end_offset": 255
       },
       "methods": [],
       "composed_protocols": []
@@ -566,8 +566,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
         "data": "HandlesInProtocol",
-        "start_offset": 630,
-        "end_offset": 647
+        "start_offset": 644,
+        "end_offset": 661
       },
       "methods": [
         {
@@ -576,8 +576,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/driver_handle.test.fidl",
             "data": "SendHandles",
-            "start_offset": 654,
-            "end_offset": 665
+            "start_offset": 675,
+            "end_offset": 686
           },
           "request_type": {
             "kind": "identifier",

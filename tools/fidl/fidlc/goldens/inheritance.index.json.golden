@@ -27,8 +27,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
             "data": "s",
-            "start_offset": 69,
-            "end_offset": 70
+            "start_offset": 83,
+            "end_offset": 84
           },
           "type": {
             "kind": "string"
@@ -46,8 +46,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
             "data": "y",
-            "start_offset": 107,
-            "end_offset": 108
+            "start_offset": 121,
+            "end_offset": 122
           },
           "type": {
             "kind": "primitive"
@@ -63,8 +63,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
         "data": "sub",
-        "start_offset": 137,
-        "end_offset": 140
+        "start_offset": 158,
+        "end_offset": 161
       },
       "methods": [
         {
@@ -73,8 +73,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
             "data": "foo",
-            "start_offset": 48,
-            "end_offset": 51
+            "start_offset": 62,
+            "end_offset": 65
           },
           "request_type": {
             "kind": "identifier",
@@ -93,8 +93,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
             "data": "super",
-            "start_offset": 186,
-            "end_offset": 191
+            "start_offset": 207,
+            "end_offset": 212
           }
         }
       ]
@@ -105,8 +105,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
         "data": "super",
-        "start_offset": 36,
-        "end_offset": 41
+        "start_offset": 43,
+        "end_offset": 48
       },
       "methods": [
         {
@@ -115,8 +115,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/inheritance.test.fidl",
             "data": "foo",
-            "start_offset": 48,
-            "end_offset": 51
+            "start_offset": 62,
+            "end_offset": 65
           },
           "request_type": {
             "kind": "identifier",

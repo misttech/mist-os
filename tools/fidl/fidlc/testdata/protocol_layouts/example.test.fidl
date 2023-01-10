@@ -10,42 +10,42 @@ type LocalUnionPayload = flexible union {
     1: b bool;
 };
 
-protocol MainProtocol {
+closed protocol MainProtocol {
     // Tests composition of protocols with union/table payloads defined in the imported library.
     compose imp.ComposedProtocol;
 
     // Tests union/table payloads defined locally.
-    OneWayImport(imp.ImportTablePayload);
-    TwoWayImport(imp.ImportUnionPayload) -> (imp.ImportTablePayload);
-    TwoWayImportWithError(imp.ImportTablePayload) -> (imp.ImportUnionPayload) error uint32;
-    -> OnImport(imp.ImportUnionPayload);
-    -> OnImportWithError(imp.ImportTablePayload) error uint32;
+    strict OneWayImport(imp.ImportTablePayload);
+    strict TwoWayImport(imp.ImportUnionPayload) -> (imp.ImportTablePayload);
+    strict TwoWayImportWithError(imp.ImportTablePayload) -> (imp.ImportUnionPayload) error uint32;
+    strict -> OnImport(imp.ImportUnionPayload);
+    strict -> OnImportWithError(imp.ImportTablePayload) error uint32;
 
     // Tests union/table payloads imported from another library.
-    OneWayLocal(LocalTablePayload);
-    TwoWayLocal(LocalUnionPayload) -> (LocalTablePayload);
-    TwoWayLocalWithError(LocalTablePayload) -> (LocalUnionPayload) error uint32;
-    -> OnLocal(LocalUnionPayload);
-    -> OnLocalWithError(LocalTablePayload) error uint32;
+    strict OneWayLocal(LocalTablePayload);
+    strict TwoWayLocal(LocalUnionPayload) -> (LocalTablePayload);
+    strict TwoWayLocalWithError(LocalTablePayload) -> (LocalUnionPayload) error uint32;
+    strict -> OnLocal(LocalUnionPayload);
+    strict -> OnLocalWithError(LocalTablePayload) error uint32;
 
     // Tests anonymous union/table payloads.
-    OneWayAnon(table {
+    strict OneWayAnon(table {
         1: a uint16;
     });
-    TwoWayAnon(flexible union {
+    strict TwoWayAnon(flexible union {
         1: b bool;
     }) -> (table {
         1: a uint16;
     });
-    TwoWayAnonWithError(table {
+    strict TwoWayAnonWithError(table {
         1: a uint16;
     }) -> (flexible union {
         1: b bool;
     }) error uint32;
-    -> OnAnon(flexible union {
+    strict -> OnAnon(flexible union {
         1: b bool;
     });
-    -> OnAnonWithError(table {
+    strict -> OnAnonWithError(table {
         1: a uint16;
     }) error uint32;
 };

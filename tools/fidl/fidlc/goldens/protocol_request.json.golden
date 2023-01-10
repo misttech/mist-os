@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 3,
-        "column": 10,
+        "column": 17,
         "length": 5
       },
       "openness": "closed",
@@ -29,7 +29,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 5,
-        "column": 10,
+        "column": 17,
         "length": 6
       },
       "openness": "closed",
@@ -42,7 +42,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
             "line": 6,
-            "column": 5,
+            "column": 12,
             "length": 8
           },
           "has_request": true,
@@ -82,7 +82,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
             "line": 9,
-            "column": 5,
+            "column": 12,
             "length": 15
           },
           "has_request": true,
@@ -122,7 +122,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
             "line": 12,
-            "column": 5,
+            "column": 12,
             "length": 9
           },
           "has_request": true,
@@ -162,7 +162,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
             "line": 15,
-            "column": 5,
+            "column": 12,
             "length": 16
           },
           "has_request": true,
@@ -210,7 +210,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 9,
-        "column": 27,
+        "column": 34,
         "length": 51
       },
       "members": [
@@ -290,7 +290,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 6,
-        "column": 20,
+        "column": 27,
         "length": 51
       },
       "members": [
@@ -370,7 +370,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 12,
-        "column": 15,
+        "column": 22,
         "length": 51
       },
       "members": [
@@ -450,7 +450,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocol_request.test.fidl",
         "line": 15,
-        "column": 22,
+        "column": 29,
         "length": 51
       },
       "members": [

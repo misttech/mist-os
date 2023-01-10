@@ -17,7 +17,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "line": 124,
-        "column": 10,
+        "column": 17,
         "length": 12
       },
       "openness": "closed",
@@ -30,7 +30,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "line": 125,
-            "column": 5,
+            "column": 12,
             "length": 44
           },
           "has_request": true,
@@ -70,7 +70,7 @@
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "line": 128,
-            "column": 5,
+            "column": 12,
             "length": 46
           },
           "has_request": true,
@@ -484,7 +484,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "line": 128,
-        "column": 58,
+        "column": 65,
         "length": 43
       },
       "members": [
@@ -563,7 +563,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "line": 125,
-        "column": 56,
+        "column": 63,
         "length": 46
       },
       "members": [

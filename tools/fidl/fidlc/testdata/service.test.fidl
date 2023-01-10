@@ -5,16 +5,16 @@ library test.service;
 
 service EmptyService {};
 
-protocol FirstProtocol {
-    MethodOnFirst();
+closed protocol FirstProtocol {
+    strict MethodOnFirst();
 };
 
 service SingleMemberService {
     single_member client_end:FirstProtocol;
 };
 
-protocol SecondProtocol {
-    MethodOnSecond();
+closed protocol SecondProtocol {
+    strict MethodOnSecond();
 };
 
 service MultiHeterogeneousMemberService {

@@ -40,8 +40,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "data": "struct {\n        s string;\n    }",
-        "start_offset": 261,
-        "end_offset": 293
+        "start_offset": 275,
+        "end_offset": 307
       }
     },
     {
@@ -50,8 +50,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "data": "(struct {\n        value int64;\n    })",
-        "start_offset": 298,
-        "end_offset": 335
+        "start_offset": 312,
+        "end_offset": 349
       }
     },
     {
@@ -60,8 +60,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "data": "struct {\n        value int64;\n    }",
-        "start_offset": 299,
-        "end_offset": 334
+        "start_offset": 313,
+        "end_offset": 348
       }
     },
     {
@@ -70,8 +70,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "data": "ParentUsesErrorSyntax",
-        "start_offset": 208,
-        "end_offset": 229
+        "start_offset": 215,
+        "end_offset": 236
       }
     },
     {
@@ -80,8 +80,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
         "data": "(struct {\n        value int64;\n    })",
-        "start_offset": 298,
-        "end_offset": 335
+        "start_offset": 312,
+        "end_offset": 349
       }
     }
   ],
@@ -127,8 +127,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
             "data": "s",
-            "start_offset": 356,
-            "end_offset": 357
+            "start_offset": 370,
+            "end_offset": 371
           },
           "type": {
             "kind": "string"
@@ -162,8 +162,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
             "data": "value",
-            "start_offset": 394,
-            "end_offset": 399
+            "start_offset": 408,
+            "end_offset": 413
           },
           "type": {
             "kind": "primitive"
@@ -179,8 +179,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
         "data": "ExampleUseOfErrorSyntax",
-        "start_offset": 233,
-        "end_offset": 256
+        "start_offset": 240,
+        "end_offset": 263
       },
       "methods": [
         {
@@ -189,8 +189,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error_syntax/parent.test.fidl",
             "data": "ComposedCallWhichMayFail",
-            "start_offset": 236,
-            "end_offset": 260
+            "start_offset": 250,
+            "end_offset": 274
           },
           "request_type": {
             "kind": "identifier",
@@ -207,8 +207,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
             "data": "CallWhichMayFail",
-            "start_offset": 322,
-            "end_offset": 338
+            "start_offset": 336,
+            "end_offset": 352
           },
           "request_type": {
             "kind": "identifier",
@@ -227,8 +227,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/error_syntax/child.test.fidl",
             "data": "test.errorsyntax.parent.ParentUsesErrorSyntax",
-            "start_offset": 271,
-            "end_offset": 316
+            "start_offset": 278,
+            "end_offset": 323
           }
         }
       ]
