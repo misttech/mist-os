@@ -439,11 +439,11 @@ template("syscall_test_suite") {
       disable_syslog_backend = true
     }
 
-    test_package_label = "${combined_label}_syscall_tests"
+    test_package_label = "${combined_label}_syscall"
+    component_label = "${test_package_label}_tests"
 
     if (use_expectations_framework) {
-      _unittest_component = "${test_package_label}_unittest_component"
-      fuchsia_unittest_component(_unittest_component) {
+      fuchsia_unittest_component(component_label) {
         deps = [
           ":${test_target_label}",
           stack.component,
@@ -458,7 +458,7 @@ template("syscall_test_suite") {
       }
       fuchsia_test_with_expectations_package(test_package_label) {
         forward_variables_from(invoker, [ "test_specs" ])
-        test_components = [ ":${_unittest_component}" ]
+        test_components = [ ":${component_label}" ]
 
         if (stack.label == ns3_label) {
           expectations = "expects/netstack3/${suite_label}.json5"
@@ -481,6 +481,7 @@ template("syscall_test_suite") {
       fuchsia_unittest_package(test_package_label) {
         forward_variables_from(invoker, [ "test_specs" ])
         package_name = test_package_label
+        component_name = component_label
         manifest = stack.manifest
         deps = [
           ":${test_target_label}",
