@@ -180,19 +180,31 @@ impl Environment for FshostEnvironment {
         // TODO(fxbug.dev/109293): This is good enough for the ram-based migration, but the
         // disk-based migration wants to be able to deactivate the zxcrypt partition after
         // mounting. This will probably require a minor refactor to the launcher code.
-        let copied_data = match (device.content_format().await?, format) {
-            // Migrate data from minfs to fxfs.
-            (DiskFormat::Minfs, DiskFormat::Fxfs) => {
-                // TODO(fxbug.dev/109293): Migrate from minfs with no zxcrypt to fxfs
-                None
-            }
-            (DiskFormat::Zxcrypt, DiskFormat::Fxfs) => {
+        let copied_data = match (device.content_format().await?, format, self.config.no_zxcrypt) {
+            // minfs->fxfs or minfs->f2fs, with no zxcrypt anywhere
+            (DiskFormat::Minfs, DiskFormat::Fxfs, _)
+            | (DiskFormat::Minfs, DiskFormat::F2fs, true) => self
+                .launcher
+                .try_read_data_from_minfs(device)
+                .await
+                .map_err(|error| {
+                    tracing::warn!(
+                        ?error,
+                        path = %device.path(),
+                        "Failed to copy data from old partition. Expect data loss!",
+                    );
+                    error
+                })
+                .ok(),
+            // zxcrypt+minfs->fxfs or zxcrypt+minfs->zxcrypt+f2fs
+            (DiskFormat::Zxcrypt, DiskFormat::Fxfs, _)
+            | (DiskFormat::Zxcrypt, DiskFormat::F2fs, false) => {
                 // Bind zxcrypt so we can peek at the contents
                 self.bind_zxcrypt(device).await?;
                 let mut inner_device = device.get_child("/zxcrypt/unsealed/block").await?;
 
                 let copied_data = if inner_device.content_format().await? == DiskFormat::Minfs {
-                    // minfs->fxfs migration. Read everything off the disk into memory.
+                    // Read everything off the disk into memory.
                     self.launcher
                         .try_read_data_from_minfs(inner_device.as_mut())
                         .await
@@ -217,18 +229,8 @@ impl Environment for FshostEnvironment {
                 copied_data
             }
 
-            // Migrate data from minfs to f2fs.
-            (DiskFormat::Minfs, DiskFormat::F2fs) if self.config.no_zxcrypt => {
-                // TODO(fxbug.dev/109293): Migrate from minfs with no zxcrypt to f2fs
-                None
-            }
-            (DiskFormat::Zxcrypt, DiskFormat::F2fs) if !self.config.no_zxcrypt => {
-                // TODO(fxbug.dev/109293): Migrate from minfs with zxcrypt to f2fs
-                None
-            }
-
             // Everything else - no migration. The mount path will reformat if needed.
-            (_, _) => None,
+            (_, _, _) => None,
         };
 
         // Potentially bind zxcrypt before serving data.

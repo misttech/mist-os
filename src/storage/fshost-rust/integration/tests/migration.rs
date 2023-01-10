@@ -83,8 +83,6 @@ async fn minfs_no_zxcrypt_to_format() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // This covers the minfs->fxfs and minfs->f2fs migrations outlined above.
-    // TODO(fxbug.dev/109293): support migrating data in the rust fshost
-    #[cfg(not(feature = "fshost_rust"))]
     if data_fs_name() == "fxfs" || (data_fs_name() == "f2fs" && !data_fs_zxcrypt()) {
         fixture.check_test_data_file().await;
     }
@@ -143,9 +141,6 @@ async fn minfs_zxcrypt_to_format() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // This covers the zxcrypt+minfs->fxfs and zxcrypt+minfs->f2fs migrations outlined above.
-
-    // TODO(fxbug.dev/109293): support migrating data in the rust fshost
-    #[cfg(not(feature = "fshost_rust"))]
     if data_fs_name() == "f2fs" && data_fs_zxcrypt() {
         fixture.check_test_data_file().await;
     }
