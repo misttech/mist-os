@@ -58,7 +58,10 @@ impl GuestMemory {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::hypervisor::testing::MockHypervisor};
+    use {
+        super::*,
+        crate::hypervisor::testing::{MockBehavior, MockHypervisor},
+    };
 
     #[fuchsia::test]
     fn test_allocation_size_matches_request() {
@@ -91,7 +94,7 @@ mod tests {
     fn test_allocation_failure() {
         let hypervisor = MockHypervisor::new();
 
-        hypervisor.on_allocate_memory(|_| Err(zx::Status::NO_RESOURCES));
+        hypervisor.on_allocate_memory(MockBehavior::ReturnError(zx::Status::NO_RESOURCES));
 
         let memory = GuestMemory::allocate(1, &hypervisor);
         assert!(memory.is_err());

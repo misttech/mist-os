@@ -34,12 +34,16 @@ impl<H: Hypervisor> VirtualMachine<H> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::hypervisor::testing::MockHypervisor, fuchsia_zircon as zx};
+    use {
+        super::*,
+        crate::hypervisor::testing::{MockBehavior, MockHypervisor},
+        fuchsia_zircon as zx,
+    };
 
     #[fuchsia::test]
     fn test_create_virtual_machine_hypervisor_failure() {
         let hypervisor = MockHypervisor::new();
-        hypervisor.on_guest_create(|| Err(zx::Status::NO_RESOURCES));
+        hypervisor.on_guest_create(MockBehavior::ReturnError(zx::Status::NO_RESOURCES));
         let config = GuestConfig::EMPTY;
 
         let vm = VirtualMachine::new(hypervisor.clone(), config);

@@ -134,9 +134,31 @@ pub mod testing {
         }
     }
 
+    /// Allow tests to control the behavior of [MockHypervisor] methods.
+    #[derive(Clone, Debug, Default)]
+    pub enum MockBehavior {
+        /// Call the mock method, which is the default behavior.
+        #[default]
+        CallMock,
+
+        /// Return an error from the operation.
+        ReturnError(zx::Status),
+    }
+
+    impl MockBehavior {
+        pub fn return_error(&self) -> Option<zx::Status> {
+            if let MockBehavior::ReturnError(status) = self {
+                Some(*status)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[derive(Default)]
     struct MockHypervisorState {
-        on_guest_create: Box<dyn Fn() -> Result<(MockGuest, MockAddressSpace), zx::Status> + Send>,
-        on_allocate_memory: Box<dyn Fn(u64) -> Result<zx::Vmo, zx::Status> + Send>,
+        on_guest_create: MockBehavior,
+        on_allocate_memory: MockBehavior,
     }
 
     #[derive(Clone)]
@@ -147,7 +169,7 @@ pub mod testing {
     /// The default callable used to implement [Hypervisor::guest_create] for [MockHypervisor].
     ///
     /// This simply returns Ok with a [MockGuest] and [MockAddressSpace].
-    pub fn default_guest_create() -> Result<(MockGuest, MockAddressSpace), zx::Status> {
+    pub fn mock_guest_create() -> Result<(MockGuest, MockAddressSpace), zx::Status> {
         let guest = MockGuest::new();
         let address_space = guest.address_space();
         Ok((guest, address_space))
@@ -156,36 +178,23 @@ pub mod testing {
     /// The default callable used to implement [Hypervisor::allocate_memory] for [MockHypervisor].
     ///
     /// This wraps [zx::Vmo::create].
-    pub fn default_allocate_memory(bytes: u64) -> Result<zx::Vmo, zx::Status> {
+    pub fn mock_allocate_memory(bytes: u64) -> Result<zx::Vmo, zx::Status> {
         zx::Vmo::create(bytes)
     }
 
     impl MockHypervisor {
         pub fn new() -> Self {
-            Self {
-                inner: Arc::new(Mutex::new(MockHypervisorState {
-                    on_guest_create: Box::new(default_guest_create),
-                    on_allocate_memory: Box::new(default_allocate_memory),
-                })),
-            }
+            Self { inner: Arc::new(Mutex::new(Default::default())) }
         }
 
-        /// Provide a callable that will be invoked as part of the implementation of
-        /// [Hypervisor::allocate_memory].
-        pub fn on_allocate_memory<F>(&self, f: F)
-        where
-            F: Fn(u64) -> Result<zx::Vmo, zx::Status> + Send + 'static,
-        {
-            self.inner.lock().on_allocate_memory = Box::new(f);
+        /// Specify the behavior of [MockHypervisor] when [Hypervisor::allocate_memory] is called.
+        pub fn on_allocate_memory(&self, behavior: MockBehavior) {
+            self.inner.lock().on_allocate_memory = behavior;
         }
 
-        /// Provide a callable that will be invoked as part of the implementation of
-        /// [Hypervisor::guest_create].
-        pub fn on_guest_create<F>(&self, f: F)
-        where
-            F: Fn() -> Result<(MockGuest, MockAddressSpace), zx::Status> + Send + 'static,
-        {
-            self.inner.lock().on_guest_create = Box::new(f);
+        /// Specify the behavior of [MockHypervisor] when [Hypervisor::guest_create] is called.
+        pub fn on_guest_create(&self, behavior: MockBehavior) {
+            self.inner.lock().on_guest_create = behavior;
         }
     }
 
@@ -198,11 +207,17 @@ pub mod testing {
         fn guest_create(
             &self,
         ) -> Result<(Self::GuestHandle, Self::AddressSpaceHandle), zx::Status> {
-            (self.inner.lock().on_guest_create)()
+            if let Some(status) = self.inner.lock().on_guest_create.return_error() {
+                return Err(status);
+            }
+            mock_guest_create()
         }
 
         fn allocate_memory(&self, bytes: u64) -> Result<zx::Vmo, zx::Status> {
-            (self.inner.lock().on_allocate_memory)(bytes)
+            if let Some(status) = self.inner.lock().on_allocate_memory.return_error() {
+                return Err(status);
+            }
+            mock_allocate_memory(bytes)
         }
 
         fn vcpu_create(
