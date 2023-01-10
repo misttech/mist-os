@@ -19,6 +19,7 @@ Usage:
   i2cutil read <device> <address> [<address>...]
   i2cutil write <device> <address> [<address>...] <data> [<data>...]
   i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
+  i2cutil list
   i2cutil ping
   i2cutil help
 )""";
@@ -39,6 +40,7 @@ Commands:
                         and <address>.
   transact | t          Perform a transaction with multiple segments. Each segment
                         can be a write (`w`) or a read (`r`).
+  list | l              List all the I2C devices available on the system.
   ping | p              Ping all I2C devices under devfs path `/dev/class/i2c` by
                         reading from each device's 0x00 address.
   help | h              Print this help text.
@@ -79,12 +81,20 @@ Examples:
   Error ZX_ERR_TIMED_OUT
   /dev/class/i2c/825: ERROR
 
+  List all I2C devices:
+  $ i2cutil list
+  159: pmic
+  160: (ANONYMOUS)
+  161: temp_sensor
+
 Notes:
   Source code for `i2cutil`: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/i2c/bin/i2cutil.cc
 )""";
 // LINT.ThenChange(//docs/reference/tools/hardware/i2cutil.md)
 
 namespace {
+
+constexpr char kI2cDevicePath[] = "/dev/class/i2c";
 
 void usage(bool show_details) {
   printf(kUsageSummary);
@@ -114,8 +124,6 @@ void printTransactions(const std::vector<i2cutil::TransactionData>& transactions
 }
 
 zx_status_t ping() {
-  constexpr char kI2cDevicePath[] = "/dev/class/i2c";
-
   for (auto& dev_path : std::filesystem::directory_iterator(kI2cDevicePath)) {
     i2cutil::TransactionData wr;
     wr.type = i2cutil::TransactionType::Write;
@@ -139,6 +147,41 @@ zx_status_t ping() {
     }
 
     printf("%s: OK\n", dev_path.path().c_str());
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t list() {
+  for (auto& dev_path : std::filesystem::directory_iterator(kI2cDevicePath)) {
+    zx::result device = component::Connect<fuchsia_hardware_i2c::Device>(dev_path.path().c_str());
+    if (device.is_error()) {
+      printf("%s: ERROR (%s)\n", dev_path.path().filename().c_str(), device.status_string());
+      continue;
+    }
+
+    // Try to get the name of the device.
+    const fidl::WireResult result = fidl::WireCall(device.value())->GetName();
+    if (!result.ok()) {
+      printf("%s: ERROR (%s)\n", dev_path.path().filename().c_str(), result.status_string());
+      continue;
+    }
+
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      if (response.error_value() == ZX_ERR_NOT_SUPPORTED) {
+        // ZX_ERR_NOT_SUPPORTED is part of the i2c.fidl contract and means that
+        // the device did not return a friendly name.
+        printf("%s: (ANONYMOUS)\n", dev_path.path().filename().c_str());
+      } else {
+        printf("%s: ERROR (%s)\n", dev_path.path().filename().c_str(),
+               zx_status_get_string(response.error_value()));
+      }
+      continue;
+    }
+
+    const std::string name(response.value()->name.get());
+    printf("%s: %s\n", dev_path.path().filename().c_str(), name.c_str());
   }
 
   return ZX_OK;
@@ -172,6 +215,8 @@ int main(int argc, const char* argv[]) {
     printTransactions(args->Transactions());
   } else if (args->Op() == i2cutil::I2cOp::Ping) {
     return ping() == ZX_OK ? 0 : -1;
+  } else if (args->Op() == i2cutil::I2cOp::List) {
+    return list() == ZX_OK ? 0 : -1;
   } else if (args->Op() == i2cutil::I2cOp::Help) {
     usage(true);
   } else {

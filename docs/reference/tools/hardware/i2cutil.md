@@ -14,6 +14,7 @@ List, read from, and write to I2C devices.
 i2cutil read <device> <address> [<address>...]
 i2cutil write <device> <address> [<address>...] <data> [<data>...]
 i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
+i2cutil list
 i2cutil ping
 i2cutil help
 ```
@@ -54,6 +55,16 @@ i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
 
 Perform a transaction with multiple segments. Each segment can be a write
 (`w`) or a read (`r`).
+
+
+### list {#list}
+
+```none
+i2cutil list
+```
+
+Lists all I2C devices available on the system. The friendly name of the device will
+also be listed if one is provided. Otherwise the device will appear as `(ANONYMOUS)`.
 
 ### ping {#ping}
 
@@ -146,6 +157,18 @@ $ i2cutil ping
 /dev/class/i2c/824: OK
 Error ZX_ERR_TIMED_OUT
 /dev/class/i2c/825: ERROR
+```
+
+### List all I2C devices
+
+List all I2C devices on the system along with their friendly names if one is available.
+
+```none
+$ i2cutil list
+378: temp_sensor
+379: (ANONYMOUS)
+380: humidity_sensor
+381: pmic
 ```
 
 ## Notes

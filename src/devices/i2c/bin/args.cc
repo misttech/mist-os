@@ -23,12 +23,12 @@ constexpr size_t kVargs = 3;    // Variable arguments (data / parameters follow)
 
 const std::map<char, i2cutil::I2cOp> kOrdinalToOperation = {
     {'r', i2cutil::I2cOp::Read}, {'w', i2cutil::I2cOp::Write}, {'t', i2cutil::I2cOp::Transact},
-    {'p', i2cutil::I2cOp::Ping}, {'h', i2cutil::I2cOp::Help},
+    {'l', i2cutil::I2cOp::List}, {'p', i2cutil::I2cOp::Ping},  {'h', i2cutil::I2cOp::Help},
 };
 
 const std::map<i2cutil::I2cOp, int> kOperationToMinArgCount = {
     {i2cutil::I2cOp::Read, 4}, {i2cutil::I2cOp::Write, 4}, {i2cutil::I2cOp::Transact, 5},
-    {i2cutil::I2cOp::Ping, 2}, {i2cutil::I2cOp::Help, 2},
+    {i2cutil::I2cOp::List, 2}, {i2cutil::I2cOp::Ping, 2},  {i2cutil::I2cOp::Help, 2},
 };
 
 std::string inferPath(const char* arg) {
