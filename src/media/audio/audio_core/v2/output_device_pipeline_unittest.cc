@@ -57,7 +57,7 @@ struct TestHarness {
   ReferenceClock reference_clock;
 
   TestEffectsV2 effects;
-  std::unique_ptr<EffectsLoaderV2> effects_loader;
+  std::shared_ptr<EffectsLoaderV2> effects_loader;
 };
 
 TestHarness::TestHarness() {

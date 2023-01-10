@@ -49,7 +49,7 @@ struct StateForCreate {
   async_dispatcher_t* dispatcher;
   ThreadId thread;
   ReferenceClock reference_clock;
-  std::unique_ptr<media::audio::EffectsLoaderV2> effects_loader;
+  std::shared_ptr<media::audio::EffectsLoaderV2> effects_loader;
   std::shared_ptr<TaskBarrier> barrier;
 };
 

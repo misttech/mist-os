@@ -230,7 +230,7 @@ std::shared_ptr<OutputPipeline> OutputPipelineBenchmark::CreateOutputPipeline(
                                               ref_time_to_frac_presentation_frame, device_clock);
 }
 
-std::unique_ptr<EffectsLoaderV2> OutputPipelineBenchmark::CreateEffectsLoaderV2(
+std::shared_ptr<EffectsLoaderV2> OutputPipelineBenchmark::CreateEffectsLoaderV2(
     sys::ComponentContext& context) {
   auto result = EffectsLoaderV2::CreateFromContext(context);
   if (result.is_ok()) {

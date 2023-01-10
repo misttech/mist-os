@@ -10,6 +10,7 @@
 #include <lib/sys/cpp/component_context.h>
 #include <zircon/types.h>
 
+#include <memory>
 #include <string>
 
 namespace media::audio {
@@ -17,11 +18,11 @@ namespace media::audio {
 class EffectsLoaderV2 {
  public:
   // Creates a effects loader from the global namespace.
-  static fpromise::result<std::unique_ptr<EffectsLoaderV2>, zx_status_t> CreateFromContext(
+  static fpromise::result<std::shared_ptr<EffectsLoaderV2>, zx_status_t> CreateFromContext(
       const sys::ComponentContext& component_context);
 
   // Creates an effects loader from the given FIDL channel.
-  static fpromise::result<std::unique_ptr<EffectsLoaderV2>, zx_status_t> CreateFromChannel(
+  static fpromise::result<std::shared_ptr<EffectsLoaderV2>, zx_status_t> CreateFromChannel(
       fidl::ClientEnd<fuchsia_audio_effects::ProcessorCreator> creator);
 
   // Get a ProcessorConfiguration for the effect with the given name.

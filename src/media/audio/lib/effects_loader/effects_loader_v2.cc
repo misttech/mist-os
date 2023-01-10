@@ -13,7 +13,7 @@
 
 namespace media::audio {
 
-fpromise::result<std::unique_ptr<EffectsLoaderV2>, zx_status_t> EffectsLoaderV2::CreateFromContext(
+fpromise::result<std::shared_ptr<EffectsLoaderV2>, zx_status_t> EffectsLoaderV2::CreateFromContext(
     const sys::ComponentContext& component_context) {
   TRACE_DURATION("audio", "EffectsLoaderV2::CreateFromContext");
   auto svc =
@@ -26,10 +26,10 @@ fpromise::result<std::unique_ptr<EffectsLoaderV2>, zx_status_t> EffectsLoaderV2:
   return CreateFromChannel(std::move(*client_end));
 }
 
-fpromise::result<std::unique_ptr<EffectsLoaderV2>, zx_status_t> EffectsLoaderV2::CreateFromChannel(
+fpromise::result<std::shared_ptr<EffectsLoaderV2>, zx_status_t> EffectsLoaderV2::CreateFromChannel(
     fidl::ClientEnd<fuchsia_audio_effects::ProcessorCreator> creator) {
   TRACE_DURATION("audio", "EffectsLoaderV2::CreateFromChannel");
-  return fpromise::ok(std::unique_ptr<EffectsLoaderV2>(new EffectsLoaderV2(std::move(creator))));
+  return fpromise::ok(std::shared_ptr<EffectsLoaderV2>(new EffectsLoaderV2(std::move(creator))));
 }
 
 fidl::WireResult<fuchsia_audio_effects::ProcessorCreator::Create>

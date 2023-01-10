@@ -24,7 +24,7 @@
 namespace media::audio {
 namespace {
 
-std::unique_ptr<EffectsLoaderV2> CreateEffectsLoaderV2(
+std::shared_ptr<EffectsLoaderV2> CreateEffectsLoaderV2(
     const sys::ComponentContext& component_context) {
   auto result = EffectsLoaderV2::CreateFromContext(component_context);
   if (result.is_ok()) {
@@ -131,7 +131,7 @@ class ContextImpl : public Context {
 
   LinkMatrix link_matrix_;
   RouteGraph route_graph_;
-  std::unique_ptr<EffectsLoaderV2> effects_loader_v2_;
+  std::shared_ptr<EffectsLoaderV2> effects_loader_v2_;
 
   // Manages clock creation.
   std::shared_ptr<AudioCoreClockFactory> clock_factory_;

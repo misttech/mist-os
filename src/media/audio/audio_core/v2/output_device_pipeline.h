@@ -49,7 +49,7 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
     media::audio::DeviceConfig::OutputDeviceProfile config;
 
     // For loading effects configs.
-    std::unique_ptr<media::audio::EffectsLoaderV2> effects_loader;
+    std::shared_ptr<media::audio::EffectsLoaderV2> effects_loader;
 
     // Callback invoked after the pipeline is constructed.
     fit::callback<void(std::shared_ptr<OutputDevicePipeline>)> callback;

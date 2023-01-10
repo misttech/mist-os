@@ -69,7 +69,7 @@ class OutputPipelineBenchmark {
 
  private:
   static ProcessConfig LoadProcessConfigOrDie();
-  static std::unique_ptr<EffectsLoaderV2> CreateEffectsLoaderV2(sys::ComponentContext& context);
+  static std::shared_ptr<EffectsLoaderV2> CreateEffectsLoaderV2(sys::ComponentContext& context);
   static std::shared_ptr<OutputPipeline> CreateOutputPipeline(const ProcessConfig& process_config,
                                                               std::shared_ptr<Clock> device_clock,
                                                               EffectsLoaderV2* effects_loader_v2);
@@ -82,7 +82,7 @@ class OutputPipelineBenchmark {
 
   sys::ComponentContext& context_;
   ProcessConfig process_config_;
-  std::unique_ptr<EffectsLoaderV2> effects_loader_v2_;
+  std::shared_ptr<EffectsLoaderV2> effects_loader_v2_;
   std::shared_ptr<OutputPipeline> output_pipeline_;
 };
 
