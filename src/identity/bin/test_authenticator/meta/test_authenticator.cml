@@ -5,7 +5,7 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/dev_authenticator",
+        binary: "bin/test_authenticator",
     },
     capabilities: [
         {

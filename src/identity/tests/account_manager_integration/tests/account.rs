@@ -34,7 +34,7 @@ use {
 /// Type alias for the LocalAccountId FIDL type
 type LocalAccountId = u64;
 
-const DEV_AUTHENTICATOR_URL: &str = "#meta/dev_authenticator.cm";
+const TEST_AUTHENTICATOR_URL: &str = "#meta/test_authenticator.cm";
 
 const ACCOUNT_MANAGER_URL: &str = "#meta/account_manager.cm";
 
@@ -257,15 +257,16 @@ async fn create_account_manager() -> Result<Arc<Mutex<NestedAccountManagerProxy>
     builder.driver_test_realm_setup().await.unwrap();
     let account_manager =
         builder.add_child("account_manager", ACCOUNT_MANAGER_URL, ChildOptions::new()).await?;
-    let dev_authenticator =
-        builder.add_child("dev_authenticator", DEV_AUTHENTICATOR_URL, ChildOptions::new()).await?;
+    let test_authenticator = builder
+        .add_child("test_authenticator", TEST_AUTHENTICATOR_URL, ChildOptions::new())
+        .await?;
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name(
                     "fuchsia.identity.authentication.TestStorageUnlockMechanism",
                 ))
-                .from(&dev_authenticator)
+                .from(&test_authenticator)
                 .to(&account_manager),
         )
         .await?;

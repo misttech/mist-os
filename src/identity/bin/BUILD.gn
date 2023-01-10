@@ -11,8 +11,8 @@ group("bin") {
     "account",
     "account_handler",
     "account_manager",
-    "dev_authenticator",
     "password_authenticator",
+    "test_authenticator",
   ]
 }
 
@@ -34,15 +34,15 @@ fuchsia_unittest_component("account_manager_test") {
   manifest = "meta/account_manager_bin_test.cml"
 }
 
-fuchsia_unittest_component("dev_authenticator_test") {
-  deps = [ "dev_authenticator:bin_test" ]
+fuchsia_unittest_component("test_authenticator_test") {
+  deps = [ "test_authenticator:bin_test" ]
 }
 
 fuchsia_test_package("identity_bin_unittests") {
   test_components = [
     ":account_handler_test",
     ":account_manager_test",
-    ":dev_authenticator_test",
+    ":test_authenticator_test",
   ]
 }
 

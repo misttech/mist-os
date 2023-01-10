@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Dev authenticator is a test-only authenticator that produces fake authentication
+//! Test authenticator is a test-only authenticator that produces fake authentication
 //! events to be consumed by identity components during tests.
 
 #![warn(clippy::all)]
@@ -19,9 +19,9 @@ use {
     tracing::{error, info},
 };
 
-#[fuchsia::main(logging_tags = ["identity", "dev_authenticator"])]
+#[fuchsia::main(logging_tags = ["identity", "test_authenticator"])]
 async fn main() -> Result<(), Error> {
-    info!("Starting dev authenticator");
+    info!("Starting test authenticator");
 
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(move |stream| {
