@@ -136,6 +136,9 @@ void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::option
   // device and the CPU)
   context->trb = trb;
   state->pending_operations.push_back(std::move(context));
+
+  // slot must exist in device_state_ so it's reported as connected.
+  device_state_[slot - 1] = fbl::MakeRefCounted<DeviceState>(this);
 }
 
 std::optional<usb_speed_t> UsbXhci::GetDeviceSpeed(uint8_t slot) {
@@ -334,7 +337,7 @@ int UsbXhci::InitThread() {
   invalid_mmio.size = 4;
   interrupters_[0].Start(RuntimeRegisterOffset::Get().FromValue(0),
                          fdf::MmioView(invalid_mmio, 0, 1));
-  device_state_ = fbl::MakeArray<DeviceState>(32);
+  device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(32);
   return 0;
 }
 
@@ -358,6 +361,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupte
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
+DeviceState::~DeviceState() = default;
+
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {}
 
 class EnumerationTests : public zxtest::Test {
@@ -369,6 +374,25 @@ class EnumerationTests : public zxtest::Test {
   TestState& state() { return state_; }
 
   UsbXhci& controller() { return controller_; }
+
+  std::optional<HubInfo> TestHubInfo(uint8_t hub_depth, uint8_t hub_slot, uint8_t hub_port,
+                                     usb_speed_t speed, bool multi_tt) {
+    auto hub_state = fbl::MakeRefCounted<DeviceState>(&controller_);
+    {
+      fbl::AutoLock _(&hub_state->transaction_lock());
+      hub_state->SetDeviceInformation(hub_slot, hub_port, std::nullopt);
+    }
+    return HubInfo(std::move(hub_state), hub_depth, speed, multi_tt);
+  }
+
+  void VerifyHubInfo(std::optional<HubInfo>& hub_info, uint8_t hub_depth, uint8_t hub_slot,
+                     uint8_t hub_port, usb_speed_t speed, bool multi_tt) {
+    ASSERT_EQ(hub_info->hub_depth, hub_depth);
+    ASSERT_EQ(hub_info->hub_state->GetSlot(), hub_slot);
+    ASSERT_EQ(hub_info->hub_state->GetPort(), hub_port);
+    ASSERT_EQ(hub_info->hub_speed, speed);
+    ASSERT_EQ(hub_info->multi_tt, multi_tt);
+  }
 
  private:
   TestState state_;
@@ -402,15 +426,12 @@ TEST_F(EnumerationTests, EnableSlotCommandReturnsIOErrorOnFailure) {
 TEST_F(EnumerationTests, EnableSlotCommandSetsDeviceInformationOnSuccess) {
   constexpr uint8_t kPort = 5;
   constexpr uint8_t kHubDepth = 52;
-  constexpr uint8_t kHubId = 28;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_HIGH;
   constexpr bool kMultiTT = false;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = kHubDepth;
-  hub_info->hub_id = kHubId;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = kMultiTT;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info));
+  auto enumeration_task = EnumerateDevice(
+      &controller(), kPort, TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT));
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -422,10 +443,7 @@ TEST_F(EnumerationTests, EnableSlotCommandSetsDeviceInformationOnSuccess) {
   controller().RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 1);
   controller().RunUntilIdle(0);
@@ -437,24 +455,22 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
   // EnableSlot
   constexpr uint8_t kPort = 5;
   constexpr uint8_t kHubDepth = 52;
-  constexpr uint8_t kHubId = 28;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_HIGH;
   constexpr bool kMultiTT = false;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = kHubDepth;
-  hub_info->hub_id = kHubId;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<void, zx_status_t>& result) {
-                                if (result.is_ok()) {
-                                  completion_code = ZX_OK;
-                                } else {
-                                  completion_code = result.error();
-                                }
-                                return result;
-                              });
+  auto enumeration_task =
+      EnumerateDevice(&controller(), kPort,
+                      TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
+          .then([&](fpromise::result<void, zx_status_t>& result) {
+            if (result.is_ok()) {
+              completion_code = ZX_OK;
+            } else {
+              completion_code = result.error();
+            }
+            return result;
+          });
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -466,10 +482,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
   controller().RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 1);
   controller().RunUntilIdle(0);
@@ -480,10 +493,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_EQ(address_device_op->slot, 1);
   ASSERT_EQ(address_device_op->port, kPort);
-  ASSERT_EQ(address_device_op->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(address_device_op->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(address_device_op->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(address_device_op->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   address_device->completer->complete_error(ZX_ERR_IO_OVERRUN);
   controller().RunUntilIdle(0);
   auto disable_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
@@ -496,24 +506,22 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
   // EnableSlot
   constexpr uint8_t kPort = 5;
   constexpr uint8_t kHubDepth = 52;
-  constexpr uint8_t kHubId = 28;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_HIGH;
   constexpr bool kMultiTT = false;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = kHubDepth;
-  hub_info->hub_id = kHubId;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<void, zx_status_t>& result) {
-                                if (result.is_ok()) {
-                                  completion_code = ZX_OK;
-                                } else {
-                                  completion_code = result.error();
-                                }
-                                return result;
-                              });
+  auto enumeration_task =
+      EnumerateDevice(&controller(), kPort,
+                      TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
+          .then([&](fpromise::result<void, zx_status_t>& result) {
+            if (result.is_ok()) {
+              completion_code = ZX_OK;
+            } else {
+              completion_code = result.error();
+            }
+            return result;
+          });
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -525,10 +533,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
   controller().RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 1);
   controller().RunUntilIdle(0);
@@ -539,10 +544,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_EQ(address_device_op->slot, 1);
   ASSERT_EQ(address_device_op->port, kPort);
-  ASSERT_EQ(address_device_op->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(address_device_op->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(address_device_op->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(address_device_op->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Stopped);
   address_device->completer->complete_ok(address_device_op.get());
@@ -557,25 +559,23 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   // EnableSlot
   constexpr uint8_t kPort = 5;
   constexpr uint8_t kHubDepth = 52;
-  constexpr uint8_t kHubId = 28;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_HIGH;
   constexpr bool kMultiTT = false;
   state().speeds[0] = kSpeed;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = kHubDepth;
-  hub_info->hub_id = kHubId;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = kMultiTT;
   zx_status_t completion_code = -1;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<void, zx_status_t>& result) {
-                                if (result.is_ok()) {
-                                  completion_code = ZX_OK;
-                                } else {
-                                  completion_code = result.error();
-                                }
-                                return result;
-                              });
+  auto enumeration_task =
+      EnumerateDevice(&controller(), kPort,
+                      TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
+          .then([&](fpromise::result<void, zx_status_t>& result) {
+            if (result.is_ok()) {
+              completion_code = ZX_OK;
+            } else {
+              completion_code = result.error();
+            }
+            return result;
+          });
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -587,10 +587,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   controller().RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 1);
 
@@ -600,10 +597,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_EQ(address_device_op->slot, 1);
   ASSERT_EQ(address_device_op->port, kPort);
-  ASSERT_EQ(address_device_op->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(address_device_op->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(address_device_op->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(address_device_op->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   address_device->completer->complete_ok(address_device_op.get());
@@ -666,25 +660,24 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   // EnableSlot
   constexpr uint8_t kPort = 5;
   constexpr uint8_t kHubDepth = 52;
-  constexpr uint8_t kHubId = 28;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_FULL;
+  constexpr bool kMultiTT = false;
   state().speeds[0] = kSpeed;
   state().speeds[1] = kSpeed;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = kHubDepth;
-  hub_info->hub_id = kHubId;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = false;
   zx_status_t completion_code = -1;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info))
-                              .then([&](fpromise::result<void, zx_status_t>& result) {
-                                if (result.is_ok()) {
-                                  completion_code = ZX_OK;
-                                } else {
-                                  completion_code = result.error();
-                                }
-                                return result;
-                              });
+  auto enumeration_task =
+      EnumerateDevice(&controller(), kPort,
+                      TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
+          .then([&](fpromise::result<void, zx_status_t>& result) {
+            if (result.is_ok()) {
+              completion_code = ZX_OK;
+            } else {
+              completion_code = result.error();
+            }
+            return result;
+          });
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -696,10 +689,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   controller().RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 1);
 
@@ -709,10 +699,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_EQ(address_device_op->slot, 1);
   ASSERT_EQ(address_device_op->port, kPort);
-  ASSERT_EQ(address_device_op->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(address_device_op->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(address_device_op->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(address_device_op->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::UsbTransactionError);
   address_device->completer->complete_ok(address_device_op.get());
@@ -741,10 +728,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   // Set device information
   device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(device_information->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(device_information->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(device_information->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
   ASSERT_EQ(device_information->slot, 2);
   controller().RunUntilIdle(0);
@@ -756,10 +740,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   ASSERT_TRUE(address_device_op->bsr);
   ASSERT_EQ(address_device_op->slot, 2);
   ASSERT_EQ(address_device_op->port, kPort);
-  ASSERT_EQ(address_device_op->hub_info->hub_depth, hub_info->hub_depth);
-  ASSERT_EQ(address_device_op->hub_info->hub_id, hub_info->hub_id);
-  ASSERT_EQ(address_device_op->hub_info->hub_speed, hub_info->hub_speed);
-  ASSERT_EQ(address_device_op->hub_info->multi_tt, hub_info->multi_tt);
+  VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   address_device->completer->complete_ok(address_device_op.get());
@@ -873,24 +854,25 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
 }
 
 TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
+  constexpr uint8_t kHubDepth = 52;
+  constexpr uint8_t kHubSlot = 28;
+  constexpr uint8_t kHubPort = 39;
   constexpr usb_speed_t kSpeed = USB_SPEED_FULL;
+  constexpr bool kMultiTT = false;
   state().speeds[0] = kSpeed;
   state().speeds[1] = kSpeed;
-  std::optional<HubInfo> hub_info;
-  hub_info->hub_depth = 52;
-  hub_info->hub_id = 28;
-  hub_info->hub_speed = kSpeed;
-  hub_info->multi_tt = false;
   zx_status_t completion_code = ZX_OK;
-  auto enumeration_task = EnumerateDevice(&controller(), 5, std::move(hub_info))
-                              .then([&](fpromise::result<void, zx_status_t>& result) {
-                                if (result.is_ok()) {
-                                  completion_code = ZX_OK;
-                                } else {
-                                  completion_code = result.error();
-                                }
-                                return result;
-                              });
+  auto enumeration_task =
+      EnumerateDevice(&controller(), 5,
+                      TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
+          .then([&](fpromise::result<void, zx_status_t>& result) {
+            if (result.is_ok()) {
+              completion_code = ZX_OK;
+            } else {
+              completion_code = result.error();
+            }
+            return result;
+          });
 
   // Enable slot.
   auto enable_slot_task = state().pending_operations.pop_front();

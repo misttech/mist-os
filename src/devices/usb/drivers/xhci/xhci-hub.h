@@ -14,6 +14,9 @@
 
 namespace usb_xhci {
 
+// Declare DeviceState. Will be defined in xhci-device-state.h
+class DeviceState;
+
 // Record of the information needed to set up devices behind a TT. See comments within struct for
 // required information.
 struct tt_info_t {
@@ -28,7 +31,13 @@ struct tt_info_t {
 // This does need to be arena-allocated since it is freed in interrupt context
 // and we don't have a context-aware allocator.
 struct HubInfo {
-  uint8_t hub_id = 0;
+  HubInfo() = default;
+  // For testing
+  HubInfo(fbl::RefPtr<DeviceState> hub_state, uint8_t hub_depth, usb_speed_t hub_speed,
+          bool multi_tt)
+      : hub_state(hub_state), hub_depth(hub_depth), hub_speed(hub_speed), multi_tt(multi_tt) {}
+
+  fbl::RefPtr<DeviceState> hub_state;
   usb_speed_t speed = 0;
   uint32_t route_string = 0;
   uint8_t hub_depth = 0;

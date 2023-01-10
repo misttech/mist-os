@@ -710,7 +710,11 @@ void EventRing::HandleTransferInterrupt() {
   auto transfer_event = static_cast<TransferEvent*>(erdp_virt_);
   transfer_event_->Insert(transfer_event->CompletionCode());
 
-  auto device_state = &hci_->GetDeviceState()[transfer_event->SlotID() - 1];
+  auto device_state = hci_->GetDeviceState()[transfer_event->SlotID() - 1];
+  if (!device_state) {
+    zxlogf(WARNING, "Device state invalid");
+    return;
+  }
   fbl::AutoLock l(&device_state->transaction_lock());
   if (!device_state->IsValid()) {
     zxlogf(WARNING, "Device state invalid");

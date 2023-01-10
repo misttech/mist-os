@@ -217,8 +217,9 @@ class EventRingHarness : public zxtest::Test {
   void InitSlot(uint8_t i) {
     // Enable SlotID i for testing with arbitrary port 1.
     auto& state = hci_.GetDeviceState()[i - 1];
-    fbl::AutoLock _(&state.transaction_lock());
-    state.SetDeviceInformation(i, 1, std::nullopt);
+    ASSERT_NOT_NULL(state);
+    fbl::AutoLock _(&state->transaction_lock());
+    state->SetDeviceInformation(i, 1, std::nullopt);
   }
 
  private:
@@ -259,15 +260,16 @@ zx_status_t UsbXhci::InitThread() {
     return ZX_ERR_NO_MEMORY;
   }
   max_slots_ = 32;
-  device_state_ = fbl::MakeArray<DeviceState>(&ac, max_slots_);
+  device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(&ac, max_slots_);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   for (size_t i = 0; i < max_slots_; i++) {
-    fbl::AutoLock l(&device_state_[i].transaction_lock());
+    device_state_[i] = fbl::MakeRefCounted<DeviceState>(nullptr);
+    fbl::AutoLock l(&device_state_[i]->transaction_lock());
     for (size_t c = 0; c < max_slots_; c++) {
-      device_state_[i].GetTransferRing(c).Init(zx_system_get_page_size(), kFakeBti, nullptr, false,
-                                               nullptr, *this);
+      device_state_[i]->GetTransferRing(c).Init(zx_system_get_page_size(), kFakeBti, nullptr, false,
+                                                nullptr, *this);
     }
   }
   port_state_ = fbl::MakeArray<PortState>(&ac, 32);
@@ -383,6 +385,8 @@ TRB* TransferRing::PhysToVirt(zx_paddr_t paddr) {
 zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* context) {
   return static_cast<EventRingHarness*>(hci_->GetTestHarness())->CompleteTRB(trb, context);
 }
+
+DeviceState::~DeviceState() = default;
 
 TEST_F(EventRingHarness, ShortTransferTest) {
   InitSlot(1);

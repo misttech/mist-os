@@ -859,9 +859,10 @@ TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
   uint64_t paddr;
   {
     auto& state = device_->GetDeviceState()[0];
-    fbl::AutoLock _(&state.transaction_lock());
-    state.GetTransferRing(0).set_stall(true);
-    paddr = state.GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
+    ASSERT_NOT_NULL(state);
+    fbl::AutoLock _(&state->transaction_lock());
+    state->GetTransferRing(0).set_stall(true);
+    paddr = state->GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
   }
   zx_status_t cancel_status;
   auto cr = FakeTRB::get(crcr()->next);
@@ -897,9 +898,10 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
   uint64_t paddr;
   {
     auto& state = device_->GetDeviceState()[0];
-    fbl::AutoLock l(&state.transaction_lock());
-    state.GetTransferRing(0).set_stall(true);
-    paddr = state.GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
+    ASSERT_NOT_NULL(state);
+    fbl::AutoLock l(&state->transaction_lock());
+    state->GetTransferRing(0).set_stall(true);
+    paddr = state->GetTransferRing(0).PeekCommandRingControlRegister(0).value().reg_value();
   }
   zx_status_t reset_status;
   auto cr = FakeTRB::get(crcr()->next);
@@ -949,8 +951,9 @@ TEST_F(XhciMmioHarness, ResetEndpointFailsIfNotStalled) {
   EnableEndpoint(0, 1, true);
   {
     auto& state = device_->GetDeviceState()[0];
-    fbl::AutoLock l(&state.transaction_lock());
-    state.GetTransferRing(0).set_stall(false);
+    ASSERT_NOT_NULL(state);
+    fbl::AutoLock l(&state->transaction_lock());
+    state->GetTransferRing(0).set_stall(false);
   }
   ASSERT_EQ(ResetEndpointCommand(0, 1), ZX_ERR_INVALID_ARGS);
 }

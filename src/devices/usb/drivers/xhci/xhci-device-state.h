@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_DEVICE_STATE_H_
 
 #include <lib/inspect/cpp/vmo/types.h>
+#include <lib/sync/completion.h>
 
 #include <optional>
 
@@ -18,21 +19,20 @@ namespace usb_xhci {
 // The maximum number of endpoints a USB device can support
 constexpr size_t kMaxEndpoints = 32;
 
-class DeviceState {
+// DeviceState is RefCounted. The device itself holds a reference to DeviceState and all its direct
+// descendents (if the device is a hub) hold references to DeviceState. DeviceState calls its
+// destructor when all references to it is released (see comment in destructor).
+// In further detail:
+// DeviceState is created when a slot is assigned. A reference is added when a slot is assigned or
+// there are any direct descendents that will reference it (In other words, this device is a hub.
+// One reference is added per device connected to the hub). A reference is removed when one of its
+// descendents is removed or when the hub itself is removed.
+class DeviceState : public fbl::RefCounted<DeviceState> {
  public:
-  void Disconnect() __TA_REQUIRES(transaction_lock_) { disconnecting_ = true; }
+  explicit DeviceState(UsbXhci* hci) : hci_(hci) {}
+  ~DeviceState();
 
-  void Reset() __TA_REQUIRES(transaction_lock_) {
-    disconnecting_ = true;
-    input_context_.reset();
-    device_context_.reset();
-    slot_ = 0;
-    hub_.reset();
-    tr_.Deinit();
-    for (size_t i = 0; i < kMaxEndpoints; i++) {
-      rings_[i].DeinitIfActive();
-    }
-  }
+  void Disconnect() __TA_REQUIRES(transaction_lock_) { disconnecting_ = true; }
 
   void SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub)
       __TA_REQUIRES(transaction_lock_) {
@@ -45,11 +45,11 @@ class DeviceState {
   // True if the device state has been initialized, false otherwise.
   bool IsValid() const { return slot_; }
 
-  uint8_t GetPort() { return port_; }
+  uint8_t GetPort() const { return port_; }
 
-  uint8_t GetSlot() { return slot_; }
+  uint8_t GetSlot() const { return slot_; }
 
-  uint16_t GetInterrupterTarget() { return interrupter_target_; }
+  uint16_t GetInterrupterTarget() const { return interrupter_target_; }
 
   std::optional<HubInfo>& GetHubLocked() __TA_REQUIRES(transaction_lock_) { return hub_; }
 
@@ -58,7 +58,7 @@ class DeviceState {
     return hub_;
   }
 
-  bool IsDisconnecting() __TA_REQUIRES(transaction_lock_) { return disconnecting_; }
+  bool IsDisconnecting() const __TA_REQUIRES(transaction_lock_) { return disconnecting_; }
 
   TransferRing& GetTransferRing() __TA_REQUIRES(transaction_lock_) { return tr_; }
 
@@ -99,6 +99,7 @@ class DeviceState {
                                             std::unique_ptr<dma_buffer::PagedBuffer>* out)
       __TA_REQUIRES(transaction_lock_);
 
+  UsbXhci* hci_;
   uint8_t slot_ = 0;
   uint8_t port_ = 0;
   uint16_t interrupter_target_;

@@ -8,6 +8,30 @@
 
 namespace usb_xhci {
 
+DeviceState::~DeviceState() {
+  // Each DeviceState corresponds to one slot. When the device is removed, we should call
+  // DisableSlotCommand on the corresponding slot.
+  if (hci_) {
+    auto status =
+        hci_->RunSynchronously(kPrimaryInterrupter, hci_->DisableSlotCommand(*this).box());
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Could not DisableSlot for %u on DeviceState destruction %d", GetSlot(),
+             status);
+    }
+  }
+
+  fbl::AutoLock _(&transaction_lock_);
+  disconnecting_ = true;
+  input_context_.reset();
+  device_context_.reset();
+  slot_ = 0;
+  hub_.reset();
+  tr_.Deinit();
+  for (auto& ring : rings_) {
+    ring.DeinitIfActive();
+  }
+}
+
 zx_status_t DeviceState::InitializeSlotBuffer(const UsbXhci& hci, uint8_t slot_id, uint8_t port_id,
                                               const std::optional<HubInfo>& hub_info,
                                               std::unique_ptr<dma_buffer::PagedBuffer>* out) {
@@ -65,8 +89,8 @@ zx_status_t DeviceState::InitializeEndpointContext(const UsbXhci& hci, uint8_t s
     // TODO (fxbug.dev/34355): USB 3.1 support. Section 6.2.2
     if (((speed == USB_SPEED_LOW) || (speed == USB_SPEED_FULL)) &&
         (hub_info->hub_speed == USB_SPEED_HIGH)) {
-      hub_info->tt_info.emplace(tt_info_t{.tt_slot_id = hci.DeviceIdToSlotId(hub_info->hub_id),
-                                          .tt_port_number = port_id});
+      hub_info->tt_info.emplace(
+          tt_info_t{.tt_slot_id = hub_info->hub_state->GetSlot(), .tt_port_number = port_id});
     }
     if (hub_info->tt_info) {
       slot_context->set_PARENT_HUB_SLOT_ID(hub_info->tt_info->tt_slot_id)

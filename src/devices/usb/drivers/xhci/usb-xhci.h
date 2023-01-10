@@ -158,13 +158,17 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   // Returns whether or not a device is connected to the root hub.
   // Always returns true for devices attached via a hub.
   bool IsDeviceConnected(uint8_t slot) {
-    auto& state = device_state_[slot - 1];
-    fbl::AutoLock _(&state.transaction_lock());
-    return !state.IsDisconnecting();
+    auto state = device_state_[slot - 1];
+    if (!state) {
+      return false;
+    }
+    fbl::AutoLock _(&state->transaction_lock());
+    return !state->IsDisconnecting();
   }
 
   // Disables a slot
   fpromise::promise<void, zx_status_t> DisableSlotCommand(uint32_t slot_id);
+  fpromise::promise<void, zx_status_t> DisableSlotCommand(DeviceState& state);
 
   TRBPromise EnableSlotCommand();
 
@@ -208,7 +212,7 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
 
   CommandRing* GetCommandRing() { return &command_ring_; }
 
-  DeviceState* GetDeviceState() { return device_state_.get(); }
+  fbl::Array<fbl::RefPtr<DeviceState>>& GetDeviceState() { return device_state_; }
 
   PortState* GetPortState() { return port_state_.get(); }
   // Indicates whether or not the controller supports cache coherency
@@ -432,7 +436,7 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   RuntimeRegisterOffset runtime_offset_;
 
   // Status information on connected devices
-  fbl::Array<DeviceState> device_state_;
+  fbl::Array<fbl::RefPtr<DeviceState>> device_state_;
 
   // Status information for each port in the system
   fbl::Array<PortState> port_state_;

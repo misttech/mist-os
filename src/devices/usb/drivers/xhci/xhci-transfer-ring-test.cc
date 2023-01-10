@@ -110,14 +110,15 @@ zx_status_t UsbXhci::InitThread() {
     return ZX_ERR_NO_MEMORY;
   }
   max_slots_ = 32;
-  device_state_ = fbl::MakeArray<DeviceState>(&ac, max_slots_);
+  device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(&ac, max_slots_);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   for (size_t i = 0; i < max_slots_; i++) {
-    fbl::AutoLock l(&device_state_[i].transaction_lock());
+    device_state_[i] = fbl::MakeRefCounted<DeviceState>(this);
+    fbl::AutoLock l(&device_state_[i]->transaction_lock());
     for (size_t c = 0; c < max_slots_; c++) {
-      zx_status_t status = device_state_[i].GetTransferRing(c).Init(
+      zx_status_t status = device_state_[i]->GetTransferRing(c).Init(
           zx_system_get_page_size(), kFakeBti,
           &static_cast<TransferRingHarness*>(GetTestHarness())->event_ring(), false, nullptr,
           *this);
@@ -126,9 +127,9 @@ zx_status_t UsbXhci::InitThread() {
       }
     }
   }
-  fbl::AutoLock l(&device_state_[0].transaction_lock());
+  fbl::AutoLock l(&device_state_[0]->transaction_lock());
   static_cast<TransferRingHarness*>(GetTestHarness())
-      ->SetRing(&device_state_[0].GetTransferRing(0));
+      ->SetRing(&device_state_[0]->GetTransferRing(0));
   return ZX_OK;
 }
 
@@ -183,6 +184,8 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
                                                      std::optional<HubInfo> hub_info) {
   return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
 }
+
+DeviceState::~DeviceState() = default;
 
 TEST_F(TransferRingHarness, EmptyShortTransferTest) {
   auto ring = this->ring();
