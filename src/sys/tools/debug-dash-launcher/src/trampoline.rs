@@ -18,11 +18,11 @@ use vfs::directory::mutable::connection::io1::MutableConnection;
 use vfs::directory::simple::Simple;
 use vfs::file::vmo::asynchronous as vmo;
 
-// The location of the the binaries added as `--tools`. The path to the binary will be of the form:
-// `/.dash/tools/<package-name>/<binary-name>`.
+// The location of the added trampolines. The path will be of the form:
+// `/.dash/tools/<package-name>/<trampoline-name>`.
 const BASE_TOOLS_PATH: &str = "/.dash/tools";
 
-// For each package requested via `--tools`, PkgDirs holds the URL and its resolved directory.
+// For each package, PkgDir holds the URL and its resolved directory.
 struct PkgDirs {
     pkg_url: AbsolutePackageUrl,
     dir: fio::DirectoryProxy,
@@ -154,7 +154,7 @@ fn directory_to_proxy(
 // same-name binaries is therefore first packages in load order, then built-ins. To avoid shadowing,
 // use the complete path to the binary: $ .dash/tools/<pkg>/<binary>
 //
-// Return the VFS directory containing the executables and the path containing them.
+// Return the VFS directory containing the executables and the associated path environment variable.
 async fn make_trampoline_vfs(
     pkg_trampolines: Vec<PkgTrampolines>,
 ) -> Result<(Option<fio::DirectoryProxy>, Option<String>), LauncherError> {
@@ -166,8 +166,10 @@ async fn make_trampoline_vfs(
     let mut path = String::new();
     for pkg_trampoline in pkg_trampolines {
         let pkg_name = pkg_trampoline.pkg_name;
-        // Note that the path will always end with a separator.
-        path.push_str(&format!("{}/{}:", BASE_TOOLS_PATH, &pkg_name));
+        if !path.is_empty() {
+            path.push(':');
+        }
+        path.push_str(&format!("{}/{}", BASE_TOOLS_PATH, &pkg_name));
         let pkg_dir = vfs::mut_pseudo_directory! {};
 
         for trampoline in pkg_trampoline.pkg_trampolines {
@@ -184,31 +186,29 @@ async fn make_trampoline_vfs(
     Ok((Some(dir), Some(path)))
 }
 
-// The user may have provided some additional tools packages. If so, return a directory containing
-// their binaries as trampolines.
-pub async fn get_tools_pkg_dir(
-    tool_urls: Vec<String>,
+// Given the URLs of some packages, return a directory containing their binaries as trampolines.
+pub async fn create_trampolines_from_packages(
+    pkg_urls: Vec<String>,
 ) -> Result<(Option<fio::DirectoryProxy>, Option<String>), LauncherError> {
-    if tool_urls.is_empty() {
+    if pkg_urls.is_empty() {
         return Ok((None, None));
     }
 
     let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
         .map_err(|_| LauncherError::PackageResolver)?;
 
-    let pkg_dirs = get_pkg_dirs(tool_urls, resolver).await?;
+    let pkg_dirs = get_pkg_dirs(pkg_urls, resolver).await?;
     let trampolines = create_trampolines(&pkg_dirs).await?;
     make_trampoline_vfs(trampolines).await
 }
 
-// Combine the existing and optional tools path, creating a PATH environment variable.
-pub fn create_env_path(path: &str, tools_path: Option<String>) -> String {
-    let mut path_envvar = path.to_string();
-    if let Some(tools_path) = tools_path {
-        // tools_path ends in a separator, so no need to add one.
-        path_envvar.insert_str(0, &tools_path);
+// Create a PATH environment variable from the tools_path if present.
+pub fn create_env_path(tools_path: Option<String>) -> String {
+    let mut path_envvar = "".to_string();
+    if let Some(tp) = tools_path {
+        path_envvar.push_str("PATH=");
+        path_envvar.push_str(&tp.to_string());
     }
-    path_envvar.insert_str(0, "PATH=");
     path_envvar
 }
 
@@ -316,10 +316,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_env_path_test() {
-        assert_eq!(create_env_path("foo", Some("bar".to_string())), "PATH=barfoo");
-        assert_eq!(create_env_path("foo", Some("".to_string())), "PATH=foo");
-        assert_eq!(create_env_path("foo", Some(" ".to_string())), "PATH= foo");
-        assert_eq!(create_env_path("foo", None), "PATH=foo");
-        assert_eq!(create_env_path("", None), "PATH=");
+        assert_eq!(create_env_path(Some("bar".to_string())), "PATH=bar");
+        assert_eq!(create_env_path(Some("".to_string())), "PATH=");
+        assert_eq!(create_env_path(Some(" ".to_string())), "PATH= ");
+        assert_eq!(create_env_path(None), "");
     }
 }

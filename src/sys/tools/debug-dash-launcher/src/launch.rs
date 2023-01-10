@@ -19,7 +19,6 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
 use fuchsia_zircon as zx;
 use moniker::{RelativeMoniker, RelativeMonikerBase};
-use std::sync::Arc;
 
 // -s: force input from stdin
 // -i: force interactive
@@ -56,7 +55,7 @@ pub async fn launch_with_handles(
     stdin: zx::Handle,
     stdout: zx::Handle,
     stderr: zx::Handle,
-    tool_urls: Vec<String>,
+    mut tool_urls: Vec<String>,
     command: Option<String>,
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
@@ -64,8 +63,6 @@ pub async fn launch_with_handles(
     let query =
         connect_to_protocol::<fsys::RealmQueryMarker>().map_err(|_| LauncherError::RealmQuery)?;
     let resolved_dirs = get_resolved_directories(&query, moniker).await?;
-
-    let launcher_pkg_dir = get_pkg_from_launcher_namespace()?;
 
     let (out_dir, runtime_dir) = if let Some(execution_dirs) = resolved_dirs.execution_dirs {
         let out_dir = execution_dirs.out_dir.map(|d| d.into_proxy().unwrap());
@@ -77,18 +74,12 @@ pub async fn launch_with_handles(
 
     let ns_entries = resolved_dirs.ns_entries;
     let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
-    let instance_pkg_dir = resolved_dirs.pkg_dir.map(|d| d.into_proxy().unwrap());
 
-    let (tools_pkg_dir, tools_path) = trampoline::get_tools_pkg_dir(tool_urls).await?;
-
-    // Get the launcher's /pkg/bin.
-    let bin_dir = fuchsia_fs::directory::open_directory(
-        &launcher_pkg_dir,
-        "bin",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .await
-    .map_err(|_| LauncherError::Internal)?;
+    // In addition to tools binaries requested by the user, add the built-in binaries of the
+    // debug-dash-launcher package, creating `#!resolve` trampolines for all.
+    tool_urls.push("fuchsia-pkg://fuchsia.com/debug-dash-launcher".to_string());
+    let (tools_pkg_dir, tools_path) =
+        trampoline::create_trampolines_from_packages(tool_urls).await?;
 
     // The dash-launcher can be asked to launch multiple dash processes, each of which can
     // make their own process hierarchies. This will look better topologically if we make a
@@ -96,23 +87,17 @@ pub async fn launch_with_handles(
     let job =
         fuchsia_runtime::job_default().create_child_job().map_err(|_| LauncherError::Internal)?;
 
-    // Create a library loader that loads libraries from 2 sources:
-    // * the launcher's /pkg/lib dir.
-    // * the instance's /pkg/lib dir.
-    let ldsvc = create_loader_service(&launcher_pkg_dir, &instance_pkg_dir).await;
-
     // Add handles for the current job, stdio, library loader and UTC time.
-    let mut handle_infos = create_handle_infos(&job, stdin, stdout, stderr, ldsvc)?;
+    let mut handle_infos = create_handle_infos(&job, stdin, stdout, stderr)?;
 
     // Add all the necessary entries into the dash namespace.
-    let (mut name_infos, path_envvar) = match ns_layout {
+    let mut name_infos = match ns_layout {
         fdash::DashNamespaceLayout::NestAllInstanceDirs => {
             // Add a custom `/svc` directory to dash that contains
             // `fuchsia.process.Launcher` and `fuchsia.process.Resolver`.
             let svc_dir = layout::serve_process_launcher_and_resolver_svc_dir()?;
 
             layout::nest_all_instance_dirs(
-                bin_dir,
                 ns_entries,
                 exposed_dir,
                 svc_dir,
@@ -122,7 +107,7 @@ pub async fn launch_with_handles(
             )
         }
         fdash::DashNamespaceLayout::InstanceNamespaceIsRoot => {
-            layout::instance_namespace_is_root(bin_dir, ns_entries, tools_pkg_dir).await
+            layout::instance_namespace_is_root(ns_entries, tools_pkg_dir).await
         }
     };
 
@@ -151,7 +136,7 @@ pub async fn launch_with_handles(
         .add_handles(&mut handle_infos.iter_mut())
         .map_err(|_| LauncherError::ProcessLauncher)?;
     launcher.add_args(&mut args.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
-    let path_envvar = trampoline::create_env_path(path_envvar, tools_path);
+    let path_envvar = trampoline::create_env_path(tools_path);
     let env_vars = vec![path_envvar.as_bytes()];
     launcher.add_environs(&mut env_vars.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
     let (status, process) =
@@ -210,20 +195,11 @@ async fn get_resolved_directories(
     resolved_dirs.ok_or(LauncherError::InstanceNotResolved)
 }
 
-fn get_pkg_from_launcher_namespace() -> Result<fio::DirectoryProxy, LauncherError> {
-    fuchsia_fs::directory::open_in_namespace(
-        "/pkg",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .map_err(|_| LauncherError::Internal)
-}
-
 fn create_handle_infos(
     job: &zx::Job,
     stdin: zx::Handle,
     stdout: zx::Handle,
     stderr: zx::Handle,
-    ldsvc: zx::Handle,
 ) -> Result<Vec<fproc::HandleInfo>, LauncherError> {
     let stdin_handle = fproc::HandleInfo {
         handle: stdin.into_handle(),
@@ -247,6 +223,7 @@ fn create_handle_infos(
         id: HandleId::new(HandleType::DefaultJob, 0).as_raw(),
     };
 
+    let ldsvc = fuchsia_runtime::loader_svc().map_err(|_| LauncherError::Internal)?;
     let ldsvc_handle =
         fproc::HandleInfo { handle: ldsvc, id: HandleId::new(HandleType::LdsvcLoader, 0).as_raw() };
 
@@ -261,40 +238,6 @@ fn create_handle_infos(
     };
 
     Ok(vec![stdin_handle, stdout_handle, stderr_handle, job_handle, ldsvc_handle, utc_clock_handle])
-}
-
-async fn create_loader_service(
-    launcher_pkg_dir: &fio::DirectoryProxy,
-    instance_pkg_dir: &Option<fio::DirectoryProxy>,
-) -> zx::Handle {
-    let mut lib_dirs = vec![];
-    if let Ok(lib_dir) = fuchsia_fs::directory::open_directory(
-        launcher_pkg_dir,
-        "lib",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .await
-    {
-        lib_dirs.push(Arc::new(lib_dir));
-    }
-
-    if let Some(pkg_dir) = instance_pkg_dir {
-        if let Ok(lib_dir) = fuchsia_fs::directory::open_directory(
-            pkg_dir,
-            "lib",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .await
-        {
-            lib_dirs.push(Arc::new(lib_dir));
-        }
-    }
-
-    let (ldsvc, server_end) = zx::Channel::create();
-    let ldsvc = ldsvc.into_handle();
-    library_loader::start_with_multiple_dirs(lib_dirs, server_end);
-
-    ldsvc
 }
 
 async fn create_launch_info(

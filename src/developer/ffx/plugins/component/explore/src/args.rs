@@ -24,7 +24,7 @@ Connection to terminal closed
 
 To run a command directly from the command line:
 > ffx component explore /bootstrap/archivist -c 'printenv'
-PATH=/.dash/bin:/ns/pkg/bin
+PATH=/.dash/tools/debug-dash-launcher
 PWD=/
 ",
     note = "The environment contains the following directories of the explored instance:
@@ -34,12 +34,12 @@ PWD=/
 * /runtime  The runtime directory of the instance, if it is running
 
 The environment also contains the following directories, irrespective of the explored instance:
-* /.dash/bin  Basic command-line tools like ls, cat and more
-* /svc        Protocols required by the dash shell
+* /.dash    User-added and built-in dash tools
+* /svc      Protocols required by the dash shell
 
 If additional binaries are provided via --tools, they will be loaded into .dash/tools/<pkg>/<binary>
-The path will be set so that they can be run by name. The path preference is given by command line
-order of the --tools packages."
+The path is set so that they can be run by name. The path preference is in the command line order
+of the --tools arguments, ending with the built-in dash tools (/.dash/tools/debug-dash-launcher)."
 )]
 
 pub struct ExploreComponentCommand {

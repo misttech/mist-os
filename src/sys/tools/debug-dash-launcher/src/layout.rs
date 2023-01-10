@@ -20,36 +20,18 @@ use vfs::{
     service::endpoint,
 };
 
-// PATH must contain the three possible sources of binaries:
-// * binaries in the instance's package.
-// * binaries in dash-launcher's package.
-// For the nested root layout, the instance's package is under /ns/pkg.
-// Tools binaries will added to the path under .dash/tools/<package_name>/bin if present.
-const PATH_ENVVAR_NESTED_ROOT: &str = "/ns/pkg/bin:/.dash/bin";
-
-// PATH must contain the three possible sources of binaries:
-// * binaries in the instance's package.
-// * binaries in dash-launcher's package.
-// For the namespace root layout, the instance's package is under /pkg.
-// Tools binaries will added to the path under .dash/tools/<package_name>/bin if present.
-const PATH_ENVVAR_NS_ROOT: &str = "/pkg/bin:/.dash/bin";
-
 /// Returns directory handles + paths for a nested layout using the given directories.
 /// In this layout, all instance directories are nested as subdirectories of the root.
 /// e.g - namespace is under `/ns`, outgoing directory is under `/out`, etc.
-///
-/// Also returns the corresponding PATH envvar that must be set for the dash shell.
 pub fn nest_all_instance_dirs(
-    bin_dir: fio::DirectoryProxy,
     ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
     exposed_dir: fio::DirectoryProxy,
     svc_dir: fio::DirectoryProxy,
     out_dir: Option<fio::DirectoryProxy>,
     runtime_dir: Option<fio::DirectoryProxy>,
     tools_pkg_dir: Option<fio::DirectoryProxy>,
-) -> (Vec<fproc::NameInfo>, &'static str) {
+) -> Vec<fproc::NameInfo> {
     let mut name_infos = vec![];
-    name_infos.push(to_name_info("/.dash/bin", bin_dir));
     name_infos.push(to_name_info("/exposed", exposed_dir));
     name_infos.push(to_name_info("/svc", svc_dir));
 
@@ -71,7 +53,7 @@ pub fn nest_all_instance_dirs(
         name_infos.push(to_name_info("/.dash/tools", dir));
     }
 
-    (name_infos, PATH_ENVVAR_NESTED_ROOT)
+    name_infos
 }
 
 /// Returns directory handles + paths for a namespace layout using the given directories.
@@ -81,17 +63,14 @@ pub fn nest_all_instance_dirs(
 ///
 /// To make the shell work correctly, we need to inject the following into the layout:
 /// * fuchsia.process.Resolver and fuchsia.process.Launcher into `/svc`
-/// * dash launcher binaries into `/.dash/bin`
 /// * tools packages, if given, into `/.dash/tools`
 ///
 /// Also returns the corresponding PATH envvar that must be set for the dash shell.
 pub async fn instance_namespace_is_root(
-    bin_dir: fio::DirectoryProxy,
     ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
     tools_pkg_dir: Option<fio::DirectoryProxy>,
-) -> (Vec<fproc::NameInfo>, &'static str) {
+) -> Vec<fproc::NameInfo> {
     let mut name_infos = vec![];
-    name_infos.push(to_name_info("/.dash/bin", bin_dir));
 
     if let Some(dir) = tools_pkg_dir {
         name_infos.push(to_name_info("/.dash/tools", dir));
@@ -110,7 +89,7 @@ pub async fn instance_namespace_is_root(
         }
     }
 
-    (name_infos, PATH_ENVVAR_NS_ROOT)
+    name_infos
 }
 
 /// Serves a VFS that contains `fuchsia.process.Launcher` and `fuchsia.process.Resolver`. This is
@@ -229,7 +208,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn nest_all_instance_dirs_started_with_tools() {
-        let bin_dir = create_temp_dir("bin");
         let tools_dir = create_temp_dir("tools");
         let exposed_dir = create_temp_dir("exposed");
         let out_dir = create_temp_dir("out");
@@ -237,8 +215,7 @@ mod tests {
         let runtime_dir = create_temp_dir("runtime");
         let ns_entries = create_ns_entries();
 
-        let (ns, _) = nest_all_instance_dirs(
-            bin_dir,
+        let ns = nest_all_instance_dirs(
             ns_entries,
             exposed_dir,
             svc_dir,
@@ -246,21 +223,13 @@ mod tests {
             Some(runtime_dir),
             Some(tools_dir),
         );
-        assert_eq!(ns.len(), 7);
+        assert_eq!(ns.len(), 6);
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
         assert_eq!(
             paths,
-            vec![
-                "/.dash/bin",
-                "/.dash/tools",
-                "/exposed",
-                "/ns/ns_subdir",
-                "/out",
-                "/runtime",
-                "/svc"
-            ]
+            vec!["/.dash/tools", "/exposed", "/ns/ns_subdir", "/out", "/runtime", "/svc"]
         );
 
         // Make sure that the correct directories were mapped to the correct paths.
@@ -283,15 +252,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn nest_all_instance_dirs_started() {
-        let bin_dir = create_temp_dir("bin");
         let exposed_dir = create_temp_dir("exposed");
         let out_dir = create_temp_dir("out");
         let svc_dir = create_temp_dir("svc");
         let runtime_dir = create_temp_dir("runtime");
         let ns_entries = create_ns_entries();
 
-        let (ns, _) = nest_all_instance_dirs(
-            bin_dir,
+        let ns = nest_all_instance_dirs(
             ns_entries,
             exposed_dir,
             svc_dir,
@@ -299,14 +266,11 @@ mod tests {
             Some(runtime_dir),
             None,
         );
-        assert_eq!(ns.len(), 6);
+        assert_eq!(ns.len(), 5);
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
-        assert_eq!(
-            paths,
-            vec!["/.dash/bin", "/exposed", "/ns/ns_subdir", "/out", "/runtime", "/svc"]
-        );
+        assert_eq!(paths, vec!["/exposed", "/ns/ns_subdir", "/out", "/runtime", "/svc"]);
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
@@ -328,18 +292,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn nest_all_instance_dirs_resolved() {
-        let bin_dir = create_temp_dir("bin");
         let exposed_dir = create_temp_dir("exposed");
         let svc_dir = create_temp_dir("svc");
         let ns_entries = create_ns_entries();
 
-        let (ns, _) =
-            nest_all_instance_dirs(bin_dir, ns_entries, exposed_dir, svc_dir, None, None, None);
-        assert_eq!(ns.len(), 4);
+        let ns = nest_all_instance_dirs(ns_entries, exposed_dir, svc_dir, None, None, None);
+        assert_eq!(ns.len(), 3);
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
-        assert_eq!(paths, vec!["/.dash/bin", "/exposed", "/ns/ns_subdir", "/svc"]);
+        assert_eq!(paths, vec!["/exposed", "/ns/ns_subdir", "/svc"]);
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
@@ -361,14 +323,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn instance_namespace_is_root_resolved() {
-        let bin_dir = create_temp_dir("bin");
         let ns_entries = create_ns_entries();
 
-        let (ns, _) = instance_namespace_is_root(bin_dir, ns_entries, None).await;
+        let ns = instance_namespace_is_root(ns_entries, None).await;
 
         let mut paths: Vec<String> = ns.iter().map(|n| n.path.clone()).collect();
         paths.sort();
-        assert_eq!(paths, vec!["/.dash/bin", "/ns_subdir"]);
+        assert_eq!(paths, vec!["/ns_subdir"]);
 
         // Make sure that the correct directories were mapped to the correct paths.
         for entry in ns {
