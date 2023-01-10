@@ -70,7 +70,9 @@ class IommuDesc {
 
   cpp20::span<uint8_t> ReservedMem() {
     // The reserved memory information starts at the end of the scopes.
-    return {reinterpret_cast<uint8_t*>(Scopes().end()), Desc().reserved_memory_bytes};
+    auto scopes = Scopes();
+    return {reinterpret_cast<uint8_t*>(scopes.data() + scopes.size()),
+            Desc().reserved_memory_bytes};
   }
   zx_iommu_desc_intel_t* RawDesc() { return reinterpret_cast<zx_iommu_desc_intel_t*>(desc_.get()); }
 

@@ -195,7 +195,7 @@ zx_status_t InitEfiServices(uint64_t efi_system_table) {
   // Map in the system table.
   const efi_memory_attributes_table_header* efi_memory_table =
       reinterpret_cast<const efi_memory_attributes_table_header*>(
-          gPhysHandoff->efi_memory_attributes.get().begin());
+          gPhysHandoff->efi_memory_attributes.get().data());
 
   if (efi_memory_table == nullptr) {
     dprintf(CRITICAL, "EFI did not provide memory table, cannot map runtime services.\n");
