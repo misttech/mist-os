@@ -97,13 +97,15 @@ void Writer::ScheduleWriteback(fpromise::promise<> task) {
   writeback_executor_.schedule_task(std::move(task));
 }
 
-void Writer::ScheduleWriteBlocks(sync_completion_t *completion, PageList pages) {
+void Writer::ScheduleWriteBlocks(sync_completion_t *completion, PageList pages, bool flush) {
   if (!pages.is_empty()) {
     std::lock_guard lock(mutex_);
     pages_.splice(pages_.end(), pages);
   }
-  auto task = GetTaskForWriteIO(completion);
-  ScheduleTask(std::move(task));
+  if (flush || completion) {
+    auto task = GetTaskForWriteIO(completion);
+    ScheduleTask(std::move(task));
+  }
 }
 
 }  // namespace f2fs

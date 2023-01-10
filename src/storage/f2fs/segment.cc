@@ -933,7 +933,7 @@ zx::result<PageList> SegmentManager::GetBlockAddrsForDirtyDataPages(std::vector<
       }
     } else {
       // Writeback for memory reclaim is not allowed for now.
-      ZX_ASSERT(fs_->GetDirtyDataPageList().AddDirty(page).is_ok());
+      ZX_ASSERT(page->GetFileCache().GetDirtyPageList().AddDirty(page).is_ok());
     }
     // Unlock |page| for waiters.
     page.reset();

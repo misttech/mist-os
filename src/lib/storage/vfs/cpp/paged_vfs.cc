@@ -103,6 +103,14 @@ zx::result<> PagedVfs::DirtyPages(const zx::vmo& node_vmo, uint64_t offset, uint
   return zx::make_result(pager_.op_range(ZX_PAGER_OP_DIRTY, node_vmo, offset, length, 0));
 }
 
+zx::result<> PagedVfs::WritebackBegin(const zx::vmo& node_vmo, uint64_t offset, uint64_t length) {
+  return zx::make_result(pager_.op_range(ZX_PAGER_OP_WRITEBACK_BEGIN, node_vmo, offset, length, 0));
+}
+
+zx::result<> PagedVfs::WritebackEnd(const zx::vmo& node_vmo, uint64_t offset, uint64_t length) {
+  return zx::make_result(pager_.op_range(ZX_PAGER_OP_WRITEBACK_END, node_vmo, offset, length, 0));
+}
+
 zx::result<> PagedVfs::ReportPagerError(const zx::vmo& node_vmo, uint64_t offset, uint64_t length,
                                         zx_status_t err) {
   return zx::make_result(pager_.op_range(ZX_PAGER_OP_FAIL, node_vmo, offset, length, err));

@@ -83,7 +83,6 @@
 #include "src/storage/f2fs/writeback.h"
 #include "src/storage/f2fs/reader.h"
 #include "src/storage/f2fs/runner.h"
-#include "src/storage/f2fs/dirty_page_list.h"
 #include "src/storage/f2fs/vnode.h"
 #include "src/storage/f2fs/vnode_cache.h"
 #include "src/storage/f2fs/dir.h"
@@ -145,7 +144,6 @@ class F2fs final {
     return zx::ok(std::move(bc_));
   }
 
-  DirtyPageList &GetDirtyDataPageList() { return dirty_data_page_list_; }
   Bcache &GetBc() const {
     ZX_DEBUG_ASSERT(bc_ != nullptr);
     return *bc_;
@@ -290,8 +288,9 @@ class F2fs final {
                                   bool is_sync = true);
   zx_status_t MakeTrimOperation(block_t blk_addr, block_t nblocks) const;
 
-  void ScheduleWriter(sync_completion_t *completion = nullptr, PageList pages = {}) {
-    writer_->ScheduleWriteBlocks(completion, std::move(pages));
+  void ScheduleWriter(sync_completion_t *completion = nullptr, PageList pages = {},
+                      bool flush = true) {
+    writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
   }
 
   void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);
@@ -304,19 +303,19 @@ class F2fs final {
   }
   std::atomic_flag &GetStopReclaimFlag() { return stop_reclaim_flag_; }
 
-  bool NeedToWriteback() {
+  bool StopWriteback() {
     // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
     auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
-    return (level > MemoryPressure::kLow &&
-            superblock_info_->GetPageCount(CountType::kDirtyData)) ||
+    return level == MemoryPressure::kLow ||
+           !superblock_info_->GetPageCount(CountType::kDirtyData) ||
            (level == MemoryPressure::kUnknown &&
-            superblock_info_->GetPageCount(CountType::kDirtyData) >= kMaxDirtyDataPages / 2);
+            superblock_info_->GetPageCount(CountType::kDirtyData) < kMaxDirtyDataPages / 4);
   }
 
   bool HasNotEnoughMemory() {
     // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
     auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
-    return (level == MemoryPressure::kHigh &&
+    return (level > MemoryPressure::kLow &&
             superblock_info_->GetPageCount(CountType::kDirtyData)) ||
            (level == MemoryPressure::kUnknown &&
             superblock_info_->GetPageCount(CountType::kDirtyData) >= kMaxDirtyDataPages);
@@ -328,8 +327,6 @@ class F2fs final {
       ZX_ASSERT(WaitForWriteback().is_ok());
     }
   }
-
-  bool CompareAndSetMemoryPressureID(uint32_t &id);
 
  private:
   void StartMemoryPressureWatcher();
@@ -361,7 +358,6 @@ class F2fs final {
   std::unique_ptr<GcManager> gc_manager_;
 
   VnodeCache vnode_cache_;
-  DirtyPageList dirty_data_page_list_;
   std::unique_ptr<Reader> reader_;
   std::unique_ptr<Writer> writer_;
 

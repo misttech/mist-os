@@ -6,6 +6,67 @@
 
 namespace f2fs {
 
+DirtyPageList::~DirtyPageList() {
+  std::lock_guard list_lock(list_lock_);
+  ZX_ASSERT(dirty_list_.is_empty());
+}
+
+void DirtyPageList::Reset() {
+  std::lock_guard list_lock(list_lock_);
+  dirty_list_.clear();
+}
+
+zx::result<> DirtyPageList::AddDirty(LockedPage &page) {
+  ZX_DEBUG_ASSERT(page->InTreeContainer());
+  ZX_DEBUG_ASSERT(page->IsActive());
+  if (page->GetVnode().GetPageType() == PageType::kData && !page->GetVnode().IsDir()) {
+    std::lock_guard lock(list_lock_);
+    if (page->InListContainer()) {
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
+    } else {
+      // No need to consider a case where |page| is recycled as passing |page| is always active.
+      dirty_list_.push_back(page.CopyRefPtr());
+    }
+  }
+  return zx::ok();
+}
+
+zx_status_t DirtyPageList::RemoveDirty(LockedPage &page) {
+  ZX_DEBUG_ASSERT(page->IsActive());
+  if (page->GetVnode().GetPageType() == PageType::kData && !page->GetVnode().IsDir()) {
+    std::lock_guard lock(list_lock_);
+    if (!page->InListContainer()) {
+      return ZX_ERR_NOT_FOUND;
+    }
+    dirty_list_.erase(*page);
+  }
+  return ZX_OK;
+}
+
+std::vector<LockedPage> DirtyPageList::TakePages(size_t count) {
+  std::vector<LockedPage> dirty_pages;
+  std::lock_guard lock(list_lock_);
+  PageList temp_list;
+  size_t try_count = std::min(count, dirty_list_.size());
+  dirty_pages.reserve(try_count);
+  while (!dirty_list_.is_empty() && try_count--) {
+    auto page = dirty_list_.pop_front();
+    if (page->IsDirty()) {
+      if (!page->TryLock()) {
+        LockedPage locked_page(std::move(page), false);
+        dirty_pages.push_back(std::move(locked_page));
+      } else {
+        // If someone already holds its lock, skip it.
+        temp_list.push_back(std::move(page));
+      }
+    }
+  }
+
+  // Keep the order Pages are inserted in dirty_list_.
+  dirty_list_.splice(dirty_list_.begin(), temp_list);
+  return dirty_pages;
+}
+
 Page::Page(FileCache *file_cache, pgoff_t index) : file_cache_(file_cache), index_(index) {}
 
 VnodeF2fs &Page::GetVnode() const { return file_cache_->GetVnode(); }
@@ -42,7 +103,7 @@ bool Page::SetDirty() {
       !flags_[static_cast<uint8_t>(PageFlag::kPageDirty)].test_and_set(std::memory_order_acquire)) {
     VnodeF2fs &vnode = GetVnode();
     SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-    vnode.MarkInodeDirty(true);
+    vnode.MarkInodeDirty();
     vnode.IncreaseDirtyPageCount();
     if (vnode.IsNode()) {
       superblock_info.IncreasePageCount(CountType::kDirtyNodes);
@@ -162,7 +223,7 @@ bool Page::ClearColdData() {
 bool LockedPage::SetDirty(bool add_to_list) {
   bool ret = page_->SetDirty();
   if (!ret && add_to_list) {
-    ZX_ASSERT(page_->fs()->GetDirtyDataPageList().AddDirty(*this).is_ok());
+    ZX_ASSERT(page_->GetFileCache().GetDirtyPageList().AddDirty(*this).is_ok());
   }
   return ret;
 }
@@ -462,7 +523,7 @@ std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end) {
   }
   for (auto &page : pages) {
     if (page->IsDirty()) {
-      ZX_ASSERT(fs()->GetDirtyDataPageList().RemoveDirty(page).is_ok());
+      ZX_ASSERT(dirty_page_list_.RemoveDirty(page) == ZX_OK);
     }
     page->Invalidate();
   }
@@ -492,6 +553,7 @@ void FileCache::Reset() {
       page->Invalidate();
     }
   }
+  dirty_page_list_.Reset();
   vmo_manager_->Reset();
 }
 
@@ -556,7 +618,7 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPagesUnsafe(const WritebackOper
           continue;
         }
         if (!operation.if_page || operation.if_page((*locked_page_or).CopyRefPtr()) == ZX_OK) {
-          ZX_ASSERT(vnode_->fs()->GetDirtyDataPageList().RemoveDirty(*locked_page_or).is_ok());
+          ZX_ASSERT(dirty_page_list_.RemoveDirty(*locked_page_or) == ZX_OK);
           pages.push_back(std::move(*locked_page_or));
           ++nwritten;
         } else {

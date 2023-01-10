@@ -100,6 +100,8 @@ class VmoDiscardable : public VmoMapping {
   std::vector<bool> page_bitmap_;
 };
 
+using PagedVfsCallback = fit::function<zx::result<>(zx::vmo &vmo, size_t start, size_t end)>;
+
 // It provides vmo service to Filecache of a vnode. To cover the full range of a vnode and save va
 // mapping resource, it divides the range of a vnode into a fixed size of vmo nodes and keeps them
 // in |vmo_tree_|. A vmo node represents a range between VmoMapping::index_ and VmoMapping::index_ +
@@ -127,12 +129,17 @@ class VmoManager {
   VmoManager &operator=(const VmoManager &) = delete;
   VmoManager(const VmoManager &&) = delete;
   VmoManager &operator=(const VmoManager &&) = delete;
-  ~VmoManager() { Reset(true); }
+  ~VmoManager() {
+    ZX_DEBUG_ASSERT(!writeback_ops_);
+    Reset(true);
+  }
 
   zx::result<bool> CreateAndLockVmo(pgoff_t index) __TA_EXCLUDES(mutex_);
   zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
   zx::result<zx_vaddr_t> GetAddress(pgoff_t index) __TA_EXCLUDES(mutex_);
   zx_status_t ZeroRange(pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
+  zx::result<size_t> WritebackBegin(PagedVfsCallback cb) __TA_EXCLUDES(mutex_);
+  zx_status_t WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) __TA_EXCLUDES(mutex_);
   void Reset(bool shutdown = false) __TA_EXCLUDES(mutex_);
 
  private:
@@ -149,7 +156,8 @@ class VmoManager {
   const VmoMode mode_;
 
   // the maximum file size (4TiB) in blocks
-  size_t size_in_blocks_ = 0;
+  size_t size_in_blocks_ __TA_GUARDED(mutex_) = 0;
+  size_t writeback_ops_ __TA_GUARDED(mutex_) = 0;
   const size_t node_size_in_blocks_ = 0;
   // a copy of paged vmo
   zx::vmo vmo_ __TA_GUARDED(mutex_);

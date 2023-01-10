@@ -62,6 +62,16 @@ class PagedVfs : public ManagedVfs {
   zx::result<> ReportPagerError(const zx::vmo& node_vmo, uint64_t offset, uint64_t length,
                                 zx_status_t err) __TA_EXCLUDES(vfs_lock_);
 
+  // Notifies the kernel that the filesystem has started cleaning the `range` of pages. See
+  // `ZX_PAGER_OP_WRITEBACK_BEGIN` for more information.
+  zx::result<> WritebackBegin(const zx::vmo& node_vmo, uint64_t offset, uint64_t length)
+      __TA_EXCLUDES(vfs_lock_);
+
+  // Notifies the kernel that the filesystem has finished cleaning the `range` of pages. See
+  // `ZX_PAGER_OP_WRITEBACK_END` for more information.
+  zx::result<> WritebackEnd(const zx::vmo& node_vmo, uint64_t offset, uint64_t length)
+      __TA_EXCLUDES(vfs_lock_);
+
   // Allocates a VMO of the given size associated with the given PagedVnode. VMOs for use with
   // the pager must be allocated by this method so the page requests are routed to the correct
   // PagedVnode.

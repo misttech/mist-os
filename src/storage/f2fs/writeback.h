@@ -31,7 +31,8 @@ class Writer final {
   void ScheduleWriteback(fpromise::promise<> task);
   // It moves |pages| to |pages_| and schedules a task to request write I/Os for |pages_|.
   // If |completion| is set, it notifies the caller when the task is completed.
-  void ScheduleWriteBlocks(sync_completion_t *completion = nullptr, PageList pages = {});
+  void ScheduleWriteBlocks(sync_completion_t *completion = nullptr, PageList pages = {},
+                           bool flush = true);
 
  private:
   // It returns a task to be scheduled on |executor_| for write IOs.

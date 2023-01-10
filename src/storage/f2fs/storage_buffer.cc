@@ -10,6 +10,7 @@ StorageBuffer::StorageBuffer(Bcache *bc, size_t blocks, uint32_t block_size, std
                              uint32_t allocation_unit)
     : max_blocks_(bc->Maxblk()), allocation_unit_(allocation_unit) {
   ZX_DEBUG_ASSERT(allocation_unit >= 1 && allocation_unit <= blocks);
+  blocks = fbl::round_up(blocks, allocation_unit);
   ZX_ASSERT(buffer_.Initialize(bc, blocks, block_size, label.data()) == ZX_OK);
   Init();
 }

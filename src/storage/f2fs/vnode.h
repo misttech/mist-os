@@ -13,7 +13,7 @@ class F2fs;
 struct ExtentInfo {
   uint64_t fofs = 0;      // start offset in a file
   uint32_t blk_addr = 0;  // start block address of the extent
-  uint32_t len = 0;       // lenth of the extent
+  uint32_t len = 0;       // length of the extent
 };
 
 // i_advise uses Fadvise:xxx bit. We can add additional hints later.
@@ -445,6 +445,13 @@ class VnodeF2fs : public fs::PagedVnode,
     return ZX_ERR_NOT_SUPPORTED;
   }
   zx_status_t Truncate(size_t len) override __TA_EXCLUDES(mutex_) { return ZX_ERR_NOT_SUPPORTED; }
+  DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
+  zx::result<size_t> WritebackBegin(PagedVfsCallback cb) {
+    return file_cache_->GetVmoManager().WritebackBegin(std::move(cb));
+  }
+  zx_status_t WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) {
+    return file_cache_->GetVmoManager().WritebackEnd(std::move(cb), size_in_blocks);
+  }
 
  protected:
   void RecycleNode() override;

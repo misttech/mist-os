@@ -413,7 +413,7 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     clock_gettime(CLOCK_REALTIME, &cur_time);
     SetCTime(cur_time);
     SetMTime(cur_time);
-    MarkInodeDirty();
+    MarkInodeDirty(true);
   }
 
   *out_actual = off_in_buf;

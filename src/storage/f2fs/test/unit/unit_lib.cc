@@ -107,7 +107,6 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
     [[maybe_unused]] auto vnode_or = fs->GetVCache().RemoveDirty(vnode.get());
     return ZX_OK;
   });
-  fs->GetDirtyDataPageList().Reset();
   fs->ResetPsuedoVnodes();
   fs->GetVCache().Reset();
   fs->GetDirEntryCache().Reset();

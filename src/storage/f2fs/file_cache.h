@@ -211,7 +211,6 @@ class Page : public PageRefCounted<Page>,
   // node id. For meta vnode, it points to the block address to which the metadata is written.
   const pgoff_t index_;
   block_t block_addr_ = kNullAddr;
-  [[maybe_unused]] uint32_t memory_pressure_id_ = 0;
 };
 
 // LockedPage is a wrapper class for f2fs::Page lock management.
@@ -299,6 +298,32 @@ class LockedPage final {
   fbl::RefPtr<Page> page_ = nullptr;
 };
 
+class DirtyPageList {
+ public:
+  DirtyPageList() = default;
+  DirtyPageList(const DirtyPageList &) = delete;
+  DirtyPageList &operator=(const DirtyPageList &) = delete;
+  DirtyPageList(const DirtyPageList &&) = delete;
+  DirtyPageList &operator=(const DirtyPageList &&) = delete;
+  ~DirtyPageList();
+
+  void Reset() __TA_EXCLUDES(list_lock_);
+
+  zx::result<> AddDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
+  zx_status_t RemoveDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
+
+  uint64_t Size() const __TA_EXCLUDES(list_lock_) {
+    fs::SharedLock read_lock(list_lock_);
+    return dirty_list_.size();
+  }
+
+  std::vector<LockedPage> TakePages(size_t count) __TA_EXCLUDES(list_lock_);
+
+ private:
+  mutable fs::SharedMutex list_lock_{};
+  PageList dirty_list_ __TA_GUARDED(list_lock_){};
+};
+
 class FileCache {
  public:
   FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager);
@@ -348,6 +373,7 @@ class FileCache {
   std::vector<bool> GetReadaheadPagesInfo(pgoff_t index, size_t max_scan) __TA_EXCLUDES(tree_lock_);
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
+  DirtyPageList &GetDirtyPageList() { return dirty_page_list_; }
 
  private:
   // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,
@@ -385,6 +411,8 @@ class FileCache {
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
   fs::SharedMutex tree_lock_;
+  // TODO: remove it once zx_pager_query_dirty_ranges() is available.
+  DirtyPageList dirty_page_list_;
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;
   std::condition_variable_any recycle_cvar_;

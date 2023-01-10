@@ -26,7 +26,7 @@ class Reader {
 
   fs::TransactionHandler *transaction_handler_ = nullptr;
   std::unique_ptr<StorageBuffer> buffer_;
-  static constexpr uint32_t kDefaultAllocationUnit_ = 32;
+  static constexpr uint32_t kDefaultAllocationUnit_ = kDefaultReadaheadSize;
 };
 
 }  // namespace f2fs

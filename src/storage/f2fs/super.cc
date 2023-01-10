@@ -44,25 +44,64 @@ void F2fs::PutSuper() {
 
 void F2fs::ScheduleWriteback(size_t num_pages) {
   // Schedule a Writer task for kernel to reclaim memory pages until the current memory pressure
-  // becomes normal or the number of dirty Pages is less than kMaxDirtyDataPages. |writeback_flag_|
-  // ensures that neither checkpoint nor gc runs during this writeback.
-  // If there is not enough space, stop writeback as flushing N of dirty Pages can produce N of
-  // additional dirty node Pages in the worst case.
-  if (NeedToWriteback() && writeback_flag_.try_acquire()) {
+  // becomes normal. If memory pressure events are not available, the task runs until the number of
+  // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
+  // checkpoint nor gc runs during this writeback. If there is not enough space, stop writeback as
+  // flushing N of dirty Pages can produce N of additional dirty node Pages in the worst case.
+  if (HasNotEnoughMemory() && writeback_flag_.try_acquire()) {
     auto promise = fpromise::make_promise([this]() mutable {
-      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim()) {
-        auto pages = dirty_data_page_list_.TakePages(kDefaultBlocksPerSegment);
-        if (auto page_list_or =
-                GetSegmentManager().GetBlockAddrsForDirtyDataPages(std::move(pages), true);
-            page_list_or.is_ok()) {
-          if (!(*page_list_or).is_empty()) {
-            ScheduleWriter(nullptr, std::move(*page_list_or));
-          }
-        }
-        if (!NeedToWriteback()) {
-          break;
-        }
+      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && !StopWriteback()) {
+        size_t merged_blocks = 0;
+        GetVCache().ForDirtyVnodesIf(
+            [&](fbl::RefPtr<VnodeF2fs> &vnode) {
+              // TODO: remove using dirty_page_list once query_dirty_ranges is available.
+              // do ZX_PAGER_OP_WRITEBACK_BEGIN
+              auto size_in_blocks_or =
+                  vnode->WritebackBegin([this](zx::vmo &vmo, size_t start, size_t length) {
+                    return vfs()->WritebackBegin(vmo, start, length);
+                  });
+              // Flush dirty pages regardless of the result of WritebackBegin()
+              size_t size = vnode->GetDirtyPageList().Size();
+              while (size) {
+                bool flush = false;
+                auto num_pages =
+                    std::min(size, static_cast<uint64_t>(kDefaultBlocksPerSegment / 4));
+                auto pages = vnode->GetDirtyPageList().TakePages(num_pages);
+                merged_blocks += pages.size();
+                size -= pages.size();
+                // Allocate block addrs for |pages|.
+                if (auto page_list_or =
+                        GetSegmentManager().GetBlockAddrsForDirtyDataPages(std::move(pages), true);
+                    page_list_or.is_ok()) {
+                  if (!(*page_list_or).is_empty()) {
+                    if (merged_blocks >= kDefaultBlocksPerSegment) {
+                      merged_blocks = 0;
+                      flush = true;
+                    }
+                    ScheduleWriter(nullptr, std::move(*page_list_or), flush);
+                  }
+                }
+              }
+              // do ZX_PAGER_OP_WRITEBACK_END
+              if (size_in_blocks_or.is_ok()) {
+                vnode->WritebackEnd(
+                    [this](zx::vmo &vmo, size_t start, size_t length) {
+                      return vfs()->WritebackEnd(vmo, start, length);
+                    },
+                    *size_in_blocks_or);
+              }
+              return ZX_OK;
+            },
+            [](fbl::RefPtr<VnodeF2fs> &vnode) {
+              // Walk ll of dirty vnodes having dirty pages.
+              if (!vnode->IsDir() && vnode->GetDirtyPageList().Size()) {
+                return ZX_OK;
+              }
+              return ZX_ERR_NEXT;
+            });
       }
+      // Flush pending pages in Writer.
+      ScheduleWriter();
       // Wake waiters of WaitForWriteback().
       writeback_flag_.release();
       return fpromise::ok();
@@ -106,8 +145,6 @@ void F2fs::SyncFs(bool bShutdown) {
       };
       FlushDirtyDataPages(op);
     }
-    // We don't need to keep dirty data Pages anymore.
-    dirty_data_page_list_.Reset();
   } else {
     WriteCheckpoint(false, false);
   }

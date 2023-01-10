@@ -34,25 +34,9 @@ class MemoryPressureWatcher : public fidl::AsyncEventHandler<fuchsia_memorypress
   explicit MemoryPressureWatcher(async_dispatcher_t* dispatcher, MemoryPressureCallback callback);
   bool IsConnected() const { return is_connected_; }
   static std::string_view ToString(MemoryPressure level);
-  uint32_t GetId() const { return id_.load(std::memory_order_acquire); }
-  bool CompareAndSetID(uint32_t& id) const {
-    auto current = id_.load(std::memory_order_acquire);
-    if (id_ && current == id) {
-      return false;
-    }
-    id = current;
-    return true;
-  }
 
  private:
   zx::result<> Start();
-  void UpdateId() {
-    if (unlikely(id_ + 1 == kMaxID)) {
-      id_.store(0, std::memory_order_release);
-    } else {
-      id_.fetch_add(1, std::memory_order_release);
-    }
-  }
 
   void on_fidl_error(fidl::UnbindInfo error) final;
 
@@ -67,7 +51,6 @@ class MemoryPressureWatcher : public fidl::AsyncEventHandler<fuchsia_memorypress
   // handling memorypressure events.
   MemoryPressureCallback callback_;
   bool is_connected_ = false;
-  std::atomic<uint32_t> id_ = 0;
 };
 
 }  // namespace f2fs

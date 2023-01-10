@@ -395,7 +395,7 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     data_page->GetAddress<uint8_t>()[0] = make_dirty;
     if (gc_type == GcType::kFgGc) {
       // If |data_page| is already in the list, remove it.
-      [[maybe_unused]] auto page = fs_->GetDirtyDataPageList().RemoveDirty(data_page);
+      vnode->GetDirtyPageList().RemoveDirty(data_page);
       pages.push_back(std::move(data_page));
     }
   }

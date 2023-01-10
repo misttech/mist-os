@@ -146,9 +146,9 @@ zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index) __TA_EXCLUDES
 }
 
 zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
-  ZX_ASSERT(index < size_in_blocks_);
   if (evict) {
     fs::SharedLock tree_lock(mutex_);
+    ZX_ASSERT(index < size_in_blocks_);
     auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
     if (vmo_node_or.is_ok()) {
       if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
@@ -224,9 +224,9 @@ zx::result<VmoMapping *> VmoManager::GetVmoNodeUnsafe(const pgoff_t index, bool 
 }
 
 zx_status_t VmoManager::ZeroRange(pgoff_t start, pgoff_t end) {
+  fs::SharedLock lock(mutex_);
   end = std::min(end, size_in_blocks_);
   if (start < end && end <= size_in_blocks_) {
-    fs::SharedLock lock(mutex_);
     if (vmo_.is_valid()) {
       return vmo_.op_range(ZX_VMO_OP_ZERO, start * kBlockSize, (end - start) * kBlockSize, nullptr,
                            0);
@@ -241,6 +241,36 @@ zx_status_t VmoManager::ZeroRange(pgoff_t start, pgoff_t end) {
     }
   }
   return ZX_OK;
+}
+
+zx::result<size_t> VmoManager::WritebackBegin(PagedVfsCallback cb) {
+  zx_status_t error_status = ZX_ERR_NOT_SUPPORTED;
+  std::lock_guard lock(mutex_);
+  if (size_in_blocks_) {
+    auto ret = cb(vmo_, 0, size_in_blocks_ * kBlockSize);
+    if (ret.is_ok()) {
+      ++writeback_ops_;
+      return zx::ok(size_in_blocks_);
+    }
+    error_status = ret.error_value();
+  }
+  FX_LOGS(WARNING) << "ZX_PAGER_OP_WRITEBACK_BEGIN failed. " << zx_status_get_string(error_status);
+  return zx::error(error_status);
+}
+
+zx_status_t VmoManager::WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) {
+  zx_status_t error_status = ZX_ERR_NOT_SUPPORTED;
+  std::lock_guard lock(mutex_);
+  if (size_in_blocks) {
+    auto status = cb(vmo_, 0, size_in_blocks * kBlockSize);
+    if (status.is_ok()) {
+      --writeback_ops_;
+    } else {
+      FX_LOGS(WARNING) << "ZX_PAGER_OP_WRITEBACK_END failed. " << status.status_string();
+    }
+    error_status = status.status_value();
+  }
+  return error_status;
 }
 
 pgoff_t VmoManager::GetOffsetInVmoNode(pgoff_t page_index) const {

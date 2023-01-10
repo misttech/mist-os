@@ -45,14 +45,6 @@ void F2fs::StartMemoryPressureWatcher() {
   }
 }
 
-bool F2fs::CompareAndSetMemoryPressureID(uint32_t& id) {
-  if (dispatcher_ && memory_pressure_watcher_->IsConnected() &&
-      current_memory_pressure_level_ == MemoryPressure::kLow) {
-    return memory_pressure_watcher_->CompareAndSetID(id);
-  }
-  return true;
-}
-
 zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
                                                std::unique_ptr<f2fs::Bcache> bc,
                                                const MountOptions& options, PlatformVfs* vfs) {
