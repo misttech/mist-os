@@ -38,3 +38,11 @@ fuchsia.storage: WriteSequentialWarm/8192/f2fs
 fuchsia.storage: WriteSequentialWarm/8192/fxfs
 fuchsia.storage: WriteSequentialWarm/8192/memfs
 fuchsia.storage: WriteSequentialWarm/8192/minfs
+fuchsia.storage: WriteSequentialFsyncCold/8192/f2fs
+fuchsia.storage: WriteSequentialFsyncCold/8192/fxfs
+fuchsia.storage: WriteSequentialFsyncCold/8192/memfs
+fuchsia.storage: WriteSequentialFsyncCold/8192/minfs
+fuchsia.storage: WriteSequentialFsyncWarm/8192/f2fs
+fuchsia.storage: WriteSequentialFsyncWarm/8192/fxfs
+fuchsia.storage: WriteSequentialFsyncWarm/8192/memfs
+fuchsia.storage: WriteSequentialFsyncWarm/8192/minfs

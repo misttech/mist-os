@@ -2,7 +2,7 @@
 
 ## Benchmarks
 
-There are 10 benchmarks that get run for every filesystem. The currently supported filesystems are
+There are 12 benchmarks that get run for every filesystem. The currently supported filesystems are
 Fxfs, F2fs, Memfs, and Minfs.
 
 ### IO Benchmarks
@@ -19,6 +19,7 @@ file. The benchmarks measure how long each read/write operation takes.
   cached in memory.
 * **Cold**: the reads/writes are performed on a file that was not cached when the benchmark started.
   If the filesystem supports read-ahead then some of the operations may still hit cached data.
+* **Fsync**: the fsync is performed for every write.
 
 ### WalkDirectoryTree Benchmarks
 The `WalkDirectoryTree` benchmarks measure how long it takes to walk a directory tree with POSIX

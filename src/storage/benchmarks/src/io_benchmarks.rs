@@ -322,6 +322,78 @@ impl Benchmark for WriteRandomWarm {
     }
 }
 
+/// A benchmark that measures how long 'write` and `fsync` calls take to a new file.
+#[derive(Clone)]
+pub struct WriteSequentialFsyncCold {
+    op_size: usize,
+    op_count: usize,
+}
+
+impl WriteSequentialFsyncCold {
+    pub fn new(op_size: usize, op_count: usize) -> Self {
+        Self { op_size, op_count }
+    }
+}
+
+#[async_trait]
+impl Benchmark for WriteSequentialFsyncCold {
+    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+        trace_duration!(
+            "benchmark",
+            "WriteSequentialFsyncCold",
+            "op_size" => self.op_size as u64,
+            "op_count" => self.op_count as u64
+        );
+        let file_path = fs.benchmark_dir().join("file");
+        let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
+        write_sequential_fsync(&mut file, self.op_size, self.op_count)
+    }
+
+    fn name(&self) -> String {
+        format!("WriteSequentialFsyncCold/{}", self.op_size)
+    }
+}
+
+/// A benchmark that measures how long `write` and `fsync` calls take when overwriting a
+/// file that should already be in memory.
+#[derive(Clone)]
+pub struct WriteSequentialFsyncWarm {
+    op_size: usize,
+    op_count: usize,
+}
+
+impl WriteSequentialFsyncWarm {
+    pub fn new(op_size: usize, op_count: usize) -> Self {
+        Self { op_size, op_count }
+    }
+}
+
+#[async_trait]
+impl Benchmark for WriteSequentialFsyncWarm {
+    async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+        trace_duration!(
+            "benchmark",
+            "WriteSequentialFsyncWarm",
+            "op_size" => self.op_size as u64,
+            "op_count" => self.op_count as u64
+        );
+        let file_path = fs.benchmark_dir().join("file");
+
+        // Setup
+        let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
+        write_sequential(&mut file, self.op_size, self.op_count);
+        // To measure the exact performance of fsync, the previous written data must be synchronized.
+        assert_eq!(unsafe { libc::fsync(file.as_raw_fd()) }, 0);
+
+        // Benchmark
+        write_sequential_fsync(&mut file, self.op_size, self.op_count)
+    }
+
+    fn name(&self) -> String {
+        format!("WriteSequentialFsyncWarm/{}", self.op_size)
+    }
+}
+
 fn write_file<F: Write>(file: &mut F, op_size: usize, op_count: usize) {
     let data = vec![0xAB; op_size];
     for _ in 0..op_count {
@@ -363,6 +435,29 @@ fn write_sequential<F: AsRawFd>(
         let result = unsafe { libc::write(fd, data.as_ptr() as *const libc::c_void, data.len()) };
         durations.push(timer.stop());
         assert_eq!(result, op_size as isize);
+    }
+    durations
+}
+
+/// Makes `op_count` `write` calls to `file`, each containing `op_size` bytes.
+/// After write, call `fsync` and sync with disk(non-volatile medium).
+fn write_sequential_fsync<F: AsRawFd>(
+    file: &mut F,
+    op_size: usize,
+    op_count: usize,
+) -> Vec<OperationDuration> {
+    let data = vec![0xAB; op_size];
+    let mut durations = Vec::new();
+    let fd = file.as_raw_fd();
+    for i in 0..op_count {
+        trace_duration!("benchmark", "write", "op_number" => i as u64);
+        let timer = OperationTimer::start();
+        let write_result =
+            unsafe { libc::write(fd, data.as_ptr() as *const libc::c_void, data.len()) };
+        let fsync_result = unsafe { libc::fsync(fd) };
+        durations.push(timer.stop());
+        assert_eq!(write_result, op_size as isize);
+        assert_eq!(fsync_result, 0);
     }
     durations
 }
@@ -513,6 +608,26 @@ mod tests {
     async fn write_random_warm_test() {
         check_benchmark(
             WriteRandomWarm::new(OP_SIZE, OP_COUNT),
+            OP_COUNT,
+            /*clear_cache_count=*/ 0,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_sequential_fsync_cold_test() {
+        check_benchmark(
+            WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT),
+            OP_COUNT,
+            /*clear_cache_count=*/ 0,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_sequential_fsync_warm_test() {
+        check_benchmark(
+            WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT),
             OP_COUNT,
             /*clear_cache_count=*/ 0,
         )

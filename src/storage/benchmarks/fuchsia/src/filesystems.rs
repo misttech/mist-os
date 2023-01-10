@@ -227,7 +227,8 @@ impl FilesystemConfig for F2fs {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
                 use_zxcrypt: true,
-                fvm_volume_size: Some(60 * 1024 * 1024),
+                // f2fs requires a minimum of 100mb volume for fsync test
+                fvm_volume_size: Some(100 * 1024 * 1024),
             })
             .await;
         Box::new(FsmFilesystem::new(fs_management::F2fs::default(), block_device).await)
@@ -353,7 +354,7 @@ mod tests {
             io::{Read, Write},
         },
     };
-    const DEVICE_SIZE: u64 = 64 * 1024 * 1024;
+    const DEVICE_SIZE: u64 = 128 * 1024 * 1024;
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = DEVICE_SIZE / BLOCK_SIZE;
 

@@ -15,7 +15,8 @@ use {
         },
         io_benchmarks::{
             ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm,
-            WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialWarm,
+            WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
+            WriteSequentialFsyncWarm, WriteSequentialWarm,
         },
         BenchmarkSet, FilesystemConfig,
     },
@@ -66,6 +67,8 @@ fn build_benchmark_set() -> BenchmarkSet {
     benchmark_set.add_benchmark(WriteSequentialWarm::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteRandomCold::new(OP_SIZE, OP_COUNT), &filesystems);
     benchmark_set.add_benchmark(WriteRandomWarm::new(OP_SIZE, OP_COUNT), &filesystems);
+    benchmark_set.add_benchmark(WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT), &filesystems);
+    benchmark_set.add_benchmark(WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT), &filesystems);
 
     // Creates a total of 62 directories and 189 files.
     let dts = DirectoryTreeStructure {
