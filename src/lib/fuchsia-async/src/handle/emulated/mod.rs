@@ -16,6 +16,7 @@ use futures::task::noop_waker_ref;
 use slab::Slab;
 #[cfg(debug_assertions)]
 use std::cell::Cell;
+use std::mem::MaybeUninit;
 use std::sync::Mutex;
 use std::{
     collections::VecDeque,
@@ -471,6 +472,61 @@ impl Channel {
                 }
             } else {
                 unreachable!();
+            }
+        })
+    }
+
+    /// Reads a message from a channel into a fixed size buffer. If either `buf` or `handles` is
+    /// not large enough to hold the message, then `Err((buf_len, handles_len))` is returned. The
+    /// caller is then expected to invoke the read function again, albeit with a resized buffer
+    /// large enough to fit the output values.
+    ///
+    /// If there are any general errors that happen during read, then `Ok(Err(_), (0, 0))` is
+    /// returned.
+    ///
+    /// On success, `Ok(Ok(()), (buf_len, handles_len))` is returned. As with zx_channel_read, of
+    /// which this function is an analogue, there are no partial reads.
+    ///
+    /// It is important to remember to check the `Ok(_)` result for potential errors, like
+    /// `PEER_CLOSED`, for example.
+    pub fn read_raw(
+        &self,
+        buf: &mut [u8],
+        handles: &mut [MaybeUninit<Handle>],
+    ) -> Result<(Result<(), zx_status::Status>, usize, usize), (usize, usize)> {
+        match self.poll_read_raw(&mut Context::from_waker(noop_waker_ref()), buf, handles) {
+            Poll::Ready(r) => r,
+            Poll::Pending => Ok((Err(zx_status::Status::SHOULD_WAIT), 0, 0)),
+        }
+    }
+
+    fn poll_read_raw(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        handles: &mut [MaybeUninit<Handle>],
+    ) -> Poll<Result<(Result<(), zx_status::Status>, usize, usize), (usize, usize)>> {
+        with_handle(self.0, |h, side| {
+            let HdlRef::Channel(obj) = h else { unreachable!() };
+            let read_side = obj.q.side_mut(side.opposite());
+            if let Some(msg) = read_side.front() {
+                let msg_bytes_len = msg.bytes.len();
+                let msg_handles_len = msg.handles.len();
+                if msg_bytes_len > buf.len() || msg_handles_len > handles.len() {
+                    Poll::Ready(Err((msg_bytes_len, msg_handles_len)))
+                } else {
+                    let msg = read_side.pop_front().unwrap();
+                    buf[..msg_bytes_len].clone_from_slice(msg.bytes.as_slice());
+                    msg.handles
+                        .into_iter()
+                        .enumerate()
+                        .for_each(|(i, hdl)| handles[i] = MaybeUninit::new(hdl));
+                    Poll::Ready(Ok((Ok(()), msg_bytes_len, msg_handles_len)))
+                }
+            } else if obj.liveness.is_open() {
+                obj.wakers.side_mut(side).pending_readable(cx)
+            } else {
+                Poll::Ready(Ok((Err(zx_status::Status::PEER_CLOSED), 0, 0)))
             }
         })
     }
@@ -1913,6 +1969,57 @@ mod test {
         let (a, b) = Channel::create();
         drop(b);
         assert_eq!(a.is_closed(), true);
+    }
+
+    #[test]
+    fn channel_read_raw() {
+        const UNINIT: MaybeUninit<Handle> = MaybeUninit::<Handle>::uninit();
+        let (a, b) = Channel::create();
+        let (c, d) = Channel::create();
+        let mut buf: [u8; 2] = [0, 0];
+        let mut handles = [UNINIT; 2];
+        assert_eq!(
+            b.read_raw(&mut buf, &mut handles).ok().unwrap(),
+            (Err(Status::SHOULD_WAIT), 0, 0)
+        );
+        d.write(&[4, 5, 6], &mut vec![]).unwrap();
+        a.write(&[1, 2, 3], &mut vec![c.into(), d.into()]).unwrap();
+
+        // Should err even though handle length is the same.
+        let (b_len, h_len) = b.read_raw(&mut buf[..], &mut handles[..]).err().unwrap();
+        assert_eq!(b_len, 3);
+        assert_eq!(h_len, 2);
+
+        let mut buf = [0, 0, 0];
+        assert_eq!(b.read_raw(&mut buf, &mut handles).ok().unwrap(), (Ok(()), 3, 2));
+        assert_eq!(buf, [1, 2, 3]);
+        assert_eq!(handles.len(), 2);
+        let mut handles_iter = handles.into_iter().take(2);
+        let c: Channel = unsafe { handles_iter.next().unwrap().assume_init() }.into();
+        let d: Channel = unsafe { handles_iter.next().unwrap().assume_init() }.into();
+        let mut handles = [UNINIT; 0];
+        assert_eq!(c.read_raw(&mut buf, &mut handles).ok().unwrap(), (Ok(()), 3, 0));
+        assert_eq!(buf, [4, 5, 6]);
+        b.write(&[1, 2], &mut vec![c.into(), d.into()]).unwrap();
+
+        // Checks that having an incorrect handle buffer size also fails.
+        assert_eq!(a.read_raw(&mut buf, &mut handles).err().unwrap(), (2, 2));
+
+        let mut handles = [UNINIT; 2];
+
+        // Verifies that copying into an "oversized" buffer does not fail (copy_to_slice panics
+        // if the slices are not the same size).
+        let _ = a.read_raw(&mut buf, &mut handles).unwrap();
+
+        let mut handles_iter = handles.into_iter().take(2);
+        let c: Channel = unsafe { handles_iter.next().unwrap().assume_init() }.into();
+        let d: Channel = unsafe { handles_iter.next().unwrap().assume_init() }.into();
+
+        // Verifies that the passed channels weren't closed after being moved.
+        c.write(&[6, 7, 8], &mut vec![]).unwrap();
+        let mut handles = [UNINIT; 0];
+        assert_eq!(d.read_raw(&mut buf, &mut handles).unwrap(), (Ok(()), 3, 0));
+        assert_eq!(buf, [6, 7, 8]);
     }
 
     #[test]
