@@ -15,8 +15,8 @@
 zx::result<fbl::RefPtr<Driver>> Driver::Create(zx_driver_t* zx_driver) {
   auto driver = fbl::MakeRefCounted<Driver>(zx_driver);
 
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-      driver.get(), FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS,
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      driver.get(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
       fbl::StringPrintf("%s-default-%p", zx_driver->name(), driver.get()),
       [driver = driver.get()](fdf_dispatcher_t* dispatcher) { driver->released_.Signal(); });
   if (dispatcher.is_error()) {

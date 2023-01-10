@@ -12,6 +12,7 @@ group("tests") {
   deps = [
     ":driver_runtime_death_tests",
     ":driver_runtime_tests",
+    "microbenchmarks",
   ]
 }
 

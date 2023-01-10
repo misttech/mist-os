@@ -1147,7 +1147,7 @@ TEST_F(DispatcherTest, ShutdownCallbackIsNotReentrant) {
   driver_context::PushDriver(CreateFakeDriver());
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   {
@@ -1168,7 +1168,7 @@ TEST_F(DispatcherTest, ChannelPeerWriteDuringShutdown) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", shutdown_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   // Create a bunch of channels, and register one end with the dispatcher to wait for
@@ -1392,7 +1392,8 @@ TEST_F(DispatcherTest, CancelWaitFromWithinCanceledWait) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", [](fdf_dispatcher_t* dispatcher) {});
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
   ASSERT_FALSE(dispatcher.is_error());
 
   async_dispatcher_t* async_dispatcher = dispatcher->async_dispatcher();
@@ -1635,7 +1636,7 @@ TEST_F(DispatcherTest, IrqCancelOnShutdown) {
   driver_context::PushDriver(CreateFakeDriver());
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto fdf_dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
 
   async_dispatcher_t* dispatcher = fdf_dispatcher->async_dispatcher();
@@ -1722,7 +1723,7 @@ TEST_F(DispatcherTest, UnbindIrqAfterDispatcherShutdown) {
   driver_context::PushDriver(CreateFakeDriver());
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto fdf_dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
 
   async_dispatcher_t* dispatcher = fdf_dispatcher->async_dispatcher();
@@ -1824,7 +1825,7 @@ TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
   driver_context::PushDriver(CreateFakeDriver());
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto fdf_dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
 
   async_dispatcher_t* dispatcher = fdf_dispatcher->async_dispatcher();
@@ -1925,7 +1926,7 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   driver_context::PushDriver(driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto fdf_dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(fdf_dispatcher.is_error());
 
   async_dispatcher_t* dispatcher = fdf_dispatcher->async_dispatcher();
@@ -1935,8 +1936,8 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   fdf::Dispatcher unused_dispatchers[kNumThreads - 1];
   {
     for (uint32_t i = 0; i < kNumThreads - 1; i++) {
-      auto fdf_dispatcher =
-          fdf::Dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "", destructed_handler);
+      auto fdf_dispatcher = fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "", destructed_handler);
       ASSERT_FALSE(fdf_dispatcher.is_error());
       unused_dispatchers[i] = *std::move(fdf_dispatcher);
     }
@@ -2421,7 +2422,7 @@ TEST_F(DispatcherTest, GetCurrentDispatcherShutdownCallback) {
     driver_context::PushDriver(CreateFakeDriver());
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-    auto dispatcher_with_status = fdf::Dispatcher::Create(0, "", shutdown_handler);
+    auto dispatcher_with_status = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
     ASSERT_FALSE(dispatcher_with_status.is_error());
     dispatcher = *std::move(dispatcher_with_status);
   }
@@ -2544,7 +2545,7 @@ TEST_F(DispatcherTest, DriverDestroysDispatcherShutdownByDriverHost) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  dispatcher = fdf::Dispatcher::Create(0, "", shutdown_handler);
+  dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   fdf_env::DriverShutdown driver_shutdown;
@@ -2566,7 +2567,7 @@ TEST_F(DispatcherTest, CannotCreateNewDispatcherDuringDriverShutdown) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", shutdown_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   libsync::Completion task_started;
@@ -2574,7 +2575,8 @@ TEST_F(DispatcherTest, CannotCreateNewDispatcherDuringDriverShutdown) {
   ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [&] {
     task_started.Signal();
     ASSERT_OK(driver_shutting_down.Wait(zx::time::infinite()));
-    auto dispatcher = fdf::Dispatcher::Create(0, "", [](fdf_dispatcher_t* dispatcher) {});
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
     // Creating a new dispatcher should fail, as the driver is currently shutting down.
     ASSERT_TRUE(dispatcher.is_error());
   }));
@@ -2603,7 +2605,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersAlreadyShutdown) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", shutdown_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   dispatcher->ShutdownAsync();
@@ -2632,7 +2634,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersCurrentlyInShutdownCallback) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", shutdown_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
   dispatcher->ShutdownAsync();
@@ -2657,7 +2659,8 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
   {
     driver_context::PushDriver(fake_driver);
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
-    auto dispatcher = fdf::Dispatcher::Create(0, "", [](fdf_dispatcher_t* dispatcher) {});
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(dispatcher.is_error());
     dispatcher->release();
   }
@@ -2666,7 +2669,8 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
   {
     driver_context::PushDriver(fake_driver2);
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
-    auto dispatcher2 = fdf::Dispatcher::Create(0, "", [](fdf_dispatcher_t* dispatcher) {});
+    auto dispatcher2 =
+        fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(dispatcher2.is_error());
     dispatcher2->release();
   }
@@ -2703,8 +2707,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
     driver_context::PushDriver(fake_driver);
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-    auto dispatcher = fdf::Dispatcher::Create(
-        0, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
     ASSERT_FALSE(dispatcher.is_error());
     dispatchers[i] = dispatcher->release();  // Destroyed in shutdown handler.
   }
@@ -2734,8 +2738,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(
-      0, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
   ASSERT_FALSE(dispatcher.is_error());
   dispatcher->release();  // Destroyed in the shutdown handler.
 
@@ -2766,8 +2770,8 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler)
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-  auto dispatcher = fdf::Dispatcher::Create(
-      0, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "", [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
   ASSERT_FALSE(dispatcher.is_error());
   dispatcher->release();  // Destroyed in shutdown handler.
 
@@ -3022,11 +3026,11 @@ TEST_F(DispatcherTest, ConcurrentDispatcherDestroy) {
     }
   };
 
-  auto dispatcher = fdf::Dispatcher::Create(0, "", destructed_handler);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
-  auto dispatcher2 =
-      fdf::Dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "", destructed_handler);
+  auto dispatcher2 = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "", destructed_handler);
   ASSERT_FALSE(dispatcher2.is_error());
 
   // The dispatchers will be destroyed in their shutdown handlers.
@@ -3050,8 +3054,8 @@ TEST_F(DispatcherTest, ShutdownCallbackSequenceId) {
 
   async_sequence_id_t initial_dispatcher_id;
 
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-      fake_driver, 0, "dispatcher", [](fdf_dispatcher_t* dispatcher) {});
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      fake_driver, {}, "dispatcher", [](fdf_dispatcher_t* dispatcher) {});
 
   // We will create a second dispatcher while running on the initial dispatcher.
   fdf::Dispatcher additional_dispatcher;
@@ -3063,7 +3067,7 @@ TEST_F(DispatcherTest, ShutdownCallbackSequenceId) {
     ASSERT_OK(async_get_sequence_id(dispatcher->get(), &initial_dispatcher_id, &error));
     ASSERT_NULL(error);
 
-    auto result = fdf::Dispatcher::Create(0, "", [&](fdf_dispatcher_t* dispatcher) {});
+    auto result = fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(result.is_error());
     additional_dispatcher = std::move(*result);
 
@@ -3092,8 +3096,8 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
 
   std::shared_ptr<fdf::OutgoingDirectory> outgoing;
 
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-      fake_driver, 0, "dispatcher", [](fdf_dispatcher_t* dispatcher) {});
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      fake_driver, {}, "dispatcher", [](fdf_dispatcher_t* dispatcher) {});
 
   // We will create a second dispatcher while running on the initial dispatcher.
   fdf::Dispatcher additional_dispatcher;
@@ -3103,7 +3107,7 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
     outgoing =
         std::make_shared<fdf::OutgoingDirectory>(fdf::OutgoingDirectory::Create(dispatcher->get()));
 
-    auto result = fdf::Dispatcher::Create(0, "", [&](fdf_dispatcher_t* dispatcher) {});
+    auto result = fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t* dispatcher) {});
     ASSERT_FALSE(result.is_error());
     additional_dispatcher = std::move(*result);
 

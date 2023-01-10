@@ -15,13 +15,18 @@ namespace fdf_env {
 
 class DispatcherBuilder {
  public:
-  // Same as |fdf::Dispatcher::Create| but allows setting the driver owner for the dispatcher.
+  // Same as |fdf::SynchronizedDispatcher::Create| but allows setting the driver owner for the
+  // dispatcher.
   //
   // |driver| is an opaque pointer to the driver object. It will be used to uniquely identify
   // the driver.
-  static zx::result<fdf::Dispatcher> CreateWithOwner(
-      const void* driver, uint32_t options, cpp17::string_view name,
+  static zx::result<fdf::SynchronizedDispatcher> CreateSynchronizedWithOwner(
+      const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
       fdf::Dispatcher::ShutdownHandler shutdown_handler, cpp17::string_view scheduler_role = {}) {
+    ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                      FDF_DISPATCHER_OPTION_SYNCHRONIZED,
+                  "options.value=%u, needs to have FDF_DISPATCHER_OPTION_SYNCHRONIZED",
+                  options.value);
     // We need to create an additional shutdown context in addition to the fdf::Dispatcher
     // object, as the fdf::Dispatcher may be destructed before the shutdown handler
     // is called. This can happen if the raw pointer is released from the fdf::Dispatcher.
@@ -29,13 +34,42 @@ class DispatcherBuilder {
         std::make_unique<fdf::Dispatcher::DispatcherShutdownContext>(std::move(shutdown_handler));
     fdf_dispatcher_t* dispatcher;
     zx_status_t status = fdf_env_dispatcher_create_with_owner(
-        driver, options, name.data(), name.size(), scheduler_role.data(), scheduler_role.size(),
-        dispatcher_shutdown_context->observer(), &dispatcher);
+        driver, options.value, name.data(), name.size(), scheduler_role.data(),
+        scheduler_role.size(), dispatcher_shutdown_context->observer(), &dispatcher);
     if (status != ZX_OK) {
       return zx::error(status);
     }
     dispatcher_shutdown_context.release();
-    return zx::ok(fdf::Dispatcher(dispatcher));
+    return zx::ok(fdf::SynchronizedDispatcher(dispatcher));
+  }
+
+  // Same as |fdf::UnsynchronizedDispatcher::Create| but allows setting the driver owner for the
+  // dispatcher.
+  //
+  // |driver| is an opaque pointer to the driver object. It will be used to uniquely identify
+  // the driver.
+  static zx::result<fdf::UnsynchronizedDispatcher> CreateUnsynchronizedWithOwner(
+      const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
+      fdf::Dispatcher::ShutdownHandler shutdown_handler, cpp17::string_view scheduler_role = {}) {
+    ZX_ASSERT_MSG((options.value & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+                      FDF_DISPATCHER_OPTION_UNSYNCHRONIZED,
+                  "options.value=%u, needs to have FDF_DISPATCHER_OPTION_UNSYNCHRONIZED",
+                  options.value);
+
+    // We need to create an additional shutdown context in addition to the fdf::Dispatcher
+    // object, as the fdf::Dispatcher may be destructed before the shutdown handler
+    // is called. This can happen if the raw pointer is released from the fdf::Dispatcher.
+    auto dispatcher_shutdown_context =
+        std::make_unique<fdf::Dispatcher::DispatcherShutdownContext>(std::move(shutdown_handler));
+    fdf_dispatcher_t* dispatcher;
+    zx_status_t status = fdf_env_dispatcher_create_with_owner(
+        driver, options.value, name.data(), name.size(), scheduler_role.data(),
+        scheduler_role.size(), dispatcher_shutdown_context->observer(), &dispatcher);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    dispatcher_shutdown_context.release();
+    return zx::ok(fdf::UnsynchronizedDispatcher(dispatcher));
   }
 };
 

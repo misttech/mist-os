@@ -75,17 +75,13 @@ class ChannelDispatcherTest {
     server_ = std::move(channel_pair->end1);
 
     {
-      auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-          &client_fake_driver_, dispatcher_options, "client",
-          fit::bind_member(this, &ChannelDispatcherTest::ShutdownHandler));
+      auto dispatcher = CreateDispatcher(&client_fake_driver_, dispatcher_options, "client");
       ASSERT_OK(dispatcher.status_value());
       client_dispatcher_ = *std::move(dispatcher);
     }
 
     {
-      auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-          &server_fake_driver_, dispatcher_options, "server",
-          fit::bind_member(this, &ChannelDispatcherTest::ShutdownHandler));
+      auto dispatcher = CreateDispatcher(&server_fake_driver_, dispatcher_options, "server");
       ASSERT_OK(dispatcher.status_value());
       server_dispatcher_ = *std::move(dispatcher);
     }
@@ -141,6 +137,20 @@ class ChannelDispatcherTest {
   }
 
  private:
+  zx::result<fdf::Dispatcher> CreateDispatcher(void* owner, uint32_t options,
+                                               cpp17::string_view name) {
+    if ((options & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
+        FDF_DISPATCHER_OPTION_SYNCHRONIZED) {
+      return fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+          owner, fdf::SynchronizedDispatcher::Options{.value = options}, name,
+          fit::bind_member(this, &ChannelDispatcherTest::ShutdownHandler));
+    } else {
+      return fdf_env::DispatcherBuilder::CreateUnsynchronizedWithOwner(
+          owner, fdf::UnsynchronizedDispatcher::Options{.value = options}, name,
+          fit::bind_member(this, &ChannelDispatcherTest::ShutdownHandler));
+    }
+  }
+
   uint32_t msg_count_;
   uint32_t msg_size_;
 
@@ -155,7 +165,7 @@ class ChannelDispatcherTest {
   fdf::Dispatcher server_dispatcher_;
   libsync::Completion server_dispatcher_shutdown_;
 
-  fdf::Arena arena_;
+  fdf::Arena arena_{nullptr};
 
   uint32_t client_fake_driver_;
   uint32_t server_fake_driver_;

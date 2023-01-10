@@ -19,8 +19,8 @@ __EXPORT int main(int argc, char** argv) {
     return status;
   }
   const void* driver = reinterpret_cast<void*>(0x12345678);
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateWithOwner(
-      driver, FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, "driver-runtime-test-main",
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      driver, fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-runtime-test-main",
       [](fdf_dispatcher_t*) {});
   if (dispatcher.is_error()) {
     return dispatcher.status_value();

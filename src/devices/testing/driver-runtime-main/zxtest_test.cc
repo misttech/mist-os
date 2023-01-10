@@ -15,7 +15,8 @@ TEST(ZxTest, GetCurrentDispatcherWorks) { EXPECT_NOT_NULL(fdf::Dispatcher::GetCu
 
 TEST(ZxTest, CreateDispatcherWorks) {
   libsync::Completion completion;
-  auto dispatcher = fdf::Dispatcher::Create(0, "", [&](fdf_dispatcher_t*) { completion.Signal(); });
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t*) { completion.Signal(); });
   EXPECT_OK(dispatcher.status_value());
   dispatcher->ShutdownAsync();
   completion.Wait();
@@ -23,7 +24,8 @@ TEST(ZxTest, CreateDispatcherWorks) {
 
 TEST(ZxTest, DoWork) {
   libsync::Completion completion;
-  auto dispatcher = fdf::Dispatcher::Create(0, "", [&](fdf_dispatcher_t*) { completion.Signal(); });
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t*) { completion.Signal(); });
   ASSERT_OK(dispatcher.status_value());
 
   async::PostTask(dispatcher->async_dispatcher(), [&]() { completion.Signal(); });

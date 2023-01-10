@@ -242,8 +242,10 @@ zx::result<fdf::Dispatcher> CreateDispatcher(fbl::RefPtr<Driver> driver, uint32_
   //
   // We do not destroy the dispatcher in the shutdown callback, to prevent crashes that
   // would happen if the driver attempts to access the dispatcher in its Stop hook.
-  return fdf_env::DispatcherBuilder::CreateWithOwner(
-      driver.get(), dispatcher_opts,
+  //
+  // Currently we only support synchronized dispatchers for the default dispatcher.
+  return fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      driver.get(), fdf::SynchronizedDispatcher::Options{.value = dispatcher_opts},
       fbl::StringPrintf("%.*s-default-%p", (int)name.size(), name.data(), driver.get()),
       [driver_ref = driver](fdf_dispatcher_t* dispatcher) {});
 }
