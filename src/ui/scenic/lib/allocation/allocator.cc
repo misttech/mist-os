@@ -16,7 +16,6 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 
 using allocation::BufferCollectionUsage;
-using fuchsia::ui::composition::BufferCollectionExportToken;
 using fuchsia::ui::composition::RegisterBufferCollectionError;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 
@@ -64,6 +63,65 @@ std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> CreateVectorOfTokens(
   return tokens;
 }
 
+struct ParsedArgs {
+  zx_koid_t koid;
+  RegisterBufferCollectionUsages buffer_collection_usages;
+  fuchsia::ui::composition::BufferCollectionExportToken export_token;
+  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> buffer_collection_token;
+};
+
+// Parses the FIDL struct, validating the arguments. Logs an error and returns std::nullopt on
+// failure.
+std::optional<ParsedArgs> ParseArgs(fuchsia::ui::composition::RegisterBufferCollectionArgs args) {
+  // It's okay if there's no specified RegisterBufferCollectionUsage. In that case, assume it is
+  // DEFAULT.
+  if (!args.has_buffer_collection_token() || !args.has_export_token()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with missing arguments";
+    return std::nullopt;
+  }
+
+  if (!args.buffer_collection_token().is_valid()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer collection token";
+    return std::nullopt;
+  }
+
+  if (!args.export_token().value.is_valid()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid export token";
+    return std::nullopt;
+  }
+
+  // Check if there is a valid peer.
+  if (fsl::GetRelatedKoid(args.export_token().value.get()) == ZX_KOID_INVALID) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with no valid import tokens";
+    return std::nullopt;
+  }
+
+  if (args.has_usages() && args.usages().has_unknown_bits()) {
+    FX_LOGS(ERROR) << "Arguments contain unknown BufferCollectionUsage type";
+    return std::nullopt;
+  }
+
+  // Grab object koid to be used as unique_id.
+  const GlobalBufferCollectionId koid = fsl::GetKoid(args.export_token().value.get());
+  FX_DCHECK(koid != ZX_KOID_INVALID);
+
+  // If no usages are set we default to DEFAULT. Otherwise the newer "usages" value takes precedence
+  // over the deprecated "usage" variant.
+  RegisterBufferCollectionUsages buffer_collection_usages = RegisterBufferCollectionUsages::DEFAULT;
+  if (args.has_usages()) {
+    buffer_collection_usages = args.usages();
+  } else if (args.has_usage()) {
+    buffer_collection_usages = UsageToUsages(args.usage());
+  }
+
+  return ParsedArgs{
+      .koid = koid,
+      .buffer_collection_usages = buffer_collection_usages,
+      .export_token = std::move(*args.mutable_export_token()),
+      .buffer_collection_token = std::move(*args.mutable_buffer_collection_token()),
+  };
+}
+
 }  // namespace
 
 Allocator::Allocator(sys::ComponentContext* app_context,
@@ -97,54 +155,14 @@ void Allocator::RegisterBufferCollection(
   TRACE_DURATION("gfx", "allocation::Allocator::RegisterBufferCollection");
   FX_DCHECK(dispatcher_ == async_get_default_dispatcher());
 
-  // It's okay if there's no specified RegisterBufferCollectionUsage. In that case, assume it is
-  // DEFAULT.
-  if (!args.has_buffer_collection_token() || !args.has_export_token()) {
-    FX_LOGS(ERROR) << "RegisterBufferCollection called with missing arguments";
+  auto parsed_args = ParseArgs(std::move(args));
+  if (!parsed_args) {
     callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
     return;
   }
 
-  auto export_token = std::move(*args.mutable_export_token());
-  auto buffer_collection_token = std::move(*args.mutable_buffer_collection_token());
-
-  // If no usages are set we default to DEFAULT. Otherwise the newer "usages" value takes precedence
-  // over the deprecated "usage" variant.
-  RegisterBufferCollectionUsages usages = RegisterBufferCollectionUsages::DEFAULT;
-  if (args.has_usages()) {
-    usages = args.usages();
-  } else if (args.has_usage()) {
-    usages = UsageToUsages(args.usage());
-  }
-
-  if (!buffer_collection_token.is_valid()) {
-    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer collection token";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-
-  if (!export_token.value.is_valid()) {
-    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid export token";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-
-  // Check if there is a valid peer.
-  if (fsl::GetRelatedKoid(export_token.value.get()) == ZX_KOID_INVALID) {
-    FX_LOGS(ERROR) << "RegisterBufferCollection called with no valid import tokens";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-
-  if (usages.has_unknown_bits()) {
-    FX_LOGS(ERROR) << "Arguments contain unknown BufferCollectionUsage type";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-
-  // Grab object koid to be used as unique_id.
-  const GlobalBufferCollectionId koid = fsl::GetKoid(export_token.value.get());
-  FX_DCHECK(koid != ZX_KOID_INVALID);
+  auto& [koid, buffer_collection_usages, export_token, buffer_collection_token] =
+      parsed_args.value();
 
   // Check if this export token has already been used.
   if (buffer_collections_.find(koid) != buffer_collections_.end()) {
@@ -153,8 +171,6 @@ void Allocator::RegisterBufferCollection(
     return;
   }
 
-  const auto importers = GetImporters(usages);
-
   if (!BufferCollectionTokenIsValid(sysmem_allocator_, buffer_collection_token)) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with a buffer collection token where "
                       "ValidateBufferCollectionToken() failed";
@@ -162,8 +178,10 @@ void Allocator::RegisterBufferCollection(
     return;
   }
 
+  const auto importers = GetImporters(buffer_collection_usages);
   // Create a token for each of the buffer collection importers.
   auto tokens = CreateVectorOfTokens(std::move(buffer_collection_token), importers.size());
+
   if (tokens.empty()) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with a buffer collection token where "
                       "Duplicate() failed";
@@ -171,35 +189,29 @@ void Allocator::RegisterBufferCollection(
     return;
   }
 
-  // Loop over each of the importers and provide each of them with a token from the map we
-  // created above. We declare the iterator |i| outside the loop to aid in cleanup if registering
-  // fails.
-  uint32_t i = 0;
-  for (i = 0; i < importers.size(); i++) {
-    auto& [importer, usage] = importers.at(i);
-    auto result = importer.ImportBufferCollection(koid, sysmem_allocator_.get(),
-                                                  std::move(tokens[i]), usage, std::nullopt);
-    // Exit the loop early if a importer fails to import the buffer collection.
-    if (!result) {
-      break;
+  // Loop over each of the importers and provide each of them with a token from the vector we
+  // created above.
+  for (uint32_t i = 0; i < importers.size(); i++) {
+    bool import_successful = false;
+    {
+      auto& [importer, usage] = importers.at(i);
+      import_successful = importer.ImportBufferCollection(
+          koid, sysmem_allocator_.get(), std::move(tokens[i]), usage, std::nullopt);
+    }
+
+    if (!import_successful) {
+      // If any importers failed then clean up the ones that didn't before returning.
+      for (uint32_t j = 0; j < i; j++) {
+        auto& [importer, usage] = importers.at(j);
+        importer.ReleaseBufferCollection(koid, usage);
+      }
+      FX_LOGS(ERROR) << "Failed to import the buffer collection to the BufferCollectionimporter.";
+      callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
+      return;
     }
   }
 
-  // If the iterator |i| isn't equal to the number of importers than we know that one of the
-  // importers has failed.
-  if (i < importers.size()) {
-    // We have to clean up the buffer collection from the importers where importation was
-    // successful.
-    for (uint32_t j = 0; j < i; j++) {
-      auto& [importer, usage] = importers.at(j);
-      importer.ReleaseBufferCollection(koid, usage);
-    }
-    FX_LOGS(ERROR) << "Failed to import the buffer collection to the BufferCollectionimporter.";
-    callback(fpromise::error(RegisterBufferCollectionError::BAD_OPERATION));
-    return;
-  }
-
-  buffer_collections_[koid] = usages;
+  buffer_collections_[koid] = buffer_collection_usages;
 
   // Use a self-referencing async::WaitOnce to deregister buffer collections when all
   // BufferCollectionImportTokens are used, i.e. peers of eventpair are closed. Note that the
@@ -208,7 +220,7 @@ void Allocator::RegisterBufferCollection(
       std::make_shared<async::WaitOnce>(export_token.value.release(), ZX_EVENTPAIR_PEER_CLOSED);
   const zx_status_t status =
       wait->Begin(async_get_default_dispatcher(),
-                  [copy_ref = wait, weak_ptr = weak_factory_.GetWeakPtr(), koid](
+                  [copy_ref = wait, weak_ptr = weak_factory_.GetWeakPtr(), koid = koid](
                       async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
                       const zx_packet_signal_t* /*signal*/) mutable {
                     FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
