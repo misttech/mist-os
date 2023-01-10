@@ -8,9 +8,13 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/fit/defer.h>
 #include <lib/fit/function.h>
+#include <lib/fpromise/bridge.h>
 #include <lib/stdcompat/optional.h>
 #include <lib/zx/time.h>
+
+#include <thread>
 
 namespace loop_fixture {
 
@@ -64,6 +68,26 @@ class RealLoop {
   template <typename PromiseType>
   typename PromiseType::result_type RunPromise(PromiseType promise);
 
+  // Runs the message loop while spawning a new thread to perform |work|, and
+  // returns the result of calling |work|. Runs the loop until |work| returns.
+  //
+  // |Callable| should take zero arguments.
+  template <typename Callable>
+  auto PerformBlockingWork(Callable&& work) {
+    using R = std::invoke_result_t<Callable>;
+    if constexpr (std::is_same_v<R, void>) {
+      // Use an |std::monostate| such that |PerformBlockingWorkImpl| does not
+      // have to contend with void values which are tricky to work with.
+      PerformBlockingWorkImpl<std::monostate>([work = std::forward<Callable>(work)]() mutable {
+        work();
+        return std::monostate{};
+      });
+      return;
+    } else {
+      return PerformBlockingWorkImpl<R>(std::forward<Callable>(work));
+    }
+  }
+
   // Quits the loop.
   void QuitLoop();
 
@@ -73,6 +97,9 @@ class RealLoop {
   async::Loop& loop() { return loop_; }
 
  private:
+  template <typename Result, typename Callable>
+  Result PerformBlockingWorkImpl(Callable&& work);
+
   // The message loop for the test.
   async::Loop loop_;
 
@@ -95,6 +122,15 @@ typename PromiseType::result_type RealLoop::RunPromise(PromiseType promise) {
   // there's more work to be done.
   RunLoopUntil([&res]() { return res.has_value(); }, zx::duration::infinite());
   return std::move(res.value());
+}
+
+template <typename Result, typename Callable>
+Result RealLoop::PerformBlockingWorkImpl(Callable&& work) {
+  fpromise::bridge<Result> bridge;
+  std::thread t([completer = std::move(bridge.completer),
+                 work = std::forward<Callable>(work)]() mutable { completer.complete_ok(work()); });
+  auto defer = fit::defer([&] { t.join(); });
+  return RunPromise(bridge.consumer.promise()).take_value();
 }
 
 }  // namespace loop_fixture

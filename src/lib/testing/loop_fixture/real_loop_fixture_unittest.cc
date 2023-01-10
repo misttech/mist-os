@@ -8,10 +8,13 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
 #include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace gtest {
 namespace {
@@ -76,6 +79,46 @@ fpromise::promise<> DelayedPromise(async_dispatcher_t* dispatcher, zx::duration 
 TEST_F(RealLoopFixtureTest, RunPromiseDelayed) {
   fpromise::result<> res = RunPromise(DelayedPromise(dispatcher(), zx::msec(100)));
   EXPECT_TRUE(res.is_ok());
+}
+
+TEST_F(RealLoopFixtureTest, RunPromiseVoidValue) {
+  auto res = RunPromise(fpromise::make_ok_promise());
+  ASSERT_TRUE(res.is_ok());
+  static_assert(std::is_same_v<decltype(res)::value_type, void>);
+}
+
+TEST_F(RealLoopFixtureTest, RunPromiseMoveOnlyValue) {
+  auto res = RunPromise(fpromise::make_ok_promise(std::make_unique<int>(42)));
+  ASSERT_TRUE(res.is_ok());
+  ASSERT_NE(res.value().get(), nullptr);
+  ASSERT_EQ(*res.value(), 42);
+}
+
+TEST_F(RealLoopFixtureTest, PerformBlockingWork) {
+  // Check that both the async loop and the blocking work are running simultaneously.
+  auto result = PerformBlockingWork([&] {
+    libsync::Completion work_done;
+    EXPECT_OK(async::PostTask(dispatcher(), [&] { work_done.Signal(); }));
+    EXPECT_OK(work_done.Wait());
+    return 42;
+  });
+
+  static_assert(std::is_same_v<decltype(result), int>);
+  ASSERT_EQ(result, 42);
+}
+
+TEST_F(RealLoopFixtureTest, PerformBlockingWorkVoidValue) {
+  struct C {
+    static void ReturnVoid() {}
+  };
+  static_assert(std::is_same_v<decltype(PerformBlockingWork(&C::ReturnVoid)), void>);
+  PerformBlockingWork(&C::ReturnVoid);
+}
+
+TEST_F(RealLoopFixtureTest, PerformBlockingWorkMoveOnlyValue) {
+  std::unique_ptr res = PerformBlockingWork([] { return std::make_unique<int>(42); });
+  ASSERT_NE(res.get(), nullptr);
+  ASSERT_EQ(*res, 42);
 }
 
 }  // namespace

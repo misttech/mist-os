@@ -53,9 +53,11 @@ executable("loop_fixture_unittests") {
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
+    "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 
