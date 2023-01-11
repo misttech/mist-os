@@ -14,15 +14,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let FeatureSupportLevel::Minimal = context.feature_set_level {
-            if connectivity_config.wlan.include_wlan_aibs {
-                builder.platform_bundle("wlan_base");
-                // Some products require legacy security types to be supported.
-                // Otherwise, they are disabled by default.
-                if connectivity_config.wlan.legacy_privacy_support {
-                    builder.platform_bundle("wlan_legacy_privacy_support");
-                } else {
-                    builder.platform_bundle("wlan_contemporary_privacy_only_support");
-                }
+            builder.platform_bundle("wlan_base");
+            // Some products require legacy security types to be supported.
+            // Otherwise, they are disabled by default.
+            if connectivity_config.wlan.legacy_privacy_support {
+                builder.platform_bundle("wlan_legacy_privacy_support");
+            } else {
+                builder.platform_bundle("wlan_contemporary_privacy_only_support");
             }
 
             if let Some(board_info) = context.board_info {
