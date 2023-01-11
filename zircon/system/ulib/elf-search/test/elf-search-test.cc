@@ -61,7 +61,7 @@ void WriteHeaders(const cpp20::span<const Elf64_Phdr>& phdrs, const zx::vmo& vmo
     .e_shstrndx = 0,
   };
   EXPECT_OK(vmo.write(&ehdr, 0, sizeof(ehdr)));
-  EXPECT_OK(vmo.write(phdrs.begin(), sizeof(ehdr), sizeof(Elf64_Phdr) * phdrs.size()));
+  EXPECT_OK(vmo.write(phdrs.data(), sizeof(ehdr), sizeof(Elf64_Phdr) * phdrs.size()));
 }
 
 // TODO(jakehehrlich): Switch all uses of uint8_t to std::byte once libc++ lands.
