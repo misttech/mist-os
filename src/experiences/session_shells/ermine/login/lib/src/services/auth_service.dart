@@ -179,8 +179,21 @@ class AuthService {
           id: id,
           account: _account!.ctrl.request(),
         ));
-      } on FidlError catch (_) {
-        clearPasswordInteractionFlow();
+      } on PasswordInteractionException catch (_) {
+        // TODO(fxb/119277): Update to support "waitingForPassword" timer based
+        // back off for next password attempt.
+        // Call PasswordInteraction.watchState again to move the interaction
+        // state machine from error state to waiting to set password state.
+        final passwordInteractionFlow =
+            await _getPasswordInteractionFlowForEnroll(metadata);
+        final result =
+            await passwordInteractionFlow.passwordInteraction.watchState();
+
+        assert(result.$tag ==
+                PasswordInteractionWatchStateResponseTag.waiting &&
+            result.waiting
+                    ?.contains(PasswordCondition.withSetPassword(Empty())) ==
+                true);
         rethrow;
       }
     } else {
@@ -219,8 +232,13 @@ class AuthService {
             await _getPasswordInteractionFlowForAuth(_accountIds.first);
         await passwordInteractionFlow.setPassword(password);
         clearPasswordInteractionFlow();
-      } on FidlError catch (_) {
-        clearPasswordInteractionFlow();
+        // ignore: avoid_catches_without_on_clauses
+      } catch (e) {
+        // Clear password interaction flow on invalid password.
+        if (e is MethodException &&
+            e.value == faccount.Error.failedAuthentication) {
+          clearPasswordInteractionFlow();
+        }
         rethrow;
       }
     } else {
@@ -369,6 +387,7 @@ class _PasswordInteractionFlow {
 
     // Ensure watchState is waiting for setPassword.
     final response = await passwordInteraction.watchState();
+
     if (response.$tag != PasswordInteractionWatchStateResponseTag.waiting ||
         !response.waiting!
             .contains(PasswordCondition.withSetPassword(Empty()))) {
@@ -427,11 +446,8 @@ class _PasswordInteractionFlow {
   Future<dynamic> setPassword(String password) async {
     // Set the password without blocking. This will allow us to call watchSate
     // right after.
-    final setPasswordCompleter = Completer();
     // ignore: unawaited_futures
-    passwordInteraction
-        .setPassword(password)
-        .catchError(setPasswordCompleter.completeError);
+    passwordInteraction.setPassword(password).catchError((_) {});
 
     // Watch for state change without blocking and report any state as an
     // exception to allow updating the UX accordingly.
@@ -441,22 +457,21 @@ class _PasswordInteractionFlow {
         .watchState()
         .then((response) => watchStateCompleter
             .completeError(PasswordInteractionException(response)))
-        .catchError(watchStateCompleter.completeError);
+        .catchError(watchStateCompleter.complete);
 
     // Wait on futures from the auth/enroll method and channel closures on
     // passwordInteraction and interaction channels. These channels are closed
     // upon successful auth/enroll. The list also includes the future from the
     // watchState completer, which throws an exception upon state change.
-    final result = await Future.wait([
-      getAccountOrProvisionNewAccountFuture,
-      passwordInteraction.ctrl.whenClosed,
-      interaction.ctrl.whenClosed,
-      watchStateCompleter.future,
-      setPasswordCompleter.future,
-    ],
-        eagerError: true,
-        // Log additional errors not handled eagerly from other futures.
-        cleanUp: (e) => log.shout('Errors during auth/enroll: $e'));
+    final result = await Future.wait(
+      [
+        getAccountOrProvisionNewAccountFuture,
+        passwordInteraction.ctrl.whenClosed,
+        interaction.ctrl.whenClosed,
+        watchStateCompleter.future,
+      ],
+      eagerError: true,
+    );
 
     return result.first;
   }
@@ -473,11 +488,14 @@ class PasswordInteractionException implements Exception {
     _processResponse();
   }
 
+  @override
+  String toString() => message;
+
   void _processResponse() {
     switch (response.$tag) {
       case PasswordInteractionWatchStateResponseTag.waiting:
-        message = '';
-        shouldWait = false;
+        message = 'Please wait';
+        shouldWait = true;
         for (final condition in response.waiting!) {
           if (condition.$tag == PasswordConditionTag.waitUntil) {
             // TODO(sanjayc): Also report the duration for a countdown UX.
@@ -493,7 +511,27 @@ class PasswordInteractionException implements Exception {
         break;
       case PasswordInteractionWatchStateResponseTag.error:
         shouldWait = false;
-        message = response.error.toString();
+        switch (response.error?.$tag) {
+          case PasswordErrorTag.tooShort:
+            message = 'Password too short';
+            break;
+          case PasswordErrorTag.tooWeak:
+            message = 'Password too weak';
+            break;
+          case PasswordErrorTag.incorrect:
+            message = 'Password incorrect';
+            break;
+          case PasswordErrorTag.mustWait:
+            message = 'Must wait';
+            break;
+          case PasswordErrorTag.notWaitingForPassword:
+            message = 'Not waiting for password';
+            break;
+          case PasswordErrorTag.$unknown:
+          default:
+            message = response.error.toString();
+            break;
+        }
         break;
     }
   }
