@@ -119,9 +119,11 @@ InterruptStatusReg DwI2cBus::ReadAndClearIrq() {
   auto irq = InterruptStatusReg::Get().ReadFrom(&mmio_);
 
   if (irq.tx_abrt()) {
-    // ABRT_SOURCE should be read before clearing TX_ABRT.
-    zxlogf(ERROR, "dw-i2c: error on bus - Abort source 0x%x",
+    // The device did not respond with an ACK to its address. This is expected for some devices, so
+    // don't log an error message.
+    zxlogf(DEBUG, "dw-i2c: error on bus - Abort source 0x%x",
            TxAbrtSourceReg::Get().ReadFrom(&mmio_).reg_value());
+    // ABRT_SOURCE should be read before clearing TX_ABRT.
     ClearTxAbrtReg::Get().ReadFrom(&mmio_);
   }
   if (irq.start_det()) {
