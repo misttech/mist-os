@@ -134,6 +134,15 @@ function fetch_or_build_tool {
   if [[ "${remote_os}" != "${local_os}" ]]; then
     if [[ -f "$(get_host_tools_dir)/${tool_name}" ]]; then
       fx-info "Using locally built ${tool_name}"
+
+      # Also copy tool to the local_dir
+      # omit the --build args that are used below as the tool is (in theory)
+      # already built since we can find it in the host tools directory
+      tool="$(fx-command-run list-build-artifacts --expect-one --name ${tool_name} tools)" || exit $?
+      rm -f "${local_dir}/${tool}"
+      mkdir -p "${local_dir}/$(dirname "$tool")"
+      cp "${FUCHSIA_BUILD_DIR}/${tool}" "${local_dir}/${tool}"
+
       echo "$(get_host_tools_dir)/${tool_name}"
       return
     fi
