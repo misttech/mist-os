@@ -4,47 +4,15 @@
 
 import("//build/components.gni")
 import("//build/go/go_library.gni")
-import("//build/go/go_test.gni")
-import("//src/connectivity/network/netstack/gentool/generated.gni")
-
-generated_go("entries_gen_test/entries") {
-  definitions = [
-    {
-      src = "test_entries.json"
-      template = "gen/entries.tmpl"
-    },
-  ]
-}
-
-go_library("fifo_gen") {
-  source_dir = "gen"
-  sources = [ "fifo_entry.go" ]
-}
 
 go_library("fifo") {
   deps = [
-    ":fifo_gen",
     "//third_party/golibs:go.uber.org/multierr",
     "//third_party/golibs:gvisor.dev/gvisor",
   ]
 
   sources = [
-    "entries_test.go",
     "mapped_vmo.go",
     "stats.go",
   ]
-}
-
-go_test("link_fifo_test") {
-  library = ":fifo"
-  deps = [ ":entries_gen_test/entries" ]
-}
-
-fuchsia_unittest_package("netstack-link-fifo-gotests") {
-  deps = [ ":link_fifo_test" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":netstack-link-fifo-gotests" ]
 }

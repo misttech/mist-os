@@ -7,7 +7,6 @@ import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/go/toolchain.gni")
-import("gentool/generated.gni")
 import("tracing/go_tracing_include_dirs.gni")
 import("udp_serde/udp_serde_include_dirs.gni")
 
@@ -82,19 +81,6 @@ fuchsia_component("component-with-tracing") {
   component_name = "netstack"
   manifest = "meta/netstack_with_tracing.cml"
   deps = [ ":bin_with_tracing" ]
-}
-
-generated_go("gen/netstack/link/netdevice") {
-  definitions = [
-    {
-      src = "link/netdevice/handler.json"
-      template = "link/fifo/gen/handler.tmpl"
-    },
-    {
-      src = "link/netdevice/entries.json"
-      template = "link/fifo/gen/entries.tmpl"
-    },
-  ]
 }
 
 go_library("pprof") {
@@ -227,7 +213,6 @@ group("tests") {
     "filter:tests",
     "inspect:tests",
     "link/bridge:tests",
-    "link/fifo:tests",
     "link/netdevice:tests",
     "routes:tests",
     "tests",

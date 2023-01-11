@@ -11,7 +11,6 @@ go_library("netdevice") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_go($go_toolchain)",
-    "//src/connectivity/network/netstack:gen/netstack/link/netdevice",
     "//src/connectivity/network/netstack/link",
     "//src/connectivity/network/netstack/link/fifo",
     "//src/connectivity/network/netstack/sync",
@@ -27,6 +26,9 @@ go_library("netdevice") {
   sources = [
     "client.go",
     "client_test.go",
+    "entries.go",
+    "entries_test.go",
+    "handler.go",
     "session_config.go",
     "session_config_test.go",
   ]

@@ -1,6 +1,0 @@
-{
-  "Pkg": "netdevice",
-  "Handler": "Handler",
-  "Entries": "Entries",
-  "EntryType": "uint16"
-}

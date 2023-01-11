@@ -4,18 +4,16 @@
 
 //go:build !build_with_native_toolchain
 
-package fifo
+package netdevice
 
 import (
 	"fmt"
 	"math/bits"
 	"testing"
-
-	"entries_gen_test/entries"
 )
 
 func TestEntries(t *testing.T) {
-	var e entries.Entries
+	var e Entries
 
 	var maxDepth uint16
 
@@ -33,7 +31,7 @@ func TestEntries(t *testing.T) {
 				t.Fatalf("got len(storage)=%d (binary=%b) want power of two", capacity, capacity)
 			}
 
-			scratch := make([]struct{}, capacity)
+			scratch := make([]uint16, capacity)
 
 			for _, delta := range []uint16{depth, 1, depth / 2, depth - 1, depth} {
 				t.Run(fmt.Sprintf("delta=%d", delta), func(t *testing.T) {

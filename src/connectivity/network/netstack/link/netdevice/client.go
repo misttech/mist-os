@@ -15,8 +15,6 @@ import (
 	"syscall/zx/fidl"
 	"unsafe"
 
-	"gen/netstack/link/netdevice"
-
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/fifo"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
@@ -63,7 +61,7 @@ type Client struct {
 	data        fifo.MappedVMO
 	descriptors fifo.MappedVMO
 
-	handler netdevice.Handler
+	handler Handler
 
 	mu struct {
 		sync.RWMutex
@@ -846,7 +844,7 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 		config:      config,
 		data:        mappedDataVmo,
 		descriptors: mappedDescVmo,
-		handler: netdevice.Handler{
+		handler: Handler{
 			TxDepth: uint32(deviceInfo.TxDepth),
 			RxDepth: uint32(deviceInfo.RxDepth),
 			RxFifo:  sessionResult.Response.Fifos.Rx,
