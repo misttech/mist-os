@@ -155,7 +155,7 @@ fn snapshot_and_select_bench(b: &mut criterion::Bencher, size: usize) {
     b.iter_with_large_drop(|| {
         criterion::black_box({
             let hierarchy = hierarchy_generator.get_diagnostics_hierarchy().into_owned();
-            filter_hierarchy(hierarchy, &hierarchy_matcher).expect("Unable to filter hierarchy.");
+            let _res = filter_hierarchy(hierarchy, &hierarchy_matcher);
         });
     });
 }

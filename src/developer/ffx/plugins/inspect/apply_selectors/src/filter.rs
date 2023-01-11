@@ -45,25 +45,14 @@ pub fn filter_json_schema_by_selectors(
             let inspect_matcher: InspectHierarchyMatcher = matched_selectors.try_into().unwrap();
 
             match diagnostics_hierarchy::filter_hierarchy(hierarchy, &inspect_matcher) {
-                Ok(Some(filtered)) => {
+                Some(filtered) => {
                     schema.payload = Some(filtered);
                     Some(schema)
                 }
-                Ok(None) => {
+                None => {
                     // Ok(None) implies the tree was fully filtered. This means that
                     // it genuinely should not be included in the output.
                     None
-                }
-                Err(e) => {
-                    schema.payload = Some(hierarchy! {
-                        root: {
-                            "filter error": format!(
-                                "Filtering the hierarchy of {}, an error occurred: {:?}",
-                                schema.moniker, e
-                            ),
-                        }
-                    });
-                    Some(schema)
                 }
             }
         }

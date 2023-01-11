@@ -39,9 +39,6 @@ static WILDCARD_SYMBOL_CHAR: char = '*';
 
 static RECURSIVE_WILDCARD_SYMBOL_STR: &str = "**";
 
-// Globs will match everything along a moniker, but won't match empty strings.
-static GLOB_REGEX_EQUIVALENT: &str = ".+";
-
 // Wildcards will match anything except for an unescaped slash, since their match
 // only extends to a single moniker "node".
 //
@@ -346,25 +343,6 @@ pub fn convert_path_selector_to_regex(
     if is_subtree_selector {
         regex_string.push_str(".*")
     }
-
-    regex_string.push_str("$");
-
-    Ok(regex_string)
-}
-
-/// Converts a single StringSelectors into a string capable of constructing a regular
-/// expression which matches strings encoding a property name on a node.
-///
-/// NOTE: The resulting regular expression makes the assumption that the property names
-/// that it will match against have been sanitized by the  sanitize_string_for_selectors API in
-/// this crate.
-pub fn convert_property_selector_to_regex(selector: &StringSelector) -> Result<String, Error> {
-    let mut regex_string = "^".to_string();
-
-    // Property selectors replace wildcards with GLOB like behavior since there is no
-    // concept of levels/depth to properties.
-    let property_regex = convert_string_selector_to_regex(selector, GLOB_REGEX_EQUIVALENT, None)?;
-    regex_string.push_str(&property_regex);
 
     regex_string.push_str("$");
 
@@ -895,74 +873,6 @@ a:b:c
                         Regex::new(&convert_path_selector_to_regex(&node_path, false).unwrap())
                             .unwrap();
                     assert!(!selector_regex.is_match(&sanitized_node_path));
-                }
-                _ => unreachable!(),
-            }
-        }
-    }
-
-    #[fuchsia::test]
-    fn canonical_property_regex_transpilation_test() {
-        // Note: We provide the full selector syntax but this test is only transpiling
-        // the property of the selector, and validating against that.
-        let test_cases = vec![
-            (r#"echo.cmx:a:*"#, r#"a"#),
-            (r#"echo.cmx:a:bob"#, r#"bob"#),
-            (r#"echo.cmx:a:b*"#, r#"bob"#),
-            (r#"echo.cmx:a:\*"#, r#"*"#),
-            (r#"echo.cmx:a:b\ c"#, r#"b c"#),
-        ];
-        for (selector, string_to_match) in test_cases {
-            let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
-            let tree_selector = parsed_selector.tree_selector.unwrap();
-            match tree_selector {
-                TreeSelector::SubtreeSelector(_) => {
-                    unreachable!("Subtree selectors don't test property selection.")
-                }
-                TreeSelector::PropertySelector(tree_selector) => {
-                    let property_selector = tree_selector.target_properties;
-                    let selector_regex = Regex::new(
-                        &convert_property_selector_to_regex(&property_selector).unwrap(),
-                    )
-                    .unwrap();
-                    assert!(
-                        selector_regex.is_match(&sanitize_string_for_selectors(string_to_match)),
-                        "{} failed for {} with regex={:?}",
-                        selector,
-                        string_to_match,
-                        selector_regex
-                    );
-                }
-                _ => unreachable!(),
-            }
-        }
-    }
-
-    #[fuchsia::test]
-    fn failing_property_regex_transpilation_test() {
-        // Note: We provide the full selector syntax but this test is only transpiling
-        // the node-path of the tree selector, and valdating against that.
-        let test_cases = vec![
-            (r#"echo.cmx:a:c"#, r#"d"#),
-            (r#"echo.cmx:a:bob"#, r#"thebob"#),
-            (r#"echo.cmx:a:c"#, r#"cdog"#),
-        ];
-        for (selector, string_to_match) in test_cases {
-            let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
-            let tree_selector = parsed_selector.tree_selector.unwrap();
-            match tree_selector {
-                TreeSelector::SubtreeSelector(_) => {
-                    unreachable!("Subtree selectors don't test property selection.")
-                }
-                TreeSelector::PropertySelector(tree_selector) => {
-                    let target_properties = tree_selector.target_properties;
-                    let selector_regex = Regex::new(
-                        &convert_property_selector_to_regex(&target_properties).unwrap(),
-                    )
-                    .unwrap();
-                    assert!(
-                        !selector_regex.is_match(&sanitize_string_for_selectors(string_to_match))
-                    );
                 }
                 _ => unreachable!(),
             }

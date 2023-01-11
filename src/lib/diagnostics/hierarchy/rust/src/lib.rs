@@ -9,16 +9,19 @@
 
 use {
     base64::display::Base64Display,
-    fidl_fuchsia_diagnostics::{Selector, StringSelector, TreeSelector},
+    fidl_fuchsia_diagnostics::{
+        PropertySelector, Selector, StringSelector, StringSelectorUnknown, SubtreeSelector,
+        TreeSelector,
+    },
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::bounds::Bounded,
-    regex::RegexSet,
     selectors::{self, ValidateExt},
     serde::Deserialize,
     std::{
         borrow::Borrow,
         cmp::Ordering,
-        convert::{TryFrom, TryInto},
+        collections::BTreeMap,
+        convert::TryFrom,
         fmt::{Display, Formatter, Result as FmtResult},
         ops::{Add, AddAssign, MulAssign},
     },
@@ -480,9 +483,6 @@ pub enum Error {
     #[error("TreeSelector only supports property and subtree selection.")]
     InvalidTreeSelector,
 
-    #[error("Invalid regex")]
-    Regex(#[source] regex::Error),
-
     #[error(transparent)]
     Selectors(#[from] selectors::Error),
 
@@ -623,26 +623,36 @@ where
 
 /// Wrapper for the tools needed to filter a single DiagnosticsHierarchy based on selectors
 /// known to be applicable to it.
-///
-/// `component_node_selector` is a RegexSet of all path
-///     selectors on a hierarchy.
-///
-/// `node_property_selectors` is a vector of Regexs that match single named properties
-///     on a DiagnosticsHierarchy. NOTE: Their order is aligned with the vector of Regexes that created
-///     the component_node_selector RegexSet, since each property selector is associated with
-///     a particular node path selector.
 pub struct InspectHierarchyMatcher {
-    /// RegexSet encoding all the node path selectors for
-    /// inspect hierarchies under this component's out directory.
-    pub component_node_selector: RegexSet,
-    /// Vector of strings encoding regexes corresponding to the node path selectors
-    /// in the regex set.
-    /// Note: Order of regex strings matters here, this vector must be aligned
-    /// with the vector used to construct component_node_selector since
-    /// conponent_node_selector.matches() returns a vector of ints used to
-    /// find all the relevant property selectors corresponding to the matching
-    /// node selectors.
-    pub node_property_selectors: Vec<String>,
+    matcher: TreeMatcher,
+}
+
+impl<T: Borrow<Selector>> TryFrom<&[T]> for InspectHierarchyMatcher {
+    type Error = Error;
+
+    fn try_from(selectors: &[T]) -> Result<Self, Self::Error> {
+        // TODO(fxbug.dev/117929: remove cloning, the archivist can probably hold
+        // InspectHierarchyMatcher<'static>
+        let mut matcher = TreeMatcher::default();
+        for selector in selectors {
+            let selector = selector.borrow();
+            selector.validate().map_err(|e| Error::Selectors(e.into()))?;
+
+            // Safe to unwrap since we already validated the selector.
+            // TODO(fxbug.dev/117929): instead of doing this over Borrow<Selector> do it over
+            // Selector.
+            match selector.tree_selector.clone().unwrap() {
+                TreeSelector::SubtreeSelector(subtree_selector) => {
+                    matcher.insert_subtree(subtree_selector.clone());
+                }
+                TreeSelector::PropertySelector(property_selector) => {
+                    matcher.insert_property(property_selector.clone());
+                }
+                _ => return Err(Error::Selectors(selectors::Error::InvalidTreeSelector)),
+            }
+        }
+        Ok(Self { matcher })
+    }
 }
 
 impl<T: Borrow<Selector>> TryFrom<Vec<T>> for InspectHierarchyMatcher {
@@ -653,53 +663,78 @@ impl<T: Borrow<Selector>> TryFrom<Vec<T>> for InspectHierarchyMatcher {
     }
 }
 
-impl<T: Borrow<Selector>> TryFrom<&[T]> for InspectHierarchyMatcher {
-    type Error = Error;
+struct OrdStringSelector(StringSelector);
 
-    fn try_from(selectors: &[T]) -> Result<Self, Self::Error> {
-        let (node_path_regexes, property_regexes): (Vec<_>, Vec<_>) = selectors
-            .iter()
-            .map(|selector| {
-                let component_selector = selector.borrow();
-                component_selector.validate().map_err(|e| Error::Selectors(e.into()))?;
+impl From<StringSelector> for OrdStringSelector {
+    fn from(selector: StringSelector) -> Self {
+        Self(selector)
+    }
+}
 
-                // Unwrapping is safe here since we validate the selector above.
-                match component_selector.tree_selector.as_ref().unwrap() {
-                    TreeSelector::SubtreeSelector(subtree_selector) => {
-                        Ok((
-                            selectors::convert_path_selector_to_regex(
-                                &subtree_selector.node_path,
-                                /*is_subtree_selector=*/ true,
-                            )?,
-                            selectors::convert_property_selector_to_regex(
-                                &StringSelector::StringPattern("*".to_string()),
-                            )?,
-                        ))
-                    }
-                    TreeSelector::PropertySelector(property_selector) => {
-                        Ok((
-                            selectors::convert_path_selector_to_regex(
-                                &property_selector.node_path,
-                                /*is_subtree_selector=*/ false,
-                            )?,
-                            selectors::convert_property_selector_to_regex(
-                                &property_selector.target_properties,
-                            )?,
-                        ))
-                    }
-                    _ => Err(Error::InvalidTreeSelector),
-                }
-            })
-            .collect::<Result<Vec<(String, String)>, Error>>()?
-            .into_iter()
-            .unzip();
+impl Ord for OrdStringSelector {
+    fn cmp(&self, other: &OrdStringSelector) -> Ordering {
+        match (&self.0, &other.0) {
+            (StringSelector::ExactMatch(s), StringSelector::ExactMatch(o)) => s.cmp(o),
+            (StringSelector::StringPattern(s), StringSelector::StringPattern(o)) => s.cmp(o),
+            (StringSelector::ExactMatch(_), StringSelector::StringPattern(_)) => Ordering::Less,
+            (StringSelector::StringPattern(_), StringSelector::ExactMatch(_)) => Ordering::Greater,
+            (StringSelectorUnknown!(), StringSelector::ExactMatch(_)) => Ordering::Less,
+            (StringSelectorUnknown!(), StringSelector::StringPattern(_)) => Ordering::Less,
+            (StringSelectorUnknown!(), StringSelectorUnknown!()) => Ordering::Equal,
+        }
+    }
+}
 
-        let node_path_regex_set = RegexSet::new(&node_path_regexes).map_err(Error::Regex)?;
+impl PartialOrd for OrdStringSelector {
+    fn partial_cmp(&self, other: &OrdStringSelector) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
 
-        Ok(InspectHierarchyMatcher {
-            component_node_selector: node_path_regex_set,
-            node_property_selectors: property_regexes,
-        })
+impl PartialEq for OrdStringSelector {
+    fn eq(&self, other: &OrdStringSelector) -> bool {
+        match (&self.0, &other.0) {
+            (StringSelector::ExactMatch(s), StringSelector::ExactMatch(o)) => s.eq(o),
+            (StringSelector::StringPattern(s), StringSelector::StringPattern(o)) => s.eq(o),
+            (StringSelector::ExactMatch(_), StringSelector::StringPattern(_)) => false,
+            (StringSelector::StringPattern(_), StringSelector::ExactMatch(_)) => false,
+            (StringSelectorUnknown!(), StringSelectorUnknown!()) => true,
+        }
+    }
+}
+
+impl Eq for OrdStringSelector {}
+
+#[derive(Default)]
+struct TreeMatcher {
+    nodes: BTreeMap<OrdStringSelector, TreeMatcher>,
+    properties: Vec<OrdStringSelector>,
+    subtree: bool,
+}
+
+impl TreeMatcher {
+    fn insert_subtree(&mut self, selector: SubtreeSelector) {
+        self.insert(selector.node_path, None);
+    }
+
+    fn insert_property(&mut self, selector: PropertySelector) {
+        self.insert(selector.node_path, Some(selector.target_properties));
+    }
+
+    fn insert(&mut self, node_path: Vec<StringSelector>, property: Option<StringSelector>) {
+        // Note: this could have additional optimization so that branches are collapsed into a
+        // single one (for example foo/bar is included by f*o/bar), however, in practice, we don't
+        // hit that edge case.
+        let mut matcher = self;
+        for node in node_path {
+            matcher = matcher.nodes.entry(node.into()).or_default();
+        }
+        match property {
+            Some(property) => {
+                matcher.properties.push(property.into());
+            }
+            None => matcher.subtree = true,
+        }
     }
 }
 
@@ -790,93 +825,65 @@ where
 ///    the tree was filtered to be empty at the end.
 /// - If the return type is Error that implies the filter encountered errors.
 pub fn filter_hierarchy<Key>(
-    root_node: DiagnosticsHierarchy<Key>,
+    mut root_node: DiagnosticsHierarchy<Key>,
     hierarchy_matcher: &InspectHierarchyMatcher,
-) -> Result<Option<DiagnosticsHierarchy<Key>>, Error>
+) -> Option<DiagnosticsHierarchy<Key>>
 where
-    Key: AsRef<str> + Clone,
+    Key: AsRef<str>,
 {
-    let mut nodes_added = 0;
-
-    let mut new_root = DiagnosticsHierarchy::new(root_node.name.clone(), vec![], vec![]);
-
-    let mut working_node: &mut DiagnosticsHierarchy<Key> = &mut new_root;
-    let mut working_node_path: Option<String> = None;
-    let mut working_property_regex_set: Option<RegexSet> = None;
-
-    for (node_path, property) in root_node.property_iter() {
-        let mut formatted_node_path = node_path
-            .iter()
-            .map(|s| selectors::sanitize_string_for_selectors(s))
-            .collect::<Vec<String>>()
-            .join("/");
-        // We must append a "/" because the absolute monikers end in slash and
-        // hierarchy node paths don't, but we want to reuse the regex logic.
-        formatted_node_path.push('/');
-
-        // TODO(fxbug.dev/44926): If any of the selectors in the current set are a
-        // subtree selector, we dont have to compile new property selector sets
-        // until we iterate out of the subtree.
-        let property_regex_set: &RegexSet = match &working_node_path {
-            Some(working_path) if *working_path == formatted_node_path => {
-                working_property_regex_set.as_ref().unwrap()
-            }
-            _ => {
-                // Either we never created a property Regex or we've iterated
-                // to a new trie node. Either way, we need to find the relevant
-                // selectors for the current node and create a new property
-                // regex set.
-                let property_regex_strings = hierarchy_matcher
-                    .component_node_selector
-                    .matches(&formatted_node_path)
-                    .into_iter()
-                    .map(|property_index| {
-                        &hierarchy_matcher.node_property_selectors[property_index]
-                    })
-                    .collect::<Vec<&String>>();
-
-                let property_regex_set =
-                    RegexSet::new(property_regex_strings).map_err(Error::Regex)?;
-
-                if property_regex_set.len() > 0 {
-                    working_node = new_root.get_or_add_node(&node_path);
-                    nodes_added = nodes_added + 1;
-                }
-
-                working_node_path = Some(formatted_node_path);
-                working_property_regex_set = Some(property_regex_set);
-
-                working_property_regex_set.as_ref().unwrap()
-            }
-        };
-
-        if property_regex_set.len() == 0 {
-            continue;
-        }
-
-        match property {
-            Some(property) => {
-                if property_regex_set
-                    .is_match(&selectors::sanitize_string_for_selectors(property.name()))
-                {
-                    // TODO(fxbug.dev/4601): We can keep track of the prefix string identifying
-                    // the "curr_node" and only insert from root if our iteration has
-                    // brought us to a new node higher up the hierarchy. Right now, we
-                    // insert from root for every new property.
-                    working_node.properties.push(property.clone());
-                }
-            }
-            None => {
-                continue;
-            }
-        }
-    }
-
-    if nodes_added > 0 {
-        Ok(Some(new_root))
+    if filter_hierarchy_helper(&mut root_node, &[&hierarchy_matcher.matcher]) {
+        Some(root_node)
     } else {
-        Ok(None)
+        None
     }
+}
+
+fn filter_hierarchy_helper<Key>(
+    node: &mut DiagnosticsHierarchy<Key>,
+    hierarchy_matchers: &[&TreeMatcher],
+) -> bool
+where
+    Key: AsRef<str>,
+{
+    let child_matchers = eval_matchers_on_node_name(&node.name, &hierarchy_matchers);
+    if child_matchers.is_empty() {
+        node.children.clear();
+        node.properties.clear();
+        return false;
+    }
+
+    if child_matchers.iter().any(|m| m.subtree) {
+        return true;
+    }
+
+    node.children.retain_mut(|child| filter_hierarchy_helper(child, &child_matchers));
+    node.properties.retain_mut(|prop| eval_matchers_on_property(prop.name(), &child_matchers));
+
+    true
+}
+
+fn eval_matchers_on_node_name<'a>(
+    node_name: &'a str,
+    matchers: &'a [&'a TreeMatcher],
+) -> Vec<&'a TreeMatcher> {
+    let mut result = vec![];
+    for matcher in matchers {
+        for (node_pattern, tree_matcher) in matcher.nodes.iter() {
+            if selectors::match_string(&node_pattern.0, node_name) {
+                result.push(tree_matcher);
+            }
+        }
+    }
+    result
+}
+
+fn eval_matchers_on_property(property_name: &str, matchers: &[&TreeMatcher]) -> bool {
+    matchers.iter().any(|matcher| {
+        matcher
+            .properties
+            .iter()
+            .any(|property_pattern| selectors::match_string(&property_pattern.0, property_name))
+    })
 }
 
 /// The parameters of an exponential histogram.
@@ -1381,7 +1388,7 @@ mod tests {
     fn parse_selectors_and_filter_hierarchy(
         hierarchy: DiagnosticsHierarchy,
         test_selectors: Vec<&str>,
-    ) -> DiagnosticsHierarchy {
+    ) -> Option<DiagnosticsHierarchy> {
         let parsed_test_selectors = test_selectors
             .into_iter()
             .map(|selector_string| {
@@ -1394,11 +1401,10 @@ mod tests {
 
         let hierarchy_matcher: InspectHierarchyMatcher = parsed_test_selectors.try_into().unwrap();
 
-        let mut filtered_hierarchy = filter_hierarchy(hierarchy, &hierarchy_matcher)
-            .expect("filtered hierarchy should succeed.")
-            .expect("There should be an actual resulting hierarchy.");
-        filtered_hierarchy.sort();
-        filtered_hierarchy
+        filter_hierarchy(hierarchy, &hierarchy_matcher).map(|mut hierarchy| {
+            hierarchy.sort();
+            hierarchy
+        })
     }
 
     fn get_test_hierarchy() -> DiagnosticsHierarchy {
@@ -1442,7 +1448,7 @@ mod tests {
 
         assert_eq!(
             parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
-            DiagnosticsHierarchy::new(
+            Some(DiagnosticsHierarchy::new(
                 "root",
                 vec![Property::Int("z".to_string(), -4),],
                 vec![
@@ -1461,7 +1467,7 @@ mod tests {
                         vec![],
                     )
                 ],
-            )
+            ))
         );
 
         let test_selectors = vec!["*:root"];
@@ -1469,7 +1475,7 @@ mod tests {
         sorted_expected.sort();
         assert_eq!(
             parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
-            sorted_expected
+            Some(sorted_expected)
         );
     }
 
@@ -1479,11 +1485,21 @@ mod tests {
 
         assert_eq!(
             parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
-            DiagnosticsHierarchy::new(
+            Some(DiagnosticsHierarchy::new(
                 "root",
                 vec![],
                 vec![DiagnosticsHierarchy::new("foo", vec![], vec![],)],
-            )
+            ))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_filter_non_existent_root() {
+        let test_selectors = vec!["*:non-existent-root"];
+
+        assert_eq!(
+            parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
+            None,
         );
     }
 
@@ -1511,7 +1527,7 @@ mod tests {
 
         assert_eq!(
             parse_selectors_and_filter_hierarchy(empty_hierarchy.clone(), test_selectors),
-            empty_hierarchy.clone()
+            Some(empty_hierarchy)
         );
     }
 
@@ -1524,14 +1540,14 @@ mod tests {
         let subtree_selector = vec!["*:root"];
         assert_eq!(
             parse_selectors_and_filter_hierarchy(empty_hierarchy.clone(), subtree_selector),
-            empty_hierarchy.clone()
+            Some(empty_hierarchy.clone())
         );
 
         // Selecting a property on the root, even if it doesn't exist, should produce the empty tree.
         let fake_property_selector = vec!["*:root:blorp"];
         assert_eq!(
             parse_selectors_and_filter_hierarchy(empty_hierarchy.clone(), fake_property_selector),
-            empty_hierarchy.clone()
+            Some(empty_hierarchy)
         );
     }
 
