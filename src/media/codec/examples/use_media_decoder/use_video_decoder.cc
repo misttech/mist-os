@@ -174,7 +174,7 @@ std::optional<size_t> FindJpegImage(cpp20::span<const uint8_t> buffer) {
 
   // Search for the EOI marker
   while (cursor < buffer.size_bytes()) {
-    auto itr = std::find_if(buffer.data() + cursor, buffer.end(),
+    auto itr = std::find_if(buffer.begin() + cursor, buffer.end(),
                             [](uint8_t data) { return (data == MARKER_PREFIX); });
 
     // If at the the end, then there isn't an EOI marker in this buffer

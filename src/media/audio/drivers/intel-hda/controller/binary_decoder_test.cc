@@ -35,13 +35,13 @@ TEST(BinaryDecoder, NonEmptyRead) {
   auto a = decoder.Read(1);
   ASSERT_TRUE(a.is_ok());
   EXPECT_EQ(a.value().size(), 1);
-  EXPECT_EQ(a.value().begin(), &buffer[0]);
+  EXPECT_EQ(a.value().data(), &buffer[0]);
 
   // Another read.
   auto b = decoder.Read(1);
   ASSERT_TRUE(b.is_ok());
   EXPECT_EQ(b.value().size(), 1);
-  EXPECT_EQ(b.value().begin(), &buffer[1]);
+  EXPECT_EQ(b.value().data(), &buffer[1]);
 
   // Too big a read.
   auto c = decoder.Read(4);
@@ -51,7 +51,7 @@ TEST(BinaryDecoder, NonEmptyRead) {
   auto d = decoder.Read(3);
   ASSERT_TRUE(d.is_ok());
   EXPECT_EQ(d.value().size(), 3);
-  EXPECT_EQ(d.value().begin(), &buffer[2]);
+  EXPECT_EQ(d.value().data(), &buffer[2]);
 }
 
 TEST(BinaryDecoder, ReadStruct) {
@@ -153,7 +153,7 @@ TEST(BinaryDecoder, VarLengthRead) {
     EXPECT_EQ(val.size, 3);
     EXPECT_EQ(val.data, 2);
     EXPECT_EQ(payload.size(), 1);
-    EXPECT_EQ(payload.begin(), &buffer[2]);
+    EXPECT_EQ(payload.data(), &buffer[2]);
   }
 }
 
