@@ -90,11 +90,9 @@ __attribute__((constructor)) void init_packet_socket_provider() {
       ZX_ASSERT_MSG(status == ZX_OK, "Failed to create channels: %s", zx_status_get_string(status));
     }
 
-    // TODO(https://fxbug.dev/77059): Drop writable right.
     {
       zx_status_t status = composed_svc_dir.Serve(
-          fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-              fuchsia::io::OpenFlags::DIRECTORY,
+          fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::DIRECTORY,
           std::move(server), composed_svc_dir_loop.dispatcher());
       ZX_ASSERT_MSG(status == ZX_OK,
                     "Failed to start serving requsts for composed service directory: %s",
