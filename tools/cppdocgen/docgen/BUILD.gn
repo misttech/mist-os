@@ -32,6 +32,8 @@ go_library("docgen") {
   deps = [ "../clangdoc" ]
 }
 
+# This target appears in the output directory as "host_x64/docgen_test" and can be built and run
+# using that path.
 go_test("test") {
   library = ":docgen"
   output_name = "docgen_test"
