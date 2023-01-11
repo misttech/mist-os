@@ -178,4 +178,46 @@ TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageReadTestParameterized) 
             0);
 }
 
+template <typename F>
+void FuchsiaFirmwareStorageWriteTest(const FuchsiaFirmwareStorageTestCase& test_case, F func) {
+  TestFuchsiaFirmwareStorage storage(test_case.storage_size, test_case.block_size);
+  FuchsiaFirmwareStorage ops = storage.GetFuchsiaFirmwareStorage();
+
+  size_t total_buffer_size = test_case.size + test_case.buffer_offset;
+  AlignedBuffer write_buffer(total_buffer_size);
+  auto write_start = write_buffer.get() + test_case.buffer_offset;
+
+  // Initialize data to write. Take the content on storage and reverse it.
+  memcpy(write_start, storage.buffer().data() + test_case.offset, test_case.size);
+  std::reverse(write_start, write_start + test_case.size);
+
+  // Make a copy of the data to write. This is for checking API does not modify input.
+  std::vector<uint8_t> original(write_buffer.get(), write_buffer.get() + total_buffer_size);
+
+  // Construct expected data on storage
+  std::vector<uint8_t> expected = storage.buffer();
+  memcpy(expected.data() + test_case.offset, write_start, test_case.size);
+  ASSERT_TRUE(func(&ops, test_case.offset, test_case.size, write_start));
+  ASSERT_EQ(expected, storage.buffer());
+
+  // Input buffer should not be changed.
+  ASSERT_EQ(memcmp(write_buffer.get(), original.data(), total_buffer_size), 0);
+}
+
+TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteTestParameterized) {
+  const FuchsiaFirmwareStorageTestCase& test_case = GetParam();
+  auto function = [](FuchsiaFirmwareStorage* ops, size_t offset, size_t size, const void* src) {
+    return FuchsiaFirmwareStorageWriteConst(ops, offset, size, src);
+  };
+  FuchsiaFirmwareStorageWriteTest<>(test_case, function);
+}
+
+TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteMutableTestParameterized) {
+  const FuchsiaFirmwareStorageTestCase& test_case = GetParam();
+  auto function = [](FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* src) {
+    return FuchsiaFirmwareStorageWrite(ops, offset, size, src);
+  };
+  FuchsiaFirmwareStorageWriteTest<>(test_case, function);
+}
+
 }  // namespace

@@ -27,7 +27,7 @@ extern "C" {
 
 typedef struct FuchsiaFirmwareStorage {
   // The minimal size for read/write. On EMMC this should be the block size. On NAND this should be
-  // the page size.
+  // the erase block size.
   size_t block_size;
 
   // The total size of the storage in number of blocks.
@@ -68,6 +68,9 @@ typedef struct FuchsiaFirmwareStorage {
   // @blocks_count: Logical size to write in terms of number of blocks.
   // @src: Pointer to buffer of data to write.
   //
+  // Note: Some storage such as NAND requires data to be erased first before it can write new data.
+  // This should be handled in the implementation of this callback.
+  //
   // Return true if success, false otherwise.
   bool (*write)(void* ctx, size_t block_offset, size_t blocks_count, const void* src);
 } FuchsiaFirmwareStorage;
@@ -82,6 +85,25 @@ typedef struct FuchsiaFirmwareStorage {
 // Return true if success, false otherwise.
 bool FuchsiaFirmwareStorageRead(FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* dst);
 
+// Write data to storage
+//
+// @ops: Pointer to FuchsiaFirmwareStorage
+// @offset: offset in number of bytes to write.
+// @size: size in number of bytes to write.
+// @src: Pointer to buffer of data to write.
+//
+// Note: `src` needs to be non-const since it might need to be temporarily modified internally
+// to optimize performance.
+//
+// Return true if success, false otherwise.
+bool FuchsiaFirmwareStorageWrite(FuchsiaFirmwareStorage* ops, size_t offset, size_t size,
+                                 void* src);
+
+// Functionally the same as FuchsiaFirmwareStorageWrite but accepts a const pointer for `src`.
+// However there's less optimization that can be done and may be slow when writing large amount of
+// data when offset, size or `src` is unaligned.
+bool FuchsiaFirmwareStorageWriteConst(FuchsiaFirmwareStorage* ops, size_t offset, size_t size,
+                                      const void* src);
 #ifdef __cplusplus
 }
 #endif
