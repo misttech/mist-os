@@ -33,8 +33,6 @@
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb_peripheral-bind.h"
 
-namespace peripheral = fuchsia_hardware_usb_peripheral;
-
 namespace usb_peripheral {
 
 zx_status_t UsbPeripheral::Create(void* ctx, zx_device_t* parent) {
@@ -336,10 +334,10 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
 
   zxlogf(DEBUG, "usb_device_function_registered functions_registered = true");
   functions_registered_ = true;
-  if (listener_) {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)fidl::WireCall<peripheral::Events>(zx::unowned_channel(listener_.get()))
-        ->FunctionRegistered();
+  if (listener_.is_valid()) {
+    if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
+      return status.status();
+    }
   }
   return DeviceStateChanged();
 }
@@ -618,10 +616,10 @@ void UsbPeripheral::ClearFunctionsComplete() {
 
   DeviceStateChanged();
 
-  if (listener_) {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)fidl::WireCall<peripheral::Events>(zx::unowned_channel(listener_.get()))
-        ->FunctionsCleared();
+  if (listener_.is_valid()) {
+    if (fidl::Status status = fidl::WireCall(listener_)->FunctionsCleared(); !status.ok()) {
+      zxlogf(ERROR, "%s: %s", __func__, status.status_string());
+    }
   }
 }
 
@@ -925,8 +923,8 @@ void UsbPeripheral::ClearFunctions(ClearFunctionsCompleter::Sync& completer) {
 
 int UsbPeripheral::ListenerCleanupThread() {
   zx_signals_t observed = 0;
-  listener_.wait_one(ZX_CHANNEL_PEER_CLOSED | __ZX_OBJECT_HANDLE_CLOSED, zx::time::infinite(),
-                     &observed);
+  listener_.channel().wait_one(ZX_CHANNEL_PEER_CLOSED | __ZX_OBJECT_HANDLE_CLOSED,
+                               zx::time::infinite(), &observed);
   fbl::AutoLock l(&lock_);
   listener_.reset();
   return 0;
@@ -962,7 +960,7 @@ void UsbPeripheral::SetStateChangeListener(SetStateChangeListenerRequestView req
       // another caller may have tried to do this while we were blocked on thrd_join.
       continue;
     }
-    listener_ = request->listener.TakeChannel();
+    listener_ = std::move(request->listener);
     if (thrd_create(
             &thread_,
             [](void* arg) -> int {

@@ -219,7 +219,7 @@ class UsbPeripheral : public UsbPeripheralType,
   // Size of our parent's usb_request_t.
   size_t parent_request_size_ = 0;
   // Registered listener
-  zx::channel listener_;
+  fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Events> listener_;
 
   thrd_t thread_ = 0;
 

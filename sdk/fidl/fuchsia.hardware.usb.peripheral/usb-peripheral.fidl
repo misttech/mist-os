@@ -64,6 +64,6 @@ protocol Device {
     ClearFunctions() -> ();
     /// Adds a state change listener that is invoked when a state change completes.
     SetStateChangeListener(resource struct {
-        listener server_end:Events;
+        listener client_end:Events;
     });
 };
