@@ -73,7 +73,7 @@ zx_status_t Watcher::ReinitWatcher() {
 }
 
 void Watcher::ProcessWatchMessages(cpp20::span<uint8_t> buf, WatcherCallback callback) {
-  uint8_t* iter = buf.begin();
+  auto iter = buf.begin();
   while (iter + 2 <= buf.end()) {
     fio::wire::WatchEvent event = static_cast<fio::wire::WatchEvent>(*iter++);
     uint8_t name_len = *iter++;
@@ -87,7 +87,7 @@ void Watcher::ProcessWatchMessages(cpp20::span<uint8_t> buf, WatcherCallback cal
     uint8_t tmp = iter[name_len];
     iter[name_len] = 0;
 
-    if (callback(*this, caller_.fd().get(), event, reinterpret_cast<const char*>(iter))) {
+    if (callback(*this, caller_.fd().get(), event, reinterpret_cast<const char*>(&*iter))) {
       // We received a WATCH_EVENT_IDLE, and the watcher is paused.
       // Bail out early.
       ignore_existing_ = true;

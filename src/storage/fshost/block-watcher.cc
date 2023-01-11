@@ -311,7 +311,7 @@ zx_signals_t BlockWatcher::WaitForWatchMessages(cpp20::span<Watcher> watchers,
     if (wait_items[i].pending & ZX_CHANNEL_READABLE) {
       uint32_t read_len;
       if (zx_status_t status = watchers[i].borrow_watcher().channel()->read(
-              0, buf.begin(), nullptr, static_cast<uint32_t>(buf.size()), 0, &read_len, nullptr);
+              0, buf.data(), nullptr, static_cast<uint32_t>(buf.size()), 0, &read_len, nullptr);
           status != ZX_OK) {
         FX_PLOGS(ERROR, status) << "failed to read from channel";
         return 0;
