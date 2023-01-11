@@ -548,6 +548,7 @@ fidl/fuchsia.io/node2.fidl
 fidl/fuchsia.io/rights-abilities.fidl
 fidl/fuchsia.io/rights-request.fidl
 fidl/fuchsia.kernel/cpu-resource.fidl
+fidl/fuchsia.kernel/energy-info-resource.fidl
 fidl/fuchsia.kernel/debug-resource.fidl
 fidl/fuchsia.kernel/hypervisor-resource.fidl
 fidl/fuchsia.kernel/info-resource.fidl

@@ -89,6 +89,7 @@ template("component_manager") {
     "src/builtin/cpu_resource.rs",
     "src/builtin/crash_introspect.rs",
     "src/builtin/debug_resource.rs",
+    "src/builtin/energy_info_resource.rs",
     "src/builtin/factory_items.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
     "src/builtin/hypervisor_resource.rs",

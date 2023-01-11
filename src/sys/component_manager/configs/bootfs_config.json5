@@ -35,6 +35,7 @@
                 "fuchsia.kernel.RootJob",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.EnergyInfoResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",

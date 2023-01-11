@@ -11,6 +11,7 @@ use {
             cpu_resource::CpuResource,
             crash_introspect::{CrashIntrospectSvc, CrashRecords},
             debug_resource::DebugResource,
+            energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
             fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME},
             hypervisor_resource::HypervisorResource,
@@ -376,6 +377,7 @@ pub struct BuiltinEnvironment {
     // Framework capabilities.
     pub boot_args: Arc<BootArguments>,
     pub cpu_resource: Option<Arc<CpuResource>>,
+    pub energy_info_resource: Option<Arc<EnergyInfoResource>>,
     pub debug_resource: Option<Arc<DebugResource>>,
     pub hypervisor_resource: Option<Arc<HypervisorResource>>,
     pub info_resource: Option<Arc<InfoResource>>,
@@ -644,6 +646,26 @@ impl BuiltinEnvironment {
             model.root().hooks.install(cpu_resource.hooks()).await;
         }
 
+        // Set up the EnergyInfoResource service.
+        let energy_info_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_ENERGY_INFO_BASE,
+                        1,
+                        b"energy_info",
+                    )
+                    .ok()
+            })
+            .map(EnergyInfoResource::new)
+            .and_then(Result::ok);
+        if let Some(energy_info_resource) = energy_info_resource.as_ref() {
+            model.root().hooks.install(energy_info_resource.hooks()).await;
+        }
+
         // Set up the DebugResource service.
         let debug_resource = system_resource_handle
             .as_ref()
@@ -896,6 +918,7 @@ impl BuiltinEnvironment {
             factory_items_service,
             items_service,
             cpu_resource,
+            energy_info_resource,
             debug_resource,
             hypervisor_resource,
             info_resource,

@@ -233,6 +233,7 @@
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.EnergyInfoResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
