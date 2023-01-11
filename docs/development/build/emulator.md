@@ -40,10 +40,8 @@ The features of FEMU include:
     [Vulkan](/docs/development/graphics/magma/concepts/vulkan.md){:.exyernal} support, or
     you can choose software rendering using
     [SwiftShader](https://swiftshader.googlesource.com/SwiftShader/){:.external}.
-*   **Remote Development:** You can use a remote desktop with FEMU, either with
-    Chrome Remote Desktop or from the command line using
-    [fx emu-remote](https://fuchsia.dev/reference/tools/fx/cmd/emu-remote)
-    command.
+*   **Remote Development:** You can use a remote desktop with FEMU over Chrome
+    Remote Desktop.
 
 To see full list of supported flags:
 
