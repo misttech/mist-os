@@ -378,6 +378,9 @@ impl SendBuffer for SendBufferWithZirconSocket {
         let new_ring_capacity = ready_to_send.cap();
 
         *capacity = *capacity - old_ring_capacity + new_ring_capacity;
+
+        // Eagerly pull more data out of the Zircon socket into the ring buffer.
+        self.poll()
     }
 
     fn mark_read(&mut self, count: usize) {
@@ -1430,5 +1433,26 @@ mod tests {
         sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
             assert_matches!(payload, SendPayload::Contiguous(&[]))
         })
+    }
+
+    #[test]
+    fn send_buffer_resize_empties_zircon_socket() {
+        // Regression test for https://fxbug.dev/119242.
+        let (local, peer) =
+            zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create zircon socket");
+        let notifier = NeedsDataNotifier::default();
+        let mut sbuf = SendBufferWithZirconSocket::new(
+            Arc::new(local),
+            notifier,
+            SendBufferWithZirconSocket::MIN_CAPACITY,
+        );
+
+        // Fill up the ring buffer and zircon socket.
+        while peer.write(TEST_BYTES).map_or(false, |l| l == TEST_BYTES.len()) {
+            sbuf.poll();
+        }
+
+        sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY + TEST_BYTES.len());
+        assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
     }
 }
