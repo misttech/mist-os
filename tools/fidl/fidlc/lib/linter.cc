@@ -409,38 +409,40 @@ Linter::Linter()
     });
   // clang-format on
 
-  callbacks_.OnLineComment(
+  callbacks_.OnComment(
       [&linter = *this]
       //
-      (const SourceSpan& span, std::string_view line_prefix_view) {
-        linter.line_comments_checked_++;
-        if (linter.CopyrightCheckIsComplete() &&
-            linter.line_comments_checked_ > linter.kCopyrightLines.size()) {
-          return;
-        }
-        // span.position() is not a lightweight operation, but as long as
-        // the conditions above are checked first, the line number only needs
-        // to be computed a minimum number of times.
-        size_t line_number = span.position().line;
-        std::string line_comment = std::string(span.data());
-        if (line_number > linter.kCopyrightLines.size()) {
-          if (!linter.CopyrightCheckIsComplete()) {
-            linter.AddInvalidCopyrightFinding(span);
+      (const std::vector<const SourceSpan>& spans) {
+        for (const auto& span : spans) {
+          linter.line_comments_checked_++;
+          if (linter.CopyrightCheckIsComplete() &&
+              linter.line_comments_checked_ > linter.kCopyrightLines.size()) {
+            return;
           }
-          return;
-        }
-        if (linter.copyright_date_.empty()) {
-          std::string year;
-          if (RE2::PartialMatch(line_comment, linter.kYearRegex, &year)) {
-            linter.copyright_date_ = year;
+          // span.position() is not a lightweight operation, but as long as
+          // the conditions above are checked first, the line number only needs
+          // to be computed a minimum number of times.
+          size_t line_number = span.position().line;
+          std::string line_comment = std::string(span.data());
+          if (line_number > linter.kCopyrightLines.size()) {
+            if (!linter.CopyrightCheckIsComplete()) {
+              linter.AddInvalidCopyrightFinding(span);
+            }
+            return;
           }
+          if (linter.copyright_date_.empty()) {
+            std::string year;
+            if (RE2::PartialMatch(line_comment, linter.kYearRegex, &year)) {
+              linter.copyright_date_ = year;
+            }
+          }
+          auto line_to_match = linter.kCopyrightLines[line_number - 1];
+          if (!linter.copyright_date_.empty()) {
+            line_to_match =
+                TemplateString(line_to_match).Substitute({{"YYYY", linter.copyright_date_}});
+          }
+          linter.CheckInvalidCopyright(span, line_comment, line_to_match);
         }
-        auto line_to_match = linter.kCopyrightLines[line_number - 1];
-        if (!linter.copyright_date_.empty()) {
-          line_to_match =
-              TemplateString(line_to_match).Substitute({{"YYYY", linter.copyright_date_}});
-        }
-        linter.CheckInvalidCopyright(span, line_comment, line_to_match);
       });
 
   callbacks_.OnExitFile([&linter = *this]
@@ -454,21 +456,6 @@ Linter::Linter()
                           }
                           linter.ExitContext();
                         });
-
-  // TODO(fxbug.dev/7978): Remove this check after issues are resolved with
-  // trailing comments in existing source and tools
-  // clang-format off
-  callbacks_.OnLineComment(
-      [& linter = *this,
-       trailing_comment_check = DefineCheck("no-trailing-comment",
-                                            "Place comments above the thing being described")]
-      //
-      (const SourceSpan& span, std::string_view line_prefix_view) {
-        if (!utils::IsBlank(line_prefix_view)) {
-          linter.AddFinding(span, trailing_comment_check);
-        }
-      });
-  // clang-format on
 
   callbacks_.OnUsing([&linter = *this,
                       case_check = DefineCheck("invalid-case-for-using-alias",

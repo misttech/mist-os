@@ -43,22 +43,11 @@ class LintingTreeCallbacks {
     source_element_callbacks_.push_back(std::move(callback));
   }
 
-  // The OnLineComment callback takes two parameters:
-  // * |SourceSpan| containing the comment
-  // * |line_prefix_view| a std::string_view of all characters on the same line,
-  //   preceding the comment
-  void OnLineComment(fit::function<void(const SourceSpan&, std::string_view)> callback) {
-    line_comment_callbacks_.push_back(std::move(callback));
+  // If comments lines are broken by more than one newline, they are treated as separate comments.
+  void OnComment(fit::function<void(const std::vector<const SourceSpan>&)> callback) {
+    comment_callbacks_.push_back(std::move(callback));
   }
-  // The OnLineComment callback takes two parameters:
-  // * |SourceSpan| containing the whitespace characters, and if the whitespace characters
-  //   end the line, it includes the newline character
-  // * |line_prefix_view| a std::string_view of all characters on the same line,
-  //   preceding the whitespace
-  void OnWhiteSpaceUpToNewline(fit::function<void(const SourceSpan&, std::string_view)> callback) {
-    white_space_up_to_newline_callbacks_.push_back(std::move(callback));
-  }
-  void OnIgnoredToken(fit::function<void(const SourceSpan&)> callback) {
+  void OnIgnoredToken(fit::function<void(const Token&)> callback) {
     ignored_token_callbacks_.push_back(std::move(callback));
   }
 
@@ -134,10 +123,8 @@ class LintingTreeCallbacks {
   std::vector<fit::function<void(const raw::File&)>> file_callbacks_;
   std::vector<fit::function<void(const raw::File&)>> exit_file_callbacks_;
   std::vector<fit::function<void(const raw::SourceElement&)>> source_element_callbacks_;
-  std::vector<fit::function<void(const SourceSpan&, std::string_view)>> line_comment_callbacks_;
-  std::vector<fit::function<void(const SourceSpan&, std::string_view)>>
-      white_space_up_to_newline_callbacks_;
-  std::vector<fit::function<void(const SourceSpan&)>> ignored_token_callbacks_;
+  std::vector<fit::function<void(const std::vector<const SourceSpan>&)>> comment_callbacks_;
+  std::vector<fit::function<void(const Token&)>> ignored_token_callbacks_;
   std::vector<fit::function<void(const raw::AliasDeclaration&)>> alias_callbacks_;
   std::vector<fit::function<void(const raw::Using&)>> using_callbacks_;
   std::vector<fit::function<void(const raw::ConstDeclaration&)>> const_declaration_callbacks_;
