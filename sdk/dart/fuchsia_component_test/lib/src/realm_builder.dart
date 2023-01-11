@@ -216,7 +216,7 @@ class ScopedInstance {
       T proxy, String protocolPath) {
     var serverEnd = proxy.ctrl.request().passChannel();
     exposedDir.open(
-      fio.OpenFlags.rightReadable | fio.OpenFlags.rightWritable,
+      fio.OpenFlags.rightReadable,
       fio.modeTypeService,
       protocolPath,
       fidl.InterfaceRequest<fio.Node>(serverEnd),

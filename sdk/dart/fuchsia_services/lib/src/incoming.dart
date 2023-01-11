@@ -123,14 +123,8 @@ class Incoming {
           'See [Incoming.request] for more information');
     }
 
-    // connection flags for service: can read & write from target object.
-    final OpenFlags _openFlags =
-        OpenFlags.rightReadable | OpenFlags.rightWritable;
-    // 0755
-    const int _openMode = 0x1ED;
-
-    _dirProxy.open(
-        _openFlags, _openMode, serviceName, InterfaceRequest<Node>(channel));
+    _dirProxy.open(OpenFlags.rightReadable, modeTypeService, serviceName,
+        InterfaceRequest<Node>(channel));
   }
 
   /// Connects to the incoming service specified by [serviceProxy] through the
