@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/mailbox/drivers/aml-mailbox/aml-mailbox.h"
+#include "src/devices/mailbox/drivers/aml-fifo-mailbox/aml-fifo-mailbox.h"
 
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/platform-device.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <stdlib.h>
@@ -19,7 +18,7 @@
 #include <cstdlib>
 #include <vector>
 
-#include "src/devices/mailbox/drivers/aml-mailbox/aml_mailbox_bind.h"
+#include "src/devices/mailbox/drivers/aml-fifo-mailbox/aml_fifo_mailbox_bind.h"
 
 namespace {
 
@@ -332,7 +331,10 @@ void AmlMailbox::SendCommand(SendCommandRequestView request,
   }
 }
 
-void AmlMailbox::ShutDown() { irq_.destroy(); }
+void AmlMailbox::ShutDown() {
+  irq_.destroy();
+  thrd_join(irq_thread_, nullptr);
+}
 
 void AmlMailbox::DdkUnbind(ddk::UnbindTxn txn) {
   ShutDown();
@@ -363,8 +365,39 @@ zx_status_t AmlMailbox::Init() {
 
 AmlMailbox::~AmlMailbox() {
   if (irq_.is_valid()) {
-    irq_.destroy();
+    ShutDown();
   }
+}
+
+zx_status_t AmlMailbox::Bind() {
+  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_mailbox::Device>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  if (status.is_error()) {
+    zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory: %s",
+           status.status_string());
+    return status.status_value();
+  }
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  status = outgoing_.Serve(std::move(endpoints->server));
+  std::array offers = {
+      fidl::DiscoverableProtocolName<fuchsia_hardware_mailbox::Device>,
+  };
+
+  zx_status_t add_status = DdkAdd(ddk::DeviceAddArgs("aml-mailbox")
+                                      .set_flags(DEVICE_ADD_MUST_ISOLATE)
+                                      .set_fidl_protocol_offers(offers)
+                                      .set_outgoing_dir(endpoints->client.TakeChannel())
+                                      .set_proto_id(ZX_PROTOCOL_AML_MAILBOX));
+
+  if (add_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to bind FIDL device");
+  }
+  return add_status;
 }
 
 zx_status_t AmlMailbox::Create(void* ctx, zx_device_t* parent) {
@@ -437,44 +470,14 @@ zx_status_t AmlMailbox::Create(void* ctx, zx_device_t* parent) {
     zxlogf(ERROR, "AmlMailbox initialization failed %s", zx_status_get_string(status));
   }
 
-  dev->outgoing_.emplace(dev->dispatcher_);
-  dev->outgoing_->svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_mailbox::Device>,
-      fbl::MakeRefCounted<fs::Service>(
-          [dev = dev.get()](fidl::ServerEnd<fuchsia_hardware_mailbox::Device> request) mutable {
-            fidl::BindServer(dev->dispatcher_, std::move(request), dev);
-            return ZX_OK;
-          }));
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-
-  status = dev->outgoing_->Serve(std::move(endpoints->server));
+  status = dev->Bind();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to service the outgoing directory %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Bind() failed for FIDL device: %s\n", zx_status_get_string(status));
     return status;
   }
+  [[maybe_unused]] auto dummy = dev.release();
 
-  std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_mailbox::Device>,
-  };
-
-  status = dev->DdkAdd(ddk::DeviceAddArgs("aml-mailbox")
-                           .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                           .set_fidl_protocol_offers(offers)
-                           .set_outgoing_dir(endpoints->client.TakeChannel())
-                           .set_proto_id(ZX_PROTOCOL_AML_MAILBOX));
-  if (status == ZX_OK) {
-    // Devmgr is now in charge of the memory for dev.
-    [[maybe_unused]] auto* dummy = dev.release();
-    return ZX_OK;
-  } else {
-    zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
-    dev->ShutDown();
-    return status;
-  }
+  return status;
 }
 
 static zx_driver_ops_t mailbox_driver_ops = {

@@ -18,7 +18,7 @@
 
 #include <fbl/unique_fd.h>
 
-#include "src/devices/mailbox/drivers/aml-mailbox/meson_mhu_common.h"
+#include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
 
 constexpr uint8_t kMboxSystem = 0;
 constexpr uint8_t kCmdMboxTest = 6;

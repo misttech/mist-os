@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_MESON_MHU_COMMON_H_
-#define SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_MESON_MHU_COMMON_H_
+#ifndef SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_
+#define SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_
 
 constexpr uint8_t kMboxMax = 4;
 constexpr uint8_t kMhuIrq32 = 2;
@@ -68,4 +68,4 @@ constexpr uint16_t kCmdDataThreadPosition = 0xf;
 #define MBX_CMD_DATA_THREAD_STOP MBX_COMPOSE_MSG(kMbxSystem, kCmdDataThreadStop)
 #define MBX_CMD_DATA_THREAD_POSITION MBX_COMPOSE_MSG(kMbxSystem, kCmdDataThreadPosition)
 
-#endif  // SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_MESON_MHU_COMMON_H_
+#endif  // SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_

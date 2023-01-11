@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_AML_MAILBOX_H_
-#define SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_AML_MAILBOX_H_
+#ifndef SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_AML_FIFO_MAILBOX_H_
+#define SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_AML_FIFO_MAILBOX_H_
 
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev.h>
 #include <lib/mmio/mmio.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zx/interrupt.h>
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
 
-#include "src/devices/mailbox/drivers/aml-mailbox/meson_mhu_common.h"
+#include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
 
 namespace aml_mailbox {
 
@@ -40,10 +40,12 @@ class AmlMailbox : public DeviceType {
         mbox_fstsmmio_(std::move(mbox_fstsmmio)),
         mbox_irqmmio_(std::move(mbox_irqmmio)),
         irq_(std::move(irq)),
+        outgoing_(dispatcher),
         dispatcher_(dispatcher) {}
 
   ~AmlMailbox();
   zx_status_t Init();
+  zx_status_t Bind();
   void ShutDown();
   int IrqThread();
 
@@ -84,10 +86,11 @@ class AmlMailbox : public DeviceType {
   uint8_t rx_flag_[kMboxMax];
   std::array<std::array<uint8_t, kMboxFifoSize>, kMboxMax> channels_;
 
-  std::optional<svc::Outgoing> outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_mailbox::Device> bindings_;
+  component::OutgoingDirectory outgoing_;
   async_dispatcher_t* dispatcher_;
 };
 
 }  // namespace aml_mailbox
 
-#endif  // SRC_DEVICES_MAILBOX_DRIVERS_AML_MAILBOX_AML_MAILBOX_H_
+#endif  // SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_AML_FIFO_MAILBOX_H_

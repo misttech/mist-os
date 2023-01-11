@@ -21,7 +21,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/smc.h>
 
-#include "src/devices/mailbox/drivers/aml-mailbox/meson_mhu_common.h"
+#include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
 #include "src/media/audio/drivers/aml-dsp/aml_dsp_bind.h"
 
 namespace {

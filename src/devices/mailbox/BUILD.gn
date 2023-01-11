@@ -3,5 +3,5 @@
 # found in the LICENSE file.
 
 group("drivers") {
-  deps = [ "drivers/aml-mailbox" ]
+  deps = [ "drivers/aml-fifo-mailbox" ]
 }

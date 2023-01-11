@@ -1,7 +1,9 @@
 {
-    "short_description": "AMLogic MailBox driver",
+    "short_description": "AMLogic MailBox driver(Fifo)",
     "manufacturer": "AMLogic",
-    "families": [],
+    "families": [
+        "Meson"
+    ],
     "models": [
         "A5"
     ],
