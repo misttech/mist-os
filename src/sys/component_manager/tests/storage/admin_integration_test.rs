@@ -5,7 +5,7 @@
 use {
     cm_moniker::InstancedRelativeMoniker,
     component_events::{events::*, matcher::*},
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component_test::{
@@ -122,8 +122,10 @@ async fn single_storage_user() {
 
     done_signal.await;
 
-    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>().expect("create node proxy");
-    let dir_proxy = fuchsia_fs::node_to_directory(node_proxy).unwrap();
+    let (node_client_end, node_server) =
+        create_endpoints::<fio::NodeMarker>().expect("create node client end");
+    let directory = ClientEnd::<fio::DirectoryMarker>::new(node_client_end.into_channel());
+    let dir_proxy = directory.into_proxy().unwrap();
     let storage_user_moniker_with_instances = storage_users.into_iter().next().unwrap();
     storage_admin
         .open_component_storage(

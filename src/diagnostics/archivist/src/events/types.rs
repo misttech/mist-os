@@ -6,7 +6,7 @@ use crate::{
     events::error::{EventError, MonikerError},
     identity::ComponentIdentity,
 };
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
@@ -300,8 +300,11 @@ impl TryFrom<fcomponent::Event> for Event {
                                 });
                             }
                             match directory_ready.node {
-                                Some(node) => fuchsia_fs::node_to_directory(node.into_proxy()?)
-                                    .map_err(EventError::NodeToDirectory)?,
+                                Some(node) => {
+                                    let directory =
+                                        ClientEnd::<fio::DirectoryMarker>::new(node.into_channel());
+                                    directory.into_proxy()?
+                                }
                                 None => return Err(EventError::MissingDiagnosticsDir),
                             }
                         }

@@ -13,12 +13,7 @@
 //! Functions that contain `in_namespace` in their name operate on absolute paths in the process's
 //! current namespace and utilize a blocking `fdio` call to open the proxy.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::encoding::Persistable,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_io as fio,
-};
+use {anyhow::Error, fidl::encoding::Persistable, fidl_fuchsia_io as fio};
 
 pub mod directory;
 pub mod file;
@@ -33,20 +28,6 @@ pub use fio::OpenFlags;
 /// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
 pub async fn read_file_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, Error> {
     Ok(file::read_fidl(file).await?)
-}
-
-/// node_to_directory will convert the given NodeProxy into a DirectoryProxy. This is unsafe if the
-/// type of the node is not checked first.
-pub fn node_to_directory(node: fio::NodeProxy) -> Result<fio::DirectoryProxy, Error> {
-    let node_chan = node.into_channel().map_err(|e| format_err!("{:?}", e))?;
-    Ok(fio::DirectoryProxy::from_channel(node_chan))
-}
-
-/// node_to_file will convert the given NodeProxy into a FileProxy. This is unsafe if the
-/// type of the node is not checked first.
-pub fn node_to_file(node: fio::NodeProxy) -> Result<fio::FileProxy, Error> {
-    let node_chan = node.into_channel().map_err(|e| format_err!("{:?}", e))?;
-    Ok(fio::FileProxy::from_channel(node_chan))
 }
 
 /// canonicalize_path will remove a leading `/` if it exists, since it's always unnecessary and in

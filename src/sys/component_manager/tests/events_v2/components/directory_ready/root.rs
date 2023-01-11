@@ -7,7 +7,9 @@ use {
         events::{DirectoryReady, Event, EventStream},
         matcher::EventMatcher,
     },
-    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ServerEnd},
+    fidl::endpoints::{
+        create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker, ServerEnd,
+    },
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_fs,
     futures::StreamExt,
     maplit::hashmap,
@@ -58,9 +60,11 @@ async fn main() {
         let expected_entries = all_expected_entries.remove(&payload.name).unwrap();
 
         // Open the directory and verify its contents
-        let (node_clone, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let (node_clone, server_end) = create_endpoints().unwrap();
         payload.node.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end).unwrap();
-        let directory = fuchsia_fs::node_to_directory(node_clone).unwrap();
+        let directory = ClientEnd::<fio::DirectoryMarker>::new(node_clone.into_channel());
+        let directory = directory.into_proxy().unwrap();
+
         let entries = list_entries(&directory).await;
 
         assert_eq!(entries, expected_entries);
