@@ -166,7 +166,7 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
         info.data.get(), info.size_data, ShouldUseCompactMerkleTreeFormat(blob_layout_format_));
     ASSERT_EQ(merkle_data.size(), merkle_tree->merkle_tree_size);
     EXPECT_EQ(
-        memcmp(merkle_data.begin(), merkle_tree->merkle_tree.get(), merkle_tree->merkle_tree_size),
+        memcmp(merkle_data.data(), merkle_tree->merkle_tree.get(), merkle_tree->merkle_tree_size),
         0);
   }
 
