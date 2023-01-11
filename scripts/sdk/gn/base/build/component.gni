@@ -69,7 +69,12 @@ template("fuchsia_component_manifest") {
   }
 
   if (fuchsia_code_coverage && _manifest_version == "v2") {
-    merged_manifest = "${target_name}-coverage.cml"
+    merged_manifest = "${target_name}-coverage"
+    manifest_file = get_path_info(manifest, "file")
+
+    # Put the coverage merged manifest in a coverage directory to avoid
+    # collision with no base manifest.
+    manifest_rel_path = "coverage/${manifest_file}"
     cmc_merge(merged_manifest) {
       forward_variables_from(invoker,
                              [
@@ -80,9 +85,9 @@ template("fuchsia_component_manifest") {
         "${fuchsia_sdk}/build/enable_coverage_data.cml",
         manifest,
       ]
-      output_name = merged_manifest
+      output_name = manifest_rel_path
     }
-    manifest = "${target_out_dir}/${merged_manifest}"
+    manifest = "${target_out_dir}/${manifest_rel_path}"
   }
 
   if (_manifest_version == "v1") {
