@@ -11,7 +11,7 @@ use {
         ImmutableString,
     },
     diagnostics_data::{self as schema, Data, Inspect},
-    diagnostics_hierarchy::{DiagnosticsHierarchy, InspectHierarchyMatcher},
+    diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
     fidl_fuchsia_diagnostics::{self, Selector},
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
@@ -123,8 +123,8 @@ impl ReaderServer {
 
     fn filter_single_components_snapshot(
         snapshot_data: SnapshotData,
-        static_matcher: Option<Arc<InspectHierarchyMatcher>>,
-        client_matcher: Option<InspectHierarchyMatcher>,
+        static_matcher: Option<Arc<HierarchyMatcher>>,
+        client_matcher: Option<HierarchyMatcher>,
         moniker: &str,
         parent_trace_id: ftrace::Id,
     ) -> NodeHierarchyData {
@@ -217,7 +217,7 @@ impl ReaderServer {
         };
 
         match client_matcher {
-            // If matcher is present, and there was an InspectHierarchyMatcher,
+            // If matcher is present, and there was an HierarchyMatcher,
             // then this means the client provided their own selectors, and a subset of
             // them matched this component. So we need to filter each of the snapshots from
             // this component with the dynamically provided components.
@@ -284,7 +284,7 @@ impl ReaderServer {
         // Since a single PopulatedInspectDataContainer shares a moniker for all pieces of data it
         // contains, we can store the result of component selector filtering to avoid reapplying
         // the selectors.
-        let mut client_selectors: Option<InspectHierarchyMatcher> = None;
+        let mut client_selectors: Option<HierarchyMatcher> = None;
 
         // We iterate the vector of pumped inspect data packets, consuming each inspect vmo
         // and filtering it using the provided selector regular expressions. Each filtered

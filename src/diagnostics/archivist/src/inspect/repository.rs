@@ -15,7 +15,7 @@ use crate::{
 };
 use async_lock::RwLock;
 use async_trait::async_trait;
-use diagnostics_hierarchy::InspectHierarchyMatcher;
+use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
@@ -58,9 +58,7 @@ impl InspectRepository {
     pub async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<
-            &HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
-        >,
+        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.inner
             .read()
@@ -198,9 +196,7 @@ impl InspectRepositoryInner {
     fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<
-            &HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
-        >,
+        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.diagnostics_directories
             .iter()

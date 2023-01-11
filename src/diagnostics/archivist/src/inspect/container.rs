@@ -10,7 +10,7 @@ use crate::{
     ImmutableString,
 };
 use diagnostics_data as schema;
-use diagnostics_hierarchy::{DiagnosticsHierarchy, InspectHierarchyMatcher};
+use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
@@ -174,7 +174,7 @@ pub struct PopulatedInspectDataContainer {
     pub snapshot: SnapshotData,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<Arc<InspectHierarchyMatcher>>,
+    pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
 }
 
 enum Status {
@@ -271,7 +271,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub component_diagnostics_proxy: fio::DirectoryProxy,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<Arc<InspectHierarchyMatcher>>,
+    pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
 }
 
 impl UnpopulatedInspectDataContainer {

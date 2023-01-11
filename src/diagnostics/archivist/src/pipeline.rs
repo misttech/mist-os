@@ -7,7 +7,7 @@ use {
         moniker_rewriter::MonikerRewriter, ImmutableString,
     },
     async_lock::RwLock,
-    diagnostics_hierarchy::InspectHierarchyMatcher,
+    diagnostics_hierarchy::HierarchyMatcher,
     fidl::prelude::*,
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
@@ -187,7 +187,7 @@ pub struct PipelineMutableState {
     static_selectors: Option<Vec<Selector>>,
 
     /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>,
+    moniker_to_static_matcher_map: HashMap<ImmutableString, Arc<HierarchyMatcher>>,
 }
 
 impl Deref for Pipeline {
@@ -228,7 +228,7 @@ impl PipelineMutableState {
 
     pub fn static_selectors_matchers(
         &self,
-    ) -> Option<&HashMap<ImmutableString, Arc<InspectHierarchyMatcher>>> {
+    ) -> Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>> {
         if self.static_selectors.is_some() {
             return Some(&self.moniker_to_static_matcher_map);
         }

@@ -6,7 +6,7 @@ use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_inspect::{
     hierarchy::filter_hierarchy,
-    hierarchy::{DiagnosticsHierarchy, InspectHierarchyMatcher},
+    hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
     testing::DiagnosticsHierarchyGetter,
     Inspector,
 };
@@ -130,8 +130,8 @@ fn generate_selectors_till_level(depth: usize) -> Vec<String> {
         .collect()
 }
 
-/// Parse selectors and returns an InspectHierarchyMatcher
-fn parse_selectors(selectors: &[String]) -> InspectHierarchyMatcher {
+/// Parse selectors and returns an HierarchyMatcher
+fn parse_selectors(selectors: &[String]) -> HierarchyMatcher {
     selectors
         .into_iter()
         .map(|selector| {

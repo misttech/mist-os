@@ -621,19 +621,13 @@ where
     }
 }
 
-/// Wrapper for the tools needed to filter a single DiagnosticsHierarchy based on selectors
-/// known to be applicable to it.
-pub struct InspectHierarchyMatcher {
-    matcher: TreeMatcher,
-}
-
-impl<T: Borrow<Selector>> TryFrom<&[T]> for InspectHierarchyMatcher {
+impl<T: Borrow<Selector>> TryFrom<&[T]> for HierarchyMatcher {
     type Error = Error;
 
     fn try_from(selectors: &[T]) -> Result<Self, Self::Error> {
         // TODO(fxbug.dev/117929: remove cloning, the archivist can probably hold
-        // InspectHierarchyMatcher<'static>
-        let mut matcher = TreeMatcher::default();
+        // HierarchyMatcher<'static>
+        let mut matcher = HierarchyMatcher::default();
         for selector in selectors {
             let selector = selector.borrow();
             selector.validate().map_err(|e| Error::Selectors(e.into()))?;
@@ -651,11 +645,11 @@ impl<T: Borrow<Selector>> TryFrom<&[T]> for InspectHierarchyMatcher {
                 _ => return Err(Error::Selectors(selectors::Error::InvalidTreeSelector)),
             }
         }
-        Ok(Self { matcher })
+        Ok(matcher)
     }
 }
 
-impl<T: Borrow<Selector>> TryFrom<Vec<T>> for InspectHierarchyMatcher {
+impl<T: Borrow<Selector>> TryFrom<Vec<T>> for HierarchyMatcher {
     type Error = Error;
 
     fn try_from(selectors: Vec<T>) -> Result<Self, Self::Error> {
@@ -706,13 +700,13 @@ impl PartialEq for OrdStringSelector {
 impl Eq for OrdStringSelector {}
 
 #[derive(Default)]
-struct TreeMatcher {
-    nodes: BTreeMap<OrdStringSelector, TreeMatcher>,
+pub struct HierarchyMatcher {
+    nodes: BTreeMap<OrdStringSelector, HierarchyMatcher>,
     properties: Vec<OrdStringSelector>,
     subtree: bool,
 }
 
-impl TreeMatcher {
+impl HierarchyMatcher {
     fn insert_subtree(&mut self, selector: SubtreeSelector) {
         self.insert(selector.node_path, None);
     }
@@ -826,12 +820,12 @@ where
 /// - If the return type is Error that implies the filter encountered errors.
 pub fn filter_hierarchy<Key>(
     mut root_node: DiagnosticsHierarchy<Key>,
-    hierarchy_matcher: &InspectHierarchyMatcher,
+    hierarchy_matcher: &HierarchyMatcher,
 ) -> Option<DiagnosticsHierarchy<Key>>
 where
     Key: AsRef<str>,
 {
-    if filter_hierarchy_helper(&mut root_node, &[&hierarchy_matcher.matcher]) {
+    if filter_hierarchy_helper(&mut root_node, &[&hierarchy_matcher]) {
         Some(root_node)
     } else {
         None
@@ -840,7 +834,7 @@ where
 
 fn filter_hierarchy_helper<Key>(
     node: &mut DiagnosticsHierarchy<Key>,
-    hierarchy_matchers: &[&TreeMatcher],
+    hierarchy_matchers: &[&HierarchyMatcher],
 ) -> bool
 where
     Key: AsRef<str>,
@@ -864,8 +858,8 @@ where
 
 fn eval_matchers_on_node_name<'a>(
     node_name: &'a str,
-    matchers: &'a [&'a TreeMatcher],
-) -> Vec<&'a TreeMatcher> {
+    matchers: &'a [&'a HierarchyMatcher],
+) -> Vec<&'a HierarchyMatcher> {
     let mut result = vec![];
     for matcher in matchers {
         for (node_pattern, tree_matcher) in matcher.nodes.iter() {
@@ -877,7 +871,7 @@ fn eval_matchers_on_node_name<'a>(
     result
 }
 
-fn eval_matchers_on_property(property_name: &str, matchers: &[&TreeMatcher]) -> bool {
+fn eval_matchers_on_property(property_name: &str, matchers: &[&HierarchyMatcher]) -> bool {
     matchers.iter().any(|matcher| {
         matcher
             .properties
@@ -1399,7 +1393,7 @@ mod tests {
             })
             .collect::<Vec<Arc<Selector>>>();
 
-        let hierarchy_matcher: InspectHierarchyMatcher = parsed_test_selectors.try_into().unwrap();
+        let hierarchy_matcher: HierarchyMatcher = parsed_test_selectors.try_into().unwrap();
 
         filter_hierarchy(hierarchy, &hierarchy_matcher).map(|mut hierarchy| {
             hierarchy.sort();

@@ -6,7 +6,7 @@ use {
     crate::screen::Line,
     anyhow::Result,
     diagnostics_data::InspectData,
-    diagnostics_hierarchy::{self, hierarchy, InspectHierarchyMatcher},
+    diagnostics_hierarchy::{self, hierarchy, HierarchyMatcher},
     difference::{
         self,
         Difference::{Add, Rem, Same},
@@ -42,7 +42,7 @@ pub fn filter_json_schema_by_selectors(
                 return None;
             }
 
-            let inspect_matcher: InspectHierarchyMatcher = matched_selectors.try_into().unwrap();
+            let inspect_matcher: HierarchyMatcher = matched_selectors.try_into().unwrap();
 
             match diagnostics_hierarchy::filter_hierarchy(hierarchy, &inspect_matcher) {
                 Some(filtered) => {
