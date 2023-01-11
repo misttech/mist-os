@@ -61,13 +61,34 @@ type Client struct {
 	data        fifo.MappedVMO
 	descriptors fifo.MappedVMO
 
-	handler Handler
+	txDepth, rxDepth uint32
+	rxFifo, txFifo   zx.Handle
+	rx               entries
+	tx               struct {
+		mu struct {
+			sync.Mutex
+			waiters int
+			scratch []uint16
+
+			entries entries
+
+			// detached signals to incoming writes that the receiver is unable
+			// to service them.
+			detached bool
+		}
+		cond sync.Cond
+	}
 
 	mu struct {
 		sync.RWMutex
 		closed      bool
 		runningChan chan struct{}
 		ports       map[basePortId]*Port
+	}
+
+	stats struct {
+		rx fifo.RxStats
+		tx fifo.TxStats
 	}
 }
 
@@ -111,7 +132,7 @@ type Port struct {
 }
 
 func (p *Port) TxDepth() uint32 {
-	return p.client.handler.TxDepth
+	return p.client.txDepth
 }
 
 func (p *Port) MTU() uint32 {
@@ -134,7 +155,7 @@ func (p *Port) LinkAddress() tcpip.LinkAddress {
 }
 
 // write writes a list of packets to the device.
-func (c *Client) write(port network.PortId, pkts stack.PacketBufferList) (int, tcpip.Error) {
+func (c *Client) write(port network.PortId, pbList stack.PacketBufferList) (int, tcpip.Error) {
 	trace.AsyncBegin("net", "netdevice.Client.write", trace.AsyncID(uintptr(unsafe.Pointer(c))))
 	defer trace.AsyncEnd("net", "netdevice.Client.write", trace.AsyncID(uintptr(unsafe.Pointer(c))))
 	c.mu.RLock()
@@ -142,44 +163,46 @@ func (c *Client) write(port network.PortId, pkts stack.PacketBufferList) (int, t
 	if c.mu.closed {
 		return 0, &tcpip.ErrClosedForSend{}
 	}
-	return c.handler.ProcessWrite(pkts, func(descriptorIndex *uint16, pkt stack.PacketBufferPtr) {
-		descriptor := c.getDescriptor(*descriptorIndex)
-		// Reset descriptor to default values before filling it.
-		c.resetTxDescriptor(descriptor)
+	return c.processWrite(port, pbList)
+}
 
-		data := c.getDescriptorData(descriptor)
-		n := 0
-		for _, v := range pkt.AsSlices() {
-			if w := copy(data[n:], v); w != len(v) {
-				panic(fmt.Sprintf("failed to copy packet data to descriptor %d, want %d got %d bytes", descriptorIndex, len(v), w))
-			} else {
-				n += w
-			}
-		}
+func (c *Client) prepareTxDescriptor(descriptorIndex uint16, port network.PortId, pkt stack.PacketBufferPtr) {
+	descriptor := c.getDescriptor(descriptorIndex)
+	// Reset descriptor to default values before filling it.
+	c.resetTxDescriptor(descriptor)
 
-		var frameType network.FrameType
-		if len(pkt.LinkHeader().Slice()) != 0 {
-			frameType = network.FrameTypeEthernet
+	data := c.getDescriptorData(descriptor)
+	n := 0
+	for _, v := range pkt.AsSlices() {
+		if w := copy(data[n:], v); w != len(v) {
+			panic(fmt.Sprintf("failed to copy packet data to descriptor %d, want %d got %d bytes", descriptorIndex, len(v), w))
 		} else {
-			switch pkt.NetworkProtocolNumber {
-			case header.IPv4ProtocolNumber:
-				frameType = network.FrameTypeIpv4
-			case header.IPv6ProtocolNumber:
-				frameType = network.FrameTypeIpv6
-			default:
-				_ = syslog.ErrorTf(tag, "can't identify outgoing packet type")
-			}
+			n += w
 		}
-		// Pad tx frame to device requirements.
-		for ; n < int(c.deviceInfo.MinTxBufferLength); n++ {
-			data[n] = 0
+	}
+
+	var frameType network.FrameType
+	if len(pkt.LinkHeader().Slice()) != 0 {
+		frameType = network.FrameTypeEthernet
+	} else {
+		switch pkt.NetworkProtocolNumber {
+		case header.IPv4ProtocolNumber:
+			frameType = network.FrameTypeIpv4
+		case header.IPv6ProtocolNumber:
+			frameType = network.FrameTypeIpv6
+		default:
+			_ = syslog.ErrorTf(tag, "can't identify outgoing packet type")
 		}
-		descriptor.port_id.base = C.uchar(port.Base)
-		descriptor.port_id.salt = C.uchar(port.Salt)
-		descriptor.info_type = C.uint(network.InfoTypeNoInfo)
-		descriptor.frame_type = C.uchar(frameType)
-		descriptor.data_length = C.uint(n)
-	})
+	}
+	// Pad tx frame to device requirements.
+	for ; n < int(c.deviceInfo.MinTxBufferLength); n++ {
+		data[n] = 0
+	}
+	descriptor.port_id.base = C.uchar(port.Base)
+	descriptor.port_id.salt = C.uchar(port.Salt)
+	descriptor.info_type = C.uint(network.InfoTypeNoInfo)
+	descriptor.frame_type = C.uchar(frameType)
+	descriptor.data_length = C.uint(n)
 }
 
 func (p *Port) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
@@ -315,6 +338,59 @@ func (p *Port) Close() error {
 	return multierr.Combine(p.port.Close(), p.watcher.Close(), err, detachErr)
 }
 
+func (c *Client) processRxDescriptor(descriptorIndex uint16) {
+	trace.AsyncBegin("net", "netdevice.RxLoop.Handler", trace.AsyncID(uintptr(unsafe.Pointer(c))))
+	defer trace.AsyncEnd("net", "netdevice.RxLoop.Handler", trace.AsyncID(uintptr(unsafe.Pointer(c))))
+	descriptor := c.getDescriptor(descriptorIndex)
+	data := c.getDescriptorData(descriptor)
+	view := make([]byte, len(data))
+	view = view[:copy(view, data)]
+
+	var protocolNumber tcpip.NetworkProtocolNumber
+	switch network.FrameType(descriptor.frame_type) {
+	case network.FrameTypeIpv4:
+		protocolNumber = header.IPv4ProtocolNumber
+	case network.FrameTypeIpv6:
+		protocolNumber = header.IPv6ProtocolNumber
+	}
+	portId := basePortId(descriptor.port_id.base)
+
+	c.mu.RLock()
+	port, ok := c.mu.ports[portId]
+	c.mu.RUnlock()
+	if ok {
+		if want, got := port.portInfo.GetId().Salt, uint8(descriptor.port_id.salt); want == got {
+			port.state.mu.Lock()
+			dispatcher := port.state.mu.dispatcher
+			port.state.mu.Unlock()
+			if dispatcher != nil {
+				func() {
+					pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
+						Payload: bufferv2.MakeWithData(view),
+					})
+					defer pkt.DecRef()
+
+					id := trace.AsyncID(pkt.ID())
+					trace.AsyncBegin("net", "netdevice.DeliverNetworkPacket", id)
+					dispatcher.DeliverNetworkPacket(protocolNumber, pkt)
+					trace.AsyncEnd("net", "netdevice.DeliverNetworkPacket", id)
+				}()
+			}
+		} else {
+			// This can happen if the port flaps on the device while frames
+			// are propagating in the FIFO.
+			_ = syslog.WarnTf(tag, "received frame on port %d with bad salt %d, want %d", portId, got, want)
+		}
+	} else {
+		// This can happen if the port is detached from the client while frames
+		// are propagating in the FIFO.
+		_ = syslog.WarnTf(tag, "received frame for unknown port: %d", portId)
+	}
+
+	// This entry is going back to the driver; it can be reused.
+	c.resetRxDescriptor(descriptor)
+}
+
 func (c *Client) Run(ctx context.Context) {
 	c.mu.Lock()
 	closed := c.mu.closed
@@ -337,7 +413,7 @@ func (c *Client) Run(ctx context.Context) {
 
 	detachWithError := func(reason error) {
 		cancel()
-		c.handler.DetachTx()
+		c.detachTx()
 		if _, err := c.closeInner(); err != nil {
 			_ = syslog.WarnTf(tag, "error closing device on detach (%s): %s", reason, err)
 		} else {
@@ -356,10 +432,7 @@ func (c *Client) Run(ctx context.Context) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := c.handler.TxReceiverLoop(func(descriptorIndex *uint16) bool {
-			descriptor := c.getDescriptor(*descriptorIndex)
-			return network.TxReturnFlags(descriptor.return_flags)&network.TxReturnFlagsTxRetError == 0
-		}); err != nil {
+		if err := c.txReceiverLoop(); err != nil {
 			detachWithError(fmt.Errorf("TX read loop: %w", err))
 		}
 		_ = syslog.VLogTf(syslog.DebugVerbosity, tag, "TX read loop finished")
@@ -368,58 +441,7 @@ func (c *Client) Run(ctx context.Context) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := c.handler.RxLoop(func(descriptorIndex *uint16) {
-			trace.AsyncBegin("net", "netdevice.RxLoop.Handler", trace.AsyncID(uintptr(unsafe.Pointer(c))))
-			defer trace.AsyncEnd("net", "netdevice.RxLoop.Handler", trace.AsyncID(uintptr(unsafe.Pointer(c))))
-			descriptor := c.getDescriptor(*descriptorIndex)
-			data := c.getDescriptorData(descriptor)
-			view := make([]byte, len(data))
-			view = view[:copy(view, data)]
-
-			var protocolNumber tcpip.NetworkProtocolNumber
-			switch network.FrameType(descriptor.frame_type) {
-			case network.FrameTypeIpv4:
-				protocolNumber = header.IPv4ProtocolNumber
-			case network.FrameTypeIpv6:
-				protocolNumber = header.IPv6ProtocolNumber
-			}
-			portId := basePortId(descriptor.port_id.base)
-
-			c.mu.RLock()
-			port, ok := c.mu.ports[portId]
-			c.mu.RUnlock()
-			if ok {
-				if want, got := port.portInfo.GetId().Salt, uint8(descriptor.port_id.salt); want == got {
-					port.state.mu.Lock()
-					dispatcher := port.state.mu.dispatcher
-					port.state.mu.Unlock()
-					if dispatcher != nil {
-						func() {
-							pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-								Payload: bufferv2.MakeWithData(view),
-							})
-							defer pkt.DecRef()
-
-							id := trace.AsyncID(pkt.ID())
-							trace.AsyncBegin("net", "netdevice.DeliverNetworkPacket", id)
-							dispatcher.DeliverNetworkPacket(protocolNumber, pkt)
-							trace.AsyncEnd("net", "netdevice.DeliverNetworkPacket", id)
-						}()
-					}
-				} else {
-					// This can happen if the port flaps on the device while frames
-					// are propagating in the FIFO.
-					_ = syslog.WarnTf(tag, "received frame on port %d with bad salt %d, want %d", portId, got, want)
-				}
-			} else {
-				// This can happen if the port is detached from the client while frames
-				// are propagating in the FIFO.
-				_ = syslog.WarnTf(tag, "received frame for unknown port: %d", portId)
-			}
-
-			// This entry is going back to the driver; it can be reused.
-			c.resetRxDescriptor(descriptor)
-		}); err != nil {
+		if err := c.rxLoop(); err != nil {
 			detachWithError(fmt.Errorf("RX loop: %w", err))
 		}
 		_ = syslog.VLogTf(syslog.DebugVerbosity, tag, "Rx loop finished")
@@ -567,8 +589,8 @@ func (c *Client) closeInner() (chan struct{}, error) {
 			// Session also has a Close method, make sure we're calling the ChannelProxy
 			// one.
 			((*fidl.ChannelProxy)(c.session)).Close(),
-			c.handler.RxFifo.Close(),
-			c.handler.TxFifo.Close(),
+			c.rxFifo.Close(),
+			c.txFifo.Close(),
 		)
 	}()
 
@@ -844,24 +866,26 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 		config:      config,
 		data:        mappedDataVmo,
 		descriptors: mappedDescVmo,
-		handler: Handler{
-			TxDepth: uint32(deviceInfo.TxDepth),
-			RxDepth: uint32(deviceInfo.RxDepth),
-			RxFifo:  sessionResult.Response.Fifos.Rx,
-			TxFifo:  sessionResult.Response.Fifos.Tx,
-		},
+
+		txDepth: uint32(deviceInfo.TxDepth),
+		rxDepth: uint32(deviceInfo.RxDepth),
+		rxFifo:  sessionResult.Response.Fifos.Rx,
+		txFifo:  sessionResult.Response.Fifos.Tx,
 	}
 	c.mu.ports = make(map[basePortId]*Port)
 
-	if entries := c.handler.InitRx(c.config.RxDescriptorCount); entries != c.config.RxDescriptorCount {
+	if entries := c.rx.init(c.config.RxDescriptorCount); entries != c.config.RxDescriptorCount {
 		panic(fmt.Sprintf("bad handler rx queue size: %d, expected %d", entries, c.config.RxDescriptorCount))
 	}
-	if entries := c.handler.InitTx(c.config.TxDescriptorCount); entries != c.config.TxDescriptorCount {
+
+	c.tx.cond.L = &c.tx.mu.Mutex
+	c.tx.mu.scratch = make([]uint16, c.txDepth)
+	if entries := c.tx.mu.entries.init(c.config.TxDescriptorCount); entries != c.config.TxDescriptorCount {
 		panic(fmt.Sprintf("bad handler tx queue size: %d, expected %d", entries, c.config.RxDescriptorCount))
 	}
 
-	c.handler.Stats.Tx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.TxDepth))
-	c.handler.Stats.Rx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.RxDepth))
+	c.stats.tx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.TxDepth))
+	c.stats.rx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.RxDepth))
 
 	descriptorIndex := uint16(0)
 	vmoOffset := uint64(0)
@@ -871,7 +895,11 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 			offset: C.ulong(vmoOffset),
 		}
 		c.resetRxDescriptor(descriptor)
-		c.handler.PushInitialRx(descriptorIndex)
+
+		c.rx.storage[c.rx.readied] = descriptorIndex
+		c.rx.incrementReadied(1)
+		c.rx.incrementQueued(1)
+
 		vmoOffset += uint64(c.config.BufferStride)
 		descriptorIndex++
 	}
@@ -881,7 +909,10 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 			offset: C.ulong(vmoOffset),
 		}
 		c.resetTxDescriptor(descriptor)
-		c.handler.PushInitialTx(descriptorIndex)
+
+		c.tx.mu.entries.storage[c.tx.mu.entries.readied] = descriptorIndex
+		c.tx.mu.entries.incrementReadied(1)
+
 		vmoOffset += uint64(c.config.BufferStride)
 		descriptorIndex++
 	}
@@ -893,11 +924,11 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 }
 
 func (p *Port) RxStats() *fifo.RxStats {
-	return &p.client.handler.Stats.Rx
+	return &p.client.stats.rx
 }
 
 func (p *Port) TxStats() *fifo.TxStats {
-	return &p.client.handler.Stats.Tx
+	return &p.client.stats.tx
 }
 
 func (p *Port) Class() network.DeviceClass {

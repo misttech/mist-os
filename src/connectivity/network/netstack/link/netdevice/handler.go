@@ -14,126 +14,106 @@ import (
 	"syscall/zx/zxwait"
 	"unsafe"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/fifo"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
+	"fidl/fuchsia/hardware/network"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
-type Handler struct {
-	TxDepth, RxDepth uint32
-	RxFifo, TxFifo   zx.Handle
-	rx               Entries
-	tx               struct {
-		mu struct {
-			sync.Mutex
-			waiters int
-			scratch []uint16
+// Historical note: this file contains part of the Client implementation to
+// better maintain git history from when this contained code shared with the
+// Ethernet client implementation.
 
-			entries Entries
-
-			// detached signals to incoming writes that the receiver is unable
-			// to service them.
-			detached bool
-		}
-		cond sync.Cond
-	}
-	Stats struct {
-		Rx fifo.RxStats
-		Tx fifo.TxStats
-	}
-}
-
-func (h *Handler) TxReceiverLoop(wasSent func(entry *uint16) bool) error {
-	scratch := make([]uint16, h.TxDepth)
+func (c *Client) txReceiverLoop() error {
+	scratch := make([]uint16, c.txDepth)
 	for {
-		h.tx.mu.Lock()
-		detached := h.tx.mu.detached
-		h.tx.mu.Unlock()
+		c.tx.mu.Lock()
+		detached := c.tx.mu.detached
+		c.tx.mu.Unlock()
 		if detached {
 			return nil
 		}
 
 		if err := zxwait.WithRetryContext(context.Background(), func() error {
-			status, count := FifoRead(h.TxFifo, scratch)
+			status, count := fifoRead(c.txFifo, scratch)
 			if status != zx.ErrOk {
-				return &zx.Error{Status: status, Text: "FifoRead(TX)"}
+				return &zx.Error{Status: status, Text: "fifoRead(TX)"}
 			}
 			var notSent uint64
 			for i := range scratch[:count] {
-				if !wasSent(&scratch[i]) {
+				descriptor := c.getDescriptor(scratch[i])
+				if network.TxReturnFlags(descriptor.return_flags)&network.TxReturnFlagsTxRetError != 0 {
 					notSent++
 				}
 			}
-			h.Stats.Tx.Drops.IncrementBy(notSent)
-			h.Stats.Tx.Reads(count).Increment()
-			h.tx.mu.Lock()
-			n := h.tx.mu.entries.AddReadied(scratch[:count])
-			h.tx.mu.entries.IncrementReadied(uint16(n))
-			h.tx.mu.Unlock()
-			h.tx.cond.Broadcast()
+			c.stats.tx.Drops.IncrementBy(notSent)
+			c.stats.tx.Reads(count).Increment()
+			c.tx.mu.Lock()
+			n := c.tx.mu.entries.addReadied(scratch[:count])
+			c.tx.mu.entries.incrementReadied(uint16(n))
+			c.tx.mu.Unlock()
+			c.tx.cond.Broadcast()
 
 			if n := uint32(n); count != n {
-				return fmt.Errorf("FifoRead(TX): tx_depth invariant violation; observed=%d expected=%d", h.TxDepth-n+count, h.TxDepth)
+				return fmt.Errorf("fifoRead(TX): tx_depth invariant violation; observed=%d expected=%d", c.txDepth-n+count, c.txDepth)
 			}
 			return nil
-		}, h.TxFifo, zx.SignalFIFOReadable, zx.SignalFIFOPeerClosed); err != nil {
+		}, c.txFifo, zx.SignalFIFOReadable, zx.SignalFIFOPeerClosed); err != nil {
 			return err
 		}
 	}
 }
 
-func (h *Handler) RxLoop(process func(entry *uint16)) error {
-	scratch := make([]uint16, h.RxDepth)
+func (c *Client) rxLoop() error {
+	scratch := make([]uint16, c.rxDepth)
 	for {
-		if batchSize := len(scratch) - int(h.rx.InFlight()); batchSize != 0 && h.rx.HaveQueued() {
-			n := h.rx.GetQueued(scratch[:batchSize])
-			h.rx.IncrementSent(uint16(n))
+		if batchSize := len(scratch) - int(c.rx.inFlight()); batchSize != 0 && c.rx.haveQueued() {
+			n := c.rx.getQueued(scratch[:batchSize])
+			c.rx.incrementSent(uint16(n))
 
-			status, count := FifoWrite(h.RxFifo, scratch[:n])
+			status, count := fifoWrite(c.rxFifo, scratch[:n])
 			switch status {
 			case zx.ErrOk:
-				h.Stats.Rx.Writes(count).Increment()
+				c.stats.rx.Writes(count).Increment()
 				if n := uint32(n); count != n {
-					return fmt.Errorf("FifoWrite(RX): rx_depth invariant violation; observed=%d expected=%d", h.RxDepth-n+count, h.RxDepth)
+					return fmt.Errorf("fifoWrite(RX): rx_depth invariant violation; observed=%d expected=%d", c.rxDepth-n+count, c.rxDepth)
 				}
 			default:
-				return &zx.Error{Status: status, Text: "FifoWrite(RX)"}
+				return &zx.Error{Status: status, Text: "fifoWrite(RX)"}
 			}
 		}
 
-		for h.rx.HaveReadied() {
-			entry := h.rx.GetReadied()
-			process(entry)
-			h.rx.IncrementQueued(1)
+		for c.rx.haveReadied() {
+			entry := c.rx.getReadied()
+			c.processRxDescriptor(*entry)
+			c.rx.incrementQueued(1)
 		}
 
 		for {
 			signals := zx.Signals(zx.SignalFIFOReadable | zx.SignalFIFOPeerClosed)
-			if int(h.rx.InFlight()) != len(scratch) && h.rx.HaveQueued() {
+			if int(c.rx.inFlight()) != len(scratch) && c.rx.haveQueued() {
 				signals |= zx.SignalFIFOWritable
 			}
-			obs, err := zxwait.WaitContext(context.Background(), h.RxFifo, signals)
+			obs, err := zxwait.WaitContext(context.Background(), c.rxFifo, signals)
 			if err != nil {
 				return err
 			}
 
 			if obs&zx.SignalFIFOPeerClosed != 0 {
-				return fmt.Errorf("FifoRead(RX): peer closed")
+				return fmt.Errorf("fifoRead(RX): peer closed")
 			}
 			if obs&zx.SignalFIFOReadable != 0 {
-				switch status, count := FifoRead(h.RxFifo, scratch); status {
+				switch status, count := fifoRead(c.rxFifo, scratch); status {
 				case zx.ErrOk:
-					h.Stats.Rx.Reads(count).Increment()
-					n := h.rx.AddReadied(scratch[:count])
-					h.rx.IncrementReadied(uint16(n))
+					c.stats.rx.Reads(count).Increment()
+					n := c.rx.addReadied(scratch[:count])
+					c.rx.incrementReadied(uint16(n))
 
 					if n := uint32(n); count != n {
-						return fmt.Errorf("FifoRead(RX): rx_depth invariant violation; observed=%d expected=%d", h.RxDepth-n+count, h.RxDepth)
+						return fmt.Errorf("fifoRead(RX): rx_depth invariant violation; observed=%d expected=%d", c.rxDepth-n+count, c.rxDepth)
 					}
 				default:
-					return &zx.Error{Status: status, Text: "FifoRead(RX)"}
+					return &zx.Error{Status: status, Text: "fifoRead(RX)"}
 				}
 				break
 			}
@@ -144,101 +124,78 @@ func (h *Handler) RxLoop(process func(entry *uint16)) error {
 	}
 }
 
-func (h *Handler) ProcessWrite(pbList stack.PacketBufferList, processor func(*uint16, stack.PacketBufferPtr)) (int, tcpip.Error) {
+func (c *Client) processWrite(port network.PortId, pbList stack.PacketBufferList) (int, tcpip.Error) {
 	pkts := pbList.AsSlice()
 	i := 0
 
 	for i < len(pkts) {
-		h.tx.mu.Lock()
+		c.tx.mu.Lock()
 		for {
-			if h.tx.mu.detached {
-				h.tx.mu.Unlock()
+			if c.tx.mu.detached {
+				c.tx.mu.Unlock()
 				return i, &tcpip.ErrClosedForSend{}
 			}
 
-			if h.tx.mu.entries.HaveReadied() {
+			if c.tx.mu.entries.haveReadied() {
 				break
 			}
 
-			h.tx.mu.waiters++
-			h.tx.cond.Wait()
-			h.tx.mu.waiters--
+			c.tx.mu.waiters++
+			c.tx.cond.Wait()
+			c.tx.mu.waiters--
 		}
 
 		// Queue as many remaining packets as possible; if we run out of space,
 		// we'll return to the waiting state in the outer loop.
-		for ; i < len(pkts) && h.tx.mu.entries.HaveReadied(); i++ {
-			entry := h.tx.mu.entries.GetReadied()
-			processor(entry, pkts[i])
-			h.tx.mu.entries.IncrementQueued(1)
+		for ; i < len(pkts) && c.tx.mu.entries.haveReadied(); i++ {
+			entry := c.tx.mu.entries.getReadied()
+			c.prepareTxDescriptor(*entry, port, pkts[i])
+			c.tx.mu.entries.incrementQueued(1)
 		}
 
-		batch := h.tx.mu.scratch[:len(h.tx.mu.scratch)-int(h.tx.mu.entries.InFlight())]
-		n := h.tx.mu.entries.GetQueued(batch)
-		h.tx.mu.entries.IncrementSent(uint16(n))
+		batch := c.tx.mu.scratch[:len(c.tx.mu.scratch)-int(c.tx.mu.entries.inFlight())]
+		n := c.tx.mu.entries.getQueued(batch)
+		c.tx.mu.entries.incrementSent(uint16(n))
 		// We must write to the FIFO under lock because `batch` is aliased from
 		// `h.tx.mu.scratch`.
-		status, count := FifoWrite(h.TxFifo, batch[:n])
-		h.tx.mu.Unlock()
+		status, count := fifoWrite(c.txFifo, batch[:n])
+		c.tx.mu.Unlock()
 
 		switch status {
 		case zx.ErrOk:
 			if n := uint32(n); count != n {
-				panic(fmt.Sprintf("FifoWrite(TX): tx_depth invariant violation; observed=%d expected=%d", h.TxDepth-n+count, h.TxDepth))
+				panic(fmt.Sprintf("fifoWrite(TX): tx_depth invariant violation; observed=%d expected=%d", c.txDepth-n+count, c.txDepth))
 			}
-			h.Stats.Tx.Writes(count).Increment()
+			c.stats.tx.Writes(count).Increment()
 		case zx.ErrPeerClosed:
-			h.DetachTx()
+			c.detachTx()
 			return i, &tcpip.ErrClosedForSend{}
 		case zx.ErrBadHandle:
 			// We may have detached then closed the FIFO since we last unlocked before
 			// writing to the FIFO.
-			h.tx.mu.Lock()
-			detached := h.tx.mu.detached
-			h.tx.mu.Unlock()
+			c.tx.mu.Lock()
+			detached := c.tx.mu.detached
+			c.tx.mu.Unlock()
 			if detached {
 				return i, &tcpip.ErrClosedForSend{}
 			}
 			fallthrough
 		default:
-			panic(fmt.Sprintf("FifoWrite(TX): (%v, %d)", status, count))
+			panic(fmt.Sprintf("fifoWrite(TX): (%v, %d)", status, count))
 		}
 	}
 
 	return i, nil
 }
 
-func (h *Handler) DetachTx() {
-	h.tx.mu.Lock()
-	h.tx.mu.detached = true
-	h.tx.mu.Unlock()
-	h.tx.cond.Broadcast()
+func (c *Client) detachTx() {
+	c.tx.mu.Lock()
+	c.tx.mu.detached = true
+	c.tx.mu.Unlock()
+	c.tx.cond.Broadcast()
 }
 
-func (h *Handler) InitRx(capacity uint16) uint16 {
-	return h.rx.Init(capacity)
-}
-
-func (h *Handler) InitTx(capacity uint16) uint16 {
-	h.tx.cond.L = &h.tx.mu.Mutex
-	h.tx.mu.Lock()
-	h.tx.mu.scratch = make([]uint16, h.TxDepth)
-	h.tx.mu.Unlock()
-	return h.tx.mu.entries.Init(capacity)
-}
-
-func (h *Handler) PushInitialRx(entry uint16) {
-	h.rx.storage[h.rx.readied] = entry
-	h.rx.IncrementReadied(1)
-	h.rx.IncrementQueued(1)
-}
-
-func (h *Handler) PushInitialTx(entry uint16) {
-	h.tx.mu.entries.storage[h.tx.mu.entries.readied] = entry
-	h.tx.mu.entries.IncrementReadied(1)
-}
-
-func FifoWrite(handle zx.Handle, b []uint16) (zx.Status, uint32) {
+func fifoWrite(handle zx.Handle, b []uint16) (zx.Status, uint32) {
 	var actual uint
 	var _x uint16
 	data := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b)).Data)
@@ -251,7 +208,7 @@ func FifoWrite(handle zx.Handle, b []uint16) (zx.Status, uint32) {
 	return status, uint32(actual)
 }
 
-func FifoRead(handle zx.Handle, b []uint16) (zx.Status, uint32) {
+func fifoRead(handle zx.Handle, b []uint16) (zx.Status, uint32) {
 	var actual uint
 	var _x uint16
 	data := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b)).Data)

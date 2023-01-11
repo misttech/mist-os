@@ -13,7 +13,7 @@ import (
 )
 
 func TestEntries(t *testing.T) {
-	var e Entries
+	var e entries
 
 	var maxDepth uint16
 
@@ -25,7 +25,7 @@ func TestEntries(t *testing.T) {
 
 	for _, depth := range []uint16{2, 50, maxDepth} {
 		t.Run(fmt.Sprintf("depth=%d", depth), func(t *testing.T) {
-			capacity := e.Init(depth)
+			capacity := e.init(depth)
 
 			if ones := bits.OnesCount16(capacity); ones != 1 {
 				t.Fatalf("got len(storage)=%d (binary=%b) want power of two", capacity, capacity)
@@ -35,68 +35,68 @@ func TestEntries(t *testing.T) {
 
 			for _, delta := range []uint16{depth, 1, depth / 2, depth - 1, depth} {
 				t.Run(fmt.Sprintf("delta=%d", delta), func(t *testing.T) {
-					if e.HaveReadied() {
-						t.Errorf("got HaveReadied=true want=false; %#v", e)
+					if e.haveReadied() {
+						t.Errorf("got haveReadied=true want=false; %#v", e)
 					}
-					if got, want := e.AddReadied(scratch), int(capacity); got != want {
+					if got, want := e.addReadied(scratch), int(capacity); got != want {
 						t.Errorf("got addReadied=%d want=%d; %#v", got, want, e)
 					}
 
-					e.IncrementReadied(delta)
+					e.incrementReadied(delta)
 
-					if got, want := e.HaveReadied(), delta != 0; got != want {
-						t.Errorf("got HaveReadied=%t want=%t; %#v", got, want, e)
+					if got, want := e.haveReadied(), delta != 0; got != want {
+						t.Errorf("got haveReadied=%t want=%t; %#v", got, want, e)
 					}
-					if got, want := e.AddReadied(scratch), int(capacity-delta); got != want {
+					if got, want := e.addReadied(scratch), int(capacity-delta); got != want {
 						t.Errorf("got addReadied=%d want=%d; %#v", got, want, e)
 					}
-					if e.HaveQueued() {
-						t.Errorf("got HaveQueued=true want=false; %#v", e)
+					if e.haveQueued() {
+						t.Errorf("got haveQueued=true want=false; %#v", e)
 					}
-					if got, want := e.GetQueued(scratch), 0; got != want {
+					if got, want := e.getQueued(scratch), 0; got != want {
 						t.Errorf("got getQueued=%d want=%d; %#v", got, want, e)
 					}
 
-					e.IncrementQueued(delta)
+					e.incrementQueued(delta)
 
-					if got, want := e.HaveQueued(), delta != 0; got != want {
-						t.Errorf("got HaveQueued=%t want=%t; %#v", got, want, e)
+					if got, want := e.haveQueued(), delta != 0; got != want {
+						t.Errorf("got haveQueued=%t want=%t; %#v", got, want, e)
 					}
-					if e.HaveReadied() {
-						t.Errorf("got HaveReadied=true want=false; %#v", e)
+					if e.haveReadied() {
+						t.Errorf("got haveReadied=true want=false; %#v", e)
 					}
 					if delta == 0 {
-						if got, want := e.GetQueued(scratch), int(capacity); got != want {
+						if got, want := e.getQueued(scratch), int(capacity); got != want {
 							t.Errorf("got getQueued=%d want=%d; %#v", got, want, e)
 						}
-						if inFlight := e.InFlight(); inFlight != 0 {
-							t.Errorf("got InFlight()=%d want=zero; %#v", inFlight, e)
+						if inFlight := e.inFlight(); inFlight != 0 {
+							t.Errorf("got inFlight()=%d want=zero; %#v", inFlight, e)
 						}
 					} else {
-						if got, want := e.GetQueued(scratch), int(delta); got != want {
+						if got, want := e.getQueued(scratch), int(delta); got != want {
 							t.Errorf("got getQueued=%d want=%d; %#v", got, want, e)
 						}
-						if got, want := e.InFlight(), capacity-delta; got != want {
-							t.Errorf("got InFlight()=%d want=%d; %#v", got, want, e)
+						if got, want := e.inFlight(), capacity-delta; got != want {
+							t.Errorf("got inFlight()=%d want=%d; %#v", got, want, e)
 						}
 					}
 
-					e.IncrementSent(delta)
+					e.incrementSent(delta)
 
-					if got, want := e.InFlight(), capacity; got != want {
-						t.Errorf("got InFlight()=%d want=%d; %#v", got, want, e)
+					if got, want := e.inFlight(), capacity; got != want {
+						t.Errorf("got inFlight()=%d want=%d; %#v", got, want, e)
 					}
-					if got, want := e.AddReadied(scratch), int(capacity); got != want {
+					if got, want := e.addReadied(scratch), int(capacity); got != want {
 						t.Errorf("got addReadied=%d want=%d; %#v", got, want, e)
 					}
-					if got, want := e.GetQueued(scratch), 0; got != want {
+					if got, want := e.getQueued(scratch), 0; got != want {
 						t.Errorf("got getQueued=%d want=%d; %#v", got, want, e)
 					}
-					if e.HaveQueued() {
-						t.Errorf("got HaveQueued=true want=false; %#v", e)
+					if e.haveQueued() {
+						t.Errorf("got haveQueued=true want=false; %#v", e)
 					}
-					if e.HaveReadied() {
-						t.Fatalf("got HaveReadied=true want=false; %#v", e)
+					if e.haveReadied() {
+						t.Fatalf("got haveReadied=true want=false; %#v", e)
 					}
 				})
 			}

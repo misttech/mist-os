@@ -419,7 +419,7 @@ func TestClient_WritePackets(t *testing.T) {
 	// This is unfortunate, but we don't have a way of being notified.
 	now := time.Now()
 	for {
-		if client.handler.Stats.Tx.Drops.Value() == 0 {
+		if client.stats.tx.Drops.Value() == 0 {
 			if time.Since(now) < 10*time.Second {
 				runtime.Gosched()
 				continue
