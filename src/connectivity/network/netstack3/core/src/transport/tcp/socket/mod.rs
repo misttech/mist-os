@@ -44,6 +44,7 @@ use nonzero_ext::nonzero;
 use packet::Buf;
 use packet_formats::ip::IpProto;
 use rand::RngCore;
+use thiserror::Error;
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
@@ -53,7 +54,7 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
-    error::{ExistsError, LocalAddressError},
+    error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         socket::{
             BufferIpSocketHandler as _, DefaultSendOptions, IpSock, IpSockCreationError,
@@ -633,7 +634,8 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         &mut self,
         ctx: &mut C,
         id: UnboundId<I>,
-        remote: SocketAddr<I::Addr>,
+        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
+        remote_port: NonZeroU16,
         netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
@@ -842,7 +844,8 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         &mut self,
         ctx: &mut C,
         id: UnboundId<I>,
-        remote: SocketAddr<I::Addr>,
+        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
+        remote_port: NonZeroU16,
         netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError> {
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
@@ -853,12 +856,15 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                 };
                 let Unbound { bound_device, buffer_sizes: _, keep_alive: _ } = inactive.get();
 
+                let (remote_ip, device) =
+                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.as_ref())?;
+
                 let ip_sock = ip_transport_ctx
                     .new_ip_socket(
                         ctx,
-                        bound_device.as_ref(),
+                        device.as_ref(),
                         None,
-                        remote.ip,
+                        remote_ip,
                         IpProto::Tcp.into(),
                         DefaultSendOptions,
                     )
@@ -874,7 +880,6 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     None => return Err(ConnectError::NoPort),
                 };
 
-                let bound_device = bound_device.clone();
                 let entry = sockets.inactive.entry(id.into());
                 let inactive = match entry {
                     IdMapEntry::Vacant(_v) => panic!("invalid unbound ID"),
@@ -888,9 +893,9 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     ip_transport_ctx,
                     ctx,
                     ip_sock,
-                    bound_device,
+                    device,
                     local_port,
-                    remote.port,
+                    remote_port,
                     netstack_buffers,
                     buffer_sizes.clone(),
                     keep_alive.clone(),
@@ -1524,12 +1529,17 @@ where
 }
 
 /// Possible errors when connecting a socket.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, Error, GenericOverIp)]
 pub enum ConnectError {
     /// Cannot allocate a local port for the connection.
+    #[error("Unable to allocate a port")]
     NoPort,
     /// Cannot find a route to the remote host.
+    #[error("No route to remote host")]
     NoRoute,
+    /// There was a problem with the provided address relating to its zone.
+    #[error("{}", _0)]
+    Zone(#[from] ZonedAddressError),
 }
 
 /// Connects a socket that has been bound locally.
@@ -1570,7 +1580,8 @@ pub fn connect_unbound<I, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
-    remote: SocketAddr<I::Addr>,
+    remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+    remote_port: NonZeroU16,
     netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
@@ -1578,12 +1589,26 @@ where
     C: crate::NonSyncContext,
 {
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx, netstack_buffers)), id, remote),
-        |(IpInvariant((sync_ctx, ctx, netstack_buffers)), id, remote)| {
-            SocketHandler::connect_unbound(sync_ctx, ctx, id, remote, netstack_buffers)
+        (IpInvariant((&mut sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip),
+        |(IpInvariant((sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip)| {
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                ctx,
+                id,
+                remote_ip,
+                remote_port,
+                netstack_buffers,
+            )
         },
-        |(IpInvariant((sync_ctx, ctx, netstack_buffers)), id, remote)| {
-            SocketHandler::connect_unbound(sync_ctx, ctx, id, remote, netstack_buffers)
+        |(IpInvariant((sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip)| {
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                ctx,
+                id,
+                remote_ip,
+                remote_port,
+                netstack_buffers,
+            )
         },
     )
 }
@@ -2025,7 +2050,7 @@ mod tests {
     use net_declare::net_ip_v6;
     use net_types::{
         ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr},
-        LinkLocalAddr,
+        AddrAndZone, LinkLocalAddr,
     };
     use packet::ParseBuffer as _;
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
@@ -2475,7 +2500,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     conn,
-                    SocketAddr { ip: I::FAKE_CONFIG.remote_ip, port: PORT_1 },
+                    ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+                    PORT_1,
                     client_ends.clone(),
                 )
                 .expect("failed to connect")
@@ -2869,19 +2895,12 @@ mod tests {
             ));
 
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        // TODO(https://fxbug.dev/115524): Use a remote address with a zone
-        // instead of setting the device manually.
-        SocketHandler::set_unbound_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            unbound,
-            Some(MultipleDevicesId::A),
-        );
         let bound = SocketHandler::connect_unbound(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            SocketAddr { ip: ll_addr.into_specified(), port: LOCAL_PORT },
+            AddrAndZone::new(*ll_addr, MultipleDevicesId::A).unwrap().into(),
+            LOCAL_PORT,
             Default::default(),
         )
         .expect("connect should succeed");
@@ -3158,7 +3177,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
-                SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 },
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
                 Default::default(),
             )
             .expect("connect should succeed")
@@ -3177,7 +3197,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
-                SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 },
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
                 Default::default(),
             )
             .expect("connect should succeed");
@@ -3240,7 +3261,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     unbound,
-                    SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 },
+                    ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                    PORT_1,
                     Default::default(),
                 )
                 .expect("connect should succeed")
@@ -3289,7 +3311,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
-                SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 },
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip),
+                PORT_1,
                 Default::default(),
             )
             .expect("connect should succeed")

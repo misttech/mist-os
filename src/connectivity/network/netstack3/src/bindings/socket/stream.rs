@@ -27,7 +27,7 @@ use fuchsia_zircon::{self as zx, Peered as _};
 use futures::StreamExt as _;
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv6},
-    SpecifiedAddr, ZonedAddr,
+    ZonedAddr,
 };
 use netstack3_core::{
     device::DeviceId,
@@ -56,8 +56,8 @@ use packet_formats::utils::NonZeroDuration;
 use crate::bindings::{
     socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
     util::{
-        DeviceNotFoundError, IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryIntoFidl,
-        TryIntoFidlWithContext,
+        DeviceNotFoundError, IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryFromFidlWithContext,
+        TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
     StackTime,
 };
@@ -421,7 +421,11 @@ pub(super) async fn spawn_worker(
     proto: fposix_socket::StreamSocketProtocol,
     ctx: crate::bindings::NetstackContext,
     request_stream: fposix_socket::StreamSocketRequestStream,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), fposix::Errno>
+where
+    DeviceId<StackTime>: TryFromFidlWithContext<Never, Error = DeviceNotFoundError>
+        + TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+{
     let (local, peer) = zx::Socket::create(zx::SocketOpts::STREAM)
         .map_err(|_: zx::Status| fposix::Errno::Enobufs)?;
     let socket = Arc::new(local);
@@ -466,6 +470,7 @@ impl IntoErrno for ConnectError {
         match self {
             ConnectError::NoRoute => fposix::Errno::Enetunreach,
             ConnectError::NoPort => fposix::Errno::Eaddrnotavail,
+            ConnectError::Zone(z) => z.into_errno(),
         }
     }
 }
@@ -506,8 +511,8 @@ fn spawn_send_task<I: IpExt>(
 
 impl<I: IpSockAddrExt + IpExt> SocketWorker<I>
 where
-    DeviceId<StackTime>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    DeviceId<StackTime>: TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>
+        + TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
 {
     fn spawn(mut self, request_stream: fposix_socket::StreamSocketRequestStream) {
         fasync::Task::spawn(async move {
@@ -604,8 +609,6 @@ where
 
     async fn connect(&mut self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let ip = SpecifiedAddr::new(addr.addr()).unwrap_or(I::LOOPBACK_ADDRESS);
-        let port = NonZeroU16::new(addr.port()).ok_or(fposix::Errno::Einval)?;
         let mut guard = self.ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
         let is_established =
@@ -617,8 +620,13 @@ where
                 Err(zx::Status::TIMED_OUT) => false,
                 Err(err) => panic!("unexpected error when observing signals: {:?}", err),
             };
+        let (ip, remote_port) =
+            addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
+        let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
+        let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
         let (connection, socket, watcher) = match self.id {
             SocketId::Bound(bound, LocalZirconSocketAndNotifier(ref socket, ref notifier)) => {
+                let (ip, _): (_, Option<DeviceId<StackTime>>) = ip.into_addr_zone();
                 let connection = connect_bound::<I, _>(
                     sync_ctx,
                     non_sync_ctx,
@@ -634,7 +642,8 @@ where
                     sync_ctx,
                     non_sync_ctx,
                     unbound,
-                    SocketAddr { ip, port },
+                    ip,
+                    port,
                     LocalZirconSocketAndNotifier(Arc::clone(socket), notifier.clone()),
                 )
                 .map_err(IntoErrno::into_errno)?;
