@@ -6,6 +6,7 @@ use anyhow::{anyhow, format_err, Context, Error};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
+use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_starnix_developer as fstardev;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
@@ -22,7 +23,13 @@ async fn main() -> Result<(), Error> {
 
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::local(async move {
-            serve_starnix_manager(stream).await.expect("failed to start manager.")
+            serve_starnix_manager(stream).await.expect("failed to start manager service.")
+        })
+        .detach();
+    });
+    fs.dir("svc").add_fidl_service(move |stream| {
+        fasync::Task::local(async move {
+            serve_runner(stream).await.expect("failed to start runner service.")
         })
         .detach();
     });
@@ -56,6 +63,17 @@ pub async fn serve_starnix_manager(
                     tracing::error!("failed to connect to vsock {:?}", e);
                 });
             }
+        }
+    }
+    Ok(())
+}
+
+pub async fn serve_runner(
+    mut request_stream: frunner::ComponentRunnerRequestStream,
+) -> Result<(), Error> {
+    while let Some(event) = request_stream.try_next().await? {
+        match event {
+            frunner::ComponentRunnerRequest::Start { .. } => {}
         }
     }
     Ok(())

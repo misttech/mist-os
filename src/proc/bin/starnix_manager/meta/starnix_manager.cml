@@ -31,10 +31,21 @@
             environment: "#starnix-env",
             durability: "single_run",
         },
+        {
+            name: "kernels",
+            durability: "single_run",
+        },
     ],
     capabilities: [
         {
-            protocol: [ "fuchsia.starnix.developer.Manager" ],
+            runner: "starnix",
+            path: "/svc/fuchsia.component.runner.ComponentRunner",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.developer.Manager",
+            ],
         },
     ],
     use: [
@@ -76,6 +87,7 @@
             ],
             from: "parent",
             to: [
+                "#kernels",
                 "#starbionic",
                 "#stardroid",
                 "#starless",
@@ -92,6 +104,7 @@
             ],
             from: "parent",
             to: [
+                "#kernels",
                 "#starbionic",
                 "#stardroid",
                 "#starless",
@@ -108,6 +121,7 @@
             directory: "dev-gpu",
             from: "parent",
             to: [
+                "#kernels",
                 "#starbionic",
                 "#stardroid",
                 "#starless",
@@ -135,6 +149,10 @@
             runner: "starnix",
             from: "#starless",
             as: "starless",
+        },
+        {
+            runner: "starnix",
+            from: "self",
         },
         {
             protocol: "fuchsia.starnix.developer.Manager",

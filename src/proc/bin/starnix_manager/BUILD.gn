@@ -19,6 +19,7 @@ rustc_binary("starnix_manager_bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.starnix.developer:fuchsia.starnix.developer_rust",
     "//sdk/fidl/fuchsia.starnix.galaxy:fuchsia.starnix.galaxy_rust",
