@@ -217,7 +217,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
                     .send(&mut Err(faccount::Error::UnsupportedOperation))
                     .context("sending GetAuthMechanismEnrollments response")?;
             }
-            AccountRequest::CreateAuthMechanismEnrollment { mechanism: _, responder } => {
+            AccountRequest::CreateAuthMechanismEnrollment { interaction: _, responder } => {
                 responder
                     .send(&mut Err(faccount::Error::UnsupportedOperation))
                     .context("sending CreateAuthMechanismEnrollment response")?;

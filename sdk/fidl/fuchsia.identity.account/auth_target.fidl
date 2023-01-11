@@ -117,12 +117,14 @@ protocol Account {
     /// Create a new enrollment of the provided authentication mechanism,
     /// and add it to the account.
     ///
-    /// `mechanism` The enum specifying the authentication mechanism to be
-    ///             used for the enrollment.
+    /// `interaction` An `Interaction` channel enabling the user to enroll a new
+    ///               authentication mechanism or complete authentication
+    ///               challenges using an existing mechanism if these are
+    ///               necessary.
     ///
     /// Returns: The `AuthMechanismEnrollmentId` of the created enrollment.
-    CreateAuthMechanismEnrollment(struct {
-        mechanism fuchsia.identity.authentication.Mechanism;
+    CreateAuthMechanismEnrollment(resource struct {
+        interaction server_end:fuchsia.identity.authentication.Interaction;
     }) -> (struct {
         enrollment_id AuthMechanismEnrollmentId;
     }) error Error;

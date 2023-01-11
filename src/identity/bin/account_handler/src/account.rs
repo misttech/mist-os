@@ -354,7 +354,6 @@ mod tests {
     use fidl_fuchsia_identity_account::{
         AccountMarker, AccountProxy, AuthChangeGranularity, AuthTargetRegisterAuthListenerRequest,
     };
-    use fidl_fuchsia_identity_authentication::Mechanism;
     use fuchsia_async as fasync;
     use fuchsia_fs::{directory, file};
     use fuchsia_inspect::Inspector;
@@ -710,8 +709,9 @@ mod tests {
                     proxy.get_auth_mechanism_enrollments().await?,
                     Err(ApiError::UnsupportedOperation)
                 );
+                let (_, interaction_server_end) = create_endpoints().unwrap();
                 assert_eq!(
-                    proxy.create_auth_mechanism_enrollment(Mechanism::Test).await?,
+                    proxy.create_auth_mechanism_enrollment(interaction_server_end).await?,
                     Err(ApiError::UnsupportedOperation)
                 );
                 assert_eq!(
