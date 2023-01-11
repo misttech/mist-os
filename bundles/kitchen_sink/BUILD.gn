@@ -8,7 +8,7 @@ assert(is_fuchsia, "These can only be defined in the default toolchain")
 group("kitchen_sink") {
   testonly = true
   public_deps = [
-    "//bundles:tests",
+    "//bundles/tests",
     "//bundles/tools",
     "//examples",
     "//src/graphics/examples",

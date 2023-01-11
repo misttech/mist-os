@@ -271,7 +271,7 @@ The easiest way to build a `fuzzer_package` with a fuzzing variant is to use the
 For example:
 
 <pre>
-<code class="devsite-terminal">fx set core.x64 --fuzz-with asan --with //bundles:tests</code>
+<code class="devsite-terminal">fx set core.x64 --fuzz-with asan --with //bundles/tests</code>
 <code class="devsite-terminal">fx build</code>
 </pre>
 

@@ -37,7 +37,7 @@ def main(args):
             [
                 'fx', '--dir=out/default', 'set', 'workstation_eng.x64',
                 '--with=//bundles/fidl:tests', '--with=//bundles:kitchen_sink',
-                '--with=//bundles:tests', '--with=//bundles/buildbot:core',
+                '--with=//bundles/tests', '--with=//bundles/buildbot:core',
                 '--with=//sdk/fidl/fuchsia.firebase.messaging:fuchsia.firebase.messaging',
                 '--with=//sdk/fidl/fuchsia.metricbroker:fuchsia.metricbroker',
                 '--with=//sdk/fidl/fuchsia.process:fuchsia.process',

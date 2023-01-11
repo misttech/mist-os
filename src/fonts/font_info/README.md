@@ -8,7 +8,7 @@ supports local paths.
 
 ## Testing
 
-Make sure your `fx set` arguments include `--with //bundles:tests`.
+Make sure your `fx set` arguments include `--with //bundles/tests`.
 
 ### Fuchsia
 ```shell

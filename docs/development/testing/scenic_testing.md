@@ -14,7 +14,7 @@ You can specify packages in these ways:
 * Everything:
 
   ```
-  --with //bundles:tests
+  --with //bundles/tests
   ```
 
 * Individually, if you want to build less packages:

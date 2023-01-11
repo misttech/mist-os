@@ -167,7 +167,7 @@ void main() {
     });
     test('correctly parses direct items', () async {
       BasicGnParser parser =
-          await parseFxGn('universe_package_labels += [ "//bundles:tests" ]');
+          await parseFxGn('universe_package_labels += [ "//bundles/tests" ]');
       var items = GNStatusParser()
           .collectFromTreeParser(parser)
           .where((item) => item.key == 'universe_package_labels');
@@ -175,7 +175,7 @@ void main() {
       expect(items.first.key, 'universe_package_labels');
       expect(items.first.title, 'Universe packages');
       expect(items.first.value.length, 1);
-      expect(items.first.value[0], '//bundles:tests');
+      expect(items.first.value[0], '//bundles/tests');
     });
     test('correctly parses calculated variables', () async {
       BasicGnParser parser =

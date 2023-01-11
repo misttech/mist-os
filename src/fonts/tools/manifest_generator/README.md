@@ -66,8 +66,8 @@ The fallback chain is defined manually. Some guidelines to follow:
 > #### Tip
 > To check which typefaces in a `font_collection` are not yet included in the
 > fallback chain, run the manifest generator with `-v` (or `--verbose`). You can
-> do this by temporarily changing the arguments in 
-> [font_manifest.gni](../../build/font_manifest.gni). 
+> do this by temporarily changing the arguments in
+> [font_manifest.gni](../../build/font_manifest.gni).
 
 One `.fontcfg.json` (or `.fontcfg.json5`) file should be checked in for every
 GN `font_collection()` invocation.
@@ -83,7 +83,7 @@ points for each typeface.
 
 ## Testing
 
-1. Make sure your `fx set` arguments include `--with //bundles:tests`.
+1. Make sure your `fx set` arguments include `--with //bundles/tests`.
 1. Execute `fx build`
 1. Execute:
   ```shell

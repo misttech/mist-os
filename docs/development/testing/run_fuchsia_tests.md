@@ -49,7 +49,7 @@ to include several of the primary testing bundles, build Fuchsia, and then run
 all tests in the build. For example:
 
 ```none
-fx set core.x64 --with //bundles/tools,//bundles:tests
+fx set core.x64 --with //bundles/tools,//bundles/tests
 fx build
 fx test
 ```

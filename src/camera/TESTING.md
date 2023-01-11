@@ -4,7 +4,7 @@ All camera tests should be run on all current targets before submitting code!
 
 ## To test the camera stack:
 
-1. `fx set [product].[board] --with //bundles:tests`
+1. `fx set [product].[board] --with //bundles/tests`
 2. You may have to re-flash zedboot if you flashed with a different fx set command
 3. `fx serve`
 4. Restart the target device in the netboot cable configuration

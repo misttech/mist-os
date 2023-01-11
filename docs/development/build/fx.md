@@ -68,13 +68,13 @@ First let's configure the build. To do this you need to make a few choices:
 * What board are you building for? (unsure: try `x64`)
 * What extra [test targets](#key-bundles) do you want? (unsure: try
   `//bundles/tools`, and if you're working on features, you probably want
-  `//bundles:tests`)
+  `//bundles/tests`)
 
 Armed with our above choices (if you didn't read above, do so now), you are
 ready to configure your build:
 
 ```posix-terminal
-fx set workstation_eng.x64 --with //bundles:tests
+fx set workstation_eng.x64 --with //bundles/tests
 ```
 
 Once you ran `fx set` in your checkout, there is no need to run it again unless
@@ -183,7 +183,7 @@ following bundles:
   for reconfiguring and testing networks, making http requests, debugging
   programs, changing audio volume, and so on. The core product includes
   `bundles:tools` in the universe package set by default.
-* `//bundles:tests` causes all test programs to be built. Most test programs
+* `//bundles/tests` causes all test programs to be built. Most test programs
   can be invoked using `run-test-suite` on the device, or via
   `fx test`.
 * `//bundles:kitchen_sink` is a target that causes all other build targets to be

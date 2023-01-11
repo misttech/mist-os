@@ -9,13 +9,13 @@ of flakiness, and standalone - the entire test is in one file.
 To build and run the tests for core-based products (e.g. core, astro, or sherlock), include
 the `integration_input_tests` test package in your build args either directly
 (`fx set ... --with //src/ui/tests/integration_input_tests`) or transitively
-(`fx set ... --with //bundles:tests`).
+(`fx set ... --with //bundles/tests`).
 
 To build and run the tests for workstation-based products, include
 the `workstation_tests` test package in your build args directly
 (`fx set ... --with //src/ui/tests/integration_input_tests:workstation_tests`).
 
-Note: Workstation tests are not built transitively via `//bundles:tests`, so exercising all tests
+Note: Workstation tests are not built transitively via `//bundles/tests`, so exercising all tests
 in this directly requires including both types of test targets described above.
 
 ## Running tests

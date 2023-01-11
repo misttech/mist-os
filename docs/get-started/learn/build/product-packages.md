@@ -82,7 +82,7 @@ following command adds all the packages in the Fuchsia `tests` bundle to a
 standard `workstation_eng` build.
 
 ```posix-terminal
-fx set workstation_eng.qemu-x64 --with //bundles:tests
+fx set workstation_eng.qemu-x64 --with //bundles/tests
 ```
 
 <aside class="key-point">

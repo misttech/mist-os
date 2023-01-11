@@ -79,7 +79,7 @@ working with tests, your build configuration is quite simple:
 
 ```sh
 
-Tab 1 > fx set core.x64 --with //bundles:tests && fx build && fx serve
+Tab 1 > fx set core.x64 --with //bundles/tests && fx build && fx serve
 
 Tab 2 > fx qemu -kN
 
