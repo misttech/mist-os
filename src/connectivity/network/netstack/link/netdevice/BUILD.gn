@@ -25,10 +25,10 @@ go_library("netdevice") {
 
   sources = [
     "client.go",
+    "client_fifo.go",
     "client_test.go",
     "entries.go",
     "entries_test.go",
-    "handler.go",
     "session_config.go",
     "session_config_test.go",
   ]
