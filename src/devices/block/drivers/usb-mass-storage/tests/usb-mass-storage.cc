@@ -412,8 +412,8 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           // Push reply
           switch (cmd.page) {
             case 0x3F: {
-              fbl::Array<unsigned char> reply(new unsigned char[sizeof(scsi_read_capacity_10_t)],
-                                              sizeof(scsi_read_capacity_10_t));
+              fbl::Array<unsigned char> reply(new unsigned char[sizeof(scsi_mode_sense_6_data_t)],
+                                              sizeof(scsi_mode_sense_6_data_t));
               scsi_mode_sense_6_data_t scsi = {};
               memcpy(reply.data(), &scsi, sizeof(scsi));
               context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
