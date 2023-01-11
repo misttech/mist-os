@@ -1180,7 +1180,7 @@ protocol MyProtocol {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructsWhenResultUnion);
 }
 
 TEST(ProtocolTests, GoodMethodNamedTypeRequest) {

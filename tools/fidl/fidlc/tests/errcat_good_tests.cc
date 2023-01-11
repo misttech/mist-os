@@ -1310,6 +1310,24 @@ TEST(ErrcatTests, Good0193) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatTests, Good0194a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0194-a.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatTests, Good0194b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0194-b.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
+  ASSERT_COMPILED(library);
+}
+
 // LINT.ThenChange(/docs/reference/fidl/language/errcat.md)
 
 }  // namespace

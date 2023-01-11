@@ -452,6 +452,9 @@ constexpr FixableErrorDef<192, Fixable::Kind::kProtocolModifier, std::string_vie
         "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
         "from closed to open, and explicit modifiers are mandatory during the migration.)");
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
+constexpr FixableErrorDef<194, Fixable::Kind::kEmptyStructResponse, std::string_view>
+    ErrEmptyPayloadStructsWhenResultUnion(
+        "method '{}' cannot have an empty struct as a payload, prefer omitting the payload altogether");
 }  // namespace fidl
 
 // LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)

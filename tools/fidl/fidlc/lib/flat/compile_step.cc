@@ -1048,15 +1048,23 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 
   CheckScopes(protocol_declaration, CheckScopes);
 
+  enum class EmptyPayload {
+    kBanned,
+    kFixable,
+    kAllowed,
+  };
+
   // Ensure that the method's type constructors for request/response payloads actually exist, and
   // are the right kind of layout.
-  std::function<void(const SourceSpan&, const Decl*, bool)> CheckPayloadDeclKind =
-      [&](const SourceSpan& method_name, const Decl* decl, bool empty_payload_allowed) -> void {
+  std::function<void(const SourceSpan&, const Decl*, EmptyPayload)> CheckPayloadDeclKind =
+      [&](const SourceSpan& method_name, const Decl* decl, EmptyPayload permission) -> void {
     switch (decl->kind) {
       case Decl::Kind::kStruct: {
         const auto struct_decl = static_cast<const Struct*>(decl);
-        if (!empty_payload_allowed && struct_decl->members.empty()) {
+        if (permission == EmptyPayload::kBanned && struct_decl->members.empty()) {
           Fail(ErrEmptyPayloadStructs, method_name, method_name.data());
+        } else if (permission == EmptyPayload::kFixable && struct_decl->members.empty()) {
+          FixableError(ErrEmptyPayloadStructsWhenResultUnion, method_name, method_name.data());
         }
         break;
       }
@@ -1070,7 +1078,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
         switch (aliased_type->kind) {
           case Type::Kind::kIdentifier: {
             const auto as_identifier_type = static_cast<const IdentifierType*>(aliased_type);
-            CheckPayloadDeclKind(method_name, as_identifier_type->type_decl, empty_payload_allowed);
+            CheckPayloadDeclKind(method_name, as_identifier_type->type_decl, permission);
             break;
           }
           default: {
@@ -1118,7 +1126,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
           auto decl = static_cast<const flat::IdentifierType*>(type)->type_decl;
           CompileDecl(decl);
           CheckNoDefaultMembers(decl);
-          CheckPayloadDeclKind(method.name, decl, false);
+          CheckPayloadDeclKind(method.name, decl, EmptyPayload::kBanned);
         }
       }
     }
@@ -1150,19 +1158,20 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
                 const auto* success_decl =
                     static_cast<const IdentifierType*>(success_variant_type)->type_decl;
                 CheckNoDefaultMembers(success_decl);
-                bool empty_payload_allowed = true;
+                auto empty_payload_permission = EmptyPayload::kAllowed;
                 if (experimental_flags().IsFlagEnabled(
                         ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax)) {
                   auto* anonymous = success_decl->name.as_anonymous();
-                  empty_payload_allowed =
-                      anonymous && anonymous->provenance == Name::Provenance::kCompilerGenerated;
+                  if (!anonymous || anonymous->provenance != Name::Provenance::kCompilerGenerated) {
+                    empty_payload_permission = EmptyPayload::kFixable;
+                  }
                 }
-                CheckPayloadDeclKind(method.name, success_decl, empty_payload_allowed);
+                CheckPayloadDeclKind(method.name, success_decl, empty_payload_permission);
               }
             }
           } else {
             CheckNoDefaultMembers(decl);
-            CheckPayloadDeclKind(method.name, decl, false);
+            CheckPayloadDeclKind(method.name, decl, EmptyPayload::kBanned);
           }
         }
       }
