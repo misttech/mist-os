@@ -1,8 +1,7 @@
 # Zircon Kernel Command Line Options
 
-TODO(53594): [//docs/gen/boot-options.md](/docs/gen/boot-options.md) is now the
-source of truth. kernel_cmdlind.md is in the process of being replaced. Please
-do not update it without coordinating with the migration effort.
+See [//docs/gen/boot-options.md](/docs/gen/boot-options.md) is now the
+source of truth.
 
 The Zircon kernel receives a textual command line from the bootloader, which can
 be used to alter some behaviours of the system. Kernel command line parameters
@@ -27,18 +26,6 @@ starting with # are ignored. Whitespace is not allowed in names.
 
 In order to specify options in the build, see
 [this guide](/docs/development/kernel/build.md#options).
-
-## aslr.disable
-
-If this option is set, the system will not use Address Space Layout
-Randomization.
-
-## aslr.entropy_bits=\<num\>
-
-For address spaces that use ASLR this controls the number of bits of entropy in
-the randomization. Higher entropy results in a sparser address space and uses
-more memory for page tables. Valid values range from 0-36, with default being
-30.
 
 ## blobfs.cache-eviction-policy=\<policy\>
 
@@ -232,86 +219,6 @@ problem arise.
 
 This option (disabled by default) allows the system to use a hardware IOMMU if
 present.
-
-## kernel.arm64.event-stream.enable=\<bool>
-
-When enabled, each ARM cpu will enable an event stream generator, which per-cpu
-sets the hidden event flag at a particular rate. This has the effect of kicking
-cpus out of any WFE states they may be sitting in. The default is false.
-
-## kernel.arm64.event-stream.freq-hz=\<uint32>
-
-If the event stream is enabled, specifies the frequency at which it will attempt
-to run. The resolution is limited, so the driver will only be able to pick the
-nearest power of 2 from the cpu timer counter. The default is 10000.
-
-## kernel.cprng-reseed-require.hw-rng=\<bool>
-
-When enabled and if HW RNG fails at reseeding, CPRNG panics. Defaults to false.
-
-## kernel.cprng-reseed-require.jitterentropy=\<bool>
-
-When enabled and if jitterentropy fails at reseeding, CPRNG panics. Defaults to
-false.
-
-## kernel.cprng-seed-require.hw-rng=\<bool>
-
-When enabled and if HW RNG fails at initial seeding, CPRNG panics. Defaults to
-false.
-
-## kernel.cprng-seed-require.jitterentropy=\<bool>
-
-When enabled and if jitterentrop fails initial seeding, CPRNG panics. Defaults
-to false.
-
-## kernel.cprng-seed-require.cmdline=\<bool>
-
-When enabled and if you do not provide entropy input from the kernel command
-line, CPRNG panics. Defaults to false.
-
-## kernel.entropy-mixin=\<hex>
-
-Provides entropy to be mixed into the kernel's CPRNG.
-
-## kernel.jitterentropy.bs=\<num>
-
-Sets the "memory block size" parameter for jitterentropy (the default is 64).
-When jitterentropy is performing memory operations (to increase variation in CPU
-timing), the memory will be accessed in blocks of this size.
-
-## kernel.jitterentropy.bc=\<num>
-
-Sets the "memory block count" parameter for jitterentropy (the default is 512).
-When jitterentropy is performing memory operations (to increase variation in CPU
-timing), this controls how many blocks (of size `kernel.jitterentropy.bs`) are
-accessed.
-
-## kernel.jitterentropy.ml=\<num>
-
-Sets the "memory loops" parameter for jitterentropy (the default is 32). When
-jitterentropy is performing memory operations (to increase variation in CPU
-timing), this controls how many times the memory access routine is repeated.
-This parameter is only used when `kernel.jitterentropy.raw` is true. If the
-value of this parameter is `0` or if `kernel.jitterentropy.raw` is `false`, then
-jitterentropy chooses the number of loops is a random-ish way.
-
-## kernel.jitterentropy.ll=\<num>
-
-Sets the "LFSR loops" parameter for jitterentropy (the default is 1). When
-jitterentropy is performing CPU-intensive LFSR operations (to increase variation
-in CPU timing), this controls how many times the LFSR routine is repeated. This
-parameter is only used when `kernel.jitterentropy.raw` is true. If the value of
-this parameter is `0` or if `kernel.jitterentropy.raw` is `false`, then
-jitterentropy chooses the number of loops is a random-ish way.
-
-## kernel.jitterentropy.raw=\<bool>
-
-When true (the default), the jitterentropy entropy collector will return raw,
-unprocessed samples. When false, the raw samples will be processed by
-jitterentropy, producing output data that looks closer to uniformly random. Note
-that even when set to false, the CPRNG will re-process the samples, so the
-processing inside of jitterentropy is somewhat redundant.
-
 ### x64 specific values
 
 On x64, some additional values are supported for configuring 8250-like UARTs:
@@ -327,11 +234,6 @@ For example, `ioport,0x3f8,4` would describe the legacy COM1 interface.
 All numbers may be in any base accepted by *strtoul*().
 
 All other values are currently undefined.
-
-## kernel.wallclock=\<name>
-
-This option can be used to force the selection of a particular wall clock. It
-only is used on pc builds. Options are "tsc", "hpet", and "pit".
 
 ## ldso.trace
 
