@@ -139,3 +139,69 @@ TEST(EpollTest, DISABLED_LotsaSignals) {
 
   ponger.join();
 }
+
+TEST(EpollTest, CloseAfterAdd) {
+  int sockets[2];
+  int result = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
+  ASSERT_EQ(0, result);
+
+  int epfd = epoll_create(2);
+  ASSERT_GE(epfd, 0);
+
+  // Wait on socket[1] readable.
+  struct epoll_event event;
+  event.events = EPOLLIN;
+  event.data.u64 = 1;
+  result = epoll_ctl(epfd, EPOLL_CTL_ADD, sockets[1], &event);
+  ASSERT_EQ(result, 0);
+
+  // Write data in the "0" end so the "1" will be marked ready to read. Writing just one byte
+  // ensures there can't be a short write.
+  ASSERT_EQ(1, HANDLE_EINTR(write(sockets[0], "a", 1)));
+
+  // Close the read socket out from under epoll.
+  close(sockets[1]);
+
+  // Waiting on the (now empty) epoll object should timeout rather than report it's ready to read
+  // or that there's a bad file descriptor.
+  result = epoll_wait(epfd, &event, 1, 1);
+  EXPECT_EQ(0, result) << errno;
+}
+
+TEST(EpollTest, InvalidCreateSize) {
+  errno = 0;
+  EXPECT_EQ(-1, epoll_create(0));
+  EXPECT_EQ(EINVAL, errno);
+
+  errno = 0;
+  EXPECT_EQ(-1, epoll_create(-1));
+  EXPECT_EQ(EINVAL, errno);
+}
+
+TEST(EpollTest, WaitInvalidParams) {
+  ScopedFD epfd(epoll_create(2));
+  ASSERT_TRUE(epfd);
+
+  struct epoll_event event;
+
+  errno = 0;
+  EXPECT_EQ(-1, epoll_wait(epfd.get(), &event, 0, 0));
+  EXPECT_EQ(EINVAL, errno);
+
+  errno = 0;
+  EXPECT_EQ(-1, epoll_wait(epfd.get(), &event, -1, 0));
+  EXPECT_EQ(EINVAL, errno);
+
+  // Pass null for event pointer but valid count.
+  /* TODO(fxbug.dev/117944) Handle this case properly.
+  errno = 0;
+  EXPECT_EQ(-1, epoll_wait(epfd.get(), nullptr, 1, 0));
+  EXPECT_EQ(EFAULT, errno);
+  */
+
+  // When both the pointer and the count are invalid, Linux returns EINVAL (it checks the count
+  // first).
+  errno = 0;
+  EXPECT_EQ(-1, epoll_wait(epfd.get(), nullptr, 0, 0));
+  EXPECT_EQ(EINVAL, errno);
+}

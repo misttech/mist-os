@@ -1527,6 +1527,9 @@ pub fn sys_pselect6(
 
 pub fn sys_epoll_create(current_task: &CurrentTask, size: i32) -> Result<FdNumber, Errno> {
     if size < 1 {
+        // The man page for epoll_create says the size was used in a previous implementation as
+        // a hint but no longer does anything. But it's still required to be >= 1 to ensure
+        // programs are backwards-compatible.
         return error!(EINVAL);
     }
     sys_epoll_create1(current_task, 0)
@@ -1587,16 +1590,18 @@ fn do_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
-    max_events: i32,
+    unvalidated_max_events: i32,
     timeout: zx::Duration,
     user_sigmask: UserRef<sigset_t>,
 ) -> Result<usize, Errno> {
-    if max_events < 1 {
-        return error!(EINVAL);
-    }
-
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
+
+    // Max_events must be greater than 0.
+    let max_events: usize = unvalidated_max_events.try_into().map_err(|_| errno!(EINVAL))?;
+    if max_events == 0 {
+        return error!(EINVAL);
+    }
 
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.mm.read_object(user_sigmask)?;
