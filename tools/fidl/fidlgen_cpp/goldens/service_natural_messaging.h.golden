@@ -27,7 +27,7 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_service::FirstProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> MethodOnFirst() const;
+  ::fit::result<::fidl::OneWayError> MethodOnFirst() const;
 };
 
 #endif  // __Fuchsia__
@@ -38,7 +38,7 @@ template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol>> {
  public:
-  ::fit::result<::fidl::Error> MethodOnFirst();
+  ::fit::result<::fidl::OneWayError> MethodOnFirst();
 
  private:
   ::fidl::UnownedClientEnd<::test_service::FirstProtocol> _client_end() const {
@@ -167,7 +167,7 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_service::SecondProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> MethodOnSecond() const;
+  ::fit::result<::fidl::OneWayError> MethodOnSecond() const;
 };
 
 #endif  // __Fuchsia__
@@ -178,7 +178,7 @@ template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol>> {
  public:
-  ::fit::result<::fidl::Error> MethodOnSecond();
+  ::fit::result<::fidl::OneWayError> MethodOnSecond();
 
  private:
   ::fidl::UnownedClientEnd<::test_service::SecondProtocol> _client_end() const {

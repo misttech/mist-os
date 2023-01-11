@@ -4768,7 +4768,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocollayouts::MainProtocol>
  public:
   
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnonComposed> _request{ ComposedProtocolOneWayAnonComposedRequest };
       return ::fidl::WireResult<::test_protocollayouts::MainProtocol::OneWayAnonComposed>(_client_end(), &_request);
@@ -4789,7 +4789,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocollayouts::MainProtocol>
     }
 
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed> _request{ ImportTablePayload };
       return ::fidl::WireResult<::test_protocollayouts::MainProtocol::OneWayNamedComposed>(_client_end(), &_request);
@@ -4810,7 +4810,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocollayouts::MainProtocol>
     }
 
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayImport> _request{ ImportTablePayload };
       return ::fidl::WireResult<::test_protocollayouts::MainProtocol::OneWayImport>(_client_end(), &_request);
@@ -4831,7 +4831,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocollayouts::MainProtocol>
     }
 
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal> _request{ LocalTablePayload };
       return ::fidl::WireResult<::test_protocollayouts::MainProtocol::OneWayLocal>(_client_end(), &_request);
@@ -4852,7 +4852,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocollayouts::MainProtocol>
     }
 
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon> _request{ MainProtocolOneWayAnonRequest };
       return ::fidl::WireResult<::test_protocollayouts::MainProtocol::OneWayAnon>(_client_end(), &_request);
@@ -4886,7 +4886,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocollayouts::MainPro
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnonComposed> _request{ ComposedProtocolOneWayAnonComposedRequest };
       return ::fidl::WireUnownedResult<::test_protocollayouts::MainProtocol::OneWayAnonComposed>(_client_end(), _allocator(), &_request);
@@ -4907,7 +4907,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocollayouts::MainPro
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed> _request{ ImportTablePayload };
       return ::fidl::WireUnownedResult<::test_protocollayouts::MainProtocol::OneWayNamedComposed>(_client_end(), _allocator(), &_request);
@@ -4928,7 +4928,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocollayouts::MainPro
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayImport> _request{ ImportTablePayload };
       return ::fidl::WireUnownedResult<::test_protocollayouts::MainProtocol::OneWayImport>(_client_end(), _allocator(), &_request);
@@ -4949,7 +4949,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocollayouts::MainPro
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal> _request{ LocalTablePayload };
       return ::fidl::WireUnownedResult<::test_protocollayouts::MainProtocol::OneWayLocal>(_client_end(), _allocator(), &_request);
@@ -4970,7 +4970,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocollayouts::MainPro
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
       ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon> _request{ MainProtocolOneWayAnonRequest };
       return ::fidl::WireUnownedResult<::test_protocollayouts::MainProtocol::OneWayAnon>(_client_end(), _allocator(), &_request);
@@ -5568,19 +5568,19 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainPro
   using ClientImplBase::ClientImplBase;
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest);
+  ::fidl::OneWayStatus OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest);
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
+  ::fidl::OneWayStatus OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
+  ::fidl::OneWayStatus OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload);
+  ::fidl::OneWayStatus OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload);
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest);
+  ::fidl::OneWayStatus OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest);
 };
 
 template<>
@@ -5615,23 +5615,23 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::M
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest);
+::fidl::OneWayStatus OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
+::fidl::OneWayStatus OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
+::fidl::OneWayStatus OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload);
+::fidl::OneWayStatus OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest);
+::fidl::OneWayStatus OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest);
 
 };
 
@@ -5728,34 +5728,34 @@ class ::fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
+    fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::Status OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
 
 
-    fidl::Status OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
 
 
-    fidl::Status OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
+    fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::Status OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
+    fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::Status OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -5765,34 +5765,34 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainPr
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
+    fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::Status OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
 
 
-    fidl::Status OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
 
 
-    fidl::Status OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
+    fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::Status OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
+    fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::Status OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -5803,34 +5803,34 @@ class ::fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
+    fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::Status OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
 
 
-    fidl::Status OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
 
 
-    fidl::Status OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
+    fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::Status OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
+    fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::Status OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -5841,34 +5841,34 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtoc
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
+    fidl::OneWayStatus OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest);
 
 
-    fidl::Status OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
+    fidl::OneWayStatus OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result);
 
 
-    fidl::Status OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
+    fidl::OneWayStatus OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result);
 
 
-    fidl::Status OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
+    fidl::OneWayStatus OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload);
 
 
-    fidl::Status OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
+    fidl::OneWayStatus OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload);
 
 
-    fidl::Status OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
+    fidl::OneWayStatus OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest);
 
 
-    fidl::Status OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };

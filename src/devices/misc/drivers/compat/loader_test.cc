@@ -147,7 +147,7 @@ TEST_F(LoaderTest, DoneClosesConnection) {
 
   ASSERT_TRUE(RunLoopUntilIdle());
 
-  EXPECT_EQ(fidl::Reason::kPeerClosed, handler.Reason());
+  EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, handler.Reason());
 }
 
 TEST_F(LoaderTest, ConfigSucceeds) {

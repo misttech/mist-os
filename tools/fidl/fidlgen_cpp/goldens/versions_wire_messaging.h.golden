@@ -371,7 +371,7 @@ template <>
 class ::fidl::internal::WireSyncClientImpl<::test_versions::Protocol> final : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::WireSyncClientImpl<::test_versions::Protocol>> {
  public:
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   Foo() {
     ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
     return ::fidl::WireResult<::test_versions::Protocol::Foo>(_client_end(), &_request);
@@ -388,7 +388,7 @@ template <>
 class ::fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol> final : public ::fidl::internal::SyncEndpointBufferVeneer<::fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol>> {
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   Foo() {
     ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
     return ::fidl::WireUnownedResult<::test_versions::Protocol::Foo>(_client_end(), _allocator(), &_request);
@@ -630,7 +630,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_versions::Protocol> : pu
   using ClientImplBase::ClientImplBase;
 
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status Foo();
+  ::fidl::OneWayStatus Foo();
 };
 
 template <>
@@ -645,7 +645,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_versions::Protocol
   using BufferClientImplBase::BufferClientImplBase;
 
   // Caller provides the backing storage for FIDL message.
-  ::fidl::Status Foo();
+  ::fidl::OneWayStatus Foo();
 };
 
 template <>

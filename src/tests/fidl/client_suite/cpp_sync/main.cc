@@ -360,10 +360,6 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
         ZX_ASSERT(event_handler.received_event.has_value());
         auto report_result = reporter->ReportEvent(event_handler.received_event.value());
         if (report_result.is_error()) {
-          // If the harness has closed the reporter, we can stop reporting events.
-          if (report_result.error_value().is_peer_closed()) {
-            break;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }
@@ -410,10 +406,6 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
         ZX_ASSERT(event_handler.received_event.has_value());
         auto report_result = reporter->ReportEvent(event_handler.received_event.value());
         if (report_result.is_error()) {
-          // If the harness has closed the reporter, we can stop reporting events.
-          if (report_result.error_value().is_peer_closed()) {
-            break;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }
@@ -470,10 +462,6 @@ class RunnerServer : public fidl::Server<fidl_clientsuite::Runner> {
         ZX_ASSERT(event_handler.received_event.has_value());
         auto report_result = reporter->ReportEvent(event_handler.received_event.value());
         if (report_result.is_error()) {
-          // If the harness has closed the reporter, we can stop reporting events.
-          if (report_result.error_value().is_peer_closed()) {
-            break;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }

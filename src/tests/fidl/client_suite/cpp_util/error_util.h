@@ -24,7 +24,7 @@ fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status) {
         return fidl_clientsuite::FidlErrorKind::kDecodingError;
       }
       return fidl_clientsuite::FidlErrorKind::kUnexpectedMessage;
-    case fidl::Reason::kPeerClosed:
+    case fidl::Reason::kPeerClosedWhileReading:
       return fidl_clientsuite::FidlErrorKind::kChannelPeerClosed;
     case fidl::Reason::kDecodeError:
       return fidl_clientsuite::FidlErrorKind::kDecodingError;

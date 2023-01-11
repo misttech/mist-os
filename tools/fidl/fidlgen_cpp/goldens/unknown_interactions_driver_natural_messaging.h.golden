@@ -634,9 +634,9 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr> FlexibleTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 
-  ::fit::result<::fidl::Error> FlexibleOneWay() const;
+  ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 namespace test_unknowninteractions {
 
@@ -1252,9 +1252,9 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 
-  ::fit::result<::fidl::Error> FlexibleOneWay() const;
+  ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 namespace test_unknowninteractions {
 
@@ -1753,7 +1753,7 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 };
 namespace test_unknowninteractions {
 

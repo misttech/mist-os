@@ -2891,14 +2891,14 @@ class ::fidl::internal::WireSyncClientImpl<::test_bindingsdenylist::ImportsSameN
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Unattributed() {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> _request{  };
       return ::fidl::WireResult<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>(_client_end(), &_request);
     }
 
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     AlwaysAppearsInImportingLibrary() {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> _request{  };
       return ::fidl::WireResult<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary>(_client_end(), &_request);
@@ -2918,14 +2918,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_bindingsdenylist::Import
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Unattributed() {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> _request{  };
       return ::fidl::WireUnownedResult<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>(_client_end(), _allocator(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     AlwaysAppearsInImportingLibrary() {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> _request{  };
       return ::fidl::WireUnownedResult<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary>(_client_end(), _allocator(), &_request);
@@ -3334,10 +3334,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_bindingsdenylist::Import
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status Unattributed();
+  ::fidl::OneWayStatus Unattributed();
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status AlwaysAppearsInImportingLibrary();
+  ::fidl::OneWayStatus AlwaysAppearsInImportingLibrary();
 };
 
 template<>
@@ -3352,11 +3352,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_bindingsdenylist::
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status Unattributed();
+::fidl::OneWayStatus Unattributed();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status AlwaysAppearsInImportingLibrary();
+::fidl::OneWayStatus AlwaysAppearsInImportingLibrary();
 
 };
 

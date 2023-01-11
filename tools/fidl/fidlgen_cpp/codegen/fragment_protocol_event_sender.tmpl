@@ -15,7 +15,7 @@ class {{ .WireWeakEventSender }} : public ::fidl::internal::WeakEventSenderBase 
 
   {{- range .Events }}
     {{- .Docs }}
-    fidl::Status {{ .Name }}({{ RenderParams .ResponseArgs }});
+    fidl::OneWayStatus {{ .Name }}({{ RenderParams .ResponseArgs }});
 
 {{ "" }}
   {{- end }}
@@ -29,7 +29,7 @@ class {{ .WireWeakBufferEventSender }} : public ::fidl::internal::WeakBufferEven
 
   {{- range .Events }}
     {{- .Docs }}
-    fidl::Status {{ .Name }}({{ RenderParams .ResponseArgs }});
+    fidl::OneWayStatus {{ .Name }}({{ RenderParams .ResponseArgs }});
 
 {{ "" }}
   {{- end }}
@@ -44,7 +44,7 @@ class {{ .WireEventSender }}
 
   {{- range .Events }}
     {{- .Docs }}
-    fidl::Status {{ .Name }}({{ RenderParams .ResponseArgs }});
+    fidl::OneWayStatus {{ .Name }}({{ RenderParams .ResponseArgs }});
 
 {{ "" }}
   {{- end }}
@@ -59,7 +59,7 @@ class {{ .InternalWireBufferEventSender }}
 
   {{- range .Events }}
     {{- .Docs }}
-    fidl::Status {{ .Name }}({{ RenderParams .ResponseArgs }});
+    fidl::OneWayStatus {{ .Name }}({{ RenderParams .ResponseArgs }});
 
 {{ "" }}
   {{- end }}
@@ -74,7 +74,7 @@ class {{ .InternalWireBufferEventSender }}
   {{- range .Events }}
 
     {{- /* Weak, managed */}}
-fidl::Status {{ $.WireWeakEventSender.NoLeading }}::{{ .Name }}(
+::fidl::OneWayStatus {{ $.WireWeakEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -86,14 +86,14 @@ fidl::Status {{ $.WireWeakEventSender.NoLeading }}::{{ .Name }}(
 
     {{- /* Weak, caller-allocated */}}
 {{ "" }}
-fidl::Status {{ $.WireWeakBufferEventSender.NoLeading }}::{{ .Name }}(
+fidl::OneWayStatus {{ $.WireWeakBufferEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<{{ .Marker }}>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
@@ -104,7 +104,7 @@ fidl::Status {{ $.WireWeakBufferEventSender.NoLeading }}::{{ .Name }}(
 {{ "" }}
 
     {{- /* Managed */}}
-fidl::Status {{ $.WireEventSender.NoLeading }}::{{ .Name }}(
+fidl::OneWayStatus {{ $.WireEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -113,18 +113,18 @@ fidl::Status {{ $.WireEventSender.NoLeading }}::{{ .Name }}(
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
     {{- /* Caller-allocated */}}
 {{ "" }}
-fidl::Status {{ $.InternalWireBufferEventSender.NoLeading }}::{{ .Name }}(
+fidl::OneWayStatus {{ $.InternalWireBufferEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<{{ .Marker }}>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
@@ -132,7 +132,7 @@ fidl::Status {{ $.InternalWireBufferEventSender.NoLeading }}::{{ .Name }}(
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 {{ "" }}
 
@@ -154,7 +154,7 @@ class {{ .NaturalWeakEventSender }} : public ::fidl::internal::WeakEventSenderBa
 
   {{- range .Events }}
     {{- .Docs }}
-    ::fit::result<::fidl::Error> {{ .Name }}({{ .NaturalResponseArg "payload" }});
+    ::fit::result<::fidl::OneWayError> {{ .Name }}({{ .NaturalResponseArg "payload" }});
 
   {{ end }}
 };
@@ -168,7 +168,7 @@ class {{ .NaturalEventSender }}
 
   {{- range .Events }}
     {{- .Docs }}
-    ::fit::result<::fidl::Error> {{ .Name }}({{ .NaturalResponseArg "payload" }});
+    ::fit::result<::fidl::OneWayError> {{ .Name }}({{ .NaturalResponseArg "payload" }});
 
   {{ end }}
 };
@@ -183,7 +183,7 @@ class {{ .NaturalEventSender }}
 {{- IfdefFuchsia -}}
   {{- range .Events }}
 
-::fit::result<::fidl::Error> {{ $.NaturalWeakEventSender.NoLeading }}::{{ .Name }}(
+::fit::result<::fidl::OneWayError> {{ $.NaturalWeakEventSender.NoLeading }}::{{ .Name }}(
     {{- .NaturalResponseArg "payload" }}) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, {{ .OrdinalName }}, {{ .DynamicFlagsName }} };
@@ -191,11 +191,10 @@ class {{ .NaturalEventSender }}
   _encoder.EncodeBody({{ .Response.Forward "payload" }});
   {{- end }}
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status result = _inner().SendEvent(_encoded_message);
-  return ::fidl::internal::ToFitxResult(result);
+  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
 }
 
-::fit::result<::fidl::Error> {{ $.NaturalEventSender.NoLeading }}::{{ .Name }}(
+::fit::result<::fidl::OneWayError> {{ $.NaturalEventSender.NoLeading }}::{{ .Name }}(
     {{- .NaturalResponseArg "payload" }}) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, {{ .OrdinalName }}, {{ .DynamicFlagsName }} };
@@ -204,7 +203,7 @@ class {{ .NaturalEventSender }}
   {{- end }}
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   _encoded_message.Write(_transport());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{_encoded_message});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
   {{ end }}

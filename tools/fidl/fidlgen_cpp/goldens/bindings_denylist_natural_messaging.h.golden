@@ -868,9 +868,9 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> Unattributed() const;
+  ::fit::result<::fidl::OneWayError> Unattributed() const;
 
-  ::fit::result<::fidl::Error> AlwaysAppearsInImportingLibrary() const;
+  ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary() const;
 };
 
 #endif  // __Fuchsia__
@@ -881,9 +881,9 @@ template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext>> {
  public:
-  ::fit::result<::fidl::Error> Unattributed();
+  ::fit::result<::fidl::OneWayError> Unattributed();
 
-  ::fit::result<::fidl::Error> AlwaysAppearsInImportingLibrary();
+  ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary();
 
  private:
   ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext> _client_end() const {

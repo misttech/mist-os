@@ -26,7 +26,7 @@ class StoreImpl final : public fidl::Server<examples_keyvaluestore_supportexport
             dispatcher, std::move(server_end), this,
             [this](StoreImpl* impl, fidl::UnbindInfo info,
                    fidl::ServerEnd<examples_keyvaluestore_supportexports::Store> server_end) {
-              if (info.reason() != ::fidl::Reason::kPeerClosed) {
+              if (info.reason() != ::fidl::Reason::kPeerClosedWhileReading) {
                 FX_LOGS(ERROR) << "Shutdown unexpectedly";
               }
               delete this;

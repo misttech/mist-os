@@ -627,7 +627,7 @@ fpromise::promise<void> Device::Remove() {
   // We don't need to log if the error is that we cannot connect
   // to the protocol, because that means we are already in the process
   // of shutting down.
-  if (!result.ok() && !result.is_peer_closed() && !result.is_canceled()) {
+  if (!result.ok() && !result.is_canceled()) {
     FDF_LOG(ERROR, "Failed to remove device '%s': %s", Name(), result.FormatDescription().data());
   }
   return finished_bridge.consumer.promise();

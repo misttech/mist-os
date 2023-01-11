@@ -789,8 +789,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
 
   auto status = stream_config_->SetGain(std::move(gain_state));
   if (status.is_error()) {
-    if (status.error_value().is_canceled() || status.error_value().is_dispatcher_shutdown() ||
-        status.error_value().is_peer_closed()) {
+    if (status.error_value().is_canceled() || status.error_value().is_dispatcher_shutdown()) {
       // These indicate that we are already shutting down, so they aren't error conditions.
       ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
           << "SetGain response will take no action on error "

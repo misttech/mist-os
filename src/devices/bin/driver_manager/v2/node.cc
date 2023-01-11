@@ -786,7 +786,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   }
   // The only valid way a driver host should shut down the Driver channel
   // is with the ZX_OK epitaph.
-  if (info.reason() != fidl::Reason::kPeerClosed || info.status() != ZX_OK) {
+  if (info.reason() != fidl::Reason::kPeerClosedWhileReading || info.status() != ZX_OK) {
     LOGF(ERROR, "Node: %s: driver channel shutdown with: %s", name().c_str(),
          info.FormatDescription().data());
   }

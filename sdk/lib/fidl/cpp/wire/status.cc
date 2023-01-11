@@ -66,7 +66,7 @@ using StatusFormattingBuffer = std::array<char, 256>;
       return "user initiated unbind";
     case Reason::kClose:
       return "(server) user initiated close with epitaph";
-    case Reason::kPeerClosed:
+    case Reason::kPeerClosedWhileReading:
       return "peer closed";
     case Reason::kDispatcherError:
       return "dispatcher error";
@@ -100,7 +100,7 @@ size_t Status::FormatImpl(char* destination, size_t length, bool from_unbind_inf
         case Reason::kClose:
           ZX_DEBUG_ASSERT(from_unbind_info);
           return "status of sending epitaph";
-        case Reason::kPeerClosed:
+        case Reason::kPeerClosedWhileReading:
           if (status_ != ZX_ERR_PEER_CLOSED) {
             return "epitaph";
           }

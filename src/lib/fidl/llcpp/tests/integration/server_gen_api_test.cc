@@ -53,7 +53,7 @@ TEST(BindServerTestCase, SyncReply) {
   sync_completion_t closed;
   fidl::OnUnboundFn<SyncServer> on_unbound = [&closed](SyncServer*, fidl::UnbindInfo info,
                                                        fidl::ServerEnd<ValueEcho> server_end) {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     EXPECT_TRUE(server_end);
     sync_completion_signal(&closed);
@@ -97,7 +97,7 @@ TEST(BindServerTestCase, AsyncReply) {
   sync_completion_t closed;
   fidl::OnUnboundFn<AsyncServer> on_unbound = [&closed](AsyncServer*, fidl::UnbindInfo info,
                                                         fidl::ServerEnd<ValueEcho> server_end) {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     EXPECT_TRUE(server_end);
     sync_completion_signal(&closed);
@@ -148,7 +148,7 @@ TEST(BindServerTestCase, MultipleAsyncReplies) {
   fidl::OnUnboundFn<AsyncDelayedServer> on_unbound =
       [&closed](AsyncDelayedServer* server, fidl::UnbindInfo info,
                 fidl::ServerEnd<ValueEcho> server_end) {
-        EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+        EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
         EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
         EXPECT_TRUE(server_end);
         sync_completion_signal(&closed);
@@ -275,7 +275,7 @@ TEST(BindServerTestCase, CallbackDestroyOnClientClose) {
 
   fidl::OnUnboundFn<Server> on_unbound = [&unbound](Server* server, fidl::UnbindInfo info,
                                                     fidl::ServerEnd<Empty> server_end) {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     EXPECT_TRUE(server_end);
     sync_completion_signal(&unbound);
@@ -322,7 +322,7 @@ TEST(BindServerTestCase, CallbackErrorClientTriggered) {
 
   fidl::OnUnboundFn<ErrorServer> on_unbound = [&error](ErrorServer*, fidl::UnbindInfo info,
                                                        fidl::ServerEnd<ValueEcho> server_end) {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     EXPECT_TRUE(server_end);
     sync_completion_signal(&error);
@@ -385,7 +385,7 @@ TEST(BindServerTestCase, DestroyBindingWithPendingCancel) {
   sync_completion_t closed;
   fidl::OnUnboundFn<WorkingServer> on_unbound = [&closed](WorkingServer*, fidl::UnbindInfo info,
                                                           fidl::ServerEnd<ValueEcho> server_end) {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     EXPECT_TRUE(server_end);
     sync_completion_signal(&closed);
@@ -1312,7 +1312,7 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorEvent) {
   ASSERT_OK(endpoints.status_value());
   auto [local, remote] = std::move(*endpoints);
 
-  UnbindObserver<Values> observer(fidl::Reason::kPeerClosed, ZX_ERR_PEER_CLOSED);
+  UnbindObserver<Values> observer(fidl::Reason::kPeerClosedWhileReading, ZX_ERR_PEER_CLOSED);
   fidl::ServerBindingRef<Values> binding =
       fidl::BindServer(loop.dispatcher(), std::move(remote), server.get(), observer.GetCallback());
 
@@ -1366,7 +1366,7 @@ TEST(BindServerTestCase, DrainAllMessageInPeerClosedSendErrorReply) {
   ASSERT_OK(endpoints.status_value());
   auto [local, remote] = std::move(*endpoints);
 
-  UnbindObserver<Values> observer(fidl::Reason::kPeerClosed, ZX_ERR_PEER_CLOSED);
+  UnbindObserver<Values> observer(fidl::Reason::kPeerClosedWhileReading, ZX_ERR_PEER_CLOSED);
   fidl::ServerBindingRef<Values> binding =
       fidl::BindServer(loop.dispatcher(), std::move(remote), server.get(), observer.GetCallback());
 

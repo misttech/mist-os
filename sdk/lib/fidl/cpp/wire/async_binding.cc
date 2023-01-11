@@ -40,7 +40,8 @@ bool DispatchError::RequiresImmediateTeardown() {
   // endpoint will be reliably drained by the client and exposed to the user. An
   // equivalent situation applies in the server bindings in ensuring that client
   // messages are reliably drained after peer closed.
-  return !(origin == fidl::ErrorOrigin::kSend && info.reason() == fidl::Reason::kPeerClosed);
+  return !(origin == fidl::ErrorOrigin::kSend &&
+           info.reason() == fidl::Reason::kPeerClosedWhileReading);
 }
 
 AsyncBinding::AsyncBinding(async_dispatcher_t* dispatcher, AnyUnownedTransport transport,

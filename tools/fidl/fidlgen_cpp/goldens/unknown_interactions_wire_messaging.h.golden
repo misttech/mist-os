@@ -6422,14 +6422,14 @@ class ::fidl::internal::WireSyncClientImpl<::test_unknowninteractions::UnknownIn
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay> _request{  };
       return ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay>(_client_end(), &_request);
     }
 
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleOneWay> _request{  };
       return ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleOneWay>(_client_end(), &_request);
@@ -6561,14 +6561,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay> _request{  };
       return ::fidl::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay>(_client_end(), _allocator(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleOneWay> _request{  };
       return ::fidl::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleOneWay>(_client_end(), _allocator(), &_request);
@@ -11595,14 +11595,14 @@ class ::fidl::internal::WireSyncClientImpl<::test_unknowninteractions::UnknownIn
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay> _request{  };
       return ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay>(_client_end(), &_request);
     }
 
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleOneWay> _request{  };
       return ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleOneWay>(_client_end(), &_request);
@@ -11678,14 +11678,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay> _request{  };
       return ::fidl::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay>(_client_end(), _allocator(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleOneWay> _request{  };
       return ::fidl::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleOneWay>(_client_end(), _allocator(), &_request);
@@ -15385,7 +15385,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_unknowninteractions::UnknownIn
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay> _request{  };
       return ::fidl::WireResult<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay>(_client_end(), &_request);
@@ -15461,7 +15461,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay> _request{  };
       return ::fidl::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay>(_client_end(), _allocator(), &_request);
@@ -15955,10 +15955,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status FlexibleOneWay();
+  ::fidl::OneWayStatus FlexibleOneWay();
 };
 
 template<>
@@ -16005,11 +16005,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status FlexibleOneWay();
+::fidl::OneWayStatus FlexibleOneWay();
 
 };
 
@@ -16148,52 +16148,52 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16203,52 +16203,52 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16259,52 +16259,52 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16315,52 +16315,52 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest UnknownInteractionsProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest UnknownInteractionsProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16377,10 +16377,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status FlexibleOneWay();
+  ::fidl::OneWayStatus FlexibleOneWay();
 };
 
 template<>
@@ -16411,11 +16411,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status FlexibleOneWay();
+::fidl::OneWayStatus FlexibleOneWay();
 
 };
 
@@ -16498,52 +16498,52 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16553,52 +16553,52 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16609,52 +16609,52 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16665,52 +16665,52 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest UnknownInteractionsAjarProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult result);
 
 
-    fidl::Status FlexibleEvent();
+    fidl::OneWayStatus FlexibleEvent();
 
 
-    fidl::Status FlexibleEventFields(int32_t some_field);
+    fidl::OneWayStatus FlexibleEventFields(int32_t some_field);
 
 
-    fidl::Status FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
+    fidl::OneWayStatus FlexibleEventUnion(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
 
 
-    fidl::Status FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
+    fidl::OneWayStatus FlexibleEventTable(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
 
 
-    fidl::Status FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
+    fidl::OneWayStatus FlexibleEventErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult result);
 
 
-    fidl::Status FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
+    fidl::OneWayStatus FlexibleEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult result);
 
 
-    fidl::Status FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
+    fidl::OneWayStatus FlexibleEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult result);
 
 
-    fidl::Status FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
+    fidl::OneWayStatus FlexibleEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult result);
 
 
 };
@@ -16727,7 +16727,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
 };
 
 template<>
@@ -16758,7 +16758,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 };
 
@@ -16841,28 +16841,28 @@ class ::fidl::internal::WireWeakEventSender<::test_unknowninteractions::UnknownI
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
 
 
 };
@@ -16872,28 +16872,28 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_unknowninteractions::Un
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
 
 
 };
@@ -16904,28 +16904,28 @@ class ::fidl::internal::WireEventSender<::test_unknowninteractions::UnknownInter
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
 
 
 };
@@ -16936,28 +16936,28 @@ class ::fidl::internal::WireBufferEventSender<::test_unknowninteractions::Unknow
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status StrictEvent();
+    fidl::OneWayStatus StrictEvent();
 
 
-    fidl::Status StrictEventFields(int32_t some_field);
+    fidl::OneWayStatus StrictEventFields(int32_t some_field);
 
 
-    fidl::Status StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
+    fidl::OneWayStatus StrictEventUnion(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClosedProtocolStrictEventUnionRequest);
 
 
-    fidl::Status StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
+    fidl::OneWayStatus StrictEventTable(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest UnknownInteractionsClosedProtocolStrictEventTableRequest);
 
 
-    fidl::Status StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
+    fidl::OneWayStatus StrictEventErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult result);
 
 
-    fidl::Status StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
+    fidl::OneWayStatus StrictEventFieldsErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult result);
 
 
-    fidl::Status StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
+    fidl::OneWayStatus StrictEventUnionErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult result);
 
 
-    fidl::Status StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
+    fidl::OneWayStatus StrictEventTableErr(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult result);
 
 
 };

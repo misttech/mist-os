@@ -20,7 +20,7 @@ class {{ .WireSyncClientImpl }} final :
     //
     {{- end }}
     // {{- template "Method:ClientAllocationComment:Helper" . }}
-    {{ if .HasResponse }}{{ .WireResult }}{{ else }}::fidl::Status{{ end }}
+    {{ if .HasResponse }}{{ .WireResult }}{{ else }}::fidl::OneWayStatus{{ end }}
     {{ .Name }}({{- RenderParams .RequestArgs }}) {
       {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
       return {{ .WireResult }}(_client_end(), &_request);
@@ -42,7 +42,7 @@ class {{ .WireSyncBufferClientImpl }} final :
   {{ range .ClientMethods }}
     {{- .Docs }}
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    {{ if .HasResponse }}{{ .WireUnownedResult }}{{ else }}::fidl::Status{{ end }}
+    {{ if .HasResponse }}{{ .WireUnownedResult }}{{ else }}::fidl::OneWayStatus{{ end }}
     {{ .Name }}({{ RenderParams .RequestArgs }}) {
       {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
       return {{ .WireUnownedResult }}(_client_end(), _allocator(), &_request);
@@ -76,7 +76,7 @@ class {{ .NaturalSyncClientImpl }} final
 
   {{ range .OneWayMethods }}
     {{ .Docs }}
-    ::fit::result<::fidl::Error> {{ .Name }}({{ .NaturalRequestArg "request" }});
+    ::fit::result<::fidl::OneWayError> {{ .Name }}({{ .NaturalRequestArg "request" }});
 
   {{ end }}
 
@@ -113,7 +113,7 @@ class {{ .NaturalSyncClientImpl }} final
 {{ end }}
 
 {{ range .OneWayMethods }}
-  ::fit::result<::fidl::Error>
+  ::fit::result<::fidl::OneWayError>
   {{ $.NaturalSyncClientImpl.NoLeading }}::{{ .Name }}({{ .NaturalRequestArg "request" }}) {
     ::fidl::internal::NaturalMessageEncoder encoder{
         &::fidl::internal::ChannelTransport::VTable, {{ .OrdinalName }}, {{ .DynamicFlagsName }} };
@@ -122,7 +122,7 @@ class {{ .NaturalSyncClientImpl }} final
     {{- end }}
     ::fidl::OutgoingMessage msg = encoder.GetMessage();
     msg.Write(_client_end().handle());
-    return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+    return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
   }
 
 {{ end }}

@@ -31,7 +31,7 @@ class InstanceImpl final : public fidl::WireServer<examples_canvas_addlinemetere
             dispatcher, std::move(server_end), this,
             [this](InstanceImpl* impl, fidl::UnbindInfo info,
                    fidl::ServerEnd<examples_canvas_addlinemetered::Instance> server_end) {
-              if (info.reason() != ::fidl::Reason::kPeerClosed) {
+              if (info.reason() != ::fidl::Reason::kPeerClosedWhileReading) {
                 FX_LOGS(ERROR) << "Shutdown unexpectedly";
               }
               delete this;

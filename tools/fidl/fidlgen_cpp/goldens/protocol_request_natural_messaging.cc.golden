@@ -99,25 +99,25 @@ fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent>::GetChildReque
       });
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::Request<::test_protocolrequest::Parent::TakeChild> request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocolrequest::kParent_TakeChild_Ordinal, ::test_protocolrequest::kParent_TakeChild_DynamicFlags};
   _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocolrequest::kParent_TakeChildRequest_Ordinal, ::test_protocolrequest::kParent_TakeChildRequest_DynamicFlags};
   _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_protocolrequest {
@@ -148,24 +148,24 @@ fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent>::GetChildR
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::Request<::test_protocolrequest::Parent::TakeChild> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocolrequest::kParent_TakeChild_Ordinal, ::test_protocolrequest::kParent_TakeChild_DynamicFlags};
   encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocolrequest::kParent_TakeChildRequest_Ordinal, ::test_protocolrequest::kParent_TakeChildRequest_DynamicFlags};
   encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
 #endif  // __Fuchsia__

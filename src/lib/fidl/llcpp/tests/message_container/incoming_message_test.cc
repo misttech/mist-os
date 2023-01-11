@@ -214,7 +214,7 @@ TEST_F(IncomingMessageChannelReadEtcTest, ReadFromClosedChannel) {
                                                 .handle_capacity = handle_buffer_size(),
                                             });
   EXPECT_EQ(ZX_ERR_PEER_CLOSED, incoming.status());
-  EXPECT_EQ(fidl::Reason::kPeerClosed, incoming.reason());
+  EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, incoming.reason());
 }
 
 TEST_F(IncomingMessageChannelReadEtcTest, ReadFromChannelInvalidMessage) {

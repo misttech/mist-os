@@ -1147,35 +1147,35 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnonComposed> _request_object{ ComposedProtocolOneWayAnonComposedRequest };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnonComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed> _request_object{ ImportTablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayImport> _request_object{ ImportTablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayImport>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal> _request_object{ LocalTablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon> _request_object{ MainProtocolOneWayAnonRequest };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon>, ::fidl::internal::ChannelTransport> _request_message(
@@ -1242,12 +1242,12 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
     return ::fidl::internal::WireThenable<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>{
         _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocollayouts::MainProtocol::OneWayAnonComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnonComposed> _request{ ComposedProtocolOneWayAnonComposedRequest };
@@ -1255,12 +1255,12 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayNamedComposed(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocollayouts::MainProtocol::OneWayNamedComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayNamedComposed> _request{ ImportTablePayload };
@@ -1268,12 +1268,12 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayImport(::test_protocollayouts_imported::wire::ImportTablePayload ImportTablePayload) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocollayouts::MainProtocol::OneWayImport>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayImport> _request{ ImportTablePayload };
@@ -1281,12 +1281,12 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayLocal(::test_protocollayouts::wire::LocalTablePayload LocalTablePayload) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocollayouts::MainProtocol::OneWayLocal>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayLocal> _request{ LocalTablePayload };
@@ -1294,12 +1294,12 @@ extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonWithErrorReq
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocollayouts::MainProtocol>::OneWayAnon(::test_protocollayouts::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocollayouts::MainProtocol::OneWayAnon>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocollayouts::MainProtocol::OneWayAnon> _request{ MainProtocolOneWayAnonRequest };
@@ -2816,7 +2816,7 @@ void ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2825,13 +2825,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
@@ -2840,7 +2840,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2848,15 +2848,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposed(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
@@ -2864,10 +2864,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2876,13 +2876,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{result };
@@ -2891,7 +2891,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2899,15 +2899,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnAnonComposedWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonComposedWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonComposedWithError> _response{result };
@@ -2915,10 +2915,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2927,13 +2927,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
@@ -2942,7 +2942,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2950,15 +2950,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposed(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposed> _response{ImportUnionPayload };
@@ -2966,10 +2966,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2978,13 +2978,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{result };
@@ -2993,7 +2993,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3001,15 +3001,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnNamedComposedWithError(::test_protocollayouts_imported::wire::ComposedProtocolOnNamedComposedWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnNamedComposedWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnNamedComposedWithError> _response{result };
@@ -3017,10 +3017,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport> _response{ImportUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3029,13 +3029,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImport>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport> _response{ImportUnionPayload };
@@ -3044,7 +3044,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport> _response{ImportUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3052,15 +3052,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnImport(::test_protocollayouts_imported::wire::ImportUnionPayload ImportUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImport>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImport> _response{ImportUnionPayload };
@@ -3068,10 +3068,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3080,13 +3080,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImportWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{result };
@@ -3095,7 +3095,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3103,15 +3103,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnImportWithError(::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnImportWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnImportWithError> _response{result };
@@ -3119,10 +3119,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal> _response{LocalUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3131,13 +3131,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocal>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal> _response{LocalUnionPayload };
@@ -3146,7 +3146,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal> _response{LocalUnionPayload };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3154,15 +3154,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocal(::test_protocollayouts::wire::LocalUnionPayload LocalUnionPayload) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocal>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocal> _response{LocalUnionPayload };
@@ -3170,10 +3170,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3182,13 +3182,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocalWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{result };
@@ -3197,7 +3197,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3205,15 +3205,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnLocalWithError(::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnLocalWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnLocalWithError> _response{result };
@@ -3221,10 +3221,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3233,13 +3233,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnon>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
@@ -3248,7 +3248,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3256,15 +3256,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnon(::test_protocollayouts::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnon>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
@@ -3272,10 +3272,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3284,13 +3284,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocollayouts::MainPro
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{result };
@@ -3299,7 +3299,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocollayouts::M
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{result };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3307,15 +3307,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocollayouts::MainProtoco
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtocol>::OnAnonWithError(::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult result) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocollayouts::MainProtocol::OnAnonWithError>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocollayouts::MainProtocol::OnAnonWithError> _response{result };
@@ -3323,7 +3323,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocollayouts::MainP
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 

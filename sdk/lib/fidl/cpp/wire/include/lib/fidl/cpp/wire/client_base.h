@@ -333,7 +333,8 @@ class ClientBase final : public std::enable_shared_from_this<ClientBase> {
   // |message| will have its transaction ID set to zero.
   //
   // Errors are returned to the caller.
-  fidl::Status SendOneWay(::fidl::OutgoingMessage& message, fidl::WriteOptions write_options = {});
+  fidl::OneWayStatus SendOneWay(::fidl::OutgoingMessage& message,
+                                fidl::WriteOptions write_options = {});
 
   // For debugging.
   size_t GetTransactionCount() {

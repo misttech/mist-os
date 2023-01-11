@@ -72,14 +72,28 @@ using BaseWireResultStorageType = typename BaseWireResultStorage<FidlMethod>::Ty
 template <typename FidlMethod, typename Enable = void>
 class BaseWireResult;
 
-// Template variant for methods without a response body, and therefore nothing
-// to |Unwrap|:
-// - Methods without response, that is one-way methods.
-// - Methods with a header-only response.
+// Template variant for methods without response, that is one-way methods.
+// These have nothing to |Unwrap|.
+template <typename FidlMethod>
+class BaseWireResult<FidlMethod, std::enable_if_t<!FidlMethod::kHasServerToClient, void>>
+    : public ::fidl::OneWayStatus {
+ protected:
+  explicit BaseWireResult(const ::fidl::Status& status) : ::fidl::OneWayStatus(status) {}
+
+  BaseWireResult() = default;
+  BaseWireResult(BaseWireResult&&) noexcept = default;
+  BaseWireResult(BaseWireResult&) = delete;
+  BaseWireResult& operator=(BaseWireResult&&) noexcept = default;
+  BaseWireResult& operator=(const BaseWireResult&) = delete;
+  ~BaseWireResult() = default;
+};
+
+// Template variant for methods with a header-only response.
+// These have nothing to |Unwrap|.
 template <typename FidlMethod>
 class BaseWireResult<
     FidlMethod,
-    std::enable_if_t<!FidlMethod::kHasServerToClient || !FidlMethod::kHasServerToClientBody, void>>
+    std::enable_if_t<FidlMethod::kHasServerToClient && !FidlMethod::kHasServerToClientBody, void>>
     : public ::fidl::Status {
  protected:
   explicit BaseWireResult(const ::fidl::Status& status) : ::fidl::Status(status) {}

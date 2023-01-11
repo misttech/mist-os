@@ -321,7 +321,7 @@ TEST(GenAPITestCase, Epitaph) {
     explicit EventHandler(sync_completion_t& unbound) : unbound_(unbound) {}
 
     void on_fidl_error(fidl::UnbindInfo info) override {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_BAD_STATE, info.status());
       sync_completion_signal(&unbound_);
     }
@@ -821,7 +821,7 @@ TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
     // Make a client method call which should fail, but not interfere with
     // reading the event.
     client->Echo("foo").ThenExactlyOnce([&](fidl::WireUnownedResult<Values::Echo>& result) {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, result.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, result.reason());
       EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
     });
     ASSERT_OK(loop.RunUntilIdle());

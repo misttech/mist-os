@@ -12,14 +12,14 @@ namespace test_inheritancewithrecursivedecl {
 #ifdef __Fuchsia__
 }  // namespace test_inheritancewithrecursivedecl
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Parent>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kParent_First_Ordinal, ::test_inheritancewithrecursivedecl::kParent_First_DynamicFlags};
   _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_inheritancewithrecursivedecl {
@@ -30,14 +30,14 @@ namespace test_inheritancewithrecursivedecl {
 
 #ifdef __Fuchsia__
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kParent_First_Ordinal, ::test_inheritancewithrecursivedecl::kParent_First_DynamicFlags};
   encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
 #endif  // __Fuchsia__
@@ -107,25 +107,25 @@ namespace test_inheritancewithrecursivedecl {
 #ifdef __Fuchsia__
 }  // namespace test_inheritancewithrecursivedecl
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Child::First> request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kChild_First_Ordinal, ::test_inheritancewithrecursivedecl::kChild_First_DynamicFlags};
   _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child>::Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kChild_Second_Ordinal, ::test_inheritancewithrecursivedecl::kChild_Second_DynamicFlags};
   _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_inheritancewithrecursivedecl {
@@ -136,24 +136,24 @@ namespace test_inheritancewithrecursivedecl {
 
 #ifdef __Fuchsia__
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child>::First(::fidl::Request<::test_inheritancewithrecursivedecl::Child::First> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kChild_First_Ordinal, ::test_inheritancewithrecursivedecl::kChild_First_DynamicFlags};
   encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child>::Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_inheritancewithrecursivedecl::kChild_Second_Ordinal, ::test_inheritancewithrecursivedecl::kChild_Second_DynamicFlags};
   encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
 #endif  // __Fuchsia__

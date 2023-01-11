@@ -142,7 +142,7 @@ TEST(WireSharedClient, Clone) {
         : did_teardown_(did_teardown), spy_(spy) {}
 
     void on_fidl_error(::fidl::UnbindInfo info) override {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
     }
 

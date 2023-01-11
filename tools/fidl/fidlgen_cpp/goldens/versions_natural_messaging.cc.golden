@@ -55,12 +55,12 @@ namespace test_versions {
 #ifdef __Fuchsia__
 }  // namespace test_versions
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_versions::Protocol>::Foo() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_versions::kProtocol_Foo_Ordinal, ::test_versions::kProtocol_Foo_DynamicFlags};
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
-  ::fidl::Status status = client_base().SendOneWay(_encoded_message);
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_versions {
@@ -71,13 +71,13 @@ namespace test_versions {
 
 #ifdef __Fuchsia__
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>::Foo() {
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_versions::kProtocol_Foo_Ordinal, ::test_versions::kProtocol_Foo_DynamicFlags};
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
-  return ::fidl::internal::ToFitxResult(::fidl::Status{msg});
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
 #endif  // __Fuchsia__

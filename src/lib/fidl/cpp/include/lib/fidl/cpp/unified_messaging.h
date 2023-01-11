@@ -109,6 +109,13 @@ inline ::fit::result<::fidl::Error> ToFitxResult(::fidl::Status result) {
   return ::fit::error<::fidl::Error>(result);
 }
 
+inline ::fit::result<::fidl::OneWayError> ToFitxResult(::fidl::OneWayStatus result) {
+  if (result.ok()) {
+    return ::fit::ok();
+  }
+  return ::fit::error<::fidl::OneWayError>(result);
+}
+
 }  // namespace internal
 
 // |ClientCallback| is the async callback type used in the |fidl::Client| for

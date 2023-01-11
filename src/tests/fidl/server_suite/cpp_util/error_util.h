@@ -23,7 +23,7 @@ inline fidl_serversuite::TeardownReason ClassifyError(const fidl::UnbindInfo& in
         return fidl_serversuite::TeardownReason::kDecodingError;
       }
       return fidl_serversuite::TeardownReason::kUnexpectedMessage;
-    case fidl::Reason::kPeerClosed:
+    case fidl::Reason::kPeerClosedWhileReading:
       return fidl_serversuite::TeardownReason::kChannelPeerClosed;
     case fidl::Reason::kDecodeError:
       return fidl_serversuite::TeardownReason::kDecodingError;

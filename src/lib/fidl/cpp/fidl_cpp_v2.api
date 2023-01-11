@@ -8,6 +8,6 @@
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/natural_client_base.h": "5d96df2747c31c5b6bfedf2d906c9115",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/natural_message_encoder.h": "953a37470e31e1b81ad2abae0c3fede3",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/thenable.h": "88f36a3aa947fda6004d6f023982a14a",
-  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging.h": "845063ff077572dc0bfda89ae8fa503f",
+  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging.h": "5812531d49c819b60084dec29bd7816e",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging_declarations.h": "413e6e1c198bc7c0e038fb79cc53d568"
 }

@@ -28,7 +28,7 @@ TEST(SyncClientErrorTest, PeerClosed) {
   endpoints->server.reset();
   auto result = client->GetEnum();
   EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
-  EXPECT_EQ(fidl::Reason::kPeerClosed, result.reason());
+  EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, result.reason());
 }
 
 TEST(SyncClientErrorTest, EncodeError) {

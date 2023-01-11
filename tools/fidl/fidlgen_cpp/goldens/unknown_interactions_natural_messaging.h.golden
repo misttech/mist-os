@@ -1076,9 +1076,9 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr> FlexibleTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 
-  ::fit::result<::fidl::Error> FlexibleOneWay() const;
+  ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 
 };namespace test_unknowninteractions {
 
@@ -1161,11 +1161,11 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
 
   
     
-    ::fit::result<::fidl::Error> StrictOneWay();
+    ::fit::result<::fidl::OneWayError> StrictOneWay();
 
   
     
-    ::fit::result<::fidl::Error> FlexibleOneWay();
+    ::fit::result<::fidl::OneWayError> FlexibleOneWay();
 
   
 
@@ -1264,52 +1264,52 @@ class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::Unkno
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEvent();
+    ::fit::result<::fidl::OneWayError> FlexibleEvent();
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest& payload);
 
   
 };
@@ -1320,52 +1320,52 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEvent();
+    ::fit::result<::fidl::OneWayError> FlexibleEvent();
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrRequest& payload);
 
   
 };
@@ -2353,9 +2353,9 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 
-  ::fit::result<::fidl::Error> FlexibleOneWay() const;
+  ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 
 };namespace test_unknowninteractions {
 
@@ -2406,11 +2406,11 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
 
   
     
-    ::fit::result<::fidl::Error> StrictOneWay();
+    ::fit::result<::fidl::OneWayError> StrictOneWay();
 
   
     
-    ::fit::result<::fidl::Error> FlexibleOneWay();
+    ::fit::result<::fidl::OneWayError> FlexibleOneWay();
 
   
 
@@ -2509,52 +2509,52 @@ class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::Unkno
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEvent();
+    ::fit::result<::fidl::OneWayError> FlexibleEvent();
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest& payload);
 
   
 };
@@ -2565,52 +2565,52 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEvent();
+    ::fit::result<::fidl::OneWayError> FlexibleEvent();
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFields(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnion(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTable(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> FlexibleEventTableErr(const ::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest& payload);
 
   
 };
@@ -3331,7 +3331,7 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr> StrictTwoWayTableErr() const;
 
-  ::fit::result<::fidl::Error> StrictOneWay() const;
+  ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 
 };namespace test_unknowninteractions {
 
@@ -3382,7 +3382,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
 
   
     
-    ::fit::result<::fidl::Error> StrictOneWay();
+    ::fit::result<::fidl::OneWayError> StrictOneWay();
 
   
 
@@ -3465,28 +3465,28 @@ class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::Unkno
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest& payload);
 
   
 };
@@ -3497,28 +3497,28 @@ class ::fidl::internal::NaturalEventSender<::test_unknowninteractions::UnknownIn
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    ::fit::result<::fidl::Error> StrictEvent();
+    ::fit::result<::fidl::OneWayError> StrictEvent();
 
   
-    ::fit::result<::fidl::Error> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFields(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnion(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTable(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventFieldsErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventUnionErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest& payload);
 
   
-    ::fit::result<::fidl::Error> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest& payload);
+    ::fit::result<::fidl::OneWayError> StrictEventTableErr(const ::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrRequest& payload);
 
   
 };

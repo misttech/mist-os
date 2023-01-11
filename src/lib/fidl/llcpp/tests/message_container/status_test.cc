@@ -15,6 +15,16 @@ TEST(Status, ReasonShouldNotBeUsedInOkStatus) {
 #endif  // __Fuchsia__
 }
 
+TEST(OneWayStatus, ConvertToFromStatus) {
+  // Status -> OneWayStatus is explicit.
+  fidl::OneWayStatus one_way_status{fidl::Status::Ok()};
+  static_assert(!std::is_convertible_v<fidl::Status, fidl::OneWayStatus>);
+  static_assert(std::is_convertible_v<fidl::OneWayStatus, fidl::Status>);
+  // OneWayStatus -> Status is implicit.
+  fidl::Status status = one_way_status;
+  ASSERT_OK(status);
+}
+
 // TODO(fxbug.dev/49971): We would be able to remove the differences between
 // fuchsia/host if |zx_status_get_string| is available on host.
 static std::string SelectErrorDescription(const std::string& fuchsia, const std::string& host) {

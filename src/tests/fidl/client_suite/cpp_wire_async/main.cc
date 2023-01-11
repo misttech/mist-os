@@ -420,19 +420,13 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
                             fidl::ClientEnd<fidl_clientsuite::ClosedTargetEventReporter> reporter)
           : dispatcher_(dispatcher), reporter_(std::move(reporter)) {}
 
-      // Report an event to the harness. If the reporter is closed, return
-      // false. If reporting succeeded, returns true.
-      bool ReportEvent(const fidl_clientsuite::ClosedTargetEventReport& event) {
+      // Report an event to the harness.
+      void ReportEvent(const fidl_clientsuite::ClosedTargetEventReport& event) {
         auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
-          if (report_result.error_value().is_peer_closed()) {
-            client_.AsyncTeardown();
-            return false;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }
-        return true;
       }
 
       void OnEventNoPayload() override {
@@ -458,17 +452,18 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
       }
 
       void on_fidl_error(fidl::UnbindInfo error) override {
-        if (ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithFidlError(
-                clienttest_util::ClassifyError(error.ToError())))) {
-          auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
-                                                          ZX_CHANNEL_PEER_CLOSED);
-          auto waiter_ptr = waiter.get();
-          waiter_ptr->Begin(
-              dispatcher_,
-              [client = std::move(client_), reporter = std::move(reporter_),
-               waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
-                                           auto* signal) mutable { client.AsyncTeardown(); });
-        }
+        ReportEvent(fidl_clientsuite::ClosedTargetEventReport::WithFidlError(
+            clienttest_util::ClassifyError(error.ToError())));
+
+        // Teardown the client when the harness closes the reporter.
+        auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
+                                                        ZX_CHANNEL_PEER_CLOSED);
+        auto waiter_ptr = waiter.get();
+        waiter_ptr->Begin(
+            dispatcher_,
+            [client = std::move(client_), reporter = std::move(reporter_),
+             waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
+                                         auto* signal) mutable { client.AsyncTeardown(); });
       }
 
       void SetClient(fidl::WireSharedClient<fidl_clientsuite::ClosedTarget> client) {
@@ -497,19 +492,13 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
                             fidl::ClientEnd<fidl_clientsuite::AjarTargetEventReporter> reporter)
           : dispatcher_(dispatcher), reporter_(std::move(reporter)) {}
 
-      // Report an event to the harness. If the reporter is closed, return
-      // false. If reporting succeeded, returns true.
-      bool ReportEvent(const fidl_clientsuite::AjarTargetEventReport& event) {
+      // Report an event to the harness.
+      void ReportEvent(const fidl_clientsuite::AjarTargetEventReport& event) {
         auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
-          if (report_result.error_value().is_peer_closed()) {
-            client_.AsyncTeardown();
-            return false;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }
-        return true;
       }
 
       void handle_unknown_event(
@@ -519,17 +508,18 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
       }
 
       void on_fidl_error(fidl::UnbindInfo error) override {
-        if (ReportEvent(fidl_clientsuite::AjarTargetEventReport::WithFidlError(
-                clienttest_util::ClassifyError(error.ToError())))) {
-          auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
-                                                          ZX_CHANNEL_PEER_CLOSED);
-          auto waiter_ptr = waiter.get();
-          waiter_ptr->Begin(
-              dispatcher_,
-              [client = std::move(client_), reporter = std::move(reporter_),
-               waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
-                                           auto* signal) mutable { client.AsyncTeardown(); });
-        }
+        ReportEvent(fidl_clientsuite::AjarTargetEventReport::WithFidlError(
+            clienttest_util::ClassifyError(error.ToError())));
+
+        // Teardown the client when the harness closes the reporter.
+        auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
+                                                        ZX_CHANNEL_PEER_CLOSED);
+        auto waiter_ptr = waiter.get();
+        waiter_ptr->Begin(
+            dispatcher_,
+            [client = std::move(client_), reporter = std::move(reporter_),
+             waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
+                                         auto* signal) mutable { client.AsyncTeardown(); });
       }
 
       void SetClient(fidl::WireSharedClient<fidl_clientsuite::AjarTarget> client) {
@@ -558,19 +548,13 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
                             fidl::ClientEnd<fidl_clientsuite::OpenTargetEventReporter> reporter)
           : dispatcher_(dispatcher), reporter_(std::move(reporter)) {}
 
-      // Report an event to the harness. If the reporter is closed, return
-      // false. If reporting succeeded, returns true.
-      bool ReportEvent(const fidl_clientsuite::OpenTargetEventReport& event) {
+      // Report an event to the harness.
+      void ReportEvent(const fidl_clientsuite::OpenTargetEventReport& event) {
         auto report_result = reporter_->ReportEvent(event);
         if (report_result.is_error()) {
-          if (report_result.error_value().is_peer_closed()) {
-            client_.AsyncTeardown();
-            return false;
-          }
           ZX_PANIC("Could not report received event: %s",
                    report_result.error_value().lossy_description());
         }
-        return true;
       }
 
       void StrictEvent() override {
@@ -588,17 +572,18 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
       }
 
       void on_fidl_error(fidl::UnbindInfo error) override {
-        if (ReportEvent(fidl_clientsuite::OpenTargetEventReport::WithFidlError(
-                clienttest_util::ClassifyError(error.ToError())))) {
-          auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
-                                                          ZX_CHANNEL_PEER_CLOSED);
-          auto waiter_ptr = waiter.get();
-          waiter_ptr->Begin(
-              dispatcher_,
-              [client = std::move(client_), reporter = std::move(reporter_),
-               waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
-                                           auto* signal) mutable { client.AsyncTeardown(); });
-        }
+        ReportEvent(fidl_clientsuite::OpenTargetEventReport::WithFidlError(
+            clienttest_util::ClassifyError(error.ToError())));
+
+        // Teardown the client when the harness closes the reporter.
+        auto waiter = std::make_unique<async::WaitOnce>(reporter_.client_end().channel().get(),
+                                                        ZX_CHANNEL_PEER_CLOSED);
+        auto waiter_ptr = waiter.get();
+        waiter_ptr->Begin(
+            dispatcher_,
+            [client = std::move(client_), reporter = std::move(reporter_),
+             waiter = std::move(waiter)](auto* dispatcher, auto* wait, auto status,
+                                         auto* signal) mutable { client.AsyncTeardown(); });
       }
 
       void SetClient(fidl::WireSharedClient<fidl_clientsuite::OpenTarget> client) {

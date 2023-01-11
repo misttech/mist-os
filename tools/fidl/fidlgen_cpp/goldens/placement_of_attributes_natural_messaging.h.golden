@@ -33,7 +33,7 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) const;
+  ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) const;
 };
 namespace test_placementofattributes {
 
@@ -47,7 +47,7 @@ template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol>> {
  public:
-  ::fit::result<::fidl::Error> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request);
+  ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request);
 
  private:
   ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> _client_end() const {

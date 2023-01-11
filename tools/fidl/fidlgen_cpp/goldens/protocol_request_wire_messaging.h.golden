@@ -1081,14 +1081,14 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocolrequest::Parent> final
   }
 
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
     ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request{std::move(c)};
     return ::fidl::WireResult<::test_protocolrequest::Parent::TakeChild>(_client_end(), &_request);
   }
 
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
     ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request{std::move(r)};
     return ::fidl::WireResult<::test_protocolrequest::Parent::TakeChildRequest>(_client_end(), &_request);
@@ -1119,14 +1119,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocolrequest::Parent>
   }
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
     ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request{std::move(c)};
     return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChild>(_client_end(), _allocator(), &_request);
   }
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
     ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request{std::move(r)};
     return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChildRequest>(_client_end(), _allocator(), &_request);
@@ -1347,10 +1347,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent>
   using ClientImplBase::ClientImplBase;
 
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c);
+  ::fidl::OneWayStatus TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c);
 
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r);
+  ::fidl::OneWayStatus TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r);
 };
 
 template <>
@@ -1369,10 +1369,10 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolrequest::P
   using BufferClientImplBase::BufferClientImplBase;
 
   // Caller provides the backing storage for FIDL message.
-  ::fidl::Status TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c);
+  ::fidl::OneWayStatus TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c);
 
   // Caller provides the backing storage for FIDL message.
-  ::fidl::Status TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r);
+  ::fidl::OneWayStatus TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r);
 };
 
 template <>

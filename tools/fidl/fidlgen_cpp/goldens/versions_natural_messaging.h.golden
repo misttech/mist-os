@@ -156,7 +156,7 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_versions::Protocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> Foo() const;
+  ::fit::result<::fidl::OneWayError> Foo() const;
 };
 
 #endif  // __Fuchsia__
@@ -167,7 +167,7 @@ template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>> {
  public:
-  ::fit::result<::fidl::Error> Foo();
+  ::fit::result<::fidl::OneWayError> Foo();
 
  private:
   ::fidl::UnownedClientEnd<::test_versions::Protocol> _client_end() const {

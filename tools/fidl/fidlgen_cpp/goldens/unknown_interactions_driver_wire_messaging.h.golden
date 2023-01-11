@@ -4373,14 +4373,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
   
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay> _request{  };
       return ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay>(_client_end(), _arena(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay> _request{  };
       return ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay>(_client_end(), _arena(), &_request);
@@ -7488,14 +7488,14 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
   
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> _request{  };
       return ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay>(_client_end(), _arena(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     FlexibleOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay> _request{  };
       return ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay>(_client_end(), _arena(), &_request);
@@ -10114,7 +10114,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_unknowninteractions::Unk
   
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     StrictOneWay() {
       ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> _request{  };
       return ::fdf::WireUnownedResult<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay>(_client_end(), _arena(), &_request);
@@ -10570,11 +10570,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status FlexibleOneWay();
+::fidl::OneWayStatus FlexibleOneWay();
 
 };
 
@@ -10687,10 +10687,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
     : ClientImplBase(client_base), arena_(arena) {}
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status FlexibleOneWay();
+  ::fidl::OneWayStatus FlexibleOneWay();
 
   protected:
   const ::fdf::Arena& arena_;
@@ -10763,11 +10763,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status FlexibleOneWay();
+::fidl::OneWayStatus FlexibleOneWay();
 
 };
 
@@ -10832,10 +10832,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
     : ClientImplBase(client_base), arena_(arena) {}
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status FlexibleOneWay();
+  ::fidl::OneWayStatus FlexibleOneWay();
 
   protected:
   const ::fdf::Arena& arena_;
@@ -10884,7 +10884,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteraction
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status StrictOneWay();
+::fidl::OneWayStatus StrictOneWay();
 
 };
 
@@ -10949,7 +10949,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::Unk
     : ClientImplBase(client_base), arena_(arena) {}
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status StrictOneWay();
+  ::fidl::OneWayStatus StrictOneWay();
 
   protected:
   const ::fdf::Arena& arena_;

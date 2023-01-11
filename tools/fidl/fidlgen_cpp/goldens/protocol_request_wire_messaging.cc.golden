@@ -280,14 +280,14 @@ namespace test_protocolrequest {
 
 #ifdef __Fuchsia__
 
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request_object{std::move(c)};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request_object{std::move(r)};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, ::fidl::internal::ChannelTransport> _request_message(
@@ -306,12 +306,12 @@ namespace test_protocolrequest {
   return ::fidl::internal::WireThenable<::test_protocolrequest::Parent::GetChildRequest>{
       _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::TakeChild>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request{std::move(c)};
@@ -319,12 +319,12 @@ namespace test_protocolrequest {
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::TakeChildRequest>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request{std::move(r)};

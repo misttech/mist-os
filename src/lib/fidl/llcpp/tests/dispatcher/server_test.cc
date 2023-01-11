@@ -121,7 +121,7 @@ TEST(BindServerTestCase, PeerAlreadyClosed) {
   sync_completion_t unbound;
   fidl::OnUnboundFn<TestServer> on_unbound = [&](TestServer*, fidl::UnbindInfo info,
                                                  fidl::ServerEnd<fidl_test::TestProtocol>) {
-    EXPECT_EQ(info.reason(), fidl::Reason::kPeerClosed);
+    EXPECT_EQ(info.reason(), fidl::Reason::kPeerClosedWhileReading);
     EXPECT_EQ(info.status(), ZX_ERR_PEER_CLOSED);
     sync_completion_signal(&unbound);
   };

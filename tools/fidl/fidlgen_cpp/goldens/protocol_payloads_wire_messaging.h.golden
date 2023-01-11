@@ -3867,7 +3867,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocolpayloads::MainProtocol
  public:
   
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayComposed(int32_t a) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed> _request{ a };
       return ::fidl::WireResult<::test_protocolpayloads::MainProtocol::OneWayComposed>(_client_end(), &_request);
@@ -3888,7 +3888,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocolpayloads::MainProtocol
     }
 
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayLocal(uint32_t a, uint32_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal> _request{ a, b };
       return ::fidl::WireResult<::test_protocolpayloads::MainProtocol::OneWayLocal>(_client_end(), &_request);
@@ -3909,7 +3909,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocolpayloads::MainProtocol
     }
 
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayImport(int32_t a) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport> _request{ a };
       return ::fidl::WireResult<::test_protocolpayloads::MainProtocol::OneWayImport>(_client_end(), &_request);
@@ -3930,7 +3930,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocolpayloads::MainProtocol
     }
 
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnon(uint32_t a, uint32_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon> _request{ a, b };
       return ::fidl::WireResult<::test_protocolpayloads::MainProtocol::OneWayAnon>(_client_end(), &_request);
@@ -3964,7 +3964,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocolpayloads::MainPr
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayComposed(int32_t a) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed> _request{ a };
       return ::fidl::WireUnownedResult<::test_protocolpayloads::MainProtocol::OneWayComposed>(_client_end(), _allocator(), &_request);
@@ -3985,7 +3985,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocolpayloads::MainPr
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayLocal(uint32_t a, uint32_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal> _request{ a, b };
       return ::fidl::WireUnownedResult<::test_protocolpayloads::MainProtocol::OneWayLocal>(_client_end(), _allocator(), &_request);
@@ -4006,7 +4006,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocolpayloads::MainPr
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayImport(int32_t a) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport> _request{ a };
       return ::fidl::WireUnownedResult<::test_protocolpayloads::MainProtocol::OneWayImport>(_client_end(), _allocator(), &_request);
@@ -4027,7 +4027,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocolpayloads::MainPr
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWayAnon(uint32_t a, uint32_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon> _request{ a, b };
       return ::fidl::WireUnownedResult<::test_protocolpayloads::MainProtocol::OneWayAnon>(_client_end(), _allocator(), &_request);
@@ -4521,16 +4521,16 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocolpayloads::MainPr
   using ClientImplBase::ClientImplBase;
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayComposed(int32_t a);
+  ::fidl::OneWayStatus OneWayComposed(int32_t a);
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayLocal(uint32_t a, uint32_t b);
+  ::fidl::OneWayStatus OneWayLocal(uint32_t a, uint32_t b);
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayImport(int32_t a);
+  ::fidl::OneWayStatus OneWayImport(int32_t a);
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWayAnon(uint32_t a, uint32_t b);
+  ::fidl::OneWayStatus OneWayAnon(uint32_t a, uint32_t b);
 };
 
 template<>
@@ -4561,19 +4561,19 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocolpayloads::
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayComposed(int32_t a);
+::fidl::OneWayStatus OneWayComposed(int32_t a);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayLocal(uint32_t a, uint32_t b);
+::fidl::OneWayStatus OneWayLocal(uint32_t a, uint32_t b);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayImport(int32_t a);
+::fidl::OneWayStatus OneWayImport(int32_t a);
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWayAnon(uint32_t a, uint32_t b);
+::fidl::OneWayStatus OneWayAnon(uint32_t a, uint32_t b);
 
 };
 
@@ -4656,28 +4656,28 @@ class ::fidl::internal::WireWeakEventSender<::test_protocolpayloads::MainProtoco
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status OnComposed(int32_t a);
+    fidl::OneWayStatus OnComposed(int32_t a);
 
 
-    fidl::Status OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
+    fidl::OneWayStatus OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
 
 
-    fidl::Status OnLocal(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnLocal(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnImport(int32_t a);
+    fidl::OneWayStatus OnImport(int32_t a);
 
 
-    fidl::Status OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnAnon(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnAnon(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -4687,28 +4687,28 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocolpayloads::MainP
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status OnComposed(int32_t a);
+    fidl::OneWayStatus OnComposed(int32_t a);
 
 
-    fidl::Status OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
+    fidl::OneWayStatus OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
 
 
-    fidl::Status OnLocal(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnLocal(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnImport(int32_t a);
+    fidl::OneWayStatus OnImport(int32_t a);
 
 
-    fidl::Status OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnAnon(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnAnon(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -4719,28 +4719,28 @@ class ::fidl::internal::WireEventSender<::test_protocolpayloads::MainProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status OnComposed(int32_t a);
+    fidl::OneWayStatus OnComposed(int32_t a);
 
 
-    fidl::Status OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
+    fidl::OneWayStatus OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
 
 
-    fidl::Status OnLocal(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnLocal(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnImport(int32_t a);
+    fidl::OneWayStatus OnImport(int32_t a);
 
 
-    fidl::Status OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnAnon(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnAnon(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };
@@ -4751,28 +4751,28 @@ class ::fidl::internal::WireBufferEventSender<::test_protocolpayloads::MainProto
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status OnComposed(int32_t a);
+    fidl::OneWayStatus OnComposed(int32_t a);
 
 
-    fidl::Status OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
+    fidl::OneWayStatus OnComposedWithError(::test_protocolpayloads_imported::wire::ComposedProtocolOnComposedWithErrorResult result);
 
 
-    fidl::Status OnLocal(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnLocal(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
+    fidl::OneWayStatus OnLocalWithError(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult result);
 
 
-    fidl::Status OnImport(int32_t a);
+    fidl::OneWayStatus OnImport(int32_t a);
 
 
-    fidl::Status OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
+    fidl::OneWayStatus OnImportWithError(::test_protocolpayloads::wire::MainProtocolOnImportWithErrorResult result);
 
 
-    fidl::Status OnAnon(uint32_t a, uint32_t b);
+    fidl::OneWayStatus OnAnon(uint32_t a, uint32_t b);
 
 
-    fidl::Status OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
+    fidl::OneWayStatus OnAnonWithError(::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResult result);
 
 
 };

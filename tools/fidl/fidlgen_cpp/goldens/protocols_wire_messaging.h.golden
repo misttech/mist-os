@@ -1632,7 +1632,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::WithAndWithoutReque
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     NoRequestNoResponse() {
       ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> _request{  };
       return ::fidl::WireResult<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse>(_client_end(), &_request);
@@ -1653,7 +1653,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::WithAndWithoutReque
     }
 
     // Allocates 16 bytes of response buffer on the stack. Request is heap-allocated.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     WithRequestNoResponse(::fidl::StringView arg) {
       ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> _request{ arg };
       return ::fidl::WireResult<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>(_client_end(), &_request);
@@ -1687,7 +1687,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::WithAndWithou
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     NoRequestNoResponse() {
       ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> _request{  };
       return ::fidl::WireUnownedResult<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse>(_client_end(), _allocator(), &_request);
@@ -1708,7 +1708,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::WithAndWithou
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     WithRequestNoResponse(::fidl::StringView arg) {
       ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> _request{ arg };
       return ::fidl::WireUnownedResult<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>(_client_end(), _allocator(), &_request);
@@ -4738,7 +4738,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::ChannelProtocol> fi
  public:
   
     // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     MethodA(int64_t a, int64_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::MethodA> _request{ a, b };
       return ::fidl::WireResult<::test_protocols::ChannelProtocol::MethodA>(_client_end(), &_request);
@@ -4779,7 +4779,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::ChannelProtoc
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     MethodA(int64_t a, int64_t b) {
       ::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::MethodA> _request{ a, b };
       return ::fidl::WireUnownedResult<::test_protocols::ChannelProtocol::MethodA>(_client_end(), _allocator(), &_request);
@@ -5655,7 +5655,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::Transitional> final
     }
 
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWay(int64_t x) {
       ::fidl::internal::TransactionalRequest<::test_protocols::Transitional::OneWay> _request{ x };
       return ::fidl::WireResult<::test_protocols::Transitional::OneWay>(_client_end(), &_request);
@@ -5682,7 +5682,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::Transitional>
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     OneWay(int64_t x) {
       ::fidl::internal::TransactionalRequest<::test_protocols::Transitional::OneWay> _request{ x };
       return ::fidl::WireUnownedResult<::test_protocols::Transitional::OneWay>(_client_end(), _allocator(), &_request);
@@ -6020,7 +6020,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::DiscoverableProtoco
  public:
   
     // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Method() {
       ::fidl::internal::TransactionalRequest<::test_protocols::DiscoverableProtocol::Method> _request{  };
       return ::fidl::WireResult<::test_protocols::DiscoverableProtocol::Method>(_client_end(), &_request);
@@ -6040,7 +6040,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::DiscoverableP
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Method() {
       ::fidl::internal::TransactionalRequest<::test_protocols::DiscoverableProtocol::Method> _request{  };
       return ::fidl::WireUnownedResult<::test_protocols::DiscoverableProtocol::Method>(_client_end(), _allocator(), &_request);
@@ -6946,7 +6946,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::HandleRightsProtoco
  public:
   
     // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     NoResponseMethod(::zx::socket&& h) {
       ::fidl::internal::TransactionalRequest<::test_protocols::HandleRightsProtocol::NoResponseMethod> _request{ std::move(h) };
       return ::fidl::WireResult<::test_protocols::HandleRightsProtocol::NoResponseMethod>(_client_end(), &_request);
@@ -6973,7 +6973,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::HandleRightsP
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     NoResponseMethod(::zx::socket&& h) {
       ::fidl::internal::TransactionalRequest<::test_protocols::HandleRightsProtocol::NoResponseMethod> _request{ std::move(h) };
       return ::fidl::WireUnownedResult<::test_protocols::HandleRightsProtocol::NoResponseMethod>(_client_end(), _allocator(), &_request);
@@ -8653,7 +8653,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_protocols::ManyParameters> fin
  public:
   
     // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
       ::fidl::internal::TransactionalRequest<::test_protocols::ManyParameters::Fifteen> _request{ p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15 };
       return ::fidl::WireResult<::test_protocols::ManyParameters::Fifteen>(_client_end(), &_request);
@@ -8673,7 +8673,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_protocols::ManyParameter
  public:
   
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-    ::fidl::Status
+    ::fidl::OneWayStatus
     Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
       ::fidl::internal::TransactionalRequest<::test_protocols::ManyParameters::Fifteen> _request{ p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15 };
       return ::fidl::WireUnownedResult<::test_protocols::ManyParameters::Fifteen>(_client_end(), _allocator(), &_request);
@@ -9272,10 +9272,10 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::WithAndWithou
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status NoRequestNoResponse();
+  ::fidl::OneWayStatus NoRequestNoResponse();
   
   // Allocates 16 bytes of response buffer on the stack. Request is heap-allocated.
-  ::fidl::Status WithRequestNoResponse(::fidl::StringView arg);
+  ::fidl::OneWayStatus WithRequestNoResponse(::fidl::StringView arg);
 };
 
 template<>
@@ -9298,11 +9298,11 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::WithAnd
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status NoRequestNoResponse();
+::fidl::OneWayStatus NoRequestNoResponse();
 
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status WithRequestNoResponse(::fidl::StringView arg);
+::fidl::OneWayStatus WithRequestNoResponse(::fidl::StringView arg);
 
 };
 
@@ -9357,10 +9357,10 @@ class ::fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithoutRequ
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status OnEmptyResponse();
+    fidl::OneWayStatus OnEmptyResponse();
 
 
-    fidl::Status OnWithResponse(::fidl::StringView ret);
+    fidl::OneWayStatus OnWithResponse(::fidl::StringView ret);
 
 
 };
@@ -9370,10 +9370,10 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAndWitho
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status OnEmptyResponse();
+    fidl::OneWayStatus OnEmptyResponse();
 
 
-    fidl::Status OnWithResponse(::fidl::StringView ret);
+    fidl::OneWayStatus OnWithResponse(::fidl::StringView ret);
 
 
 };
@@ -9384,10 +9384,10 @@ class ::fidl::internal::WireEventSender<::test_protocols::WithAndWithoutRequestR
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status OnEmptyResponse();
+    fidl::OneWayStatus OnEmptyResponse();
 
 
-    fidl::Status OnWithResponse(::fidl::StringView ret);
+    fidl::OneWayStatus OnWithResponse(::fidl::StringView ret);
 
 
 };
@@ -9398,10 +9398,10 @@ class ::fidl::internal::WireBufferEventSender<::test_protocols::WithAndWithoutRe
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status OnEmptyResponse();
+    fidl::OneWayStatus OnEmptyResponse();
 
 
-    fidl::Status OnWithResponse(::fidl::StringView ret);
+    fidl::OneWayStatus OnWithResponse(::fidl::StringView ret);
 
 
 };
@@ -9526,7 +9526,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ChannelProtoc
   using ClientImplBase::ClientImplBase;
   
   // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status MethodA(int64_t a, int64_t b);
+  ::fidl::OneWayStatus MethodA(int64_t a, int64_t b);
 };
 
 template<>
@@ -9547,7 +9547,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::Channel
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status MethodA(int64_t a, int64_t b);
+::fidl::OneWayStatus MethodA(int64_t a, int64_t b);
 
 };
 
@@ -9595,7 +9595,7 @@ class ::fidl::internal::WireWeakEventSender<::test_protocols::ChannelProtocol> :
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status EventA(int64_t a, int64_t b);
+    fidl::OneWayStatus EventA(int64_t a, int64_t b);
 
 
 };
@@ -9605,7 +9605,7 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocols::ChannelProto
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status EventA(int64_t a, int64_t b);
+    fidl::OneWayStatus EventA(int64_t a, int64_t b);
 
 
 };
@@ -9616,7 +9616,7 @@ class ::fidl::internal::WireEventSender<::test_protocols::ChannelProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status EventA(int64_t a, int64_t b);
+    fidl::OneWayStatus EventA(int64_t a, int64_t b);
 
 
 };
@@ -9627,7 +9627,7 @@ class ::fidl::internal::WireBufferEventSender<::test_protocols::ChannelProtocol>
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status EventA(int64_t a, int64_t b);
+    fidl::OneWayStatus EventA(int64_t a, int64_t b);
 
 
 };
@@ -9644,7 +9644,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::Transitional>
   using ClientImplBase::ClientImplBase;
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status OneWay(int64_t x);
+  ::fidl::OneWayStatus OneWay(int64_t x);
 };
 
 template<>
@@ -9661,7 +9661,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::Transit
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status OneWay(int64_t x);
+::fidl::OneWayStatus OneWay(int64_t x);
 
 };
 
@@ -9695,7 +9695,7 @@ class ::fidl::internal::WireWeakEventSender<::test_protocols::Transitional> : pu
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status Event(int64_t x);
+    fidl::OneWayStatus Event(int64_t x);
 
 
 };
@@ -9705,7 +9705,7 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocols::Transitional
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status Event(int64_t x);
+    fidl::OneWayStatus Event(int64_t x);
 
 
 };
@@ -9716,7 +9716,7 @@ class ::fidl::internal::WireEventSender<::test_protocols::Transitional>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status Event(int64_t x);
+    fidl::OneWayStatus Event(int64_t x);
 
 
 };
@@ -9727,7 +9727,7 @@ class ::fidl::internal::WireBufferEventSender<::test_protocols::Transitional>
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status Event(int64_t x);
+    fidl::OneWayStatus Event(int64_t x);
 
 
 };
@@ -9744,7 +9744,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::DiscoverableP
   using ClientImplBase::ClientImplBase;
   
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status Method();
+  ::fidl::OneWayStatus Method();
 };
 
 template<>
@@ -9759,7 +9759,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::Discove
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status Method();
+::fidl::OneWayStatus Method();
 
 };
 
@@ -9895,7 +9895,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::HandleRightsP
   using ClientImplBase::ClientImplBase;
   
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status NoResponseMethod(::zx::socket&& h);
+  ::fidl::OneWayStatus NoResponseMethod(::zx::socket&& h);
 };
 
 template<>
@@ -9912,7 +9912,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::HandleR
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status NoResponseMethod(::zx::socket&& h);
+::fidl::OneWayStatus NoResponseMethod(::zx::socket&& h);
 
 };
 
@@ -9946,7 +9946,7 @@ class ::fidl::internal::WireWeakEventSender<::test_protocols::HandleRightsProtoc
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-    fidl::Status AnEvent(::zx::socket&& h);
+    fidl::OneWayStatus AnEvent(::zx::socket&& h);
 
 
 };
@@ -9956,7 +9956,7 @@ class ::fidl::internal::WireWeakBufferEventSender<::test_protocols::HandleRights
  public:
   using WeakBufferEventSenderBase::WeakBufferEventSenderBase;
 
-    fidl::Status AnEvent(::zx::socket&& h);
+    fidl::OneWayStatus AnEvent(::zx::socket&& h);
 
 
 };
@@ -9967,7 +9967,7 @@ class ::fidl::internal::WireEventSender<::test_protocols::HandleRightsProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-    fidl::Status AnEvent(::zx::socket&& h);
+    fidl::OneWayStatus AnEvent(::zx::socket&& h);
 
 
 };
@@ -9978,7 +9978,7 @@ class ::fidl::internal::WireBufferEventSender<::test_protocols::HandleRightsProt
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 
-    fidl::Status AnEvent(::zx::socket&& h);
+    fidl::OneWayStatus AnEvent(::zx::socket&& h);
 
 
 };
@@ -10094,7 +10094,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ManyParameter
   using ClientImplBase::ClientImplBase;
   
   // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15);
+  ::fidl::OneWayStatus Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15);
 };
 
 template<>
@@ -10109,7 +10109,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::ManyPar
   using BufferClientImplBase::BufferClientImplBase;
 
 // Caller provides the backing storage for FIDL message.
-::fidl::Status Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15);
+::fidl::OneWayStatus Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15);
 
 };
 

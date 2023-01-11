@@ -129,7 +129,7 @@ namespace test_emptystruct {
 
 #ifdef __Fuchsia__
 
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_emptystruct::EmptyProtocol>::Send(const ::test_emptystruct::wire::Empty& e) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_emptystruct::EmptyProtocol>::Send(const ::test_emptystruct::wire::Empty& e) {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send> _request_object{e};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, ::fidl::internal::ChannelTransport> _request_message(
@@ -142,12 +142,12 @@ namespace test_emptystruct {
   return ::fidl::internal::WireThenable<::test_emptystruct::EmptyProtocol::SendAndReceive>{
       _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_emptystruct::EmptyProtocol>::Send(const ::test_emptystruct::wire::Empty& e) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_emptystruct::EmptyProtocol>::Send(const ::test_emptystruct::wire::Empty& e) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_emptystruct::EmptyProtocol::Send>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send> _request{e};
@@ -333,7 +333,7 @@ void ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
   ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive> _response{e};
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, ::fidl::internal::ChannelTransport> _response_message{
@@ -341,13 +341,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_emptystruct::EmptyProtoc
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_emptystruct::EmptyProtocol::Receive>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive> _response{e};
@@ -356,22 +356,22 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_emptystruct::Empty
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
   ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive> _response{e};
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_emptystruct::EmptyProtocol>::Receive(const ::test_emptystruct::wire::Empty& e) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_emptystruct::EmptyProtocol::Receive>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive> _response{e};
@@ -379,7 +379,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_emptystruct::EmptyProt
       _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 #endif  // __Fuchsia__

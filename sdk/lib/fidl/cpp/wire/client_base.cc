@@ -97,7 +97,7 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
         // would have been notified during |Dispatch| or making the call.
         context->OnError(fidl::Status::Unbound());
         break;
-      case fidl::Reason::kPeerClosed:
+      case fidl::Reason::kPeerClosedWhileReading:
       case fidl::Reason::kDispatcherError:
       case fidl::Reason::kTransportError:
       case fidl::Reason::kUnexpectedMessage:
@@ -128,18 +128,18 @@ void ClientBase::SendTwoWay(fidl::OutgoingMessage& message, ResponseContext* con
   TryAsyncDeliverError(fidl::Status::Unbound(), context);
 }
 
-fidl::Status ClientBase::SendOneWay(::fidl::OutgoingMessage& message,
-                                    fidl::WriteOptions write_options) {
+fidl::OneWayStatus ClientBase::SendOneWay(::fidl::OutgoingMessage& message,
+                                          fidl::WriteOptions write_options) {
   if (auto transport = GetTransport()) {
     message.set_txid(0);
     message.Write(*transport, std::move(write_options));
     if (!message.ok()) {
       HandleSendError(message.error());
-      return message.error();
+      return fidl::OneWayStatus{message.error()};
     }
-    return fidl::Status::Ok();
+    return fidl::OneWayStatus{fidl::Status::Ok()};
   }
-  return fidl::Status::Unbound();
+  return fidl::OneWayStatus{fidl::Status::Unbound()};
 }
 
 void ClientBase::HandleSendError(fidl::Status error) {

@@ -54,19 +54,19 @@ namespace test_service {
 
 #ifdef __Fuchsia__
 
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_service::FirstProtocol>::MethodOnFirst() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_service::FirstProtocol>::MethodOnFirst() {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_service::FirstProtocol>::MethodOnFirst() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_service::FirstProtocol>::MethodOnFirst() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_service::FirstProtocol::MethodOnFirst>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst> _request{};
@@ -193,19 +193,19 @@ namespace test_service {
 
 #ifdef __Fuchsia__
 
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_service::SecondProtocol>::MethodOnSecond() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_service::SecondProtocol>::MethodOnSecond() {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_service::SecondProtocol>::MethodOnSecond() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_service::SecondProtocol>::MethodOnSecond() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_service::SecondProtocol::MethodOnSecond>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond> _request{};

@@ -519,15 +519,15 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayouts::MainProtocol> 
 
   ::fidl::internal::NaturalThenable<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> TwoWayAnonWithError(const ::fidl::Request<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnonComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnonComposed>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayNamedComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayNamedComposed>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayImport(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayImport>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayImport(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayImport>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayLocal(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayLocal>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayLocal(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayLocal>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request) const;
 };
 namespace test_protocollayouts {
 
@@ -561,15 +561,15 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtoc
 
   ::fidl::Result<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> TwoWayAnonWithError(const ::fidl::Request<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>& request);
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnonComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnonComposed>& request);
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayNamedComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayNamedComposed>& request);
 
-  ::fit::result<::fidl::Error> OneWayImport(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayImport>& request);
+  ::fit::result<::fidl::OneWayError> OneWayImport(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayImport>& request);
 
-  ::fit::result<::fidl::Error> OneWayLocal(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayLocal>& request);
+  ::fit::result<::fidl::OneWayError> OneWayLocal(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayLocal>& request);
 
-  ::fit::result<::fidl::Error> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request);
+  ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request);
 
  private:
   ::fidl::UnownedClientEnd<::test_protocollayouts::MainProtocol> _client_end() const {
@@ -647,25 +647,25 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProto
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
 };
 
 template <>
@@ -674,25 +674,25 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayouts_imported::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnImport(const ::test_protocollayouts_imported::ImportUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnImportWithError(const ::test_protocollayouts::MainProtocolOnImportWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayouts::LocalUnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayouts::MainProtocolOnLocalWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& payload);
 };
 
 #endif  // __Fuchsia__

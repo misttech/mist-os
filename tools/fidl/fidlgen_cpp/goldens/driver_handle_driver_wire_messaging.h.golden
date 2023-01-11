@@ -302,7 +302,7 @@ template <>
 class ::fidl::internal::WireSyncBufferClientImpl<::test_driverhandle::HandlesInProtocol> final : public ::fdf::internal::SyncEndpointBufferVeneer<::fidl::internal::WireSyncBufferClientImpl<::test_driverhandle::HandlesInProtocol>> {
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
-  ::fidl::Status
+  ::fidl::OneWayStatus
   SendHandles(::test_driverhandle::wire::T t) {
     ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles> _request{t};
     return ::fdf::WireUnownedResult<::test_driverhandle::HandlesInProtocol::SendHandles>(_client_end(), _arena(), &_request);
@@ -402,7 +402,7 @@ class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::Hand
   using BufferClientImplBase::BufferClientImplBase;
 
   // Caller provides the backing storage for FIDL message.
-  ::fidl::Status SendHandles(::test_driverhandle::wire::T t);
+  ::fidl::OneWayStatus SendHandles(::test_driverhandle::wire::T t);
 };
 
 template <>
@@ -418,7 +418,7 @@ class ::fidl::internal::WireWeakOnewayClientImpl<::test_driverhandle::HandlesInP
       : ClientImplBase(client_base), arena_(arena) {}
 
   // Allocates 64 bytes of message buffer on the stack. No heap allocation necessary.
-  ::fidl::Status SendHandles(::test_driverhandle::wire::T t);
+  ::fidl::OneWayStatus SendHandles(::test_driverhandle::wire::T t);
 
  protected:
   const ::fdf::Arena& arena_;

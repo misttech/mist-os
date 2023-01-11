@@ -11,18 +11,18 @@
 //
 {{- end }}
 // Caller provides the backing storage for FIDL message.
-::fidl::Status {{ .Name }}({{ RenderParams .RequestArgs }});
+::fidl::OneWayStatus {{ .Name }}({{ RenderParams .RequestArgs }});
 {{ end }}
 
 
 {{- define "Method:ClientImplOnewayBuffer:WireMessagingSource" }}
-::fidl::Status {{ .Protocol.WireWeakOnewayBufferClientImpl.NoLeading }}::{{ .Name }}(
+::fidl::OneWayStatus {{ .Protocol.WireWeakOnewayBufferClientImpl.NoLeading }}::{{ .Name }}(
     {{- RenderParams .RequestArgs }}) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<{{ .Marker }}>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };

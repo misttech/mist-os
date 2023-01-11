@@ -225,9 +225,9 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Com
 
   ::fidl::internal::NaturalThenable<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> TwoWayNamedComposedWithError(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request) const;
 };
 namespace test_protocollayoutssamelibrary {
 
@@ -249,9 +249,9 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
 
   ::fidl::Result<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> TwoWayNamedComposedWithError(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>& request);
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>& request);
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request);
 
  private:
   ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> _client_end() const {
@@ -317,13 +317,13 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 };
 
 template <>
@@ -332,13 +332,13 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Co
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 };
 
 #endif  // __Fuchsia__
@@ -847,13 +847,13 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Mai
 
   ::fidl::internal::NaturalThenable<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> TwoWayAnonWithError(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayLocal(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayLocal(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>& request) const;
 
-  ::fit::result<::fidl::Error> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request) const;
+  ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request) const;
 };
 namespace test_protocollayoutssamelibrary {
 
@@ -883,13 +883,13 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
 
   ::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> TwoWayAnonWithError(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>& request);
 
-  ::fit::result<::fidl::Error> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayAnonComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>& request);
 
-  ::fit::result<::fidl::Error> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>& request);
+  ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>& request);
 
-  ::fit::result<::fidl::Error> OneWayLocal(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>& request);
+  ::fit::result<::fidl::OneWayError> OneWayLocal(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>& request);
 
-  ::fit::result<::fidl::Error> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request);
+  ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request);
 
  private:
   ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> _client_end() const {
@@ -963,21 +963,21 @@ class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& payload);
 };
 
 template <>
@@ -986,21 +986,21 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayoutssamelibrary::Ma
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-  ::fit::result<::fidl::Error> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposed(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnNamedComposedWithError(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
+  ::fit::result<::fidl::OneWayError> OnLocal(const ::test_protocollayoutssamelibrary::UnionPayload& payload);
 
-  ::fit::result<::fidl::Error> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnLocalWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest& payload);
 
-  ::fit::result<::fidl::Error> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& payload);
+  ::fit::result<::fidl::OneWayError> OnAnonWithError(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& payload);
 };
 
 #endif  // __Fuchsia__

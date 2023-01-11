@@ -53,7 +53,7 @@ TEST(ClientBindingTestCase, AsyncTxn) {
     EventHandler(sync_completion_t& unbound, ClientBaseSpy& spy) : unbound_(unbound), spy_(spy) {}
 
     void on_fidl_error(::fidl::UnbindInfo info) override {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
       EXPECT_EQ("FIDL endpoint was unbound due to peer closed, status: ZX_ERR_PEER_CLOSED (-24)",
                 info.FormatDescription());
@@ -100,7 +100,7 @@ TEST(ClientBindingTestCase, ParallelAsyncTxns) {
     EventHandler(sync_completion_t& unbound, ClientBaseSpy& spy) : unbound_(unbound), spy_(spy) {}
 
     void on_fidl_error(::fidl::UnbindInfo info) override {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
       EXPECT_EQ(0, spy_.GetTxidCount());
       sync_completion_signal(&unbound_);
@@ -219,7 +219,7 @@ TEST(ClientBindingTestCase, Events) {
     EventHandler(sync_completion_t& unbound) : unbound_(unbound) {}
 
     void on_fidl_error(::fidl::UnbindInfo info) override {
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
       EXPECT_EQ(10, event_count());  // Expect 10 events.
       sync_completion_signal(&unbound_);
@@ -361,7 +361,7 @@ TEST(ClientBindingTestCase, ReleaseOutstandingTxnsOnPeerClosed) {
   // Create and register a response context which will signal when deleted.
   sync_completion_t done;
   ClientBaseSpy spy{client};
-  spy.PrepareAsyncTxn(new OnErrorTestResponseContext(&done, fidl::Reason::kPeerClosed));
+  spy.PrepareAsyncTxn(new OnErrorTestResponseContext(&done, fidl::Reason::kPeerClosedWhileReading));
 
   // Close the server end and wait for the transaction context to be released.
   remote.reset();
@@ -388,7 +388,7 @@ TEST_F(ClientReceiveEpitaphTest, OkEpitpah) {
       // An epitaph value of ZX_OK is defined to indicate normal closure.
       EXPECT_TRUE(info.is_peer_closed());
       EXPECT_FALSE(info.is_user_initiated());
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_OK, info.status());
       sync_completion_signal(&unbound_);
     }
@@ -416,7 +416,7 @@ TEST_F(ClientReceiveEpitaphTest, NonOkEpitaph) {
     void on_fidl_error(::fidl::UnbindInfo info) override {
       EXPECT_TRUE(info.is_peer_closed());
       EXPECT_FALSE(info.is_user_initiated());
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       EXPECT_EQ(ZX_ERR_BAD_STATE, info.status());
       sync_completion_signal(&unbound_);
     }
@@ -444,7 +444,7 @@ TEST_F(ClientReceiveEpitaphTest, PeerClosedNoEpitaph) {
     void on_fidl_error(::fidl::UnbindInfo info) override {
       EXPECT_TRUE(info.is_peer_closed());
       EXPECT_FALSE(info.is_user_initiated());
-      EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
       // No epitaph is equivalent to ZX_ERR_PEER_CLOSED epitaph.
       EXPECT_EQ(ZX_ERR_PEER_CLOSED, info.status());
       sync_completion_signal(&unbound_);

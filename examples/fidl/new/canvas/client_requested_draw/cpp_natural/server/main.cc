@@ -38,7 +38,7 @@ class InstanceImpl final : public fidl::Server<examples_canvas_clientrequesteddr
   }
 
   void OnFidlClosed(fidl::UnbindInfo info) {
-    if (info.reason() != ::fidl::Reason::kPeerClosed) {
+    if (info.reason() != ::fidl::Reason::kPeerClosedWhileReading) {
       FX_LOGS(ERROR) << "Shutdown unexpectedly";
     }
     delete this;

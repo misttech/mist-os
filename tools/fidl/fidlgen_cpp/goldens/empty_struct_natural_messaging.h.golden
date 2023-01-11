@@ -74,7 +74,7 @@ class ::fidl::internal::NaturalClientImpl<::test_emptystruct::EmptyProtocol> fin
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_emptystruct::EmptyProtocol::SendAndReceive> SendAndReceive(const ::fidl::Request<::test_emptystruct::EmptyProtocol::SendAndReceive>& request) const;
 
-  ::fit::result<::fidl::Error> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request) const;
+  ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request) const;
 };
 namespace test_emptystruct {
 
@@ -90,7 +90,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>
  public:
   ::fidl::Result<::test_emptystruct::EmptyProtocol::SendAndReceive> SendAndReceive(const ::fidl::Request<::test_emptystruct::EmptyProtocol::SendAndReceive>& request);
 
-  ::fit::result<::fidl::Error> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request);
+  ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request);
 
  private:
   ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> _client_end() const {
@@ -150,7 +150,7 @@ class ::fidl::internal::NaturalWeakEventSender<::test_emptystruct::EmptyProtocol
  public:
   using WeakEventSenderBase::WeakEventSenderBase;
 
-  ::fit::result<::fidl::Error> Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload);
+  ::fit::result<::fidl::OneWayError> Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload);
 };
 
 template <>
@@ -159,7 +159,7 @@ class ::fidl::internal::NaturalEventSender<::test_emptystruct::EmptyProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 
-  ::fit::result<::fidl::Error> Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload);
+  ::fit::result<::fidl::OneWayError> Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload);
 };
 
 #endif  // __Fuchsia__

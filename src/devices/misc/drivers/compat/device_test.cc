@@ -192,7 +192,7 @@ TEST_F(DeviceTest, ConstructDevice) {
   TestNode node(dispatcher());
   fidl::BindServer(dispatcher(), std::move(endpoints->server), &node,
                    [](auto, fidl::UnbindInfo info, auto) {
-                     EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+                     EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
                    });
   device.Unbind();
 

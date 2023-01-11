@@ -109,7 +109,7 @@ template <>
 class ::fidl::internal::NaturalClientImpl<::test_driverhandle::HandlesInProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
-  ::fit::result<::fidl::Error> SendHandles(::fidl::Request<::test_driverhandle::HandlesInProtocol::SendHandles> request) const;
+  ::fit::result<::fidl::OneWayError> SendHandles(::fidl::Request<::test_driverhandle::HandlesInProtocol::SendHandles> request) const;
 };
 namespace test_driverhandle {
 

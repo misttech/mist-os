@@ -75,17 +75,17 @@ void Dispatch(void* impl, ::fidl::IncomingHeaderAndMessage& msg,
   }
 }
 
-::fidl::Status WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message) const {
+::fidl::OneWayStatus WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message) const {
   if (auto binding = binding_.lock()) {
     message.set_txid(0);
     message.Write(binding->transport());
     if (!message.ok()) {
       HandleSendError(message.error());
-      return message.error();
+      return fidl::OneWayStatus{message.error()};
     }
-    return fidl::Status::Ok();
+    return fidl::OneWayStatus{fidl::OneWayStatus::Ok()};
   }
-  return fidl::Status::Unbound();
+  return fidl::OneWayStatus{fidl::OneWayStatus::Unbound()};
 }
 
 void WeakEventSenderInner::HandleSendError(fidl::Status error) const {

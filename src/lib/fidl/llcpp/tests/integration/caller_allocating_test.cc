@@ -302,7 +302,7 @@ class ExpectPeerClosedEventHandler : public fidl::WireAsyncEventHandler<test::Fr
   }
 
   void on_fidl_error(fidl::UnbindInfo info) final {
-    EXPECT_EQ(fidl::Reason::kPeerClosed, info.reason());
+    EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
     peer_closed_ = true;
   }
 

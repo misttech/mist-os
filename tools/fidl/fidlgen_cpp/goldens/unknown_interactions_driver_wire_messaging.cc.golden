@@ -758,7 +758,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictOneWay() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictOneWay() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay> _request_object{  };
 
@@ -773,7 +773,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
           arena_.get());
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleOneWay() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleOneWay() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay> _request_object{  };
 
@@ -788,7 +788,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
           arena_.get());
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictOneWay() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictOneWay() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
 
@@ -801,7 +801,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverP
         _arena().get());
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleOneWay() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleOneWay() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
 
@@ -2790,7 +2790,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictOneWay() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictOneWay() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> _request_object{  };
 
@@ -2805,7 +2805,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
           arena_.get());
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::FlexibleOneWay() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::FlexibleOneWay() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay> _request_object{  };
 
@@ -2820,7 +2820,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
           arena_.get());
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictOneWay() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictOneWay() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
 
@@ -2833,7 +2833,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDri
         _arena().get());
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::FlexibleOneWay() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::FlexibleOneWay() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
 
@@ -4074,7 +4074,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedD
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictOneWay() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictOneWay() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> _request_object{  };
 
@@ -4089,7 +4089,7 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedD
           arena_.get());
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage(), std::move(_options));
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictOneWay() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictOneWay() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay>();
   uint8_t* _buffer = static_cast<uint8_t*>(_arena().Allocate(_buffer_size));
 

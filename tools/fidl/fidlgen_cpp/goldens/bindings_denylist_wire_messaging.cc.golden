@@ -1191,26 +1191,26 @@ namespace test_bindingsdenylist {
 
 #ifdef __Fuchsia__
 
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::Unattributed() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::Unattributed() {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::AlwaysAppearsInImportingLibrary() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::AlwaysAppearsInImportingLibrary() {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::Unattributed() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::Unattributed() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_bindingsdenylist::ImportsSameNameContext::Unattributed>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> _request{};
@@ -1218,12 +1218,12 @@ namespace test_bindingsdenylist {
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::AlwaysAppearsInImportingLibrary() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_bindingsdenylist::ImportsSameNameContext>::AlwaysAppearsInImportingLibrary() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> _request{};

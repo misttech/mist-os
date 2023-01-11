@@ -60,10 +60,19 @@ enum class Reason {
   // |status| is the result of sending the epitaph.
   kClose,
 
-  // The endpoint peer was closed. For a server, |status| is ZX_ERR_PEER_CLOSED.
-  // For a client, it is the epitaph. If no epitaph was sent, the behavior is
-  // equivalent to having received a ZX_ERR_PEER_CLOSED epitaph.
-  kPeerClosed,
+  // The endpoint peer was closed while the bindings runtime was reading,
+  // or waiting to read a message.
+  //
+  // In server APIs, |status| will be ZX_ERR_PEER_CLOSED. In client APIs,
+  // |status| will be the epitaph.
+  //
+  // If no epitaph was sent, the behavior is equivalent to having received a
+  // ZX_ERR_PEER_CLOSED epitaph.
+  //
+  // Note that if a FIDL operation only involves writing to a transport (e.g.
+  // one way calls), then peer closed errors are hidden, to discourage race
+  // conditions.
+  kPeerClosedWhileReading,
 
   // An error associated with the dispatcher, or with waiting on the transport.
   //
@@ -197,7 +206,7 @@ class [[nodiscard]] Status {
     // |kPeerClosed|.
     ::fidl::Reason reason = Reason::kTransportError;
     if (status == ZX_ERR_PEER_CLOSED) {
-      reason = Reason::kPeerClosed;
+      reason = Reason::kPeerClosedWhileReading;
     }
     return Status(status, reason, error_message);
   }
@@ -247,14 +256,19 @@ class [[nodiscard]] Status {
     return reason_;
   }
 
-  // Returns if the operation failed because the peer endpoint was closed.
+  // Returns if the operation failed because the peer endpoint was closed while
+  // the bindings runtime was reading, or waiting to read a message.
   //
   // If this error happens on the client side and an epitaph was received,
   // |status| contains the value of the epitaph.
   //
   // This error is of interest since some protocol users may consider the peer
   // going away to be part of its normal operation, while others might not.
-  bool is_peer_closed() const { return reason_ == Reason::kPeerClosed; }
+  //
+  // Note that if a FIDL operation only involves writing to a transport (e.g.
+  // one way calls), then peer closed errors are hidden, to discourage race
+  // conditions.
+  bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
 
   // Returns if the operation failed because the async dispatcher is shutting
   // down.
@@ -347,8 +361,41 @@ struct fidl::internal::DisplayError<fidl::Status> {
   static size_t Format(const fidl::Status& value, char* destination, size_t capacity);
 };
 
+// |OneWayStatus| represents the result of a one-way FIDL operation:
+// - One-way client call.
+// - Send server reply.
+// - Send event.
+//
+// The main difference between |OneWayStatus| and |Status| is that the former
+// does not expose peer-closed errors. The FIDL runtime only surfaces
+// peer-closed errors when it is encountered while reading or waiting. Otherwise,
+// they support the same APIs.
+//
+// |OneWayStatus| may implicitly decay into a |Status|, but one must explicitly
+// perform the inverse transformation by calling the constructor.
+class [[nodiscard]] OneWayStatus : public Status {
+ public:
+  explicit OneWayStatus(const Status& other) : Status(other) {
+    ZX_DEBUG_ASSERT(!other.is_peer_closed());
+  }
+
+ private:
+  using Status::is_peer_closed;
+  using Status::Status;
+};
+
+template <>
+struct fidl::internal::DisplayError<fidl::OneWayStatus> {
+  static size_t Format(const fidl::OneWayStatus& value, char* destination, size_t capacity) {
+    return fidl::internal::DisplayError<fidl::Status>::Format(value, destination, capacity);
+  }
+};
+
 // |Error| is a type alias for when the result of an operation is an error.
 using Error = Status;
+
+// |OneWayError| is a type alias for when the result of an one-way operation is an error.
+using OneWayError = OneWayStatus;
 
 // |UnbindInfo| describes how the channel was unbound from a server or client.
 //
@@ -393,7 +440,7 @@ class UnbindInfo : private Status {
   // Constructs an |UnbindInfo| indicating that the endpoint peer has
   // closed.
   constexpr static UnbindInfo PeerClosed(zx_status_t status) {
-    return UnbindInfo{Status(status, ::fidl::Reason::kPeerClosed, nullptr)};
+    return UnbindInfo{Status(status, ::fidl::Reason::kPeerClosedWhileReading, nullptr)};
   }
 
   // Constructs an |UnbindInfo| indicating the async dispatcher returned
@@ -470,7 +517,7 @@ class UnbindInfo : private Status {
   //
   // This error is of interest since some protocol users may consider the peer
   // going away to be part of its normal operation, while others might not.
-  using Status::is_peer_closed;
+  bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
 
   // Returns if the transport was unbound because the async dispatcher is
   // shutting down.

@@ -566,7 +566,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
 
 
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictOneWay() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::DriverTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsDriverProtocol_StrictOneWay_Ordinal, ::test_unknowninteractions::kUnknownInteractionsDriverProtocol_StrictOneWay_DynamicFlags };
@@ -579,12 +579,12 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
   };
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
-  ::fidl::Status status = client_base().SendOneWay(_arena_msg, std::move(_options));
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
 
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleOneWay() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::DriverTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsDriverProtocol_FlexibleOneWay_Ordinal, ::test_unknowninteractions::kUnknownInteractionsDriverProtocol_FlexibleOneWay_DynamicFlags };
@@ -597,7 +597,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
   };
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
-  ::fidl::Status status = client_base().SendOneWay(_arena_msg, std::move(_options));
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_unknowninteractions {
@@ -1478,7 +1478,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
 
 
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictOneWay() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::DriverTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarDriverProtocol_StrictOneWay_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarDriverProtocol_StrictOneWay_DynamicFlags };
@@ -1491,12 +1491,12 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
   };
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
-  ::fidl::Status status = client_base().SendOneWay(_arena_msg, std::move(_options));
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
 
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::FlexibleOneWay() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::DriverTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsAjarDriverProtocol_FlexibleOneWay_Ordinal, ::test_unknowninteractions::kUnknownInteractionsAjarDriverProtocol_FlexibleOneWay_DynamicFlags };
@@ -1509,7 +1509,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
   };
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
-  ::fidl::Status status = client_base().SendOneWay(_arena_msg, std::move(_options));
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_unknowninteractions {
@@ -2140,7 +2140,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
 
 
 
-::fit::result<::fidl::Error>
+::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictOneWay() const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::DriverTransport::VTable, ::test_unknowninteractions::kUnknownInteractionsClosedDriverProtocol_StrictOneWay_Ordinal, ::test_unknowninteractions::kUnknownInteractionsClosedDriverProtocol_StrictOneWay_DynamicFlags };
@@ -2153,7 +2153,7 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
   };
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
-  ::fidl::Status status = client_base().SendOneWay(_arena_msg, std::move(_options));
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_arena_msg, std::move(_options));
   return ::fidl::internal::ToFitxResult(status);
 }
 namespace test_unknowninteractions {

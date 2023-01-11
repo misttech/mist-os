@@ -410,14 +410,14 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithR
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestNoResponse() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestNoResponse() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> _request_object{  };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::WithAndWithoutRequestResponse>::WithRequestNoResponse(::fidl::StringView arg) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::WithAndWithoutRequestResponse>::WithRequestNoResponse(::fidl::StringView arg) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> _request_object{ arg };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>, ::fidl::internal::ChannelTransport> _request_message(
@@ -448,12 +448,12 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithR
     return ::fidl::internal::WireThenable<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse>{
         _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestNoResponse() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestNoResponse() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> _request{  };
@@ -461,12 +461,12 @@ extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithR
       _allocation->data, _buffer_size, &_request);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::WithAndWithoutRequestResponse>::WithRequestNoResponse(::fidl::StringView arg) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::WithAndWithoutRequestResponse>::WithRequestNoResponse(::fidl::StringView arg) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> _request{ arg };
@@ -1013,7 +1013,7 @@ void ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutReques
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> _response{ };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse>, ::fidl::internal::ChannelTransport> _response_message{
@@ -1022,13 +1022,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithou
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> _response{ };
@@ -1037,7 +1037,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAnd
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> _response{ };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse>, ::fidl::internal::ChannelTransport> _response_message{
@@ -1045,15 +1045,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocols::WithAndWithoutReq
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> _response{ };
@@ -1061,10 +1061,10 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::WithAndWith
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> _response{ret };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>, ::fidl::internal::ChannelTransport> _response_message{
@@ -1073,13 +1073,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::WithAndWithou
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> _response{ret };
@@ -1088,7 +1088,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::WithAnd
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> _response{ret };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>, ::fidl::internal::ChannelTransport> _response_message{
@@ -1096,15 +1096,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocols::WithAndWithoutReq
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::StringView ret) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> _response{ret };
@@ -1112,7 +1112,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::WithAndWith
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 
@@ -2278,7 +2278,7 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseT
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ChannelProtocol>::MethodA(int64_t a, int64_t b) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ChannelProtocol>::MethodA(int64_t a, int64_t b) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::MethodA> _request_object{ a, b };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::MethodA>, ::fidl::internal::ChannelTransport> _request_message(
@@ -2303,12 +2303,12 @@ extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseT
     return ::fidl::internal::WireThenable<::test_protocols::ChannelProtocol::MutateSocket>{
         _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::ChannelProtocol>::MethodA(int64_t a, int64_t b) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::ChannelProtocol>::MethodA(int64_t a, int64_t b) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::ChannelProtocol::MethodA>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::MethodA> _request{ a, b };
@@ -2720,7 +2720,7 @@ void ::fidl::internal::TransactionalRequest<::test_protocols::ChannelProtocol::M
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA> _response{a, b };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2729,13 +2729,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::ChannelProtoc
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::ChannelProtocol::EventA>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA> _response{a, b };
@@ -2744,7 +2744,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::Channel
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA> _response{a, b };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA>, ::fidl::internal::ChannelTransport> _response_message{
@@ -2752,15 +2752,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocols::ChannelProtocol>:
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocols::ChannelProtocol>::EventA(int64_t a, int64_t b) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::ChannelProtocol::EventA>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::ChannelProtocol::EventA> _response{a, b };
@@ -2768,7 +2768,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::ChannelProt
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 
@@ -2922,7 +2922,7 @@ extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::Transitional>::OneWay(int64_t x) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::Transitional>::OneWay(int64_t x) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::Transitional::OneWay> _request_object{ x };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::Transitional::OneWay>, ::fidl::internal::ChannelTransport> _request_message(
@@ -2935,12 +2935,12 @@ extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
     return ::fidl::internal::WireThenable<::test_protocols::Transitional::Request>{
         _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::Transitional>::OneWay(int64_t x) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::Transitional>::OneWay(int64_t x) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::Transitional::OneWay>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::Transitional::OneWay> _request{ x };
@@ -3161,7 +3161,7 @@ void ::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event>
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::Transitional>::Event(int64_t x) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocols::Transitional>::Event(int64_t x) {
   ::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event> _response{x };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3170,13 +3170,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::Transitional>
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::Transitional>::Event(int64_t x) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocols::Transitional>::Event(int64_t x) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::Transitional::Event>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event> _response{x };
@@ -3185,7 +3185,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::Transit
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocols::Transitional>::Event(int64_t x) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocols::Transitional>::Event(int64_t x) {
   ::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event> _response{x };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3193,15 +3193,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocols::Transitional>::Ev
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::Transitional>::Event(int64_t x) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocols::Transitional>::Event(int64_t x) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::Transitional::Event>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::Transitional::Event> _response{x };
@@ -3209,7 +3209,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::Transitiona
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 
@@ -3273,19 +3273,19 @@ constexpr ::fidl::MessageDynamicFlags kDiscoverableProtocol_Method_DynamicFlags 
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::DiscoverableProtocol>::Method() {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::DiscoverableProtocol>::Method() {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::DiscoverableProtocol::Method> _request_object{  };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::DiscoverableProtocol::Method>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::DiscoverableProtocol>::Method() {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::DiscoverableProtocol>::Method() {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::DiscoverableProtocol::Method>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::DiscoverableProtocol::Method> _request{  };
@@ -3598,7 +3598,7 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTa
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::HandleRightsProtocol>::NoResponseMethod(::zx::socket&& h) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::HandleRightsProtocol>::NoResponseMethod(::zx::socket&& h) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::HandleRightsProtocol::NoResponseMethod> _request_object{ std::move(h) };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::HandleRightsProtocol::NoResponseMethod>, ::fidl::internal::ChannelTransport> _request_message(
@@ -3611,12 +3611,12 @@ extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTa
     return ::fidl::internal::WireThenable<::test_protocols::HandleRightsProtocol::ResponseMethod>{
         _client_base(), ::fidl::WriteOptions{}, ::fidl::internal::AllowUnownedInputRef{}, &_request};
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::HandleRightsProtocol>::NoResponseMethod(::zx::socket&& h) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::HandleRightsProtocol>::NoResponseMethod(::zx::socket&& h) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::HandleRightsProtocol::NoResponseMethod>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::HandleRightsProtocol::NoResponseMethod> _request{ std::move(h) };
@@ -3842,7 +3842,7 @@ void ::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol
 
 #ifdef __Fuchsia__
 
-fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
+::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
   ::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent> _response{std::move(h) };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3851,13 +3851,13 @@ fidl::Status fidl::internal::WireWeakEventSender<::test_protocols::HandleRightsP
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
+fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::HandleRightsProtocol::AnEvent>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
     _inner().HandleSendError(_allocation.error_value());
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent> _response{std::move(h) };
@@ -3866,7 +3866,7 @@ fidl::Status fidl::internal::WireWeakBufferEventSender<::test_protocols::HandleR
   return _inner().SendEvent(_response_message.GetOutgoingMessage());
 }
 
-fidl::Status fidl::internal::WireEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
+fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
   ::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent> _response{std::move(h) };
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent>, ::fidl::internal::ChannelTransport> _response_message{
@@ -3874,15 +3874,15 @@ fidl::Status fidl::internal::WireEventSender<::test_protocols::HandleRightsProto
   };
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
+fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::zx::socket&& h) {
   constexpr uint32_t _buffer_size = ::fidl::EventReplyBufferSizeInChannel<::test_protocols::HandleRightsProtocol::AnEvent>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalEvent<::test_protocols::HandleRightsProtocol::AnEvent> _response{std::move(h) };
@@ -3890,7 +3890,7 @@ fidl::Status fidl::internal::WireBufferEventSender<::test_protocols::HandleRight
         _allocation->data, _buffer_size, &_response);
   auto& _message = _response_message.GetOutgoingMessage();
   _message.Write(_transport());
-  return ::fidl::Status{_message};
+  return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
 
@@ -4567,19 +4567,19 @@ extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 
 #ifdef __Fuchsia__
 
-  ::fidl::Status fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ManyParameters>::Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
+  ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocols::ManyParameters>::Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
     FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
     ::fidl::internal::TransactionalRequest<::test_protocols::ManyParameters::Fifteen> _request_object{ p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15 };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocols::ManyParameters::Fifteen>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
-::fidl::Status fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::ManyParameters>::Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
+::fidl::OneWayStatus fidl::internal::WireWeakOnewayBufferClientImpl<::test_protocols::ManyParameters>::Fifteen(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_protocols::ManyParameters::Fifteen>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> _allocation =
       _allocator().TryAllocate(_buffer_size);
   if (!_allocation.is_ok()) {
-    return _allocation.error_value();
+    return ::fidl::OneWayStatus{_allocation.error_value()};
   }
 
   ::fidl::internal::TransactionalRequest<::test_protocols::ManyParameters::Fifteen> _request{ p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15 };
