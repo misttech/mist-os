@@ -131,9 +131,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     let timing_in_millis = (command_done - command_start).as_millis().to_string();
 
     let analytics_task = fuchsia_async::Task::local(async move {
-        if let Err(e) =
-            add_ffx_launch_and_timing_events(&context, sanitized_args, timing_in_millis).await
-        {
+        if let Err(e) = add_ffx_launch_and_timing_events(sanitized_args, timing_in_millis).await {
             tracing::error!("metrics submission failed: {}", e);
         }
         Instant::now()

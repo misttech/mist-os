@@ -7,7 +7,6 @@ use analytics::{
     uuid_as_str,
 };
 use anyhow::Result;
-use ffx_config::EnvironmentContext;
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
 use std::collections::BTreeMap;
@@ -15,10 +14,6 @@ use std::time::{Duration, Instant};
 use tracing;
 
 pub const GA_PROPERTY_ID: &str = "UA-127897021-9";
-
-pub const FUCHSIA_DISCOVERY_LEGACY_ENV_VAR_NAME: &str = "FUCSHIA_DISABLED_legacy_discovery";
-
-pub const ANALYTICS_LEGACY_DISCOVERY_CUSTOM_DIMENSION_KEY: &str = "cd4";
 
 pub const ANALYTICS_CLIENTID_CUSTOM_DIMENSION_KEY: &str = "cd5";
 
@@ -28,44 +23,17 @@ pub async fn init_metrics_svc(build_info: VersionInfo, invoker: Option<String>) 
         .await;
 }
 
-fn legacy_discovery_env(context: &EnvironmentContext) -> String {
-    let _one = "1".to_string();
-    match context.env_var(FUCHSIA_DISCOVERY_LEGACY_ENV_VAR_NAME) {
-        Ok(_one) => "true",
-        _ => "false",
-    }
-    .to_string()
-}
-
-pub async fn add_ffx_launch_and_timing_events(
-    context: &EnvironmentContext,
-    sanitized_args: String,
-    time: String,
-) -> Result<()> {
+pub async fn add_ffx_launch_and_timing_events(sanitized_args: String, time: String) -> Result<()> {
     let mut batcher = make_batch().await?;
-    let legacy_discovery_env = legacy_discovery_env(context);
-    add_ffx_launch_event(&legacy_discovery_env, &sanitized_args, &mut batcher).await?;
-    add_ffx_timing_event(&legacy_discovery_env, &sanitized_args, time, &mut batcher).await?;
+    add_ffx_launch_event(&sanitized_args, &mut batcher).await?;
+    add_ffx_timing_event(&sanitized_args, time, &mut batcher).await?;
     batcher.send_events().await
 }
 
-async fn add_ffx_launch_event(
-    legacy_discovery_env: &str,
-    sanitized_args: &str,
-    batcher: &mut MetricsEventBatch,
-) -> Result<()> {
+async fn add_ffx_launch_event(sanitized_args: &str, batcher: &mut MetricsEventBatch) -> Result<()> {
     let mut custom_dimensions = BTreeMap::new();
-    add_legacy_discovery_metrics(legacy_discovery_env, &mut custom_dimensions);
     add_client_id_as_custom_dimension(&mut custom_dimensions).await;
     batcher.add_custom_event(None, Some(&sanitized_args), None, custom_dimensions).await
-}
-
-fn add_legacy_discovery_metrics(
-    legacy_discovery_env: &str,
-    custom_dimensions: &mut BTreeMap<&str, String>,
-) {
-    custom_dimensions
-        .insert(ANALYTICS_LEGACY_DISCOVERY_CUSTOM_DIMENSION_KEY, legacy_discovery_env.to_owned());
 }
 
 /// By adding clientId as a custom dimension, DataStudio dashboards will be able to
@@ -77,13 +45,11 @@ async fn add_client_id_as_custom_dimension(custom_dimensions: &mut BTreeMap<&str
 }
 
 async fn add_ffx_timing_event(
-    legacy_discovery_env: &str,
     sanitized_args: &str,
     time: String,
     batcher: &mut MetricsEventBatch,
 ) -> Result<()> {
     let mut custom_dimensions = BTreeMap::new();
-    add_legacy_discovery_metrics(legacy_discovery_env, &mut custom_dimensions);
     add_client_id_as_custom_dimension(&mut custom_dimensions).await;
     batcher.add_timing_event(Some(&sanitized_args), time, None, None, custom_dimensions).await
 }
