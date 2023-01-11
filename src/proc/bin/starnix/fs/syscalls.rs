@@ -1603,6 +1603,11 @@ fn do_epoll_pwait(
         return error!(EINVAL);
     }
 
+    // Return early if the user passes an obviously invalid pointer. This avoids dropping events
+    // for common pointer errors. When we catch bad pointers after the wait is complete when the
+    // memory is actually written, the events will be lost. This check is not a guarantee.
+    current_task.mm.check_plausible(events.addr())?;
+
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.mm.read_object(user_sigmask)?;
         current_task.wait_with_temporary_mask(signal_mask, |current_task| {

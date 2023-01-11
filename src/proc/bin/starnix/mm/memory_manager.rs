@@ -1440,6 +1440,29 @@ impl MemoryManager {
         Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
     }
 
+    /// Does a rough check that the given address is plausibly in the address space of the
+    /// application. This does not mean the pointer is valid for any particular purpose or that
+    /// it will remain so!
+    ///
+    /// In some syscalls, Linux seems to do some initial validation of the pointer up front to
+    /// tell the caller early if it's invalid. For example, in epoll_wait() it's returning a vector
+    /// of events. If the caller passes an invalid pointer, it wants to fail without dropping any
+    /// events. Failing later when actually copying the required events to userspace would mean
+    /// those events will be lost. But holding a lock on the memory manager for an asynchronous
+    /// wait is not desirable.
+    ///
+    /// Testing shows that Linux seems to do some initial plausibility checking of the pointer to
+    /// be able to report common usage errors before doing any (possibly unreversable) work. This
+    /// checking is easy to get around if you try, so this function is also not required to
+    /// be particularly robust. Certainly the more advanced cases of races (the memory could be
+    /// unmapped after this call but before it's used) are not handled.
+    ///
+    /// Returns the error EFAULT if invalid.
+    pub fn check_plausible(&self, addr: UserAddress) -> Result<(), Errno> {
+        let _ = self.state.read().mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn get_mapping_name(&self, addr: UserAddress) -> Result<CString, Errno> {
         let state = self.state.read();

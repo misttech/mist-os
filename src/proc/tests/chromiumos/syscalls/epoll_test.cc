@@ -193,11 +193,9 @@ TEST(EpollTest, WaitInvalidParams) {
   EXPECT_EQ(EINVAL, errno);
 
   // Pass null for event pointer but valid count.
-  /* TODO(fxbug.dev/117944) Handle this case properly.
   errno = 0;
   EXPECT_EQ(-1, epoll_wait(epfd.get(), nullptr, 1, 0));
   EXPECT_EQ(EFAULT, errno);
-  */
 
   // When both the pointer and the count are invalid, Linux returns EINVAL (it checks the count
   // first).
