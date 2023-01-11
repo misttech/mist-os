@@ -15,16 +15,15 @@ use {
                 BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
             },
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
+            load_store_info,
             transaction::LockKey,
             volume::root_volume,
-            HandleOptions, ObjectKey, ObjectStore, ObjectValue, StoreInfo,
-            MAX_STORE_INFO_SERIALIZED_SIZE,
+            HandleOptions, ObjectKey, ObjectStore, ObjectValue,
         },
-        serialized_types::VersionedLatest,
     },
     anyhow::{anyhow, Context, Error},
     futures::try_join,
@@ -345,31 +344,11 @@ impl<'a> Fsck<'a> {
         let root_store = filesystem.root_store();
 
         // Manually open the StoreInfo so we can validate it without unlocking the store.
-        let handle = self.assert(
-            ObjectStore::open_object(&root_store, store_id, HandleOptions::default(), None).await,
-            FsckFatal::MissingStoreInfo(store_id),
+        let info = self.assert(
+            load_store_info(&root_store, store_id).await,
+            FsckFatal::MalformedStore(store_id),
         )?;
-        let info = if handle.get_size() > 0 {
-            let serialized_info = handle.contents(MAX_STORE_INFO_SERIALIZED_SIZE).await?;
-            let mut cursor = std::io::Cursor::new(&serialized_info[..]);
-            let (store_info, _version) = self.assert(
-                StoreInfo::deserialize_with_version(&mut cursor)
-                    .context("Failed to deserialize StoreInfo"),
-                FsckFatal::MalformedStore(store_id),
-            )?;
-            store_info
-        } else {
-            // The store_info will be absent for a newly created and empty object store.
-            StoreInfo::default()
-        };
-        // We don't replay the store ReplayInfo here, since it doesn't affect what we
-        // want to check (mainly the existence of the layer files).  If that changes,
-        // we'll need to update this.
-        self.verbose(format!("Store {} has {} object tree layers", store_id, info.layers.len()));
-        root_store_root_objects.append(&mut info.layers.clone());
-        if info.encrypted_mutations_object_id != INVALID_OBJECT_ID {
-            root_store_root_objects.push(info.encrypted_mutations_object_id);
-        }
+        root_store_root_objects.append(&mut info.parent_objects());
         Ok(())
     }
 
@@ -387,9 +366,7 @@ impl<'a> Fsck<'a> {
             if let Some(crypt) = &crypt {
                 store.unlock_read_only(crypt.clone()).await?;
                 Some(scopeguard::guard(store.clone(), |store| {
-                    if let Err(e) = store.lock_read_only() {
-                        error!(?e, "Failed to re-lock store");
-                    }
+                    store.lock_read_only();
                 }))
             } else {
                 return Err(anyhow!("Invalid key"));

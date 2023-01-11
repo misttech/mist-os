@@ -22,7 +22,7 @@ use {
             store_object_handle::DirectWriter,
             transaction::{AssociatedObject, LockKey, Mutation},
             tree, AssocObj, CachingObjectHandle, EncryptedMutations, HandleOptions, LockState,
-            ObjectStore, Options, StoreInfo, MAX_ENCRYPTED_MUTATIONS_SIZE,
+            ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
         serialized_types::{Version, VersionedLatest},
         trace_duration,
@@ -85,16 +85,29 @@ impl ObjectStore {
             info!(store_id = self.store_object_id(), "OS: begin flush");
         }
 
-        let parent_store = self.parent_store.as_ref().unwrap();
-
-        let reservation = object_manager.metadata_reservation();
-        let txn_options = Options {
-            skip_journal_checks: true,
-            borrow_metadata_space: true,
-            allocator_reservation: Some(reservation),
-            ..Default::default()
+        let layer_file_sizes = if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
+            self.flush_locked().await?;
+            None
+        } else {
+            Some(self.flush_unlocked().await?)
         };
 
+        if trace {
+            info!(store_id = self.store_object_id(), "OS: end flush");
+        }
+
+        let mut counters = self.counters.lock().unwrap();
+        counters.num_flushes += 1;
+        counters.last_flush_time = Some(std::time::SystemTime::now());
+        if let Some(layer_file_sizes) = layer_file_sizes {
+            counters.persistent_layer_file_sizes = layer_file_sizes;
+        }
+        // Return the earliest version used by a struct in the tree
+        Ok(self.tree.get_earliest_version())
+    }
+
+    // Flushes an unlocked store. Returns the layer file sizes.
+    async fn flush_unlocked(&self) -> Result<Vec<u64>, Error> {
         let roll_mutations_key = self
             .mutations_cipher
             .lock()
@@ -137,6 +150,16 @@ impl ObjectStore {
 
         let store_info_snapshot = StoreInfoSnapshot { store: self, store_info: OnceCell::new() };
 
+        let filesystem = self.filesystem();
+        let object_manager = filesystem.object_manager();
+        let reservation = object_manager.metadata_reservation();
+        let txn_options = Options {
+            skip_journal_checks: true,
+            borrow_metadata_space: true,
+            allocator_reservation: Some(reservation),
+            ..Default::default()
+        };
+
         // The BeginFlush mutation must be within a transaction that has no impact on StoreInfo
         // since we want to get an accurate snapshot of StoreInfo.
         let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
@@ -147,6 +170,8 @@ impl ObjectStore {
         );
         transaction.commit().await?;
 
+        let mut new_store_info = store_info_snapshot.store_info.into_inner().unwrap();
+
         // There is a transaction to create objects at the start and then another transaction at the
         // end. Between those two transactions, there are transactions that write to the files.  In
         // the first transaction, objects are created in the graveyard. Upon success, the objects
@@ -154,143 +179,58 @@ impl ObjectStore {
         let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
 
         let reservation_update: ReservationUpdate; // Must live longer than end_transaction.
-        let handle; // Must live longer than end_transaction.
         let mut end_transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
 
-        let mut new_store_info = store_info_snapshot.store_info.into_inner().unwrap();
-        let mut total_layer_size = 0;
+        // Create and write a new layer, compacting existing layers.
+        let parent_store = self.parent_store.as_ref().unwrap();
+        let new_object_tree_layer = ObjectStore::create_object(
+            parent_store,
+            &mut transaction,
+            HandleOptions { skip_journal_checks: true, ..Default::default() },
+            self.crypt().as_deref(),
+        )
+        .await?;
+        let writer = DirectWriter::new(&new_object_tree_layer, txn_options);
+        let new_object_tree_layer_object_id = new_object_tree_layer.object_id();
+        parent_store.add_to_graveyard(&mut transaction, new_object_tree_layer_object_id);
+        parent_store.remove_from_graveyard(&mut end_transaction, new_object_tree_layer_object_id);
 
-        let mut old_encrypted_mutations_object_id = INVALID_OBJECT_ID;
+        transaction.commit().await?;
+        let (layers_to_keep, old_layers) = tree::flush(&self.tree, writer).await?;
 
-        let store_is_locked = matches!(&*self.lock_state.lock().unwrap(), LockState::Locked);
-        let (old_layers, new_layers) = if store_is_locked {
-            // The store is locked so we need to either write our encrypted mutations to a new file,
-            // or append them to an existing one.
-            handle = if new_store_info.encrypted_mutations_object_id == INVALID_OBJECT_ID {
-                let handle = ObjectStore::create_object(
-                    parent_store,
-                    &mut transaction,
-                    HandleOptions { skip_journal_checks: true, ..Default::default() },
-                    None,
-                )
+        let mut new_layers =
+            layers_from_handles(Box::new([CachingObjectHandle::new(new_object_tree_layer)]))
                 .await?;
-                let oid = handle.object_id();
-                new_store_info.encrypted_mutations_object_id = oid;
-                parent_store.add_to_graveyard(&mut transaction, oid);
-                parent_store.remove_from_graveyard(&mut end_transaction, oid);
-                handle
-            } else {
-                ObjectStore::open_object(
-                    parent_store,
-                    new_store_info.encrypted_mutations_object_id,
-                    HandleOptions { skip_journal_checks: true, ..Default::default() },
-                    None,
-                )
-                .await?
-            };
-            transaction.commit().await?;
+        new_layers.extend(layers_to_keep.iter().map(|l| (*l).clone()));
 
-            // Append the encrypted mutations, which need to be read from the journal.
-            // This assumes that the journal has no buffered mutations for this store (see
-            // Self::lock).
-            let journaled = filesystem
-                .journal()
-                .read_transactions_for_object(self.store_object_id)
-                .await
-                .context("Failed to read encrypted mutations from journal")?;
-            let mut buffer = handle.allocate_buffer(MAX_ENCRYPTED_MUTATIONS_SIZE);
-            let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
-            EncryptedMutations::from_replayed_mutations(self.store_object_id, journaled)
-                .serialize_with_version(&mut cursor)?;
-            let len = cursor.position() as usize;
-            handle
-                .txn_write(&mut end_transaction, handle.get_size(), buffer.subslice(..len))
-                .await?;
-
-            total_layer_size += layer_size_from_encrypted_mutations_size(handle.get_size())
-                + self
-                    .tree
-                    .immutable_layer_set()
-                    .layers
-                    .iter()
-                    .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
-                    .sum::<u64>();
-
-            // There are no changes to the layers in this case.
-            (Vec::new(), None)
-        } else {
-            // Create and write a new layer, compacting existing layers.
-            let new_object_tree_layer = ObjectStore::create_object(
-                parent_store,
-                &mut transaction,
-                HandleOptions { skip_journal_checks: true, ..Default::default() },
-                self.crypt().as_deref(),
-            )
-            .await?;
-            let writer = DirectWriter::new(&new_object_tree_layer, txn_options);
-            let new_object_tree_layer_object_id = new_object_tree_layer.object_id();
-            parent_store.add_to_graveyard(&mut transaction, new_object_tree_layer_object_id);
-            parent_store
-                .remove_from_graveyard(&mut end_transaction, new_object_tree_layer_object_id);
-
-            transaction.commit().await?;
-            let (layers_to_keep, old_layers) = tree::flush(&self.tree, writer).await?;
-
-            let mut new_layers =
-                layers_from_handles(Box::new([CachingObjectHandle::new(new_object_tree_layer)]))
-                    .await?;
-            new_layers.extend(layers_to_keep.iter().map(|l| (*l).clone()));
-
-            new_store_info.layers = Vec::new();
-            for layer in &new_layers {
-                if let Some(handle) = layer.handle() {
-                    new_store_info.layers.push(handle.object_id());
-                }
+        new_store_info.layers = Vec::new();
+        for layer in &new_layers {
+            if let Some(handle) = layer.handle() {
+                new_store_info.layers.push(handle.object_id());
             }
+        }
 
-            // Move the existing layers we're compacting to the graveyard at the end.
-            for layer in &old_layers {
-                if let Some(handle) = layer.handle() {
-                    parent_store.add_to_graveyard(&mut end_transaction, handle.object_id());
-                }
+        // Move the existing layers we're compacting to the graveyard at the end.
+        for layer in &old_layers {
+            if let Some(handle) = layer.handle() {
+                parent_store.add_to_graveyard(&mut end_transaction, handle.object_id());
             }
+        }
 
-            let object_tree_handles = new_layers.iter().map(|l| l.handle());
-            total_layer_size += object_tree_handles
-                .map(|h| h.map(ObjectHandle::get_size).unwrap_or(0))
-                .sum::<u64>();
+        let old_encrypted_mutations_object_id =
+            std::mem::replace(&mut new_store_info.encrypted_mutations_object_id, INVALID_OBJECT_ID);
+        if old_encrypted_mutations_object_id != INVALID_OBJECT_ID {
+            parent_store.add_to_graveyard(&mut end_transaction, old_encrypted_mutations_object_id);
+        }
 
-            old_encrypted_mutations_object_id = std::mem::replace(
-                &mut new_store_info.encrypted_mutations_object_id,
-                INVALID_OBJECT_ID,
-            );
-            if old_encrypted_mutations_object_id != INVALID_OBJECT_ID {
-                parent_store
-                    .add_to_graveyard(&mut end_transaction, old_encrypted_mutations_object_id);
-            }
+        self.write_store_info(&mut end_transaction, &new_store_info).await?;
 
-            (old_layers, Some(new_layers))
-        };
-        let layer_file_sizes = if let Some(new_layers) = new_layers.as_ref() {
-            new_layers
-                .iter()
-                .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
-                .collect::<Vec<u64>>()
-        } else {
-            vec![]
-        };
+        let layer_file_sizes = new_layers
+            .iter()
+            .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
+            .collect::<Vec<u64>>();
 
-        let mut serialized_info = Vec::new();
-        new_store_info.serialize_with_version(&mut serialized_info)?;
-        let mut buf = self.device.allocate_buffer(serialized_info.len());
-        buf.as_mut_slice().copy_from_slice(&serialized_info[..]);
-
-        self.store_info_handle
-            .get()
-            .unwrap()
-            .txn_write(&mut end_transaction, 0u64, buf.as_ref())
-            .await?;
-
+        let total_layer_size = layer_file_sizes.iter().sum();
         reservation_update =
             ReservationUpdate::new(tree::reservation_amount_from_layer_size(total_layer_size));
 
@@ -300,16 +240,17 @@ impl ObjectStore {
             AssocObj::Borrowed(&reservation_update),
         );
 
-        if trace {
+        if self.trace.load(Ordering::Relaxed) {
             info!(
                 store_id = self.store_object_id(),
                 old_layer_count = old_layers.len(),
-                new_layer_count = new_layers.as_ref().map(|v| v.len()).unwrap_or(0),
+                new_layer_count = new_layers.len(),
                 total_layer_size,
                 ?new_store_info,
                 "OS: compacting"
             );
         }
+
         end_transaction
             .commit_with_callback(|_| {
                 let mut store_info = self.store_info.lock().unwrap();
@@ -317,10 +258,7 @@ impl ObjectStore {
                 info.layers = new_store_info.layers;
                 info.encrypted_mutations_object_id = new_store_info.encrypted_mutations_object_id;
                 info.mutations_cipher_offset = new_store_info.mutations_cipher_offset;
-
-                if let Some(layers) = new_layers {
-                    self.tree.set_layers(layers);
-                }
+                self.tree.set_layers(new_layers);
             })
             .await?;
 
@@ -337,16 +275,114 @@ impl ObjectStore {
             parent_store.tombstone(old_encrypted_mutations_object_id, txn_options).await?;
         }
 
-        if trace {
-            info!(store_id = self.store_object_id(), "OS: end flush");
-        }
+        Ok(layer_file_sizes)
+    }
 
-        let mut counters = self.counters.lock().unwrap();
-        counters.num_flushes += 1;
-        counters.last_flush_time = Some(std::time::SystemTime::now());
-        counters.persistent_layer_file_sizes = layer_file_sizes;
-        // Return the earliest version used by a struct in the tree
-        Ok(self.tree.get_earliest_version())
+    // Flushes a locked store.
+    async fn flush_locked(&self) -> Result<(), Error> {
+        let filesystem = self.filesystem();
+        let object_manager = filesystem.object_manager();
+        let reservation = object_manager.metadata_reservation();
+        let txn_options = Options {
+            skip_journal_checks: true,
+            borrow_metadata_space: true,
+            allocator_reservation: Some(reservation),
+            ..Default::default()
+        };
+
+        let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+        transaction.add(self.store_object_id(), Mutation::BeginFlush);
+        transaction.commit().await?;
+
+        let mut new_store_info = self.load_store_info().await?;
+
+        // There is a transaction to create objects at the start and then another transaction at the
+        // end. Between those two transactions, there are transactions that write to the files.  In
+        // the first transaction, objects are created in the graveyard. Upon success, the objects
+        // are removed from the graveyard.
+        let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+
+        let reservation_update: ReservationUpdate; // Must live longer than end_transaction.
+        let handle; // Must live longer than end_transaction.
+        let mut end_transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+
+        // We need to either write our encrypted mutations to a new file, or append them to an
+        // existing one.
+        let parent_store = self.parent_store.as_ref().unwrap();
+        handle = if new_store_info.encrypted_mutations_object_id == INVALID_OBJECT_ID {
+            let handle = ObjectStore::create_object(
+                parent_store,
+                &mut transaction,
+                HandleOptions { skip_journal_checks: true, ..Default::default() },
+                None,
+            )
+            .await?;
+            let oid = handle.object_id();
+            new_store_info.encrypted_mutations_object_id = oid;
+            parent_store.add_to_graveyard(&mut transaction, oid);
+            parent_store.remove_from_graveyard(&mut end_transaction, oid);
+            handle
+        } else {
+            ObjectStore::open_object(
+                parent_store,
+                new_store_info.encrypted_mutations_object_id,
+                HandleOptions { skip_journal_checks: true, ..Default::default() },
+                None,
+            )
+            .await?
+        };
+        transaction.commit().await?;
+
+        // Append the encrypted mutations, which need to be read from the journal.
+        // This assumes that the journal has no buffered mutations for this store (see
+        // Self::lock).
+        let journaled = filesystem
+            .journal()
+            .read_transactions_for_object(self.store_object_id)
+            .await
+            .context("Failed to read encrypted mutations from journal")?;
+        let mut buffer = handle.allocate_buffer(MAX_ENCRYPTED_MUTATIONS_SIZE);
+        let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
+        EncryptedMutations::from_replayed_mutations(self.store_object_id, journaled)
+            .serialize_with_version(&mut cursor)?;
+        let len = cursor.position() as usize;
+        handle.txn_write(&mut end_transaction, handle.get_size(), buffer.subslice(..len)).await?;
+
+        self.write_store_info(&mut end_transaction, &new_store_info).await?;
+
+        let total_layer_size = layer_size_from_encrypted_mutations_size(handle.get_size())
+            + self
+                .tree
+                .immutable_layer_set()
+                .layers
+                .iter()
+                .map(|l| l.handle().map(ObjectHandle::get_size).unwrap_or(0))
+                .sum::<u64>();
+        reservation_update =
+            ReservationUpdate::new(tree::reservation_amount_from_layer_size(total_layer_size));
+
+        end_transaction.add_with_object(
+            self.store_object_id(),
+            Mutation::EndFlush,
+            AssocObj::Borrowed(&reservation_update),
+        );
+
+        end_transaction.commit().await?;
+
+        Ok(())
+    }
+
+    async fn write_store_info<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        new_store_info: &StoreInfo,
+    ) -> Result<(), Error> {
+        let mut serialized_info = Vec::new();
+        new_store_info.serialize_with_version(&mut serialized_info)?;
+        let mut buf = self.device.allocate_buffer(serialized_info.len());
+        buf.as_mut_slice().copy_from_slice(&serialized_info[..]);
+
+        self.store_info_handle.get().unwrap().txn_write(transaction, 0u64, buf.as_ref()).await
     }
 }
 
@@ -355,11 +391,13 @@ mod tests {
     use {
         crate::{
             crypt::insecure::InsecureCrypt,
-            filesystem::{self, Filesystem, FxFilesystem},
+            filesystem::{self, Filesystem, FxFilesystem, JournalingObject, SyncOptions},
+            object_handle::ObjectHandle,
             object_store::{
                 directory::Directory,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
+                HandleOptions, ObjectStore,
             },
         },
         std::sync::Arc,
@@ -392,7 +430,7 @@ mod tests {
         .await
         .expect("open failed");
 
-        {
+        let (first_filename, last_filename) = {
             let store = fs.object_manager().store(store_id).expect("store not found");
             store.unlock(Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
 
@@ -403,6 +441,7 @@ mod tests {
 
             let mut last_mutations_cipher_offset = 0;
             let mut i = 0;
+            let first_filename = format!("{:<200}", i);
             loop {
                 let mut transaction = fs
                     .clone()
@@ -423,18 +462,24 @@ mod tests {
                 last_mutations_cipher_offset = cipher_offset;
             }
 
+            // Sync now, so that we can be fairly certain that the next transaction *won't* trigger
+            // a store flush (so we'll still have something to flush when we reopen the filesystem).
+            fs.sync(SyncOptions::default()).await.expect("sync failed");
+
             // Write one more file to ensure the cipher has a non-zero offset.
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())
                 .await
                 .expect("new_transaction failed");
+            let last_filename = format!("{:<200}", i);
             root_dir
-                .create_child_file(&mut transaction, &format!("{:<200}", i))
+                .create_child_file(&mut transaction, &last_filename)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
-        }
+            (first_filename, last_filename)
+        };
 
         fs.close().await.expect("close failed");
 
@@ -466,6 +511,20 @@ mod tests {
 
             // The key should get rolled when we unlock.
             assert_eq!(store.mutations_cipher.lock().unwrap().as_ref().unwrap().offset(), 0);
+
+            let root_dir = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            root_dir
+                .lookup(&first_filename)
+                .await
+                .expect("Lookup failed")
+                .expect("First created file wasn't present");
+            root_dir
+                .lookup(&last_filename)
+                .await
+                .expect("Lookup failed")
+                .expect("Last created file wasn't present");
         }
     }
 
@@ -477,6 +536,62 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_metadata_key_roll_with_flush_before_unlock() {
         run_key_roll_test(/* flush_before_unlock: */ true).await;
+    }
+
+    #[fuchsia::test]
+    async fn test_flush_when_locked() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 1024));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+        let store =
+            root_volume.new_volume("test", Some(crypt.clone())).await.expect("new_volume failed");
+        let root_dir =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let foo = root_dir
+            .create_child_file(&mut transaction, "foo")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        // When the volume is first created it will include a new mutations key but we want to test
+        // what happens when the encrypted mutations file doesn't contain a new mutations key, so we
+        // flush here.
+        store.flush().await.expect("flush failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let bar = root_dir
+            .create_child_file(&mut transaction, "bar")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        store.lock().await.expect("lock failed");
+
+        // Flushing the store whilst locked should create an encrypted mutations file.
+        store.flush().await.expect("flush failed");
+
+        // Unlocking the store should replay that encrypted mutations file.
+        store.unlock(crypt).await.expect("unlock failed");
+
+        ObjectStore::open_object(&store, foo.object_id(), HandleOptions::default(), None)
+            .await
+            .expect("open_object failed");
+
+        ObjectStore::open_object(&store, bar.object_id(), HandleOptions::default(), None)
+            .await
+            .expect("open_object failed");
+
+        fs.close().await.expect("close failed");
     }
 }
 

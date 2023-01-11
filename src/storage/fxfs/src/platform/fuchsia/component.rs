@@ -242,24 +242,24 @@ impl Component {
     async fn handle_startup_requests(&self, mut stream: StartupRequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
-                StartupRequest::Start { responder, device, options } => {
-                    responder.send(&mut self.handle_start(device, options).await.map_err(|e| {
-                        error!(?e, "handle_start failed");
-                        map_to_raw_status(e)
-                    }))?
-                }
+                StartupRequest::Start { responder, device, options } => responder.send(
+                    &mut self.handle_start(device, options).await.map_err(|error| {
+                        error!(?error, "handle_start failed");
+                        map_to_raw_status(error)
+                    }),
+                )?,
                 StartupRequest::Format { responder, device, .. } => {
-                    responder.send(&mut self.handle_format(device).await.map_err(|e| {
-                        error!(?e, "handle_format failed");
-                        map_to_raw_status(e)
+                    responder.send(&mut self.handle_format(device).await.map_err(|error| {
+                        error!(?error, "handle_format failed");
+                        map_to_raw_status(error)
                     }))?
                 }
-                StartupRequest::Check { responder, device, options } => {
-                    responder.send(&mut self.handle_check(device, options).await.map_err(|e| {
-                        error!(?e, "handle_check failed");
-                        map_to_raw_status(e)
-                    }))?
-                }
+                StartupRequest::Check { responder, device, options } => responder.send(
+                    &mut self.handle_check(device, options).await.map_err(|error| {
+                        error!(?error, "handle_check failed");
+                        map_to_raw_status(error)
+                    }),
+                )?,
             }
         }
         Ok(())

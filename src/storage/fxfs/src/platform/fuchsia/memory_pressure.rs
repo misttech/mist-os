@@ -117,7 +117,7 @@ impl Inner {
 
     /// A task that continuously listens to requests from `watcher_requests`.
     async fn watch_requests(self: Arc<Self>, mut watcher_requests: WatcherRequestStream) {
-        info!("Successfully listening to system memory pressure");
+        debug!("Successfully listening to system memory pressure");
 
         while !self.process_level_update(watcher_requests.next().await) {}
 
@@ -134,7 +134,7 @@ impl Inner {
         let watcher_request = match watcher_request {
             Some(v) => v,
             None => {
-                info!(
+                debug!(
                     "Memory pressure watcher stream has finished. Terminating memory pressure \
                 monitoring."
                 );

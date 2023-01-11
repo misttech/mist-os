@@ -157,6 +157,17 @@ impl StoreInfo {
         let guid = Uuid::new_v4();
         Self { guid: *guid.as_bytes(), ..Default::default() }
     }
+
+    /// Returns the parent objects for this store.
+    pub fn parent_objects(&self) -> Vec<u64> {
+        // We should not include the ID of the store itself, since that should be referred to in the
+        // volume directory.
+        let mut objects = self.layers.to_vec();
+        if self.encrypted_mutations_object_id != INVALID_OBJECT_ID {
+            objects.push(self.encrypted_mutations_object_id);
+        }
+        objects
+    }
 }
 
 // TODO(fxbug.dev/95972): We should test or put checks in place to ensure this limit isn't exceeded.
@@ -293,6 +304,9 @@ enum StoreOrReplayInfo {
     // This is why the information is stored in a VecDeque.  The frontmost element is always the
     // most recent.
     Replay(VecDeque<ReplayInfo>),
+
+    // Used when a store is locked.
+    Locked,
 }
 
 impl StoreOrReplayInfo {
@@ -329,6 +343,7 @@ impl StoreOrReplayInfo {
             StoreOrReplayInfo::Replay(replay_info) => {
                 replay_info.front_mut().unwrap().object_count_delta += delta;
             }
+            StoreOrReplayInfo::Locked => unreachable!(),
         }
     }
 
@@ -351,11 +366,10 @@ pub enum LockState {
     Locked,
     Unencrypted,
     Unlocked(Arc<dyn Crypt>),
+
     // The store is unlocked, but in a read-only state, and no flushes or other operations will be
-    // performed on the store.  We have to retain journaled modifications to the store info, which
-    // normally get persisted during unlock when we flush the object store, which we skip in
-    // read-only mode.
-    UnlockedReadOnly(Arc<dyn Crypt>, StoreInfo),
+    // performed on the store.
+    UnlockedReadOnly(Arc<dyn Crypt>),
 
     // The store is encrypted but is now in an unusable state (due to a failure to sync the journal
     // after locking the store).  The store cannot be unlocked.
@@ -754,7 +768,7 @@ impl ObjectStore {
             | LockState::Locking
             | LockState::Unlocking => None,
             LockState::Unlocked(crypt) => Some(crypt.clone()),
-            LockState::UnlockedReadOnly(crypt, _) => Some(crypt.clone()),
+            LockState::UnlockedReadOnly(crypt) => Some(crypt.clone()),
             LockState::Unknown => {
                 panic!("Store is of unknown lock state; has the journal been replayed yet?")
             }
@@ -1162,16 +1176,7 @@ impl ObjectStore {
     /// referenced externally.
     pub fn parent_objects(&self) -> Vec<u64> {
         assert!(self.store_info_handle.get().is_some());
-        let mut objects = Vec::new();
-        // We should not include the ID of the store itself, since that should be referred to in the
-        // volume directory.
-        let guard = self.store_info.lock().unwrap();
-        let store_info = guard.info().unwrap();
-        objects.extend_from_slice(&store_info.layers);
-        if store_info.encrypted_mutations_object_id != INVALID_OBJECT_ID {
-            objects.push(store_info.encrypted_mutations_object_id);
-        }
-        objects
+        self.store_info.lock().unwrap().info().unwrap().parent_objects()
     }
 
     /// Returns the object ID of all layer files for this store (which are in the parent store).
@@ -1220,20 +1225,15 @@ impl ObjectStore {
         )
         .await?;
 
-        let (object_tree_layer_object_ids, encrypted) = {
-            let mut info = if handle.get_size() > 0 {
-                let serialized_info = handle.contents(MAX_STORE_INFO_SERIALIZED_SIZE).await?;
-                let mut cursor = std::io::Cursor::new(&serialized_info[..]);
-                let (store_info, _) = StoreInfo::deserialize_with_version(&mut cursor)
-                    .context("Failed to deserialize StoreInfo")?;
-                if store_info.object_id_key.is_none() {
-                    self.update_last_object_id(store_info.last_object_id);
-                }
-                store_info
-            } else {
-                // The store_info will be absent for a newly created and empty object store.
-                StoreInfo::default()
-            };
+        let object_tree_layer_object_ids;
+        let encrypted;
+
+        {
+            let mut info = self.load_store_info().await?;
+
+            if info.object_id_key.is_none() {
+                self.update_last_object_id(info.last_object_id);
+            }
 
             // Merge the replay information.
             let mut store_info = self.store_info.lock().unwrap();
@@ -1250,17 +1250,19 @@ impl ObjectStore {
                 }
             }
 
-            let result = (
-                info.layers.clone(),
-                if info.mutations_key.is_some() {
-                    Some(info.encrypted_mutations_object_id)
-                } else {
-                    None
-                },
-            );
-            *store_info = StoreOrReplayInfo::Info(info);
-            result
-        };
+            object_tree_layer_object_ids = info.layers.clone();
+            encrypted = if info.mutations_key.is_some() {
+                Some(info.encrypted_mutations_object_id)
+            } else {
+                None
+            };
+
+            if encrypted.is_some() {
+                *store_info = StoreOrReplayInfo::Locked;
+            } else {
+                *store_info = StoreOrReplayInfo::Info(info);
+            }
+        }
 
         if encrypted.is_some() {
             *self.lock_state.lock().unwrap() = LockState::Locked;
@@ -1302,6 +1304,10 @@ impl ObjectStore {
         );
 
         Ok(())
+    }
+
+    async fn load_store_info(&self) -> Result<StoreInfo, Error> {
+        load_store_info(self.parent_store.as_ref().unwrap(), self.store_object_id).await
     }
 
     async fn open_layers(
@@ -1359,7 +1365,7 @@ impl ObjectStore {
         let fs = self.filesystem();
         let guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
-        let store_info = self.store_info();
+        let store_info = self.load_store_info().await?;
 
         self.tree
             .append_layers(
@@ -1424,8 +1430,6 @@ impl ObjectStore {
             }
         };
 
-        let _ = std::mem::replace(&mut *self.lock_state.lock().unwrap(), LockState::Unlocking);
-
         // This assumes that the journal has no buffered mutations for this store (see Self::lock).
         let journaled = EncryptedMutations::from_replayed_mutations(
             self.store_object_id,
@@ -1436,11 +1440,13 @@ impl ObjectStore {
         );
         mutations.extend(&journaled);
 
+        let _ = std::mem::replace(&mut *self.lock_state.lock().unwrap(), LockState::Unlocking);
+        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Info(store_info);
+
         // If we fail, clean up.
-        let store_info_cloned = store_info.clone();
         let clean_up = scopeguard::guard((), |_| {
             *self.lock_state.lock().unwrap() = LockState::Locked;
-            *self.store_info.lock().unwrap().info_mut().unwrap() = store_info_cloned;
+            *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
             // Make sure we don't leave unencrypted data lying around in memory.
             self.tree.reset();
         });
@@ -1484,11 +1490,8 @@ impl ObjectStore {
             }
         }
 
-        *self.lock_state.lock().unwrap() = if read_only {
-            LockState::UnlockedReadOnly(crypt, store_info)
-        } else {
-            LockState::Unlocked(crypt)
-        };
+        *self.lock_state.lock().unwrap() =
+            if read_only { LockState::UnlockedReadOnly(crypt) } else { LockState::Unlocked(crypt) };
 
         // To avoid unbounded memory growth, we should flush the encrypted mutations now. Otherwise
         // it's possible for more writes to be queued and for the store to be locked before we can
@@ -1521,10 +1524,16 @@ impl ObjectStore {
         self.store_info.lock().unwrap().info().unwrap().mutations_key.is_some()
     }
 
-    // Locks a store.  This assumes no other concurrent access to the store.  Whilst this can return
-    // an error, the store will be placed into an unusable but safe state (i.e. no lingering
-    // unencrypted data) if an error is encountered.
+    // Locks a store.  This assumes no other concurrent access to the store (other than flushing
+    // which is guarded for here).  Whilst this can return an error, the store will be placed into
+    // an unusable but safe state (i.e. no lingering unencrypted data) if an error is encountered.
     pub async fn lock(&self) -> Result<(), Error> {
+        // We must lock flushing since it is not safe for that to be happening whilst we are locking
+        // the store.
+        let keys = [LockKey::flush(self.store_object_id())];
+        let fs = self.filesystem();
+        let _guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+
         {
             let mut lock_state = self.lock_state.lock().unwrap();
             if let LockState::Unlocked(_) = &*lock_state {
@@ -1541,12 +1550,13 @@ impl ObjectStore {
         let sync_result =
             self.filesystem().sync(SyncOptions { flush_device: true, ..Default::default() }).await;
 
-        *self.lock_state.lock().unwrap() = if let Err(e) = &sync_result {
-            error!(?e, "Failed to sync journal; store will no longer be usable");
+        *self.lock_state.lock().unwrap() = if let Err(error) = &sync_result {
+            error!(?error, "Failed to sync journal; store will no longer be usable");
             LockState::Invalid
         } else {
             LockState::Locked
         };
+        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
         self.tree.reset();
 
         sync_result
@@ -1555,22 +1565,10 @@ impl ObjectStore {
     // Locks a store which was previously unlocked read-only (see `Self::unlock_read_only`).  Data
     // is not flushed, and instead any journaled mutations are buffered back into the ObjectStore
     // and will be replayed next time the store is unlocked.
-    // Whilst this can return an error, the store will be placed into an unusable but safe state
-    // (i.e. no lingering unencrypted data) if an error is encountered.
-    pub fn lock_read_only(&self) -> Result<(), Error> {
-        let mut store_info = self.store_info.lock().unwrap();
-        let mut lock_state = self.lock_state.lock().unwrap();
-        let old_store_info = if let LockState::UnlockedReadOnly(_, store_info) =
-            std::mem::replace(&mut *lock_state, LockState::Unknown)
-        {
-            store_info
-        } else {
-            panic!("Unexpected lock state: {:?}", &*lock_state);
-        };
-        *lock_state = LockState::Locked;
-        *store_info = StoreOrReplayInfo::Info(old_store_info);
+    pub fn lock_read_only(&self) {
+        *self.lock_state.lock().unwrap() = LockState::Locked;
+        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
         self.tree.reset();
-        Ok(())
     }
 
     // Returns INVALID_OBJECT_ID if the object ID cipher needs to be created or rolled.
@@ -1918,6 +1916,26 @@ pub enum TrimResult {
     /// We finished this attribute.  Returns the ID of the next attribute for the same object if
     /// there is one.
     Done(Option<u64>),
+}
+
+/// Loads store info.
+pub async fn load_store_info(
+    parent: &Arc<ObjectStore>,
+    store_object_id: u64,
+) -> Result<StoreInfo, Error> {
+    let handle =
+        ObjectStore::open_object(parent, store_object_id, HandleOptions::default(), None).await?;
+
+    Ok(if handle.get_size() > 0 {
+        let serialized_info = handle.contents(MAX_STORE_INFO_SERIALIZED_SIZE).await?;
+        let mut cursor = std::io::Cursor::new(&serialized_info[..]);
+        let (store_info, _) = StoreInfo::deserialize_with_version(&mut cursor)
+            .context("Failed to deserialize StoreInfo")?;
+        store_info
+    } else {
+        // The store_info will be absent for a newly created and empty object store.
+        StoreInfo::default()
+    })
 }
 
 #[cfg(test)]
@@ -2305,7 +2323,9 @@ mod tests {
                 fs.object_manager()
                     .store(store_object_id)
                     .unwrap()
-                    .store_info()
+                    .load_store_info()
+                    .await
+                    .expect("load_store_info failed")
                     .encrypted_mutations_object_id,
                 INVALID_OBJECT_ID
             );
@@ -2318,7 +2338,9 @@ mod tests {
                 fs.object_manager()
                     .store(store_object_id)
                     .unwrap()
-                    .store_info()
+                    .load_store_info()
+                    .await
+                    .expect("load_store_info failed")
                     .encrypted_mutations_object_id,
                 INVALID_OBJECT_ID
             );
@@ -2455,7 +2477,7 @@ mod tests {
 
         store.unlock_read_only(crypt.clone()).await.expect("unlock failed");
         root_directory.lookup("test").await.expect("lookup failed").expect("not found");
-        store.lock_read_only().expect("lock failed");
+        store.lock_read_only();
         store.unlock_read_only(crypt).await.expect("unlock failed");
         root_directory.lookup("test").await.expect("lookup failed").expect("not found");
     }

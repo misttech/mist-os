@@ -8,8 +8,8 @@ use {
         errors::FxfsError,
         filesystem::Filesystem,
         object_store::{
-            allocator::Allocator, directory::Directory, transaction::Options, NewChildStoreOptions,
-            ObjectDescriptor, ObjectStore,
+            allocator::Allocator, directory::Directory, load_store_info, transaction::Options,
+            NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, Context, Error},
@@ -118,12 +118,11 @@ impl RootVolume {
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             };
         let root_store = self.filesystem.root_store();
-        let store = self.filesystem.object_manager().store(object_id).ok_or(FxfsError::NotFound)?;
 
         // Delete all the layers and encrypted mutations stored in root_store for this volume.
         // This includes the StoreInfo itself.
-        let mut objects_to_delete = store.parent_objects();
-        objects_to_delete.push(store.store_object_id());
+        let mut objects_to_delete = load_store_info(&root_store, object_id).await?.parent_objects();
+        objects_to_delete.push(object_id);
 
         let mut transaction = self
             .filesystem
@@ -134,13 +133,10 @@ impl RootVolume {
             root_store.adjust_refs(&mut transaction, *object_id, -1).await?;
         }
         // Mark all volume data as deleted.
-        self.filesystem
-            .allocator()
-            .mark_for_deletion(&mut transaction, store.store_object_id())
-            .await;
+        self.filesystem.allocator().mark_for_deletion(&mut transaction, object_id).await;
         // Remove the volume entry from the VolumeDirectory.
         self.volume_directory()
-            .delete_child_volume(&mut transaction, volume_name, store.store_object_id())
+            .delete_child_volume(&mut transaction, volume_name, object_id)
             .await?;
         transaction.commit().await.context("commit")?;
         // Tombstone the deleted objects.

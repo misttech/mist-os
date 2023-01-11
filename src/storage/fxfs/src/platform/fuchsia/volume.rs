@@ -420,33 +420,33 @@ impl FxVolumeAndRoot {
             match request {
                 ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
                     .send(&mut self.set_project_limit(project_id, bytes, nodes).await.map_err(
-                        |e| {
-                            error!(?e, store_id, project_id, "Failed to set project limit");
-                            map_to_raw_status(e)
+                        |error| {
+                            error!(?error, store_id, project_id, "Failed to set project limit");
+                            map_to_raw_status(error)
                         },
                     ))?,
                 ProjectIdRequest::Clear { responder, project_id } => responder.send(
-                    &mut self.clear_project_limit(project_id).await.map_err(|e| {
-                        error!(?e, store_id, project_id, "Failed to clear project limit");
-                        map_to_raw_status(e)
+                    &mut self.clear_project_limit(project_id).await.map_err(|error| {
+                        error!(?error, store_id, project_id, "Failed to clear project limit");
+                        map_to_raw_status(error)
                     }),
                 )?,
                 ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
-                    &mut self.set_project_for_node(node_id, project_id).await.map_err(|e| {
-                        error!(?e, store_id, node_id, project_id, "Failed to apply node.");
-                        map_to_raw_status(e)
+                    &mut self.set_project_for_node(node_id, project_id).await.map_err(|error| {
+                        error!(?error, store_id, node_id, project_id, "Failed to apply node.");
+                        map_to_raw_status(error)
                     }),
                 )?,
-                ProjectIdRequest::GetForNode { responder, node_id } => {
-                    responder.send(&mut self.get_project_for_node(node_id).await.map_err(|e| {
-                        error!(?e, store_id, node_id, "Failed to apply node.");
-                        map_to_raw_status(e)
-                    }))?
-                }
+                ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
+                    &mut self.get_project_for_node(node_id).await.map_err(|error| {
+                        error!(?error, store_id, node_id, "Failed to apply node.");
+                        map_to_raw_status(error)
+                    }),
+                )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
-                    &mut self.clear_project_for_node(node_id).await.map_err(|e| {
-                        error!(?e, store_id, node_id, "Failed to apply node.");
-                        map_to_raw_status(e)
+                    &mut self.clear_project_for_node(node_id).await.map_err(|error| {
+                        error!(?error, store_id, node_id, "Failed to apply node.");
+                        map_to_raw_status(error)
                     }),
                 )?,
             }
