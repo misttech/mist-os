@@ -1164,7 +1164,7 @@ class Directory : public Remote<fio::Directory> {
 
         const fio::wire::WatchEvent wire_event = static_cast<fio::wire::WatchEvent>(*it++);
         const uint8_t len = *it++;
-        uint8_t* name = it;
+        uint8_t* name = &*it;
 
         if (std::distance(it, span.end()) < len) {
           break;
