@@ -274,7 +274,7 @@ func testListener(t *testing.T) (net.Listener, string) {
 	name := filepath.Join(t.TempDir(), "test-serial-listener")
 	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: name, Net: "unix"})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("net.ListenUnix(name=%s): %s", name, err)
 	}
 	l.SetUnlinkOnClose(true)
 	return l, name
