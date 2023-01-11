@@ -71,10 +71,7 @@ pub(super) fn make_touchpad_event(
 pub(super) const EPSILON: f32 = 1.0 / 100_000.0;
 
 pub(super) const NO_MOVEMENT_LOCATION: mouse_binding::RelativeLocation =
-    mouse_binding::RelativeLocation {
-        counts: Position { x: 0.0, y: 0.0 },
-        millimeters: Position { x: 0.0, y: 0.0 },
-    };
+    mouse_binding::RelativeLocation { millimeters: Position { x: 0.0, y: 0.0 } };
 
 /// [`expect_mouse_event`] is a helper marco extracts mouse information.
 /// - motion event:

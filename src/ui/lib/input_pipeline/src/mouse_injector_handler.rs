@@ -376,7 +376,6 @@ impl MouseInjectorHandler {
         let new_position = match (mouse_event.location, mouse_descriptor) {
             (
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                    counts: _,
                     millimeters: offset,
                 }),
                 mouse_binding::MouseDeviceDescriptor { counts_per_mm, .. },
@@ -516,7 +515,6 @@ impl MouseInjectorHandler {
         if let Some(injector) = injector {
             let relative_motion = match mouse_event.location {
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                    counts: _,
                     millimeters: offset_mm,
                 }) if mouse_event.phase == mouse_binding::MousePhase::Move => {
                     let offset =
@@ -880,8 +878,6 @@ mod tests {
     ) -> input_device::InputEvent {
         create_mouse_event(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                // TODO(https://fxbug.dev/102570): Remove counts.
-                counts: Position::zero(),
                 millimeters: Position {
                     x: position.x / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
                     y: position.y / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
@@ -1061,15 +1057,12 @@ mod tests {
     // Tests that a mouse move event both sends an update to scenic and sends the current cursor
     // location via the cursor location sender.
     #[test_case(
-        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {counts:Position { x: 0.0, y: 0.0 }, millimeters: Position { x: 10.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: 15.0/mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
+        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: 10.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: 15.0/mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
         Position { x: DISPLAY_WIDTH / 2.0 + 10.0, y: DISPLAY_HEIGHT / 2.0 + 15.0 },
         [10.0, 15.0]; "Valid move event."
     )]
     #[test_case(
-        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {counts:Position {
-          x: 0.0,
-          y: 0.0,
-        }, millimeters: Position { x: (DISPLAY_WIDTH  + 2.0)/ mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: (DISPLAY_HEIGHT + 2.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
+        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: (DISPLAY_WIDTH  + 2.0)/ mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: (DISPLAY_HEIGHT + 2.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
         Position {
           x: DISPLAY_WIDTH,
           y: DISPLAY_HEIGHT,
@@ -1077,7 +1070,7 @@ mod tests {
         [DISPLAY_WIDTH + 2.0, DISPLAY_HEIGHT + 2.0]; "Move event exceeds max bounds."
     )]
     #[test_case(
-      mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {counts:Position { x: 0.0, y: 0.0 }, millimeters: Position { x: -(DISPLAY_WIDTH + 20.0) / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: -(DISPLAY_HEIGHT + 15.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32}}),
+      mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: -(DISPLAY_WIDTH + 20.0) / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: -(DISPLAY_HEIGHT + 15.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32}}),
       Position { x: 0.0, y: 0.0 },
       [-(DISPLAY_WIDTH + 20.0), -(DISPLAY_HEIGHT + 15.0)]; "Move event exceeds min bounds."
     )]
@@ -1845,7 +1838,6 @@ mod tests {
         );
         let event2 = create_mouse_event(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
                 millimeters: Position {
                     x: 10.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
                     y: 15.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
@@ -1862,7 +1854,6 @@ mod tests {
         );
         let event3 = create_mouse_event(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
                 millimeters: Position { x: 0.0, y: 0.0 },
             }),
             None, /* wheel_delta_v */
@@ -2018,7 +2009,6 @@ mod tests {
         let cursor_relative_position = Position { x: 50.0, y: 75.0 };
         let cursor_location =
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
                 millimeters: Position {
                     x: cursor_relative_position.x / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
                     y: cursor_relative_position.y / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
@@ -2052,7 +2042,6 @@ mod tests {
 
     fn zero_relative_location() -> mouse_binding::MouseLocation {
         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-            counts: Position { x: 0.0, y: 0.0 },
             millimeters: Position { x: 0.0, y: 0.0 },
         })
     }
@@ -2338,7 +2327,6 @@ mod tests {
 
         let zero_location =
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
                 millimeters: Position { x: 0.0, y: 0.0 },
             });
         let expected_position = Position { x: 50.0, y: 50.0 };

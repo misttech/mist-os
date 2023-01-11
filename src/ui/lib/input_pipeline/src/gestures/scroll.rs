@@ -748,7 +748,6 @@ fn touchpad_event_to_mouse_scroll_event(
         timestamp: new_event.timestamp,
         mouse_data: mouse_binding::MouseEvent::new(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
                 millimeters: Position { x: 0.0, y: 0.0 },
             }),
             wheel_delta_v,
@@ -1251,7 +1250,6 @@ mod tests {
                     timestamp: zx::Time::from_nanos(2),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                            counts: Position { x: 0.0, y: 0.0 },
                             millimeters: Position { x: 0.0, y: 0.0 },
                         }),
                         /* wheel_delta_v= */ wheel_delta_mm(0.0),
@@ -1267,7 +1265,6 @@ mod tests {
                     timestamp: zx::Time::from_nanos(3),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                            counts: Position { x: 0.0, y: 0.0 },
                             millimeters: Position { x: 0.0, y: 0.0 },
                         }),
                         /* wheel_delta_v= */ wheel_delta_mm(0.0),
@@ -1282,7 +1279,6 @@ mod tests {
                     timestamp: zx::Time::from_nanos(4),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                            counts: Position { x: 0.0, y: 0.0 },
                             millimeters: Position { x: 0.0, y: 0.0 },
                         }),
                         /* wheel_delta_v= */ wheel_delta_mm(-12.0),
@@ -1378,7 +1374,6 @@ mod tests {
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
-                        counts: Position { x: 0.0, y: 0.0 },
                         millimeters: Position { x: 0.0, y: 0.0 },
                     }
                 ),
@@ -1403,7 +1398,6 @@ mod tests {
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
-                        counts: Position { x: 0.0, y: 0.0 },
                         millimeters: Position { x: 0.0, y: 0.0 },
                     }
                 ),
@@ -1428,7 +1422,6 @@ mod tests {
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
-                        counts: Position { x: 0.0, y: 0.0 },
                         millimeters: Position { x: 0.0, y: 0.0 },
                     }
                 ),

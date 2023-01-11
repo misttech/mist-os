@@ -286,15 +286,13 @@ pub fn create_consumer_controls_event(
 /// Creates a [`fidl_input_report::InputReport`] with a mouse report.
 ///
 /// # Parameters
-/// - `location`: The movement or position of the mouse report, in input device coordinates.
-///     [`MouseLocation::Relative`] represents movement, and
-///     [`MouseLocation::Absolute`] represents position.
+/// - `location`: The position of the mouse report, in input device coordinates.
 /// - `wheel_delta_v`: The wheel delta in vertical.
 /// - `wheel_delta_h`: The wheel delta in horizontal.
 /// - `buttons`: The buttons to report as pressed in the mouse report.
 /// - `event_time`: The time of event.
-pub fn create_mouse_input_report(
-    location: mouse_binding::MouseLocation,
+pub fn create_mouse_input_report_absolute(
+    location: Position,
     scroll_v: Option<i64>,
     scroll_h: Option<i64>,
     buttons: Vec<u8>,
@@ -304,28 +302,40 @@ pub fn create_mouse_input_report(
         event_time: Some(event_time),
         keyboard: None,
         mouse: Some(fidl_input_report::MouseInputReport {
-            movement_x: match location {
-                mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                    counts: Position { x, .. },
-                    millimeters: Position { .. },
-                }) => Some(x as i64),
-                _ => None,
-            },
-            movement_y: match location {
-                mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                    counts: Position { y, .. },
-                    millimeters: Position { .. },
-                }) => Some(y as i64),
-                _ => None,
-            },
-            position_x: match location {
-                mouse_binding::MouseLocation::Absolute(Position { x, .. }) => Some(x as i64),
-                _ => None,
-            },
-            position_y: match location {
-                mouse_binding::MouseLocation::Absolute(Position { y, .. }) => Some(y as i64),
-                _ => None,
-            },
+            position_x: Some(location.x as i64),
+            position_y: Some(location.y as i64),
+            scroll_v,
+            scroll_h,
+            pressed_buttons: Some(buttons),
+            ..fidl_input_report::MouseInputReport::EMPTY
+        }),
+        ..fidl_input_report::InputReport::EMPTY
+    }
+}
+
+/// Creates a [`fidl_input_report::InputReport`] with a mouse report.
+///
+/// # Parameters
+/// - `location`: The movement of the mouse report, in input device coordinates.
+/// - `wheel_delta_v`: The wheel delta in vertical.
+/// - `wheel_delta_h`: The wheel delta in horizontal.
+/// - `buttons`: The buttons to report as pressed in the mouse report.
+/// - `event_time`: The time of event.
+pub fn create_mouse_input_report_relative(
+    movement: Position,
+    scroll_v: Option<i64>,
+    scroll_h: Option<i64>,
+    buttons: Vec<u8>,
+    event_time: i64,
+) -> fidl_input_report::InputReport {
+    fidl_input_report::InputReport {
+        event_time: Some(event_time),
+        keyboard: None,
+        mouse: Some(fidl_input_report::MouseInputReport {
+            movement_x: Some(movement.x as i64),
+            movement_y: Some(movement.y as i64),
+            position_x: None,
+            position_y: None,
             scroll_v: scroll_v,
             scroll_h: scroll_h,
             pressed_buttons: Some(buttons),

@@ -606,10 +606,7 @@ fn make_mouse_event(
     gesture_arena::MouseEvent {
         timestamp,
         mouse_data: MouseEvent::new(
-            MouseLocation::Relative(RelativeLocation {
-                counts: Position { x: 0.0, y: 0.0 },
-                millimeters: movement_in_mm,
-            }),
+            MouseLocation::Relative(RelativeLocation { millimeters: movement_in_mm }),
             /* wheel_delta_v= */ None,
             /* wheel_delta_h= */ None,
             phase,
@@ -1020,7 +1017,6 @@ mod test {
               timestamp:zx::Time::from_nanos(41),
               mouse_data: MouseEvent::new(
                   MouseLocation::Relative(RelativeLocation {
-                      counts: Position { x: 0.0, y: 0.0 },
                       millimeters: Position { x: 0.0, y: 0.0 },
                   }),
                   /* wheel_delta_v= */ None,
@@ -1114,7 +1110,6 @@ mod test {
         assert_matches!(got, ProcessNewEventResult::ContinueGesture(Some(gesture_arena::MouseEvent {mouse_data, ..}), got_winner) => {
             pretty_assertions::assert_eq!(mouse_data, MouseEvent::new(
                 MouseLocation::Relative(RelativeLocation {
-                    counts: Position { x: 0.0, y: 0.0 },
                     millimeters: Position { x: 0.0, y: 0.0 },
                 }),
                 /* wheel_delta_v= */ None,
@@ -1252,7 +1247,6 @@ mod test {
         assert_matches!(got, ProcessNewEventResult::ContinueGesture(Some(gesture_arena::MouseEvent {mouse_data, ..}), got_winner) => {
             pretty_assertions::assert_eq!(mouse_data, MouseEvent::new(
                 MouseLocation::Relative(RelativeLocation {
-                    counts: Position { x: 0.0, y: 0.0 },
                     millimeters: Position { x: 0.0, y: 0.0 },
                 }),
                 /* wheel_delta_v= */ None,
@@ -1301,7 +1295,6 @@ mod test {
         assert_matches!(got, ProcessNewEventResult::ContinueGesture(Some(gesture_arena::MouseEvent {mouse_data, ..}), got_winner)=>{
             pretty_assertions::assert_eq!(mouse_data, MouseEvent::new(
                 MouseLocation::Relative(RelativeLocation {
-                    counts: Position { x: 0.0, y: 0.0 },
                     millimeters: Position { x: 19.0, y: 1.0 },
                 }),
                 /* wheel_delta_v= */ None,

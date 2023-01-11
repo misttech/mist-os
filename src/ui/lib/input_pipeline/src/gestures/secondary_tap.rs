@@ -475,7 +475,6 @@ impl gesture_arena::MatchedContender for MatchedContender {
                     timestamp: self.two_finger_contacts_event.timestamp,
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
-                            counts: Position::zero(),
                             millimeters: Position::zero(),
                         }),
                         wheel_delta_v: None,
@@ -490,7 +489,6 @@ impl gesture_arena::MatchedContender for MatchedContender {
                     timestamp: self.no_contacts_event.timestamp,
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
-                            counts: Position::zero(),
                             millimeters: Position::zero(),
                         }),
                         wheel_delta_v: None,
@@ -1350,7 +1348,6 @@ mod tests {
                     timestamp: zx::Time::from_nanos(0),
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
-                            counts: Position { x: 0.0, y: 0.0 },
                             millimeters: Position { x: 0.0, y: 0.0 }
                         }),
                         wheel_delta_v: None,
@@ -1365,7 +1362,6 @@ mod tests {
                     timestamp: zx::Time::from_nanos(123),
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
-                            counts: Position { x: 0.0, y: 0.0 },
                             millimeters: Position { x: 0.0, y: 0.0 }
                         }),
                         wheel_delta_v: None,

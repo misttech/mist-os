@@ -49,15 +49,13 @@ pub enum MousePhase {
 /// A [`RelativeLocation`] contains the relative mouse pointer location at the time of a pointer event.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RelativeLocation {
-    /// A pointer location in device-specific counts.
-    pub counts: Position,
     /// A pointer location in millimeters.
     pub millimeters: Position,
 }
 
 impl Default for RelativeLocation {
     fn default() -> Self {
-        RelativeLocation { counts: Position::zero(), millimeters: Position::zero() }
+        RelativeLocation { millimeters: Position::zero() }
     }
 }
 
@@ -89,7 +87,6 @@ pub struct WheelDelta {
 /// ```
 /// let mouse_device_event = input_device::InputDeviceEvent::Mouse(MouseEvent::new(
 ///     MouseLocation::Relative(RelativePosition {
-///       counts: Position { x: 48.0, y: 24.0 },
 ///       millimeters: Position { x: 4.0, y: 2.0 },
 ///     }),
 ///     Some(1),
@@ -343,7 +340,6 @@ impl MouseBinding {
             let movement_x = mouse_report.movement_x.unwrap_or_default() as f32;
             let movement_y = mouse_report.movement_y.unwrap_or_default() as f32;
             MouseLocation::Relative(RelativeLocation {
-                counts: Position { x: movement_x, y: movement_y },
                 millimeters: Position {
                     x: movement_x / DEFAULT_COUNTS_PER_MM as f32,
                     y: movement_y / DEFAULT_COUNTS_PER_MM as f32,
@@ -605,16 +601,9 @@ mod tests {
     /// Tests that a report containing no buttons but with movement generates a move event.
     #[fasync::run_singlethreaded(test)]
     async fn movement_without_button() {
-        let location = MouseLocation::Relative(RelativeLocation {
-            counts: Position { x: 10.0, y: 16.0 },
-            millimeters: Position {
-                x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
-            },
-        });
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            location,
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position { x: 10.0, y: 16.0 },
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
@@ -624,7 +613,12 @@ mod tests {
 
         let input_reports = vec![first_report];
         let expected_events = vec![testing_utilities::create_mouse_event(
-            location,
+            MouseLocation::Relative(RelativeLocation {
+                millimeters: Position {
+                    x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
+                    y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                },
+            }),
             None, /* wheel_delta_v */
             None, /* wheel_delta_h */
             None, /* is_precision_scroll */
@@ -648,8 +642,8 @@ mod tests {
     async fn down_without_movement() {
         let mouse_button: MouseButton = 3;
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![mouse_button],
@@ -682,17 +676,10 @@ mod tests {
     /// move event.
     #[fasync::run_singlethreaded(test)]
     async fn down_with_movement() {
-        let location = MouseLocation::Relative(RelativeLocation {
-            counts: Position { x: 10.0, y: 16.0 },
-            millimeters: Position {
-                x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
-            },
-        });
         let mouse_button: MouseButton = 3;
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            location,
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position { x: 10.0, y: 16.0 },
             None, /* scroll_v */
             None, /* scroll_h */
             vec![mouse_button],
@@ -714,7 +701,12 @@ mod tests {
                 &descriptor,
             ),
             testing_utilities::create_mouse_event(
-                location,
+                MouseLocation::Relative(RelativeLocation {
+                    millimeters: Position {
+                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                    },
+                }),
                 None, /* wheel_delta_v */
                 None, /* wheel_delta_h */
                 None, /* is_precision_scroll */
@@ -739,15 +731,15 @@ mod tests {
     async fn down_up() {
         let button = 1;
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![button],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
@@ -792,25 +784,18 @@ mod tests {
     /// Tests that a press and release of a mouse button with movement generates down, move, and up events.
     #[fasync::run_singlethreaded(test)]
     async fn down_up_with_movement() {
-        let location = MouseLocation::Relative(RelativeLocation {
-            counts: Position { x: 10.0, y: 16.0 },
-            millimeters: Position {
-                x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
-            },
-        });
         let button = 1;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![button],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            location,
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position { x: 10.0, y: 16.0 },
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
@@ -832,7 +817,12 @@ mod tests {
                 &descriptor,
             ),
             testing_utilities::create_mouse_event(
-                location,
+                MouseLocation::Relative(RelativeLocation {
+                    millimeters: Position {
+                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                    },
+                }),
                 None, /* wheel_delta_v */
                 None, /* wheel_delta_h */
                 None, /* is_precision_scroll */
@@ -868,32 +858,25 @@ mod tests {
     /// the movement as part of the down or up events.
     #[fasync::run_singlethreaded(test)]
     async fn down_move_up() {
-        let location = MouseLocation::Relative(RelativeLocation {
-            counts: Position { x: 10.0, y: 16.0 },
-            millimeters: Position {
-                x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
-            },
-        });
         let button = 1;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![button],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            location,
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position { x: 10.0, y: 16.0 },
             None, /* scroll_v */
             None, /* scroll_h */
             vec![button],
             event_time_i64,
         );
-        let third_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let third_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
@@ -915,7 +898,12 @@ mod tests {
                 &descriptor,
             ),
             testing_utilities::create_mouse_event(
-                location,
+                MouseLocation::Relative(RelativeLocation {
+                    millimeters: Position {
+                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                    },
+                }),
                 None, /* wheel_delta_v */
                 None, /* wheel_delta_h */
                 None, /* is_precision_scroll */
@@ -949,19 +937,18 @@ mod tests {
     /// Tests that a report with absolute movement to {0, 0} generates a move event.
     #[fasync::run_until_stalled(test)]
     async fn absolute_movement_to_origin() {
-        let location = MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
         let descriptor = mouse_device_descriptor(DEVICE_ID);
 
-        let input_reports = vec![testing_utilities::create_mouse_input_report(
-            location,
+        let input_reports = vec![testing_utilities::create_mouse_input_report_absolute(
+            Position::zero(),
             None, /* wheel_delta_v */
             None, /* wheel_delta_h */
             vec![],
             event_time_i64,
         )];
         let expected_events = vec![testing_utilities::create_mouse_event(
-            location,
+            MouseLocation::Absolute(Position { x: 0.0, y: 0.0 }),
             None, /* wheel_delta_v */
             None, /* wheel_delta_h */
             None, /* is_precision_scroll */
@@ -1038,15 +1025,15 @@ mod tests {
         const SECONDARY_BUTTON: u8 = 2;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![PRIMARY_BUTTON],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![PRIMARY_BUTTON, SECONDARY_BUTTON],
@@ -1103,29 +1090,29 @@ mod tests {
         const SECONDARY_BUTTON: u8 = 2;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![PRIMARY_BUTTON],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![PRIMARY_BUTTON, SECONDARY_BUTTON],
             event_time_i64,
         );
-        let third_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let third_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![SECONDARY_BUTTON],
             event_time_i64,
         );
-        let fourth_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let fourth_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
@@ -1193,15 +1180,15 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn scroll() {
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None,
             Some(1),
             vec![],
@@ -1250,29 +1237,29 @@ mod tests {
         const PRIMARY_BUTTON: u8 = 1;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![PRIMARY_BUTTON],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![PRIMARY_BUTTON],
             event_time_i64,
         );
-        let third_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let third_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             None, /* scroll_v */
             None, /* scroll_h */
             vec![],
             event_time_i64,
         );
-        let fourth_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let fourth_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![],
@@ -1343,22 +1330,22 @@ mod tests {
         const PRIMARY_BUTTON: u8 = 1;
 
         let (event_time_i64, event_time_u64) = testing_utilities::event_times();
-        let first_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let first_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![PRIMARY_BUTTON],
             event_time_i64,
         );
-        let second_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let second_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![],
             event_time_i64,
         );
-        let third_report = testing_utilities::create_mouse_input_report(
-            MouseLocation::Relative(Default::default()),
+        let third_report = testing_utilities::create_mouse_input_report_relative(
+            Position::zero(),
             Some(1),
             None,
             vec![],

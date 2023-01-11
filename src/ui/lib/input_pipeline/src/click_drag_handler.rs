@@ -22,9 +22,6 @@ use {
 struct RelativeMouseEvent {
     // Change in position since the previous event in mm
     displacement: Position,
-    // Change in position since the previous event in counts
-    // TODO(https://fxbug.dev/103457) Remove displacement_counts.
-    displacement_counts: Position,
     phase: mouse_binding::MousePhase,
     affected_buttons: HashSet<mouse_binding::MouseButton>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
@@ -44,7 +41,6 @@ impl TryFrom<input_device::UnhandledInputEvent> for RelativeMouseEvent {
                     input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent {
                         location:
                             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                                counts: position_counts,
                                 millimeters: position,
                             }),
                         // Click and drag only interested in motion and button events.
@@ -61,7 +57,6 @@ impl TryFrom<input_device::UnhandledInputEvent> for RelativeMouseEvent {
                 trace_id: _,
             } => Ok(RelativeMouseEvent {
                 displacement: position,
-                displacement_counts: position_counts,
                 phase,
                 affected_buttons,
                 pressed_buttons,
@@ -80,8 +75,6 @@ impl From<RelativeMouseEvent> for input_device::InputEvent {
             device_event: input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                     millimeters: relative_mouse_event.displacement,
-                    // TODO(https://fxbug.dev/103457) Remove counts.
-                    counts: relative_mouse_event.displacement_counts,
                 }),
                 wheel_delta_v: None,
                 wheel_delta_h: None,
@@ -449,7 +442,6 @@ mod tests {
         let event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: SMALL_MOTION, y: SMALL_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -479,7 +471,6 @@ mod tests {
         let move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: SMALL_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -511,7 +502,6 @@ mod tests {
         let move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: SMALL_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -567,7 +557,6 @@ mod tests {
         let move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: position,
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -601,7 +590,6 @@ mod tests {
         let move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: LARGE_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -646,7 +634,6 @@ mod tests {
         let first_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: HALF_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -658,7 +645,6 @@ mod tests {
         let second_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: HALF_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -702,7 +688,6 @@ mod tests {
         let first_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: HALF_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -714,7 +699,6 @@ mod tests {
         let second_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: HALF_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -726,7 +710,6 @@ mod tests {
         let third_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 0.0, y: HALF_MOTION },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -770,7 +753,6 @@ mod tests {
         let first_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: first_motion,
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -782,7 +764,6 @@ mod tests {
         let second_move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: second_motion,
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,
@@ -838,7 +819,6 @@ mod tests {
         let move_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: -2.0, y: 0.0 },
-                counts: Position::zero(),
             }),
             wheel_delta_v: None,
             wheel_delta_h: None,

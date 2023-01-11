@@ -1283,10 +1283,7 @@ mod tests {
             input_device::InputEvent {
                 device_event: input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
-                        mouse_binding::RelativeLocation {
-                            counts: Position::zero(),
-                            millimeters: Position::zero(),
-                        },
+                        mouse_binding::RelativeLocation { millimeters: Position::zero() },
                     ),
                     wheel_delta_h: None,
                     wheel_delta_v: None,
@@ -2454,7 +2451,6 @@ mod tests {
                             mouse_data: mouse_binding::MouseEvent {
                                 location: mouse_binding::MouseLocation::Relative(
                                     mouse_binding::RelativeLocation {
-                                        counts: Position::zero(),
                                         millimeters: Position::zero(),
                                     },
                                 ),
@@ -2471,7 +2467,6 @@ mod tests {
                             mouse_data: mouse_binding::MouseEvent {
                                 location: mouse_binding::MouseLocation::Relative(
                                     mouse_binding::RelativeLocation {
-                                        counts: Position::zero(),
                                         millimeters: Position::zero(),
                                     },
                                 ),
@@ -2816,10 +2811,7 @@ mod tests {
                     timestamp: zx::Time::from_nanos(123),
                     mouse_data: mouse_binding::MouseEvent {
                         location: mouse_binding::MouseLocation::Relative(
-                            mouse_binding::RelativeLocation {
-                                counts: Position::zero(),
-                                millimeters: Position::zero(),
-                            },
+                            mouse_binding::RelativeLocation { millimeters: Position::zero() },
                         ),
                         wheel_delta_v: None,
                         wheel_delta_h: None,
@@ -2965,10 +2957,7 @@ mod tests {
                 timestamp: zx::Time::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
-                        mouse_binding::RelativeLocation {
-                            counts: Position::zero(),
-                            millimeters: Position::zero(),
-                        },
+                        mouse_binding::RelativeLocation { millimeters: Position::zero() },
                     ),
                     wheel_delta_v: None,
                     wheel_delta_h: None,
@@ -3002,7 +2991,6 @@ mod tests {
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
-                        counts: Position::zero(),
                         millimeters: Position::zero(),
                     },
                 ),
@@ -3035,10 +3023,7 @@ mod tests {
                 timestamp: zx::Time::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
-                        mouse_binding::RelativeLocation {
-                            counts: Position::zero(),
-                            millimeters: Position::zero(),
-                        },
+                        mouse_binding::RelativeLocation { millimeters: Position::zero() },
                     ),
                     wheel_delta_v: None,
                     wheel_delta_h: None,
@@ -3064,10 +3049,7 @@ mod tests {
                 timestamp: zx::Time::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
-                        mouse_binding::RelativeLocation {
-                            counts: Position::zero(),
-                            millimeters: Position::zero(),
-                        },
+                        mouse_binding::RelativeLocation { millimeters: Position::zero() },
                     ),
                     wheel_delta_v: None,
                     wheel_delta_h: None,
@@ -3865,7 +3847,6 @@ mod tests {
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
-                        counts: Position::zero(),
                         millimeters: Position::zero(),
                     },
                 ),
