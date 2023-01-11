@@ -435,46 +435,64 @@ async fn duplicate_address_detection(name: &str) {
         // Create the state stream before adding the address to observe all events.
         let state_stream =
             fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(address_state_provider);
-        let () = control
-            .add_address(
-                &mut net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
-                    }),
-                    prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
-                },
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
-                server,
-            )
-            .expect("Control.AddAddress FIDL error");
-        if interface_up {
-            // The first DAD message should be sent immediately.
-            expect_dad_neighbor_solicitation(fake_ep).await;
 
-            // Ensure that fuchsia.net.interfaces/Watcher doesn't erroneously report the
-            // address as added before DAD completes successfully or otherwise.
-            assert_eq!(
-                iface.get_addrs().await.expect("failed to get addresses").into_iter().find(
-                    |fidl_fuchsia_net_interfaces_ext::Address {
-                         addr: fidl_fuchsia_net::Subnet { addr, prefix_len },
-                         valid_until: _,
-                     }| {
-                        *prefix_len == ipv6_consts::LINK_LOCAL_SUBNET_PREFIX
-                            && match addr {
-                                fidl_fuchsia_net::IpAddress::Ipv4(
-                                    fidl_fuchsia_net::Ipv4Address { .. },
-                                ) => false,
-                                fidl_fuchsia_net::IpAddress::Ipv6(
-                                    fidl_fuchsia_net::Ipv6Address { addr },
-                                ) => *addr == ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
-                            }
-                    }
-                ),
-                None,
-                "added IPv6 LL address already present even though it is tentative"
-            );
-        }
-        dad_fn(fake_ep).await;
+        // Note that DAD completes successfully after 1 second has elapsed if it
+        // has not received a response to it's neighbor solicitation. This
+        // introduces some inherent flakiness, as certain aspects of this test
+        // (limited to this scope) MUST execute within this one second window
+        // for the test to pass.
+        let (get_addrs_fut, get_addrs_poll) = {
+            let () = control
+                .add_address(
+                    &mut net::Subnet {
+                        addr: net::IpAddress::Ipv6(net::Ipv6Address {
+                            addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
+                        }),
+                        prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
+                    },
+                    fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+                    server,
+                )
+                .expect("Control.AddAddress FIDL error");
+            // `Box::pin` rather than `pin_mut!` allows `get_addr_fut` to be
+            // moved out of this scope.
+            let mut get_addrs_fut = Box::pin(iface.get_addrs());
+            let get_addrs_poll = futures::poll!(&mut get_addrs_fut);
+            if interface_up {
+                expect_dad_neighbor_solicitation(fake_ep).await;
+            }
+            dad_fn(fake_ep).await;
+            (get_addrs_fut, get_addrs_poll)
+        }; // This marks the end of the time-sensitive operations.
+
+        let addrs = match get_addrs_poll {
+            std::task::Poll::Ready(addrs) => addrs,
+            std::task::Poll::Pending => get_addrs_fut.await,
+        };
+
+        // Ensure that fuchsia.net.interfaces/Watcher doesn't erroneously report
+        // the address as added before DAD completes successfully or otherwise.
+        assert_eq!(
+            addrs.expect("failed to get addresses").into_iter().find(
+                |fidl_fuchsia_net_interfaces_ext::Address {
+                     addr: fidl_fuchsia_net::Subnet { addr, prefix_len },
+                     valid_until: _,
+                 }| {
+                    *prefix_len == ipv6_consts::LINK_LOCAL_SUBNET_PREFIX
+                        && match addr {
+                            fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
+                                ..
+                            }) => false,
+                            fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address {
+                                addr,
+                            }) => *addr == ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
+                        }
+                }
+            ),
+            None,
+            "added IPv6 LL address already present even though it is tentative"
+        );
+
         state_stream
     }
 
