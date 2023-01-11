@@ -14,7 +14,7 @@ use fidl_fuchsia_diagnostics::{
 };
 use regex::Regex;
 use regex_syntax;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -597,6 +597,147 @@ pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
     Ok(segments.join(":"))
 }
 
+/// Match a selector against a target string.
+pub fn match_string(selector: &StringSelector, target: impl AsRef<str>) -> bool {
+    match selector {
+        StringSelector::ExactMatch(s) => s == target.as_ref(),
+        StringSelector::StringPattern(pattern) => match_pattern(&pattern, &target.as_ref()),
+        _ => false,
+    }
+}
+
+fn match_pattern(pattern: &str, target: &str) -> bool {
+    // Tokenize the string. From: "a*bc*d" to "a, bc, d".
+    let mut pattern_tokens = vec![];
+    let mut token = TokenBuilder::new(pattern);
+    let mut chars = pattern.char_indices();
+
+    while let Some((index, curr_char)) = chars.next() {
+        token.maybe_init(index);
+
+        // If we find a backslash then push the next character directly to our new string.
+        match curr_char {
+            '\\' => {
+                match chars.next() {
+                    Some((i, c)) => {
+                        token.into_string();
+                        token.push(c, i);
+                    }
+                    // We found a backslash without a character to its right. Return false as this
+                    // isn't valid.
+                    None => return false,
+                }
+            }
+            '*' => {
+                if !token.is_empty() {
+                    pattern_tokens.push(token.take());
+                }
+                token = TokenBuilder::new(pattern);
+            }
+            c => {
+                token.push(c, index);
+            }
+        }
+    }
+
+    // Push the remaining token if there's any.
+    if !token.is_empty() {
+        pattern_tokens.push(token.take());
+    }
+
+    // Exit early. We only have *'s.
+    if pattern_tokens.is_empty() && !pattern.is_empty() {
+        return true;
+    }
+
+    // If the pattern doesn't begin with a * and the target string doesn't start with the first
+    // pattern token, we can exit.
+    if pattern.chars().nth(0) != Some('*') && !target.starts_with(pattern_tokens[0].as_ref()) {
+        return false;
+    }
+
+    // If the last character of the pattern is not an unescaped * and the target string doesn't end
+    // with the last token in the pattern, then we can exit.
+    if pattern.chars().rev().nth(0) != Some('*')
+        && pattern.chars().rev().nth(1) != Some('\\')
+        && !target.ends_with(pattern_tokens[pattern_tokens.len() - 1].as_ref())
+    {
+        return false;
+    }
+
+    // We must find all pattern tokens in the target string in order. If we don't find one then we
+    // fail.
+    let mut cur_string = target;
+    for pattern in pattern_tokens.iter() {
+        match cur_string.find(pattern.as_ref()) {
+            Some(i) => {
+                cur_string = &cur_string[i + pattern.len()..];
+            }
+            None => {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+// Utility to allow matching the string cloning only when necessary, this is when we run into a
+// escaped character.
+#[derive(Debug)]
+enum TokenBuilder<'a> {
+    Init(&'a str),
+    Slice { string: &'a str, start: usize, end: Option<usize> },
+    String(String),
+}
+
+impl<'a> TokenBuilder<'a> {
+    fn new(string: &'a str) -> Self {
+        Self::Init(string)
+    }
+
+    fn maybe_init(&mut self, start_index: usize) {
+        match self {
+            Self::Init(s) => *self = Self::Slice { string: s, start: start_index, end: None },
+            _ => {}
+        }
+    }
+
+    fn into_string(&mut self) {
+        if let Self::Slice { string, start, end: Some(end) } = self {
+            *self = Self::String(string[*start..=*end].to_string())
+        }
+    }
+
+    fn push(&mut self, c: char, index: usize) {
+        match self {
+            Self::Slice { end, .. } => {
+                *end = Some(index);
+            }
+            Self::String(s) => s.push(c),
+            Self::Init(_) => unreachable!(),
+        }
+    }
+
+    fn take(self) -> Cow<'a, str> {
+        match self {
+            Self::Slice { string, start, end: Some(end) } => Cow::Borrowed(&string[start..=end]),
+            Self::Slice { string, start, end: None } => Cow::Borrowed(&string[start..start]),
+            Self::String(s) => Cow::Owned(s),
+            Self::Init(_) => unreachable!(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Slice { start, end: Some(end), .. } => start > end,
+            Self::Slice { end: None, .. } => true,
+            Self::String(s) => s.is_empty(),
+            Self::Init(_) => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -983,5 +1124,36 @@ a:b:c
                 ..Selector::EMPTY
             }
         );
+    }
+
+    #[fuchsia::test]
+    fn match_string_test() {
+        // Exact match.
+        assert!(match_string(&StringSelector::ExactMatch("foo".into()), "foo"));
+
+        // Valid pattern matches.
+        assert!(match_string(&StringSelector::StringPattern("*foo*".into()), "hellofoobye"));
+        assert!(match_string(&StringSelector::StringPattern("bar*foo".into()), "barxfoo"));
+        assert!(match_string(&StringSelector::StringPattern("bar*foo".into()), "barfoo"));
+        assert!(match_string(&StringSelector::StringPattern("bar*foo".into()), "barxfoo"));
+        assert!(match_string(&StringSelector::StringPattern("foo*".into()), "foobar"));
+        assert!(match_string(&StringSelector::StringPattern("*".into()), "foo"));
+        assert!(match_string(&StringSelector::StringPattern("bar*baz*foo".into()), "barxzybazfoo"));
+        assert!(match_string(&StringSelector::StringPattern("foo*bar*baz".into()), "foobazbarbaz"));
+
+        // Escaped char.
+        assert!(match_string(&StringSelector::StringPattern("foo\\*".into()), "foo*"));
+
+        // Invalid cases.
+        assert!(!match_string(&StringSelector::StringPattern("foo\\".into()), "foo\\"));
+        assert!(!match_string(&StringSelector::StringPattern("bar*foo".into()), "barxfoox"));
+        assert!(!match_string(&StringSelector::StringPattern("m*".into()), "echo.csx"));
+        assert!(!match_string(&StringSelector::StringPattern("mx*".into()), "echo.cmx"));
+        assert!(!match_string(&StringSelector::StringPattern("m*x*".into()), "echo.cmx"));
+        assert!(!match_string(&StringSelector::StringPattern("*foo*".into()), "xbary"));
+        assert!(!match_string(
+            &StringSelector::StringPattern("foo*bar*baz*qux".into()),
+            "foobarbaazqux"
+        ));
     }
 }

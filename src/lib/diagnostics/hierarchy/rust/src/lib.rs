@@ -21,7 +21,6 @@ use {
         convert::{TryFrom, TryInto},
         fmt::{Display, Formatter, Result as FmtResult},
         ops::{Add, AddAssign, MulAssign},
-        sync::Arc,
     },
     thiserror::Error,
 };
@@ -486,6 +485,9 @@ pub enum Error {
 
     #[error(transparent)]
     Selectors(#[from] selectors::Error),
+
+    #[error(transparent)]
+    InvalidSelector(#[from] selectors::ValidationError),
 }
 
 impl Error {
@@ -701,59 +703,82 @@ impl<T: Borrow<Selector>> TryFrom<&[T]> for InspectHierarchyMatcher {
     }
 }
 
-/// PropertyEntry is a container of Properties, and their locations in the hierarchy.
-///
-/// eg: `{property_node_path: "root/a/b/c", property: Property::Int("foo", -4)}`
-///     is a `PropertyEntry` specifying an integer property named Foo
-///     found at node c.
-#[derive(Debug, PartialEq)]
-pub struct PropertyEntry<Key = String> {
-    /// A forward-slash (`/`) delimited string of node names from the root node of a hierarchy
-    /// to the node holding the Property.
-    /// eg: `root/a/b/c` is a property_node_path specifying that `property`
-    ///     can found at node c, under node b, which is under node a, which is under root.
-    pub property_node_path: String,
-
-    /// A clone of the property found in the diagnostics hierarchy at the node specified by
-    /// `property_node_path`.
-    pub property: Property<Key>,
-}
-
 /// Applies a single selector to a `DiagnosticsHierarchy`, returning a vector of tuples for every
 /// property in the hierarchy matched by the selector.
-// TODO(fxbug.dev/47015): Benchmark performance issues with full-filters for selection.
-pub fn select_from_hierarchy<Key>(
-    root_node: DiagnosticsHierarchy<Key>,
-    selector: Selector,
-) -> Result<Vec<PropertyEntry<Key>>, Error>
+pub fn select_from_hierarchy<'a, 'b, Key>(
+    root_node: &'a DiagnosticsHierarchy<Key>,
+    selector: &'b Selector,
+) -> Result<Vec<&'a Property<Key>>, Error>
 where
-    Key: AsRef<str> + Clone,
+    Key: AsRef<str>,
+    'a: 'b,
 {
-    let single_selector_hierarchy_matcher = vec![Arc::new(selector)].try_into()?;
+    selector.validate()?;
 
-    // TODO(fxbug.dev/47015): Extraction doesn't require a full tree filter. Instead, the hierarchy
-    // should be traversed like a state machine, and all matching nodes should search for
-    // their properties.
-    let filtered_hierarchy = filter_hierarchy(root_node, &single_selector_hierarchy_matcher)?;
-
-    match filtered_hierarchy {
-        Some(new_root) => Ok(new_root
-            .property_iter()
-            .filter_map(|(node_path, property_opt)| {
-                let formatted_node_path = node_path
-                    .iter()
-                    .map(|s| selectors::sanitize_string_for_selectors(s))
-                    .collect::<Vec<String>>()
-                    .join("/");
-
-                property_opt.map(|property| PropertyEntry {
-                    property_node_path: formatted_node_path,
-                    property: property.clone(),
-                })
-            })
-            .collect::<Vec<PropertyEntry<Key>>>()),
-        None => Ok(Vec::new()),
+    struct StackEntry<'a, Key> {
+        node: &'a DiagnosticsHierarchy<Key>,
+        node_path_index: usize,
+        explored_path: Vec<&'a str>,
     }
+
+    // Safe to unwrap since we validated above.
+    let (node_path, property_selector, stack_entry) = match selector.tree_selector.as_ref().unwrap()
+    {
+        TreeSelector::SubtreeSelector(ref subtree_selector) => (
+            &subtree_selector.node_path,
+            None,
+            StackEntry { node: root_node, node_path_index: 0, explored_path: vec![] },
+        ),
+        TreeSelector::PropertySelector(ref property_selector) => (
+            &property_selector.node_path,
+            Some(&property_selector.target_properties),
+            StackEntry { node: root_node, node_path_index: 0, explored_path: vec![] },
+        ),
+        _ => return Err(Error::InvalidTreeSelector),
+    };
+
+    let mut stack = vec![stack_entry];
+    let mut result = vec![];
+
+    while !stack.is_empty() {
+        // Unwrap is safe since we validate is_empty right above.
+        let StackEntry { node, node_path_index, mut explored_path } = stack.pop().unwrap();
+        if !selectors::match_string(&node_path[node_path_index], &node.name) {
+            continue;
+        }
+        explored_path.push(&node.name);
+
+        // If we are at the last node in the path, then we just need to explore the properties.
+        // Otherwise, we explore the children of the current node and the properties.
+        if node_path_index != node_path.len() - 1 {
+            // If this node matches the next selector we are looking at, then explore its children.
+            for child in node.children.iter() {
+                stack.push(StackEntry {
+                    node: &child,
+                    node_path_index: node_path_index + 1,
+                    explored_path: explored_path.clone(),
+                });
+            }
+        } else if let Some(s) = property_selector {
+            // If we have a property selector, then add any properties matching it to our result.
+            for property in &node.properties {
+                if selectors::match_string(s, property.key()) {
+                    result.push(property);
+                }
+            }
+        } else {
+            // If we don't have a property selector and we reached the end of the node path, then
+            // we should add everything under the current node to the result.
+            for (path, property) in node.property_iter() {
+                if let Some(property) = property {
+                    let mut property_path = explored_path.clone();
+                    property_path.extend_from_slice(&path[1..]);
+                    result.push(property);
+                }
+            }
+        }
+    }
+    Ok(result)
 }
 
 /// Filters a diagnostics hierarchy using a set of path selectors and their associated property
@@ -887,7 +912,10 @@ pub struct LinearHistogramParams<T: Clone> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, selectors::VerboseError};
+    use super::*;
+    use assert_matches::assert_matches;
+    use selectors::VerboseError;
+    use std::sync::Arc;
 
     fn validate_hierarchy_iteration(
         mut results_vec: Vec<(Vec<String>, Option<Property>)>,
@@ -1373,17 +1401,6 @@ mod tests {
         filtered_hierarchy
     }
 
-    fn parse_selector_and_select_from_hierarchy(
-        hierarchy: DiagnosticsHierarchy,
-        test_selector: &str,
-    ) -> Vec<PropertyEntry> {
-        let parsed_selector = selectors::parse_selector::<VerboseError>(test_selector)
-            .expect("All test selectors are valid and parsable.");
-
-        select_from_hierarchy(hierarchy, parsed_selector)
-            .expect("Selecting from hierarchy should succeed.")
-    }
-
     fn get_test_hierarchy() -> DiagnosticsHierarchy {
         DiagnosticsHierarchy::new(
             "root",
@@ -1520,68 +1537,27 @@ mod tests {
 
     #[fuchsia::test]
     fn test_select_from_hierarchy() {
+        let int_11 = Property::Int("11".to_string(), -4);
+        let double_0 = Property::Double("0".to_string(), 8.1);
+        let bytes_123 = Property::Bytes("123".to_string(), "foo".bytes().into_iter().collect());
+        let int_13 = Property::Int("13".to_string(), -4);
         let test_cases = vec![
-            (
-                "*:root/foo:11",
-                vec![PropertyEntry {
-                    property_node_path: "root/foo".to_string(),
-                    property: Property::Int("11".to_string(), -4),
-                }],
-            ),
-            (
-                "*:root/foo:*",
-                vec![
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Double("0".to_string(), 8.1),
-                    },
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Int("11".to_string(), -4),
-                    },
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Bytes(
-                            "123".to_string(),
-                            "foo".bytes().into_iter().collect(),
-                        ),
-                    },
-                ],
-            ),
+            ("*:root/foo:11", vec![&int_11]),
+            ("*:root/foo:*", vec![&double_0, &int_11, &bytes_123]),
             ("*:root/foo:nonexistant", vec![]),
-            (
-                "*:root/foo",
-                vec![
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Double("0".to_string(), 8.1),
-                    },
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Int("11".to_string(), -4),
-                    },
-                    PropertyEntry {
-                        property_node_path: "root/foo".to_string(),
-                        property: Property::Bytes(
-                            "123".to_string(),
-                            "foo".bytes().into_iter().collect(),
-                        ),
-                    },
-                    PropertyEntry {
-                        property_node_path: "root/foo/zed".to_string(),
-                        property: Property::Int("13".to_string(), -4),
-                    },
-                ],
-            ),
+            ("*:root/foo", vec![&double_0, &int_11, &bytes_123, &int_13]),
         ];
 
         for (test_selector, expected_vector) in test_cases {
-            let mut property_entry_vec =
-                parse_selector_and_select_from_hierarchy(get_test_hierarchy(), test_selector);
+            let hierarchy = get_test_hierarchy();
+            let parsed_selector = selectors::parse_selector::<VerboseError>(test_selector)
+                .expect("All test selectors are valid and parsable.");
+            let mut property_entry_vec = select_from_hierarchy(&hierarchy, &parsed_selector)
+                .expect("Selecting from hierarchy should succeed.");
 
             property_entry_vec.sort_by(|p1, p2| {
-                let p1_string = format!("{}/{}", p1.property_node_path, p1.property.name());
-                let p2_string = format!("{}/{}", p2.property_node_path, p2.property.name());
+                let p1_string = p1.name().to_string();
+                let p2_string = p2.name().to_string();
                 p1_string.cmp(&p2_string)
             });
             assert_eq!(property_entry_vec, expected_vector);

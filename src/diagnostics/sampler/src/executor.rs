@@ -651,11 +651,9 @@ impl ProjectSampler {
             if let Some(ParsedSelector { selector, selector_string, .. }) =
                 &metric.selectors[*selector_index]
             {
-                let found_values = diagnostics_hierarchy::select_from_hierarchy(
-                    payload.clone(),
-                    selector.clone(),
-                )?;
-                match found_values.len() {
+                let found_properties =
+                    diagnostics_hierarchy::select_from_hierarchy(&payload, &selector)?;
+                match found_properties.len() {
                     // Maybe the data hasn't been published yet. Maybe another selector in this
                     // metric is the correct one to find the data. Either way, not-found is fine.
                     0 => {}
@@ -676,7 +674,7 @@ impl ProjectSampler {
                                 metric_id,
                                 codes,
                                 metric_cache_key,
-                                &found_values[0].property,
+                                &found_properties[0],
                             )
                             .await?
                         {
