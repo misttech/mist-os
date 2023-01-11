@@ -46,6 +46,7 @@ fuchsia_test_component("binder_test") {
   manifest = "meta/binder_test.cml"
   deps = [
     ":binder_test_script",
+    "//src/connectivity/network/netstack:component",
     "//src/proc/tests:starnix_test",
   ]
 }
