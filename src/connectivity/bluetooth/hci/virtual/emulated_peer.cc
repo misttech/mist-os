@@ -23,16 +23,16 @@ bt::DeviceAddress LeAddressFromFidl(const fbt::Address& address) {
   return bt::DeviceAddress(LeAddressTypeFromFidl(address.type), address.bytes);
 }
 
-bt::hci_spec::ConnectionRole ConnectionRoleFromFidl(fbt::ConnectionRole role) {
+pw::bluetooth::emboss::ConnectionRole ConnectionRoleFromFidl(fbt::ConnectionRole role) {
   switch (role) {
     case fbt::ConnectionRole::LEADER:
-      return bt::hci_spec::ConnectionRole::CENTRAL;
+      return pw::bluetooth::emboss::ConnectionRole::CENTRAL;
     case fbt::ConnectionRole::FOLLOWER:
       [[fallthrough]];
     default:
       break;
   }
-  return bt::hci_spec::ConnectionRole::PERIPHERAL;
+  return pw::bluetooth::emboss::ConnectionRole::PERIPHERAL;
 }
 
 }  // namespace
@@ -142,7 +142,7 @@ void EmulatedPeer::AssignConnectionStatus(ftest::HciError status,
 
   auto peer = fake_controller_->FindPeer(address_);
   if (peer) {
-    peer->set_connect_response(static_cast<bt::hci_spec::StatusCode>(status));
+    peer->set_connect_response(static_cast<pw::bluetooth::emboss::StatusCode>(status));
   }
 
   callback();

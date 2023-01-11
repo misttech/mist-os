@@ -15,7 +15,7 @@ constexpr ::bt::hci_spec::OpCode kLoadPatch = ::bt::hci_spec::VendorOpCode(0x008
 constexpr ::bt::hci_spec::OpCode kReadVersion = ::bt::hci_spec::VendorOpCode(0x0005);
 
 struct IntelVersionReturnParams {
-  ::bt::hci_spec::StatusCode status;
+  ::pw::bluetooth::emboss::StatusCode status;
   uint8_t hw_platform;
   uint8_t hw_variant;
   uint8_t hw_revision;
@@ -31,22 +31,22 @@ constexpr bt::hci_spec::OpCode kSecureSend = ::bt::hci_spec::VendorOpCode(0x0009
 constexpr ::bt::hci_spec::OpCode kReadBootParams = ::bt::hci_spec::VendorOpCode(0x000D);
 
 struct IntelReadBootParamsReturnParams {
-  ::bt::hci_spec::StatusCode status;
+  ::pw::bluetooth::emboss::StatusCode status;
   uint8_t otp_format;
   uint8_t otp_content;
   uint8_t otp_patch;
   uint16_t dev_revid;
-  ::bt::hci_spec::GenericEnableParam secure_boot;
+  ::pw::bluetooth::emboss::GenericEnableParam secure_boot;
   uint8_t key_from_hdr;
   uint8_t key_type;
-  ::bt::hci_spec::GenericEnableParam otp_lock;
-  ::bt::hci_spec::GenericEnableParam api_lock;
-  ::bt::hci_spec::GenericEnableParam debug_lock;
+  ::pw::bluetooth::emboss::GenericEnableParam otp_lock;
+  ::pw::bluetooth::emboss::GenericEnableParam api_lock;
+  ::pw::bluetooth::emboss::GenericEnableParam debug_lock;
   ::bt::DeviceAddressBytes otp_bdaddr;
   uint8_t min_fw_build_num;
   uint8_t min_fw_build_week;
   uint8_t min_fw_build_year;
-  ::bt::hci_spec::GenericEnableParam limited_cce;
+  ::pw::bluetooth::emboss::GenericEnableParam limited_cce;
   uint8_t unlocked_state;
 } __PACKED;
 
@@ -65,7 +65,7 @@ enum class MfgDisableMode : uint8_t {
 };
 
 struct IntelMfgModeChangeCommandParams {
-  ::bt::hci_spec::GenericEnableParam enable;
+  ::pw::bluetooth::emboss::GenericEnableParam enable;
   MfgDisableMode disable_mode;
 } __PACKED;
 

@@ -39,7 +39,7 @@ ReadVersionReturnParams VendorHci::SendReadVersion() const {
       return *params;
   }
   errorf("VendorHci: ReadVersion: Error reading response!");
-  return ReadVersionReturnParams{.status = bt::hci_spec::StatusCode::UNSPECIFIED_ERROR};
+  return ReadVersionReturnParams{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
 }
 
 ReadBootParamsReturnParams VendorHci::SendReadBootParams() const {
@@ -52,10 +52,10 @@ ReadBootParamsReturnParams VendorHci::SendReadBootParams() const {
       return *params;
   }
   errorf("VendorHci: ReadBootParams: Error reading response!");
-  return ReadBootParamsReturnParams{.status = bt::hci_spec::StatusCode::UNSPECIFIED_ERROR};
+  return ReadBootParamsReturnParams{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
 }
 
-bt::hci_spec::StatusCode VendorHci::SendHciReset() const {
+pw::bluetooth::emboss::StatusCode VendorHci::SendHciReset() const {
   auto packet = CommandPacket::New(bt::hci_spec::kReset);
   SendCommand(packet->view());
 
@@ -65,13 +65,13 @@ bt::hci_spec::StatusCode VendorHci::SendHciReset() const {
   auto evt_packet = WaitForEventPacket(kInitTimeoutMs, bt::hci_spec::kCommandCompleteEventCode);
   if (!evt_packet) {
     errorf("VendorHci: failed while waiting for HCI_Reset response");
-    return bt::hci_spec::StatusCode::UNSPECIFIED_ERROR;
+    return pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR;
   }
 
   const auto* params = evt_packet->return_params<bt::hci_spec::SimpleReturnParams>();
   if (!params) {
     errorf("VendorHci: HCI_Reset: received malformed response");
-    return bt::hci_spec::StatusCode::UNSPECIFIED_ERROR;
+    return pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR;
   }
 
   return params->status;
@@ -157,7 +157,7 @@ void VendorHci::EnterManufacturerMode() {
 
   auto packet = CommandPacket::New(kMfgModeChange, sizeof(MfgModeChangeCommandParams));
   auto params = packet->mutable_payload<MfgModeChangeCommandParams>();
-  params->enable = bt::hci_spec::GenericEnableParam::ENABLE;
+  params->enable = pw::bluetooth::emboss::GenericEnableParam::ENABLE;
   params->disable_mode = MfgDisableMode::kNoPatches;
 
   SendCommand(packet->view());
@@ -178,7 +178,7 @@ bool VendorHci::ExitManufacturerMode(MfgDisableMode mode) {
 
   auto packet = CommandPacket::New(kMfgModeChange, sizeof(MfgModeChangeCommandParams));
   auto params = packet->mutable_payload<MfgModeChangeCommandParams>();
-  params->enable = bt::hci_spec::GenericEnableParam::DISABLE;
+  params->enable = pw::bluetooth::emboss::GenericEnableParam::DISABLE;
   params->disable_mode = mode;
 
   SendCommand(packet->view());

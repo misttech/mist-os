@@ -23,8 +23,8 @@
 
 using bt::hci::CommandPacket;
 using bt::hci::EventPacket;
-using bt::hci_spec::GenericEnableParam;
-using bt::hci_spec::StatusCode;
+using pw::bluetooth::emboss::GenericEnableParam;
+using pw::bluetooth::emboss::StatusCode;
 
 using std::placeholders::_1;
 using std::placeholders::_2;

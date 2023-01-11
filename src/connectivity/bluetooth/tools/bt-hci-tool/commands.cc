@@ -43,7 +43,8 @@ template <typename T>
       });
 }
 
-void LogCommandResult(bt::hci_spec::StatusCode status, ::bt::hci::CommandChannel::TransactionId id,
+void LogCommandResult(pw::bluetooth::emboss::StatusCode status,
+                      ::bt::hci::CommandChannel::TransactionId id,
                       const std::string& event_name = "Command Complete") {
   std::cout << fxl::StringPrintf("  %s - status: 0x%02hhx (id=%lu)\n", event_name.c_str(), status,
                                  id);
@@ -202,7 +203,7 @@ bool HandleVersionInfo(const CommandData* cmd_data, const fxl::CommandLine& cmd_
                                                 const ::bt::hci::EventPacket& event) {
     auto params = event.return_params<::bt::hci_spec::ReadLocalVersionInfoReturnParams>();
     LogCommandResult(params->status, id);
-    if (params->status != bt::hci_spec::StatusCode::SUCCESS) {
+    if (params->status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
@@ -249,7 +250,7 @@ bool HandleReadBDADDR(const CommandData* cmd_data, const fxl::CommandLine& cmd_l
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::ReadBDADDRReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
@@ -277,7 +278,7 @@ bool HandleReadLocalName(const CommandData* cmd_data, const fxl::CommandLine& cm
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::ReadLocalNameReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
@@ -304,7 +305,7 @@ bool HandleWriteLocalName(const CommandData* cmd_data, const fxl::CommandLine& c
   const std::string& name = cmd_line.positional_args()[0];
 
   auto write_name =
-      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WriteLocalNameCommandWriter>(
+      ::bt::hci::EmbossCommandPacket::New<::pw::bluetooth::emboss::WriteLocalNameCommandWriter>(
           ::bt::hci_spec::kWriteLocalName);
   auto write_name_view = write_name.view_t();
   auto local_name = write_name_view.local_name().BackingStorage();
@@ -340,8 +341,9 @@ bool HandleSetEventMask(const CommandData* cmd_data, const fxl::CommandLine& cmd
     return false;
   }
 
-  auto set_event = ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::SetEventMaskCommandWriter>(
-      ::bt::hci_spec::kSetEventMask);
+  auto set_event =
+      ::bt::hci::EmbossCommandPacket::New<::pw::bluetooth::emboss::SetEventMaskCommandWriter>(
+          ::bt::hci_spec::kSetEventMask);
   auto set_event_params = set_event.view_t();
   set_event_params.event_mask().Write(mask);
   auto id = SendCompleteCommand(cmd_data, std::move(set_event), std::move(complete_cb));
@@ -358,12 +360,12 @@ bool HandleLESetAdvEnable(const CommandData* cmd_data, const fxl::CommandLine& c
     return false;
   }
 
-  ::bt::hci_spec::GenericEnableParam value;
+  ::pw::bluetooth::emboss::GenericEnableParam value;
   std::string cmd_arg = cmd_line.positional_args()[0];
   if (cmd_arg == "enable") {
-    value = ::bt::hci_spec::GenericEnableParam::ENABLE;
+    value = ::pw::bluetooth::emboss::GenericEnableParam::ENABLE;
   } else if (cmd_arg == "disable") {
-    value = ::bt::hci_spec::GenericEnableParam::DISABLE;
+    value = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
   } else {
     std::cout << "  Unrecognized parameter: " << cmd_arg << std::endl;
     std::cout << "  Usage: set-adv-enable [enable|disable]" << std::endl;
@@ -580,16 +582,17 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
     return false;
   }
 
-  ::bt::hci_spec::GenericEnableParam filter_duplicates = ::bt::hci_spec::GenericEnableParam::ENABLE;
+  ::pw::bluetooth::emboss::GenericEnableParam filter_duplicates =
+      ::pw::bluetooth::emboss::GenericEnableParam::ENABLE;
   if (cmd_line.HasOption("no-dedup")) {
-    filter_duplicates = ::bt::hci_spec::GenericEnableParam::DISABLE;
+    filter_duplicates = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
   }
 
   constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetScanEnableCommandParams);
   auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetScanEnable, kPayloadSize);
 
   auto params = packet->mutable_payload<::bt::hci_spec::LESetScanEnableCommandParams>();
-  params->scanning_enabled = ::bt::hci_spec::GenericEnableParam::ENABLE;
+  params->scanning_enabled = ::pw::bluetooth::emboss::GenericEnableParam::ENABLE;
   params->filter_duplicates = filter_duplicates;
 
   // Event handler to log when we receive advertising reports
@@ -628,8 +631,8 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                           cmd_data]() mutable {
     auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetScanEnable, kPayloadSize);
     auto params = packet->mutable_payload<::bt::hci_spec::LESetScanEnableCommandParams>();
-    params->scanning_enabled = ::bt::hci_spec::GenericEnableParam::DISABLE;
-    params->filter_duplicates = ::bt::hci_spec::GenericEnableParam::DISABLE;
+    params->scanning_enabled = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
+    params->filter_duplicates = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
 
     auto id = SendCommand(cmd_data, std::move(packet), std::move(final_cb), std::move(cleanup_cb));
 
@@ -641,7 +644,7 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                                                   const ::bt::hci::EventPacket& event) mutable {
     auto return_params = event.return_params<::bt::hci_spec::SimpleReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       cleanup_cb();
       return;
     }
@@ -714,9 +717,10 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
   }
 
   bt::hci::EmbossCommandPacket packet =
-      bt::hci::EmbossCommandPacket::New<::bt::hci_spec::InquiryCommandView>(bt::hci_spec::kInquiry);
-  auto view = packet.view<::bt::hci_spec::InquiryCommandWriter>();
-  view.lap().Write(::bt::hci_spec::InquiryAccessCode::GIAC);
+      bt::hci::EmbossCommandPacket::New<::pw::bluetooth::emboss::InquiryCommandView>(
+          bt::hci_spec::kInquiry);
+  auto view = packet.view<::pw::bluetooth::emboss::InquiryCommandWriter>();
+  view.lap().Write(::pw::bluetooth::emboss::InquiryAccessCode::GIAC);
   // Always use the maximum inquiry length, we will time it more accurately.
   view.inquiry_length().Write(::bt::hci_spec::kInquiryLengthMax);
   view.num_responses().Write(max_responses);
@@ -752,7 +756,7 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
   // The callback invoked for an Inquiry Complete response.
   auto inquiry_complete_cb = [cleanup_cb = cleanup_cb.share()](
                                  const ::bt::hci::EmbossEventPacket& event) mutable {
-    auto view = event.view<::bt::hci_spec::InquiryCompleteEventView>();
+    auto view = event.view<::pw::bluetooth::emboss::InquiryCompleteEventView>();
     std::cout << fxl::StringPrintf("  Inquiry Complete - status: 0x%02hhx\n", view.status().Read());
     cleanup_cb();
     return ::bt::hci::CommandChannel::EventCallbackResult::kContinue;
@@ -774,7 +778,7 @@ bool HandleBRScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
                                                   const ::bt::hci::EventPacket& event) mutable {
     auto return_params = event.params<::bt::hci_spec::CommandStatusEventParams>();
     LogCommandResult(return_params.status, id, "Command Status");
-    if (return_params.status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params.status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       cleanup_cb();
       return;
     }
@@ -839,8 +843,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed interval value: " << interval_str << std::endl;
       return false;
     }
-    if (parsed_interval < static_cast<uint16_t>(::bt::hci_spec::PageScanInterval::MIN) ||
-        parsed_interval > static_cast<uint16_t>(::bt::hci_spec::PageScanInterval::MAX)) {
+    if (parsed_interval < static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanInterval::MIN) ||
+        parsed_interval > static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanInterval::MAX)) {
       std::cout << "  Interval value is out of the allowed range." << std::endl;
       return false;
     }
@@ -859,8 +863,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed window value: " << window_str << std::endl;
       return false;
     }
-    if (parsed_window < static_cast<uint16_t>(::bt::hci_spec::PageScanWindow::MIN) ||
-        parsed_window > static_cast<uint16_t>(::bt::hci_spec::PageScanWindow::MAX)) {
+    if (parsed_window < static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanWindow::MIN) ||
+        parsed_window > static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanWindow::MAX)) {
       std::cout << "  Window value is out of the allowed range." << std::endl;
       return false;
     }
@@ -872,9 +876,9 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
     page_scan_window = parsed_window;
   }
 
-  auto write_activity =
-      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WritePageScanActivityCommandWriter>(
-          ::bt::hci_spec::kWritePageScanActivity);
+  auto write_activity = ::bt::hci::EmbossCommandPacket::New<
+      ::pw::bluetooth::emboss::WritePageScanActivityCommandWriter>(
+      ::bt::hci_spec::kWritePageScanActivity);
   auto activity_params = write_activity.view_t();
   activity_params.page_scan_interval().Write(page_scan_interval);
   activity_params.page_scan_window().Write(page_scan_window);
@@ -897,7 +901,7 @@ bool HandleReadPageScanActivity(const CommandData* cmd_data, const fxl::CommandL
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::ReadPageScanActivityReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
@@ -966,7 +970,7 @@ bool HandleReadPageScanType(const CommandData* cmd_data, const fxl::CommandLine&
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::ReadPageScanTypeReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
@@ -1021,7 +1025,7 @@ bool HandleWriteScanEnable(const CommandData* cmd_data, const fxl::CommandLine& 
   }
 
   auto write_enable =
-      ::bt::hci::EmbossCommandPacket::New<::bt::hci_spec::WriteScanEnableCommandWriter>(
+      ::bt::hci::EmbossCommandPacket::New<::pw::bluetooth::emboss::WriteScanEnableCommandWriter>(
           ::bt::hci_spec::kWriteScanEnable);
   auto write_enable_view = write_enable.view_t();
   write_enable_view.scan_enable().inquiry().Write(
@@ -1046,7 +1050,7 @@ bool HandleReadScanEnable(const CommandData* cmd_data, const fxl::CommandLine& c
                                                 const ::bt::hci::EventPacket& event) {
     auto return_params = event.return_params<::bt::hci_spec::ReadScanEnableReturnParams>();
     LogCommandResult(return_params->status, id);
-    if (return_params->status != ::bt::hci_spec::StatusCode::SUCCESS) {
+    if (return_params->status != ::pw::bluetooth::emboss::StatusCode::SUCCESS) {
       complete_cb();
       return;
     }
