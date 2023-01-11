@@ -8,6 +8,7 @@
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/exception.h>
+#include <zircon/syscalls/object.h>
 
 #include <optional>
 
@@ -28,6 +29,10 @@ using fuchsia::feedback::CrashReport;
 // otherwise.
 void ResetException(async_dispatcher_t* dispatcher, zx::exception exception,
                     const zx::process& process) {
+  if (!exception.is_valid()) {
+    return;
+  }
+
   if (!process.is_valid()) {
     FX_LOGS(ERROR) << "Process for exception is invalid";
     exception.reset();
@@ -55,6 +60,19 @@ void ResetException(async_dispatcher_t* dispatcher, zx::exception exception,
   }
 }
 
+// Returns true if the process is terminated.
+bool IsProcessTerminated(zx::process& crashed_process) {
+  zx_info_process_t process_info;
+  if (const zx_status_t status = crashed_process.get_info(ZX_INFO_PROCESS, &process_info,
+                                                          sizeof(process_info), nullptr, nullptr);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to get info for process " << crashed_process.get();
+    return false;
+  }
+
+  return process_info.flags & ZX_INFO_PROCESS_FLAG_EXITED;
+}
+
 }  // namespace
 
 CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
@@ -74,7 +92,6 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
     std::optional<ExceptionReason> exception_reason{std::nullopt};
     std::optional<std::string> gwp_asan_exception_type;
     zx::vmo minidump = GenerateMinidump(exception, &exception_reason, &gwp_asan_exception_type);
-    ResetException(dispatcher_, std::move(exception), crashed_process);
 
     if (minidump.is_valid()) {
       builder.SetMinidump(std::move(minidump));
@@ -88,6 +105,11 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
   } else {
     builder.SetExceptionExpired();
   }
+
+  if (IsProcessTerminated(crashed_process)) {
+    builder.SetProcessTerminated();
+  }
+  ResetException(dispatcher_, std::move(exception), crashed_process);
 
   const auto thread_koid = fsl::GetKoid(crashed_thread.get());
   auto file_crash_report =

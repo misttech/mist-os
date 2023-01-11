@@ -41,6 +41,7 @@ source_set("lib") {
 
   deps = [
     "//sdk/lib/syslog/cpp",
+    "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/utils:errors",
     "//src/lib/fsl",
   ]

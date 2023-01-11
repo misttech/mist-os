@@ -3,15 +3,20 @@
 
 #include "src/developer/forensics/exceptions/handler/report_builder.h"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
+#include "src/developer/forensics/testing/gmatchers.h"
 #include "src/lib/fsl/vmo/strings.h"
 
 namespace forensics {
 namespace exceptions {
 namespace handler {
 namespace {
+
+using testing::Contains;
 
 class CrashReportBuilderTest : public testing::Test {
  protected:
@@ -35,6 +40,10 @@ TEST_F(CrashReportBuilderTest, SetsMinidump) {
   ASSERT_TRUE(
       fsl::StringFromVmo(crash_report.specific_report().native().minidump(), &minidump_content));
   EXPECT_STREQ(minidump_content.c_str(), "minidump");
+
+  ASSERT_TRUE(crash_report.has_annotations());
+  EXPECT_THAT(crash_report.annotations(),
+              Contains(MatchesAnnotation(kCrashProcessStateKey, "in exception")));
 }
 
 TEST_F(CrashReportBuilderTest, ExceptionReason_ChannelOverflow) {
@@ -125,6 +134,10 @@ TEST_F(CrashReportBuilderTest, ProcessTerminated) {
 
   ASSERT_TRUE(crash_report.has_crash_signature());
   EXPECT_EQ(crash_report.crash_signature(), "fuchsia-no-minidump-process-terminated");
+
+  ASSERT_TRUE(crash_report.has_annotations());
+  EXPECT_THAT(crash_report.annotations(),
+              Contains(MatchesAnnotation(kCrashProcessStateKey, "terminated")));
 }
 
 TEST_F(CrashReportBuilderTest, ExpiredException) {

@@ -85,6 +85,7 @@ executable("exception_broker_unittest_exe") {
   deps = [
     ":test_lib",
     "//sdk/lib/sys/cpp/testing:unit",
+    "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/exceptions:lib",
     "//src/developer/forensics/exceptions/handler:lib",
     "//src/developer/forensics/testing:gmatchers",

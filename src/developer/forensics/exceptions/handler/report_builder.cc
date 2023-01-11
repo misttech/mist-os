@@ -8,6 +8,7 @@
 
 #include <optional>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -148,6 +149,7 @@ fuchsia::feedback::CrashReport CrashReportBuilder::Consume() {
   if (gwp_asan_exception_type_.has_value()) {
     AddAnnotation("crash.gwp_asan.exception-type", gwp_asan_exception_type_.value());
   }
+  AddAnnotation(kCrashProcessStateKey, process_already_terminated_ ? "terminated" : "in exception");
 
   // Crash signature overwrite on channel/port overflow.
   if (exception_reason_.has_value()) {

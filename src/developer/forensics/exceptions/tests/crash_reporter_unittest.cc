@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/exceptions/handler/component_lookup.h"
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 #include "src/developer/forensics/testing/gmatchers.h"
@@ -410,6 +411,7 @@ TEST_F(HandlerTest, NoExceptionV1) {
   ValidateCrashReport(report, kComponentUrl, process_name, process_koid, thread_name, thread_koid,
                       {
                           {"crash.realm-path", "/realm/path"},
+                          {kCrashProcessStateKey, "in exception"},
                       });
   ValidateCrashSignature(report, "fuchsia-no-minidump-exception-expired");
 
@@ -463,13 +465,59 @@ TEST_F(HandlerTest, NoExceptionV2) {
   auto& report = crash_reporter().reports().front();
 
   ValidateCrashReport(report, kComponentUrl, process_name, process_koid, thread_name, thread_koid,
-                      {});
+                      {{kCrashProcessStateKey, "in exception"}});
   ValidateCrashSignature(report, "fuchsia-no-minidump-exception-expired");
 
   // We kill the jobs. This kills the underlying process. We do this so that the crashed process
   // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
   // environment and create noise on the overall system.
   exception.job.kill();
+}
+
+TEST_F(HandlerTest, ProcessTerminated) {
+  SetUpCrashReporter();
+  SetUpCrashIntrospect();
+
+  // Create the exception.
+  ExceptionContext exception;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception));
+
+  zx::process process;
+  ASSERT_EQ(exception.exception.get_process(&process), ZX_OK);
+  const std::string process_name = fsl::GetObjectName(process.get());
+  const zx_koid_t process_koid = fsl::GetKoid(process.get());
+
+  zx::thread thread;
+  ASSERT_EQ(exception.exception.get_thread(&thread), ZX_OK);
+  const std::string thread_name = fsl::GetObjectName(thread.get());
+  const zx_koid_t thread_koid = fsl::GetKoid(thread.get());
+
+  const std::string kComponentUrl = "crasher";
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception.job.kill();
+
+  // Must explicitly wait for the job to be terminated to ensure consistency between asan and
+  // non-asan.
+  exception.job.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr);
+
+  bool called = false;
+  HandleException(std::move(exception.exception), zx::duration::infinite(),
+                  [&called](const ::fidl::StringPtr& moniker) { called = true; });
+
+  ASSERT_TRUE(called);
+
+  ASSERT_EQ(crash_reporter().reports().size(), 1u);
+  auto& report = crash_reporter().reports().front();
+
+  ValidateCrashReport(report, kComponentUrl, process_name, process_koid, "", thread_koid,
+                      {
+                          {"debug.crash.component.url.set", "false"},
+                          {kCrashProcessStateKey, "terminated"},
+                      });
+  ValidateCrashSignature(report, "fuchsia-no-minidump-process-terminated");
 }
 
 }  // namespace

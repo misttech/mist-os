@@ -19,6 +19,8 @@ constexpr zx::duration kExceptionTtl = zx::min(5);
 // generation happens prior to component lookup and could take some arbitrary time.
 constexpr zx::duration kComponentLookupTimeout{zx::sec(30)};
 
+constexpr const char kCrashProcessStateKey[] = "crash.process.state";
+
 }  // namespace exceptions
 }  // namespace forensics
 
