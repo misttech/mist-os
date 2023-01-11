@@ -1419,7 +1419,7 @@ pub mod capability_util {
         let state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
-                let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                let flags = fio::OpenFlags::RIGHT_READABLE;
                 let vns_path = to_fvfs_path(path);
                 resolved_instance_state
                     .get_exposed_dir()

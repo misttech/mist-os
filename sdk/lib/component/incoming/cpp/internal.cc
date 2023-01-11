@@ -73,12 +73,10 @@ zx::result<> CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>&& clone
 
 zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
                                fidl::internal::AnyTransport remote) {
-  constexpr fuchsia_io::wire::OpenFlags flags =
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable;
   fidl::UnownedClientEnd<fuchsia_io::Directory> dir_end(dir);
   fidl::ServerEnd<fuchsia_io::Node> node_end(remote.release<fidl::internal::ChannelTransport>());
-  fidl::Status result =
-      fidl::WireCall<fuchsia_io::Directory>(dir_end)->Open(flags, 0755u, path, std::move(node_end));
+  fidl::Status result = fidl::WireCall<fuchsia_io::Directory>(dir_end)->Open(
+      fuchsia_io::wire::OpenFlags::kRightReadable, 0755u, path, std::move(node_end));
   return zx::make_result(result.status());
 }
 

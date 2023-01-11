@@ -238,6 +238,10 @@ mod tests {
             fio::MODE_TYPE_SERVICE,
             fio::OpenFlags::NODE_REFERENCE,
         );
-        ncvf_ok(READ_WRITE, fio::MODE_TYPE_SERVICE, READ_WRITE);
+        ncvf_ok(
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::MODE_TYPE_SERVICE,
+            fio::OpenFlags::RIGHT_READABLE,
+        );
     }
 }

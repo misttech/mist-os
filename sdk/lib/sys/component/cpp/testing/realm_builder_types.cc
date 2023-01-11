@@ -106,11 +106,7 @@ sys::ServiceDirectory LocalComponentHandles::svc() {
   zx::channel remote;
   ZX_COMPONENT_ASSERT_STATUS_OK("zx::channel/create", zx::channel::create(0, &local, &remote));
 
-  // TODO(https://fxbug.dev/101092): Replace this with fdio_ns_service_connect when
-  // ServiceDirectory::Connect (via fdio_service_connect_at) no longer requests R/W.
-  constexpr uint32_t kServiceFlags = static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                           fuchsia::io::OpenFlags::RIGHT_WRITABLE);
-  auto status = fdio_ns_open(namespace_, kSvcDirectoryPath, kServiceFlags, remote.release());
+  auto status = fdio_ns_service_connect(namespace_, kSvcDirectoryPath, remote.release());
   ZX_ASSERT_MSG(status == ZX_OK,
                 "fdio_ns_service_connect on LocalComponent's /svc directory failed: %s\nThis most"
                 "often occurs when a component has no FIDL protocols routed to it.",
