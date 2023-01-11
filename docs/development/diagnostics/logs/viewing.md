@@ -133,7 +133,7 @@ When running tests, a [Swarming] bot invokes [botanist], which collects several 
 presented in the web UI. The `stdout` & `stderr` of botanist are what's presented in the "swarming task
 UI".
 
-For individual test executables botanist invokes [testrunner] and collects that output separately.
+For individual test executables botanist uses [testrunner] lib and collects that output separately.
 It is this output that can be seen after a failing test, with a link named `stdio`. Most tests that
 testrunner invokes run `run-test-suite` via SSH to the target device. This collects the
 stdout, stderr, and logs from the test environment and prints them inline.
@@ -150,7 +150,6 @@ Normally this includes the following notable items, all interleaved:
 
 * [botanist]'s log messages
 * kernel log from netsvc (equivalent to `fx klog`)
-* [testrunner]'s log messages
 * `stdout` and `stderr` of the tests run by testrunner
 
 This aggregate log is run through the equivalent of `fx symbolize` before upload.
@@ -165,5 +164,5 @@ This aggregate log is run through the equivalent of `fx symbolize` before upload
 [forwarded over UDP by netsvc]: /src/bringup/bin/netsvc/debuglog.cc
 [`dlog`]: /src/bringup/bin/dlog/README.md
 [botanist]: /tools/botanist/cmd/main.go
-[testrunner]: /tools/testing/testrunner/cmd/main.go
+[testrunner]: /tools/testing/testrunner/lib.go
 [Swarming]: https://chromium.googlesource.com/infra/luci/luci-py/+/HEAD/appengine/swarming/doc/README.md

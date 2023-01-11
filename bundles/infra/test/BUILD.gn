@@ -58,7 +58,6 @@ group("host_tools") {
     "//src/storage/bin/fvm",
     "//tools/bootserver",
     "//tools/botanist",
-    "//tools/testing/testrunner",
     "//zircon/tools/zbi",
   ]
 

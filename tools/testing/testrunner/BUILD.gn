@@ -51,23 +51,6 @@ go_library("constants") {
   sources = [ "constants.go" ]
 }
 
-go_library("main") {
-  source_dir = "cmd"
-
-  sources = [ "main.go" ]
-
-  deps = [
-    ":lib",
-    "//tools/botanist:constants",
-    "//tools/lib/color",
-    "//tools/lib/logger",
-  ]
-}
-
-go_binary("testrunner") {
-  library = ":main"
-}
-
 go_test("testrunner_lib_tests") {
   library = ":lib"
   deps = [ "//third_party/golibs:github.com/google/go-cmp" ]

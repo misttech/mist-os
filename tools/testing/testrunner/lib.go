@@ -74,8 +74,6 @@ type TestrunnerFlags struct {
 
 func SetupAndExecute(ctx context.Context, flags TestrunnerFlags, testsPath string) error {
 	// Our mDNS library doesn't use the logger library.
-	// This flags are repeated in the main function, we can remove this once we
-	// don't call testrunner on its own.
 	const logFlags = log.Ltime | log.Lmicroseconds | log.Lshortfile
 	log.SetFlags(logFlags)
 
