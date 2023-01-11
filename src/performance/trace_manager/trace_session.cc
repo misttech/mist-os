@@ -11,13 +11,13 @@
 
 #include <numeric>
 
-#include "src/performance/trace_manager/trace_manager.h"
 #include "src/performance/trace_manager/util.h"
 
 namespace tracing {
 
 TraceSession::TraceSession(zx::socket destination, std::vector<std::string> categories,
-                           size_t buffer_size_megabytes, provider::BufferingMode buffering_mode,
+                           size_t buffer_size_megabytes,
+                           fuchsia::tracing::BufferingMode buffering_mode,
                            TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                            zx::duration stop_timeout, fit::closure abort_handler,
                            AlertCallback alert_callback)
@@ -91,7 +91,7 @@ void TraceSession::AddProvider(TraceProviderBundle* bundle) {
       case State::kStarting:
       case State::kStarted:
         // This is a new provider, there is nothing in the buffer to retain.
-        tracee->Start(controller::BufferDisposition::CLEAR_ALL, additional_categories_);
+        tracee->Start(fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE, additional_categories_);
         break;
       case State::kStopping:
       case State::kStopped:
@@ -125,14 +125,14 @@ void TraceSession::Terminate(fit::closure callback) {
   TerminateSessionIfEmpty();
 }
 
-void TraceSession::Start(controller::BufferDisposition buffer_disposition,
+void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
                          const std::vector<std::string>& additional_categories,
                          controller::Controller::StartTracingCallback callback) {
   FX_DCHECK(state_ == State::kInitialized || state_ == State::kStopped);
 
   if (force_clear_buffer_contents_) {
     // "force-clear" -> Clear the entire buffer because it was saved.
-    buffer_disposition = controller::BufferDisposition::CLEAR_ALL;
+    buffer_disposition = fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE;
   }
   force_clear_buffer_contents_ = false;
 

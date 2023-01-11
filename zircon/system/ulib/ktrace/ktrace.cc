@@ -23,7 +23,7 @@ namespace ktrace {
 class KTrace : public fuchsia::tracing::kernel::Controller,
                public fuchsia::tracing::kernel::Reader {
  public:
-  using BufferingMode = ::fuchsia::tracing::provider::BufferingMode;
+  using BufferingMode = fuchsia::tracing::BufferingMode;
 
   explicit KTrace(zx::resource root_resource)
       : controller_(this), reader_(this), root_resource_(std::move(root_resource)) {}

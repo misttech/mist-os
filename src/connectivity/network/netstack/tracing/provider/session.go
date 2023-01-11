@@ -15,7 +15,7 @@ import (
 	"syscall/zx"
 	"unsafe"
 
-	fidlprovider "fidl/fuchsia/tracing/provider"
+	"fidl/fuchsia/tracing"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/trace"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
@@ -44,7 +44,7 @@ func newSession() *session {
 	}
 }
 
-func (s *session) initializeEngine(mode fidlprovider.BufferingMode, vmo zx.VMO, fifo zx.Handle, categories []string) (err error) {
+func (s *session) initializeEngine(mode tracing.BufferingMode, vmo zx.VMO, fifo zx.Handle, categories []string) (err error) {
 	defer func() {
 		if err != nil {
 			s.finalize()
@@ -80,11 +80,11 @@ func (s *session) initializeEngine(mode fidlprovider.BufferingMode, vmo zx.VMO, 
 
 	var bufferingMode trace.BufferingMode
 	switch mode {
-	case fidlprovider.BufferingModeOneshot:
+	case tracing.BufferingModeOneshot:
 		bufferingMode = trace.Oneshot
-	case fidlprovider.BufferingModeCircular:
+	case tracing.BufferingModeCircular:
 		bufferingMode = trace.Circular
-	case fidlprovider.BufferingModeStreaming:
+	case tracing.BufferingModeStreaming:
 		bufferingMode = trace.Streaming
 	default:
 		panic(fmt.Sprintf("unknown BufferingMode (%d)", mode))
@@ -113,7 +113,7 @@ func (s *session) finalize() {
 	}
 }
 
-func (s *session) startEngine(disposition fidlprovider.BufferDisposition, additionalCategories []string) error {
+func (s *session) startEngine(disposition tracing.BufferDisposition, additionalCategories []string) error {
 	switch state := trace.EngineState(); state {
 	case trace.Stopped:
 	case trace.Stopping:
@@ -127,11 +127,11 @@ func (s *session) startEngine(disposition fidlprovider.BufferDisposition, additi
 
 	var startMode trace.StartMode
 	switch disposition {
-	case fidlprovider.BufferDispositionClearEntire:
+	case tracing.BufferDispositionClearEntire:
 		startMode = trace.ClearEntireBuffer
-	case fidlprovider.BufferDispositionClearNondurable:
+	case tracing.BufferDispositionClearNondurable:
 		startMode = trace.ClearNonDurableBuffer
-	case fidlprovider.BufferDispositionRetain:
+	case tracing.BufferDispositionRetain:
 		startMode = trace.RetainBuffer
 	default:
 		panic(fmt.Sprintf("unknown disposition (%d)", disposition))

@@ -18,7 +18,7 @@
 namespace tracing {
 namespace test {
 
-namespace provider = ::fuchsia::tracing::provider;
+namespace provider = fuchsia::tracing::provider;
 
 class FakeProvider : public provider::Provider {
  public:
@@ -57,6 +57,7 @@ class FakeProvider : public provider::Provider {
   void Start(provider::StartOptions options) override;
   void Stop() override;
   void Terminate() override;
+  void GetKnownCategories(GetKnownCategoriesCallback callback) override {}
 
   // Helpers to provide discrete advancement of provider state.
   // These should only be called when the provider is in the preceding state,
@@ -106,7 +107,7 @@ class FakeProvider : public provider::Provider {
 
   State state_ = State::kReady;
 
-  provider::BufferingMode buffering_mode_;
+  fuchsia::tracing::BufferingMode buffering_mode_;
   zx::vmo buffer_vmo_;
   zx::fifo fifo_;
   std::vector<std::string> categories_;

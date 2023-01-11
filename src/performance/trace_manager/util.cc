@@ -60,15 +60,15 @@ std::ostream& operator<<(std::ostream& out, TransferStatus status) {
   return out;
 }
 
-std::ostream& operator<<(std::ostream& out, controller::BufferDisposition disposition) {
+std::ostream& operator<<(std::ostream& out, fuchsia::tracing::BufferDisposition disposition) {
   switch (disposition) {
-    case controller::BufferDisposition::CLEAR_ALL:
+    case fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE:
       out << "clear-all";
       break;
-    case controller::BufferDisposition::CLEAR_NONDURABLE:
+    case fuchsia::tracing::BufferDisposition::CLEAR_NONDURABLE:
       out << "clear-nondurable";
       break;
-    case controller::BufferDisposition::RETAIN:
+    case fuchsia::tracing::BufferDisposition::RETAIN:
       out << "retain";
       break;
   }

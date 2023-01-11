@@ -43,7 +43,7 @@ class RecordCommand : public CommandWithController {
     std::optional<std::string> environment_name;
     uint32_t buffer_size_megabytes = kDefaultBufferSizeMegabytes;
     std::vector<ProviderSpec> provider_specs;
-    controller::BufferingMode buffering_mode = kDefaultBufferingMode;
+    fuchsia::tracing::BufferingMode buffering_mode = kDefaultBufferingMode;
     bool binary = false;
     bool compress = false;
     std::string output_file_name = kDefaultOutputFileName;

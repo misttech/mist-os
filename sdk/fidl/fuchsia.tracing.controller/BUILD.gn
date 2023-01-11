@@ -8,5 +8,8 @@ fidl("fuchsia.tracing.controller") {
   sdk_category = "internal"
   sources = [ "trace_controller.fidl" ]
 
-  public_deps = [ "//zircon/vdso/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.tracing",
+    "//zircon/vdso/zx",
+  ]
 }

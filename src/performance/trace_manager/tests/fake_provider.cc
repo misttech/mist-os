@@ -62,7 +62,7 @@ void FakeProvider::Start(provider::StartOptions options) {
     return;
   }
 
-  if (options.buffer_disposition == provider::BufferDisposition::RETAIN) {
+  if (options.buffer_disposition == fuchsia::tracing::BufferDisposition::RETAIN) {
     // Don't reset the buffer pointer.
     FX_VLOGS(2) << "Retaining buffer contents";
   } else {
@@ -194,7 +194,7 @@ void FakeProvider::InitializeBuffer() {
   // E.g., We don't emit any records to the durable buffer so ensure
   // TraceManager will see the buffer beginning with a zero-length record
   // which tells it there isn't any.
-  if (buffering_mode_ == provider::BufferingMode::ONESHOT) {
+  if (buffering_mode_ == fuchsia::tracing::BufferingMode::ONESHOT) {
     size_t rolling_buffer0_offset = kHeaderSize;
     WriteZeroLengthRecord(rolling_buffer0_offset);
   } else {
@@ -214,12 +214,12 @@ void FakeProvider::ComputeBufferSizes() {
 
   // See trace-engine's |trace_context::ComputeBufferSizes()|.
   switch (buffering_mode_) {
-    case provider::BufferingMode::ONESHOT:
+    case fuchsia::tracing::BufferingMode::ONESHOT:
       durable_buffer_size_ = 0;
       rolling_buffer_size_ = total_buffer_size_ - header_size;
       break;
-    case provider::BufferingMode::CIRCULAR:
-    case provider::BufferingMode::STREAMING: {
+    case fuchsia::tracing::BufferingMode::CIRCULAR:
+    case fuchsia::tracing::BufferingMode::STREAMING: {
       size_t avail = total_buffer_size_ - header_size;
       durable_buffer_size_ = kDurableBufferSize;
       uint64_t off_by = (avail - durable_buffer_size_) & 15;
@@ -250,13 +250,13 @@ void FakeProvider::InitBufferHeader() {
   header.version = TRACE_BUFFER_HEADER_V0;
 
   switch (buffering_mode_) {
-    case provider::BufferingMode::ONESHOT:
+    case fuchsia::tracing::BufferingMode::ONESHOT:
       header.buffering_mode = static_cast<uint8_t>(TRACE_BUFFERING_MODE_ONESHOT);
       break;
-    case provider::BufferingMode::CIRCULAR:
+    case fuchsia::tracing::BufferingMode::CIRCULAR:
       header.buffering_mode = static_cast<uint8_t>(TRACE_BUFFERING_MODE_CIRCULAR);
       break;
-    case provider::BufferingMode::STREAMING:
+    case fuchsia::tracing::BufferingMode::STREAMING:
       header.buffering_mode = static_cast<uint8_t>(TRACE_BUFFERING_MODE_STREAMING);
       break;
   }
@@ -307,11 +307,11 @@ void FakeProvider::WriteRecordToBuffer(const uint8_t* data, size_t size) {
               << buffer_next_;
   size_t offset;
   switch (buffering_mode_) {
-    case provider::BufferingMode::ONESHOT:
+    case fuchsia::tracing::BufferingMode::ONESHOT:
       offset = kHeaderSize + buffer_next_;
       break;
-    case provider::BufferingMode::CIRCULAR:
-    case provider::BufferingMode::STREAMING:
+    case fuchsia::tracing::BufferingMode::CIRCULAR:
+    case fuchsia::tracing::BufferingMode::STREAMING:
       offset = kHeaderSize + durable_buffer_size_ + buffer_next_;
       break;
   }

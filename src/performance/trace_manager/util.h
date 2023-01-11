@@ -12,7 +12,7 @@
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
+namespace controller = fuchsia::tracing::controller;
 
 enum class TransferStatus {
   // The transfer is complete.
@@ -28,7 +28,7 @@ enum class TransferStatus {
 
 std::ostream& operator<<(std::ostream& out, TransferStatus status);
 
-std::ostream& operator<<(std::ostream& out, controller::BufferDisposition disposition);
+std::ostream& operator<<(std::ostream& out, fuchsia::tracing::BufferDisposition disposition);
 
 std::ostream& operator<<(std::ostream& out, controller::SessionState state);
 

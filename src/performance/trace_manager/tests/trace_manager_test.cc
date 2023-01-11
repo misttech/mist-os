@@ -94,7 +94,7 @@ controller::TraceConfig TraceManagerTest::GetDefaultTraceConfig() {
   config.set_categories(std::move(categories));
   config.set_buffer_size_megabytes_hint(kDefaultBufferSizeMegabytes);
   config.set_start_timeout_milliseconds(kDefaultStartTimeoutMilliseconds);
-  config.set_buffering_mode(controller::BufferingMode::ONESHOT);
+  config.set_buffering_mode(fuchsia::tracing::BufferingMode::ONESHOT);
   return config;
 }
 
@@ -141,7 +141,7 @@ bool TraceManagerTest::InitializeSession(controller::TraceConfig config) {
 controller::StartOptions TraceManagerTest::GetDefaultStartOptions() {
   std::vector<std::string> additional_categories{};
   controller::StartOptions options;
-  options.set_buffer_disposition(controller::BufferDisposition::RETAIN);
+  options.set_buffer_disposition(fuchsia::tracing::BufferDisposition::RETAIN);
   options.set_additional_categories(std::move(additional_categories));
   return options;
 }

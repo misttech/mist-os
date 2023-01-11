@@ -12,7 +12,7 @@
 namespace tracing {
 namespace test {
 
-namespace provider = ::fuchsia::tracing::provider;
+namespace provider = fuchsia::tracing::provider;
 
 namespace {
 const char kProviderRegistryPath[] = "svc/fuchsia.tracing.provider.Registry";

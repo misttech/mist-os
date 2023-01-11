@@ -4,15 +4,22 @@
 @available(added=7)
 library fuchsia.tracing.provider;
 
+using fuchsia.tracing;
 using zx;
 
 /// The maximum length of a provider's name.
+@available(deprecated=11, removed=12, note="Use fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH instead")
 const MAX_PROVIDER_NAME_LENGTH uint32 = 100;
 
 /// The maximum number of categories supported.
+@available(
+        deprecated=11,
+        removed=12,
+        note="Use fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES or fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES instead")
 const MAX_NUM_CATEGORIES uint32 = 100;
 
 /// The maximum length of a category name.
+@available(deprecated=11, removed=12, note="Use fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH instead")
 const MAX_CATEGORY_NAME_LENGTH uint32 = 100;
 
 /// The provider interface which applications must implement and register
@@ -59,6 +66,12 @@ protocol Provider {
     /// `buffer` and `fifo` to indicate to the trace manager that tracing is
     /// finished.
     Terminate();
+
+    /// Gets the trace categories that might be produced by this provider.
+    @available(added=11)
+    GetKnownCategories() -> (struct {
+        categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
+    });
 };
 
 /// The service which trace providers use to register themselves with
@@ -77,7 +90,10 @@ protocol Registry {
     RegisterProvider(resource struct {
         provider client_end:Provider;
         pid zx.koid;
+        @available(removed=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
+        @available(added=11)
+        name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
     });
 
     /// Registers the trace provider synchronously. The call doesn't return
@@ -92,7 +108,10 @@ protocol Registry {
     RegisterProviderSynchronously(resource struct {
         provider client_end:Provider;
         pid zx.koid;
+        @available(removed=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
+        @available(added=11)
+        name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
     }) -> (struct {
         s zx.status;
         started bool;
@@ -100,6 +119,7 @@ protocol Registry {
 };
 
 /// The trace buffering mode.
+@available(deprecated=11, removed=12)
 type BufferingMode = strict enum : uint8 {
     /// In oneshot mode there is only one buffer that is not reused. When the
     /// buffer fills the provider just keeps dropping records, keeping a count,
@@ -128,7 +148,10 @@ type BufferingMode = strict enum : uint8 {
 // tables are ready for use in zircon.
 type ProviderConfig = resource struct {
     /// `buffering_mode` specifies what happens when the buffer fills.
+    @available(removed=11)
     buffering_mode BufferingMode;
+    @available(added=11)
+    buffering_mode fuchsia.tracing.BufferingMode;
 
     /// The buffer to write trace records into.
     buffer zx.handle:VMO;
@@ -140,7 +163,11 @@ type ProviderConfig = resource struct {
     fifo zx.handle:FIFO;
 
     /// What trace categories to collect data for.
+    @available(removed=11)
     categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
+    @available(added=11)
+    categories
+            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 };
 
 /// Choices for clearing/retaining trace buffer contents at Start.
@@ -151,6 +178,7 @@ type ProviderConfig = resource struct {
 /// trace_encoded_thread_ref_t). The non-durable portion contains the rest of
 /// the trace data like events); this is the portion that, for example, is
 /// discarded in circular buffering mode when the (non-durable) buffer fills.
+@available(deprecated=11, removed=12)
 type BufferDisposition = strict enum : uint8 {
     /// Clear the entire buffer, including durable buffer contents.
     /// N.B. If this is done mid-session, then string and thread references
@@ -181,9 +209,16 @@ type StartOptions = struct {
     /// Whether and how to clear the buffer when starting data collection.
     /// This allows, for example, multiple Start/Stop trace runs to be
     /// collected in the same buffer.
+    @available(removed=11)
     buffer_disposition BufferDisposition;
+    @available(added=11)
+    buffer_disposition fuchsia.tracing.BufferDisposition;
 
     /// The trace categories to add to the initial set provided in
     /// `ProviderConfig`.
+    @available(removed=11)
     additional_categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
+    @available(added=11)
+    additional_categories
+            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 };

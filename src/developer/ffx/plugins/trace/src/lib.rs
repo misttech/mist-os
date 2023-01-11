@@ -9,7 +9,8 @@ use {
     ffx_trace_args::{TraceCommand, TraceSubCommand},
     ffx_writer::Writer,
     fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy},
-    fidl_fuchsia_tracing_controller::{ControllerProxy, KnownCategory, ProviderInfo, TraceConfig},
+    fidl_fuchsia_tracing::KnownCategory,
+    fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, TraceConfig},
     futures::future::{BoxFuture, FutureExt},
     lazy_static::lazy_static,
     regex::Regex,
@@ -512,8 +513,8 @@ mod tests {
         ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop},
         ffx_writer::Format,
         fidl::endpoints::{ControlHandle, Responder},
-        fidl_fuchsia_developer_ffx as ffx,
-        fidl_fuchsia_tracing_controller::{self as trace, BufferingMode},
+        fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
+        fidl_fuchsia_tracing_controller as tracing_controller,
         futures::TryStreamExt,
         regex::Regex,
         serde_json::json,
@@ -638,11 +639,11 @@ mod tests {
 
     fn setup_fake_controller_proxy() -> ControllerProxy {
         setup_fake_controller(|req| match req {
-            trace::ControllerRequest::GetKnownCategories { responder, .. } => {
+            tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
                 let mut categories = fake_known_categories();
                 responder.send(categories.iter_mut().by_ref()).expect("should respond");
             }
-            trace::ControllerRequest::GetProviders { responder, .. } => {
+            tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
                 let mut providers = fake_provider_infos();
                 responder.send(&mut providers.drain(..)).expect("should respond");
             }
@@ -650,41 +651,44 @@ mod tests {
         })
     }
 
-    fn fake_known_categories() -> Vec<trace::KnownCategory> {
+    fn fake_known_categories() -> Vec<tracing::KnownCategory> {
         vec![
-            trace::KnownCategory {
+            tracing::KnownCategory {
                 name: String::from("input"),
                 description: String::from("Input system"),
             },
-            trace::KnownCategory {
+            tracing::KnownCategory {
                 name: String::from("kernel"),
                 description: String::from("All kernel trace events"),
             },
-            trace::KnownCategory {
+            tracing::KnownCategory {
                 name: String::from("kernel:arch"),
                 description: String::from("Kernel arch events"),
             },
-            trace::KnownCategory {
+            tracing::KnownCategory {
                 name: String::from("kernel:ipc"),
                 description: String::from("Kernel ipc events"),
             },
         ]
     }
 
-    fn fake_provider_infos() -> Vec<trace::ProviderInfo> {
+    fn fake_provider_infos() -> Vec<tracing_controller::ProviderInfo> {
         vec![
-            trace::ProviderInfo {
+            tracing_controller::ProviderInfo {
                 id: Some(42),
                 name: Some("foo".to_string()),
-                ..trace::ProviderInfo::EMPTY
+                ..tracing_controller::ProviderInfo::EMPTY
             },
-            trace::ProviderInfo {
+            tracing_controller::ProviderInfo {
                 id: Some(99),
                 pid: Some(1234567),
                 name: Some("bar".to_string()),
-                ..trace::ProviderInfo::EMPTY
+                ..tracing_controller::ProviderInfo::EMPTY
             },
-            trace::ProviderInfo { id: Some(2), ..trace::ProviderInfo::EMPTY },
+            tracing_controller::ProviderInfo {
+                id: Some(2),
+                ..tracing_controller::ProviderInfo::EMPTY
+            },
         ]
     }
 
@@ -697,10 +701,10 @@ mod tests {
 
     fn setup_closed_fake_controller_proxy() -> ControllerProxy {
         setup_fake_controller(|req| match req {
-            trace::ControllerRequest::GetKnownCategories { responder, .. } => {
+            tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }
-            trace::ControllerRequest::GetProviders { responder, .. } => {
+            tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
                 responder.control_handle().shutdown();
             }
             r => panic!("unsupported req: {:?}", r),
@@ -813,7 +817,7 @@ mod tests {
                     buffer_size: 2,
                     categories: vec!["platypus".to_string(), "beaver".to_string()],
                     duration: None,
-                    buffering_mode: BufferingMode::Oneshot,
+                    buffering_mode: tracing::BufferingMode::Oneshot,
                     output: "foo.txt".to_string(),
                     background: true,
                     trigger: vec![],
@@ -896,7 +900,7 @@ Current tracing status:
                     buffer_size: 2,
                     categories: vec![],
                     duration: Some(5.2),
-                    buffering_mode: BufferingMode::Oneshot,
+                    buffering_mode: tracing::BufferingMode::Oneshot,
                     output: "foober.fxt".to_owned(),
                     background: true,
                     trigger: vec![],
@@ -922,7 +926,7 @@ Current tracing status:
                     buffer_size: 2,
                     categories: vec![],
                     duration: Some(0.8),
-                    buffering_mode: BufferingMode::Oneshot,
+                    buffering_mode: tracing::BufferingMode::Oneshot,
                     output: "foober.fxt".to_owned(),
                     background: false,
                     trigger: vec![],
@@ -951,7 +955,7 @@ Current tracing status:
                 sub_cmd: TraceSubCommand::Start(Start {
                     buffer_size: 2,
                     categories: vec![],
-                    buffering_mode: BufferingMode::Oneshot,
+                    buffering_mode: tracing::BufferingMode::Oneshot,
                     duration: None,
                     output: "foober.fxt".to_owned(),
                     background: false,
@@ -980,7 +984,7 @@ Current tracing status:
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand {
             sub_cmd: TraceSubCommand::Start(Start {
-                buffering_mode: BufferingMode::Oneshot,
+                buffering_mode: tracing::BufferingMode::Oneshot,
                 categories: vec![],
                 duration: Some(1.0),
                 background: false,

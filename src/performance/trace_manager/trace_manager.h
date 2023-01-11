@@ -6,6 +6,7 @@
 #define SRC_PERFORMANCE_TRACE_MANAGER_TRACE_MANAGER_H_
 
 #include <fuchsia/tracing/controller/cpp/fidl.h>
+#include <fuchsia/tracing/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/interface_ptr_set.h>
@@ -22,8 +23,8 @@
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
-namespace provider = ::fuchsia::tracing::provider;
+namespace controller = fuchsia::tracing::controller;
+namespace provider = fuchsia::tracing::provider;
 
 // forward decl, here to break mutual header dependency
 class TraceManagerApp;

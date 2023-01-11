@@ -6,7 +6,7 @@ use {
     argh::FromArgs,
     ffx_core::ffx_command,
     fidl_fuchsia_developer_ffx::{Action, Trigger},
-    fidl_fuchsia_tracing_controller::BufferingMode,
+    fidl_fuchsia_tracing::BufferingMode,
 };
 
 #[ffx_command()]

@@ -112,6 +112,7 @@
 //sdk/fidl/fuchsia.thermal:fuchsia.thermal_sdk
 //sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto_sdk
 //sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_sdk
+//sdk/fidl/fuchsia.tracing:fuchsia.tracing_sdk
 //sdk/fidl/fuchsia.ui.activity.control:fuchsia.ui.activity.control_sdk
 //sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_sdk
 //sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_sdk

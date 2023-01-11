@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
+#include <fidl/fuchsia.tracing/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service_client.h>
 #include <lib/zx/socket.h>
 #include <stdlib.h>
@@ -23,7 +24,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
   const fuchsia_tracing_controller::TraceConfig config{
       {.buffer_size_megabytes_hint = uint32_t{4},
-       .buffering_mode = fuchsia_tracing_controller::BufferingMode::kOneshot}};
+       .buffering_mode = fuchsia_tracing::BufferingMode::kOneshot}};
   auto init_response = client->InitializeTracing({config, std::move(outgoing_socket)});
   ASSERT_TRUE(init_response.is_ok());
 

@@ -16,7 +16,7 @@ import (
 	"time"
 	"unsafe"
 
-	fidlprovider "fidl/fuchsia/tracing/provider"
+	"fidl/fuchsia/tracing"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/trace"
 )
@@ -115,7 +115,7 @@ func mapBufferHeader(t *testing.T, vmo zx.VMO, vmoSize uint64) *trace.BufferHead
 func TestSessionOneshotInitializeTerminate(t *testing.T) {
 	s, vmo, fifo, _ := newTestSession(t, vmoSize)
 
-	mode := fidlprovider.BufferingModeOneshot
+	mode := tracing.BufferingModeOneshot
 	categories := []string{"foo", "bar"}
 
 	if err := s.initializeEngine(mode, vmo, fifo, categories); err != nil {
@@ -135,14 +135,14 @@ func TestSessionOneshotInitializeTerminate(t *testing.T) {
 func TestSessionOneshotInitializeStartTerminate(t *testing.T) {
 	s, vmo, fifo, ch := newTestSession(t, vmoSize)
 
-	mode := fidlprovider.BufferingModeOneshot
+	mode := tracing.BufferingModeOneshot
 	categories := []string{"foo", "bar"}
 
 	if err := s.initializeEngine(mode, vmo, fifo, categories); err != nil {
 		t.Fatalf("initializeEngine(%d, _, _, %v) = %s", mode, categories, err)
 	}
 
-	if err := s.startEngine(fidlprovider.BufferDispositionClearEntire, []string{}); err != nil {
+	if err := s.startEngine(tracing.BufferDispositionClearEntire, []string{}); err != nil {
 		t.Fatalf("startEngine(_, _) = %s", err)
 	}
 
@@ -165,7 +165,7 @@ func TestSessionOneshotInitializeStartTerminate(t *testing.T) {
 func TestSessionCircularNotSupported(t *testing.T) {
 	s, vmo, fifo, _ := newTestSession(t, vmoSize)
 
-	mode := fidlprovider.BufferingModeCircular
+	mode := tracing.BufferingModeCircular
 	categories := []string{"foo", "bar"}
 
 	if got, want := s.initializeEngine(mode, vmo, fifo, categories), trace.ErrNotSupported; !errors.Is(got, want) {
@@ -176,7 +176,7 @@ func TestSessionCircularNotSupported(t *testing.T) {
 func TestSessionStreamingNotSupported(t *testing.T) {
 	s, vmo, fifo, _ := newTestSession(t, vmoSize)
 
-	mode := fidlprovider.BufferingModeStreaming
+	mode := tracing.BufferingModeStreaming
 	categories := []string{"foo", "bar"}
 
 	if got, want := s.initializeEngine(mode, vmo, fifo, categories), trace.ErrNotSupported; !errors.Is(got, want) {
@@ -208,7 +208,7 @@ func TestIsCategoryEnabled(t *testing.T) {
 		t.Run(tc.testName, func(t *testing.T) {
 			s, vmo, fifo, _ := newTestSession(t, vmoSize)
 
-			mode := fidlprovider.BufferingModeOneshot
+			mode := tracing.BufferingModeOneshot
 
 			if err := s.initializeEngine(mode, vmo, fifo, tc.initCategories); err != nil {
 				t.Fatalf("initializeEngine(%d, _, _, %v) = %s", mode, tc.initCategories, err)

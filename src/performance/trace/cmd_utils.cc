@@ -106,17 +106,17 @@ bool ParseAction(std::string_view value, Action* out_action) {
   return false;
 }
 
-controller::BufferingMode TranslateBufferingMode(BufferingMode mode) {
+fuchsia::tracing::BufferingMode TranslateBufferingMode(BufferingMode mode) {
   switch (mode) {
     case BufferingMode::kOneshot:
-      return controller::BufferingMode::ONESHOT;
+      return fuchsia::tracing::BufferingMode::ONESHOT;
     case BufferingMode::kCircular:
-      return controller::BufferingMode::CIRCULAR;
+      return fuchsia::tracing::BufferingMode::CIRCULAR;
     case BufferingMode::kStreaming:
-      return controller::BufferingMode::STREAMING;
+      return fuchsia::tracing::BufferingMode::STREAMING;
     default:
       FX_NOTREACHED();
-      return controller::BufferingMode::ONESHOT;
+      return fuchsia::tracing::BufferingMode::ONESHOT;
   }
 }
 

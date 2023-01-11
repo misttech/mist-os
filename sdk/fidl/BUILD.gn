@@ -105,6 +105,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.sys.test:fuchsia.sys.test",
   "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal",
+  "//sdk/fidl/fuchsia.tracing:fuchsia.tracing",
   "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider",
   "//sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto",
   "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity",

@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
+	fidltracing "fidl/fuchsia/tracing"
 	fidlprovider "fidl/fuchsia/tracing/provider"
 )
 
@@ -64,6 +65,10 @@ func (p *providerImpl) Terminate(fidl.Context) error {
 		_ = syslog.ErrorTf(tag, "Terminate failed: %s", err)
 	}
 	return nil
+}
+
+func (*providerImpl) GetKnownCategories(fidl.Context) ([]fidltracing.KnownCategory, error) {
+	return nil, nil
 }
 
 func Create() error {

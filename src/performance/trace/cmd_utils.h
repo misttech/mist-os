@@ -18,11 +18,12 @@
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
+namespace controller = fuchsia::tracing::controller;
 
 constexpr uint32_t kDefaultDurationSeconds = 10;
 constexpr uint32_t kDefaultBufferSizeMegabytes = 4;
-constexpr controller::BufferingMode kDefaultBufferingMode = controller::BufferingMode::ONESHOT;
+constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
+    fuchsia::tracing::BufferingMode::ONESHOT;
 
 constexpr char kDefaultOutputFileName[] = "/tmp/trace.json";
 constexpr char kDefaultBinaryOutputFileName[] = "/tmp/trace.fxt";
@@ -41,7 +42,7 @@ bool ParseTriggers(const std::vector<std::string_view>& values,
 
 bool ParseAction(std::string_view value, Action* out_action);
 
-controller::BufferingMode TranslateBufferingMode(BufferingMode mode);
+fuchsia::tracing::BufferingMode TranslateBufferingMode(BufferingMode mode);
 
 // Uniquify the list, with later entries overriding earlier entries,
 // and convert to the FIDL form.

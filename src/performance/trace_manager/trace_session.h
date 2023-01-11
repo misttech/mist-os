@@ -6,6 +6,7 @@
 #define SRC_PERFORMANCE_TRACE_MANAGER_TRACE_SESSION_H_
 
 #include <fuchsia/tracing/controller/cpp/fidl.h>
+#include <fuchsia/tracing/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/string.h>
@@ -20,15 +21,13 @@
 #include <vector>
 
 #include "src/lib/fxl/memory/ref_counted.h"
-#include "src/lib/fxl/memory/ref_ptr.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/performance/trace_manager/trace_provider_bundle.h"
 #include "src/performance/trace_manager/tracee.h"
 
 namespace tracing {
 
-namespace controller = ::fuchsia::tracing::controller;
-namespace provider = ::fuchsia::tracing::provider;
+namespace controller = fuchsia::tracing::controller;
 
 // TraceSession keeps track of all TraceProvider instances that
 // are active for a tracing session.
@@ -65,7 +64,8 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   // |abort_handler| is invoked whenever the session encounters
   // unrecoverable errors that render the session dead.
   explicit TraceSession(zx::socket destination, std::vector<std::string> categories,
-                        size_t buffer_size_megabytes, provider::BufferingMode buffering_mode,
+                        size_t buffer_size_megabytes,
+                        fuchsia::tracing::BufferingMode buffering_mode,
                         TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                         zx::duration stop_timeout, fit::closure abort_handler,
                         AlertCallback alert_callback);
@@ -102,7 +102,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   // Starts the trace.
   // Invokes |callback| when all providers in this session have
   // acknowledged the start request, or after |start_timeout_| has elapsed.
-  void Start(controller::BufferDisposition buffer_disposition,
+  void Start(fuchsia::tracing::BufferDisposition buffer_disposition,
              const std::vector<std::string>& additional_categories,
              controller::Controller::StartTracingCallback callback);
 
@@ -164,7 +164,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   zx::socket destination_;
   fidl::VectorPtr<std::string> categories_;
   size_t buffer_size_megabytes_;
-  provider::BufferingMode buffering_mode_;
+  fuchsia::tracing::BufferingMode buffering_mode_;
   TraceProviderSpecMap provider_specs_;
   zx::duration start_timeout_;
   // The stop timeout is used for both stopping and terminating.

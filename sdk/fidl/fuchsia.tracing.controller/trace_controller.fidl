@@ -3,22 +3,11 @@
 // found in the LICENSE file.
 library fuchsia.tracing.controller;
 
+using fuchsia.tracing;
 using zx;
 
 /// The maximum number of providers supported.
 const MAX_NUM_PROVIDERS uint32 = 100;
-
-/// The maximum length of a provider's name.
-const MAX_PROVIDER_NAME_LENGTH uint32 = 100;
-
-/// The maximum number of categories supported.
-const MAX_NUM_CATEGORIES uint32 = 100;
-
-/// The maximum length of a category name.
-const MAX_CATEGORY_NAME_LENGTH uint32 = 100;
-
-/// The maximum length of a category description.
-const MAX_CATEGORY_DESCRIPTION_LENGTH uint32 = 400;
 
 /// The maximum length of an alert name.
 const MAX_ALERT_NAME_LENGTH uint32 = 14;
@@ -113,7 +102,7 @@ protocol Controller {
 
     // Gets the known categories.
     GetKnownCategories() -> (struct {
-        categories vector<KnownCategory>:MAX_NUM_CATEGORIES;
+        categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
     });
 
     /// Event sent when the session state changes.
@@ -127,23 +116,17 @@ protocol Controller {
     });
 };
 
-// This is a copy of provider.fidl:BufferingMode.
-type BufferingMode = strict enum : uint8 {
-    ONESHOT = 0;
-    CIRCULAR = 1;
-    STREAMING = 2;
-};
-
 // Individual providers can be tuned with this.
 type ProviderSpec = table {
-    1: name string:MAX_PROVIDER_NAME_LENGTH;
+    1: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
     2: buffer_size_megabytes_hint uint32;
 };
 
 /// Provides options for the trace.
 type TraceConfig = table {
     /// The trace categories to record, or an empty array for all.
-    1: categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
+    1: categories
+            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 
     /// Suggested size of trace buffer which each provider should receive.
     // TODO(fxbug.dev/7932): Default to 4.
@@ -154,7 +137,7 @@ type TraceConfig = table {
     3: start_timeout_milliseconds uint64;
 
     // TODO(fxbug.dev/7932), TODO(fxbug.dev/7810): Default to BufferingMode.ONESHOT.
-    4: buffering_mode BufferingMode;
+    4: buffering_mode fuchsia.tracing.BufferingMode;
 
     /// Overrides for particular providers.
     5: provider_specs vector<ProviderSpec>:MAX_NUM_PROVIDERS;
@@ -171,40 +154,6 @@ type TerminateOptions = table {
 type TerminateResult = table {
         // TODO(dje): Provider stats.
         };
-
-/// Choices for clearing/retaining trace buffer contents at Start.
-/// A brief summary of buffer contents:
-/// The trace buffer is divided into two main pieces: durable and
-/// non-durable.
-/// The durable portion contains things like the string and thread data for
-/// their respective references (trace_encoded_string_ref_t and
-/// trace_encoded_thread_ref_t). The non-durable portion contains the rest of
-/// the trace data like events); this is the portion that, for example, is
-/// discarded in circular buffering mode when the (non-durable) buffer fills.
-type BufferDisposition = strict enum : uint8 {
-    /// Clear the entire buffer, including durable buffer contents.
-    /// N.B. If this is done mid-session, then string and thread references
-    /// from prior to this point will become invalid - the underlying data
-    /// will be gone. To prevent this save buffer contents before clearing.
-    ///
-    /// This is typically used when buffer contents were saved after the
-    /// preceding Stop.
-    CLEAR_ALL = 1;
-
-    /// Clear the non-durable portion of the buffer, retaining the durable
-    /// portion.
-    ///
-    /// This is typically used when buffer contents were not saved after the
-    /// preceding Stop and the current contents are to be discarded.
-    CLEAR_NONDURABLE = 2;
-
-    /// Retain buffer contents. New trace data is added whether the previous
-    /// trace run left off.
-    ///
-    /// This is typically used when buffer contents were not saved after the
-    /// preceding Stop and the current contents are to be retained.
-    RETAIN = 3;
-};
 
 /// Error codes from Start operations.
 type StartErrorCode = strict enum {
@@ -227,12 +176,13 @@ type StartOptions = table {
     /// If the preceding `Stop()` request had `save_after_stopped=true`
     /// then this value is overridden to CLEAR_ENTIRE_BUFFER to avoid
     /// duplicate data being saved.
-    1: buffer_disposition BufferDisposition;
+    1: buffer_disposition fuchsia.tracing.BufferDisposition;
 
     /// The trace categories to add to the initial set provided in
     /// `TraceConfig`. If the combined number of categories goes over the
     /// limit then the extra categories past the limit are discarded.
-    2: additional_categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
+    2: additional_categories
+            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 };
 
 /// Additional options to control stopping of a trace.
@@ -244,14 +194,6 @@ type StopOptions = table {
     1: write_results bool;
 };
 
-/// Result of `GetKnownCategories`.
-type KnownCategory = struct {
-    // Category name.
-    name string:MAX_CATEGORY_NAME_LENGTH;
-    // Category description.
-    description string:MAX_CATEGORY_DESCRIPTION_LENGTH;
-};
-
 /// Result of `GetProviders`.
 type ProviderInfo = table {
     /// The provider's ID, assigned by trace-manager.
@@ -261,5 +203,5 @@ type ProviderInfo = table {
     2: pid zx.koid;
 
     /// The name of the provider.
-    3: name string:MAX_PROVIDER_NAME_LENGTH;
+    3: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
 };

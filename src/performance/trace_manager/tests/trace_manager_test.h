@@ -23,7 +23,7 @@
 namespace tracing {
 namespace test {
 
-namespace controller = ::fuchsia::tracing::controller;
+namespace controller = fuchsia::tracing::controller;
 
 class TraceManagerTest : public gtest::TestLoopFixture {
  public:

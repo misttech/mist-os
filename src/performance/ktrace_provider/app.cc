@@ -88,7 +88,7 @@ void RequestKtraceRewind(Controller_SyncProxy& controller) {
 
 void RequestKtraceStart(Controller_SyncProxy& controller, trace_buffering_mode_t buffering_mode,
                         uint32_t group_mask) {
-  using BufferingMode = ::fuchsia::tracing::provider::BufferingMode;
+  using BufferingMode = fuchsia::tracing::BufferingMode;
   zx_status_t start_status;
   zx_status_t status;
 

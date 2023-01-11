@@ -20,14 +20,14 @@ namespace tracing {
 
 namespace {
 
-provider::BufferingMode EngineBufferingModeToProviderMode(trace_buffering_mode_t mode) {
+fuchsia::tracing::BufferingMode EngineBufferingModeToProviderMode(trace_buffering_mode_t mode) {
   switch (mode) {
     case TRACE_BUFFERING_MODE_ONESHOT:
-      return provider::BufferingMode::ONESHOT;
+      return fuchsia::tracing::BufferingMode::ONESHOT;
     case TRACE_BUFFERING_MODE_CIRCULAR:
-      return provider::BufferingMode::CIRCULAR;
+      return fuchsia::tracing::BufferingMode::CIRCULAR;
     case TRACE_BUFFERING_MODE_STREAMING:
-      return provider::BufferingMode::STREAMING;
+      return fuchsia::tracing::BufferingMode::STREAMING;
     default:
       __UNREACHABLE;
   }
@@ -73,9 +73,9 @@ Tracee::~Tracee() {
 bool Tracee::operator==(TraceProviderBundle* bundle) const { return bundle_ == bundle; }
 
 bool Tracee::Initialize(fidl::VectorPtr<std::string> categories, size_t buffer_size,
-                        provider::BufferingMode buffering_mode, StartCallback start_callback,
-                        StopCallback stop_callback, TerminateCallback terminate_callback,
-                        AlertCallback alert_callback) {
+                        fuchsia::tracing::BufferingMode buffering_mode,
+                        StartCallback start_callback, StopCallback stop_callback,
+                        TerminateCallback terminate_callback, AlertCallback alert_callback) {
   FX_DCHECK(state_ == State::kReady);
   FX_DCHECK(!buffer_vmo_);
   FX_DCHECK(start_callback);
@@ -107,7 +107,7 @@ bool Tracee::Initialize(fidl::VectorPtr<std::string> categories, size_t buffer_s
     return false;
   }
 
-  provider::ProviderConfig provider_config;
+  fuchsia::tracing::provider::ProviderConfig provider_config;
   provider_config.buffering_mode = buffering_mode;
   provider_config.buffer = std::move(buffer_vmo_for_provider);
   provider_config.fifo = std::move(fifo_for_provider);
@@ -144,28 +144,15 @@ void Tracee::Terminate() {
   TransitionToState(State::kTerminating);
 }
 
-void Tracee::Start(controller::BufferDisposition buffer_disposition,
+void Tracee::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
                    const std::vector<std::string>& additional_categories) {
   // TraceSession should not call us unless we're ready, either because this
   // is the first time, or subsequent times after tracing has fully stopped
   // from the preceding time.
   FX_DCHECK(state_ == State::kInitialized || state_ == State::kStopped);
 
-  provider::StartOptions start_options;
-  switch (buffer_disposition) {
-    case controller::BufferDisposition::CLEAR_ALL:
-      start_options.buffer_disposition = provider::BufferDisposition::CLEAR_ENTIRE;
-      break;
-    case controller::BufferDisposition::CLEAR_NONDURABLE:
-      start_options.buffer_disposition = provider::BufferDisposition::CLEAR_NONDURABLE;
-      break;
-    case controller::BufferDisposition::RETAIN:
-      start_options.buffer_disposition = provider::BufferDisposition::RETAIN;
-      break;
-    default:
-      FX_NOTREACHED();
-      break;
-  }
+  fuchsia::tracing::provider::StartOptions start_options;
+  start_options.buffer_disposition = buffer_disposition;
   start_options.additional_categories = additional_categories;
   bundle_->provider->Start(std::move(start_options));
 
@@ -260,7 +247,7 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
       }
       break;
     case TRACE_PROVIDER_SAVE_BUFFER:
-      if (buffering_mode_ != provider::BufferingMode::STREAMING) {
+      if (buffering_mode_ != fuchsia::tracing::BufferingMode::STREAMING) {
         FX_LOGS(WARNING) << *bundle_ << ": Received TRACE_PROVIDER_SAVE_BUFFER in mode "
                          << ModeName(buffering_mode_);
       } else if (state_ == State::kStarted || state_ == State::kStopping ||
@@ -393,7 +380,7 @@ TransferStatus Tracee::WriteChunk(const zx::socket& socket, uint64_t offset, uin
   ZX_DEBUG_ASSERT(end <= buffer_size);
   ZX_DEBUG_ASSERT(end == 0 || last <= end);
   offset += last;
-  if (buffering_mode_ == provider::BufferingMode::ONESHOT ||
+  if (buffering_mode_ == fuchsia::tracing::BufferingMode::ONESHOT ||
       // If end is zero then the header wasn't updated when tracing stopped.
       end == 0) {
     uint64_t size = buffer_size - last;
@@ -446,7 +433,7 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
     }
   }
 
-  if (buffering_mode_ != provider::BufferingMode::ONESHOT) {
+  if (buffering_mode_ != fuchsia::tracing::BufferingMode::ONESHOT) {
     uint64_t offset = header->get_durable_buffer_offset();
     uint64_t last = last_durable_data_end_;
     uint64_t end = header->durable_data_end();
@@ -515,7 +502,7 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
 
 void Tracee::TransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
                             uint64_t durable_data_end) {
-  FX_DCHECK(buffering_mode_ == provider::BufferingMode::STREAMING);
+  FX_DCHECK(buffering_mode_ == fuchsia::tracing::BufferingMode::STREAMING);
   FX_DCHECK(socket);
   FX_DCHECK(buffer_vmo_);
 
@@ -684,13 +671,13 @@ void Tracee::Abort() {
   Terminate();
 }
 
-const char* Tracee::ModeName(provider::BufferingMode mode) {
+const char* Tracee::ModeName(fuchsia::tracing::BufferingMode mode) {
   switch (mode) {
-    case provider::BufferingMode::ONESHOT:
+    case fuchsia::tracing::BufferingMode::ONESHOT:
       return "oneshot";
-    case provider::BufferingMode::CIRCULAR:
+    case fuchsia::tracing::BufferingMode::CIRCULAR:
       return "circular";
-    case provider::BufferingMode::STREAMING:
+    case fuchsia::tracing::BufferingMode::STREAMING:
       return "streaming";
   }
 }

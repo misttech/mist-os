@@ -5,6 +5,7 @@
 #include "src/performance/trace_manager/trace_manager.h"
 
 #include <fuchsia/sys/cpp/fidl.h>
+#include <fuchsia/tracing/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/zx/time.h>
 
@@ -25,7 +26,8 @@ constexpr uint32_t kMaxBufferSizeMegabytes = 64;
 // These defaults are copied from fuchsia.tracing/trace_controller.fidl.
 constexpr uint32_t kDefaultBufferSizeMegabytesHint = 4;
 constexpr uint32_t kDefaultStartTimeoutMilliseconds = 5000;
-constexpr controller::BufferingMode kDefaultBufferingMode = controller::BufferingMode::ONESHOT;
+constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
+    fuchsia::tracing::BufferingMode::ONESHOT;
 
 constexpr size_t kMaxAlertQueueDepth = 16;
 
@@ -87,23 +89,19 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
     }
   }
 
-  controller::BufferingMode tracing_buffering_mode = kDefaultBufferingMode;
+  fuchsia::tracing::BufferingMode tracing_buffering_mode = kDefaultBufferingMode;
   if (config.has_buffering_mode()) {
     tracing_buffering_mode = config.buffering_mode();
   }
-  provider::BufferingMode provider_buffering_mode;
   const char* mode_name;
   switch (tracing_buffering_mode) {
-    case controller::BufferingMode::ONESHOT:
-      provider_buffering_mode = provider::BufferingMode::ONESHOT;
+    case fuchsia::tracing::BufferingMode::ONESHOT:
       mode_name = "oneshot";
       break;
-    case controller::BufferingMode::CIRCULAR:
-      provider_buffering_mode = provider::BufferingMode::CIRCULAR;
+    case fuchsia::tracing::BufferingMode::CIRCULAR:
       mode_name = "circular";
       break;
-    case controller::BufferingMode::STREAMING:
-      provider_buffering_mode = provider::BufferingMode::STREAMING;
+    case fuchsia::tracing::BufferingMode::STREAMING:
       mode_name = "streaming";
       break;
     default:
@@ -132,7 +130,7 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
 
   session_ = fxl::MakeRefCounted<TraceSession>(
       std::move(output), std::move(categories), default_buffer_size_megabytes,
-      provider_buffering_mode, std::move(provider_specs), zx::msec(start_timeout_milliseconds),
+      tracing_buffering_mode, std::move(provider_specs), zx::msec(start_timeout_milliseconds),
       kStopTimeout, [this]() { session_ = nullptr; },
       [this](const std::string& alert_name) { OnAlert(alert_name); });
 
@@ -217,13 +215,14 @@ void TraceManager::StartTracing(controller::StartOptions options,
   }
 
   // This default matches trace's.
-  controller::BufferDisposition buffer_disposition = controller::BufferDisposition::RETAIN;
+  fuchsia::tracing::BufferDisposition buffer_disposition =
+      fuchsia::tracing::BufferDisposition::RETAIN;
   if (options.has_buffer_disposition()) {
     buffer_disposition = options.buffer_disposition();
     switch (buffer_disposition) {
-      case controller::BufferDisposition::CLEAR_ALL:
-      case controller::BufferDisposition::CLEAR_NONDURABLE:
-      case controller::BufferDisposition::RETAIN:
+      case fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE:
+      case fuchsia::tracing::BufferDisposition::CLEAR_NONDURABLE:
+      case fuchsia::tracing::BufferDisposition::RETAIN:
         break;
       default:
         FX_LOGS(ERROR) << "Bad value for buffer disposition: " << buffer_disposition
@@ -285,9 +284,9 @@ void TraceManager::GetProviders(GetProvidersCallback callback) {
 // fidl
 void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
   FX_VLOGS(2) << "GetKnownCategories";
-  std::vector<controller::KnownCategory> known_categories;
+  std::vector<::fuchsia::tracing::KnownCategory> known_categories;
   for (const auto& it : config_.known_categories()) {
-    known_categories.push_back(controller::KnownCategory{it.first, it.second});
+    known_categories.push_back(fuchsia::tracing::KnownCategory{it.first, it.second});
   }
   callback(std::move(known_categories));
 }
