@@ -35,6 +35,8 @@ WEAK void BeginRecord(LogBuffer* buffer, syslog::LogSeverity severity, const cha
 
 WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value);
 
+WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value, size_t value_length);
+
 WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, int64_t value);
 
 WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, uint64_t value);
@@ -154,6 +156,16 @@ struct LogBuffer {
   // Encodes a NULL-terminated C-string.
   void Encode(KeyValue<const char*, char*> value) {
     syslog_backend::WriteKeyValue(this, value.key, value.value);
+  }
+
+  // Encodes a C++ std::string.
+  void Encode(KeyValue<const char*, std::string> value) {
+    syslog_backend::WriteKeyValue(this, value.key, value.value.data(), value.value.size());
+  }
+
+  // Encodes a C++ std::string_view.
+  void Encode(KeyValue<const char*, std::string_view> value) {
+    syslog_backend::WriteKeyValue(this, value.key, value.value.data(), value.value.size());
   }
 
   // Encodes a double floating point value

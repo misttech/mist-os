@@ -630,6 +630,10 @@ void BeginRecordWithSocket(LogBuffer* buffer, syslog::LogSeverity severity, cons
 }
 
 void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value) {
+  WriteKeyValue(buffer, key, value, strlen(value));
+}
+
+void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value, size_t value_length) {
   auto* state = RecordState::CreatePtr(buffer);
   ExternalDataBuffer external_buffer(buffer);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
@@ -638,7 +642,7 @@ void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value) {
                   key, WordOffset<const char>::FromByteOffset(ByteOffset::Unbounded(strlen(key)))));
   encoder.AppendArgumentValue(
       *state, DataSlice<const char>(value, WordOffset<const char>::FromByteOffset(
-                                               ByteOffset::Unbounded(strlen(value)))));
+                                               ByteOffset::Unbounded(value_length))));
 }
 
 void WriteKeyValue(LogBuffer* buffer, const char* key, int64_t value) {

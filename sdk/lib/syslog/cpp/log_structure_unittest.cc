@@ -22,6 +22,10 @@ namespace syslog {
 
 TEST(StructuredLogging, Log) {
   FX_SLOG(WARNING, "test_log", KV("foo", "bar"));
+  constexpr std::string_view kStringView = "string_view";
+  FX_SLOG(WARNING, "test_log", KV("foo", kStringView));
+  const std::string kString = "string";
+  FX_SLOG(WARNING, "test_log", KV("foo", kString));
   // TODO(fxbug.dev/57482): Figure out how to verify this appropriately.
 }
 

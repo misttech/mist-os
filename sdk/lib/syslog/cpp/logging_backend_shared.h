@@ -115,6 +115,9 @@ void BeginRecordLegacy(LogBuffer* buffer, syslog::LogSeverity severity, const ch
 
 void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value);
 
+void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value,
+                         size_t value_length);
+
 void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, int64_t value);
 
 void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, uint64_t value);

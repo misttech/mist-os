@@ -92,6 +92,10 @@ void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
+void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value, size_t value_length) {
+  WriteKeyValueLegacy(buffer, key, value, value_length);
+}
+
 void WriteKeyValue(LogBuffer* buffer, const char* key, int64_t value) {
   WriteKeyValueLegacy(buffer, key, value);
 }

@@ -59,20 +59,25 @@ MsgHeader* StartKv(LogBuffer* buffer, const char* key) {
 }
 
 void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value) {
+  WriteKeyValueLegacy(buffer, key, value, strlen(value));
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value,
+                         size_t value_length) {
   // "tag" has special meaning to our logging API
-  if (strcmp("tag", key) == 0) {
+  if (strncmp("tag", key, value_length) == 0) {
     auto header = MsgHeader::CreatePtr(buffer);
-    auto tag_size = strlen(value) + 1;
+    auto tag_size = value_length + 1;
     header->user_tag = (reinterpret_cast<char*>(buffer->data) + sizeof(buffer->data)) - tag_size;
-    memcpy(header->user_tag, value, tag_size);
+    memcpy(header->user_tag, value, value_length);
+    header->user_tag[value_length] = '\0';
     return;
   }
   auto header = StartKv(buffer, key);
   header->WriteChar('"');
-  if (strchr(value, '"') != nullptr) {
+  if (memchr(value, '"', value_length) != nullptr) {
     // Escape quotes in strings.
-    size_t len = strlen(value);
-    for (size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < value_length; ++i) {
       char c = value[i];
       if (c == '"') {
         header->WriteChar('\\');
