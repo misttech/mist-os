@@ -1839,7 +1839,7 @@ async fn from_relative_url() -> Result<(), Error> {
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     let echo_client_decl: fcdecl::Component =
-        fuchsia_fs::read_file_fidl(&echo_client_decl_file).await?;
+        fuchsia_fs::file::read_fidl(&echo_client_decl_file).await?;
 
     assert_eq!(
         builder.get_component_decl("echo_client").await?,
@@ -1851,7 +1851,7 @@ async fn from_relative_url() -> Result<(), Error> {
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     let echo_server_decl: fcdecl::Component =
-        fuchsia_fs::read_file_fidl(&echo_server_decl_file).await?;
+        fuchsia_fs::file::read_fidl(&echo_server_decl_file).await?;
 
     assert_eq!(
         builder.get_component_decl("echo_server").await?,
@@ -1863,7 +1863,7 @@ async fn from_relative_url() -> Result<(), Error> {
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
     let mut echo_realm_decl: fcdecl::Component =
-        fuchsia_fs::read_file_fidl(&echo_realm_decl_file).await?;
+        fuchsia_fs::file::read_fidl(&echo_realm_decl_file).await?;
 
     // The realm builder server removes these decls so it can manage them itself
     echo_realm_decl.children = Some(vec![]);

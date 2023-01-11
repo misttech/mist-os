@@ -298,9 +298,10 @@ impl Registry {
             fio::OpenFlags::RIGHT_READABLE,
         )
         .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
-        let component_decl: fcdecl::Component = fuchsia_fs::read_file_fidl(&manifest_file)
-            .await
-            .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
+        let component_decl: fcdecl::Component =
+            fuchsia_fs::file::read_fidl(&manifest_file)
+                .await
+                .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         cm_fidl_validator::validate(&component_decl)
             .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>()

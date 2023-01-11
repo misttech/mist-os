@@ -494,7 +494,7 @@ mod tests {
         )
         .expect("could not open cm");
 
-        let decl = fuchsia_fs::read_file_fidl::<fdecl::Component>(&file_proxy)
+        let decl = fuchsia_fs::file::read_fidl::<fdecl::Component>(&file_proxy)
             .await
             .expect("could not read cm");
         let decl = decl.fidl_into_native();

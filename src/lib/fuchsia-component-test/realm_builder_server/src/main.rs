@@ -1036,7 +1036,7 @@ impl RealmNode2 {
                 }
             };
 
-            let fidl_decl = fuchsia_fs::read_file_fidl::<fcdecl::Component>(&file_proxy)
+            let fidl_decl = fuchsia_fs::file::read_fidl::<fcdecl::Component>(&file_proxy)
                 .await
                 .map_err(|e| RealmBuilderError::DeclReadError(relative_url.clone(), e))?;
             cm_fidl_validator::validate(&fidl_decl).map_err(|e| {
@@ -2820,7 +2820,7 @@ mod tests {
             fio::OpenFlags::RIGHT_READABLE,
         )
         .expect("failed to open manifest");
-        let a_decl = fuchsia_fs::read_file_fidl::<fcdecl::Component>(&a_decl_file)
+        let a_decl = fuchsia_fs::file::read_fidl::<fcdecl::Component>(&a_decl_file)
             .await
             .expect("failed to read manifest")
             .fidl_into_native();
@@ -2861,7 +2861,7 @@ mod tests {
         )
         .expect("failed to open manifest");
         let mut realm_with_child_decl =
-            fuchsia_fs::read_file_fidl::<fcdecl::Component>(&realm_with_child_decl_file)
+            fuchsia_fs::file::read_fidl::<fcdecl::Component>(&realm_with_child_decl_file)
                 .await
                 .expect("failed to read manifest")
                 .fidl_into_native();
@@ -2873,7 +2873,7 @@ mod tests {
         let a_decl_file =
             fuchsia_fs::file::open_in_namespace("/pkg/meta/a.cm", fio::OpenFlags::RIGHT_READABLE)
                 .expect("failed to open manifest");
-        let a_decl = fuchsia_fs::read_file_fidl::<fcdecl::Component>(&a_decl_file)
+        let a_decl = fuchsia_fs::file::read_fidl::<fcdecl::Component>(&a_decl_file)
             .await
             .expect("failed to read manifest")
             .fidl_into_native();

@@ -43,7 +43,7 @@ impl AboveRootCapabilitiesForTest {
         let path = format!("/pkg/meta/{}", manifest_name);
         let file_proxy =
             fuchsia_fs::file::open_in_namespace(&path, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
-        let component_decl = fuchsia_fs::read_file_fidl::<fdecl::Component>(&file_proxy).await?;
+        let component_decl = fuchsia_fs::file::read_fidl::<fdecl::Component>(&file_proxy).await?;
         let collection_data = Self::load(component_decl);
         Ok(Self { collection_data })
     }

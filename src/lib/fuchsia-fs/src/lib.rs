@@ -1,19 +1,10 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 //! fuchsia.IO UTIL-ity library
-//!
-//! This crate provides various helper functions for iteracting with
-//! `fidl_fuchsia_io::{DirectoryProxy, FileProxy, NodeProxy}` objects.
-//!
-//! Functions in the top-level module are deprecated. New uses of `io_util` should use the
-//! `directory`, `file`, or `node` modules instead.
-//!
-//! Functions that contain `in_namespace` in their name operate on absolute paths in the process's
-//! current namespace and utilize a blocking `fdio` call to open the proxy.
 
-use {anyhow::Error, fidl::encoding::Persistable, fidl_fuchsia_io as fio};
+use {fidl_fuchsia_io as fio};
 
 pub mod directory;
 pub mod file;
@@ -21,14 +12,6 @@ pub mod node;
 
 // Reexported from fidl_fuchsia_io for convenience
 pub use fio::OpenFlags;
-
-/// Read the given FIDL message from binary form from a file open for reading.
-/// FIDL structure should be provided at a read time.
-/// Incompatible data is populated as per FIDL ABI compatibility guide:
-/// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
-pub async fn read_file_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, Error> {
-    Ok(file::read_fidl(file).await?)
-}
 
 /// canonicalize_path will remove a leading `/` if it exists, since it's always unnecessary and in
 /// some cases disallowed (fxbug.dev/28436).
@@ -46,6 +29,7 @@ pub fn canonicalize_path(path: &str) -> &str {
 mod tests {
     use {
         super::*,
+        anyhow::Error,
         fidl::endpoints::ServerEnd,
         fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
         std::{fs, path::Path},

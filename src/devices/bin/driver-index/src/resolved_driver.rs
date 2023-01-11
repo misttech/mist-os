@@ -235,7 +235,7 @@ pub async fn load_driver(
         format!("{}: Failed to open component manifest file", component_url.as_str())
     })?;
 
-    let component: fdecl::Component = fuchsia_fs::read_file_fidl(&component)
+    let component: fdecl::Component = fuchsia_fs::file::read_fidl(&component)
         .await
         .with_context(|| format!("{}: Failed to read component", component_url.as_str()))?;
     let component: cm_rust::ComponentDecl = component.fidl_into_native();

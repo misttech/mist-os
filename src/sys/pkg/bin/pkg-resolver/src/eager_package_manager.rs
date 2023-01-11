@@ -288,7 +288,7 @@ impl<T: Resolver> EagerPackageManager<T> {
         };
 
         let persistent_packages =
-            fuchsia_fs::read_file_fidl::<PersistentEagerPackages>(&file_proxy)
+            fuchsia_fs::file::read_fidl::<PersistentEagerPackages>(&file_proxy)
                 .await
                 .context("while reading eager_packages.pf")?;
 
