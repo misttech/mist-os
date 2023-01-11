@@ -89,6 +89,7 @@ sdk_source_set("backend_host") {
   sources = [
     "logging_backend_host.cc",
     "logging_backend_shared.cc",
+    "logging_backend_shared.h",
   ]
 
   deps = [ ":cpp" ]
@@ -121,7 +122,10 @@ sdk_source_set("backend_fuchsia_lib") {
     "fx_log_api.cc",
     "logging_backend_fuchsia.cc",
     "logging_backend_fuchsia_globals.h",
+    "logging_backend_fuchsia_private.h",
     "logging_backend_shared.cc",
+    "logging_backend_shared.h",
+    "macros.h",
   ]
 
   deps = [
@@ -157,7 +161,9 @@ sdk_source_set("backend_fuchsia_compat") {
     "fx_log_api_null.cc",
     "logging_backend_fuchsia.cc",
     "logging_backend_fuchsia_globals.h",
+    "logging_backend_fuchsia_private.h",
     "logging_backend_shared.cc",
+    "logging_backend_shared.h",
   ]
 
   deps = [

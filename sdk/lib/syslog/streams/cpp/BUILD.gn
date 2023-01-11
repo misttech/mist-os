@@ -20,9 +20,12 @@ sdk_source_set("streams-encoder") {
   category = "internal"
   sdk_name = "streams_encoder"
 
+  include_base = "//sdk"
+
   sources = [
     "encode.cc",
     "encode.h",
+    "fields.h",
   ]
 
   public_deps = [

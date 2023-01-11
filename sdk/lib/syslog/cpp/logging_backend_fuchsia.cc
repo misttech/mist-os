@@ -25,10 +25,10 @@
 #include <iostream>
 #include <sstream>
 
+#include "lib/syslog/cpp/logging_backend_fuchsia_private.h"
+#include "lib/syslog/cpp/logging_backend_shared.h"
+#include "lib/syslog/cpp/macros.h"
 #include "lib/syslog/streams/cpp/fields.h"
-#include "logging_backend_fuchsia_private.h"
-#include "logging_backend_shared.h"
-#include "macros.h"
 
 namespace syslog_backend {
 

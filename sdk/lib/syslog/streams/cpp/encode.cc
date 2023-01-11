@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "encode.h"
+#include "lib/syslog/streams/cpp/encode.h"
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <fuchsia/diagnostics/stream/cpp/fidl.h>
@@ -12,7 +12,7 @@
 #include <iostream>
 #include <vector>
 
-#include "fields.h"
+#include "lib/syslog/streams/cpp/fields.h"
 
 namespace streams {
 namespace {
