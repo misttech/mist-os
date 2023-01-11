@@ -393,7 +393,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         strictness = method->modifiers->maybe_strictness->value;
       } else if (experimental_flags().IsFlagEnabled(
                      ExperimentalFlags::Flag::kUnknownInteractionsMandate)) {
-        Fail(ErrMethodMustDefineStrictness, method_name, method_name.data());
+        FixableError(ErrMethodMustDefineStrictness, method_name, method_name.data());
       } else if (experimental_flags().IsFlagEnabled(
                      ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults)) {
         strictness = types::Strictness::kFlexible;
@@ -514,8 +514,8 @@ void ConsumeStep::ConsumeProtocolDeclaration(
     openness = protocol_declaration->modifiers->maybe_openness->value;
   } else if (experimental_flags().IsFlagEnabled(
                  ExperimentalFlags::Flag::kUnknownInteractionsMandate)) {
-    Fail(ErrProtocolMustDefineOpenness, protocol_declaration->identifier->span(),
-         protocol_declaration->identifier->span().data());
+    FixableError(ErrProtocolMustDefineOpenness, protocol_declaration->identifier->span(),
+                 protocol_declaration->identifier->span().data());
   }
 
   RegisterDecl(std::make_unique<Protocol>(protocol_declaration->source_signature(),

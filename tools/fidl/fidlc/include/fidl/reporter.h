@@ -66,21 +66,19 @@ class Reporter {
     Report(Diagnostic::MakeWarning(def, span, args...));
   }
 
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void Warn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) {
-    Report(Diagnostic::MakeWarning(def, span, args...));
-  }
-
   // Reports an error or warning.
   void Report(std::unique_ptr<Diagnostic> diag);
 
   // Reports a fixable error. This differs slightly from |Fail| in that it should never stop
-  // compilation, but rather may optionally be reported when it completes.
+  // compilation, but rather may optionally be reported when it completes. In essence, except for
+  // how it is surfaced when reporting diagnostics, a |FixableError()| call should be thought of as
+  // a |Warn()|, with the compiler able to proceed past it.
   template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void FixableFail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
-                   const identity_t<Args>&... args) {
-    Report(Diagnostic::MakeError(def, span, args...));
+  void FixableError(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
+                    const identity_t<Args>&... args) {
+    if (!ignore_fixables_) {
+      Report(Diagnostic::MakeError(def, span, args...));
+    }
   }
 
   // Reports a fixable warning. This differs slightly from |Fail| in that it should never stop
@@ -88,7 +86,9 @@ class Reporter {
   template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
   void FixableWarn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
                    const identity_t<Args>&... args) {
-    Report(Diagnostic::MakeWarning(def, span, args...));
+    if (!ignore_fixables_) {
+      Report(Diagnostic::MakeWarning(def, span, args...));
+    }
   }
 
   // Combines errors and warnings and sorts by (file, span).
@@ -104,9 +104,9 @@ class Reporter {
   const ProgramInvocation& program_invocation() const { return program_invocation_; }
   const std::vector<std::unique_ptr<Diagnostic>>& errors() const { return errors_; }
   const std::vector<std::unique_ptr<Diagnostic>>& warnings() const { return warnings_; }
+  bool ignore_fixables() const { return ignore_fixables_; }
+  void set_ignore_fixables(bool value) { ignore_fixables_ = value; }
   void set_warnings_as_errors(bool value) { warnings_as_errors_ = value; }
-  bool silence_fixables() const { return silence_fixables_; }
-  void set_silence_fixables(bool value) { silence_fixables_ = value; }
 
   // Formats a diagnostic message for the command line, displaying the filename,
   // line, column, diagnostic kind, and the full line where the span occurs,
@@ -121,11 +121,10 @@ class Reporter {
 
   bool warnings_as_errors_ = false;
 
-  // This mode is useful when we are running |fidl-fix| itself. We don't want parsing to fail due to
-  // the error we are trying to fix, or for one fixable error to interfere with the fixing operation
-  // on another, so we just turn of fix reporting altogether. We still record the errors/warning
-  // like usual, but simply refrain from reporting them.
-  bool silence_fixables_ = false;
+  // This mode is useful when we are running |fidl-fix| itself. We don't want parsing to fail due
+  // to the error we are trying to fix, or for one fixable error to interfere with the fixing
+  // operation on another, so we just turn off collection of such errors altogether when needed.
+  bool ignore_fixables_ = false;
 
   const ProgramInvocation program_invocation_;
 
@@ -163,9 +162,9 @@ class ReporterMixin {
   }
 
   template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  bool Fail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) {
-    return reporter_->Fail(def, span, args...);
+  void FixableError(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
+                    const identity_t<Args>&... args) {
+    return reporter_->FixableError(def, span, args...);
   }
 
   template <ErrorId Id, typename... Args>
@@ -175,9 +174,9 @@ class ReporterMixin {
   }
 
   template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void Warn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) {
-    reporter_->Warn(def, span, args...);
+  void FixableWarn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
+                   const identity_t<Args>&... args) {
+    reporter_->FixableWarn(def, span, args...);
   }
 
  private:

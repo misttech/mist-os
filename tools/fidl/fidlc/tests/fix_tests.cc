@@ -20,10 +20,10 @@ namespace {
 using namespace fidl;
 using namespace fidl::fix;
 
-template <typename T>
+template <typename T, Fixable::Kind Fixing>
 void GoodParsedFix(const ExperimentalFlags experimental_flags, const std::string& before,
                    const std::string& after) {
-  static_assert(std::is_base_of<ParsedFix, T>::value,
+  static_assert(std::is_base_of_v<ParsedFix, T>,
                 "Only classes derived from |ParsedFix| may be used by |GoodTransform()}");
   static const std::string kGoodFileName = "good.fidl";
 
@@ -134,7 +134,7 @@ TEST(FixTests, BadProtocolModifierFixMissingExperiment) {
 }
 
 void GoodProtocolModifierFix(const std::string& before, const std::string& after) {
-  GoodParsedFix<ProtocolModifierFix>(
+  GoodParsedFix<ProtocolModifierFix, Fixable::Kind::kProtocolModifier>(
       ExperimentalFlags(ExperimentalFlags::Flag::kUnknownInteractions), before, after);
 }
 

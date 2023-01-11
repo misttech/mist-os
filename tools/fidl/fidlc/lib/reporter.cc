@@ -74,11 +74,12 @@ std::string Reporter::Format(std::string_view qualifier, SourceSpan span, std::s
 void Reporter::AddError(std::unique_ptr<Diagnostic> error) { errors_.push_back(std::move(error)); }
 
 void Reporter::AddWarning(std::unique_ptr<Diagnostic> warning) {
+  ZX_ASSERT(warning->def.kind == DiagnosticKind::kWarning);
   if (warnings_as_errors_) {
-    errors_.push_back(std::move(warning));
-  } else {
-    warnings_.push_back(std::move(warning));
+    return AddError(std::move(warning));
   }
+
+  warnings_.push_back(std::move(warning));
 }
 
 // Record a diagnostic with the span, message, source line, position indicator,
@@ -107,15 +108,9 @@ std::vector<Diagnostic*> Reporter::Diagnostics() const {
   std::vector<Diagnostic*> diagnostics;
   diagnostics.reserve(errors_.size() + warnings_.size());
   for (const auto& err : errors_) {
-    if (silence_fixables_ && err->is_diagnostic_fixable()) {
-      continue;
-    }
     diagnostics.push_back(err.get());
   }
   for (const auto& warn : warnings_) {
-    if (silence_fixables_ && warn->is_diagnostic_fixable()) {
-      continue;
-    }
     diagnostics.push_back(warn.get());
   }
 

@@ -625,14 +625,14 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
       : reporter_(reporter),
         source_files_(source_files),
         experimental_flags_(experimental_flags),
-        reporter_was_already_silenced_(reporter->silence_fixables()) {
+        reporter_was_already_silenced_(reporter->ignore_fixables()) {
     // No reporting of other fixable errors - we don't want one fixable error to derail to fixing of
     // another one.
-    reporter_->set_silence_fixables(true);
+    reporter_->set_ignore_fixables(true);
   }
   ~Transformer() override {
     if (!reporter_was_already_silenced_) {
-      reporter_->set_silence_fixables(false);
+      reporter_->set_ignore_fixables(false);
     }
   }
 

@@ -147,7 +147,7 @@ TEST(ReporterTests, ReportFixableErrorFormatParams) {
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kNoop);
   Reporter reporter(kFakeBinaryLocation, experimental_flags, &sources);
   SourceSpan span("fixable span text", *sources.back().sources().back().get());
-  reporter.FixableFail(FixableErrTest, span, "param1", "param2");
+  reporter.FixableError(FixableErrTest, span, "param1", "param2");
 
   const auto& errors = reporter.errors();
   EXPECT_TRUE(reporter.warnings().empty());
@@ -253,23 +253,84 @@ TEST(ReporterTests, MakeFixableWarningThenReportIt) {
   EXPECT_SUBSTR(warnings[0]->Print(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
 
-TEST(ReporterTests, CheckpointNumNewErrors) {
+TEST(ReporterTests, CheckpointFixablesSilenced) {
   Reporter reporter;
+  reporter.set_ignore_fixables(true);
   VirtualSourceFile file("fake");
   SourceSpan span("span text", file);
   reporter.Fail(ErrTest, span, "1", "");
+  reporter.FixableError(FixableErrTest, span, "2", "");
+  EXPECT_EQ(reporter.errors().size(), 1);
+  EXPECT_EQ(reporter.warnings().size(), 0);
 
   auto checkpoint = reporter.Checkpoint();
   EXPECT_EQ(checkpoint.NumNewErrors(), 0);
   EXPECT_TRUE(checkpoint.NoNewErrors());
 
-  reporter.Fail(ErrTest, span, "2", "");
+  reporter.Fail(ErrTest, span, "3", "");
+  reporter.FixableError(FixableErrTest, span, "4", "");
   EXPECT_EQ(checkpoint.NumNewErrors(), 1);
   EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 2);
+  EXPECT_EQ(reporter.warnings().size(), 0);
 
-  reporter.Fail(ErrTest, span, "3", "");
+  reporter.Fail(ErrTest, span, "5", "");
+  reporter.FixableError(FixableErrTest, span, "6", "");
   EXPECT_EQ(checkpoint.NumNewErrors(), 2);
   EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 3);
+  EXPECT_EQ(reporter.warnings().size(), 0);
+
+  reporter.Warn(WarnTest, span, "ignored", "");
+  reporter.FixableWarn(FixableWarnTest, span, "ignored", "");
+  EXPECT_EQ(checkpoint.NumNewErrors(), 2);
+  EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 3);
+  EXPECT_EQ(reporter.warnings().size(), 1);
+
+  // Un-silencing works, but only for errors/warnings reported after the switch has been unflipped.
+  reporter.set_ignore_fixables(false);
+  reporter.Fail(ErrTest, span, "7", "");
+  reporter.FixableError(FixableErrTest, span, "8", "");
+  EXPECT_EQ(checkpoint.NumNewErrors(), 4);
+  EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 5);
+  EXPECT_EQ(reporter.warnings().size(), 1);
+}
+
+TEST(ReporterTests, CheckpointFixablesNotSilenced) {
+  Reporter reporter;
+  VirtualSourceFile file("fake");
+  SourceSpan span("span text", file);
+  reporter.Fail(ErrTest, span, "1", "");
+  reporter.FixableError(FixableErrTest, span, "2", "");
+  EXPECT_EQ(reporter.errors().size(), 2);
+  EXPECT_EQ(reporter.warnings().size(), 0);
+
+  auto checkpoint = reporter.Checkpoint();
+  EXPECT_EQ(checkpoint.NumNewErrors(), 0);
+  EXPECT_TRUE(checkpoint.NoNewErrors());
+
+  reporter.Fail(ErrTest, span, "3", "");
+  reporter.FixableError(FixableErrTest, span, "4", "");
+  EXPECT_EQ(checkpoint.NumNewErrors(), 2);
+  EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 4);
+  EXPECT_EQ(reporter.warnings().size(), 0);
+
+  reporter.Fail(ErrTest, span, "5", "");
+  reporter.FixableError(FixableErrTest, span, "6", "");
+  EXPECT_EQ(checkpoint.NumNewErrors(), 4);
+  EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 6);
+  EXPECT_EQ(reporter.warnings().size(), 0);
+
+  reporter.Warn(WarnTest, span, "ignored", "");
+  reporter.FixableWarn(FixableWarnTest, span, "ignored", "");
+  EXPECT_EQ(checkpoint.NumNewErrors(), 4);
+  EXPECT_FALSE(checkpoint.NoNewErrors());
+  EXPECT_EQ(reporter.errors().size(), 6);
+  EXPECT_EQ(reporter.warnings().size(), 2);
 }
 
 }  // namespace
