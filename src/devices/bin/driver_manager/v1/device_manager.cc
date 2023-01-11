@@ -115,8 +115,7 @@ zx_status_t DeviceManager::AddDevice(
     for (auto& cur_fragment : dev->parent()->fragments()) {
       // Pick the first fragment that does not have a device added by the fragment
       // driver.
-      if (cur_fragment.fragment_device() == nullptr &&
-          !cur_fragment.bound_device()->has_outgoing_directory()) {
+      if (cur_fragment.fragment_device() == nullptr && cur_fragment.uses_fragment_driver()) {
         cur_fragment.set_fragment_device(dev);
         status = cur_fragment.composite()->TryAssemble();
         if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
