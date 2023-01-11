@@ -4,9 +4,9 @@ This guide assumes you have already [created](write-a-fuzzer.md) a fuzzer that y
 build. It uses the same [sample code](write-a-fuzzer.md#samples) as in that guide.
 
 Fuchsia uses [GN][fuchsia-gn], a meta-build system, to generate `.ninja` files that explicitly
-describe how to build the system. [_GN targets_][gn-targets]{.external} are nodes in the build graph
+describe how to build the system. [_GN targets_][gn-targets]{: .external} are nodes in the build graph
 that represent a specific output such as a library or executable.
-[_GN templates_][gn-templates]{.external} are rules that generate additional targets.
+[_GN templates_][gn-templates]{: .external} are rules that generate additional targets.
 
 In order to make adding new fuzzers as easy as possible, Fuchsia provides fuzzing-related GN
 templates.
