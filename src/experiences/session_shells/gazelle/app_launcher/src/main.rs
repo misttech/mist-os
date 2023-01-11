@@ -10,6 +10,7 @@ use appkit::{
 };
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_ui_app as ui_app;
+use fidl_fuchsia_ui_composition as ui_comp;
 use fidl_fuchsia_ui_views as ui_views;
 use fuchsia_async as fasync;
 use fuchsia_component::{client::connect_to_protocol, server};
@@ -81,7 +82,8 @@ impl AppLauncher {
 
         let image = window.create_image(&mut image_data)?;
         image.set_size(LAUNCHER_IMG_WIDTH, LAUNCHER_IMG_HEIGHT)?;
-        window.set_content(window.get_root_transform_id(), image.get_content_id());
+        image.set_blend_mode(ui_comp::BlendMode::SrcOver)?;
+        window.set_content(window.get_root_transform_id(), image.get_content_id())?;
         window.redraw();
 
         let mut app = AppLauncher::new(window, element_manager, event_sender);

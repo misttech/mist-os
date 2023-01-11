@@ -373,7 +373,8 @@ impl WindowManager {
             ui_comp::BlendMode::SrcOver,
         )?;
 
-        self.window.set_content(self.shortcuts_image_transform, shortcuts_image.get_content_id());
+        self.window
+            .set_content(self.shortcuts_image_transform, shortcuts_image.get_content_id())?;
         Ok(())
     }
 
@@ -425,7 +426,7 @@ impl WindowManager {
         for ((_, child_view), child_view_transform) in
             self.child_views.iter().zip(self.child_view_transforms.iter())
         {
-            self.window.set_content(child_view_transform.clone(), child_view.get_content_id());
+            self.window.set_content(child_view_transform.clone(), child_view.get_content_id())?;
         }
 
         Ok(())

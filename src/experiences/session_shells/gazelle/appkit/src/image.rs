@@ -53,6 +53,12 @@ impl Image {
         self.flatland.set_image_destination_size(&mut content_id, &mut size)?;
         Ok(())
     }
+
+    pub fn set_blend_mode(&self, blend_mode: ui_comp::BlendMode) -> Result<(), Error> {
+        let mut content_id = self.get_content_id();
+        self.flatland.set_image_blending_function(&mut content_id, blend_mode)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

@@ -15,6 +15,7 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/experiences/session_shells/gazelle/appkit",
     "//src/lib/fuchsia",

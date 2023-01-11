@@ -146,10 +146,12 @@ async fn test_appkit() -> Result<(), Error> {
 
                 match child_view_event {
                     ChildViewEvent::Available => {
-                        window.set_content(
-                            window.get_root_transform_id(),
-                            child_view.get_content_id(),
-                        );
+                        window
+                            .set_content(
+                                window.get_root_transform_id(),
+                                child_view.get_content_id(),
+                            )
+                            .expect("Failed to set content");
                         window.redraw();
                     }
                     ChildViewEvent::Attached { mut view_ref } => {
@@ -161,10 +163,12 @@ async fn test_appkit() -> Result<(), Error> {
                         }
                     }
                     ChildViewEvent::Detached | ChildViewEvent::Dismissed => {
-                        window.set_content(
-                            window.get_root_transform_id(),
-                            ui_comp::ContentId { value: 0 },
-                        );
+                        window
+                            .set_content(
+                                window.get_root_transform_id(),
+                                ui_comp::ContentId { value: 0 },
+                            )
+                            .expect("Failed to set content");
                         window.redraw();
                         event_sender.send(Event::Exit);
                     }
@@ -360,10 +364,9 @@ async fn create_child_view_spec(
                                 .create_image(&mut image_data)
                                 .expect("Failed to create image content");
                             image.set_size(width, height).expect("Failed to set image size");
-                            window.set_content(
-                                window.get_root_transform_id(),
-                                image.get_content_id(),
-                            );
+                            window
+                                .set_content(window.get_root_transform_id(), image.get_content_id())
+                                .expect("Failed to set content");
                             window.redraw();
                         }
                     }

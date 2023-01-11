@@ -136,3 +136,38 @@ where
     })
     .detach();
 }
+
+/// Converts a 32-bit sRGB color value encoded as 0xRRGGBBAA into [ui_comp::ColorRgba].
+pub fn srgb_to_linear(color: u32) -> ui_comp::ColorRgba {
+    let to_linear = |x: u8| {
+        let x = x as f32 / 255.0;
+        if x >= 0.04045 {
+            ((x + 0.055) / 1.055).powf(2.4)
+        } else {
+            x / 12.92
+        }
+    };
+    let bytes: [u8; 4] = unsafe { std::mem::transmute(color.to_be()) };
+    ui_comp::ColorRgba {
+        red: to_linear(bytes[0]),
+        green: to_linear(bytes[1]),
+        blue: to_linear(bytes[2]),
+        alpha: bytes[3] as f32 / 255.0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fidl_fuchsia_ui_composition::ColorRgba;
+
+    use crate::srgb_to_linear;
+
+    #[test]
+    fn convert_color() {
+        let x = srgb_to_linear(0x7f7f7fff);
+        assert_eq!(
+            x,
+            ColorRgba { red: 0.21223073, green: 0.21223073, blue: 0.21223073, alpha: 1.0 }
+        );
+    }
+}

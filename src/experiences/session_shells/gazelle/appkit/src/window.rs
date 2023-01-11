@@ -40,20 +40,21 @@ struct Presenter {
     flatland: ui_comp::FlatlandProxy,
     can_update: bool,
     needs_update: bool,
+    present_credits: u32,
 }
 
 impl Presenter {
     pub fn new(flatland: ui_comp::FlatlandProxy) -> Self {
-        Presenter { flatland, can_update: true, needs_update: false }
+        Presenter { flatland, can_update: true, needs_update: false, present_credits: 1 }
     }
 
     pub fn on_next_frame(
         &mut self,
-        _next_frame_info: ui_comp::OnNextFrameBeginValues,
+        next_frame_info: ui_comp::OnNextFrameBeginValues,
     ) -> Result<(), Error> {
+        self.present_credits += next_frame_info.additional_present_credits.unwrap_or(0);
+
         if self.needs_update {
-            self.needs_update = false;
-            self.can_update = false;
             self.present()
         } else {
             self.can_update = true;
@@ -63,8 +64,6 @@ impl Presenter {
 
     pub fn redraw(&mut self) -> Result<(), Error> {
         if self.can_update {
-            self.needs_update = false;
-            self.can_update = false;
             self.present()
         } else {
             self.needs_update = true;
@@ -72,7 +71,11 @@ impl Presenter {
         }
     }
 
-    fn present(&self) -> Result<(), Error> {
+    fn present(&mut self) -> Result<(), Error> {
+        self.needs_update = false;
+        self.present_credits -= 1;
+        self.can_update = self.present_credits > 0;
+
         self.flatland.present(ui_comp::PresentArgs::EMPTY)?;
         Ok(())
     }
@@ -199,6 +202,18 @@ impl Window {
         self.id_generator.next_content_id()
     }
 
+    pub fn create_transform(
+        &mut self,
+        add_to_parent: Option<&mut ui_comp::TransformId>,
+    ) -> Result<ui_comp::TransformId, Error> {
+        let mut transform = self.next_transform_id();
+        self.get_flatland().create_transform(&mut transform)?;
+        if let Some(parent_transform) = add_to_parent {
+            self.get_flatland().add_child(parent_transform, &mut transform)?;
+        }
+        Ok(transform)
+    }
+
     pub fn get_view_ref(&self) -> Result<ui_views::ViewRef, Error> {
         let view_ref = fuchsia_scenic::duplicate_view_ref(&self.view_ref)?;
         Ok(view_ref)
@@ -212,10 +227,9 @@ impl Window {
         &self,
         mut transform_id: ui_comp::TransformId,
         mut content_id: ui_comp::ContentId,
-    ) {
-        self.get_flatland()
-            .set_content(&mut transform_id, &mut content_id)
-            .expect("Failed to set content");
+    ) -> Result<(), Error> {
+        self.get_flatland().set_content(&mut transform_id, &mut content_id)?;
+        Ok(())
     }
 
     pub fn close(&mut self) -> Result<(), Error> {
