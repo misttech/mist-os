@@ -52,14 +52,21 @@ void SystemSymbols::InjectModuleForTesting(const std::string& build_id, ModuleSy
 }
 
 Err SystemSymbols::GetModule(const std::string& name, const std::string& build_id,
-                             fxl::RefPtr<ModuleSymbols>* module,
+                             bool force_reload_symbols, fxl::RefPtr<ModuleSymbols>* module,
                              SystemSymbols::DownloadType download_type) {
   *module = fxl::RefPtr<ModuleSymbols>();
 
   auto found_existing = modules_.find(build_id);
   if (found_existing != modules_.end()) {
-    *module = RefPtrTo(found_existing->second);
-    return Err();
+    if (force_reload_symbols) {
+      // Clear any cached symbols. Processes with existing references to the old symbols will keep
+      // their existing reference to the old symbol file. This will only affect new symbol loads.
+      modules_.erase(found_existing);
+    } else {
+      // Use cached.
+      *module = RefPtrTo(found_existing->second);
+      return Err();
+    }
   }
 
   auto entry = build_id_index_.EntryForBuildID(build_id);
@@ -107,14 +114,12 @@ void SystemSymbols::SaveModule(const std::string& build_id, ModuleSymbols* modul
           return;
         SystemSymbols* system = weak_system.get();
 
+        // Only clear our reference if it's the module reporting the delete. This can get
+        // out-of-sync when symbols are force-updated: new module loads will get the new symbols but
+        // old processes can still have references to the old one.
         auto found = system->modules_.find(build_id);
-        if (found == system->modules_.end()) {
-          FX_NOTREACHED();  // Should be found if we registered.
-          return;
-        }
-
-        FX_DCHECK(module == found->second);  // Mapping should match.
-        system->modules_.erase(found);
+        if (found != system->modules_.end() && module == found->second)
+          system->modules_.erase(found);
       });
   modules_[build_id] = module;
 }

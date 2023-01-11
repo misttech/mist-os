@@ -41,7 +41,8 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
     return component_info_;
   }
   ProcessSymbols* GetSymbols() override { return &symbols_; }
-  void GetModules(fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) override;
+  void GetModules(bool force_reload_symbols,
+                  fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) override;
   void GetAspace(
       uint64_t address,
       fit::callback<void(const Err&, std::vector<debug_ipc::AddressRegion>)>) const override;

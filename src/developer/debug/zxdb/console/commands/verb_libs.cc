@@ -21,11 +21,26 @@ namespace zxdb {
 
 namespace {
 
+constexpr int kForceReloadSwitch = 1;
+
 const char kLibsShortHelp[] = "libs: Show loaded libraries for a process.";
 const char kLibsHelp[] =
     R"(libs
 
   Shows the loaded library information for the given process.
+
+  This will update the library list from the target process and will attempt to
+  reload symbols for any unsymbolized modules (when the "sym-stat" command says
+  "Symbols loaded: No"). Note that stripped binaries can have a few symbols
+  which will confuse this checking: if you have updated the symbol file on your
+  system, use "--reload" to reload.
+
+Options
+
+  -r
+  --reload
+      Force reload all symbol information for all libraries in the current
+      process.
 
 Examples
 
@@ -63,7 +78,8 @@ void RunVerbLibs(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
       err.has_error())
     return cmd_context->ReportError(err);
 
-  cmd.target()->GetProcess()->GetModules([cmd_context](auto err, auto modules) {
+  bool force_reload = cmd.HasSwitch(kForceReloadSwitch);
+  cmd.target()->GetProcess()->GetModules(force_reload, [cmd_context](auto err, auto modules) {
     if (err.has_error())
       return cmd_context->ReportError(err);
     OnLibsComplete(modules, cmd_context);
@@ -73,7 +89,9 @@ void RunVerbLibs(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetLibsVerbRecord() {
-  return VerbRecord(&RunVerbLibs, {"libs"}, kLibsShortHelp, kLibsHelp, CommandGroup::kQuery);
+  VerbRecord libs(&RunVerbLibs, {"libs"}, kLibsShortHelp, kLibsHelp, CommandGroup::kQuery);
+  libs.switches.push_back(SwitchRecord(kForceReloadSwitch, false, "reload", 'r'));
+  return libs;
 }
 
 }  // namespace zxdb

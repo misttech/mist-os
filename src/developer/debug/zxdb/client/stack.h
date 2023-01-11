@@ -67,6 +67,9 @@ class Stack {
                                                      Location location) = 0;
 
     virtual Location GetSymbolizedLocationForAddress(uint64_t address) = 0;
+
+    // Notification that the frames have been changed.
+    virtual void DidUpdateStackFrames() = 0;
   };
 
   // The delegate must outlive this class.
@@ -133,9 +136,13 @@ class Stack {
   // the frames when a Stack has only partial frame information, and it can be used to force an
   // update from the remote system in case anything changed.
   //
+  // Normally frame info is cached. Setting "force" will unconditionally clear all state. This will
+  // invalidate any weak pointers into the stack and could change the frame indices in the
+  // frontend.
+  //
   // If the stack is destroyed before the frames can be synced, the callback will be issued with an
   // error.
-  void SyncFrames(fit::callback<void(const Err&)> callback);
+  void SyncFrames(bool force, fit::callback<void(const Err&)> callback);
 
   // Provides a new set of frames computed by a backtrace in the debug_agent. In normal operation
   // this is called by the Thread.
@@ -157,11 +164,10 @@ class Stack {
   // Removes all frames. In normal operation this is called by the Thread when things happen that
   // invalidate all frames such as resuming the thread.
   //
-  // Callers should generally do this via the thread. Code in ThreadImpl should use
-  // ThreadImpl::ClearFrames instead which will send observer notifications.
-  //
-  // Returns true if anything was modified (false means there were no frames to clear).
-  bool ClearFrames();
+  // This should generally only be called by the Thread. Otherwise the thread state (whether it's
+  // stopped, etc.) can diverge from the stack state (threads in certain stopped states are always
+  // expected to have at least one stack frame).
+  void ClearFrames();
 
  private:
   // Symbolizes the given frame address, taking into account that non-topmost frames should slow the
@@ -176,6 +182,10 @@ class Stack {
 
   std::vector<std::unique_ptr<Frame>> frames_;
   bool has_all_frames_ = false;
+
+  // Set when a "forced" frame update is requested. This will clear any previous state when new
+  // frames are available.
+  bool force_update_in_progress_ = false;
 
   // Number of frames to hide from size() and operator[] that are inline frames at the top of the
   // stack that shouldn't be exposed right now.

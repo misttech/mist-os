@@ -353,6 +353,7 @@ TEST_F(StackTest, UpdateExisting) {
   input_frames.push_back(std::move(inline_top));
   input_frames.push_back(std::move(phys_top));
   stack.SetFramesForTest(std::move(input_frames), true);
+  EXPECT_EQ(1, delegate.update_count());
 
   // The ambiguous inline frame is hidden so we can check later this is preserved across updates.
   ASSERT_EQ(2u, stack.size());
@@ -369,6 +370,7 @@ TEST_F(StackTest, UpdateExisting) {
   raw_frames.push_back(phys_bottom_record);
 
   stack.SetFrames(debug_ipc::ThreadRecord::StackAmount::kFull, raw_frames);
+  EXPECT_EQ(2, delegate.update_count());
 
   // The update should have left the existing top physical frame and the inline frame expanded on
   // top of it, and add the additional physical frame below it.
@@ -385,6 +387,7 @@ TEST_F(StackTest, UpdateExisting) {
   stack.SetHideAmbiguousInlineFrameCount(0);  // So we can test for reset.
   raw_frames[0].sp++;                         // Modify frame.
   stack.SetFrames(debug_ipc::ThreadRecord::StackAmount::kFull, raw_frames);
+  EXPECT_EQ(3, delegate.update_count());
 
   // The inline frame at the top should have gone away because we didn't provide any inline
   // information for the Stack to expand it.
@@ -437,7 +440,8 @@ TEST_F(StackTest, InlineVars) {
 
   stack.SetFrames(debug_ipc::ThreadRecord::StackAmount::kFull,
                   {debug_ipc::StackFrame(kInlineAddr, kTopSP, kBottomSP)});
-  ASSERT_EQ(2u, stack.size());  // Should have expanded the inline frame.
+  ASSERT_EQ(2u, stack.size());            // Should have expanded the inline frame.
+  EXPECT_EQ(1, delegate.update_count());  // Should have notified of update.
 
   // ACTUAL TEST.
 

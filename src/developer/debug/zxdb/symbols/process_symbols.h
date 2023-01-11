@@ -60,7 +60,7 @@ class ProcessSymbols {
   const TargetSymbols* target_symbols() const { return target_symbols_; }
 
   // Replaces all modules with the given list.
-  void SetModules(const std::vector<debug_ipc::Module>& modules);
+  void SetModules(const std::vector<debug_ipc::Module>& modules, bool force_reload_symbols);
 
   // Try to load the symbols for a given build ID again, presumably because we have downloaded them
   // and now expect the index to hit.
@@ -126,7 +126,8 @@ class ProcessSymbols {
   // This class issues no notifications, the caller needs to do that. Just because there's no error
   // doesn't necessarily mean the symbols have been loaded, since some symbols might be expected to
   // be not present.
-  ModuleInfo* SaveModuleInfo(const debug_ipc::Module& module, Err* symbol_load_err);
+  ModuleInfo* SaveModuleInfo(const debug_ipc::Module& module, bool force_reload_symbols,
+                             Err* symbol_load_err);
 
   // Equality comparison for the two types of modules. This compares load address and build id.
   static bool RefersToSameModule(const debug_ipc::Module& a, const ModuleInfo& b);

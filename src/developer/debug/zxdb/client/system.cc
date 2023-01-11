@@ -102,7 +102,9 @@ const char* ClientSettings::System::kSymbolPaths = "symbol-paths";
 static const char* kSymbolPathsDescription =
     R"(  List of ELF files or directories for symbol lookup. When a directory
   path is passed, the directory will be enumerated non-recursively to index all
-  ELF files within. When a file is passed, it will be loaded as an ELF file.)";
+  ELF files within. When a file is passed, it will be loaded as an ELF file.
+
+  To view the currently indexed files run "sym-stat --dump-index".)";
 
 const char* ClientSettings::System::kBuildIdDirs = "build-id-dirs";
 static const char* kBuildIdDirsDescription =
@@ -116,7 +118,9 @@ const char* ClientSettings::System::kIdsTxts = "ids-txts";
 static const char* kIdsTxtsDescription =
     R"(  List of "ids.txt" files for symbol lookup. Each file, typically named
   "ids.txt", serves as a mapping from build ID to symbol file path and should
-  contain multiple lines in the format of "<build ID> <file path>".)";
+  contain multiple lines in the format of "<build ID> <file path>".
+
+  To view the currently indexed files run "sym-stat --dump-index".)";
 
 const char* ClientSettings::System::kSymbolServers = "symbol-servers";
 static const char* kSymbolServersDescription = R"(  List of symbol server URLs.)";

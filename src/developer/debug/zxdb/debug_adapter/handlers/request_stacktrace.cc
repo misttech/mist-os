@@ -61,15 +61,15 @@ void OnRequestStackTrace(
     if (thread->GetStack().has_all_frames()) {
       callback(PopulateStackTraceResponse(ctx, thread, req));
     } else {
-      thread->GetStack().SyncFrames([ctx, weak_thread = thread->GetWeakPtr(),
-                                     request = dap::StackTraceRequest(req),
-                                     callback](const Err& err) {
-        if (!err.has_error() && weak_thread) {
-          callback(PopulateStackTraceResponse(ctx, weak_thread.get(), request));
-        } else {
-          callback(dap::Error("Thread exited, no frames."));
-        }
-      });
+      thread->GetStack().SyncFrames(
+          false, [ctx, weak_thread = thread->GetWeakPtr(), request = dap::StackTraceRequest(req),
+                  callback](const Err& err) {
+            if (!err.has_error() && weak_thread) {
+              callback(PopulateStackTraceResponse(ctx, weak_thread.get(), request));
+            } else {
+              callback(dap::Error("Thread exited, no frames."));
+            }
+          });
     }
   } else {
     callback(dap::Error("Thread not found."));

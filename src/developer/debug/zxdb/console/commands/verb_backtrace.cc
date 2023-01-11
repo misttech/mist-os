@@ -19,6 +19,7 @@ namespace {
 constexpr int kForceAllTypes = 1;
 constexpr int kRawOutput = 2;
 constexpr int kVerboseBacktrace = 3;
+constexpr int kForceRefresh = 4;
 
 const char kBacktraceShortHelp[] = "backtrace / bt: Print a backtrace.";
 const char kBacktraceHelp[] =
@@ -29,6 +30,11 @@ const char kBacktraceHelp[] =
   To see just function names and line numbers, use "frame" or just "f".
 
 Arguments
+
+  -f
+  --force
+      Force an update to the stack. This will always request the latest stack
+      frames from the target and re-evaluate all symbol information.
 
   -r
   --raw
@@ -88,9 +94,8 @@ void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
   opts.frame.variable.pointer_expand_depth = 1;
   opts.frame.variable.max_depth = 3;
 
-  // Always force update the stack. Various things can have changed and when the user requests
-  // a stack we want to be sure things are correct.
-  cmd_context->Output(FormatStack(cmd.thread(), true, opts));
+  bool force_update = cmd.HasSwitch(kForceRefresh);
+  cmd_context->Output(FormatStack(cmd.thread(), force_update, opts));
 }
 
 }  // namespace
@@ -101,7 +106,8 @@ VerbRecord GetBacktraceVerbRecord() {
   SwitchRecord force_types(kForceAllTypes, false, "types", 't');
   SwitchRecord raw(kRawOutput, false, "raw", 'r');
   SwitchRecord verbose(kVerboseBacktrace, false, "verbose", 'v');
-  backtrace.switches = {force_types, raw, verbose};
+  SwitchRecord force_refresh(kForceRefresh, false, "force", 'f');
+  backtrace.switches = {force_types, raw, verbose, force_refresh};
 
   return backtrace;
 }

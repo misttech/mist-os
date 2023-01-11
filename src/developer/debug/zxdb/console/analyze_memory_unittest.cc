@@ -8,6 +8,7 @@
 
 #include "src/developer/debug/zxdb/client/mock_frame.h"
 #include "src/developer/debug/zxdb/client/mock_process.h"
+#include "src/developer/debug/zxdb/client/mock_stack_delegate.h"
 #include "src/developer/debug/zxdb/client/mock_target.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/stack.h"
@@ -93,9 +94,9 @@ TEST_F(AnalyzeMemoryTest, Basic) {
                                   kStack1SP, 0, frame1_regs, kStack1SP, bottom_frame.get()));
   frames.push_back(std::move(bottom_frame));
 
-  // Stack to hold our mock frames. This stack doesn't need to do anything other than return the
-  // frames again, so the delegate can be null.
-  Stack temp_stack(nullptr);
+  // Stack to hold our mock frames.
+  MockStackDelegate delegate(&session);
+  Stack temp_stack(&delegate);
   temp_stack.SetFramesForTest(std::move(frames), true);
   analysis->SetStack(temp_stack);
 

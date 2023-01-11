@@ -81,7 +81,7 @@ TEST(ProcessSymbols, SetModules_Probe) {
   ipc_module.build_id = test_file_build_id;
   ipc_module.name = "module1.so";
   ipc.push_back(ipc_module);
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
 
   // Should have gotten one add notifications and no others.
   ASSERT_EQ(1u, notifications.loaded().size());
@@ -116,7 +116,7 @@ TEST(ProcessSymbols, SetModules) {
   ipc_module.build_id = fake_build_id_1;
   ipc_module.name = "module1.so";
   ipc.push_back(ipc_module);
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
 
   // Should have gotten one add notifications and no others.
   ASSERT_EQ(1u, notifications.loaded().size());
@@ -128,7 +128,7 @@ TEST(ProcessSymbols, SetModules) {
   // Replace with a different one at the same address.
   notifications.Clear();
   ipc[0].build_id = fake_build_id_2;
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
   EXPECT_EQ(0, notifications.err_count());
 
   // Should have one unload and one load.
@@ -140,7 +140,7 @@ TEST(ProcessSymbols, SetModules) {
   notifications.Clear();
   ipc[0].build_id = fake_build_id_1;
   ipc[0].base = base2;
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
   EXPECT_EQ(0, notifications.err_count());
 
   // Should have one unload and one load.
@@ -150,7 +150,7 @@ TEST(ProcessSymbols, SetModules) {
   // Remove everything.
   notifications.Clear();
   ipc.clear();
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
   EXPECT_EQ(0, notifications.err_count());
 
   // Should have one unload and no load.
@@ -177,7 +177,7 @@ TEST(ProcessSymbols, ModuleLength) {
   ipc_module.build_id = fake_build_id;
   ipc_module.name = "module1.so";
   ipc.push_back(ipc_module);
-  process.SetModules(ipc);
+  process.SetModules(ipc, false);
 
   // Valid address for the module should return it.
   EXPECT_TRUE(process.GetModuleForAddress(kBase + 1));

@@ -70,7 +70,7 @@ class SystemSymbols {
   //
   // This function uses the build_id for loading symbols. The name is only used for generating
   // informational messages.
-  Err GetModule(const std::string& name, const std::string& build_id,
+  Err GetModule(const std::string& name, const std::string& build_id, bool force_reload_symbols,
                 fxl::RefPtr<ModuleSymbols>* module, DownloadType download_type = kSymbols);
 
  private:

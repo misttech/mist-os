@@ -46,8 +46,10 @@ struct FormatStackOptions {
 // Generates the list of frames from the given Thread to the console. This will complete
 // asynchronously. The current frame will automatically be queried and will be indicated.
 //
-// This will request the full frame list from the agent if it has not been synced locally or if
-// force_update is set.
+// This will request the full frame list from the agent if it has not been synced locally.
+//
+// If force_update is set, the full frame list will be re-requested (even if a full stack is already
+// available locally).
 fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
                                            const FormatStackOptions& opts);
 

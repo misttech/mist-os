@@ -736,15 +736,24 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
   ScheduleDisplayExpressions(thread);
 }
 
-void ConsoleContext::OnThreadFramesInvalidated(Thread* thread) {
+void ConsoleContext::DidUpdateStackFrames(Thread* thread) {
   ThreadRecord* record = GetThreadRecord(thread);
   if (!record) {
     FX_NOTREACHED();
     return;
   }
 
-  // Reset the active frame.
-  record->active_frame_id = 0;
+  // We don't really know what changed. We don't want to reset the active frame ID every time since
+  // one of the update cases is that the frames have been appended to (so existing indices are still
+  // valid) or that symbols are loaded (normally this means that the frames are unchanged, though
+  // inline frames can get expanded in some cases).
+  //
+  // As a result, keep the index the unchanged unless it's now out-of-bounds. If symbols are loaded
+  // and inline frames expand things, the current frame could possibly change. But normally the user
+  // will be at frame 0 in this case anyway, and this avoids resetting any state in the more common
+  // cases.
+  if (record->active_frame_id >= static_cast<int>(thread->GetStack().size()))
+    record->active_frame_id = 0;
 }
 
 void ConsoleContext::OnDownloadsStarted() { Console::get()->Output("Downloading symbols..."); }

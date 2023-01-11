@@ -21,20 +21,16 @@ class ThreadObserver {
 
   // Notification that a thread has stopped. The thread and all breakpoint statistics will be
   // up-to-date.
-  //
-  // IMPORTANT: The thread's stack may be empty during this notification. See the Stack object for
-  // more information.
   virtual void OnThreadStopped(Thread* thread, const StopInfo& info) {}
 
-  // A thread's backtrace (consisting of a vector of Frames) will be static as long as the thread is
-  // not running. When the thread is resumed, the frames will be cleared and this notification will
-  // be issued. Code that caches state based on frames should clear the cache at this point.
+  // Notification that the frames on a thread have been updated in some way:
   //
-  // An initially stopped thread will only have one Frame (the topmost one), and the full backtrace
-  // can be filled out on-demand. This function will NOT be called when the full backtrace is filled
-  // out. Frame 0 will be unchanged in this case, so nothing has been invalidate, just more data is
-  // available.
-  virtual void OnThreadFramesInvalidated(Thread* thread) {}
+  //  - They could be cleared (when the thread is resumed).
+  //  - They could go from empty to being set (when the thread is stopped).
+  //  - They could be added to (when the minimal stack is replaced with a full stack).
+  //  - They could be changed arbitrarily (when symbols are loaded or when a stack refresh is
+  //    requested and the thread has changed out from under us).
+  virtual void DidUpdateStackFrames(Thread* thread) {}
 };
 
 }  // namespace zxdb

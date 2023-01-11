@@ -76,9 +76,11 @@ class Process : public ClientObject {
   // Returns the interface for querying symbols for this process.
   virtual ProcessSymbols* GetSymbols() = 0;
 
-  // Queries the process for the currently-loaded modules (this always
-  // recomputes the list).
-  virtual void GetModules(fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) = 0;
+  // Queries the process for the currently-loaded modules (this always recomputes the list). The
+  // force_reload_symbols flag will force-reload all symbol information for all modules, regardless
+  // of whether it may already have symbols.
+  virtual void GetModules(bool force_reload_symbols,
+                          fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) = 0;
 
   // Queries the process for its address map if |address| is zero the entire map is requested. If
   // |address| is non-zero only the containing region if exists will be retrieved.

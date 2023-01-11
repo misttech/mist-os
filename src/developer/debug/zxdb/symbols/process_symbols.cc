@@ -34,7 +34,11 @@ fxl::WeakPtr<const ProcessSymbols> ProcessSymbols::GetWeakPtr() const {
   return weak_factory_.GetWeakPtr();
 }
 
-void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules) {
+void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules,
+                                bool force_reload_symbols) {
+  if (force_reload_symbols)
+    modules_.clear();
+
   // Map from load address to index into |modules| argument.
   std::map<uint64_t, size_t> new_module_address_to_index;
 
@@ -49,17 +53,23 @@ void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules) {
       new_module_indices.push_back(i);
   }
 
-  // Find deleted modules and remove them.
+  // Find deleted modules plus any that need their symbols refreshed.
   std::vector<ModuleMap::iterator> deleted_modules;
   for (auto iter = modules_.begin(); iter != modules_.end(); ++iter) {
     auto found_index = new_module_address_to_index.find(iter->second.base);
     if (found_index == new_module_address_to_index.end() ||
-        !RefersToSameModule(modules[found_index->second], iter->second))
+        !RefersToSameModule(modules[found_index->second], iter->second)) {
       deleted_modules.push_back(iter);
+    } else if (found_index != new_module_address_to_index.end() &&
+               !iter->second.symbols->module_symbols()) {
+      // This is an existing module with no symbols: try to reload it in case the user has updated
+      // the symbol path. Mark it as both deleted and added to force the refresh.
+      deleted_modules.push_back(iter);
+      new_module_indices.push_back(found_index->second);
+    }
   }
 
-  // First update for deleted modules since the addresses may overlap the
-  // added ones.
+  // First update for deleted modules since the addresses may overlap the added ones.
   for (auto& deleted : deleted_modules) {
     notifications_->WillUnloadModuleSymbols(deleted->second.symbols.get());
     modules_.erase(deleted);
@@ -71,7 +81,7 @@ void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules) {
   std::vector<Err> load_errors;
   for (const auto& added_index : new_module_indices) {
     Err sym_load_err;
-    ModuleInfo* info = SaveModuleInfo(modules[added_index], &sym_load_err);
+    ModuleInfo* info = SaveModuleInfo(modules[added_index], force_reload_symbols, &sym_load_err);
     if (sym_load_err.has_error())
       load_errors.push_back(std::move(sym_load_err));
     else if (info->symbols->module_symbols_ref())
@@ -200,6 +210,7 @@ LineDetails ProcessSymbols::LineDetailsForAddress(uint64_t address, bool greedy)
 }
 
 ProcessSymbols::ModuleInfo* ProcessSymbols::SaveModuleInfo(const debug_ipc::Module& module,
+                                                           bool force_reload_symbols,
                                                            Err* symbol_load_err) {
   ModuleInfo info;
   info.name = module.name;
@@ -207,8 +218,8 @@ ProcessSymbols::ModuleInfo* ProcessSymbols::SaveModuleInfo(const debug_ipc::Modu
   info.base = module.base;
 
   fxl::RefPtr<ModuleSymbols> module_symbols;
-  *symbol_load_err =
-      target_symbols_->system_symbols()->GetModule(module.name, module.build_id, &module_symbols);
+  *symbol_load_err = target_symbols_->system_symbols()->GetModule(
+      module.name, module.build_id, force_reload_symbols, &module_symbols);
   if (symbol_load_err->has_error()) {
     // Error, but it may be expected.
     if (!ExpectSymbolsForName(module.name))
@@ -242,7 +253,7 @@ void ProcessSymbols::RetryLoadBuildID(const std::string& name, const std::string
     }
 
     fxl::RefPtr<ModuleSymbols> module_symbols;
-    Err err = target_symbols_->system_symbols()->GetModule(name, build_id, &module_symbols,
+    Err err = target_symbols_->system_symbols()->GetModule(name, build_id, false, &module_symbols,
                                                            download_type);
 
     if (!err.has_error() && !module_symbols) {

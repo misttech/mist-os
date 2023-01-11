@@ -268,7 +268,7 @@ void DebugAdapterContext::OnThreadStopped(Thread* thread, const StopInfo& info) 
   dap_->send(event);
 }
 
-void DebugAdapterContext::OnThreadFramesInvalidated(Thread* thread) {
+void DebugAdapterContext::DidUpdateStackFrames(Thread* thread) {
   DeleteFrameIdsForThread(thread);
   if (supports_invalidate_event_) {
     dap::InvalidatedEvent event;

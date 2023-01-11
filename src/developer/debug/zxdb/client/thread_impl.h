@@ -66,6 +66,7 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
   std::unique_ptr<Frame> MakeFrameForStack(const debug_ipc::StackFrame& input,
                                            Location location) override;
   Location GetSymbolizedLocationForAddress(uint64_t address) override;
+  void DidUpdateStackFrames() override;
 
   // Invalidates the thread state and cached frames. Used when we know that some operation has
   // invalidated our state but we aren't sure what the new state is yet.
@@ -103,6 +104,11 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
   // stop or continue. This prevents infinite loops if there is a bug in the thread controllers.
   StopInfo async_stop_info_;
   int nested_stop_future_completion_ = 0;
+
+  // Indicates if observer notifications are permitted to be sent. This is set to false during
+  // construction to prevent notifications before the thread is set up and the "new thread"
+  // notification has been sent to register it.
+  bool allow_notifications_ = false;
 
   fxl::WeakPtrFactory<ThreadImpl> weak_factory_;
 

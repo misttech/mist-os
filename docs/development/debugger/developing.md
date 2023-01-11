@@ -2,17 +2,25 @@
 
 ## Run tests
 
-To run the zxdb tests:
+To run the zxdb frontend tests (these run on the host development computer
+only):
 
 ```posix-terminal
 fx test zxdb_tests
 ```
 
-To run the debug\_agent tests:
+To run the debug\_agent tests (these run on the target Fuchsia system only):
 
 ```posix-terminal
 fx test debug_agent_unit_tests
 fx test debug_agent_integration_tests
+```
+
+To run the end-to-end tests (these test the integration of the zxdb frontend
+with the debug\_agent):
+
+```posix-terminal
+fx test --e2e zxdb_e2e_tests
 ```
 
 ## Reload debug\_agent.cm after a new version is built

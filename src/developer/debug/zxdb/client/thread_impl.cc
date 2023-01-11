@@ -48,6 +48,10 @@ ThreadImpl::ThreadImpl(ProcessImpl* process, const debug_ipc::ThreadRecord& reco
       weak_factory_(this) {
   SetMetadata(record);
   settings_.set_fallback(&process_->target()->settings());
+
+  // Should be at the bottom of this function. This will enable notifications now that
+  // initialization is complete.
+  allow_notifications_ = true;
 }
 
 ThreadImpl::~ThreadImpl() = default;
@@ -494,14 +498,18 @@ Location ThreadImpl::GetSymbolizedLocationForAddress(uint64_t address) {
   return vect[0];
 }
 
+void ThreadImpl::DidUpdateStackFrames() {
+  if (allow_notifications_) {
+    for (auto& observer : session()->thread_observers()) {
+      observer.DidUpdateStackFrames(this);
+    }
+  }
+}
+
 void ThreadImpl::ClearState() {
   state_ = std::nullopt;
   blocked_reason_ = debug_ipc::ThreadRecord::BlockedReason::kNotBlocked;
-
-  if (stack_.ClearFrames()) {
-    for (auto& observer : session()->thread_observers())
-      observer.OnThreadFramesInvalidated(this);
-  }
+  stack_.ClearFrames();
 }
 
 void ThreadImpl::RunNextPostStopTaskOrNotify(const StopInfo& info, bool should_stop) {
@@ -531,8 +539,10 @@ void ThreadImpl::RunNextPostStopTaskOrNotify(const StopInfo& info, bool should_s
       // Stay stopped and notify the observers.
       if (debug_stepping)
         printf(" → Dispatching stop notification.\r\n");
-      for (auto& observer : session()->thread_observers()) {
-        observer.OnThreadStopped(this, info);
+      if (allow_notifications_) {
+        for (auto& observer : session()->thread_observers()) {
+          observer.OnThreadStopped(this, info);
+        }
       }
     } else {
       // Controllers all say to continue.

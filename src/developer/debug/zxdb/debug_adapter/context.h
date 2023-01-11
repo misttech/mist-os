@@ -80,7 +80,7 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   void DidCreateThread(Thread* thread) override;
   void WillDestroyThread(Thread* thread) override;
   void OnThreadStopped(Thread* thread, const StopInfo& info) override;
-  void OnThreadFramesInvalidated(Thread* thread) override;
+  void DidUpdateStackFrames(Thread* thread) override;
 
   // ProcessObserver implementation:
   void DidCreateProcess(Process* process, uint64_t timestamp) override;

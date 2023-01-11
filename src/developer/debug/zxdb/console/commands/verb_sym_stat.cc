@@ -112,7 +112,9 @@ void SummarizeProcessSymbolStatus(ConsoleContext* context, Process* process, Out
     out->Append(Syntax::kError, "  No known modules.\n");
 
   out->Append(Syntax::kWarning, "  👉 ");
-  out->Append(Syntax::kComment, "Use \"libs\" to refresh the module list from the process.");
+  out->Append(Syntax::kComment,
+              "Use \"libs\" to refresh the module list from the target or\n"
+              "     \"libs --reload\" to additionally reload all symbols for the process.");
   out->Append(Syntax::kNormal, "\n\n");
 }
 
@@ -150,9 +152,18 @@ void DumpIndexOverview(SystemSymbols* system_symbols, OutputBuffer* out) {
 }
 
 void DumpBuildIdIndex(SystemSymbols* system_symbols, OutputBuffer* out) {
+  // This command can confusingly list must less than people expect because most symbols come from
+  // a .build-id directory structure.
+  out->Append(Syntax::kWarning, " 👉 ");
+  out->Append(Syntax::kComment,
+              "Note: This only shows files that have been separately indexed by the\n"
+              "    debugger. In many cases, symbols come from structured \".build-id\"\n"
+              "    directories (the \"build-id-dirs\" setting) which are only searched on\n"
+              "    demand and will not appear in this index.\n\n");
+
   const auto& build_id_to_files = system_symbols->build_id_index().build_id_to_files();
   if (build_id_to_files.empty()) {
-    out->Append(Syntax::kError, "  No build IDs found.\n");
+    out->Append(Syntax::kError, "No separately indexed build IDs found.");
   } else {
     for (const auto& [id, files] : build_id_to_files)
       out->Append(fxl::StringPrintf("%s %s\n", id.c_str(), files.debug_info.c_str()));

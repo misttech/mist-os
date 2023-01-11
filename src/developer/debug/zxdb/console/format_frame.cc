@@ -128,12 +128,13 @@ fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
   }
 
   // Request a stack update.
-  thread->GetStack().SyncFrames([thread = thread->GetWeakPtr(), opts, out](const Err& err) {
-    if (!err.has_error() && thread)
-      out->Complete(ListCompletedFrames(thread.get(), opts));
-    else
-      out->Complete("Thread exited, no frames.\n");
-  });
+  thread->GetStack().SyncFrames(force_update,
+                                [thread = thread->GetWeakPtr(), opts, out](const Err& err) {
+                                  if (!err.has_error() && thread)
+                                    out->Complete(ListCompletedFrames(thread.get(), opts));
+                                  else
+                                    out->Complete("Thread exited, no frames.\n");
+                                });
   return out;
 }
 

@@ -196,12 +196,16 @@ void Stack::SetHideAmbiguousInlineFrameCount(size_t hide_count) {
   hide_ambiguous_inline_frame_count_ = hide_count;
 }
 
-void Stack::SyncFrames(fit::callback<void(const Err&)> callback) {
+void Stack::SyncFrames(bool force, fit::callback<void(const Err&)> callback) {
+  if (force)
+    force_update_in_progress_ = true;
   delegate_->SyncFramesForStack(std::move(callback));
 }
 
 void Stack::SetFrames(debug_ipc::ThreadRecord::StackAmount amount,
                       const std::vector<debug_ipc::StackFrame>& new_frames) {
+  bool initial_has_frames = !frames_.empty();
+
   // See if the new frames are an extension of the existing frames or are a replacement. This
   // avoids overwriting existing frames when possible because:
   //  - There may be in-process operations with weak references to the frame that we don't want
@@ -209,6 +213,14 @@ void Stack::SetFrames(debug_ipc::ThreadRecord::StackAmount amount,
   //  - Inline frame state, especially with the hide_ambiguous_inline_frame_count_, needs to
   //    stay the same. Keeping this state across frame replacements and potential symbol changes
   //    isn't possible.
+  size_t old_ambiguous_frame_count = GetAmbiguousInlineFrameCount();
+  size_t old_hide_ambiguous_inline_frame_count = hide_ambiguous_inline_frame_count_;
+  if (force_update_in_progress_) {
+    // Replace all frames.
+    hide_ambiguous_inline_frame_count_ = 0;
+    frames_.clear();
+  }
+
   size_t appending_from = 0;  // First index in new_frames to append.
   for (size_t i = 0; i < frames_.size(); i++) {
     // The input will not contain any inline frames so skip over those when doing the checking.
@@ -232,23 +244,38 @@ void Stack::SetFrames(debug_ipc::ThreadRecord::StackAmount amount,
     AppendFrame(new_frames[i]);
 
   has_all_frames_ = amount == debug_ipc::ThreadRecord::StackAmount::kFull;
+
+  if (force_update_in_progress_ && old_ambiguous_frame_count == GetAmbiguousInlineFrameCount()) {
+    // When forcing a refresh of the stack frames, optimistically assume that the actual stack
+    // hasn't changed and the user wants the existing one re-evaluated (maybe with new symbols).
+    // When the number of inline frames at the top of the stack hasn't changed, assume the old hide
+    // count is also still valid and keep it from before.
+    hide_ambiguous_inline_frame_count_ = old_hide_ambiguous_inline_frame_count;
+  }
+
+  force_update_in_progress_ = false;
+
+  // Skip sending notifications when 0 frames replaced 0 frames.
+  if (new_frames.size() != 0 || initial_has_frames)
+    delegate_->DidUpdateStackFrames();
 }
 
 void Stack::SetFramesForTest(std::vector<std::unique_ptr<Frame>> frames, bool has_all) {
   frames_ = std::move(frames);
   has_all_frames_ = has_all;
   hide_ambiguous_inline_frame_count_ = 0;
+  delegate_->DidUpdateStackFrames();
 }
 
-bool Stack::ClearFrames() {
+void Stack::ClearFrames() {
   has_all_frames_ = false;
   hide_ambiguous_inline_frame_count_ = 0;
 
   if (frames_.empty())
-    return false;  // Nothing to do.
+    return;  // Nothing to do.
 
   frames_.clear();
-  return true;
+  delegate_->DidUpdateStackFrames();
 }
 
 Location Stack::SymbolizeFrameAddress(uint64_t address, bool is_top_physical_frame) const {

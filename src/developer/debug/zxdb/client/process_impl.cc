@@ -54,15 +54,17 @@ ThreadImpl* ProcessImpl::GetThreadImplFromKoid(uint64_t koid) {
 }
 
 void ProcessImpl::GetModules(
+    bool force_reload_symbols,
     fit::callback<void(const Err&, std::vector<debug_ipc::Module>)> callback) {
   debug_ipc::ModulesRequest request;
   request.process_koid = koid_;
   session()->remote_api()->Modules(
-      request, [process = weak_factory_.GetWeakPtr(), callback = std::move(callback)](
-                   const Err& err, debug_ipc::ModulesReply reply) mutable {
+      request,
+      [process = weak_factory_.GetWeakPtr(), force_reload_symbols, callback = std::move(callback)](
+          const Err& err, debug_ipc::ModulesReply reply) mutable {
         if (process) {
           process->FixupEmptyModuleNames(reply.modules);
-          process->symbols_.SetModules(reply.modules);
+          process->symbols_.SetModules(reply.modules, force_reload_symbols);
         }
         if (callback)
           callback(err, std::move(reply.modules));
@@ -281,7 +283,7 @@ void ProcessImpl::OnThreadExiting(const debug_ipc::ThreadRecord& record) {
 
 void ProcessImpl::OnModules(std::vector<debug_ipc::Module> modules) {
   FixupEmptyModuleNames(modules);
-  symbols_.SetModules(modules);
+  symbols_.SetModules(modules, false);
 
   // The process is stopped so we have time to load symbols and enable any pending breakpoints.
   // Now that the notification is complete, resume the process.
@@ -338,6 +340,12 @@ void ProcessImpl::UpdateThreads(const std::vector<debug_ipc::ThreadRecord>& new_
 }
 
 void ProcessImpl::DidLoadModuleSymbols(LoadedModuleSymbols* module) {
+  // Force any stopped threads to update their cached stack with the new symbol information.
+  for (const auto& [koid, thread] : threads_) {
+    if (thread->CurrentStopSupportsFrames())
+      thread->GetStack().SyncFrames(true, [](const Err&) {});
+  }
+
   for (auto& observer : session()->process_observers())
     observer.DidLoadModuleSymbols(this, module);
 }

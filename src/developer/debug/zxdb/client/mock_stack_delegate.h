@@ -59,11 +59,16 @@ class MockStackDelegate : public Stack::Delegate {
     return found->second;
   }
 
+  void DidUpdateStackFrames() override { update_count_++; }
+
+  int update_count() const { return update_count_; }
+
  private:
   Session* session_;
   Stack* stack_ = nullptr;
   std::map<uint64_t, Location> locations_;
   std::vector<std::unique_ptr<Frame>> async_frames_;
+  int update_count_ = 0;
 };
 
 }  // namespace zxdb

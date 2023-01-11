@@ -466,7 +466,7 @@ void ProcessController::Initialize(zxdb::Session& session,
     // interesting.
     if (target->GetProcess() != nullptr) {
       target->GetProcess()->GetModules(
-          [](const zxdb::Err& /*err*/, std::vector<debug_ipc::Module> /*modules*/) {
+          false, [](const zxdb::Err& /*err*/, std::vector<debug_ipc::Module> /*modules*/) {
             debug::MessageLoop::Current()->QuitNow();
           });
       debug::MessageLoop::Current()->Run();

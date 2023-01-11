@@ -68,6 +68,7 @@ class MockThread : public Thread, public Stack::Delegate {
   Location GetSymbolizedLocationForAddress(uint64_t address) override {
     return Location(Location::State::kSymbolized, address);
   }
+  void DidUpdateStackFrames() override {}
 
   std::string thread_name_ = "test thread";
   Process* process_;

@@ -400,7 +400,7 @@ void SymbolizerImpl::InitProcess() {
     modules.push_back({pair.second.name, pair.second.base, 0, pair.second.build_id});
     address_to_module_id_[pair.second.base] = pair.first;
   }
-  target_->GetProcess()->GetSymbols()->SetModules(modules);
+  target_->GetProcess()->GetSymbols()->SetModules(modules, false);
 
   // Collect module info for analytics.
   size_t num_modules_with_cached_symbols = 0;

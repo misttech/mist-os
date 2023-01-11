@@ -43,6 +43,7 @@ namespace {
 constexpr int kForceTypes = 1;
 constexpr int kVerboseSwitch = 2;
 constexpr int kRawOutput = 3;
+constexpr int kForceRefresh = 4;
 
 // Frames ------------------------------------------------------------------------------------------
 
@@ -64,6 +65,12 @@ const char kFrameHelp[] =
   regardless of which is the active one.
 
 Options
+
+  -f
+  --force
+      Force an update to the stack when listing stack frames. This will always
+      request the latest stack frames from the target and re-evaluate all symbol
+      information.
 
   -r
   --raw
@@ -133,9 +140,8 @@ bool HandleFrameNoun(ConsoleContext* console_context, const Command& cmd,
       opts.frame.loc.func.params = FormatFunctionNameOptions::kParamTypes;
     }
 
-    // Always force update the stack. Various things can have changed and when the user requests
-    // a stack we want to be sure things are correct.
-    cmd_context->Output(FormatStack(cmd.thread(), true, opts));
+    bool force_refresh = cmd.HasSwitch(kForceRefresh);
+    cmd_context->Output(FormatStack(cmd.thread(), force_refresh, opts));
     return true;
   }
 
@@ -845,6 +851,7 @@ const std::vector<SwitchRecord>& GetNounSwitches() {
     switches.emplace_back(kRawOutput, false, "raw", 'r');
     switches.emplace_back(kForceTypes, false, "types", 't');
     switches.emplace_back(kVerboseSwitch, false, "verbose", 'v');
+    switches.emplace_back(kForceRefresh, false, "force", 'f');
   }
   return switches;
 }

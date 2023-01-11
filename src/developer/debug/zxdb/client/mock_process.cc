@@ -14,7 +14,8 @@ namespace zxdb {
 
 using debug::MessageLoop;
 
-void MockProcess::GetModules(fit::callback<void(const Err&, std::vector<debug_ipc::Module>)> cb) {
+void MockProcess::GetModules(bool force_reload_symbols,
+                             fit::callback<void(const Err&, std::vector<debug_ipc::Module>)> cb) {
   MessageLoop::Current()->PostTask(
       FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err(), std::vector<debug_ipc::Module>()); });
 }
