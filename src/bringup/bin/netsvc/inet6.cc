@@ -282,7 +282,7 @@ struct Ip6Stack {
     DeviceBuffer& buffer = status.value();
 
     std::optional prepared =
-        PrepareIp6Packet(buffer.data().begin(), saddr, daddr, length, HDR_ICMP6);
+        PrepareIp6Packet(buffer.data().data(), saddr, daddr, length, HDR_ICMP6);
     if (!prepared.has_value()) {
       return ZX_ERR_INVALID_ARGS;
     }
@@ -321,7 +321,7 @@ zx_status_t udp6_send(const void* data, size_t dlen, const ip6_addr_t* daddr, ui
   const ip6_addr_t& saddr = ula ? stack_state.ula_ip6_addr : stack_state.ll_ip6_addr;
 
   std::optional prepared =
-      stack_state.PrepareIp6Packet(buffer.data().begin(), saddr, *daddr, length, HDR_UDP);
+      stack_state.PrepareIp6Packet(buffer.data().data(), saddr, *daddr, length, HDR_UDP);
   if (!prepared.has_value()) {
     return ZX_ERR_INVALID_ARGS;
   }

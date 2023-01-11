@@ -95,7 +95,7 @@ zx::result<> open_netdevice(async_dispatcher_t* dispatcher,
     ZX_ASSERT_MSG(buffer.data().parts() == 1, "received fragmented buffer with %d parts",
                   buffer.data().parts());
     cpp20::span data = buffer.data().part(0).data();
-    netifc_recv(dispatcher, data.begin(), data.size());
+    netifc_recv(dispatcher, data.data(), data.size());
   });
   ifc.client.OpenSession("netsvc", [&ifc](zx_status_t status) {
     if (status != ZX_OK) {

@@ -68,7 +68,7 @@ void Console::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   while (!span.empty()) {
     size_t count = std::min(span.size(), kMaxWriteSize);
     if (zx_status_t status = tx_sink_(span.data(), count); status != ZX_OK) {
-      uint64_t written = std::distance(request->data.begin(), span.begin());
+      uint64_t written = std::distance(request->data.begin(), span.data());
       if (written != 0) {
         return completer.ReplySuccess(written);
       }
