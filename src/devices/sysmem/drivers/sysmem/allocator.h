@@ -5,7 +5,8 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_ALLOCATOR_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_ALLOCATOR_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/zx/channel.h>
 
 #include "device.h"
@@ -19,27 +20,58 @@ namespace sysmem_driver {
 //
 // Because Allocator is essentially self-contained and handling the server end
 // of a channel, most of Allocator is private.
-class Allocator : public fidl::WireServer<fuchsia_sysmem::Allocator>, public LoggingMixin {
+class Allocator : public LoggingMixin {
  public:
   // Public for std::unique_ptr<Allocator>:
   ~Allocator();
 
-  static void CreateChannelOwned(zx::channel request, Device* device);
+  static void CreateChannelOwnedV1(zx::channel request, Device* device);
+  static void CreateChannelOwnedV2(zx::channel request, Device* device);
 
  private:
+  struct V1 : public fidl::Server<fuchsia_sysmem::Allocator> {
+    explicit V1(std::unique_ptr<Allocator> allocator) : allocator_(std::move(allocator)) {}
+
+    void AllocateNonSharedCollection(
+        AllocateNonSharedCollectionRequest& request,
+        AllocateNonSharedCollectionCompleter::Sync& completer) override;
+    void AllocateSharedCollection(AllocateSharedCollectionRequest& request,
+                                  AllocateSharedCollectionCompleter::Sync& completer) override;
+    void BindSharedCollection(BindSharedCollectionRequest& request,
+                              BindSharedCollectionCompleter::Sync& completer) override;
+    void ValidateBufferCollectionToken(
+        ValidateBufferCollectionTokenRequest& request,
+        ValidateBufferCollectionTokenCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+
+    std::unique_ptr<Allocator> allocator_;
+  };
+
+  struct V2 : public fidl::Server<fuchsia_sysmem2::Allocator> {
+    explicit V2(std::unique_ptr<Allocator> allocator) : allocator_(std::move(allocator)) {}
+
+    void AllocateNonSharedCollection(
+        AllocateNonSharedCollectionRequest& request,
+        AllocateNonSharedCollectionCompleter::Sync& completer) override;
+    void AllocateSharedCollection(AllocateSharedCollectionRequest& request,
+                                  AllocateSharedCollectionCompleter::Sync& completer) override;
+    void BindSharedCollection(BindSharedCollectionRequest& request,
+                              BindSharedCollectionCompleter::Sync& completer) override;
+    void ValidateBufferCollectionToken(
+        ValidateBufferCollectionTokenRequest& request,
+        ValidateBufferCollectionTokenCompleter::Sync& completer) override;
+    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                            SetDebugClientInfoCompleter::Sync& completer) override;
+
+    std::unique_ptr<Allocator> allocator_;
+  };
+
   Allocator(Device* parent_device);
 
-  void AllocateNonSharedCollection(AllocateNonSharedCollectionRequestView request,
-                                   AllocateNonSharedCollectionCompleter::Sync& completer) override;
-  void AllocateSharedCollection(AllocateSharedCollectionRequestView request,
-                                AllocateSharedCollectionCompleter::Sync& completer) override;
-  void BindSharedCollection(BindSharedCollectionRequestView request,
-                            BindSharedCollectionCompleter::Sync& completer) override;
-  void ValidateBufferCollectionToken(
-      ValidateBufferCollectionTokenRequestView request,
-      ValidateBufferCollectionTokenCompleter::Sync& completer) override;
-  void SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                          SetDebugClientInfoCompleter::Sync& completer) override;
+  template <typename Completer>
+  fit::result<std::monostate, std::pair<zx::channel, zx::channel>>
+  CommonAllocateNonSharedCollection(Completer& completer);
 
   Device* parent_device_ = nullptr;
 

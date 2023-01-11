@@ -8,6 +8,7 @@ fidl("fuchsia.sysmem2") {
   sdk_category = "internal"
   api = "fuchsia.sysmem2.api"
   sources = [
+    "allocator.fidl",
     "collection.fidl",
     "constraints.fidl",
     "format_modifier.fidl",

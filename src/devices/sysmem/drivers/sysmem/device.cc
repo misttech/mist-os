@@ -694,7 +694,7 @@ void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
   async::PostTask(loop_.dispatcher(),
                   [this, allocator_request = std::move(request->allocator_request)]() mutable {
                     // The Allocator is channel-owned / self-owned.
-                    Allocator::CreateChannelOwned(allocator_request.TakeChannel(), this);
+                    Allocator::CreateChannelOwnedV1(allocator_request.TakeChannel(), this);
                   });
 }
 
@@ -715,7 +715,7 @@ zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
   return async::PostTask(loop_.dispatcher(),
                          [this, allocator_request = std::move(allocator_request)]() mutable {
                            // The Allocator is channel-owned / self-owned.
-                           Allocator::CreateChannelOwned(std::move(allocator_request), this);
+                           Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
                          });
 }
 

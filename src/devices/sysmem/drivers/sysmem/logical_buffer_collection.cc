@@ -446,10 +446,10 @@ void LogicalBufferCollection::CreateV2(zx::channel buffer_collection_token_reque
 // So this method will close the buffer_collection_token and when it closes via
 // normal FIDL processing path, the token will remember the
 // buffer_collection_request to essentially convert itself into.
-void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
-                                                   zx::channel buffer_collection_token,
-                                                   zx::channel buffer_collection_request,
-                                                   const ClientDebugInfo* client_debug_info) {
+void LogicalBufferCollection::CommonBindSharedCollection(Device* parent_device,
+                                                         zx::channel buffer_collection_token,
+                                                         zx::channel buffer_collection_request,
+                                                         const ClientDebugInfo* client_debug_info) {
   ZX_DEBUG_ASSERT(buffer_collection_token);
   ZX_DEBUG_ASSERT(buffer_collection_request);
 
@@ -497,6 +497,22 @@ void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
   // close.
   //
   // ~buffer_collection_token
+}
+
+void LogicalBufferCollection::BindSharedCollectionV1(Device* parent_device,
+                                                     zx::channel buffer_collection_token,
+                                                     zx::channel buffer_collection_request,
+                                                     const ClientDebugInfo* client_debug_info) {
+  CommonBindSharedCollection(parent_device, std::move(buffer_collection_token),
+                             std::move(buffer_collection_request), client_debug_info);
+}
+
+void LogicalBufferCollection::BindSharedCollectionV2(Device* parent_device,
+                                                     zx::channel buffer_collection_token,
+                                                     zx::channel buffer_collection_request,
+                                                     const ClientDebugInfo* client_debug_info) {
+  CommonBindSharedCollection(parent_device, std::move(buffer_collection_token),
+                             std::move(buffer_collection_request), client_debug_info);
 }
 
 zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Device* parent_device,

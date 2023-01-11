@@ -68,9 +68,12 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // |buffer_collection_request| the server end of a BufferCollection channel
   // to be served by the LogicalBufferCollection associated with
   // buffer_collection_token.
-  static void BindSharedCollection(Device* parent_device, zx::channel buffer_collection_token,
-                                   zx::channel buffer_collection_request,
-                                   const ClientDebugInfo* client_debug_info);
+  static void BindSharedCollectionV1(Device* parent_device, zx::channel buffer_collection_token,
+                                     zx::channel buffer_collection_request,
+                                     const ClientDebugInfo* client_debug_info);
+  static void BindSharedCollectionV2(Device* parent_device, zx::channel buffer_collection_token,
+                                     zx::channel buffer_collection_request,
+                                     const ClientDebugInfo* client_debug_info);
 
   // ZX_OK if the token is known to the server.
   // ZX_ERR_NOT_FOUND if the token isn't known to the server.
@@ -590,6 +593,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                                                NodeProperties* new_node_properties,
                                                zx::unowned_channel token_request,
                                                BufferCollectionToken** out_token);
+
+  static void CommonBindSharedCollection(Device* parent_device, zx::channel buffer_collection_token,
+                                         zx::channel buffer_collection_request,
+                                         const ClientDebugInfo* client_debug_info);
 
   Device* parent_device_ = nullptr;
 

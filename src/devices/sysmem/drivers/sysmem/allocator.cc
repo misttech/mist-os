@@ -22,17 +22,27 @@ Allocator::Allocator(Device* parent_device)
 Allocator::~Allocator() { LogInfo(FROM_HERE, "~Allocator"); }
 
 // static
-void Allocator::CreateChannelOwned(zx::channel request, Device* device) {
+void Allocator::CreateChannelOwnedV1(zx::channel request, Device* device) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
+  auto v1_server = std::make_unique<V1>(std::move(allocator));
   // Ignore the result - allocator will be destroyed and the channel will be closed on error.
-  fidl::BindServer<fuchsia_sysmem::Allocator>(device->dispatcher(), std::move(request),
-                                              std::move(allocator));
+  fidl::BindServer(device->dispatcher(),
+                   fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(request)),
+                   std::move(v1_server));
 }
 
-void Allocator::AllocateNonSharedCollection(AllocateNonSharedCollectionRequestView request,
-                                            AllocateNonSharedCollectionCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "Allocator::AllocateNonSharedCollection");
+void Allocator::CreateChannelOwnedV2(zx::channel request, Device* device) {
+  auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
+  auto v2_server = std::make_unique<V2>(std::move(allocator));
+  // Ignore the result - allocator will be destroyed and the channel will be closed on error.
+  fidl::BindServer(device->dispatcher(),
+                   fidl::ServerEnd<fuchsia_sysmem2::Allocator>(std::move(request)),
+                   std::move(v2_server));
+}
 
+template <typename Completer>
+fit::result<std::monostate, std::pair<zx::channel, zx::channel>>
+Allocator::CommonAllocateNonSharedCollection(Completer& completer) {
   // The AllocateCollection() message skips past the token stage because the
   // client is also the only participant (probably a temp/test client).  Real
   // clients are encouraged to use AllocateSharedCollection() instead, so that
@@ -62,16 +72,32 @@ void Allocator::AllocateNonSharedCollection(AllocateNonSharedCollectionRequestVi
     // which seems like a good idea (more likely to recover overall) given
     // the nature of the error.
     completer.Close(status);
+    return fit::error(std::monostate{});
+  }
+
+  return fit::success(std::make_pair(std::move(token_client), std::move(token_server)));
+}
+
+void Allocator::V1::AllocateNonSharedCollection(
+    AllocateNonSharedCollectionRequest& request,
+    AllocateNonSharedCollectionCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Allocator::AllocateNonSharedCollection");
+
+  auto result = allocator_->CommonAllocateNonSharedCollection(completer);
+  if (!result.is_ok()) {
     return;
   }
+  auto endpoints = std::move(result.value());
+  auto& [token_client, token_server] = endpoints;
 
   // The server end of the local token goes to Create(), and the client end
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
-  LogicalBufferCollection::CreateV1(std::move(token_server), parent_device_);
-  LogicalBufferCollection::BindSharedCollection(
-      parent_device_, std::move(token_client), request->collection_request.TakeChannel(),
-      client_debug_info_.has_value() ? &*client_debug_info_ : nullptr);
+  LogicalBufferCollection::CreateV1(std::move(token_server), allocator_->parent_device_);
+  LogicalBufferCollection::BindSharedCollectionV1(
+      allocator_->parent_device_, std::move(token_client),
+      request.collection_request().TakeChannel(),
+      allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
   // Now the client can SetConstraints() on the BufferCollection, etc.  The
   // client didn't have to hassle with the BufferCollectionToken, which is the
@@ -79,8 +105,41 @@ void Allocator::AllocateNonSharedCollection(AllocateNonSharedCollectionRequestVi
   // AllocateSharedCollection().
 }
 
-void Allocator::AllocateSharedCollection(AllocateSharedCollectionRequestView request,
-                                         AllocateSharedCollectionCompleter::Sync& completer) {
+void Allocator::V2::AllocateNonSharedCollection(
+    AllocateNonSharedCollectionRequest& request,
+    AllocateNonSharedCollectionCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Allocator::AllocateNonSharedCollection");
+
+  if (!request.collection_request().has_value()) {
+    allocator_->LogError(FROM_HERE, "AllocateNonSharedCollection requires collection_request set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  auto result = allocator_->CommonAllocateNonSharedCollection(completer);
+  if (!result.is_ok()) {
+    return;
+  }
+  auto endpoints = std::move(result.value());
+  auto& [token_client, token_server] = endpoints;
+
+  // The server end of the local token goes to Create(), and the client end
+  // goes to BindSharedCollection().  The BindSharedCollection() will figure
+  // out which token we're talking about based on the koid(s), as usual.
+  LogicalBufferCollection::CreateV2(std::move(token_server), allocator_->parent_device_);
+  LogicalBufferCollection::BindSharedCollectionV2(
+      allocator_->parent_device_, std::move(token_client),
+      request.collection_request()->TakeChannel(),
+      allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
+
+  // Now the client can SetConstraints() on the BufferCollection, etc.  The
+  // client didn't have to hassle with the BufferCollectionToken, which is the
+  // sole upside of the client using this message over
+  // AllocateSharedCollection().
+}
+
+void Allocator::V1::AllocateSharedCollection(AllocateSharedCollectionRequest& request,
+                                             AllocateSharedCollectionCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Allocator::AllocateSharedCollection");
 
   // The LogicalBufferCollection is self-owned / owned by all the channels it
@@ -94,11 +153,37 @@ void Allocator::AllocateSharedCollection(AllocateSharedCollectionRequestView req
   // go ahead and allocate the LogicalBufferCollection here since the
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
-  LogicalBufferCollection::CreateV1(request->token_request.TakeChannel(), parent_device_);
+  LogicalBufferCollection::CreateV1(request.token_request().TakeChannel(),
+                                    allocator_->parent_device_);
 }
 
-void Allocator::BindSharedCollection(BindSharedCollectionRequestView request,
-                                     BindSharedCollectionCompleter::Sync& completer) {
+void Allocator::V2::AllocateSharedCollection(AllocateSharedCollectionRequest& request,
+                                             AllocateSharedCollectionCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Allocator::AllocateSharedCollection");
+
+  if (!request.token_request().has_value()) {
+    allocator_->LogError(FROM_HERE, "AllocateSharedCollection requires token_request set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  // The LogicalBufferCollection is self-owned / owned by all the channels it
+  // serves.
+  //
+  // There's no channel served directly by the LogicalBufferCollection.
+  // Instead LogicalBufferCollection owns all the FidlServer instances that
+  // each own a channel.
+  //
+  // Initially there's only a channel to the first BufferCollectionToken.  We
+  // go ahead and allocate the LogicalBufferCollection here since the
+  // LogicalBufferCollection associates all the BufferCollectionToken and
+  // BufferCollection bindings to the same LogicalBufferCollection.
+  LogicalBufferCollection::CreateV2(request.token_request()->TakeChannel(),
+                                    allocator_->parent_device_);
+}
+
+void Allocator::V1::BindSharedCollection(BindSharedCollectionRequest& request,
+                                         BindSharedCollectionCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Allocator::BindSharedCollection");
 
   // The BindSharedCollection() message is about a supposed-to-be-pre-existing
@@ -108,26 +193,89 @@ void Allocator::BindSharedCollection(BindSharedCollectionRequestView request,
   // we have to look it up by koid.  The koid table is held by
   // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
   // this request.
-  LogicalBufferCollection::BindSharedCollection(
-      parent_device_, request->token.TakeChannel(),
-      request->buffer_collection_request.TakeChannel(),
-      client_debug_info_.has_value() ? &*client_debug_info_ : nullptr);
+  LogicalBufferCollection::BindSharedCollectionV1(
+      allocator_->parent_device_, request.token().TakeChannel(),
+      request.buffer_collection_request().TakeChannel(),
+      allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
 
-void Allocator::ValidateBufferCollectionToken(
-    ValidateBufferCollectionTokenRequestView request,
+void Allocator::V2::BindSharedCollection(BindSharedCollectionRequest& request,
+                                         BindSharedCollectionCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Allocator::BindSharedCollection");
+
+  if (!request.token().has_value()) {
+    allocator_->LogError(FROM_HERE, "BindSharedCollection requires token set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  if (!request.buffer_collection_request().has_value()) {
+    allocator_->LogError(FROM_HERE, "BindSharedCollection requires buffer_collection_request set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  // The BindSharedCollection() message is about a supposed-to-be-pre-existing
+  // logical BufferCollection, but the only association we have to that
+  // BufferCollection is the client end of a BufferCollectionToken channel
+  // being handed in via token_param.  To find any associated BufferCollection
+  // we have to look it up by koid.  The koid table is held by
+  // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
+  // this request.
+  LogicalBufferCollection::BindSharedCollectionV2(
+      allocator_->parent_device_, request.token()->TakeChannel(),
+      request.buffer_collection_request()->TakeChannel(),
+      allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
+}
+
+void Allocator::V1::ValidateBufferCollectionToken(
+    ValidateBufferCollectionTokenRequest& request,
     ValidateBufferCollectionTokenCompleter::Sync& completer) {
   zx_status_t status = LogicalBufferCollection::ValidateBufferCollectionToken(
-      parent_device_, request->token_server_koid);
+      allocator_->parent_device_, request.token_server_koid());
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_NOT_FOUND);
   completer.Reply(status == ZX_OK);
 }
 
-void Allocator::SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                                   SetDebugClientInfoCompleter::Sync& completer) {
-  client_debug_info_.emplace();
-  client_debug_info_->name = std::string(request->name.begin(), request->name.end());
-  client_debug_info_->id = request->id;
+void Allocator::V2::ValidateBufferCollectionToken(
+    ValidateBufferCollectionTokenRequest& request,
+    ValidateBufferCollectionTokenCompleter::Sync& completer) {
+  if (!request.token_server_koid().has_value()) {
+    allocator_->LogError(FROM_HERE, "ValidateBufferCollectionToken requires token_server_koid set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  zx_status_t status = LogicalBufferCollection::ValidateBufferCollectionToken(
+      allocator_->parent_device_, request.token_server_koid().value());
+  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_NOT_FOUND);
+  fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenResponse response;
+  response.is_known().emplace(status == ZX_OK);
+  completer.Reply(std::move(response));
+}
+
+void Allocator::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                       SetDebugClientInfoCompleter::Sync& completer) {
+  allocator_->client_debug_info_.emplace();
+  allocator_->client_debug_info_->name = std::string(request.name().begin(), request.name().end());
+  allocator_->client_debug_info_->id = request.id();
+}
+
+void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
+                                       SetDebugClientInfoCompleter::Sync& completer) {
+  if (!request.name().has_value()) {
+    allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires name set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  if (!request.id().has_value()) {
+    allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires id set");
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  allocator_->client_debug_info_.emplace();
+  allocator_->client_debug_info_->name =
+      std::string(request.name()->begin(), request.name()->end());
+  allocator_->client_debug_info_->id = request.id().value();
 }
 
 }  // namespace sysmem_driver
