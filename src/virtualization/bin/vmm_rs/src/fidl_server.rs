@@ -105,16 +105,22 @@ impl<H: Hypervisor> FidlServer<H> {
         match request {
             GuestLifecycleRequest::Create { guest_config, responder } => {
                 if self.run_responder.is_some() {
-                    responder.send(&mut Err(GuestError::AlreadyRunning)).unwrap();
+                    if let Err(e) = responder.send(&mut Err(GuestError::AlreadyRunning)) {
+                        tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
+                    }
                     return;
                 }
                 match VirtualMachine::new(self.hypervisor.clone(), guest_config) {
                     Err(e) => {
-                        responder.send(&mut Err(e)).unwrap();
+                        if let Err(e) = responder.send(&mut Err(e)) {
+                            tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
+                        }
                     }
                     Ok(virtual_machine) => {
                         self.virtual_machine = Some(virtual_machine);
-                        responder.send(&mut Ok(())).unwrap();
+                        if let Err(e) = responder.send(&mut Ok(())) {
+                            tracing::warn!(%e, "Failed to send GuestLifecycle.Create response");
+                        }
                     }
                 }
             }
@@ -123,29 +129,37 @@ impl<H: Hypervisor> FidlServer<H> {
                     match guest.into_stream() {
                         Ok(stream) => self.guest_fidl.push(stream),
                         Err(e) => {
-                            tracing::warn!("Failed to create Guest RequestStream: {}", e);
+                            tracing::warn!(%e, "Failed to create Guest RequestStream");
                         }
                     }
                 }
             }
             GuestLifecycleRequest::Run { responder } => {
                 if self.virtual_machine.is_none() {
-                    responder.send(&mut Err(GuestError::NotCreated)).unwrap();
+                    if let Err(e) = responder.send(&mut Err(GuestError::NotCreated)) {
+                        tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
+                    }
                     return;
                 }
                 if self.run_responder.is_some() {
-                    responder.send(&mut Err(GuestError::AlreadyRunning)).unwrap();
+                    if let Err(e) = responder.send(&mut Err(GuestError::AlreadyRunning)) {
+                        tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
+                    }
                     return;
                 }
                 if let Err(e) = self.virtual_machine.as_ref().unwrap().start_primary_vcpu() {
-                    responder.send(&mut Err(e)).unwrap();
+                    if let Err(e) = responder.send(&mut Err(e)) {
+                        tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
+                    }
                     return;
                 }
                 self.run_responder = Some(responder);
             }
             GuestLifecycleRequest::Stop { responder } => {
                 self.destroy_and_respond(Err(GuestError::ControllerForcedHalt));
-                responder.send().unwrap();
+                if let Err(e) = responder.send() {
+                    tracing::warn!(%e, "Failed to send GuestLifecycle.Stop response");
+                }
             }
         }
     }
