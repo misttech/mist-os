@@ -102,6 +102,18 @@ func writeEnumIndex(index *Index, f io.Writer) {
 	writeListOfLinks(allEnums, f)
 }
 
+func writeTypedefIndex(index *Index, f io.Writer) {
+	fmt.Fprintf(f, "## Typedefs and aliases\n\n")
+
+	allTypedefs := make([]indexLink, 0, len(index.Typedefs))
+	for _, t := range index.Typedefs {
+		allTypedefs = append(allTypedefs, indexLink{
+			Name: typedefFullName(t),
+			Link: typedefLink(t)})
+	}
+	writeListOfLinks(allTypedefs, f)
+}
+
 func WriteIndex(settings WriteSettings, index *Index, f io.Writer) {
 	if len(settings.OverviewContents) > 0 {
 		// The overview will comprise the top of the index and we will also take the
@@ -148,6 +160,10 @@ func WriteIndex(settings WriteSettings, index *Index, f io.Writer) {
 
 	if len(index.Enums) > 0 {
 		writeEnumIndex(index, f)
+	}
+
+	if len(index.Typedefs) > 0 {
+		writeTypedefIndex(index, f)
 	}
 
 	if len(index.Defines) > 0 {

@@ -23,6 +23,32 @@ properly qualified and that links to other items are correct.
 Here is a link to <code><a href="namespace.h.md#myns::StructInsideNamespace">myns::StructInsideNamespace</a></code>.
 
 
+## StructInsideNamespaceTypedef typedef {:#myns::StructInsideNamespaceTypedef}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/namespace.h#26)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">namespace</span> myns {
+
+<span class="kwd">typedef</span> <span class="typ">StructInsideNamespace</span> <span class="typ">StructInsideNamespaceTypedef</span>;
+
+}  <span class="com">// namespace myns</span>
+</pre>
+
+
+## StructInsideNamespaceUsing typedef {:#myns::StructInsideNamespaceUsing}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/namespace.h#27)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">namespace</span> myns {
+
+<span class="kwd">using</span> <span class="typ">StructInsideNamespaceUsing</span> = <span class="typ">StructInsideNamespace</span>;
+
+}  <span class="com">// namespace myns</span>
+</pre>
+
+
 ## myns::ClassInsideNamespace class {:#myns::ClassInsideNamespace}
 
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/namespace.h#34)

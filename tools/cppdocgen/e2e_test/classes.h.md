@@ -45,8 +45,8 @@ Insightful documentation for BaseClass2Function.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/classes.h#64)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> DerivedClass : <span class="kwd">public</span> <span class="typ"><a href="classes.h.md#BaseClass1">GlobalNamespace::BaseClass1</a></span>,
-                     <span class="kwd">private</span> <span class="typ"><a href="classes.h.md#BaseClass2">GlobalNamespace::BaseClass2</a></span> { <span class="com">...</span> };
+<span class="kwd">class</span> DerivedClass : <span class="kwd">public</span> <span class="typ"><a href="classes.h.md#BaseClass1">BaseClass1</a></span>,
+                     <span class="kwd">private</span> <span class="typ"><a href="classes.h.md#BaseClass2">BaseClass2</a></span> { <span class="com">...</span> };
 </pre>
 
 ### Inherited from [BaseClass1](classes.h.md#BaseClass1)

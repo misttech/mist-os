@@ -58,7 +58,7 @@ Full template specialization.
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/templates.h#30)
 
 <pre class="devsite-disable-click-to-copy">
-<span class="kwd">class</span> DerivesFromTemplate : <span class="kwd">public</span> <span class="typ"><a href="templates.h.md#BaseTemplate">GlobalNamespace::BaseTemplate&lt;int, 0&gt;</a></span> { <span class="com">...</span> };
+<span class="kwd">class</span> DerivesFromTemplate : <span class="kwd">public</span> <span class="typ"><a href="templates.h.md#BaseTemplate">BaseTemplate&lt;int, 0&gt;</a></span> { <span class="com">...</span> };
 </pre>
 
 Class derived from a template.

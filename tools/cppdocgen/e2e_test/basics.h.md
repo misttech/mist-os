@@ -71,6 +71,48 @@ title for the docstring.
 This enum should have the declaration omitted because of the  annotation.
 
 
+## SimpleTestStructureTypedef typedef {:#SimpleTestStructureTypedef}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#67)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">typedef</span> <span class="typ">SimpleTestStructure</span> <span class="typ">SimpleTestStructureTypedef</span>;
+</pre>
+
+
+## SimpleTestStructureUsing typedef {:#SimpleTestStructureUsing}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#68)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">using</span> <span class="typ">SimpleTestStructureUsing</span> = <span class="typ">SimpleTestStructure</span>;
+</pre>
+
+
+## tagged_struct_t typedef {:#tagged_struct_t}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#80)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">typedef</span> <span class="typ">struct tagged_struct</span> <span class="typ">tagged_struct_t</span>;
+</pre>
+
+This one has a name for the struct that's separate from the typedef, yet still defined in the
+same declaration.
+
+TODO https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=119281 the struct definition and the
+typedef should be grouped togeher.
+
+
+## tagged_struct_separate_t typedef {:#tagged_struct_separate_t}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#88)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">typedef</span> <span class="typ">struct tagged_struct_separate</span> <span class="typ">tagged_struct_separate_t</span>;
+</pre>
+
+
 ## SimpleTestStructure struct {:#SimpleTestStructure}
 
 [Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#29)
@@ -117,4 +159,32 @@ Some documentation for the `b` member of the `SimpleTestStructure`.
 </pre>
 
 This tests the C-style thing of defining an unnamed struct and a typedef for it at the same time.
+
+## tagged_struct struct {:#tagged_struct}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#80)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">struct</span> tagged_struct {
+    <span class="typ">int</span> a;
+};
+</pre>
+
+This one has a name for the struct that's separate from the typedef, yet still defined in the
+same declaration.
+
+TODO https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=119281 the struct definition and the
+typedef should be grouped togeher.
+
+## tagged_struct_separate struct {:#tagged_struct_separate}
+
+[Declaration source code](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/tools/cppdocgen/e2e_test/basics.h#85)
+
+<pre class="devsite-disable-click-to-copy">
+<span class="kwd">struct</span> tagged_struct_separate {
+    <span class="typ">int</span> a;
+};
+</pre>
+
+Here the C non-typedef'ed struct and the typedefed version are separate declarations.
 

@@ -63,6 +63,9 @@ type Index struct {
 
 	// All toplevel and namespaced enums indexed by their name.
 	Enums map[string]*clangdoc.EnumInfo
+
+	// All typedefs indexed by their name.
+	Typedefs map[string]*clangdoc.TypedefInfo
 }
 
 // Returns a sorted list of all functions.
@@ -144,6 +147,19 @@ func (f enumByName) Less(i, j int) bool {
 	return f[i].Name < f[j].Name
 }
 
+// Interface for sorting a typedef list by name.
+type typedefByName []*clangdoc.TypedefInfo
+
+func (f typedefByName) Len() int {
+	return len(f)
+}
+func (f typedefByName) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+func (f typedefByName) Less(i, j int) bool {
+	return f[i].Name < f[j].Name
+}
+
 type DefineGroup struct {
 	// Nonempty when an explicit title is given. Empty means just use the first name.
 	ExplicitTitle string
@@ -211,6 +227,16 @@ func indexEnum(settings IndexSettings, index *Index, e *clangdoc.EnumInfo) {
 	}
 }
 
+func indexTypedef(settings IndexSettings, index *Index, t *clangdoc.TypedefInfo) {
+	if settings.ShouldIndexInHeader(t.DefLocation.Filename) &&
+		!commentContains(t.Description, NoDocTag) {
+		index.Typedefs[typedefFullName(t)] = t
+
+		header := index.HeaderForFileName(t.DefLocation.Filename)
+		header.Typedefs = append(header.Typedefs, t)
+	}
+}
+
 func indexNamespace(settings IndexSettings, index *Index, r *clangdoc.NamespaceInfo) {
 	for _, f := range r.ChildFunctions {
 		indexFunction(settings, index, f)
@@ -223,6 +249,9 @@ func indexNamespace(settings IndexSettings, index *Index, r *clangdoc.NamespaceI
 	}
 	for _, e := range r.ChildEnums {
 		indexEnum(settings, index, e)
+	}
+	for _, t := range r.ChildTypedefs {
+		indexTypedef(settings, index, t)
 	}
 }
 
@@ -343,6 +372,7 @@ func makeEmptyIndex() Index {
 	index.Headers = make(map[string]*Header)
 	index.Defines = make(map[string]*Define)
 	index.Enums = make(map[string]*clangdoc.EnumInfo)
+	index.Typedefs = make(map[string]*clangdoc.TypedefInfo)
 	return index
 }
 

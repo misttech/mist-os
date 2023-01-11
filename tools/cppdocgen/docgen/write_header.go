@@ -19,6 +19,7 @@ type Header struct {
 	Functions []*clangdoc.FunctionInfo
 	Records   []*clangdoc.RecordInfo
 	Enums     []*clangdoc.EnumInfo
+	Typedefs  []*clangdoc.TypedefInfo
 
 	// These are extracted from the header source code.
 	Description []clangdoc.CommentInfo // Header-wide docstring.
@@ -95,7 +96,10 @@ func WriteHeaderReference(settings WriteSettings, index *Index, h *Header, f io.
 		writeEnumSection(settings, index, e, f)
 	}
 
-	// TODO typedefs, usings.
+	// Typedefs and usings.
+	for _, t := range h.Typedefs {
+		writeTypedefSection(settings, index, t, f)
+	}
 
 	// Structs and classes.
 	sort.Sort(recordByName(h.Records))

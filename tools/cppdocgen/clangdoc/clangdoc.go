@@ -39,6 +39,10 @@ func PathNameToFullyQualified(path, name string) string {
 		// No scoping.
 		return name
 	}
+	if path == "GlobalNamespace" {
+		// Clang-doc generates a "GlobalNamespace" at the toplevel.
+		return name
+	}
 
 	// Replace "std::__2" prefixes which are standard library versioning stuff that the user
 	// doesn't want to see.
@@ -50,7 +54,7 @@ func PathNameToFullyQualified(path, name string) string {
 }
 
 type Reference struct {
-	Type                string `yaml:"Type"` // e.g. "class", "struct", "union".
+	Type                string `yaml:"Type"` // e.g. "Namespace", "Record".
 	Name                string `yaml:"Name"`
 	QualName            string `yaml:"QualName"`
 	USR                 string `yaml:"USR"`
@@ -123,13 +127,11 @@ type FieldTypeInfo struct {
 }
 
 type MemberTypeInfo struct {
-	Name         string    `yaml:"Name"`
-	TypeRef      Reference `yaml:"Type"`
-	FullTypeName string    `yaml:"FullTypeName"`
-	Access       string    `yaml:"Access"`
-
-	// This being present depends on Brett's unlanded clang-doc change.
-	Description []CommentInfo `yaml:"Description"`
+	Name         string        `yaml:"Name"`
+	TypeRef      Reference     `yaml:"Type"`
+	FullTypeName string        `yaml:"FullTypeName"`
+	Access       string        `yaml:"Access"`
+	Description  []CommentInfo `yaml:"Description"`
 }
 
 func (m MemberTypeInfo) IsPublic() bool {
@@ -276,6 +278,7 @@ type RecordInfo struct {
 
 	ChildFunctions []*FunctionInfo `yaml:"ChildFunctions"`
 	ChildEnums     []*EnumInfo     `yaml:"ChildEnums"`
+	ChildTypedefs  []*TypedefInfo  `yaml:"ChildTypedefs"`
 
 	// When this record is a base class, these items hold the derived information.
 	Access    string `yaml:"Access"`
@@ -284,6 +287,16 @@ type RecordInfo struct {
 	// I'm not sure what this means, I suspect this is set when the class also appears in the
 	// Parents or VirtualParents list.
 	IsParent bool `yaml:"IsParent"`
+}
+
+type TypedefInfo struct {
+	USR         string        `yaml:"USR"`
+	Name        string        `yaml:"Name"`
+	Namespace   []Reference   `yaml:"Namespace"`
+	Description []CommentInfo `yaml:"Description"`
+	DefLocation Location      `yaml:"DefLocation"`
+	Underlying  Reference     `yaml:"Underlying"`
+	IsUsing     bool          `yaml:"IsUsing"` // False means "typedef".
 }
 
 func (r RecordInfo) IsConstructor(f *FunctionInfo) bool {
@@ -305,6 +318,7 @@ type NamespaceInfo struct {
 
 	ChildFunctions []*FunctionInfo `yaml:"ChildFunctions"`
 	ChildEnums     []*EnumInfo     `yaml:"ChildEnums"`
+	ChildTypedefs  []*TypedefInfo  `yaml:"ChildTypedefs"`
 }
 
 // Abstracts how to read files from the input.

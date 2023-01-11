@@ -72,4 +72,19 @@ typedef struct {
   int a;
 } UnnamedStructTypedef;
 
+// This one has a name for the struct that's separate from the typedef, yet still defined in the
+// same declaration.
+//
+// TODO https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=119281 the struct definition and the
+// typedef should be grouped togeher.
+typedef struct tagged_struct {
+  int a;
+} tagged_struct_t;
+
+// Here the C non-typedef'ed struct and the typedefed version are separate declarations.
+struct tagged_struct_separate {
+  int a;
+};
+typedef struct tagged_struct_separate tagged_struct_separate_t;
+
 #endif  // TOOLS_CPPDOCGEN_E2E_TEST_BASICS_H_

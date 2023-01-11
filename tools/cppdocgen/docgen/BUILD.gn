@@ -27,6 +27,7 @@ go_library("docgen") {
     "write_record_test.go",
     "write_test.go",
     "write_toc.go",
+    "write_typedef.go",
   ]
   deps = [ "../clangdoc" ]
 }

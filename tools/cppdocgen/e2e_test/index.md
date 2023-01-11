@@ -33,6 +33,8 @@ The contents of this README file will comprise the top of the generated index.md
   - [StandaloneUnion](basics.h.md#StandaloneUnion) union
   - [myns::StructInsideNamespace](namespace.h.md#myns::StructInsideNamespace) struct
   - [UnnamedStructTypedef](basics.h.md#UnnamedStructTypedef) struct
+  - [tagged_struct](basics.h.md#tagged_struct) struct
+  - [tagged_struct_separate](basics.h.md#tagged_struct_separate) struct
 
 ## Functions
 
@@ -54,6 +56,15 @@ The contents of this README file will comprise the top of the generated index.md
   - [myns::EnumInsideNamespace](namespace.h.md#myns::EnumInsideNamespace)
   - [MySimpleEnum](basics.h.md#MySimpleEnum)
   - [NoDeclEnum](basics.h.md#NoDeclEnum)
+
+## Typedefs and aliases
+
+  - [myns::StructInsideNamespaceTypedef](namespace.h.md#myns::StructInsideNamespaceTypedef)
+  - [myns::StructInsideNamespaceUsing](namespace.h.md#myns::StructInsideNamespaceUsing)
+  - [SimpleTestStructureTypedef](basics.h.md#SimpleTestStructureTypedef)
+  - [SimpleTestStructureUsing](basics.h.md#SimpleTestStructureUsing)
+  - [tagged_struct_separate_t](basics.h.md#tagged_struct_separate_t)
+  - [tagged_struct_t](basics.h.md#tagged_struct_t)
 
 ## Macros
 
