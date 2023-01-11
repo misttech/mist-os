@@ -21,7 +21,11 @@ driver_bind_rules("pinecrest-wifi-bind") {
   header_output = "pinecrest-wifi-bind.h"
   bind_output = "pinecrest-wifi-bind.bc"
   tests = "bind-tests/pinecrest-wifi-bind-test.json"
-  deps = [ "//src/devices/bind/fuchsia.sdmmc" ]
+  deps = [
+    "//src/devices/bind/fuchsia.nxp.platform",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sdmmc",
+  ]
 }
 
 driver_bind_rules("pinecrest-emmc-bind") {

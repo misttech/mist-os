@@ -4,9 +4,19 @@
 
 composite wifi;
 
+using fuchsia.nxp.platform;
+using fuchsia.platform;
 using fuchsia.sdmmc;
 
-primary node "sdio-function-1" {
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.nxp.platform.BIND_PLATFORM_DEV_VID.NXP;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.nxp.platform.BIND_PLATFORM_DEV_PID.SD8987;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.nxp.platform.BIND_PLATFORM_DEV_DID.WIFI;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+}
+
+node "sdio-function-1" {
   fuchsia.BIND_PROTOCOL == fuchsia.sdmmc.BIND_PROTOCOL.SDIO;
   fuchsia.BIND_SDIO_VID == 0x02df;
   fuchsia.BIND_SDIO_FUNCTION == 1;

@@ -16,6 +16,7 @@
 
 #include "pinecrest.h"
 #include "src/devices/board/drivers/pinecrest/pinecrest-wifi-bind.h"
+#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/nxp/include/wifi/wifi-config.h"
 
 namespace board_pinecrest {
@@ -59,12 +60,19 @@ zx_status_t Pinecrest::SdioInit() {
       .indication_gpio = 0xff,
   };
 
-  static const std::vector<fpbus::Metadata> sd_emmc_metadata = {
+  static const std::vector<fpbus::Metadata> wifi_metadata{
       {{
           .type = DEVICE_METADATA_WIFI_CONFIG,
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&wifi_config),
               reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
+      }},
+  };
+
+  static const std::vector<fpbus::BootMetadata> wifi_boot_metadata{
+      {{
+          .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+          .zbi_extra = MACADDR_WIFI,
       }},
   };
 
@@ -83,7 +91,6 @@ zx_status_t Pinecrest::SdioInit() {
   sdio_dev.irq() = sdio_irqs;
   sdio_dev.mmio() = sdio_mmios;
   sdio_dev.bti() = sdio_btis;
-  sdio_dev.metadata() = sd_emmc_metadata;
   sdio_dev.boot_metadata() = sd_emmc_boot_metadata;
 
   // Configure eMMC-SD soc pads.
@@ -117,26 +124,28 @@ zx_status_t Pinecrest::SdioInit() {
     return result->error_value();
   }
 
-  constexpr zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_NXP},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_MARVELL_88W8987},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_MARVELL_WIFI},
-  };
+  // Create the wifi composite device that will be the parent for wifi devices.
+  fpbus::Node wifi_dev;
+  wifi_dev.name() = "wifi";
+  wifi_dev.vid() = PDEV_VID_NXP;
+  wifi_dev.pid() = PDEV_PID_MARVELL_88W8987;
+  wifi_dev.did() = PDEV_DID_MARVELL_WIFI;
+  wifi_dev.metadata() = wifi_metadata;
+  wifi_dev.boot_metadata() = wifi_boot_metadata;
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = wifi_fragments,
-      .fragments_count = std::size(wifi_fragments),
-      .primary_fragment = "sdio-function-1",
-      .spawn_colocated = true,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-
-  status = DdkAddComposite("wifi", &comp_desc);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed; %s", __func__, zx_status_get_string(status));
+  fidl_arena.Reset();
+  auto fragment = platform_bus_composite::MakeFidlFragment(fidl_arena, wifi_fragments,
+                                                           std::size(wifi_fragments));
+  arena = fdf::Arena('WIFI');
+  auto res = pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, wifi_dev), fragment,
+                                               "sdio-function-1");
+  if (!res.ok()) {
+    zxlogf(ERROR, "Request to add WIFI composite failed: %s", res.FormatDescription().data());
+    return res.status();
+  }
+  if (res->is_error()) {
+    zxlogf(ERROR, "Failed to add WIFI composite: %s", zx_status_get_string(res->error_value()));
+    return res->error_value();
   }
 
   return status;
