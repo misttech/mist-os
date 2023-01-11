@@ -4,7 +4,7 @@
 
 use {
     crate::hypervisor::Hypervisor,
-    crate::memory::GuestMemory,
+    crate::memory::Memory,
     fidl_fuchsia_virtualization::{GuestConfig, GuestError},
 };
 
@@ -13,7 +13,7 @@ pub struct VirtualMachine<H: Hypervisor> {
     hypervisor: H,
     guest: H::GuestHandle,
     guest_physical_address_space: H::AddressSpaceHandle,
-    memory: GuestMemory,
+    memory: Memory,
 }
 
 impl<H: Hypervisor> VirtualMachine<H> {
@@ -22,7 +22,11 @@ impl<H: Hypervisor> VirtualMachine<H> {
             tracing::error!("Failed to create zx::Guest: {}", e);
             GuestError::InternalError
         })?;
-        let memory = GuestMemory::allocate_from_config(&config, &hypervisor)?;
+        let memory = Memory::new_from_config(&config, &hypervisor).map_err(|e| {
+            tracing::error!("Failed to create guest memory: {}", e);
+            e.into()
+        })?;
+
         Ok(VirtualMachine { hypervisor, guest, guest_physical_address_space, memory })
     }
 
