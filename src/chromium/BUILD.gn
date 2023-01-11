@@ -4,6 +4,14 @@
 
 import("generate_chromium_targets.gni")
 
+# This target is provided per
+# https://fuchsia.dev/fuchsia-src/development/source_code/layout?hl=en#canonical_targets
+# for use by //src:src* targets. Dependencies on Chromium-supplied packages
+# should reference specific package(s).
+group("chromium") {
+  visibility = [ "//src:*" ]
+}
+
 generate_chromium_targets("chromium") {
   archive_path_suffix = ""
 }

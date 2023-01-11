@@ -18,26 +18,10 @@ import("//src/sys/core/build/core_shard.gni")
 
 template("generate_chromium_targets") {
   assert(defined(invoker.archive_path_suffix))
+  not_needed([ "target_name" ])
 
   prebuilt_archive_root_path = "//prebuilt/third_party"
   build_output_gen_base_path = "/gen"
-
-  # This target is provided for use by //src:src* targets. Dependencies on
-  # Chromium-supplied packages should reference specific package(s).
-  group(target_name) {
-    visibility = [ "//src:*" ]
-
-    public_deps = [
-      ":web_engine",
-      ":web_runner",
-    ]
-
-    # TODO(fxbug.dev/81925): Uncomment once this will not fail without
-    # `-fetch-optional=chrome-browser`.
-    # if (target_cpu == "x64") {
-    #   public_deps += [ ":chrome_browser", ]
-    # }
-  }
 
   group("web_engine") {
     deps = [
@@ -47,8 +31,6 @@ template("generate_chromium_targets") {
   }
 
   # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
-  # TODO(fxbug.dev/81925): Remove else condition when release chrome is
-  # available.
   if (use_chromium_canary) {
     package_flavor_selections += [
       {
@@ -69,6 +51,7 @@ template("generate_chromium_targets") {
       },
     ]
   } else {
+    # TODO(fxbug.dev/115624): Remove once other Chrome builds are available.
     package_flavor_selections += [
       {
         name = "chrome_browser_pkg"
@@ -148,7 +131,7 @@ template("generate_chromium_targets") {
   }
 
   group("chrome_browser") {
-    # Only add chrome_browser for x64, arm64 is still WIP: http://crbug/1320078
+    # TODO(crbug.com/1320078): Remove the condition if arm64 becomes available.
     if (target_cpu == "x64") {
       deps = [
         ":chrome_browser_pkg",
