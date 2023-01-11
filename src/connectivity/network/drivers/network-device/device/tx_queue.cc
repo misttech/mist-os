@@ -50,7 +50,7 @@ void TxQueue::SessionTransaction::Commit() {
   // when we destroy a session transaction, we commit all the queued buffers to
   // the device.
   if (queued_ != 0) {
-    queue_->parent_->QueueTx(buffers_.begin(), queued_);
+    queue_->parent_->QueueTx(buffers_.data(), queued_);
   }
 }
 
