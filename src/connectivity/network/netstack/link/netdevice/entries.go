@@ -129,8 +129,8 @@ func (e *entries) getQueuedRange() (uint16, uint16) {
 
 // getReadied returns the first readied entry. Only valid if HaveReadied is
 // true.
-func (e *entries) getReadied() *uint16 {
-	return &e.storage[e.mask(e.queued)]
+func (e *entries) getReadied() uint16 {
+	return e.storage[e.mask(e.queued)]
 }
 
 // addReadied copies the contents of a slice into as many available "in-flight"

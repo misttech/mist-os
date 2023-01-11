@@ -85,7 +85,7 @@ func (c *Client) rxLoop() error {
 
 		for c.rx.haveReadied() {
 			entry := c.rx.getReadied()
-			c.processRxDescriptor(*entry)
+			c.processRxDescriptor(entry)
 			c.rx.incrementQueued(1)
 		}
 
@@ -149,7 +149,7 @@ func (c *Client) processWrite(port network.PortId, pbList stack.PacketBufferList
 		// we'll return to the waiting state in the outer loop.
 		for ; i < len(pkts) && c.tx.mu.entries.haveReadied(); i++ {
 			entry := c.tx.mu.entries.getReadied()
-			c.prepareTxDescriptor(*entry, port, pkts[i])
+			c.prepareTxDescriptor(entry, port, pkts[i])
 			c.tx.mu.entries.incrementQueued(1)
 		}
 
