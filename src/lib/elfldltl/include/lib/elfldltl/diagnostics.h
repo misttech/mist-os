@@ -248,8 +248,8 @@ class Diagnostics {
   }
 
   constexpr bool ResourceLimit(size_t max, std::string_view error, size_t requested) {
-    return FormatError(error, internal::ConstString(": maximum "), max,
-                       internal::ConstString(" < requested "), requested);
+    return FormatError(error, internal::ConstString(": maximum"), max,
+                       internal::ConstString(" < requested"), requested);
   }
 
   template <typename... Args>

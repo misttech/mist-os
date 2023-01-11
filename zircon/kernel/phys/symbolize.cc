@@ -8,19 +8,17 @@
 
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/elfldltl/diagnostics.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/string_view.h>
+#include <phys/elf-image.h>
 #include <phys/frame-pointer.h>
 #include <phys/stack.h>
 #include <pretty/hexdump.h>
-
-#ifdef __ELF__
-#include <lib/elfldltl/note.h>
-#endif
 
 // The zx_*_t types used in the exception stuff aren't defined for 32-bit.
 // There is no exception handling implementation for 32-bit.
@@ -30,63 +28,33 @@
 
 #include <ktl/enforce.h>
 
-#ifdef __ELF__
-
-namespace {
-
-// On x86-32, there is a fixed link-time address.
-#ifdef __i386__
-static constexpr auto kLinkTimeAddress = PHYS_LOAD_ADDRESS;
-#else
-static constexpr uintptr_t kLinkTimeAddress = 0;
-#endif
-
-// These are defined by the linker script.
-extern "C" void __code_start();
-extern "C" const ktl::byte __start_note_gnu_build_id[];
-extern "C" const ktl::byte __stop_note_gnu_build_id[];
-
-}  // namespace
-
-elfldltl::ElfNote Symbolize::BuildId() const {
-  ktl::span kNoteBytes{__start_note_gnu_build_id, __stop_note_gnu_build_id};
-
-  elfldltl::ElfNoteSegment<> notes({kNoteBytes.data(), kNoteBytes.size()});
-  ZX_DEBUG_ASSERT(notes.begin() != notes.end());
-  ZX_DEBUG_ASSERT(++notes.begin() == notes.end());
-  return *notes.begin();
-}
-
-void Symbolize::ContextAlways() {
-  constexpr symbolizer_markup::MemoryPermissions kRWX{
-      .read = true,
-      .write = true,
-      .execute = true,
-  };
-  auto start = reinterpret_cast<uintptr_t>(__code_start);
-  auto end = reinterpret_cast<uintptr_t>(_end);
-  writer_.Prefix(name_).Reset().Newline();
-  writer_.Prefix(name_).ElfModule(0, name_, BuildId().desc).Newline();
-  writer_.Prefix(name_)
-      .LoadImageMmap(start, static_cast<size_t>(end - start), 0, kRWX,
-                     reinterpret_cast<uint64_t>(kLinkTimeAddress))
-      .Newline();
-}
-
-#elif defined(_WIN32)
-
-// TODO(mcgrathr): extract pdb guid as build id
-void Symbolize::ContextAlways() {}
-
-#endif  // __ELF__
-
 Symbolize* gSymbolize = nullptr;
+
+void Symbolize::ReplaceModulesStorage(ModuleList modules) {
+  ModuleList old = ktl::exchange(modules_, ktl::move(modules));
+  modules_.clear();
+  for (const ElfImage* module : old) {
+    AddModule(module);
+  }
+}
+
+void Symbolize::AddModule(const ElfImage* module) {
+  auto diag = elfldltl::PanicDiagnostics(name_, ": ");
+  [[maybe_unused]] bool ok = modules_.push_back(diag, "too many modules loaded", module);
+  ZX_DEBUG_ASSERT(ok);
+}
 
 const char* ProgramName() {
   if (gSymbolize) {
     return gSymbolize->name();
   }
   return "early-init";
+}
+
+elfldltl::ElfNote Symbolize::BuildId() const {
+  ZX_DEBUG_ASSERT(!modules_.empty());
+  ZX_DEBUG_ASSERT(modules_.front()->build_id());
+  return *modules_.front()->build_id();
 }
 
 void Symbolize::Printf(const char* fmt, ...) {
@@ -96,11 +64,25 @@ void Symbolize::Printf(const char* fmt, ...) {
   va_end(args);
 }
 
+void Symbolize::ContextAlways() {
+  writer_.Prefix(name_).Reset().Newline();
+  for (size_t i = 0; i < modules_.size(); ++i) {
+    modules_[i]->SymbolizerContext(writer_, static_cast<unsigned int>(i), name_);
+  }
+}
+
 void Symbolize::Context() {
   if (!context_done_) {
     context_done_ = true;
     ContextAlways();
   }
+}
+
+void Symbolize::OnLoad(const ElfImage& loaded) {
+  if (context_done_) {
+    loaded.SymbolizerContext(writer_, static_cast<unsigned int>(modules_.size()), name_);
+  }
+  AddModule(&loaded);
 }
 
 void Symbolize::BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt) {

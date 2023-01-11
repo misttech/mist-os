@@ -365,11 +365,11 @@ class LoadInfo {
   template <class Writer>
   Writer& SymbolizerContext(Writer& writer, unsigned int id, std::string_view name,
                             cpp20::span<const std::byte> build_id, size_type load_address,
-                            std::string_view prefix = {}) {
-    writer.Literal(prefix).ElfModule(id, name, build_id).Newline();
+                            std::string_view prefix = {}) const {
+    writer.Prefix(prefix).ElfModule(id, name, build_id).Newline();
     VisitSegments([&](const auto& segment) {
       size_type load_vaddr = segment.vaddr() - vaddr_start() + load_address;
-      writer.Literal(prefix)
+      writer.Prefix(prefix)
           .LoadImageMmap(load_vaddr, segment.memsz(), id,
                          {.read = segment.readable(),
                           .write = segment.writable(),

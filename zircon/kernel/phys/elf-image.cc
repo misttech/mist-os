@@ -10,7 +10,7 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/link.h>
-#include <lib/elfldltl/load.h>
+#include <lib/fit/defer.h>
 #include <zircon/assert.h>
 #include <zircon/limits.h>
 
@@ -18,6 +18,7 @@
 #include <ktl/move.h>
 #include <ktl/variant.h>
 #include <phys/allocation.h>
+#include <phys/symbolize.h>
 
 #include <ktl/enforce.h>
 
@@ -39,12 +40,15 @@ struct NoWarnings : public DiagBase {
 };
 auto GetDiagnostics() { return NoWarnings(); }
 #endif
+
 }  // namespace
 
 fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string_view name,
                                             bool relocated) {
-  auto read_file = [this, &dir, name]() -> fit::result<Error> {
-    if (auto found = dir.find(name); found != dir.end()) {
+  name_ = name;
+
+  auto read_file = [this, &dir]() -> fit::result<Error> {
+    if (auto found = dir.find(name_); found != dir.end()) {
       // Singleton ELF file, no patches.
       dir.ignore_error();
       image_.set_image(found->data);
@@ -52,7 +56,7 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
     }
 
     BootfsDir subdir;
-    if (auto result = dir.subdir(name); result.is_ok()) {
+    if (auto result = dir.subdir(name_); result.is_ok()) {
       subdir = ktl::move(result).value();
     } else {
       return result.take_error();
@@ -118,8 +122,9 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
   if (interp) {
     auto chars = image_.ReadArrayFromFile<char>(interp->offset, elfldltl::NoArrayFromFile<char>(),
                                                 interp->filesz);
-    ZX_ASSERT_MSG(chars, "PT_INTERP has invalid offset range [%#" PRIx64 ", %#" PRIx64 ")",
-                  interp->offset(), interp->offset() + interp->filesz());
+    ZX_ASSERT_MSG(chars, "PT_INTERP has invalid offset range [%#" PRIxPTR ", %#" PRIxPTR ")",
+                  static_cast<uintptr_t>(interp->offset),
+                  static_cast<uintptr_t>(interp->offset + interp->filesz));
     ZX_ASSERT_MSG(!chars->empty(), "PT_INTERP has zero filesz");
     ZX_ASSERT_MSG(chars->back() == '\0', "PT_INTERP missing NUL terminator");
     interp_.emplace(chars->data(), chars->size() - 1);
@@ -134,15 +139,17 @@ ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& p
   ZX_ASSERT_MSG(patch.range_start >= image_.base() && file.size() >= patch.range_size &&
                     file.size() - patch.range_size >= patch.range_start - image_.base(),
                 "Patch ID %#" PRIx32 " range [%#" PRIx64 ", %#" PRIx64
-                ") is outside file bounds [%#" PRIx64 ", %#" PRIx64 ")",
+                ") is outside file bounds [%#" PRIxPTR ", %#" PRIxPTR ")",
                 patch.id, patch.range_start, patch.range_start + patch.range_size, image_.base(),
                 image_.base() + file.size());
-  return file.subspan(patch.range_start - image_.base(), patch.range_size);
+  return file.subspan(static_cast<size_t>(patch.range_start - image_.base()), patch.range_size);
 }
 
 Allocation ElfImage::Load(bool in_place_ok) {
   auto endof = [](const auto& last) { return last.offset() + last.filesz(); };
   const uint64_t load_size = ktl::visit(endof, load_.segments().back());
+
+  auto symbolize = fit::defer([this]() { gSymbolize->OnLoad(*this); });
 
   if (in_place_ok && CanLoadInPlace()) {
     // TODO(fxbug.dev/113938): Could have a memalloc::Pool feature to
@@ -152,7 +159,8 @@ Allocation ElfImage::Load(bool in_place_ok) {
     // there is any bss (memsz > filesz), it may overlap with some nonzero file
     // contents and not just the BOOTFS page-alignment padding.  Zero it all.
     ZX_DEBUG_ASSERT(ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes()) >= load_.vaddr_size());
-    memset(image_.image().data() + load_size, 0, load_.vaddr_size() - load_size);
+    memset(image_.image().data() + load_size, 0,
+           static_cast<size_t>(load_.vaddr_size() - load_size));
 
     LoadInPlace();
     return {};
@@ -162,7 +170,8 @@ Allocation ElfImage::Load(bool in_place_ok) {
   Allocation image =
       Allocation::New(ac, memalloc::Type::kPhysElf, load_.vaddr_size(), ZX_PAGE_SIZE);
   if (!ac.check()) {
-    ZX_PANIC("cannot allocate phys ELF load image of %#zx bytes", load_.vaddr_size());
+    ZX_PANIC("cannot allocate phys ELF load image of %#zx bytes",
+             static_cast<size_t>(load_.vaddr_size()));
   }
 
   ZX_ASSERT_MSG(load_size <= image.size_bytes(), "load_size %#" PRIx64 " > allocation size %#zx",
@@ -173,7 +182,7 @@ Allocation ElfImage::Load(bool in_place_ok) {
   // how mapping from a file would work.  To get the equivalent effect, just
   // fill the remainder of the allocated page with zero while zeroing any
   // following bss (memsz > filesz).
-  const size_t copy = ktl::min<size_t>(load_size, image_.image().size_bytes());
+  const size_t copy = ktl::min(static_cast<size_t>(load_size), image_.image().size_bytes());
   memcpy(image.get(), image_.image().data(), copy);
   memset(image.get() + copy, 0, load_.vaddr_size() - copy);
 
@@ -215,4 +224,22 @@ void ElfImage::AssertInterpMatchesBuildId(ktl::string_view prefix,
                 static_cast<int>(prefix.size()), prefix.data(),      //
                 static_cast<int>(interp_->size()), interp_->data(),  //
                 static_cast<int>(build_id_hex.size()), build_id_hex.data());
+}
+
+void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, uintptr_t load_bias,
+                        const elfldltl::Elf<>::Phdr& load_segment,
+                        ktl::span<const ktl::byte> build_id_note) {
+  image_.set_image(memory.image());
+  image_.set_base(memory.base());
+  load_bias_ = load_bias;
+
+  auto diag = elfldltl::PanicDiagnostics();
+  ZX_ASSERT(load_.AddSegment(diag, ZX_PAGE_SIZE, load_segment));
+
+  elfldltl::ElfNoteSegment<> notes(build_id_note);
+  ZX_DEBUG_ASSERT(notes.begin() != notes.end());
+  ZX_DEBUG_ASSERT(++notes.begin() == notes.end());
+  build_id_ = *notes.begin();
+
+  name_ = name;
 }

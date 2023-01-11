@@ -685,8 +685,8 @@ foo: {{{mmap:0x12342000:0x1000:load:17:rw:0x2000}}}
 
   std::string markup;
   symbolizer_markup::Writer writer([&markup](std::string_view str) { markup += str; });
-  EXPECT_EQ(&writer, &(info.SymbolizerContext(writer, 17, "foo", cpp20::span(kBuildId), 0x12340000,
-                                              "foo: ")));
+  EXPECT_EQ(&writer,
+            &(info.SymbolizerContext(writer, 17, "foo", cpp20::span(kBuildId), 0x12340000, "foo")));
 
   EXPECT_EQ(kExpectedContext, markup);
 }

@@ -36,7 +36,7 @@ namespace arch {
 template <typename NopTraits
 #if defined(__aarch64__)
           = Arm64NopTraits
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__i386__)
           = X86NopTraits
 #endif
           >

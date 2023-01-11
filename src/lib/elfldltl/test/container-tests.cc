@@ -402,7 +402,7 @@ TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtent) {
   EXPECT_EQ(vec.size(), 5u);
 
   {
-    ExpectedSingleError expected("error", ": maximum ", 5, " < requested ", 6);
+    ExpectedSingleError expected("error", ": maximum", 5, " < requested", 6);
     vec.emplace_back(expected.diag(), "error", 1);
   }
 }

@@ -26,14 +26,17 @@ namespace internal {
 // This only exists to be specialized.  The interface is shown here.
 template <typename T>
 struct PrintfType {
-  static_assert(std::is_void_v<T>, "missing specialization");
+  // The default template also handles other unsigned types that are the
+  // same size as one of the uintNN_t types but a different type, which
+  // just get widened to uint64_t.
+  static_assert(std::is_unsigned_v<T>, "missing specialization");
 
   // This is a ConstString of a printf format string fragment.
-  static constexpr auto kFormat = ConstString("%something");
+  static constexpr auto kFormat = ConstString(" %" PRIu64);
 
   // This is a function of T that returns a std::tuple<...> of the arguments to
   // pass to printf corresponding to the kFormat string.
-  static constexpr auto Arguments(T arg) { return std::make_tuple(arg); }
+  static constexpr auto Arguments(uint64_t arg) { return std::make_tuple(arg); }
 };
 
 template <typename T>
@@ -61,12 +64,6 @@ template <>
 struct PrintfType<uint32_t> {
   static constexpr auto kFormat = ConstString(" %" PRIu32);
   static constexpr auto Arguments(uint32_t arg) { return std::make_tuple(arg); }
-};
-
-template <>
-struct PrintfType<uint64_t> {
-  static constexpr auto kFormat = ConstString(" %" PRIu64);
-  static constexpr auto Arguments(uint64_t arg) { return std::make_tuple(arg); }
 };
 
 template <typename T>

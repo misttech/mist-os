@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
+#include <lib/elfldltl/static-vector.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/items/bootfs.h>
 #include <lib/zbitl/view.h>
@@ -52,6 +53,11 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     bootfs = ktl::move(result).value();
   }
 
+  symbolize.Context();
+
+  ktl::array<const ElfImage*, 2> modules;
+  symbolize.ReplaceModulesStorage(Symbolize::ModuleList(ktl::span(modules)));
+
   printf("Loading %.*s...\n", static_cast<int>(kGetInt.size()), kGetInt.data());
   ElfImage elf;
   if (auto result = elf.Init(bootfs, kGetInt, true); result.is_error()) {
@@ -61,14 +67,21 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   ZX_ASSERT(!elf.has_patches());
 
-  elf.Load();
+  // If the file can't be loaded in place, this Allocation owns its image.
+  Allocation loaded = elf.Load();
   elf.Relocate();
 
   // The GN target for get-int uses kernel_elf_interp() on this test binary.
   printf("Verifying PT_INTERP matches test build ID...\n");
   elf.AssertInterpMatchesBuildId(kGetInt, symbolize.BuildId());
 
-  printf("Calling entry point...\n");
+  // Since Context() was called above ContextOnLoad() should have printed
+  // inside elf.Load() above.  Now that the new module list is in place,
+  // printing again should show the same two modules already printed piecemeal.
+  printf("Symbolizer context for both modules expected, repeating:\n");
+  symbolize.ContextAlways();
+
+  printf("Calling entry point %#" PRIx64 "...\n", elf.entry());
 
   // We should now be able to access GetInt()!
   constexpr int kExpected = 42;

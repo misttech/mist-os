@@ -208,7 +208,12 @@ class Writer {
 
   // Emits "$prefix: ", a conventional way of establishing the context of a
   // line of emitted markup.
-  constexpr Writer& Prefix(std::string_view prefix) { return Literal(prefix).Literal(": "); }
+  constexpr Writer& Prefix(std::string_view prefix) {
+    if (!prefix.empty()) {
+      Literal(prefix).Literal(": ");
+    }
+    return *this;
+  }
 
   // Emits the decimal digits for a given unsigned integer. Leading zeroes are
   // not emitted.
@@ -297,8 +302,10 @@ class Writer {
 
   Writer& HexField(cpp20::span<const std::byte> bytes) {
     Separator();
-    for (auto byte : bytes) {
-      Digits<16>(*reinterpret_cast<const uint8_t*>(&byte));
+    for (const std::byte byte : bytes) {
+      const uint8_t b = static_cast<uint8_t>(byte);
+      const char hex[2] = {kHexDigits[b >> 4], kHexDigits[b & 0xf]};
+      Literal({hex, 2});
     }
     return *this;
   }

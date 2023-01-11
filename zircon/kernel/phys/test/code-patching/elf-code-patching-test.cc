@@ -9,6 +9,7 @@
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 
+#include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
@@ -45,6 +46,11 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   } else {
     bootfs = ktl::move(result).value();
   }
+
+  symbolize.Context();
+
+  ktl::array<const ElfImage*, 5> modules;
+  symbolize.ReplaceModulesStorage(Symbolize::ModuleList(ktl::span(modules)));
 
   constexpr uint64_t kValue = 42;
 

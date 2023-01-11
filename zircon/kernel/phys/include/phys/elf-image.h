@@ -47,17 +47,23 @@ class ElfImage {
   // singleton file will be treated as the image with no patches to apply.
   fit::result<Error> Init(BootfsDir dir, ktl::string_view name, bool relocated);
 
+  ktl::string_view name() const { return name_; }
+
   LoadInfo& load() { return load_; }
   const LoadInfo& load() const { return load_; }
 
-  size_t size_bytes() const { return image_.image().size_bytes(); }
-
-  uint64_t entry() const {
+  uint64_t load_bias() const {
     ZX_DEBUG_ASSERT(load_bias_);
-    return entry_ + *load_bias_;
+    return *load_bias_;
   }
 
+  size_t size_bytes() const { return image_.image().size_bytes(); }
+
+  uint64_t entry() const { return entry_ + load_bias(); }
+
   ktl::optional<ktl::string_view> interp() const { return interp_; }
+
+  const ktl::optional<elfldltl::ElfNote>& build_id() const { return build_id_; }
 
   bool has_patches() const { return !patches().empty(); }
 
@@ -90,6 +96,11 @@ class ElfImage {
     load_bias_ = address - load_.vaddr_start();
   }
 
+  uintptr_t LoadAddress() const {
+    ZX_DEBUG_ASSERT(load_bias_);
+    return static_cast<uintptr_t>(load_.vaddr_start() + *load_bias_);
+  }
+
   // Return true if the memory within the BOOTFS image for this file is
   // sufficient to be used in place as the load image.
   bool CanLoadInPlace() const {
@@ -114,6 +125,20 @@ class ElfImage {
   // corresponding to this build ID note; the prefix is used in panic messages.
   void AssertInterpMatchesBuildId(ktl::string_view prefix, const elfldltl::ElfNote& build_id);
 
+  // Set up state to describe the running phys executable.
+  void InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, uintptr_t load_bias,
+                const elfldltl::Elf<>::Phdr& load_segment,
+                ktl::span<const ktl::byte> build_id_note);
+
+  // This uses the symbolizer_markup::Writer API to emit the contextual
+  // elements describing this ELF module.  The ID number should be unique among
+  // modules in the same address space, i.e. since the last Reset() in the same
+  // markup output stream.
+  template <class Writer>
+  Writer& SymbolizerContext(Writer& writer, unsigned int id, ktl::string_view prefix = {}) const {
+    return load_.SymbolizerContext(writer, id, name(), build_id_->desc, LoadAddress(), prefix);
+  }
+
   // Call the image's entry point as a function type F.
   template <typename F, typename... Args>
   ktl::invoke_result_t<F*, Args...> Call(Args&&... args) const {
@@ -135,6 +160,7 @@ class ElfImage {
   ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch,
                                        const Allocation& loaded);
 
+  ktl::string_view name_;
   elfldltl::DirectMemory image_{{}};
   LoadInfo load_;
   uint64_t entry_ = 0;
@@ -142,7 +168,7 @@ class ElfImage {
   ktl::optional<elfldltl::ElfNote> build_id_;
   ktl::optional<ktl::string_view> interp_;
   code_patching::Patcher patcher_;
-  ktl::optional<uint64_t> load_bias_;
+  ktl::optional<uintptr_t> load_bias_;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_

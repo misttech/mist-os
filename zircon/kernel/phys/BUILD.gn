@@ -133,12 +133,15 @@ if (toolchain_environment == "kernel.phys" ||
       "symbolize.cc",
     ]
 
+    allow_circular_includes_from = [ ":elf-image" ]
     deps = [
+      ":elf-image",
       "//src/lib/elfldltl",
       "//src/lib/symbolizer-markup",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
+      "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/pretty",
     ]
 
@@ -478,6 +481,7 @@ if (toolchain_environment == "kernel.phys" ||
     sources = [ "elf-image.cc" ]
     public_configs = [ ":includes" ]
     public_deps = [
+      "//sdk/lib/fit",
       "//src/lib/elfldltl",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/code-patching",
@@ -485,7 +489,12 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/libc",
       "//zircon/system/ulib/zx",
     ]
-    deps = [ ":allocation" ]
+    deps = [
+      ":allocation",
+
+      # Indirect dep via circular :symbolize dep.
+      "//src/lib/symbolizer-markup",
+    ]
   }
 }
 

@@ -8,6 +8,7 @@
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
 
 #include <lib/elfldltl/note.h>
+#include <lib/elfldltl/preallocated-vector.h>
 #include <lib/symbolizer-markup/writer.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -21,6 +22,7 @@
 #include <phys/main.h>
 #include <phys/stack.h>
 
+class ElfImage;
 class FramePointer;
 class ShadowCallStackBacktrace;
 struct PhysExceptionState;
@@ -43,6 +45,8 @@ class Symbolize {
     std::string_view name;
   };
 
+  using ModuleList = elfldltl::PreallocatedVector<const ElfImage*>;
+
   Symbolize() = delete;
   Symbolize(const Symbolize&) = delete;
 
@@ -50,6 +54,12 @@ class Symbolize {
       : name_(name), output_(f), writer_(Sink{output_}) {}
 
   const char* name() const { return name_; }
+
+  auto modules() const { return modules_.as_span(); }
+
+  // This readds the existing modules to the new storage and then
+  // replaces it as the storage to be used by future OnLoad calls.
+  void ReplaceModulesStorage(ModuleList modules);
 
   void set_stacks(ktl::span<const Stack<BootStack>> stacks) { stacks_ = stacks; }
 
@@ -65,11 +75,15 @@ class Symbolize {
   // Return the ELF build ID note for the main executable.
   elfldltl::ElfNote BuildId() const;
 
-  // Print the contextual markup elements describing this phys executable.
+  // Print the contextual markup elements describing each loaded module.
   void ContextAlways();
 
   // Same, but idempotent: the first call prints and others do nothing.
   void Context();
+
+  // Adds the new module to the list.  If Context() has run, then emit context
+  // for the new module.
+  void OnLoad(const ElfImage& loaded);
 
   // Print the presentation markup element for one frame of a backtrace.
   void BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt = false);
@@ -114,8 +128,11 @@ class Symbolize {
 
   void Printf(const char* fmt, ...);
 
+  void AddModule(const ElfImage* module);
+
   const char* name_;
   FILE* output_;
+  ModuleList modules_;
   ktl::span<const Stack<BootStack>> stacks_;
   ktl::span<const Stack<BootShadowCallStack>> shadow_call_stacks_;
   symbolizer_markup::Writer<Sink> writer_;
@@ -128,6 +145,13 @@ class Symbolize {
 class MainSymbolize : public Symbolize {
  public:
   explicit MainSymbolize(const char* name);
+
+  const ElfImage& self() const { return *self_; }
+
+  void set_self(const ElfImage* self);
+
+ private:
+  const ElfImage* self_ = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
