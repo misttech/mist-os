@@ -453,7 +453,13 @@ impl FileOps for RemoteDirectoryObject {
 
         let mut add_entry = |entry: &ZxioDirent| {
             let inode_num: ino_t = entry.id.ok_or_else(|| errno!(EIO))?;
-            let entry_type = DirectoryEntryType::UNKNOWN;
+            let entry_type = if entry.is_dir() {
+                DirectoryEntryType::DIR
+            } else if entry.is_file() {
+                DirectoryEntryType::REG
+            } else {
+                DirectoryEntryType::UNKNOWN
+            };
             sink.add(inode_num, sink.offset() + 1, entry_type, &entry.name)?;
             Ok(())
         };

@@ -4,7 +4,10 @@
 
 use std::convert::From;
 
-use crate::zxio::{zxio_dirent_iterator_next, zxio_dirent_iterator_t};
+use crate::zxio::{
+    zxio_dirent_iterator_next, zxio_dirent_iterator_t, ZXIO_NODE_PROTOCOL_DIRECTORY,
+    ZXIO_NODE_PROTOCOL_FILE,
+};
 use bitflags::bitflags;
 use fidl::{encoding::const_assert_eq, endpoints::ServerEnd};
 use fidl_fuchsia_io as fio;
@@ -130,6 +133,14 @@ impl ZxioDirent {
         let mut name = name_buffer;
         unsafe { name.set_len(dirent.name_length as usize) };
         ZxioDirent { protocols, abilities, id, name }
+    }
+
+    pub fn is_dir(&self) -> bool {
+        self.protocols.map(|p| p & ZXIO_NODE_PROTOCOL_DIRECTORY > 0).unwrap_or(false)
+    }
+
+    pub fn is_file(&self) -> bool {
+        self.protocols.map(|p| p & ZXIO_NODE_PROTOCOL_FILE > 0).unwrap_or(false)
     }
 }
 
@@ -996,11 +1007,27 @@ mod test {
         let expected_dir_names = vec![".", "bin", "lib", "meta"];
         let mut found_dir_names = iter
             .map(|e| {
-                std::str::from_utf8(&e.unwrap().name).expect("name was not valid utf8").to_string()
+                let dirent = e.expect("dirent");
+                assert!(dirent.is_dir());
+                std::str::from_utf8(&dirent.name).expect("name was not valid utf8").to_string()
             })
             .collect::<Vec<_>>();
         found_dir_names.sort();
         assert_eq!(expected_dir_names, found_dir_names);
+
+        // Check all entry inside bin are either "." or a file
+        let bin_io = io
+            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, 0, "bin")
+            .expect("open");
+        for entry in bin_io.create_dirent_iterator().expect("failed to create iterator") {
+            let dirent = entry.expect("dirent");
+            if dirent.name == b"." {
+                assert!(dirent.is_dir());
+            } else {
+                assert!(dirent.is_file());
+            }
+        }
+
         Ok(())
     }
 
