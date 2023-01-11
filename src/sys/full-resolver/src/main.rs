@@ -10,6 +10,7 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::stream::{StreamExt as _, TryStreamExt as _},
     tracing::{error, info, warn},
+    version_history::AbiRevision,
 };
 
 enum IncomingService {
@@ -148,7 +149,8 @@ async fn resolve_component(
     } else {
         None
     };
-
+    let abi_revision =
+        fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&dir, AbiRevision::PATH).await?;
     let dir = ClientEnd::new(
         dir.into_channel().map_err(|_| ResolverError::DirectoryProxyIntoChannel)?.into_zx_channel(),
     );
@@ -162,6 +164,7 @@ async fn resolve_component(
             ..fresolution::Package::EMPTY
         }),
         config_values,
+        abi_revision,
         ..fresolution::Component::EMPTY
     })
 }
@@ -197,6 +200,9 @@ enum ResolverError {
 
     #[error("converting package directory proxy into an async channel")]
     DirectoryProxyIntoChannel,
+
+    #[error("failed to read abi revision file")]
+    AbiRevision(#[from] fidl_fuchsia_component_abi_ext::AbiRevisionFileError),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
@@ -224,6 +230,7 @@ impl From<&ResolverError> for fresolution::ResolverError {
                     PkgErr::InvalidUrl | PkgErr::InvalidContext => ferr::InvalidArgs,
                 }
             }
+            AbiRevision(_) => ferr::InvalidAbiRevision,
         }
     }
 }
@@ -243,8 +250,11 @@ mod tests {
         futures::{channel::mpsc, lock::Mutex, SinkExt as _},
         std::{boxed::Box, sync::Arc},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::asynchronous::read_only_static, path::Path, pseudo_directory,
+            directory::entry::DirectoryEntry,
+            execution_scope::ExecutionScope,
+            file::vmo::{asynchronous::read_only_static, read_only_const},
+            path::Path,
+            pseudo_directory,
         },
     };
 
@@ -718,5 +728,36 @@ mod tests {
             .await,
             Err(ResolverError::MissingConfigSource)
         );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn resolve_component_sets_pkg_abi_revision() {
+        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone())
+            .expect("failed to encode ComponentDecl FIDL");
+        pseudo_directory! {
+            "meta" => pseudo_directory! {
+                "test.cm" => read_only_const(&cm_bytes),
+                "fuchsia.abi" => pseudo_directory! {
+                  "abi-revision" => read_only_static(1u64.to_le_bytes()),
+                }
+            },
+        }
+        .clone()
+        .open(
+            ExecutionScope::new(),
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::MODE_TYPE_DIRECTORY,
+            Path::dot(),
+            dir_server.into_channel().into(),
+        );
+        let resolved_component = resolve_component(
+            &"fuchsia-pkg://fuchsia.com/test#meta/test.cm".parse().unwrap(),
+            dir,
+            fpkg::ResolutionContext { bytes: vec![] },
+        )
+        .await
+        .unwrap();
+        assert_matches!(resolved_component, fresolution::Component { abi_revision: Some(1), .. });
     }
 }
