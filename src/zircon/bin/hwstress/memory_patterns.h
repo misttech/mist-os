@@ -69,7 +69,7 @@ inline auto MultiWordPattern(std::vector<uint64_t> pattern) {
 // endian conversion is required, it must be converted by the PatternGenerator.
 template <typename PatternGenerator>
 void WritePattern(cpp20::span<uint8_t> range, PatternGenerator pattern) {
-  auto* __restrict start = reinterpret_cast<uint64_t*>(range.begin());
+  auto* __restrict start = reinterpret_cast<uint64_t*>(range.data());
   size_t words = range.size_bytes() / sizeof(uint64_t);
 
   for (size_t i = 0; i < words; i++) {
@@ -80,7 +80,7 @@ void WritePattern(cpp20::span<uint8_t> range, PatternGenerator pattern) {
 // Verify the given pattern is in memory.
 template <typename PatternGenerator>
 std::optional<std::string> VerifyPattern(cpp20::span<uint8_t> range, PatternGenerator pattern) {
-  auto* __restrict start = reinterpret_cast<uint64_t*>(range.begin());
+  auto* __restrict start = reinterpret_cast<uint64_t*>(range.data());
   size_t words = range.size_bytes() / sizeof(uint64_t);
 
   // Find any mismatches.
