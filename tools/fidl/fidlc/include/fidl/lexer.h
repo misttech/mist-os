@@ -33,7 +33,6 @@ class Lexer : private ReporterMixin {
     };
     current_ = data().data();
     end_of_file_ = current_ + data().size();
-    previous_end_ = token_start_ = current_;
   }
 
   // Lexes and returns the next token. Must not be called again after returning
@@ -68,7 +67,6 @@ class Lexer : private ReporterMixin {
   const char* current_ = nullptr;
   const char* end_of_file_ = nullptr;
   const char* token_start_ = nullptr;
-  const char* previous_end_ = nullptr;
   size_t token_size_ = 0u;
   uint32_t next_ordinal_ = 0;
   uint16_t leading_newlines_ = 0;

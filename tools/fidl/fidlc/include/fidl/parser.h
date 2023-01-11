@@ -91,7 +91,6 @@ class Parser {
     }
     raw::TokenChain GetTokenChain() {
       parser_->active_ast_scopes_.back().set_end(parser_->previous_token_);
-      parser_->last_was_gap_start_ = true;
       return raw::TokenChain(parser_->active_ast_scopes_.back());
     }
     ~ASTScope() { parser_->active_ast_scopes_.pop_back(); }
@@ -106,24 +105,6 @@ class Parser {
   void UpdateMarks(Token& token) {
     // There should always be at least one of these - the outermost.
     ZX_ASSERT_MSG(!active_ast_scopes_.empty(), "unbalanced parse tree");
-
-    // If the end of the last node was the start of a gap, record that.
-    if (last_was_gap_start_ && previous_token_.kind() != Token::Kind::kNotAToken) {
-      gap_start_ = token.previous_end();
-      last_was_gap_start_ = false;
-    }
-
-    // If this is a start node, then the end of it will be the start of
-    // a gap.
-    if (active_ast_scopes_.back().start().kind() == Token::Kind::kNotAToken) {
-      last_was_gap_start_ = true;
-    }
-
-    // Update the token to record the correct location of the beginning of
-    // the gap prior to it.
-    if (gap_start_.valid()) {
-      token.set_previous_end(gap_start_);
-    }
 
     for (auto& scope : active_ast_scopes_) {
       if (scope.start().kind() == Token::Kind::kNotAToken) {
@@ -377,15 +358,7 @@ class Parser {
   // The stack of information interesting to the currently active ASTScope
   // objects.
   std::vector<raw::TokenChain> active_ast_scopes_;
-  // TODO(fxbug.dev/117642): I'm fairly certain that both |gap_start_| and |last_was_gap_start_|
-  // below are redundant, and can be removed alongside |Token::previous_end()|.
-  //
-  // The most recent start of a "gap" - the uninteresting source prior to the
-  // beginning of a token (usually mostly containing whitespace).
-  SourceSpan gap_start_;
-  // Indicates that the last element was the start of a gap, and that the
-  // scope should be updated accordingly.
-  bool last_was_gap_start_ = false;
+
   // The token before last_token_ (below).
   Token previous_token_;
 

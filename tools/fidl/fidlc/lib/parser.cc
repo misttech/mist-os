@@ -11,6 +11,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
+#include "tools/fidl/fidlc/include/fidl/token.h"
 #include "tools/fidl/fidlc/include/fidl/types.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
@@ -710,9 +711,8 @@ void Parser::ParseProtocolMember(
       if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kCompose)) {
         // There are two possibilities here: we are looking at the first token in a compose
         // statement like `compose a.b;`, or we are looking at the identifier of a method that has
-        // unfortunately been named `compose(...);`.  Because we want the previous_end of the
-        // CompoundIdentifier to correctly point to the previous raw AST node, instead of calling
-        // ParseIdentifier here, we merely consume the token for now.
+        // unfortunately been named `compose(...);`. Instead of calling ParseIdentifier here, we
+        // merely consume the token for now.
         const auto compose_token = ConsumeToken(IdentifierOfSubkind(Token::Subkind::kCompose));
         if (!Ok()) {
           Fail();
@@ -720,9 +720,7 @@ void Parser::ParseProtocolMember(
         }
 
         // If the `compose` identifier is not immediately followed by a left paren we assume that we
-        // are looking at a compose clause.  Because we only we haven't built any raw AST nodes
-        // since the compose clause started, the previous_end of its raw AST node will point to the
-        // correct position.
+        // are looking at a compose clause.
         if (Peek().kind() != Token::Kind::kLeftParen) {
           add(composed_protocols,
               [&] { return ParseProtocolCompose(std::move(attributes), scope); });

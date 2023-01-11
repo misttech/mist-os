@@ -43,14 +43,8 @@ namespace fidl::raw {
 
 // In order to be able to associate AST nodes with their original source, each
 // node is a SourceElement, which contains information about the original
-// source.  The AST has a start token, whose previous_end field points to the
-// end of the previous AST node, and an end token, which points to the end of
-// this syntactic element.
-//
-// Note: The file may have a tail of whitespace / comment text not explicitly
-// associated with any node.  In order to reconstruct that text, raw::File
-// contains an end token; the previous_end field of that token points to the end
-// of the last interesting token.
+// source.  The AST has a start token and an end token, which point to the start
+// and end of this syntactic element, respectively.
 class TreeVisitor;
 
 // A collection of one or more consecutive |Token|s from a single |SourceFile|.

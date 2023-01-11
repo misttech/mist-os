@@ -202,8 +202,6 @@ class TokenSlice {
 
     // Retain some useful information from this |Token|, then erase it from the |TokenSlice|.
     uint32_t erasing_ordinal = erasing->ordinal();
-    // TODO(fxbug.dev/117642): Remove when |previous_end_| is removed.
-    (*next)->set_previous_end((*prev)->span());
     (*next)->set_leading_newlines((*prev)->leading_newlines());
     underlying_.erase(pos);
     ZX_ASSERT(--end_ >= begin_);
@@ -393,12 +391,9 @@ class TokenSlice {
     std::string_view data = std::string_view(data_stash_.back()->c_str());
     auto new_span = SourceSpan(data, prev_token->span().source_file());
     auto leading_newlines = next_token_ptr->leading_newlines();
-    // TODO(fxbug.dev/117642): Remove when |previous_end_| is removed.
-    next_token_ptr->set_previous_end(new_span);
     next_token_ptr->set_leading_newlines(0);
-    token_stash_.emplace_back(std::make_unique<SyntheticToken>(prev_token->span(), new_span,
-                                                               leading_newlines, kind, subkind,
-                                                               prev_ordinal, prev_sub_ordinal + 1));
+    token_stash_.emplace_back(std::make_unique<SyntheticToken>(
+        new_span, leading_newlines, kind, subkind, prev_ordinal, prev_sub_ordinal + 1));
 
     // TODO(fxbug.dev/114357): As noted in the comment on |TokenIterator|, the following operation
     // has the potential to cause a re-allocation of the underlying storage, thereby invalidating
