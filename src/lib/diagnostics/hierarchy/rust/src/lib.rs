@@ -813,11 +813,8 @@ where
 /// Filters a diagnostics hierarchy using a set of path selectors and their associated property
 /// selectors.
 ///
-/// - If the return type is Ok(Some()) that implies that the filter encountered no errors AND
-///    a meaningful tree remained at the end.
-/// - If the return type is Ok(None) that implies that the filter encountered no errors AND
-///    the tree was filtered to be empty at the end.
-/// - If the return type is Error that implies the filter encountered errors.
+/// If the return type is None that implies that the filter encountered no errors AND the tree was
+/// filtered to be empty at the end.
 pub fn filter_hierarchy<Key>(
     mut root_node: DiagnosticsHierarchy<Key>,
     hierarchy_matcher: &HierarchyMatcher,
@@ -825,11 +822,14 @@ pub fn filter_hierarchy<Key>(
 where
     Key: AsRef<str>,
 {
+    let starts_empty = root_node.children.is_empty() && root_node.properties.is_empty();
     if filter_hierarchy_helper(&mut root_node, &[&hierarchy_matcher]) {
-        Some(root_node)
-    } else {
-        None
+        if !starts_empty && root_node.children.is_empty() && root_node.properties.is_empty() {
+            return None;
+        }
+        return Some(root_node);
     }
+    None
 }
 
 fn filter_hierarchy_helper<Key>(
@@ -1488,9 +1488,37 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_filter_non_existent_root() {
-        let test_selectors = vec!["*:non-existent-root"];
+    fn test_filter_empty_hierarchy() {
+        let test_selectors = vec!["*:root"];
 
+        assert_eq!(
+            parse_selectors_and_filter_hierarchy(
+                DiagnosticsHierarchy::new("root", vec![], vec![]),
+                test_selectors
+            ),
+            Some(DiagnosticsHierarchy::new("root", vec![], vec![])),
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_full_filtering() {
+        // If we select a non-existent root, then we return a fully filtered hierarchy.
+        let test_selectors = vec!["*:non-existent-root"];
+        assert_eq!(
+            parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
+            None,
+        );
+
+        // If we select a non-existent child of the root, then we return a fully filtered hierarchy.
+        let test_selectors = vec!["*:root/i-dont-exist:foo"];
+        assert_eq!(
+            parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
+            None,
+        );
+
+        // Even if the root exists, but we don't include any property, we consider the hierarchy
+        // fully filtered. This is aligned with the previous case.
+        let test_selectors = vec!["*:root:i-dont-exist"];
         assert_eq!(
             parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
             None,
