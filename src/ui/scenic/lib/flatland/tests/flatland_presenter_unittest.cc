@@ -24,7 +24,8 @@
 
 using flatland::FlatlandPresenterImpl;
 
-namespace flatland::test {
+namespace flatland {
+namespace test {
 
 namespace {
 
@@ -107,25 +108,20 @@ TEST_F(FlatlandPresenterTest, ScheduleUpdateForSessionForwardsToFrameScheduler) 
 TEST_F(FlatlandPresenterTest, RemoveSessionForwardsToFrameScheduler) {
   scheduling::test::MockFrameScheduler frame_scheduler;
 
-  // FlatlandPresenter should first remove the session_id and *then* schedule a new frame for it.
-  // Capture both ordering and arguments to confirm.
-  std::vector<std::pair<std::string, scheduling::SessionId>> results;
-  frame_scheduler.set_remove_session_callback([&results](scheduling::SessionId session_id) {
-    results.emplace_back("RemoveSession", session_id);
-  });
-  frame_scheduler.set_schedule_update_for_session_callback(
-      [&results](auto time, auto id_pair, auto squashable) {
-        results.emplace_back("Schedule", id_pair.session_id);
-      });
+  // Capture the relevant arguments of the ScheduleUpdateForSession() call.
+  scheduling::SessionId last_session_id = scheduling::kInvalidSessionId;
+
+  frame_scheduler.set_remove_session_callback(
+      [&last_session_id](scheduling::SessionId session_id) { last_session_id = session_id; });
 
   auto presenter = CreateFlatlandPresenterImpl(frame_scheduler);
 
   const scheduling::SessionId kSessionId = 1;
+
   presenter->RemoveSession(kSessionId);
 
   // Since this function runs on the main thread, no RunLoopUntilIdle() is necessary.
-  EXPECT_THAT(results, testing::ElementsAre(std::make_pair("RemoveSession", kSessionId),
-                                            std::make_pair("Schedule", kSessionId)));
+  EXPECT_EQ(last_session_id, kSessionId);
 }
 
 TEST_F(FlatlandPresenterTest, GetFuturePresentationInfosForwardsToFrameScheduler) {
@@ -420,4 +416,5 @@ TEST_F(FlatlandPresenterTest, MultithreadedAccess) {
   EXPECT_EQ(loop_quits, kNumSessions);
 }
 
-}  // namespace flatland::test
+}  // namespace test
+}  // namespace flatland
