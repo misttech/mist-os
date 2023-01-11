@@ -805,7 +805,7 @@ impl SharedMemory {
     }
 
     /// Allocate a buffer of size `length` from this memory block.
-    fn allocate(&mut self, length: usize) -> Result<usize, Errno> {
+    fn allocate(&mut self, length: usize) -> Result<usize, TransactionError> {
         // The current candidate for an allocation.
         let mut candidate = 0;
         for (&ptr, &size) in &self.allocations {
@@ -820,7 +820,7 @@ impl SharedMemory {
         // end of the buffer. In both case, the allocation succeed if there is enough room between
         // the candidate and the end of the buffer.
         if self.length - candidate < length {
-            return error!(ENOMEM);
+            return Err(TransactionError::Failure);
         }
         self.allocations.insert(candidate, length);
         Ok(candidate)
@@ -842,7 +842,7 @@ impl SharedMemory {
         data_length: usize,
         offsets_length: usize,
         sg_buffers_length: usize,
-    ) -> Result<SharedMemoryAllocation<'_>, Errno> {
+    ) -> Result<SharedMemoryAllocation<'_>, TransactionError> {
         // Round `data_length` up to the nearest multiple of 8, so that the offsets buffer is
         // aligned when we pack it next to the data buffer.
         let data_cap = round_up_to_increment(data_length, std::mem::size_of::<binder_uintptr_t>())?;
@@ -854,7 +854,7 @@ impl SharedMemory {
         if offsets_length % std::mem::size_of::<binder_uintptr_t>() != 0
             || sg_buffers_length % std::mem::size_of::<binder_uintptr_t>() != 0
         {
-            return error!(EINVAL);
+            return Err(TransactionError::Malformed(errno!(EINVAL)));
         }
         let total_length = data_cap
             .checked_add(offsets_length)
