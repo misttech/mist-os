@@ -1,4 +1,4 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -19,8 +19,9 @@ impl HttpRequest for FuchsiaHyperHttpRequest {
     fn request(&mut self, req: Request<Body>) -> BoxFuture<'_, Result<Response<Vec<u8>>, Error>> {
         // create the initial response future
         let response = self.client.request(req);
+        let timeout = self.timeout;
 
-        collect_from_future(response).on_timeout(self.timeout, || Err(Error::new_timeout())).boxed()
+        collect_from_future(response).on_timeout(timeout, || Err(Error::new_timeout())).boxed()
     }
 }
 
