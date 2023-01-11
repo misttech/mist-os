@@ -73,6 +73,10 @@ class Allocation {
   static void Init(ktl::span<memalloc::Range> mem_ranges,
                    ktl::span<memalloc::Range> special_ranges);
 
+  // Alternatively, this can be called instead of Init() to install a
+  // previously-initialized memalloc::Pool that was handed off.
+  static void InitWithPool(memalloc::Pool& pool);
+
   // If allocation fails, operator bool will return false later.
   // The AllocChecker must be checked after construction, too.
   static Allocation New(fbl::AllocChecker& ac, memalloc::Type type, size_t size,
@@ -81,8 +85,8 @@ class Allocation {
                         ktl::optional<uint64_t> max_addr = ktl::nullopt);
 
   // Get the memalloc::Pool instance used to construct Allocation objects.
-  // Every call returns the same object, but the first may initialize it.  Note
-  // separate #include <lib/memalloc/pool.h> is necessary to use the instance.
+  // Every call returns the same object.  Note that a separate `#include
+  // <lib/memalloc/pool.h>` is necessary to use the instance.
   [[gnu::const]] static memalloc::Pool& GetPool();
 
  private:

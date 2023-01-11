@@ -10,33 +10,28 @@
 #include <lib/memalloc/pool.h>
 #include <zircon/assert.h>
 
-#include <fbl/no_destructor.h>
-#include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/move.h>
 #include <ktl/string_view.h>
-#include <phys/arch/arch-allocation.h>
 #include <phys/main.h>
 
 #include <ktl/enforce.h>
 
+namespace {
+
+memalloc::Pool* gAllocationPool;
+
+}  // namespace
+
 // Global memory allocation book-keeping.
 memalloc::Pool& Allocation::GetPool() {
-  // Use fbl::NoDestructor to avoid generation of static destructors,
-  // which fails in the phys environment.
-  static fbl::NoDestructor<memalloc::Pool> allocator;
-  return *allocator;
+  ZX_DEBUG_ASSERT(gAllocationPool);
+  return *gAllocationPool;
 }
 
-void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
-                      ktl::span<memalloc::Range> special_ranges) {
-  auto& pool = Allocation::GetPool();
-  ktl::array ranges{mem_ranges, special_ranges};
-  // kAllocationMinAddr is defined in arch-allocation.h.
-  auto init_result = kAllocationMinAddr  // ktl::nullopt if don't care.
-                         ? pool.Init(ranges, *kAllocationMinAddr)
-                         : pool.Init(ranges);
-  ZX_ASSERT(init_result.is_ok());
+void Allocation::InitWithPool(memalloc::Pool& pool) {
+  ZX_DEBUG_ASSERT(!gAllocationPool);
+  gAllocationPool = &pool;
 }
 
 // This is where actual allocation happens.

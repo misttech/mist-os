@@ -13,6 +13,8 @@ import("//zircon/kernel/arch/$zircon_cpu/phys/phys.gni")
 import("//zircon/kernel/params.gni")
 import("zbi_executable.gni")
 
+arch_phys = "//zircon/kernel/arch/$zircon_cpu/phys"
+
 if (current_toolchain == default_toolchain) {
   # Default toolchain (current_cpu == "") just defines the phys environment.
   # Note: see //zircon/kernel/arch/x86/phys:kernel.phys32 too.
@@ -164,7 +166,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("phys_executable.deps") {
     deps = [
       ":symbolize",
-      "//zircon/kernel/arch/$zircon_cpu/phys",
+      "$arch_phys",
     ]
   }
 
@@ -311,16 +313,13 @@ if (toolchain_environment == "kernel.phys" ||
   # are run directly as QEMU kernels.
   source_set("qemu-header") {
     sources = [ "qemu-header.S" ]
-    public_configs = [ "//zircon/kernel/arch/$zircon_cpu/phys:qemu.config" ]
+    public_configs = [ "$arch_phys:qemu.config" ]
   }
 
-  source_set("allocation") {
+  static_library("allocation") {
     public = [ "include/phys/allocation.h" ]
     if (toolchain_environment != "kernel.efi") {
-      sources = [
-        "//zircon/kernel/arch/$zircon_cpu/phys/include/phys/arch/arch-allocation.h",
-        "allocation.cc",
-      ]
+      sources = [ "allocation.cc" ]
       deps = [
         ":main",
         "//zircon/kernel/phys/lib/memalloc",
@@ -346,6 +345,19 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/phys/lib/memalloc",
     ]
     public_configs = [ ":includes" ]
+  }
+
+  if (toolchain_environment != "kernel.efi") {
+    # This is only linked into a main phys executable and not into secondary
+    # modules, which only get the pool set up here handed off.  It's not used
+    # at all for UEFI, where efi:allocation handles everything.
+    source_set("allocation-init") {
+      sources = [
+        "$arch_phys/include/phys/arch/arch-allocation.h",
+        "allocation-init.cc",
+      ]
+      public_deps = [ ":allocation" ]
+    }
   }
 
   source_set("new") {
@@ -391,12 +403,12 @@ if (toolchain_environment == "kernel.phys" ||
       "zbi-memory.cc",
     ]
     deps = [
-      ":allocation",
+      ":allocation-init",
       ":main",
       ":page-table",
       ":symbolize",
+      "$arch_phys:address-space",
       "//src/lib/zbitl",
-      "//zircon/kernel/arch/$zircon_cpu/phys:address-space",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/phys/lib/memalloc",
@@ -468,9 +480,9 @@ if (toolchain_environment == "kernel.phys" ||
       ":handoff-entropy",
       ":symbolize",
       ":zbitl-allocation",
+      "$arch_phys:arch-handoff-prep",
       "//src/lib/llvm-profdata",
       "//src/lib/zbitl",
-      "//zircon/kernel/arch/$zircon_cpu/phys:arch-handoff-prep",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/phys/lib/memalloc",
     ]
@@ -521,9 +533,9 @@ group("tests") {
 group("boot_tests") {
   testonly = true
   deps = [
+    "$arch_phys:tests",
     "boot-shim:boot_tests",
     "test",
-    "//zircon/kernel/arch/$zircon_cpu/phys:tests",
   ]
 }
 

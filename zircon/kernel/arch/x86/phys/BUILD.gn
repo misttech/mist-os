@@ -180,7 +180,7 @@ if (current_toolchain == default_toolchain) {
         ":address-space",
         "//src/lib/zbitl",
         "//zircon/kernel/phys:acpi",
-        "//zircon/kernel/phys:allocation",
+        "//zircon/kernel/phys:allocation-init",
         "//zircon/kernel/phys:page-table",
         "//zircon/kernel/phys:symbolize",
         "//zircon/kernel/phys:uart",
