@@ -361,18 +361,16 @@ template("sdk_shared_library") {
   lib_name = "lib${output_name}.so"
   link_lib = "${prebuilt_base}/lib/${lib_name}"
   dist_lib = "${prebuilt_base}/dist/${lib_name}"
-  sdk_files =
-      sdk_header_files + [
-        {
-          # TODO(fxbug.dev/2875): put ABI stubs under lib/, not the full thing.
-          source = "${shared_out_dir}/${lib_name}"
-          dest = link_lib
-        },
-        {
-          source = "${shared_out_dir}/${lib_name}"
-          dest = dist_lib
-        },
-      ]
+  sdk_files = sdk_header_files + [
+                {
+                  source = "${shared_out_dir}/link_stub/${lib_name}"
+                  dest = link_lib
+                },
+                {
+                  source = "${shared_out_dir}/${lib_name}"
+                  dest = dist_lib
+                },
+              ]
 
   if (generate_plasa_artifacts) {
     _plasa_artifacts_target_name = "${main_target_name}_plasa"
