@@ -43,7 +43,7 @@ zx_status_t RxBuffer::WriteData(cpp20::span<const uint8_t> data, const VmoProvid
   }
   zx::unowned_vmo vmo = vmo_provider(space_.region.vmo);
   return_part_.length = static_cast<uint32_t>(data.size());
-  return vmo->write(data.begin(), space_.region.offset, data.size());
+  return vmo->write(data.data(), space_.region.offset, data.size());
 }
 
 FakeNetworkPortImpl::FakeNetworkPortImpl()
