@@ -36,4 +36,8 @@
             from: "self",
         },
     ],
+    config: {
+        // Whether base-resolver should only resolve base packages.
+        only_base_packages: { type: "bool" },
+    },
 }

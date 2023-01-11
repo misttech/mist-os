@@ -17,6 +17,11 @@ use {
 #[derive(Debug)]
 pub struct BasePackageIndex {
     index: HashMap<UnpinnedAbsolutePackageUrl, BlobId>,
+    // TODO(fxbug.dev/101492) The base package index may have multiple URLs with the same hash.
+    // In that case, this reverse mapping is lossy and there is no guarantee on which URL will be
+    // chosen for a given hash. Once base-resolver resolves packages directly from blobfs (and no
+    // longer needs to use this to reverse-lookup the package from pkgfs/packages) remove this
+    // field.
     blob_id_to_url: HashMap<BlobId, UnpinnedAbsolutePackageUrl>,
 }
 
@@ -53,6 +58,11 @@ impl BasePackageIndex {
 
     /// Returns the absolute package URL for a base package, by `BlobId`, or
     /// `None` if the given `BlobId` is not in the set of base packages.
+    /// TODO(fxbug.dev/101492) The base package index may have multiple URLs with the same hash.
+    /// In that case, this reverse mapping is lossy and there is no guarantee on which URL will be
+    /// chosen for a given hash. Once base-resolver resolves packages directly from blobfs (and no
+    /// longer needs to use this to reverse-lookup the package from pkgfs/packages) remove this
+    /// field.
     pub fn get_url(&self, blob_id: &BlobId) -> Option<&UnpinnedAbsolutePackageUrl> {
         self.blob_id_to_url.get(blob_id)
     }

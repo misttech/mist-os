@@ -29,11 +29,13 @@ rustc_binary("bin") {
   configs += [ "//build/config/rust:bootfs" ]
 
   deps = [
+    ":base-resolver-config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -81,10 +83,25 @@ component_manifest_resources("root-manifest") {
   ]
 }
 
-fuchsia_component("base-resolver-component") {
-  manifest = "meta/base-resolver.cml"
+fuchsia_component_manifest("base-resolver-manifest") {
   component_name = "base-resolver"
+  manifest = "meta/base-resolver.cml"
+}
+
+fuchsia_component("base-resolver-component") {
+  cm_label = ":base-resolver-manifest"
   deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_rust_lib("base-resolver-config") {
+  cm_label = ":base-resolver-manifest"
+}
+
+fuchsia_structured_config_values("values-from-gn") {
+  cm_label = ":base-resolver-manifest"
+  values = {
+    only_base_packages = false
+  }
 }
 
 fuchsia_component("pkg-cache-resolver-component") {
@@ -111,5 +128,6 @@ group("bootfs") {
   deps = [
     ":bin",
     ":root-manifest",
+    ":values-from-gn",
   ]
 }

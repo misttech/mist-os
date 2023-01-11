@@ -83,11 +83,11 @@ enum ResolverError {
     #[error("converting a FIDL proxy into a FIDL client")]
     ConvertProxyToClient,
 
-    #[error("internal error")]
-    Internal,
-
     #[error("failed to read abi revision")]
     AbiRevision(#[source] fidl_fuchsia_component_abi_ext::AbiRevisionFileError),
+
+    #[error("the package URL was not found in the base package index")]
+    PackageNotInBase(fuchsia_url::AbsolutePackageUrl),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
@@ -106,10 +106,12 @@ impl From<&ResolverError> for fresolution::ResolverError {
             | CreateEndpoints(_)
             | ServePackageDirectory(_)
             | ConvertProxyToClient => ferror::Io,
-            CreatingContext(_) | ReadingContext(_) | RelativeUrlMissingContext(_) | Internal => {
+            CreatingContext(_) | ReadingContext(_) | RelativeUrlMissingContext(_) => {
                 ferror::Internal
             }
-            SubpackageNotInBase(_) | SubpackageNotFound(_) => ferror::PackageNotFound,
+            SubpackageNotInBase(_) | SubpackageNotFound(_) | PackageNotInBase(_) => {
+                ferror::PackageNotFound
+            }
             AbiRevision(_) => ferror::InvalidAbiRevision,
         }
     }

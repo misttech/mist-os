@@ -27,8 +27,24 @@ fn context_to_string(context: &fresolution::Context) -> String {
     String::from_utf8(context.bytes.clone()).unwrap_or_else(|_| hex::encode(&context.bytes))
 }
 
+#[derive(Debug, Copy, Clone)]
+enum ResolutionRestrictions {
+    OnlyBasePackages,
+    None,
+}
+
 pub(crate) async fn main() -> anyhow::Result<()> {
     info!("started");
+
+    let resolution_restrictions = {
+        let config = base_resolver_config::Config::take_from_startup_handle();
+        let inspector = fuchsia_inspect::component::inspector();
+        inspector.root().record_child("config", |node| config.record_inspect(node));
+        match config.only_base_packages {
+            true => ResolutionRestrictions::OnlyBasePackages,
+            false => ResolutionRestrictions::None,
+        }
+    };
 
     let mut service_fs = ServiceFs::new_local();
     service_fs.dir("svc").add_fidl_service(Services::BaseResolver);
@@ -37,7 +53,7 @@ pub(crate) async fn main() -> anyhow::Result<()> {
         .for_each_concurrent(None, |request| async {
             match request {
                 Services::BaseResolver(stream) => {
-                    serve(stream)
+                    serve(stream, resolution_restrictions)
                         .unwrap_or_else(|e| {
                             error!("failed to serve base resolver request: {:#}", e)
                         })
@@ -54,7 +70,10 @@ enum Services {
     BaseResolver(ResolverRequestStream),
 }
 
-async fn serve(mut stream: ResolverRequestStream) -> anyhow::Result<()> {
+async fn serve(
+    mut stream: ResolverRequestStream,
+    resolution_restrictions: ResolutionRestrictions,
+) -> anyhow::Result<()> {
     let pkg_cache =
         connect_to_protocol::<PackageCacheMarker>().context("error connecting to package cache")?;
     let base_package_index = BasePackageIndex::from_proxy(&pkg_cache)
@@ -70,9 +89,14 @@ async fn serve(mut stream: ResolverRequestStream) -> anyhow::Result<()> {
     {
         match request {
             ResolverRequest::Resolve { component_url, responder } => {
-                let mut result = resolve_component(&component_url, &packages_dir)
-                    .await
-                    .map_err(|err| (&err).into());
+                let mut result = resolve_component(
+                    &component_url,
+                    &packages_dir,
+                    &base_package_index,
+                    resolution_restrictions,
+                )
+                .await
+                .map_err(|err| (&err).into());
                 responder.send(&mut result).context("failed sending response")?;
             }
             ResolverRequest::ResolveWithContext { component_url, context, responder } => {
@@ -81,6 +105,7 @@ async fn serve(mut stream: ResolverRequestStream) -> anyhow::Result<()> {
                     &context,
                     &packages_dir,
                     &base_package_index,
+                    resolution_restrictions,
                 )
                 .await
                 .map_err(|err| (&err).into());
@@ -94,8 +119,17 @@ async fn serve(mut stream: ResolverRequestStream) -> anyhow::Result<()> {
 async fn resolve_component(
     component_url: &str,
     packages_dir: &fio::DirectoryProxy,
+    base_package_index: &BasePackageIndex,
+    resolution_restrictions: ResolutionRestrictions,
 ) -> Result<fresolution::Component, crate::ResolverError> {
-    let res = resolve_component_async(component_url, None, packages_dir, None).await;
+    let res = resolve_component_async(
+        component_url,
+        None,
+        packages_dir,
+        base_package_index,
+        resolution_restrictions,
+    )
+    .await;
     if let Err(err) = &res {
         error!("failed to resolve component URL {}: {:?}", &component_url, err);
     }
@@ -107,12 +141,14 @@ async fn resolve_component_with_context(
     context: &fresolution::Context,
     packages_dir: &fio::DirectoryProxy,
     base_package_index: &BasePackageIndex,
+    resolution_restrictions: ResolutionRestrictions,
 ) -> Result<fresolution::Component, crate::ResolverError> {
     let res = resolve_component_async(
         component_url,
         Some(context),
         packages_dir,
-        Some(base_package_index),
+        base_package_index,
+        resolution_restrictions,
     )
     .await;
     if let Err(err) = &res {
@@ -130,14 +166,16 @@ async fn resolve_component_async(
     component_url_str: &str,
     some_incoming_context: Option<&fresolution::Context>,
     packages_dir: &fio::DirectoryProxy,
-    some_base_package_index: Option<&BasePackageIndex>,
+    base_package_index: &BasePackageIndex,
+    resolution_restrictions: ResolutionRestrictions,
 ) -> Result<fresolution::Component, crate::ResolverError> {
     let component_url = ComponentUrl::parse(component_url_str)?;
     let package = resolve_package_async(
         component_url.package_url(),
         some_incoming_context,
         packages_dir,
-        some_base_package_index,
+        base_package_index,
+        resolution_restrictions,
     )
     .await?;
 
@@ -196,7 +234,8 @@ async fn resolve_package_async(
     package_url: &PackageUrl,
     some_incoming_context: Option<&fresolution::Context>,
     packages_dir: &fio::DirectoryProxy,
-    some_base_package_index: Option<&BasePackageIndex>,
+    base_package_index: &BasePackageIndex,
+    resolution_restrictions: ResolutionRestrictions,
 ) -> Result<ResolvedPackage, crate::ResolverError> {
     let (package_name, some_variant) = match package_url {
         PackageUrl::Relative(relative) => {
@@ -207,8 +246,6 @@ async fn resolve_package_async(
             // and allow subpackage lookup to resolve subpackages from blobfs via
             // the blobid (package hash). Then base-resolver will no longer need
             // access to pkgfs-packages or to the package index (from PackageCache).
-            let base_package_index =
-                some_base_package_index.ok_or_else(|| crate::ResolverError::Internal)?;
             let subpackage_hashes = subpackages_map_from_context_bytes(&context.bytes)
                 .map_err(|err| crate::ResolverError::ReadingContext(err))?;
             let hash = subpackage_hashes.get(relative).ok_or_else(|| {
@@ -236,6 +273,14 @@ async fn resolve_package_async(
             }
             if absolute.name().as_ref().starts_with(PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES) {
                 return Err(crate::ResolverError::AbsoluteUrlWithReservedName);
+            }
+            match resolution_restrictions {
+                ResolutionRestrictions::OnlyBasePackages => {
+                    if base_package_index.is_unpinned_base_package(absolute).is_none() {
+                        Err(crate::ResolverError::PackageNotInBase(absolute.clone()))?
+                    }
+                }
+                ResolutionRestrictions::None => {}
             }
             (absolute.name(), absolute.variant())
         }
@@ -283,7 +328,7 @@ mod tests {
         fuchsia_url::{RelativePackageUrl, UnpinnedAbsolutePackageUrl},
         fuchsia_zircon::Status,
         maplit::hashmap,
-        std::{iter::FromIterator, str::FromStr, sync::Arc},
+        std::{collections::HashMap, iter::FromIterator, str::FromStr, sync::Arc},
     };
 
     const SUBPACKAGE_NAME: &'static str = "my_subpackage";
@@ -339,12 +384,21 @@ mod tests {
         proxy
     }
 
+    fn empty_index() -> BasePackageIndex {
+        BasePackageIndex::create_mock(HashMap::new())
+    }
+
     #[fuchsia::test]
     async fn fails_to_resolve_package_unsupported_repo() {
         let packages_dir = serve_executable_dir(vfs::pseudo_directory! {});
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.ca/test-package#meta/foo.cm", &packages_dir)
-                .await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.ca/test-package#meta/foo.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::UnsupportedRepo)
         );
     }
@@ -353,19 +407,43 @@ mod tests {
     async fn fails_to_resolve_component_invalid_url() {
         let packages_dir = serve_executable_dir(vfs::pseudo_directory! {});
         assert_matches!(
-            resolve_component("fuchsia://fuchsia.com/foo#meta/bar.cm", &packages_dir).await,
+            resolve_component(
+                "fuchsia://fuchsia.com/foo#meta/bar.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::InvalidUrl(_))
         );
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.com/foo", &packages_dir).await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.com/foo",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::InvalidUrl(_))
         );
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.com/#meta/bar.cm", &packages_dir).await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.com/#meta/bar.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::InvalidUrl(_))
         );
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.ca/foo#meta/bar.cm", &packages_dir).await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.ca/foo#meta/bar.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::UnsupportedRepo)
         );
         assert_matches!(
@@ -375,7 +453,9 @@ mod tests {
                     PackageName::PREFIX_FOR_INDEXED_SUBPACKAGES,
                     SUBPACKAGE_HASH
                 ),
-                &packages_dir
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
             )
             .await,
             Err(crate::ResolverError::AbsoluteUrlWithReservedName)
@@ -387,7 +467,13 @@ mod tests {
             "#meta/test.cm"
         );
         assert_matches!(
-            resolve_component(url_with_hash, &packages_dir).await,
+            resolve_component(
+                url_with_hash,
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::PackageHashNotSupported)
         );
     }
@@ -398,7 +484,9 @@ mod tests {
         assert_matches!(
             resolve_component(
                 "fuchsia-pkg://fuchsia.com/missing-package#meta/foo.cm",
-                &packages_dir
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
             )
             .await,
             Err(crate::ResolverError::PackageNotFound(_))
@@ -409,8 +497,13 @@ mod tests {
     async fn fails_to_resolve_component_missing_manifest() {
         let packages_dir = serve_executable_dir(build_fake_packages_dir());
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.com/test-package#meta/bar.cm", &packages_dir)
-                .await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.com/test-package#meta/bar.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Err(crate::ResolverError::ComponentNotFound(_))
         );
     }
@@ -421,7 +514,7 @@ mod tests {
         assert_matches!(
             resolve_component(
                 "fuchsia-pkg://fuchsia.com/test-package#meta/large.cm",
-                &packages_dir
+                &packages_dir, &empty_index(), ResolutionRestrictions::None
             )
             .await,
             Ok(fresolution::Component { decl: Some(decl_as_bytes), .. }) => {
@@ -441,8 +534,13 @@ mod tests {
     async fn resolves_component_file_manifest() {
         let packages_dir = serve_executable_dir(build_fake_packages_dir());
         assert_matches!(
-            resolve_component("fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm", &packages_dir)
-                .await,
+            resolve_component(
+                "fuchsia-pkg://fuchsia.com/test-package#meta/foo.cm",
+                &packages_dir,
+                &empty_index(),
+                ResolutionRestrictions::None
+            )
+            .await,
             Ok(fresolution::Component {
                 decl: Some(fidl_fuchsia_mem::Data::Buffer(fidl_fuchsia_mem::Buffer { .. })),
                 ..
@@ -467,9 +565,14 @@ mod tests {
         let base_package_index = BasePackageIndex::create_mock(index);
 
         let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
-        let parent_component = resolve_component(parent_component_url, &packages_dir)
-            .await
-            .expect("failed to resolve parent_component");
+        let parent_component = resolve_component(
+            parent_component_url,
+            &packages_dir,
+            &base_package_index,
+            ResolutionRestrictions::None,
+        )
+        .await
+        .expect("failed to resolve parent_component");
 
         assert_matches!(parent_component.resolution_context, Some(..));
         assert_matches!(
@@ -478,6 +581,7 @@ mod tests {
                 parent_component.resolution_context.as_ref().unwrap(),
                 &packages_dir,
                 &base_package_index,
+                ResolutionRestrictions::None,
             )
             .await,
             Ok(fresolution::Component { decl: Some(..), .. }),
@@ -517,15 +621,22 @@ mod tests {
         assert_matches!(
             resolve_component(
                 &format!("{subpackage_as_base_package_url_string}#meta/bar.cm"),
-                &packages_dir
+                &packages_dir,
+                &base_package_index,
+                ResolutionRestrictions::None
             )
             .await,
             Err(crate::ResolverError::AbsoluteUrlWithReservedName)
         );
 
-        let parent_component = resolve_component(parent_component_url, &packages_dir)
-            .await
-            .expect("failed to resolve parent_component");
+        let parent_component = resolve_component(
+            parent_component_url,
+            &packages_dir,
+            &base_package_index,
+            ResolutionRestrictions::None,
+        )
+        .await
+        .expect("failed to resolve parent_component");
 
         assert_matches!(parent_component.resolution_context, Some(..));
         assert_matches!(
@@ -534,6 +645,7 @@ mod tests {
                 parent_component.resolution_context.as_ref().unwrap(),
                 &packages_dir,
                 &base_package_index,
+                ResolutionRestrictions::None,
             )
             .await,
             Ok(fresolution::Component { decl: Some(..), .. }),
@@ -558,8 +670,14 @@ mod tests {
 
         // Test ABI revision value of the top-level package component
         let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
-        let parent_component =
-            resolve_component(parent_component_url, &packages_dir).await.unwrap();
+        let parent_component = resolve_component(
+            parent_component_url,
+            &packages_dir,
+            &base_package_index,
+            ResolutionRestrictions::None,
+        )
+        .await
+        .unwrap();
         assert_matches!(parent_component, fresolution::Component { abi_revision: Some(0), .. });
 
         // Test ABI revision value of the sub-packaged component
@@ -568,6 +686,7 @@ mod tests {
             &parent_component.resolution_context.unwrap(),
             &packages_dir,
             &base_package_index,
+            ResolutionRestrictions::None,
         )
         .await
         .unwrap();
@@ -594,9 +713,14 @@ mod tests {
         assert!(base_package_index.contains_package(&other_subpackage_blob_id));
 
         let packages_dir = serve_executable_dir(build_fake_packages_dir());
-        let parent_component = resolve_component(parent_component_url, &packages_dir)
-            .await
-            .expect("failed to resolve parent_component");
+        let parent_component = resolve_component(
+            parent_component_url,
+            &packages_dir,
+            &base_package_index,
+            ResolutionRestrictions::None,
+        )
+        .await
+        .expect("failed to resolve parent_component");
 
         assert_matches!(parent_component.resolution_context, Some(..));
         assert_matches!(
@@ -605,6 +729,7 @@ mod tests {
                 parent_component.resolution_context.as_ref().unwrap(),
                 &packages_dir,
                 &base_package_index,
+                ResolutionRestrictions::None,
             )
             .await,
             Err(crate::ResolverError::SubpackageNotInBase(..))
@@ -630,9 +755,14 @@ mod tests {
         assert!(base_package_index.contains_package(&other_subpackage_blob_id));
 
         let packages_dir = serve_executable_dir(build_fake_packages_dir_with_named_subpackage());
-        let parent_component = resolve_component(parent_component_url, &packages_dir)
-            .await
-            .expect("failed to resolve parent_component");
+        let parent_component = resolve_component(
+            parent_component_url,
+            &packages_dir,
+            &base_package_index,
+            ResolutionRestrictions::None,
+        )
+        .await
+        .expect("failed to resolve parent_component");
 
         assert_matches!(parent_component.resolution_context, Some(..));
         assert_matches!(
@@ -641,6 +771,7 @@ mod tests {
                 parent_component.resolution_context.as_ref().unwrap(),
                 &packages_dir,
                 &base_package_index,
+                ResolutionRestrictions::None,
             )
             .await,
             Err(crate::ResolverError::SubpackageNotFound(..))
@@ -653,6 +784,8 @@ mod tests {
         let component = resolve_component(
             "fuchsia-pkg://fuchsia.com/test-package#meta/foo-with-config.cm",
             &packages_dir,
+            &empty_index(),
+            ResolutionRestrictions::None,
         )
         .await
         .unwrap();
@@ -668,6 +801,8 @@ mod tests {
         let error = resolve_component(
             "fuchsia-pkg://fuchsia.com/test-package#meta/foo-without-config.cm",
             &packages_dir,
+            &empty_index(),
+            ResolutionRestrictions::None,
         )
         .await
         .unwrap_err();
@@ -680,10 +815,49 @@ mod tests {
         let error = resolve_component(
             "fuchsia-pkg://fuchsia.com/test-package#meta/foo-with-bad-config.cm",
             &packages_dir,
+            &empty_index(),
+            ResolutionRestrictions::None,
         )
         .await
         .unwrap_err();
         assert_matches!(error, crate::ResolverError::InvalidConfigSource);
+    }
+
+    #[fuchsia::test]
+    async fn resolves_base_component_with_enforcement_enabled() {
+        let packages_dir = serve_executable_dir(build_fake_packages_dir());
+        let component = resolve_component(
+            "fuchsia-pkg://fuchsia.com/test-package#meta/foo-with-config.cm",
+            &packages_dir,
+            &BasePackageIndex::create_mock(HashMap::from_iter([(
+                "fuchsia-pkg://fuchsia.com/test-package".parse().unwrap(),
+                BlobId::from([0u8; 32]),
+            )])),
+            ResolutionRestrictions::OnlyBasePackages,
+        )
+        .await
+        .unwrap();
+        assert_matches!(
+            component,
+            fresolution::Component { decl: Some(..), config_values: Some(..), .. }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn fails_to_resolve_non_base_component() {
+        let packages_dir = serve_executable_dir(build_fake_packages_dir());
+        let error = resolve_component(
+            "fuchsia-pkg://fuchsia.com/test-package#meta/foo-with-bad-config.cm",
+            &packages_dir,
+            &BasePackageIndex::create_mock(HashMap::from_iter([(
+                "fuchsia-pkg://fuchsia.com/wrong-package".parse().unwrap(),
+                BlobId::from([0u8; 32]),
+            )])),
+            ResolutionRestrictions::OnlyBasePackages,
+        )
+        .await
+        .unwrap_err();
+        assert_matches!(error, crate::ResolverError::PackageNotInBase(_));
     }
 
     fn build_fake_packages_dir() -> Arc<dyn vfs::directory::entry::DirectoryEntry> {

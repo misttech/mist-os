@@ -162,6 +162,7 @@ fuchsia_test_package("base-resolver-tests") {
     ":mock-superpackage-component",
     "//src/sys/base-resolver:base-resolver-component",
     "//src/sys/base-resolver:pkg-cache-resolver-component",
+    "//src/sys/base-resolver:values-from-gn",
   ]
 
   subpackages = [ ":subpackaged-component" ]
