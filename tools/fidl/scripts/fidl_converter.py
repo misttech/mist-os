@@ -26,7 +26,7 @@ def main(args):
         print('\nREAL RUN!')
 
     if args.rebuild:
-        # Note: This includes all of the "kitchen_sink" and "buildbot:core", but
+        # Note: This includes all of the "kitchen_sink" and "buildbot/core", but
         # unfortunately there are still some build targets that are not included
         # in these catch-all targets.  Those are manually listed at th marked
         # point, but will likely change in the future (ie, the targets could be
@@ -36,8 +36,8 @@ def main(args):
         subprocess.check_call(
             [
                 'fx', '--dir=out/default', 'set', 'workstation_eng.x64',
-                '--with=//bundles/fidl:tests', '--with=//bundles:kitchen_sink',
-                '--with=//bundles/tests', '--with=//bundles/buildbot:core',
+                '--with=//bundles/fidl:tests', '--with=//bundles/kitchen_sink',
+                '--with=//bundles/tests', '--with=//bundles/buildbot/core',
                 '--with=//sdk/fidl/fuchsia.firebase.messaging:fuchsia.firebase.messaging',
                 '--with=//sdk/fidl/fuchsia.metricbroker:fuchsia.metricbroker',
                 '--with=//sdk/fidl/fuchsia.process:fuchsia.process',

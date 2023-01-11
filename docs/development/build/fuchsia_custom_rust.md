@@ -66,7 +66,7 @@ correct package manager for your machine.
      --args=rustc_prefix="\"$DEV_ROOT/rust/install/fuchsia-rust\"" \
      --args=rustc_version_string='"1"'
    # plus other settings such as:
-   #   --with //bundles:kitchen_sink
+   #   --with //bundles/kitchen_sink
    #   --variant=coverage-rust  # to enable coverage profiling of fuchsia binaries
    #   --variant=host_coverage-rust  # to enable coverage profiling of host binaries
    ```

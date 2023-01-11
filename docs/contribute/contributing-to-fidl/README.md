@@ -209,7 +209,7 @@ The `--with-base` flag is necessary to run Dart tests and benchmarks.
 If you are working on an LSC:
 
 ```sh
-fx set terminal.x64 --with //bundles:kitchen_sink \
+fx set terminal.x64 --with //bundles/kitchen_sink \
 ```
 
 ### symbolizer

@@ -39,7 +39,7 @@ vim ./build/rust/clippy.gni
 
 git commit -a -m "throwaway"
 
-fx set core.x64 --with //bundles:kitchen_sink --with //bundles/buildbot:core
+fx set core.x64 --with //bundles/kitchen_sink --with //bundles/buildbot/core
 
 fx clippy --all --raw > lints.json
 

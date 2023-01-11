@@ -17,7 +17,7 @@ group("tests") {
   ]
 }
 
-# Tests in this group are enabled for workstation in //bundles/buildbot:workstation.
+# Tests in this group are enabled for workstation in //bundles/buildbot/workstation.
 # TODO(https://fxbug.dev/94919): This comment should be updated with the
 # final location of the test targets for workstation.
 group("workstation_tests") {

@@ -182,11 +182,11 @@ following bundles:
   This includes tools for spawning components from command-line shells, tools
   for reconfiguring and testing networks, making http requests, debugging
   programs, changing audio volume, and so on. The core product includes
-  `bundles:tools` in the universe package set by default.
+  `//bundles/tools` in the universe package set by default.
 * `//bundles/tests` causes all test programs to be built. Most test programs
   can be invoked using `run-test-suite` on the device, or via
   `fx test`.
-* `//bundles:kitchen_sink` is a target that causes all other build targets to be
+* `//bundles/kitchen_sink` is a target that causes all other build targets to be
   included. It is useful when testing the impact of core changes, or when
   making large scale changes in the code base. It also may be a fun
   configuration for enthusiasts to play with, as it includes all software

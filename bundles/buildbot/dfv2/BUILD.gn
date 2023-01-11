@@ -3,12 +3,12 @@
 # found in the LICENSE file.
 
 # TODO(fxbug.dev/110255): Remove when all bringup builder bots with DFv2 enabled
-# include //bundles/buildbot:bringup instead of :bringup  into their base
+# include //bundles/buildbot/bringup instead of :bringup  into their base
 # package set.
 group("bringup") {
   testonly = true
 
-  # Assign should contain all deps of //src/buildbot:bringup.
+  # Assign should contain all deps of //bundles/buildbot/bringup.
   # TODO(fxbug.dev/110255): Add //bundles/bringup:tests to deps when all
   # tests in //bundles/bringup:tests pass with DFv2 enabled.
   deps = []
@@ -209,8 +209,8 @@ group("host-tests") {
 }
 
 # The dependencies of this group should be the same as
-# //src/buildbot:workstation_host_tests. If there is a target in
-# //src/buildbot:workstation_host_tests's dependencies that is not in this group
+# //src/buildbot/workstation_host_tests. If there is a target in
+# //src/buildbot/workstation_host_tests's dependencies that is not in this group
 # then that either means the target includes a test that is failing and has been
 # explicitly omitted or a new target was added to workstation_host_tests's deps
 # and this assign needs to be updated. Explicitly omitted targets may have been
@@ -232,8 +232,8 @@ group("workstation_host_tests") {
 }
 
 # The dependencies of this group should be the same as
-# //src/buildbot:workstation. If there is a target in
-# //src/buildbot:workstation's dependencies that is not in this group then that
+# //src/buildbot/workstation. If there is a target in
+# //src/buildbot/workstation's dependencies that is not in this group then that
 # either means the target includes a test that is failing and has been
 # explicitly omitted or a new target was added to workstation's deps and this
 # assign needs to be updated. Explicitly omitted targets may have been expanded
