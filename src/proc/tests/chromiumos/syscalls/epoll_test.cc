@@ -80,10 +80,7 @@ class ScopedSignalHandler {
 
 // Ping-pongs a bunch of messages between two threads while spamming the main thread with signals.
 // This tests that epoll doesn't issue any spurious wakes.
-//
-// TODO(fxbug.dev/118066) This test sometimes loses the train of signals and hangs. If the
-// kMessageCount is 1,000 it almost always passes, and with 10,000 it almost always hangs.
-TEST(EpollTest, DISABLED_LotsaSignals) {
+TEST(EpollTest, LotsaSignals) {
   ScopedSignalHandler handler(SIGUSR1, &NoOpSigHandler);
 
   int pair1[2];

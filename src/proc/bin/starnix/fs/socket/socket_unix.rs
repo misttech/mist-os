@@ -549,7 +549,14 @@ impl SocketOps for UnixSocket {
         if events & cur_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
             waiter.wake_immediately(cur_events.mask(), handler)
         } else {
-            self.lock().waiters.wait_async_mask(waiter, events.mask(), handler)
+            let wait_key = self.lock().waiters.wait_async_mask(waiter, events.mask(), handler);
+
+            // Resolve the race if the events changed while adding the waiter while unlocked.
+            let present_events = self.query_events(socket, current_task);
+            if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+                self.lock().waiters.wake_key_immediately(&wait_key, present_events.mask());
+            }
+            wait_key
         }
     }
 

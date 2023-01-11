@@ -472,6 +472,25 @@ impl WaitQueue {
         cancelled
     }
 
+    // Manually signals the task associated with the given key.
+    pub fn wake_key_immediately(&mut self, key: &WaitKey, events: u32) -> bool {
+        let mut woken = false;
+        self.waiters.retain(|entry| {
+            if entry.key.equals(key) {
+                woken = true;
+                entry.waiter.access(|waiter| {
+                    if let Some(waiter) = waiter {
+                        waiter.queue_events(key, events);
+                    }
+                });
+                false
+            } else {
+                true
+            }
+        });
+        woken
+    }
+
     pub fn notify_mask(&mut self, events: u32) {
         self.notify_mask_count(events, usize::MAX);
     }

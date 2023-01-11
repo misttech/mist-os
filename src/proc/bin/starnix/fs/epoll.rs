@@ -469,8 +469,15 @@ impl FileOps for EpollFileObject {
         if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
             waiter.wake_immediately(present_events.mask(), handler)
         } else {
-            let mut state = self.state.write();
-            state.waiters.wait_async_mask(waiter, events.mask(), handler)
+            let wait_key =
+                self.state.write().waiters.wait_async_mask(waiter, events.mask(), handler);
+
+            // Resolve the race if the events changed while adding the waiter while unlocked.
+            let present_events = self.query_events(current_task);
+            if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+                self.state.write().waiters.wake_key_immediately(&wait_key, present_events.mask());
+            }
+            wait_key
         }
     }
 
