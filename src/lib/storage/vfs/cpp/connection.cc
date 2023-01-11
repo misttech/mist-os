@@ -125,6 +125,7 @@ void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node
   auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
   auto write_error = [describe = clone_options.flags.describe](fidl::ServerEnd<fio::Node> channel,
                                                                zx_status_t error) {
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", zx_status_get_string(error));
     if (describe) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] auto result =
@@ -152,7 +153,6 @@ void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node
     clone_options.rights = options().rights;
   }
   if (!clone_options.rights.StricterOrSameAs(options().rights)) {
-    FS_PRETTY_TRACE_DEBUG("Rights violation during NodeClone");
     return write_error(std::move(server_end), ZX_ERR_ACCESS_DENIED);
   }
 

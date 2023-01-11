@@ -183,6 +183,7 @@ void DirectoryConnection::AddInotifyFilter(AddInotifyFilterRequestView request,
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
   auto write_error = [describe = request->flags & fio::wire::OpenFlags::kDescribe](
                          fidl::ServerEnd<fio::Node> channel, zx_status_t error) {
+    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", zx_status_get_string(error));
     if (describe) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] auto result =
@@ -242,7 +243,6 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   // Check for directory rights inheritance
   zx_status_t status = EnforceHierarchicalRights(options().rights, open_options, &open_options);
   if (status != ZX_OK) {
-    FS_PRETTY_TRACE_DEBUG("Rights violation during DirectoryOpen");
     return write_error(std::move(request->object), status);
   }
   OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights, mode);
