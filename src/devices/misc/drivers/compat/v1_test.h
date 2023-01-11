@@ -11,11 +11,6 @@
 #include <mutex>
 
 struct V1Test {
-  // The driver dispatcher is on a separate thread from the test thread,
-  // so this is needed for proper synchronization.
-  // TODO(fxbug.dev/103368): Fix test framework synchronization.
-  std::mutex lock;
-
   zx_status_t status = ZX_OK;
   bool did_bind = false;
   bool did_create = false;
