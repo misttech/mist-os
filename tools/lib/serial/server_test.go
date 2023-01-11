@@ -271,7 +271,25 @@ func serialAndDevice() (io.ReadWriteCloser, io.ReadWriteCloser) {
 func testListener(t *testing.T) (net.Listener, string) {
 	t.Helper()
 
-	name := filepath.Join(t.TempDir(), "test-serial-listener")
+	// UNIX socket path lengths are limited to 104 characters on macOS; see
+	// https://github.com/apple/darwin-xnu/blob/2ff845c/bsd/sys/un.h#L79.
+	//
+	// This appears to include the null terminator; test failures with paths of
+	// 104 characters have been observed.
+	const limit = 103
+	dir := t.TempDir()
+	name := filepath.Join(dir, "test.sock")
+	if len(name) > limit {
+		originalName := name
+		name = name[:limit]
+		if filepath.Dir(name) != dir {
+			t.Fatalf(
+				"name='%s' (len=%d); is outside t.TempDir() after truncation",
+				originalName,
+				len(originalName),
+			)
+		}
+	}
 	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: name, Net: "unix"})
 	if err != nil {
 		t.Fatalf("net.ListenUnix(name=%s): %s", name, err)
