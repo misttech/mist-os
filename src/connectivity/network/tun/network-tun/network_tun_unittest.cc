@@ -1655,7 +1655,7 @@ TEST_F(TunTest, ChainsRxBuffers) {
     buffer_descriptor_t* desc = client.descriptor(desc_idx);
     ASSERT_EQ(desc->chain_length, kChainedBuffers - i - 1);
     ASSERT_EQ(desc->data_length, kRxBufferSize);
-    ASSERT_EQ(memcmp(&send_data[kRxBufferSize * i], client.data(desc).begin(), kRxBufferSize), 0);
+    ASSERT_EQ(memcmp(&send_data[kRxBufferSize * i], client.data(desc).data(), kRxBufferSize), 0);
     desc_idx = desc->nxt;
   }
 }
