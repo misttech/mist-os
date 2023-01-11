@@ -12,6 +12,7 @@ use crate::subsystems::prelude::*;
 const BASE_CONSOLE_ALLOWED_TAGS: &[&str] = &[
     "blobfs",
     "console-launcher",
+    "devfs",
     "device",
     "driver",
     "driver_host2.cm",
