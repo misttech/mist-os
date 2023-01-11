@@ -74,10 +74,8 @@ VirtioInput::VirtioInput(const PhysMem& phys_mem, VirtioInputType type)
                             fit::bind_member(this, &VirtioInput::Ready)),
       type_(type) {}
 
-zx_status_t VirtioInput::Start(const zx::guest& guest,
-                               fuchsia::virtualization::hardware::InputType input_type,
-                               ::sys::ComponentContext* context, async_dispatcher_t* dispatcher,
-                               std::string component_name) {
+zx_status_t VirtioInput::Start(const zx::guest& guest, ::sys::ComponentContext* context,
+                               async_dispatcher_t* dispatcher, std::string component_name) {
   zx_status_t status = CreateDynamicComponent(
       context, kComponentCollectionName, component_name.c_str(), kComponentUrl,
       [&, input = input_.NewRequest()](std::shared_ptr<sys::ServiceDirectory> services) mutable {
@@ -92,7 +90,7 @@ zx_status_t VirtioInput::Start(const zx::guest& guest,
   if (status != ZX_OK) {
     return status;
   }
-  return input_->Start(std::move(start_info), std::move(input_type));
+  return input_->Start(std::move(start_info));
 }
 
 zx_status_t VirtioInput::ConfigureQueue(uint16_t queue, uint16_t size, zx_gpaddr_t desc,
