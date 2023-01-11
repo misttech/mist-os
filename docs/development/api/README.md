@@ -26,7 +26,6 @@ below is not complete: as Fuchsia evolves, more rubrics will be added.
    * [FIDL API][fidl-api]
  * Domain-specific areas
    * [Zircon System Interface](system.md)
-   * [Fuchsia Device Interface](device_interfaces.md)
 
 <!-- xrefs -->
 [api-council]: /docs/contribute/governance/api_council.md

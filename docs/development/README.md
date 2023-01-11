@@ -35,7 +35,6 @@ operating system. Explore the open source code at [cs.fuchsia.dev](https://cs.fu
  - [FIDL style][fidl-style] - FIDL style rubric
  - [C](/docs/development/api/c.md) - Rubric for designing C library interfaces
  - [Tools](/docs/development/api/tools.md) - Rubrics for designing developer tools
- - [Devices](/docs/development/api/device_interfaces.md) - Rubric for designing device interfaces
 
 ## Testing
 

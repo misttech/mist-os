@@ -17,8 +17,6 @@ toc:
   path: /docs/development/api/c.md
 - title: "Dart API readability rubric"
   path: /docs/development/api/dart.md
-- title: "Fuchsia device interface rubric"
-  path: /docs/development/api/device_interfaces.md
 - title: "API documentation readability rubric"
   path: /docs/development/api/documentation.md
 - title: "FIDL API readability rubric"
