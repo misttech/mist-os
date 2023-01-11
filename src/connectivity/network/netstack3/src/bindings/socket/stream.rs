@@ -729,18 +729,19 @@ where
             SocketId::Unbound(_, _) => return Err(fposix::Errno::Einval),
             SocketId::Bound(id, _) => {
                 let BoundInfo { addr, port, device: _ } = get_bound_info::<I, _>(sync_ctx, id);
-                (addr, port).into_fidl()
+                (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
             }
             SocketId::Listener(id) => {
                 let BoundInfo { addr, port, device: _ } = get_listener_info::<I, _>(sync_ctx, id);
-                (addr, port).into_fidl()
+                (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
             }
             SocketId::Connection(id, _) => {
                 let ConnectionInfo { local_addr, remote_addr: _, device: _ } =
                     get_connection_info::<I, _>(sync_ctx, id);
-                local_addr.try_into_fidl_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?
+                local_addr.try_into_fidl_with_ctx(non_sync_ctx)
             }
-        };
+        }
+        .map_err(IntoErrno::into_errno)?;
         Ok(fidl.into_sock_addr())
     }
 

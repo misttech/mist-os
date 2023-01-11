@@ -783,6 +783,26 @@ where
     }
 }
 
+impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
+    for (Option<ZonedAddr<A, D>>, NonZeroU16)
+where
+    A::Version: IpSockAddrExt,
+    D: TryIntoFidlWithContext<
+        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
+        Error = DeviceNotFoundError,
+    >,
+{
+    type Error = DeviceNotFoundError;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
+        let (addr, port) = self;
+        (addr, port.get()).try_into_fidl_with_ctx(ctx)
+    }
+}
+
 impl<A, D1, D2> TryFromFidlWithContext<MulticastMembershipInterfaceSelector<A, D1>>
     for MulticastMembershipInterfaceSelector<A, D2>
 where

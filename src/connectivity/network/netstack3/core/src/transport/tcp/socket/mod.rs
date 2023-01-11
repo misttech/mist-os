@@ -1770,7 +1770,7 @@ pub struct UnboundInfo<D> {
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
 pub struct BoundInfo<A: IpAddress, D> {
     /// The IP address the socket is bound to, or `None` for all local IPs.
-    pub addr: Option<SpecifiedAddr<A>>,
+    pub addr: Option<ZonedAddr<A, D>>,
     /// The port number the socket is bound to.
     pub port: NonZeroU16,
     /// The device the socket is bound to.
@@ -1795,9 +1795,22 @@ impl<D: Clone> From<&'_ Unbound<D>> for UnboundInfo<D> {
     }
 }
 
-impl<A: IpAddress, D> From<ListenerAddr<A, D, NonZeroU16>> for BoundInfo<A, D> {
+fn maybe_zoned<A: IpAddress, D: Clone>(
+    ip: SpecifiedAddr<A>,
+    device: &Option<D>,
+) -> ZonedAddr<A, D> {
+    device
+        .as_ref()
+        .and_then(|device| {
+            AddrAndZone::new(*ip, device).map(|az| ZonedAddr::Zoned(az.map_zone(Clone::clone)))
+        })
+        .unwrap_or(ZonedAddr::Unzoned(ip))
+}
+
+impl<A: IpAddress, D: Clone> From<ListenerAddr<A, D, NonZeroU16>> for BoundInfo<A, D> {
     fn from(addr: ListenerAddr<A, D, NonZeroU16>) -> Self {
         let ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device } = addr;
+        let addr = addr.map(|ip| maybe_zoned(ip, &device));
         BoundInfo { addr, port: identifier, device }
     }
 }
@@ -1805,18 +1818,7 @@ impl<A: IpAddress, D> From<ListenerAddr<A, D, NonZeroU16>> for BoundInfo<A, D> {
 impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for ConnectionInfo<A, D> {
     fn from(addr: ConnAddr<A, D, NonZeroU16, NonZeroU16>) -> Self {
         let ConnAddr { ip: ConnIpAddr { local, remote }, device } = addr;
-        let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| {
-            (
-                device
-                    .as_ref()
-                    .and_then(|device| {
-                        AddrAndZone::new(*ip, device)
-                            .map(|az| ZonedAddr::Zoned(az.map_zone(Clone::clone)))
-                    })
-                    .unwrap_or(ZonedAddr::Unzoned(ip)),
-                port,
-            )
-        };
+        let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| (maybe_zoned(ip, &device), port);
         Self { local_addr: convert(local), remote_addr: convert(remote), device }
     }
 }
@@ -2917,7 +2919,11 @@ mod tests {
     }
 
     #[ip_test]
-    fn bound_info<I: Ip + TcpTestIpExt>() {
+    #[test_case(*<I as TestIpExt>::FAKE_CONFIG.local_ip, true; "specified bound")]
+    #[test_case(I::UNSPECIFIED_ADDRESS, true; "unspecified bound")]
+    #[test_case(*<I as TestIpExt>::FAKE_CONFIG.local_ip, false; "specified listener")]
+    #[test_case(I::UNSPECIFIED_ADDRESS, false; "unspecified listener")]
+    fn bound_socket_info<I: Ip + TcpTestIpExt>(ip_addr: I::Addr, listen: bool) {
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::with_sync_ctx(TcpSyncCtx::<I, _>::new(
                 I::FAKE_CONFIG.local_ip,
@@ -2926,34 +2932,19 @@ mod tests {
             ));
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
 
-        let (addr, port) = (I::FAKE_CONFIG.local_ip, PORT_1);
+        let (addr, port) = (ip_addr, PORT_1);
+        let zoned_addr = SpecifiedAddr::new(addr).map(ZonedAddr::Unzoned);
         let bound =
-            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, *addr, Some(port))
+            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, addr, Some(port))
                 .expect("bind should succeed");
-
-        let info = SocketHandler::get_bound_info(&sync_ctx, bound);
-        assert_eq!(info, BoundInfo { addr: Some(addr), port, device: None });
-    }
-
-    #[ip_test]
-    fn listener_info<I: Ip + TcpTestIpExt>() {
-        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
-            TcpCtx::with_sync_ctx(TcpSyncCtx::<I, _>::new(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-
-        let (addr, port) = (I::FAKE_CONFIG.local_ip, PORT_1);
-        let bound =
-            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, *addr, Some(port))
-                .expect("bind should succeed");
-        let listener =
-            SocketHandler::listen(&mut sync_ctx, &mut non_sync_ctx, bound, nonzero!(25usize));
-
-        let info = SocketHandler::get_listener_info(&sync_ctx, listener);
-        assert_eq!(info, BoundInfo { addr: Some(addr), port, device: None });
+        let info = if listen {
+            let listener =
+                SocketHandler::listen(&mut sync_ctx, &mut non_sync_ctx, bound, nonzero!(25usize));
+            SocketHandler::get_listener_info(&sync_ctx, listener)
+        } else {
+            SocketHandler::get_bound_info(&sync_ctx, bound)
+        };
+        assert_eq!(info, BoundInfo { addr: zoned_addr, port, device: None });
     }
 
     #[ip_test]
@@ -2997,7 +2988,7 @@ mod tests {
     }
 
     #[test]
-    fn connection_info_zoned_addrs() {
+    fn bound_connection_info_zoned_addrs() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
@@ -3026,6 +3017,15 @@ mod tests {
             Some(local.port),
         )
         .expect("bind should succeed");
+
+        assert_eq!(
+            SocketHandler::get_bound_info(&sync_ctx, bound),
+            BoundInfo {
+                addr: Some(ZonedAddr::Zoned(AddrAndZone::new(*local_ip, FakeDeviceId).unwrap())),
+                port: PORT_1,
+                device: Some(FakeDeviceId)
+            }
+        );
 
         let connected = SocketHandler::connect_bound(
             &mut sync_ctx,
