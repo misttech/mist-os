@@ -23,9 +23,8 @@ use moniker::{RelativeMoniker, RelativeMonikerBase};
 // -s: force input from stdin
 // -i: force interactive
 const DASH_ARGS_FOR_INTERACTIVE: [&[u8]; 2] = ["-i".as_bytes(), "-s".as_bytes()];
-// TODO(fxbug.dev/104634): Verbose (-v) or write-commands-to-stderr (-x) is required if a
-// command is given, else it errors with `Can't open <cmd>`.
-// -c: execute command
+// TODO(fxbug.dev/104634): Verbose (-v) or write-commands-to-stderr (-x) is required if a command is
+// given, else it errors with `Can't open <cmd>`. -c: execute command
 const DASH_ARGS_FOR_COMMAND: [&[u8]; 2] = ["-v".as_bytes(), "-c".as_bytes()];
 
 pub async fn launch_with_socket(
@@ -59,7 +58,7 @@ pub async fn launch_with_handles(
     command: Option<String>,
     ns_layout: fdash::DashNamespaceLayout,
 ) -> Result<zx::Process, LauncherError> {
-    // Get all directories needed to launch dash successfully
+    // Get all directories needed to launch dash successfully.
     let query =
         connect_to_protocol::<fsys::RealmQueryMarker>().map_err(|_| LauncherError::RealmQuery)?;
     let resolved_dirs = get_resolved_directories(&query, moniker).await?;
@@ -81,9 +80,9 @@ pub async fn launch_with_handles(
     let (tools_pkg_dir, tools_path) =
         trampoline::create_trampolines_from_packages(tool_urls).await?;
 
-    // The dash-launcher can be asked to launch multiple dash processes, each of which can
-    // make their own process hierarchies. This will look better topologically if we make a
-    // child job for each dash process.
+    // The dash-launcher can be asked to launch multiple dash processes, each of which can make
+    // their own process hierarchies. This will look better topologically if we make a child job for
+    // each dash process.
     let job =
         fuchsia_runtime::job_default().create_child_job().map_err(|_| LauncherError::Internal)?;
 
@@ -93,8 +92,8 @@ pub async fn launch_with_handles(
     // Add all the necessary entries into the dash namespace.
     let mut name_infos = match ns_layout {
         fdash::DashNamespaceLayout::NestAllInstanceDirs => {
-            // Add a custom `/svc` directory to dash that contains
-            // `fuchsia.process.Launcher` and `fuchsia.process.Resolver`.
+            // Add a custom `/svc` directory to dash that contains `fuchsia.process.Launcher` and
+            // `fuchsia.process.Resolver`.
             let svc_dir = layout::serve_process_launcher_and_resolver_svc_dir()?;
 
             layout::nest_all_instance_dirs(
@@ -111,8 +110,8 @@ pub async fn launch_with_handles(
         }
     };
 
-    // Set a name that's easy to find.
-    // If moniker is `./core/foo`, process name is `sh-core-foo`.
+    // Set a name for the dash process of the component we're exploring that is easy to find. If
+    // moniker is `./core/foo`, process name is `sh-core-foo`.
     let mut process_name = moniker.replace('/', "-");
     process_name.remove(0);
     let process_name = format!("sh{}", process_name);

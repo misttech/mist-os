@@ -5,6 +5,7 @@
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/client.shard.cml",
+        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -17,6 +18,7 @@
         },
     ],
     use: [
+        { protocol: "fuchsia.kernel.VmexResource" },
         {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",

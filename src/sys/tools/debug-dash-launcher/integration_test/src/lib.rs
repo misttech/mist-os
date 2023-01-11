@@ -26,7 +26,7 @@ pub async fn unknown_tools_package() {
         .unwrap()
         .unwrap_err();
 
-    assert_eq!(err, fdash::LauncherError::ToolsBinaryRead);
+    assert_eq!(err, fdash::LauncherError::PackageResolver);
 }
 
 #[fuchsia::test]
