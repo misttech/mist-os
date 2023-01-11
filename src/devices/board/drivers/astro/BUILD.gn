@@ -25,18 +25,6 @@ driver_bind_rules("astro-bind") {
   ]
 }
 
-driver_bind_rules("astro-backlight-bind") {
-  rules = "bind/astro-backlight.bind"
-  header_output = "astro-backlight-bind.h"
-  bind_output = "astro-backlight.bindbc"
-  tests = "bind-tests/astro-backlight-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.ti.platform",
-  ]
-}
-
 driver_bind_rules("astro-bluetooth-bind") {
   rules = "bind/astro-bluetooth.bind"
   header_output = "astro-bluetooth-bind.h"
@@ -338,7 +326,6 @@ fuchsia_driver("astro-driver") {
   deps = [
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
-    ":astro-backlight-bind_header",
     ":astro-bind",
     ":astro-bluetooth-bind_header",
     ":astro-buttons-bind_header",
@@ -373,6 +360,7 @@ fuchsia_driver("astro-driver") {
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
@@ -433,7 +421,6 @@ group("tests") {
   deps = [
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
-    ":astro-backlight-bind_test",
     ":astro-bind_test",
     ":astro-bluetooth-bind_test",
     ":astro-buttons-bind_test",
