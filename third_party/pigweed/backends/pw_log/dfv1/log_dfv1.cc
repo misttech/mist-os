@@ -50,8 +50,8 @@ inline const char* LogLevelToString(int severity) {
 
 }  // namespace
 
-extern "C" void pw_Log(int level, unsigned int flags, const char* file_name, int line_number,
-                       const char* message, ...) {
+extern "C" void pw_Log(int level, const char* module_name, unsigned int flags,
+                       const char* file_name, int line_number, const char* message, ...) {
   if (flags & PW_LOG_FLAG_IGNORE) {
     return;
   }
@@ -61,14 +61,14 @@ extern "C" void pw_Log(int level, unsigned int flags, const char* file_name, int
 
   if (flags & PW_LOG_FLAG_USE_PRINTF) {
     pw::StringBuffer<kPrintfBufferSize> buffer;
-    buffer.Format("%s: [%s:%d] ", LogLevelToString(level), pw_log_ddk::BaseName(file_name),
-                  line_number);
+    buffer.Format("%s: [%s:%s:%d] ", LogLevelToString(level), module_name,
+                  pw_log_ddk::BaseName(file_name), line_number);
     buffer.FormatVaList(message, args);
     printf("%s\n", buffer.c_str());
     return;
   }
 
-  zxlogvf_etc(LogLevelToDdkLog(level), nullptr, file_name, line_number, message, args);
+  zxlogvf_etc(LogLevelToDdkLog(level), /*tag=*/module_name, file_name, line_number, message, args);
 
   va_end(args);
 }

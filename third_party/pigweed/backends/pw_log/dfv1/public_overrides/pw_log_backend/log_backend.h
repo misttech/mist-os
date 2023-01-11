@@ -11,13 +11,13 @@
 
 PW_EXTERN_C_START
 
-void pw_Log(int level, unsigned int flags, const char* file_name, int line_number,
-            const char* message, ...) PW_PRINTF_FORMAT(5, 6);
+void pw_Log(int level, const char* module_name, unsigned int flags, const char* file_name,
+            int line_number, const char* message, ...) PW_PRINTF_FORMAT(6, 7);
 
 PW_EXTERN_C_END
 
-#define PW_HANDLE_LOG(level, flags, message, ...) \
-  pw_Log((level), (flags), __FILE__, __LINE__, message PW_COMMA_ARGS(__VA_ARGS__))
+#define PW_HANDLE_LOG(level, module, flags, message, ...) \
+  pw_Log((level), (module), (flags), __FILE__, __LINE__, message PW_COMMA_ARGS(__VA_ARGS__))
 
 // Use printf for logging. The first 2 bits of the PW_HANDLE_LOG "flags" int are reserved, so use
 // the third bit.
