@@ -25,11 +25,11 @@ use crate::types::*;
 
 /// Starts a component in an isolated environment, called a "galaxy".
 ///
-/// The galaxy will be configured according to a configuration file in the Starnix runner's package.
+/// The galaxy will be configured according to a configuration file in the Starnix kernel's package.
 /// The configuration file specifies, for example, which binary to run as "init", whether or not the
 /// system should wait for the existence of a given file path to run the component, etc.
 ///
-/// The Starnix runner's package also contains the system image to mount.
+/// The Starnix kernel's package also contains the system image to mount.
 ///
 /// The component's `binary` can either:
 ///   - an absolute path, in which case the path is treated as a path into the root filesystem that

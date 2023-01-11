@@ -51,7 +51,7 @@ pub async fn handle_case_iterator_for_gtests(
     test_url: &str,
     mut program: Option<fdata::Dictionary>,
     namespace: &ComponentNamespace,
-    starnix_runner: frunner::ComponentRunnerProxy,
+    starnix_kernel: frunner::ComponentRunnerProxy,
     mut stream: ftest::CaseIteratorRequestStream,
 ) -> Result<(), Error> {
     const LIST_TESTS_ARG: &str = "--gunit_list_tests";
@@ -80,7 +80,7 @@ pub async fn handle_case_iterator_for_gtests(
         ..frunner::ComponentStartInfo::EMPTY
     };
 
-    starnix_runner.start(start_info, component_controller_server_end)?;
+    starnix_kernel.start(start_info, component_controller_server_end)?;
 
     // Parse tests out of logs from stdout.
     let logger_stream = LoggerStream::new(fidl::Socket::from_handle(stdout_client.into_handle()))?;
@@ -114,7 +114,7 @@ pub async fn handle_case_iterator_for_gtests(
 
 /// Runs a gtest case associated with a single `ftest::SuiteRequest::Run` request.
 ///
-/// Running the test component is delegated to an instance of the starnix runner.
+/// Running the test component is delegated to an instance of the starnix kernel.
 /// stdout logs are filtered before they're reported to the test framework.
 ///
 /// # Parameters
@@ -131,9 +131,9 @@ pub async fn run_gtest_case(
     run_listener_proxy: &ftest::RunListenerProxy,
     namespace: &ComponentNamespace,
 ) -> Result<(), Error> {
-    // Start a starnix runner.
-    let runner_name = format!("starnix-runner-{}", rand::thread_rng().gen::<u64>());
-    let (starnix_runner, realm) = instantiate_runner_in_realm(&namespace, &runner_name).await?;
+    // Start a starnix kernel.
+    let kernel_name = format!("starnix-kernel-{}", rand::thread_rng().gen::<u64>());
+    let (starnix_kernel, realm) = instantiate_kernel_in_realm(&namespace, &kernel_name).await?;
 
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
@@ -162,7 +162,7 @@ pub async fn run_gtest_case(
 
     // Start the test component.
     let component_controller =
-        start_test_component(test_url, program, namespace, numbered_handles, &starnix_runner)?;
+        start_test_component(test_url, program, namespace, numbered_handles, &starnix_kernel)?;
 
     // Filter stdout logs to reduce spam.
     let test_framework_stdout = fasync::Socket::from_socket(test_framework_stdout)
@@ -176,10 +176,10 @@ pub async fn run_gtest_case(
     let result = read_result(component_controller.take_event_stream()).await;
     case_listener_proxy.finished(result)?;
 
-    // Cleanup the starnix runner.
+    // Cleanup the starnix kernel.
     realm
         .destroy_child(&mut fdecl::ChildRef {
-            name: runner_name.to_string(),
+            name: kernel_name.to_string(),
             collection: Some(RUNNERS_COLLECTION.into()),
         })
         .await?

@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//tools/cmc/build/cmc.gni")
 
-# Defines a starnix runner package with a provided configuration file and system image.
+# Defines a starnix kernel package with a provided configuration file and system image.
 #
 # Parameters
 #
@@ -34,7 +34,7 @@ template("starnix_galaxy_package") {
     system_image_target = "${target_name}_system_image"
   }
 
-  galaxy_manifest = "//src/proc/bin/starnix/meta/starnix_runner.cml"
+  galaxy_manifest = "//src/proc/bin/starnix/meta/starnix_kernel.cml"
   galaxy_manifest_deps = []
   if (defined(invoker.manifest)) {
     merged_manifest_target = "${target_name}_merged_manifest"
@@ -59,14 +59,14 @@ template("starnix_galaxy_package") {
   }
 
   fuchsia_component_manifest(manifest_target) {
-    component_name = "starnix_runner"
+    component_name = "starnix_kernel"
     manifest = galaxy_manifest
     deps = galaxy_manifest_deps
   }
 
   fuchsia_component(component_target) {
     cm_label = ":${manifest_target}"
-    deps = [ "//src/proc/bin/starnix:starnix_runner_bin" ]
+    deps = [ "//src/proc/bin/starnix:starnix_kernel_bin" ]
   }
 
   fuchsia_structured_config_values(config_target) {

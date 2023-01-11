@@ -20,7 +20,7 @@ declare_args() {
 
 group("starnix") {
   if (target_cpu == "x64") {
-    deps = [ ":starnix_runner_bin" ]
+    deps = [ ":starnix_kernel_bin" ]
   }
 }
 
@@ -37,15 +37,15 @@ if (target_cpu == "x64") {
     sources = [ "execution/trampoline_x64.S" ]
   }
 
-  rustc_binary("starnix_runner_bin") {
-    name = "starnix_runner"
+  rustc_binary("starnix_kernel_bin") {
+    name = "starnix_kernel"
     edition = "2021"
     with_unit_tests = true
     exclude_toolchain_tags = [ "asan" ]
 
     source_root = "main.rs"
     deps = [
-      ":starnix_runner_config",
+      ":starnix_kernel_config",
       "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
       "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
       "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -278,14 +278,14 @@ if (target_cpu == "x64") {
     }
   }
 
-  # The starnix runner manifest, used by all galaxies.
-  fuchsia_component_manifest("starnix_runner_manifest") {
-    manifest = "meta/starnix_runner.cml"
+  # The starnix kernel manifest, used by all galaxies.
+  fuchsia_component_manifest("starnix_kernel_manifest") {
+    manifest = "meta/starnix_kernel.cml"
   }
 
-  # The starnix runner configuration library, used by the Rust binary to parse configuration.
-  fuchsia_structured_config_rust_lib("starnix_runner_config") {
-    cm_label = ":starnix_runner_manifest"
+  # The starnix kernel configuration library, used by the Rust binary to parse configuration.
+  fuchsia_structured_config_rust_lib("starnix_kernel_config") {
+    cm_label = ":starnix_kernel_manifest"
   }
 
   resource("starnix-test-files") {
@@ -297,7 +297,7 @@ if (target_cpu == "x64") {
     manifest = "meta/starnix-tests.cml"
     deps = [
       ":starnix-test-files",
-      ":starnix_runner_bin_test",
+      ":starnix_kernel_bin_test",
       "//src/proc/examples/hello_starnix:bin",
     ]
     test_specs = {

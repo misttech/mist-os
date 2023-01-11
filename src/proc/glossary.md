@@ -37,8 +37,8 @@ for the child process.
 ## File descriptor table
 
 A *file descriptor table* is a mapping between [file descriptors](#file-descriptor)
-and file objects. The [Starnix runner](#starnix-runner) maintains a separate
-file descritptor table for each [child process](#child-process).
+and file objects. The [Starnix kernel](#starnix-kernel) maintains a separate
+file descriptor table for each [child process](#child-process).
 
 ## Futex
 
@@ -56,8 +56,8 @@ futexes.
 
 ## Galaxy
 
-The term "galaxy" refers to the [Starnix runner](#starnix-runner) bundled with a particular
-system image and configuration. For example, the `starbionic` galaxy is a starnix runner instance
+The term "galaxy" refers to the [Starnix kernel](#starnix-kernel) bundled with a particular
+system image and configuration. For example, the `starbionic` galaxy is a starnix kernel instance
 configured to run binaries using an Android system image (Bionic libc).
 
 
@@ -74,7 +74,7 @@ objects is stored in the [handle table](#handle-table) for the Fuchsia process.
 
 [Child processes](#child-process) cannot interact directly with handles.
 Instead, they need to issue Linux [system calls](#system-call) to instruct the
-[starnix runner](#starnix-runner) to interact with handles on their behalf.
+[starnix kernel](#starnix-kernel) to interact with handles on their behalf.
 
 ## Handle table
 
@@ -126,7 +126,7 @@ semantics of Fuchsia futexes and will likely require a separate implementation.
 *Normal mode* is an execution mode for a thread that receives
 [system calls](#system-call) from when the thread is executing in
 [restricted mode](#restricted-mode). When running in normal mode,
-the thread is executing code from the [starnix runner](#starnix-runner), has
+the thread is executing code from the [starnix kernel](#starnix-kernel), has
 read/write access to the [starnix address space](#starnix-address-space), and
 can interact directly with [handles](#handle).
 
@@ -170,12 +170,12 @@ modification.
 
 The *starnix address space* is a range of memory addresses that have a
 consistent mapping to physical memory across [child processes](#child-process).
-These shared mappings let the [starnix runner](#starnix-runner) implement
+These shared mappings let the [starnix kernel](#starnix-kernel) implement
 [system calls](#system-call) from child processes using data structures that
 are shared between child processes.
 
 For example, suppose a child process calls `open()` on `/proc/14/fd/7`. The
-shared Starnix address space lets the starnix runner examine the
+shared Starnix address space lets the starnix kernel examine the
 [file descriptor table](#file-descriptor-table) for process 14 and create
 a new entry in the file descriptor table for the current process that refers
 to the same file object as file descriptor 7 for process 14.
@@ -190,14 +190,14 @@ such as `hello_starnix` and `sh`.
 As starnix matures, we might remove starnix manager entirely or replace it
 with a dedicated developer component.
 
-## Starnix runner
+## Starnix kernel
 
-The *starnix runner* is a Fuchsia component framework (CFv2) runner that can
-run [Linux binaries](#linux-binary). Specifically, the starnix runner implements
-the `fuchsia.component.runner.ComponentRunner` protocol. The starnix runner
+The *starnix kernel* is a Fuchsia component framework (CFv2) runner that can
+run [Linux binaries](#linux-binary). Specifically, the starnix kernel implements
+the `fuchsia.component.runner.ComponentRunner` protocol. The starnix kernel
 is analogous to the ELF Runner, which runs ELF binaries compiled for Fuchsia.
 
-To run a Linux binary, the starnix runner creates a new
+To run a Linux binary, the starnix kernel creates a new
 [child process](#child-process) and loads the binary into the process. If
 that process calls `fork()`, starnix will create another child process to
 back the newly forked process.
@@ -208,7 +208,7 @@ The *starnix test runner* is a [test runner](/src/sys/test_runners/README.md)
 that adapts [Linux binaries](#linux-binary) to the `fuchsia.test.Suite`
 interface, making it possible to run Linux binaries as Fuchsia tests. The
 *starnix test runner* uses a dedicated instance of the
-[starnix runner](#starnix-runner) in order to make these tests hermetic.
+[starnix kernel](#starnix-kernel) in order to make these tests hermetic.
 
 ## System call
 
@@ -227,7 +227,7 @@ To distinguish these cases, a given thread in a [child process](#child-process)
 is either running in [restricted mode](#restricted-mode) or
 [supervisor mode](#supervisor-mode). When running in restricted mode, system
 calls have Linux UAPI semantics and are handled by the
-[starnix runner](#starnix-runner). When running in supervisor mode, system calls
+[starnix kernel](#starnix-kernel). When running in supervisor mode, system calls
 are handled by Zircon.
 
 ## Vector state

@@ -190,7 +190,7 @@ they need to be stopped explicitly in order to be updated when changes have been
 runner code.
 
 ```sh
-ffx component stop starnix_runner
+ffx component stop starnix_kernel
 ```
 
 If more than one Starnix instance is running, the above command will list the running Starnix instances and you can stop them individually.
@@ -198,7 +198,7 @@ If more than one Starnix instance is running, the above command will list the ru
 Alternatively, use the following command to stop all the instances at once:
 
 ```sh
-fx shell killall starnix_runner.cm
+fx shell killall starnix_kernel.cm
 ```
 
 ## Testing

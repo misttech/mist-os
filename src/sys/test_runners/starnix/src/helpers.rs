@@ -16,7 +16,7 @@ use {
     runner::component::ComponentNamespace,
 };
 
-/// The name of the collection in which the starnix runner is instantiated.
+/// The name of the collection in which the starnix kernel is instantiated.
 pub const RUNNERS_COLLECTION: &str = "runners";
 
 /// Replace the arguments in `program` with `test_arguments`, which were provided to the test
@@ -30,7 +30,7 @@ pub fn append_program_args(new_args: Vec<String>, program: &mut fdata::Dictionar
     update_program_args(new_args, program, true);
 }
 
-/// Instantiates a starnix runner in the realm of the given namespace.
+/// Instantiates a starnix kernel in the realm of the given namespace.
 ///
 /// # Parameters
 ///   - `namespace`: The namespace in which to fetch the realm to instantiate the runner in.
@@ -38,11 +38,11 @@ pub fn append_program_args(new_args: Vec<String>, program: &mut fdata::Dictionar
 ///
 /// Returns a proxy to the instantiated runner as well as to the realm in which the runner is
 /// instantiated.
-pub async fn instantiate_runner_in_realm(
+pub async fn instantiate_kernel_in_realm(
     namespace: &ComponentNamespace,
     runner_name: &str,
 ) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy), Error> {
-    let runner_url = "galaxy#meta/starnix_runner.cm";
+    let runner_url = "galaxy#meta/starnix_kernel.cm";
 
     let realm = get_realm(namespace)?;
     realm
@@ -59,11 +59,11 @@ pub async fn instantiate_runner_in_realm(
         .await?
         .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
     let runner_outgoing = open_exposed_directory(&realm, &runner_name, RUNNERS_COLLECTION).await?;
-    let starnix_runner = fclient::connect_to_protocol_at_dir_root::<frunner::ComponentRunnerMarker>(
+    let starnix_kernel = fclient::connect_to_protocol_at_dir_root::<frunner::ComponentRunnerMarker>(
         &runner_outgoing,
     )?;
 
-    Ok((starnix_runner, realm))
+    Ok((starnix_kernel, realm))
 }
 
 /// Returns numbered handles with their respective stdout and stderr clients.
@@ -95,7 +95,7 @@ pub fn start_test_component(
     program: Option<fdata::Dictionary>,
     namespace: &ComponentNamespace,
     numbered_handles: Option<Vec<fprocess::HandleInfo>>,
-    starnix_runner: &frunner::ComponentRunnerProxy,
+    starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<frunner::ComponentControllerProxy, Error> {
     let (component_controller, component_controller_server_end) =
         create_proxy::<frunner::ComponentControllerMarker>()?;
@@ -112,7 +112,7 @@ pub fn start_test_component(
         ..frunner::ComponentStartInfo::EMPTY
     };
 
-    starnix_runner.start(start_info, component_controller_server_end)?;
+    starnix_kernel.start(start_info, component_controller_server_end)?;
 
     Ok(component_controller)
 }

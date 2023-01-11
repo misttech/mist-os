@@ -9,7 +9,7 @@ use fuchsia_async::DurationExt;
 use fuchsia_inspect as inspect;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
-use starnix_runner_config::Config;
+use starnix_kernel_config::Config;
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::sync::Arc;
@@ -25,7 +25,7 @@ use crate::task::*;
 use crate::types::*;
 
 lazy_static::lazy_static! {
-    /// The configuration for the starnix runner. This is static because reading the configuration
+    /// The configuration for the starnix kernel. This is static because reading the configuration
     /// consumes a startup handle, and thus can only be done once per component-run.
     static ref CONFIG: Config = Config::take_from_startup_handle();
 
@@ -167,7 +167,7 @@ fn create_fs_context(
 
     // Create a layered fs to handle /galaxy and /galaxy/pkg
     // /galaxy will mount the galaxy pkg
-    // /galaxy/pkg will be a tmpfs where component using the starnix runner will have their package
+    // /galaxy/pkg will be a tmpfs where component using the starnix kernel will have their package
     // mounted.
     let kernel = task.kernel();
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;

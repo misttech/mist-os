@@ -17,7 +17,7 @@
         },
     ],
 
-    // This collection will contain the starnix runner that will run the linux
+    // This collection will contain the starnix kernel that will run the linux
     // binary.
     collections: [
         {
@@ -35,7 +35,7 @@
         },
     ],
 
-    // The test runner will dispatch the permissions that the starnix runner
+    // The test runner will dispatch the permissions that the starnix kernel
     // need from the test to the runner.
     offer: [
         {

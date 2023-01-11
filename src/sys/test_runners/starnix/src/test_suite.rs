@@ -32,8 +32,8 @@ pub async fn handle_suite_requests(
     let is_gtest = is_gtest(&program.as_ref().expect("No program."))?;
     while let Some(event) = stream.try_next().await? {
         let mut program = program.clone();
-        let runner_name = format!("starnix-runner-{}", rand::thread_rng().gen::<u64>());
-        let (starnix_runner, realm) = instantiate_runner_in_realm(&namespace, &runner_name).await?;
+        let kernel_name = format!("starnix-kernel-{}", rand::thread_rng().gen::<u64>());
+        let (starnix_kernel, realm) = instantiate_kernel_in_realm(&namespace, &kernel_name).await?;
 
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
@@ -44,7 +44,7 @@ pub async fn handle_suite_requests(
                         test_url,
                         program,
                         &namespace,
-                        starnix_runner,
+                        starnix_kernel,
                         stream,
                     )
                     .await?;
@@ -85,7 +85,7 @@ pub async fn handle_suite_requests(
                             program,
                             &run_listener_proxy,
                             &namespace,
-                            &starnix_runner,
+                            &starnix_kernel,
                         )
                         .await?;
                     }
@@ -97,7 +97,7 @@ pub async fn handle_suite_requests(
 
         realm
             .destroy_child(&mut fdecl::ChildRef {
-                name: runner_name.to_string(),
+                name: kernel_name.to_string(),
                 collection: Some(RUNNERS_COLLECTION.into()),
             })
             .await?
@@ -109,7 +109,7 @@ pub async fn handle_suite_requests(
 
 /// Runs a test case associated with a single `ftest::SuiteRequest::Run` request.
 ///
-/// Running the test component is delegated to an instance of the starnix runner.
+/// Running the test component is delegated to an instance of the starnix kernel.
 ///
 /// # Parameters
 /// - `tests`: The tests that are to be run. Each test executes an independent run of the test
@@ -118,14 +118,14 @@ pub async fn handle_suite_requests(
 /// - `program`: The program data associated with the runner request for the test component.
 /// - `run_listener_proxy`: The listener proxy for the test run.
 /// - `namespace`: The incoming namespace to provide to the test component.
-/// - `starnix_runner`: The instance of the starnix runner that will run the test component.
+/// - `starnix_kernel`: The instance of the starnix kernel that will run the test component.
 async fn run_test_case(
     test: ftest::Invocation,
     test_url: &str,
     program: Option<fdata::Dictionary>,
     run_listener_proxy: &ftest::RunListenerProxy,
     namespace: &ComponentNamespace,
-    starnix_runner: &frunner::ComponentRunnerProxy,
+    starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
@@ -141,7 +141,7 @@ async fn run_test_case(
     )?;
 
     let component_controller =
-        start_test_component(test_url, program, namespace, numbered_handles, starnix_runner)?;
+        start_test_component(test_url, program, namespace, numbered_handles, starnix_kernel)?;
 
     let result = read_result(component_controller.take_event_stream()).await;
     case_listener_proxy.finished(result)?;
@@ -205,7 +205,7 @@ mod tests {
     /// Spawns a `ComponentRunnerRequestStream` server that immediately closes all incoming
     /// component controllers with the epitaph specified in `component_controller_epitaph`.
     ///
-    /// This function can be used to mock the starnix runner in a way that simulates a component
+    /// This function can be used to mock the starnix kernel in a way that simulates a component
     /// exiting with or without error.
     ///
     /// # Parameters
@@ -274,7 +274,7 @@ mod tests {
     /// `runner_proxy`. The call is made with a mock test case.
     fn spawn_run_test_cases(
         run_listener: ClientEnd<ftest::RunListenerMarker>,
-        starnix_runner: frunner::ComponentRunnerProxy,
+        starnix_kernel: frunner::ComponentRunnerProxy,
     ) {
         fasync::Task::local(async move {
             let _ = run_test_case(
@@ -287,7 +287,7 @@ mod tests {
                 None,
                 &run_listener.into_proxy().expect("Couldn't create proxy."),
                 &ComponentNamespace::try_from(vec![]).expect(""),
-                &starnix_runner,
+                &starnix_kernel,
             )
             .await;
         })
@@ -323,11 +323,11 @@ mod tests {
     /// passes.
     #[fasync::run_singlethreaded(test)]
     async fn test_component_controller_epitaph_ok() {
-        let starnix_runner = spawn_runner(zx::Status::OK);
+        let starnix_kernel = spawn_runner(zx::Status::OK);
         let (run_listener, run_listener_stream) =
             create_request_stream::<ftest::RunListenerMarker>()
                 .expect("Couldn't create case listener");
-        spawn_run_test_cases(run_listener, starnix_runner);
+        spawn_run_test_cases(run_listener, starnix_kernel);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Passed));
     }
 
@@ -335,11 +335,11 @@ mod tests {
     /// fails.
     #[fasync::run_singlethreaded(test)]
     async fn test_component_controller_epitaph_not_ok() {
-        let starnix_runner = spawn_runner(zx::Status::INTERNAL);
+        let starnix_kernel = spawn_runner(zx::Status::INTERNAL);
         let (run_listener, run_listener_stream) =
             create_request_stream::<ftest::RunListenerMarker>()
                 .expect("Couldn't create case listener");
-        spawn_run_test_cases(run_listener, starnix_runner);
+        spawn_run_test_cases(run_listener, starnix_kernel);
         assert_eq!(listen_to_test_result(run_listener_stream).await, Some(ftest::Status::Failed));
     }
 }

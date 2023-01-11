@@ -8,7 +8,7 @@ using zx;
 
 /// A protocol used to instantiate and interact with components run by Starnix.
 ///
-/// Several `Manager` methods allow clients to choose a "galaxy." A galaxy is a Starnix runner
+/// Several `Manager` methods allow clients to choose a "galaxy." A galaxy is a Starnix kernel
 /// instance configured with a particular system image, init task, etc.
 ///
 /// For example, the `starbionic` galaxy runs components in a bionic (Android libc) based

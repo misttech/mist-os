@@ -11,7 +11,7 @@ import(
 # Arguments:
 #
 #   galaxy [mandatory]
-#   The target defining the galaxy package containing the starnix runner and the system image.
+#   The target defining the galaxy package containing the starnix kernel and the system image.
 #
 #   Any fuchsia_test_package arguments are supported.
 template("starnix_test_package") {
@@ -40,7 +40,7 @@ template("starnix_test_package") {
 # Arguments:
 #
 #   galaxy [mandatory]
-#   The target defining the galaxy package containing the starnix runner and the system image.
+#   The target defining the galaxy package containing the starnix kernel and the system image.
 #
 #   Any fuchsia_test_package arguments are supported.
 template("starnix_test_package_with_expectations") {
