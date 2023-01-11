@@ -25,11 +25,10 @@ class VirtioGpu
  public:
   explicit VirtioGpu(const PhysMem& phys_mem);
 
-  zx_status_t Start(
-      const zx::guest& guest,
-      fidl::InterfaceHandle<fuchsia::virtualization::hardware::KeyboardListener> keyboard_listener,
-      fidl::InterfaceHandle<fuchsia::virtualization::hardware::PointerListener> pointer_listener,
-      ::sys::ComponentContext* context, async_dispatcher_t* dispatcher);
+  zx_status_t Start(const zx::guest& guest,
+                    fidl::InterfaceHandle<fuchsia::ui::input3::KeyboardListener> keyboard_listener,
+                    fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
+                    ::sys::ComponentContext* context, async_dispatcher_t* dispatcher);
 
  private:
   enum class State {

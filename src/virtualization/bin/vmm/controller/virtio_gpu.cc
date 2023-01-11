@@ -21,8 +21,8 @@ VirtioGpu::VirtioGpu(const PhysMem& phys_mem)
 
 zx_status_t VirtioGpu::Start(
     const zx::guest& guest,
-    fidl::InterfaceHandle<fuchsia::virtualization::hardware::KeyboardListener> keyboard_listener,
-    fidl::InterfaceHandle<fuchsia::virtualization::hardware::PointerListener> pointer_listener,
+    fidl::InterfaceHandle<fuchsia::ui::input3::KeyboardListener> keyboard_listener,
+    fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
     ::sys::ComponentContext* context, async_dispatcher_t* dispatcher) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_virtualization_hardware::VirtioGpu>();
   auto [client_end, server_end] = std::move(endpoints.value());
@@ -45,13 +45,12 @@ zx_status_t VirtioGpu::Start(
     return status;
   }
 
-  fidl::ClientEnd<fuchsia_virtualization_hardware::KeyboardListener> llcpp_keyboard_listener(
+  fidl::ClientEnd<fuchsia_ui_input3::KeyboardListener> llcpp_keyboard_listener(
       keyboard_listener.TakeChannel());
-  fidl::ClientEnd<fuchsia_virtualization_hardware::PointerListener> llcpp_pointer_listener(
-      pointer_listener.TakeChannel());
+  fidl::ServerEnd<fuchsia_ui_pointer::MouseSource> llcpp_mouse_source(mouse_source.TakeChannel());
   return gpu_.sync()
       ->Start(std::move(start_info), std::move(llcpp_keyboard_listener),
-              std::move(llcpp_pointer_listener))
+              std::move(llcpp_mouse_source))
       .status();
 }
 

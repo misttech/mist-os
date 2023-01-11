@@ -6,17 +6,14 @@ use {
     crate::keyboard::translate_keyboard_event,
     crate::wire,
     anyhow::{anyhow, Error},
-    fidl_fuchsia_virtualization_hardware::{
-        KeyboardListenerRequest, KeyboardListenerRequestStream,
-    },
+    fidl_fuchsia_ui_input3::{KeyboardListenerRequest, KeyboardListenerRequestStream},
     futures::{
-        channel::mpsc,
         future::OptionFuture,
         select,
-        stream::{Fuse, FusedStream, Stream},
+        stream::{Fuse, Stream},
         FutureExt, StreamExt,
     },
-    std::{collections::VecDeque, io::Write, pin::Pin},
+    std::{collections::VecDeque, io::Write},
     virtio_device::{
         chain::WritableChain,
         mem::DriverMem,
@@ -32,10 +29,9 @@ pub struct InputDevice<
     M: DriverMem,
     Q: Stream<Item = DescChain<'a, 'b, N>> + Unpin,
 > {
-    listener_receiver: mpsc::Receiver<KeyboardListenerRequestStream>,
     event_stream: Q,
     status_stream: Option<Fuse<Q>>,
-    keyboard_stream: Pin<Box<dyn FusedStream<Item = Result<KeyboardListenerRequest, fidl::Error>>>>,
+    keyboard_stream: KeyboardListenerRequestStream,
     chain_buffer: VecDeque<DescChain<'a, 'b, N>>,
     mem: &'a M,
 }
@@ -45,17 +41,14 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
 {
     pub fn new(
         mem: &'a M,
-        listener_receiver: mpsc::Receiver<KeyboardListenerRequestStream>,
+        keyboard_listener: KeyboardListenerRequestStream,
         event_stream: Q,
         status_stream: Option<Q>,
     ) -> Self {
         Self {
-            listener_receiver,
             event_stream,
             status_stream: status_stream.map(StreamExt::fuse),
-            // Initialize with an empty KeyboardStream. This will be updated when we receive a new
-            // KeyboardListener FIDL connection.
-            keyboard_stream: Box::pin(futures::stream::empty().fuse()),
+            keyboard_stream: keyboard_listener,
             chain_buffer: VecDeque::new(),
             mem,
         }
@@ -64,17 +57,6 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
     pub async fn run(&mut self) -> Result<(), Error> {
         loop {
             select! {
-                // The listener_recevier will pass request streams that are created as a result of
-                // connecting to our public KeyboardListener service. When we receive a stream we
-                // update the keyboard request stream.
-                //
-                // We only support a single KeyboardListener connection and any previous connection
-                // will be dropped.
-                keyboard_listener = self.listener_receiver.next() => {
-                    if let Some(stream) = keyboard_listener {
-                        self.keyboard_stream = Box::pin(stream);
-                    }
-                },
                 // This handles incoming key events from the KeyboardListener service. This will
                 // attempt to decode the key event and produce 1 or more VirtioInputEvents to send
                 // back to the driver.
@@ -107,7 +89,6 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
                     tracing::warn!("Failed to ack KeyEvent: {}", e);
                 }
             }
-            _ => {}
         }
     }
 
@@ -153,8 +134,7 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_input::Key,
         fidl_fuchsia_ui_input3 as input3,
-        fidl_fuchsia_virtualization_hardware::KeyboardListenerMarker,
-        futures::SinkExt,
+        fidl_fuchsia_ui_input3::KeyboardListenerMarker,
         virtio_device::{
             fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
             util::DescChainStream,
@@ -174,18 +154,16 @@ mod tests {
         let mem = IdentityDriverMem::new();
         let mut event_queue = TestQueue::new(32, &mem);
         let status_queue = TestQueue::new(32, &mem);
-        let (mut sender, receiver) = mpsc::channel(1);
-        let mut device = InputDevice::new(
-            &mem,
-            receiver,
-            DescChainStream::new(&event_queue.queue),
-            Some(DescChainStream::new(&status_queue.queue)),
-        );
 
         // Create a keyboard listener proxy and send the request stream to the device.
         let (keyboard_proxy, request_stream) =
             create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
-        sender.send(request_stream).now_or_never().unwrap().unwrap();
+        let mut device = InputDevice::new(
+            &mem,
+            request_stream,
+            DescChainStream::new(&event_queue.queue),
+            Some(DescChainStream::new(&status_queue.queue)),
+        );
 
         // Add two descriptors to the queue.
         event_queue
@@ -245,18 +223,16 @@ mod tests {
         let mem = IdentityDriverMem::new();
         let mut event_queue = TestQueue::new(32, &mem);
         let status_queue = TestQueue::new(32, &mem);
-        let (mut sender, receiver) = mpsc::channel(1);
-        let mut device = InputDevice::new(
-            &mem,
-            receiver,
-            DescChainStream::new(&event_queue.queue),
-            Some(DescChainStream::new(&status_queue.queue)),
-        );
 
         // Create a keyboard listener proxy and send the request stream to the device.
         let (keyboard_proxy, request_stream) =
             create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
-        sender.send(request_stream).now_or_never().unwrap().unwrap();
+        let mut device = InputDevice::new(
+            &mem,
+            request_stream,
+            DescChainStream::new(&event_queue.queue),
+            Some(DescChainStream::new(&status_queue.queue)),
+        );
 
         // Add only one descriptor to the queue. This will not be enough to generate a key press
         // event because we need 2 descriptors for that (one for the key event and one for the sync

@@ -9,10 +9,7 @@
     },
     capabilities: [
         {
-            protocol: [
-                "fuchsia.virtualization.hardware.KeyboardListener",
-                "fuchsia.virtualization.hardware.VirtioInput",
-            ],
+            protocol: [ "fuchsia.virtualization.hardware.VirtioInput" ],
         },
     ],
     use: [
@@ -22,10 +19,7 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.virtualization.hardware.KeyboardListener",
-                "fuchsia.virtualization.hardware.VirtioInput",
-            ],
+            protocol: [ "fuchsia.virtualization.hardware.VirtioInput" ],
             from: "self",
         },
     ],

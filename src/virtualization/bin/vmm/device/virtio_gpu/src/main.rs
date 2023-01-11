@@ -12,8 +12,7 @@ use {
     crate::gpu_device::GpuDevice,
     crate::scanout::FlatlandScanout,
     anyhow::{anyhow, Context},
-    fidl::endpoints::{ClientEnd, RequestStream},
-    fidl_fuchsia_ui_input3::KeyboardListenerMarker,
+    fidl::endpoints::RequestStream,
     fidl_fuchsia_virtualization_hardware::VirtioGpuRequestStream,
     fuchsia_component::server,
     futures::{select, FutureExt, StreamExt, TryFutureExt, TryStreamExt},
@@ -22,7 +21,7 @@ use {
 
 async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(), anyhow::Error> {
     // Receive start info as first message.
-    let (start_info, keyboard_listener, _pointer_listener, responder) = virtio_gpu_fidl
+    let (start_info, keyboard_listener, mouse_source, responder) = virtio_gpu_fidl
         .try_next()
         .await?
         .ok_or(anyhow!("Failed to read fidl message from the channel."))?
@@ -67,11 +66,9 @@ async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(
     // handle the config change interrupt on resize.
     let mut gpu_device = GpuDevice::new(&guest_mem, control_handle);
     let command_sender = gpu_device.command_sender();
-    let keyboard_listener =
-        keyboard_listener.map(|k| ClientEnd::<KeyboardListenerMarker>::from(k.into_channel()));
     select! {
         _ = gpu_device.process_gpu_commands().fuse() => {},
-        result = FlatlandScanout::attach(command_sender, keyboard_listener).fuse() => {
+        result = FlatlandScanout::attach(command_sender, keyboard_listener, mouse_source).fuse() => {
             if let Err(e) = result {
                 tracing::warn!("Failed to create scanout: {}", e);
             }

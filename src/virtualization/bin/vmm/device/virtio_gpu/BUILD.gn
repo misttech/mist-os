@@ -27,6 +27,7 @@ _common_deps = [
   "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
   "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
   "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
+  "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
   "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
   "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_rust",
   "//src/lib/async-utils",

@@ -8,7 +8,7 @@ use {
     crate::wire,
     anyhow::{anyhow, Context, Error},
     async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{create_proxy, ClientEnd},
+    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
     fidl_fuchsia_element::{GraphicalPresenterMarker, ViewSpec},
     fidl_fuchsia_math as fmath,
     fidl_fuchsia_ui_composition::{
@@ -17,6 +17,7 @@ use {
         ViewBoundProtocols,
     },
     fidl_fuchsia_ui_input3::KeyboardListenerMarker,
+    fidl_fuchsia_ui_pointer::MouseSourceMarker,
     fidl_fuchsia_ui_views::{ViewCreationToken, ViewIdentityOnCreation, ViewportCreationToken},
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
@@ -146,6 +147,11 @@ impl Scanout for FlatlandScanout {
         }
     }
 
+    // TODO(fxbug.dev/90290): Currently there is no way to hide or modify the mouse cursor drawn by
+    // scene_manager for a particular view. Once there is we will need to update this code to
+    // utilize the new APIs. Until then we just ignore the problem and draw the cursor as specified
+    // by the guest into our view. To avoid seeing multiple different cursors one can globally hide
+    // the system cursor by entering "immersive mode" with the shortcut alt-shift-I.
     fn update_cursor_resource<'a>(
         &mut self,
         resource: Option<&Resource2D<'a>>,
@@ -188,6 +194,7 @@ impl FlatlandScanout {
     pub async fn attach(
         mut command_sender: GpuCommandSender,
         keyboard_listener: Option<ClientEnd<KeyboardListenerMarker>>,
+        mouse_source: Option<ServerEnd<MouseSourceMarker>>,
     ) -> Result<(), Error> {
         let flatland =
             connect_to_protocol::<FlatlandMarker>().context("error connecting to Flatland")?;
@@ -201,7 +208,7 @@ impl FlatlandScanout {
         let view_ref_for_presenter = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let mut view_ref_for_keyboard = fuchsia_scenic::duplicate_view_ref(&viewref_pair.view_ref)?;
         let mut view_identity = ViewIdentityOnCreation::from(viewref_pair);
-        let view_bound_protocols = ViewBoundProtocols { ..ViewBoundProtocols::EMPTY };
+        let view_bound_protocols = ViewBoundProtocols { mouse_source, ..ViewBoundProtocols::EMPTY };
         flatland
             .create_view2(
                 &mut view_token,
