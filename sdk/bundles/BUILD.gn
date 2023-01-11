@@ -5,11 +5,7 @@
 # Packages added to the universe set complementing SDK images.
 group("tools") {
   testonly = true
-  public_deps = [
-    ":core-tools",
-    "//src/chromium:web_engine",
-    "//src/chromium:web_runner",
-  ]
+  public_deps = [ ":core-tools" ]
 }
 
 group("core-tools") {

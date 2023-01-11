@@ -65,7 +65,8 @@ fuchsia_test_package("simple_video_web_system_validation_test_pkg") {
   ]
 }
 
-# fx set workstation_eng_paused.qemu-x64 --release --with-base //sdk/bundles:tools  \
+# fx set workstation_eng_paused.qemu-x64 --release \
+# --with-base //src/chromium:web_engine \
 # --with-base //src/testing/system-validation:tests \
 # --with-host //src/testing/system-validation/web:simple_video_web_with_host_script
 #
