@@ -138,15 +138,14 @@ pub async fn get_inspect_data(
     tree_selector: impl Into<String>,
     file_prefix: &str,
 ) -> Result<diagnostics_hierarchy::DiagnosticsHierarchy> {
-    let realm_moniker = selectors::sanitize_string_for_selectors(
-        &realm.get_moniker().await.context("calling get moniker")?,
-    );
+    let moniker = realm.get_moniker().await.context("calling get moniker")?;
+    let realm_moniker = selectors::sanitize_string_for_selectors(&moniker);
     let mut archive_reader = diagnostics_reader::ArchiveReader::new();
     let _archive_reader_ref = archive_reader
         .add_selector(
             diagnostics_reader::ComponentSelector::new(vec![
                 NETEMUL_SANDBOX_MONIKER.into(),
-                realm_moniker,
+                realm_moniker.into_owned(),
                 component_moniker.into(),
             ])
             .with_tree_selector(tree_selector.into()),

@@ -79,7 +79,7 @@ fn get_selectors(component_selector: String, hierarchy: DiagnosticsHierarchy) ->
             let node_selector = node_path
                 .iter()
                 .map(|s| selectors::sanitize_string_for_selectors(s))
-                .collect::<Vec<String>>()
+                .collect::<Vec<_>>()
                 .join("/");
             let property_selector = selectors::sanitize_string_for_selectors(property.name());
             format!("{}:{}:{}", component_selector, node_selector, property_selector)

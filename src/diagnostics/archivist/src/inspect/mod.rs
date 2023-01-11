@@ -295,7 +295,7 @@ impl ReaderServer {
             .relative_moniker
             .iter()
             .map(|s| selectors::sanitize_string_for_selectors(s))
-            .collect::<Vec<String>>()
+            .collect::<Vec<_>>()
             .join("/");
         let sanitized_moniker = match &self.output_rewriter {
             None => sanitized_moniker,
