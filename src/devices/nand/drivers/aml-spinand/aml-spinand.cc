@@ -447,7 +447,7 @@ zx_status_t AmlSpiNand::SpiNandWriteToCacheOp(OobOps mode, const uint8_t *data, 
       oob_offset = flash_chip_->oob_region.offset;
       oob_len = flash_chip_->oob_region.length;
     }
-    memcpy(nand_dev_.oobbuf + oob_offset, data, std::min(oob_size, oob_len));
+    memcpy(nand_dev_.oobbuf + oob_offset, oob, std::min(oob_size, oob_len));
     op.data.nbytes += flash_chip_->mem_org.oobsize;
     if (op.data.buf_out == nullptr) {
       op.data.buf_out = nand_dev_.oobbuf;
