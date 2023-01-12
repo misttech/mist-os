@@ -768,7 +768,6 @@ config("Wno-conversion") {
     "//src/lib/fidl/llcpp/tests/conformance:*",
     "//src/lib/fidl/llcpp/tests/integration:*",
     "//src/lib/fidl/llcpp/tests/wire_types:*",
-    "//src/lib/files:*",
     "//src/lib/fsl/socket:*",
     "//src/lib/fsl/vmo:*",
     "//src/lib/icu/tools/extractor:*",

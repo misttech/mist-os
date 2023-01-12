@@ -33,10 +33,6 @@ sdk_source_set("files") {
     "//sdk/lib/utf-utils",
     "//src/lib/fxl:memory",
   ]
-  configs += [
-    # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-    "//build/config:Wno-conversion",
-  ]
 }
 
 executable("files_unittests") {
@@ -60,9 +56,6 @@ executable("files_unittests") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 if (is_fuchsia) {

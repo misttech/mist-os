@@ -27,25 +27,42 @@ bool ReadFileDescriptor(int fd, T* result) {
   assert(result);
   result->clear();
 
-  if (fd < 0)
-    return false;
-
-  constexpr size_t kBufferSize = 1 << 16;
-  size_t offset = 0;
-  ssize_t bytes_read = 0;
-  do {
-    offset += bytes_read;
-    result->resize(offset + kBufferSize);
-    bytes_read = HANDLE_EINTR(read(fd, &(*result)[offset], kBufferSize));
-  } while (bytes_read > 0);
-
-  if (bytes_read < 0) {
-    result->clear();
+  struct stat s;
+  if (int res = fstat(fd, &s); res < 0) {
     return false;
   }
+  // Some (many?) file implementations on Fuchsia do not report their size.
+  //
+  // See e.g. https://fxbug.dev/119418.
+  const size_t size = s.st_size;
+  if (size != 0) {
+    result->resize(size);
+  }
 
-  result->resize(offset + bytes_read);
-  return true;
+  for (size_t offset = 0;;) {
+    size_t count = [&]() {
+      if (size != 0) {
+        return size - offset;
+      }
+      constexpr size_t kBufferSize = 1 << 16;
+      result->resize(offset + kBufferSize);
+      return kBufferSize;
+    }();
+    ssize_t bytes_read = HANDLE_EINTR(read(fd, &result->data()[offset], count));
+    if (bytes_read < 0) {
+      result->clear();
+      return false;
+    }
+    if (bytes_read == 0) {
+      if (size != 0) {
+        assert(offset == size);
+      } else {
+        result->resize(offset);
+      }
+      return true;
+    }
+    offset += bytes_read;
+  }
 }
 
 }  // namespace
