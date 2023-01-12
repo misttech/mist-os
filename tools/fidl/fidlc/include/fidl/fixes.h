@@ -36,8 +36,11 @@ enum struct Status {
   kComplete,
 };
 
+using SourceFilePath = std::string;
+using TransformedSource = std::string;
+
 // A map of filepaths to their transformed contents.
-using OutputMap = std::map<const SourceFile*, std::string>;
+using OutputMap = std::map<SourceFilePath, TransformedSource>;
 
 // The result of a failed transform operation, containing both errors encountered, and the final
 // |Status|.
@@ -62,9 +65,9 @@ class Fix {
   Status ValidateFlags();
 
  protected:
-  Fix(const Fixable fixable, const std::unique_ptr<SourceManager>& library,
+  Fix(const Fixable fixable, std::unique_ptr<SourceManager> library,
       const ExperimentalFlags experimental_flags)
-      : fixable_(fixable), library_(library), experimental_flags_(experimental_flags) {}
+      : fixable_(fixable), library_(std::move(library)), experimental_flags_(experimental_flags) {}
 
   // Get pointers to all of the source files.
   std::vector<const SourceFile*> GetSourceFiles();
@@ -73,18 +76,18 @@ class Fix {
   // prepare a |TransformResult| as needed.
   template <typename T>
   TransformResult Execute(std::unique_ptr<T> transformer,
-                          std::vector<const SourceFile*> source_files, Reporter* reporter);
+                          const std::vector<const SourceFile*>& source_files, Reporter* reporter);
 
   const Fixable fixable_;
-  const std::unique_ptr<SourceManager>& library_;
+  const std::unique_ptr<SourceManager> library_;
   const ExperimentalFlags experimental_flags_;
 };
 
 class ParsedFix : public Fix {
  public:
-  ParsedFix(const Fixable fixable, const std::unique_ptr<SourceManager>& library,
+  ParsedFix(const Fixable fixable, std::unique_ptr<SourceManager> library,
             const ExperimentalFlags experimental_flags)
-      : Fix(fixable, library, experimental_flags) {}
+      : Fix(fixable, std::move(library), experimental_flags) {}
 
   TransformResult Transform(Reporter* reporter) final;
 
@@ -93,7 +96,7 @@ class ParsedFix : public Fix {
   // |Transformer| derivation that it is targeting, this is a virtual class that must be overridden
   // by derived class implementations.
   virtual std::unique_ptr<ParsedTransformer> GetParsedTransformer(
-      const std::vector<const SourceFile*> source_files,
+      const std::vector<const SourceFile*>& source_files,
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) = 0;
 
  private:
@@ -102,32 +105,75 @@ class ParsedFix : public Fix {
   using Fix::library_;
 };
 
+class CompiledFix : public Fix {
+ public:
+  CompiledFix(const Fixable fixable, std::unique_ptr<SourceManager> library,
+              std::vector<std::unique_ptr<fidl::SourceManager>> dependencies,
+              const ExperimentalFlags experimental_flags)
+      : Fix(fixable, std::move(library), experimental_flags),
+        dependencies_(std::move(dependencies)) {}
+
+  TransformResult Transform(Reporter* reporter) final;
+
+ protected:
+  // Retrieve the appropriate transformer. Because each derivation will have a specific
+  // |Transformer| derivation that it is targeting, this is a virtual class that must be overridden
+  // by derived class implementations.
+  virtual std::unique_ptr<CompiledTransformer> GetCompiledTransformer(
+      const std::vector<const SourceFile*>& library_source_files,
+      const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) = 0;
+
+ private:
+  using Fix::Execute;
+  using Fix::GetSourceFiles;
+  using Fix::library_;
+
+  const std::vector<std::unique_ptr<fidl::SourceManager>> dependencies_;
+};
+
 // A fix that does nothing. This is retained both for testing purposes, and to ensure there is
 // always at least one "example" |Fix| implementation, even when no active fixes are being
 // performed.
 class NoopParsedFix final : public ParsedFix {
  public:
-  NoopParsedFix(const std::unique_ptr<SourceManager>& library,
-                const ExperimentalFlags experimental_flags)
-      : ParsedFix(Fixable::Get(Fixable::Kind::kNoop), library, experimental_flags) {}
+  NoopParsedFix(std::unique_ptr<SourceManager> library, const ExperimentalFlags experimental_flags)
+      : ParsedFix(Fixable::Get(Fixable::Kind::kNoop), std::move(library), experimental_flags) {}
   ~NoopParsedFix() = default;
 
  protected:
   std::unique_ptr<ParsedTransformer> GetParsedTransformer(
-      std::vector<const SourceFile*> source_files,
+      const std::vector<const SourceFile*>& source_files,
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
 };
 
 class ProtocolModifierFix final : public ParsedFix {
  public:
-  ProtocolModifierFix(const std::unique_ptr<SourceManager>& library,
+  ProtocolModifierFix(std::unique_ptr<SourceManager> library,
                       const ExperimentalFlags experimental_flags)
-      : ParsedFix(Fixable::Get(Fixable::Kind::kProtocolModifier), library, experimental_flags) {}
+      : ParsedFix(Fixable::Get(Fixable::Kind::kProtocolModifier), std::move(library),
+                  experimental_flags) {}
   ~ProtocolModifierFix() = default;
 
  protected:
   std::unique_ptr<ParsedTransformer> GetParsedTransformer(
-      std::vector<const SourceFile*> source_files,
+      const std::vector<const SourceFile*>& source_files,
+      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
+};
+
+class EmptyStructResponseFix final : public CompiledFix {
+ public:
+  EmptyStructResponseFix(std::unique_ptr<SourceManager> library,
+                         std::vector<std::unique_ptr<fidl::SourceManager>> dependencies,
+                         const ExperimentalFlags experimental_flags)
+      : CompiledFix(Fixable::Get(Fixable::Kind::kEmptyStructResponse), std::move(library),
+                    std::move(dependencies), experimental_flags) {}
+  ~EmptyStructResponseFix() = default;
+
+ protected:
+  std::unique_ptr<CompiledTransformer> GetCompiledTransformer(
+      const std::vector<const SourceFile*>& source_files,
+      const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
 };
 

@@ -5,6 +5,7 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SOURCE_MAP_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SOURCE_MAP_H_
 
+#include <lib/fit/function.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -92,6 +93,12 @@ class VersionedEntry final : public SourceMapEntry {
       }
     }
     return nullptr;
+  }
+
+  void ForEach(fit::function<void(const VersionRange&, const T&)> f) const {
+    for (const auto& entry : versions_) {
+      f(entry.first, *entry.second);
+    }
   }
 
   const T* Oldest() const {

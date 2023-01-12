@@ -134,12 +134,10 @@ TEST(ParsedTransformerTests, BadOneTransformingFailure) {
   EXPECT_TRUE(transformer.HasErrors());
 
   auto errors = transformer.GetErrors();
-  ASSERT_EQ(errors.size(), 2);
+  ASSERT_EQ(errors.size(), 1);
   ASSERT_TRUE(library.reporter()->errors().empty());
   EXPECT_EQ(errors[0].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[0].msg, "failure!");
-  EXPECT_EQ(errors[1].step, fidl::fix::Step::kTransforming);
-  EXPECT_SUBSTR(errors[1].msg, "valid.fidl");
 }
 
 TEST(ParsedTransformerTests, BadManyTransformingFailures) {
@@ -154,16 +152,12 @@ TEST(ParsedTransformerTests, BadManyTransformingFailures) {
   EXPECT_TRUE(transformer.HasErrors());
 
   auto errors = transformer.GetErrors();
-  ASSERT_EQ(errors.size(), 4);
+  ASSERT_EQ(errors.size(), 2);
   ASSERT_TRUE(library.reporter()->errors().empty());
   EXPECT_EQ(errors[0].step, fidl::fix::Step::kTransforming);
   EXPECT_SUBSTR(errors[0].msg, "failure!");
   EXPECT_EQ(errors[1].step, fidl::fix::Step::kTransforming);
-  EXPECT_SUBSTR(errors[1].msg, "valid.fidl");
-  EXPECT_EQ(errors[2].step, fidl::fix::Step::kTransforming);
-  EXPECT_SUBSTR(errors[2].msg, "failure!");
-  EXPECT_EQ(errors[3].step, fidl::fix::Step::kTransforming);
-  EXPECT_SUBSTR(errors[3].msg, "also_valid.fidl");
+  EXPECT_SUBSTR(errors[1].msg, "failure!");
 }
 
 // Adds an errant semicolon. The purpose of this case is for the transformed token list to be

@@ -115,15 +115,17 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<fidl::fix::Fix> fix;
   switch (fixable.value().kind) {
     case fidl::Fixable::Kind::kNoop: {
-      fix = std::make_unique<fidl::fix::NoopParsedFix>(library, experimental_flags);
+      fix = std::make_unique<fidl::fix::NoopParsedFix>(std::move(library), experimental_flags);
       break;
     }
     case fidl::Fixable::Kind::kProtocolModifier: {
-      fix = std::make_unique<fidl::fix::ProtocolModifierFix>(library, experimental_flags);
+      fix =
+          std::make_unique<fidl::fix::ProtocolModifierFix>(std::move(library), experimental_flags);
       break;
     }
     case fidl::Fixable::Kind::kEmptyStructResponse: {
-      Fail(fidl::fix::Status::kErrorOther, "Empty struct removal fix not yet supported %s\n");
+      fix = std::make_unique<fidl::fix::EmptyStructResponseFix>(
+          std::move(library), std::move(dependencies), experimental_flags);
       break;
     }
   }
@@ -135,7 +137,7 @@ int main(int argc, char* argv[]) {
   }
 
   fidl::Reporter reporter;
-  reporter.silence_fixables();
+  reporter.ignore_fixables();
   fidl::fix::TransformResult result = fix->Transform(&reporter);
   if (!result.is_ok()) {
     // If we've reached this point, there has been a failure.
@@ -157,7 +159,7 @@ int main(int argc, char* argv[]) {
   fidl::fix::OutputMap transforms = result.value();
   for (const auto& transform : transforms) {
     FILE* out_file;
-    const char* filename = transform.first->filename().data();
+    const char* filename = transform.first.c_str();
     const std::string& contents = transform.second;
     out_file = fopen(filename, "w+");
     if (out_file == nullptr) {

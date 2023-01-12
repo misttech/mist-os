@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "lib/fit/result.h"
+#include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/formatter.h"
 #include "tools/fidl/fidlc/include/fidl/lexer.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
@@ -41,7 +42,7 @@ std::vector<const SourceFile*> Fix::GetSourceFiles() {
 
 template <typename T>
 TransformResult Fix::Execute(std::unique_ptr<T> transformer,
-                             const std::vector<const SourceFile*> source_files,
+                             const std::vector<const SourceFile*>& source_files,
                              Reporter* reporter) {
   if (!transformer->Prepare()) {
     return fit::error(Failure{.status = Status::kErrorPreFix, .errors = transformer->GetErrors()});
@@ -61,7 +62,7 @@ TransformResult Fix::Execute(std::unique_ptr<T> transformer,
   std::vector<std::string> results = formatted.value();
   ZX_ASSERT(results.size() == source_files.size());
   for (size_t i = 0; i < source_files.size(); i++) {
-    out.insert({source_files[i], std::move(results[i])});
+    out.insert({std::string(source_files[i]->filename()), std::move(results[i])});
   }
 
   return fit::ok(out);
@@ -83,10 +84,26 @@ class NoopTransformer final : public fix::ParsedTransformer {
 };
 
 std::unique_ptr<ParsedTransformer> NoopParsedFix::GetParsedTransformer(
-    const std::vector<const SourceFile*> source_files,
+    const std::vector<const SourceFile*>& source_files,
     const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) {
   return std::make_unique<NoopTransformer>(source_files, experimental_flags_, reporter);
 }
+
+TransformResult CompiledFix::Transform(Reporter* reporter) {
+  const std::vector<const SourceFile*> library_source_files = GetSourceFiles();
+  std::vector<std::vector<const SourceFile*>> dependency_source_files;
+  for (const auto& dependency : dependencies_) {
+    dependency_source_files.emplace_back();
+    std::vector<const SourceFile*>& source_file_ptrs = dependency_source_files.back();
+    for (const auto& source_file : dependency->sources()) {
+      source_file_ptrs.emplace_back(source_file.get());
+    }
+  }
+
+  return Execute(GetCompiledTransformer(library_source_files, dependency_source_files,
+                                        experimental_flags_, reporter),
+                 library_source_files, reporter);
+};
 
 // Transformer to add `closed` before `protocol` definitions with no leading modifiers.
 class ProtocolModifiersTransformer final : public fix::ParsedTransformer {
@@ -186,10 +203,114 @@ class ProtocolModifiersTransformer final : public fix::ParsedTransformer {
 };
 
 std::unique_ptr<ParsedTransformer> ProtocolModifierFix::GetParsedTransformer(
-    const std::vector<const SourceFile*> source_files,
+    const std::vector<const SourceFile*>& source_files,
     const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) {
   return std::make_unique<ProtocolModifiersTransformer>(source_files, experimental_flags_,
                                                         reporter);
+}
+
+// Transformer to remove empty struct payloads from error-bearing method responses.
+class EmptyStructResponseTransformer final : public fix::CompiledTransformer {
+ public:
+  EmptyStructResponseTransformer(
+      const std::vector<const SourceFile*> library_source_files,
+      const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
+      : fix::CompiledTransformer(library_source_files, dependencies_source_files,
+                                 experimental_flags, reporter) {}
+
+ private:
+  void WhenProtocolMethod(raw::ProtocolMethod* el, TokenSlice& token_slice,
+                          const VersionedEntry<flat::Protocol::Method>* entry) override {
+    // If the latest variant is not an empty payload struct in a result union, there is nothing to
+    // do.
+    const flat::Protocol::Method* compiled = entry->Newest();
+    std::optional<const flat::Struct*> latest_success_variant =
+        GetEmptyStructForResultSuccessVariant(*compiled);
+    if (!latest_success_variant.has_value()) {
+      return;
+    }
+
+    // If this is an anonymous, compiler-generated name, we are looking at an already correct
+    // instance, so there is nothing to do.
+    auto* anonymous = latest_success_variant.value()->name.as_anonymous();
+    if (anonymous && anonymous->provenance == flat::Name::Provenance::kCompilerGenerated) {
+      return;
+    }
+
+    // Ensure that we avoid situations where this is a struct that is currently empty, but was
+    // previously membered. While this is an obvious ABI breakage and should not occur, it is still
+    // technically possible, so we should error cleanly.
+    bool previously_had_members = false;
+    entry->ForEach([&](const VersionRange& range, const flat::Protocol::Method& method) {
+      if (GetEmptyStructForResultSuccessVariant(method) == std::nullopt) {
+        // TODO(fxbug.dev/118371): We could probably create something similar to |Reporter|, or even
+        // use that class directly, to generalize transformation error message construction.
+        AddError("Unexpectedly unfixable result payload struct at " + method.name.position_str() +
+                 ": '" + method.owning_protocol->GetName() + "." + std::string(method.name.data()) +
+                 "' did not have an empty struct payload " + fidl::internal::Display(range));
+        previously_had_members = true;
+      }
+    });
+    if (previously_had_members) {
+      return;
+    }
+
+    // Delete the offending entry-> Because the `struct`'s type constructor could not have been
+    // the |start()| or |end()| node of any of its parent elements, we don't need to do any
+    // |UpdateTokenPointer| calls here.
+    token_slice.DropSourceElement(el->maybe_response->type_ctor.get());
+    el->maybe_response->type_ctor = nullptr;
+  }
+
+  // We only want to convert two-way methods that use a result union, with an empty payload struct,
+  // for the response. If any of those things are untrue about this method, just ignore it, as
+  // there's nothing to do.
+  std::optional<const flat::Struct*> GetEmptyStructForResultSuccessVariant(
+      const flat::Protocol::Method& compiled) {
+    if (!compiled.HasResultUnion()) {
+      return std::nullopt;
+    }
+
+    ZX_ASSERT(compiled.maybe_response->type->kind == flat::Type::Kind::kIdentifier);
+    auto wrapper_id = static_cast<const flat::IdentifierType*>(compiled.maybe_response->type);
+    ZX_ASSERT(wrapper_id->type_decl->kind == flat::Decl::Kind::kStruct);
+    auto wrapper_struct = static_cast<const flat::Struct*>(wrapper_id->type_decl);
+    ZX_ASSERT(!wrapper_struct->members.empty());
+
+    const auto* result_union_id =
+        static_cast<const flat::IdentifierType*>(wrapper_struct->members[0].type_ctor->type);
+    ZX_ASSERT(result_union_id->type_decl->kind == flat::Decl::Kind::kUnion);
+    const auto* result_union = static_cast<const flat::Union*>(result_union_id->type_decl);
+    ZX_ASSERT(!result_union->members.empty());
+    ZX_ASSERT(result_union->members[0].maybe_used);
+
+    const auto* success_variant_type = result_union->members[0].maybe_used->type_ctor->type;
+    if (!success_variant_type) {
+      return std::nullopt;
+    }
+
+    ZX_ASSERT(success_variant_type->kind == flat::Type::Kind::kIdentifier);
+    auto success_variant_id = static_cast<const flat::IdentifierType*>(success_variant_type);
+    if (success_variant_id->type_decl->kind != flat::Decl::Kind::kStruct) {
+      return std::nullopt;
+    }
+
+    auto success_variant_struct = static_cast<const flat::Struct*>(success_variant_id->type_decl);
+    if (!success_variant_struct->members.empty()) {
+      return std::nullopt;
+    }
+
+    return std::make_optional(success_variant_struct);
+  }
+};
+
+std::unique_ptr<CompiledTransformer> EmptyStructResponseFix::GetCompiledTransformer(
+    const std::vector<const SourceFile*>& library_source_files,
+    const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+    const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) {
+  return std::make_unique<EmptyStructResponseTransformer>(
+      library_source_files, dependencies_source_files, experimental_flags_, reporter);
 }
 
 }  // namespace fidl::fix

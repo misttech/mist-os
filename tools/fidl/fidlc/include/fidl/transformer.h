@@ -651,10 +651,6 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
     for (auto& transforming : transform_states_) {
       auto ptr_list_location = CurrentlyTransforming().mutable_token_ptr_list->begin();
       OnFile(transforming.immutable_raw_ast);
-      if (HasErrors()) {
-        AddError("Error while transforming " + std::string(transforming.source_file->filename()) +
-                 "\n");
-      }
 
       // TODO(fxbug.dev/114357): as noted in the comment on |TokenIterator|, we currently
       // pre-allocate a large vector to try and avoid this, and use the following assert to error

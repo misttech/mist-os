@@ -7,6 +7,7 @@
 
 #include <lib/fit/function.h>
 
+#include <initializer_list>
 #include <map>
 #include <string_view>
 
@@ -59,6 +60,11 @@ class ExperimentalFlags {
 
   ExperimentalFlags() = default;
   explicit ExperimentalFlags(Flag flag) : flags_(static_cast<FlagSet>(flag)) {}
+  explicit ExperimentalFlags(std::initializer_list<Flag> flags) {
+    for (const auto& flag : flags) {
+      EnableFlag(flag);
+    }
+  }
 
   bool EnableFlagByName(std::string_view flag);
   void EnableFlag(Flag flag);
