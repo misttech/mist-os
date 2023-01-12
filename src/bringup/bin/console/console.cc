@@ -165,8 +165,20 @@ zx_status_t Console::Log(fuchsia_logger::wire::LogMessage log) {
           "] VLOG(%d): ",
           static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kInfo) - log.severity);
   }
-  buffer.Append(log.msg.data(), log.msg.size()).Append('\n');
-  return tx_sink_(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size());
+  // Split log into multiple lines if necessary. Log splitting assumes logs are ASCII for
+  // simplicities sake.
+  size_t offset = 0;
+  while (offset < log.msg.size()) {
+    auto count = std::min(buffer.capacity() - buffer.size() - 1, log.msg.size() - offset);
+    buffer.Append(log.msg.data() + offset, count).Append('\n');
+    zx_status_t status = tx_sink_(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size());
+    if (status != ZX_OK) {
+      return status;
+    }
+    buffer.Clear();
+    offset += count;
+  };
+  return ZX_OK;
 }
 
 void Console::Log(LogRequestView request, LogCompleter::Sync& completer) {

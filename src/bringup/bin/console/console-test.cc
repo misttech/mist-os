@@ -158,4 +158,46 @@ TEST(ConsoleTestCase, LogDenyTag) {
   ASSERT_OK(console.Log(log));
 }
 
+// Verify that calling Log() splits lines into multiple TxSink calls
+TEST(ConsoleTestCase, LogSplit) {
+  const std::string kExpectedBuffer1 =
+      "[00004.321] 00001:00002> [tag] INFO: 123456789 123456789 123456789 123456789 123456789 "
+      "123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 "
+      "123456789 123456789 123456789 123456789 123456789 123456789 123456789 12345678\n";
+  const std::string kExpectedBuffer2 = "overflow\n";
+
+  ASSERT_EQ(kExpectedBuffer1.size(), Console::kMaxWriteSize);
+
+  std::vector<std::string> actual;
+
+  // Cause the RX thread to exit
+  Console::RxSource rx_source = [](uint8_t* byte) { return ZX_ERR_NOT_SUPPORTED; };
+  Console::TxSink tx_sink = [&actual](const uint8_t* buffer, size_t length) {
+    actual.emplace_back(reinterpret_cast<const char*>(buffer), length);
+    return ZX_OK;
+  };
+
+  zx::eventpair event1, event2;
+  ASSERT_OK(zx::eventpair::create(0, &event1, &event2));
+  Console console(nullptr, std::move(event1), std::move(event2), std::move(rx_source),
+                  std::move(tx_sink), {});
+
+  fidl::StringView tag = "tag";
+  fuchsia_logger::wire::LogMessage log{
+      .pid = 1,
+      .tid = 2,
+      .time = 4321000000,
+      .severity = static_cast<int32_t>(fuchsia_logger::LogLevelFilter::kInfo),
+      .tags = fidl::VectorView<fidl::StringView>::FromExternal(&tag, 1),
+      .msg = {"123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 "
+              "123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 "
+              "123456789 123456789 123456789 123456789 123456789 12345678overflow"},
+  };
+  ASSERT_OK(console.Log(log));
+
+  EXPECT_EQ(actual.size(), 2);
+  EXPECT_STREQ(actual[0], kExpectedBuffer1);
+  EXPECT_STREQ(actual[1], kExpectedBuffer2);
+}
+
 }  // namespace
