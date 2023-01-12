@@ -4,18 +4,15 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/node_group.h>
 #include <zircon/compiler.h>
 
-#include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/i2c/cpp/bind.h>
-
 #include "sherlock.h"
+#include "src/devices/board/drivers/sherlock/sherlock-backlight-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
@@ -82,37 +79,18 @@ static const fpbus::Node backlight_dev = []() {
 zx_status_t Sherlock::BacklightInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BACK');
-
-  auto bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
-                              bind_fuchsia_i2c::BIND_I2C_ADDRESS_BACKLIGHT),
-  };
-
-  auto properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-  };
-
-  auto nodes = std::vector{
-      fuchsia_driver_framework::NodeRepresentation{{
-          .bind_rules = bind_rules,
-          .properties = properties,
-      }},
-  };
-
-  auto node_group = fuchsia_driver_framework::NodeGroup{{.name = "backlight", .nodes = nodes}};
-
-  auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, backlight_dev),
-                                                  fidl::ToWire(fidl_arena, node_group));
+  auto result = pbus_.buffer(arena)->AddComposite(
+      fidl::ToWire(fidl_arena, backlight_dev),
+      platform_bus_composite::MakeFidlFragment(fidl_arena, backlight_fragments,
+                                               std::size(backlight_fragments)),
+      "i2c");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Backlight(backlight) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite Backlight(backlight_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Backlight(backlight) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite Backlight(backlight_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

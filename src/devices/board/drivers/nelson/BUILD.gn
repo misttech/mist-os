@@ -36,6 +36,18 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
+driver_bind_rules("nelson_backlight_bind") {
+  rules = "bind/nelson_backlight.bind"
+  header_output = "nelson_backlight_bind.h"
+  bind_output = "nelson_backlight_bind.bc"
+  tests = "bind-tests/nelson_backlight-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.ti.platform",
+  ]
+}
+
 driver_bind_rules("nelson_bt_uart_bind") {
   rules = "bind/nelson_bt_uart.bind"
   header_output = "nelson_bt_uart_bind.h"
@@ -410,6 +422,7 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_aml_nna_bind_header",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
+    ":nelson_backlight_bind_header",
     ":nelson_bt_uart_bind_header",
     ":nelson_buttons_bind_header",
     ":nelson_display_bind_header",
@@ -443,11 +456,8 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
-    "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/openthread/lib/ot-radio",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
-    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -510,6 +520,7 @@ group("tests") {
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
+    ":nelson_backlight_bind_test",
     ":nelson_bt_uart_bind_test",
     ":nelson_display_bind_test",
     ":nelson_dwc2_bind_test",

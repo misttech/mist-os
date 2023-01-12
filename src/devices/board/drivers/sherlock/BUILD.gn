@@ -78,6 +78,18 @@ driver_bind_rules("sherlock-pwm-bind") {
   ]
 }
 
+driver_bind_rules("sherlock-backlight-bind") {
+  rules = "bind/sherlock-backlight.bind"
+  header_output = "sherlock-backlight-bind.h"
+  bind_output = "sherlock-backlight-bind.bc"
+  tests = "bind-tests/sherlock-backlight-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.ti.platform",
+  ]
+}
+
 driver_bind_rules("sherlock-display-bind") {
   rules = "bind/sherlock-display.bind"
   header_output = "sherlock-display-bind.h"
@@ -595,6 +607,7 @@ template("sherlock_driver") {
       ":luis-power-domain-bind_header",
       ":luis-power-impl-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
+      ":sherlock-backlight-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
       ":sherlock-cpu-bind_header",
@@ -636,7 +649,6 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_c",
       "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
       "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_c",
-      "//sdk/lib/driver/component/cpp:cpp",
       "//src/connectivity/openthread/lib/ot-radio",
       "//src/devices/bind/fuchsia:fuchsia_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",
