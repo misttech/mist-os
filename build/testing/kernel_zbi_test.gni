@@ -70,6 +70,7 @@ template("cuckoo_kernel_zbi_test") {
     cmdline_deps = []
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
+    core_realm_definition = "//build/testing:cuckoo-core-realm"
   }
 
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
@@ -82,7 +83,6 @@ template("cuckoo_kernel_zbi_test") {
   }
 
   assembly_input.bootfs_labels += [ "//build/testing:cuckoo-root-realm" ]
-  assembly_input.base_packages += [ "//build/testing:cuckoo-core-realm" ]
 
   assembled_system(cuckoo_target_name) {
     forward_variables_from(assembly_input, "*")
