@@ -26,7 +26,7 @@ void MutableElementMapGenerator::OnSourceElementStart(const raw::SourceElement& 
 }
 
 void TokenPointerResolver::OnToken(const Token* token) {
-  // TODO(fxbug.dev/114357): Searching the entire |TokenSlice| for each |Token|, every time we make
+  // TODO(fxbug.dev/118371): Searching the entire |TokenSlice| for each |Token|, every time we make
   // a change, has N^2 complexity, where N is the number of |SourceElement|s we visit. This is a
   // good place to look for future optimizations.
 
@@ -96,7 +96,7 @@ std::optional<std::vector<std::string>> Transformer::Format() {
       token_ptr_list.push_back(token_ptr);
     }
 
-    // TODO(fxbug.dev/114357): Currently, breakages here will be very opaque. We should improve this
+    // TODO(fxbug.dev/118371): Currently, breakages here will be very opaque. We should improve this
     // to report more useful errors when formatting fails.
     std::optional<std::string> pretty_printed =
         formatter.Format(std::move(transformed.mutable_raw_ast), token_ptr_list,
@@ -139,7 +139,7 @@ raw::SourceElement* Transformer::GetAsMutable(const raw::SourceElement* el) {
 TokenSlice Transformer::GetTokenSlice(Token from, Token until) {
   MutableTokenPointerList& list = *CurrentlyTransforming().mutable_token_ptr_list;
   std::optional<TokenIterator> maybe_begin = FindIn(list.begin(), list.end(), from);
-  // TODO(fxbug.dev/114357): Here and below, should probably do something more recoverable than
+  // TODO(fxbug.dev/118371): Here and below, should probably do something more recoverable than
   // asserting in the future.
   ZX_ASSERT(maybe_begin.has_value());
 
@@ -211,7 +211,7 @@ bool Transformer::Transform() {
     auto ptr_list_location = CurrentlyTransforming().mutable_token_ptr_list->begin();
     OnFile(transforming.immutable_raw_ast);
 
-    // TODO(fxbug.dev/114357): as noted in the comment on |TokenIterator|, we currently pre-allocate
+    // TODO(fxbug.dev/118371): as noted in the comment on |TokenIterator|, we currently pre-allocate
     // a large vector to try and avoid this, and use the following assert to error fast at runtime,
     // but better solutions are possible.
     ZX_ASSERT(ptr_list_location == CurrentlyTransforming().mutable_token_ptr_list->begin());
@@ -254,7 +254,7 @@ TokenIterator TokenSlice::AddTokenBefore(TokenIterator next_it, const std::strin
   token_stash_.emplace_back(std::make_unique<SyntheticToken>(
       new_span, leading_newlines, kind, subkind, prev_ordinal, prev_sub_ordinal + 1));
 
-  // TODO(fxbug.dev/114357): As noted in the comment on |TokenIterator|, the following operation has
+  // TODO(fxbug.dev/118371): As noted in the comment on |TokenIterator|, the following operation has
   // the potential to cause a re-allocation of the underlying storage, thereby invalidating all
   // |TokenIterator|s (including |prev_it|, |next_it|, and |new_token_it| here, as well as any other
   // |TokenIterator|s minted before this method was called). We currently pre-allocate a large

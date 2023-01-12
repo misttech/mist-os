@@ -1263,7 +1263,7 @@ type U2 = strict union {};
 )FIDL");
 }
 
-// TODO(fxbug.dev/114357): We should add the following tests for completeness.
+// TODO(fxbug.dev/118371): We should add the following tests for completeness.
 //   * BadManyParsingFailuresInSingleFile
 //   * GoodAddConstraintToTypeConstructor
 //   * GoodDropConstraintFromTypeConstructor

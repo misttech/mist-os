@@ -684,6 +684,6 @@ type MemberShouldBeMarkedWasDirty = flexible union {
 )FIDL");
 }
 
-// TODO(fxbug.dev/114357): Add more tests for the |When*| methods that have not yet been covered.
+// TODO(fxbug.dev/118371): Add more tests for the |When*| methods that have not yet been covered.
 
 }  // namespace

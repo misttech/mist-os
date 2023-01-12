@@ -62,7 +62,7 @@ class TokenChain {
   // pre-supposes that all of the the returned |SourceSpan| is still a valid view into the source,
   // which may no longer be the case. In particular, the formatter should avoid using this method.
   //
-  // TODO(fxbug.dev/114357): Find a better way than the above comment to prevent the post-transform
+  // TODO(fxbug.dev/118371): Find a better way than the above comment to prevent the post-transform
   // context like the formatter from trying to use this method. This will likely involve specifying
   // whether or not the underlying |SourceFile| is "mutable", and placing an assert inside this
   // method to prevent |span()| calls on mutable |SourceFile|s.

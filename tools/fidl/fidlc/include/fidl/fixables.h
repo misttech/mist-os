@@ -40,7 +40,6 @@ class Fixable {
   constexpr Fixable(Kind kind, std::string_view name, Scope scope, ExperimentalFlags required_flags)
       : kind(kind), name(name), scope(scope), required_flags(required_flags) {}
 
-  // TODO(fxbug.dev/114357): Will see use in a future CL.
   const Kind kind;
   const std::string_view name;
   const Scope scope;

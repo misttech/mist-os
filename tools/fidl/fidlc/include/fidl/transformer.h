@@ -102,7 +102,7 @@ using MutableTokenPointerList = std::vector<Token*>;
 // A view into a |TokenSlice|. Care must be taken when using as, like any iterator, previous values
 // are invalidated as the underlying |TokenSlice| is mutated.
 //
-// TODO(fxbug.dev/114357): This iterator currently does not survive resizing. This means that any
+// TODO(fxbug.dev/118371): This iterator currently does not survive resizing. This means that any
 // |MutableTokenPointerList| expanding operation has the potential to invalidate all previously
 // minted |TokenIterator|s, since the underlying memory they point to has been re-allocated. Our
 // current "solution" to this problem is to simply pre-allocate a very large underlying token list
@@ -333,7 +333,7 @@ class FileTransformState {
     auto token_ptr_list = raw::TokenPointerListBuilder(this->mutable_raw_ast).Build();
     mutable_token_ptr_list = std::make_unique<MutableTokenPointerList>();
 
-    // TODO(fxbug.dev/114357): This is a hack to work around the limitations of |TokenIterator|
+    // TODO(fxbug.dev/118371): This is a hack to work around the limitations of |TokenIterator|
     // described above. We simply guess that the number of |Token|s in the list won't double due to
     // the transformations we're doing.
     mutable_token_ptr_list->reserve(std::max(token_ptr_list.size() * 2, static_cast<size_t>(100)));
@@ -498,7 +498,7 @@ class Transformer : public raw::DeclarationOrderTreeVisitor {
   // Create a |TokenSlice|. Note that the start and end |Token| passed to this function are
   // inclusive.
   //
-  // TODO(fxbug.dev/114357): There is certainly a way to make this faster by not searching the
+  // TODO(fxbug.dev/118371): There is certainly a way to make this faster by not searching the
   // entire |MutableTokenPointerList| every time we call this, and instead keeping some state
   // tracking what range in the list we are looking at for each |SourceElement|, but this is an
   // optimization for later.
