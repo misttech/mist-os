@@ -113,9 +113,6 @@ impl ExitStatus {
 }
 
 pub struct TaskMutableState {
-    /// The arguments with which this task was started.
-    pub argv: Vec<CString>,
-
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
 
@@ -198,7 +195,6 @@ impl Task {
     fn new(
         id: pid_t,
         command: CString,
-        argv: Vec<CString>,
         thread_group: Arc<ThreadGroup>,
         thread: Option<zx::Thread>,
         files: Arc<FdTable>,
@@ -231,7 +227,6 @@ impl Task {
             command: RwLock::new(command),
             creds: RwLock::new(creds),
             mutable_state: RwLock::new(TaskMutableState {
-                argv,
                 clear_child_tid: UserRef::default(),
                 signals: Default::default(),
                 exit_status: None,
@@ -304,7 +299,6 @@ impl Task {
         let current_task = CurrentTask::new(Self::new(
             pid,
             initial_name,
-            Vec::new(),
             thread_group,
             thread,
             FdTable::new(),
@@ -390,7 +384,6 @@ impl Task {
 
         let pid;
         let command;
-        let argv;
         let creds;
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -399,7 +392,6 @@ impl Task {
 
             pid = pids.allocate_pid();
             command = self.command();
-            argv = state.argv.clone();
             creds = self.creds();
             if clone_thread {
                 create_zircon_thread(self)?
@@ -428,7 +420,6 @@ impl Task {
         let child = CurrentTask::new(Self::new(
             pid,
             command,
-            argv,
             thread_group,
             thread,
             files,
@@ -1002,7 +993,6 @@ impl CurrentTask {
         self.mm
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
-        self.write().argv = resolved_elf.argv.clone();
         let start_info = load_executable(self, resolved_elf, &path)?;
         self.registers = start_info.to_registers().into();
         self.dt_debug_address = start_info.dt_debug_address;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::mm::{ProcMapsFile, ProcStatFile, ProcStatusFile};
+use crate::mm::{MemoryAccessor, ProcMapsFile, ProcStatFile, ProcStatusFile};
 use crate::task::{CurrentTask, Task, ThreadGroup};
 use crate::types::*;
 
@@ -415,15 +415,19 @@ impl FileOps for CmdlineFile {
         offset: usize,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let argv = self.task.read().argv.clone();
-        let mut seq = self.seq.lock();
-        let iter = move |_cursor, sink: &mut SeqFileBuf| {
-            for arg in &argv {
-                sink.write(arg.as_bytes_with_nul());
-            }
+        let iter = move |_, sink: &mut SeqFileBuf| {
+            let (argv_start, argv_end) = {
+                let mm_state = self.task.mm.state.read();
+                (mm_state.argv_start, mm_state.argv_end)
+            };
+            #[allow(clippy::manual_saturating_arithmetic)]
+            let len = argv_end.ptr().checked_sub(argv_start.ptr()).unwrap_or(0);
+            let mut buf = vec![0u8; len];
+            let len = self.task.mm.read_memory_partial(argv_start, &mut buf)?;
+            sink.write(&buf[..len]);
             Ok(None)
         };
-        seq.read_at(current_task, iter, offset, data)
+        self.seq.lock().read_at(current_task, iter, offset, data)
     }
 
     fn write_at(

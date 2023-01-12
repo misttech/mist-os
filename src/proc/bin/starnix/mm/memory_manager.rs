@@ -178,6 +178,8 @@ pub struct MemoryManagerState {
     pub stack_base: UserAddress,
     pub stack_size: usize,
     pub stack_start: UserAddress,
+    pub argv_start: UserAddress,
+    pub argv_end: UserAddress,
 }
 
 impl MemoryManagerState {
@@ -1108,9 +1110,11 @@ impl MemoryManager {
                 brk: None,
                 mappings: RangeMap::new(),
                 executable_node: None,
-                stack_base: UserAddress::default(),
+                stack_base: UserAddress::NULL,
                 stack_size: 0,
-                stack_start: UserAddress::default(),
+                stack_start: UserAddress::NULL,
+                argv_start: UserAddress::NULL,
+                argv_end: UserAddress::NULL,
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.

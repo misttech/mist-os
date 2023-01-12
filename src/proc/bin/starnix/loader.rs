@@ -14,6 +14,13 @@ use crate::mm::*;
 use crate::task::*;
 use crate::types::*;
 
+#[derive(Debug)]
+struct StackResult {
+    stack_pointer: UserAddress,
+    argv_start: UserAddress,
+    argv_end: UserAddress,
+}
+
 fn populate_initial_stack(
     stack_vmo: &zx::Vmo,
     path: &CStr,
@@ -22,7 +29,7 @@ fn populate_initial_stack(
     mut auxv: Vec<(u32, u64)>,
     stack_base: UserAddress,
     original_stack_start_addr: UserAddress,
-) -> Result<UserAddress, Errno> {
+) -> Result<StackResult, Errno> {
     let mut stack_pointer = original_stack_start_addr;
     let write_stack = |data: &[u8], addr: UserAddress| {
         stack_vmo
@@ -30,16 +37,18 @@ fn populate_initial_stack(
             .map_err(|status| from_status_like_fdio!(status))
     };
 
-    let mut string_data = vec![];
-    for arg in argv {
-        string_data.extend_from_slice(arg.as_bytes_with_nul());
+    let argv_end = stack_pointer;
+    for arg in argv.iter().rev() {
+        stack_pointer -= arg.as_bytes_with_nul().len();
+        write_stack(arg.as_bytes_with_nul(), stack_pointer)?;
     }
-    for env in environ {
-        string_data.extend_from_slice(env.as_bytes_with_nul());
+    let argv_start = stack_pointer;
+
+    for env in environ.iter().rev() {
+        stack_pointer -= env.as_bytes_with_nul().len();
+        write_stack(env.as_bytes_with_nul(), stack_pointer)?;
     }
-    stack_pointer -= string_data.len();
-    let strings_addr = stack_pointer;
-    write_stack(string_data.as_slice(), strings_addr)?;
+    let env_start = stack_pointer;
 
     // Write the path used with execve.
     stack_pointer -= path.to_bytes_with_nul().len();
@@ -67,16 +76,17 @@ fn populate_initial_stack(
     main_data.extend_from_slice(&argc.to_ne_bytes());
     // argv
     const ZERO: [u8; 8] = [0; 8];
-    let mut next_string_addr = strings_addr;
+    let mut next_arg_addr = argv_start;
     for arg in argv {
-        main_data.extend_from_slice(&next_string_addr.ptr().to_ne_bytes());
-        next_string_addr += arg.as_bytes_with_nul().len();
+        main_data.extend_from_slice(&next_arg_addr.ptr().to_ne_bytes());
+        next_arg_addr += arg.as_bytes_with_nul().len();
     }
     main_data.extend_from_slice(&ZERO);
     // environ
+    let mut next_env_addr = env_start;
     for env in environ {
-        main_data.extend_from_slice(&next_string_addr.ptr().to_ne_bytes());
-        next_string_addr += env.as_bytes_with_nul().len();
+        main_data.extend_from_slice(&next_env_addr.ptr().to_ne_bytes());
+        next_env_addr += env.as_bytes_with_nul().len();
     }
     main_data.extend_from_slice(&ZERO);
     // auxv
@@ -90,7 +100,7 @@ fn populate_initial_stack(
     stack_pointer -= stack_pointer.ptr() % 16;
     write_stack(main_data.as_slice(), stack_pointer)?;
 
-    Ok(stack_pointer)
+    Ok(StackResult { stack_pointer, argv_start, argv_end })
 }
 
 struct LoadedElf {
@@ -431,9 +441,11 @@ pub fn load_executable(
     let mut mm_state = current_task.mm.state.write();
     mm_state.stack_base = stack_base;
     mm_state.stack_size = stack_size;
-    mm_state.stack_start = stack;
+    mm_state.stack_start = stack.stack_pointer;
+    mm_state.argv_start = stack.argv_start;
+    mm_state.argv_end = stack.argv_end;
 
-    Ok(ThreadStartInfo { entry, stack, dt_debug_address })
+    Ok(ThreadStartInfo { entry, stack: stack.stack_pointer, dt_debug_address })
 }
 
 /// Parses the debug address (`DT_DEBUG`) from the provided ELF.
@@ -492,7 +504,8 @@ mod tests {
             stack_base,
             original_stack_start_addr,
         )
-        .expect("Populate initial stack should succeed.");
+        .expect("Populate initial stack should succeed.")
+        .stack_pointer;
 
         let argc_size: usize = 8;
         let argv_terminator_size: usize = 8;

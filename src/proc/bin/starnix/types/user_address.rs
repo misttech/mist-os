@@ -20,6 +20,8 @@ pub struct UserAddress(u64);
 impl UserAddress {
     const NULL_PTR: u64 = 0;
 
+    pub const NULL: Self = Self(Self::NULL_PTR);
+
     // TODO(lindkvist): Remove this in favor of marking the From<u64> trait const once feature is
     // stabilized.
     pub const fn from(value: u64) -> Self {
@@ -52,8 +54,8 @@ impl UserAddress {
 }
 
 impl Default for UserAddress {
-    fn default() -> UserAddress {
-        UserAddress(UserAddress::NULL_PTR)
+    fn default() -> Self {
+        Self::NULL
     }
 }
 

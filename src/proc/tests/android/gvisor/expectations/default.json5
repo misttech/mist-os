@@ -89,9 +89,6 @@
                 // where bash is located on the Android system image.
                 "ExecTest.InterpreterScript",
 
-                // Disable FromSiblingThread as we don't handle multithreading.
-                "ExecTest.FromSiblingThread",
-
                 // Disable NoExecPerm because execute rights are not yet checked.
                 "ExecTest.NoExecPerm",
                 "ProcSelfExe.ChangesAcrossExecve",
