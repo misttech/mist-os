@@ -1,0 +1,13 @@
+{
+    "short_description": "AMLogic MailBox driver(Progarmmable Logic)",
+    "manufacturer": "AMLogic",
+    "families": [
+        "Meson"
+    ],
+    "models": [
+        "A1"
+    ],
+    "areas": [
+        "Misc"
+    ]
+}

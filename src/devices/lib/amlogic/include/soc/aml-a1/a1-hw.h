@@ -60,6 +60,14 @@
 // rtc
 
 // mailbox
+#define A1_DSPA_BASE 0xfe030000
+#define A1_DSPA_BASE_LENGTH 0x10000
+#define A1_DSPB_BASE 0xfe040000
+#define A1_DSPB_BASE_LENGTH 0x10000
+#define A1_DSPA_PAYLOAD_BASE 0xffffd400
+#define A1_DSPA_PAYLOAD_BASE_LENGTH 0x400
+#define A1_DSPB_PAYLOAD_BASE 0xffffd800
+#define A1_DSPB_PAYLOAD_BASE_LENGTH 0x400
 
 // dsp
 
@@ -98,6 +106,8 @@
 #define A1_SEC_RESET0__MASK 0x148
 
 // IRQs
+#define A1_DSPA_RECV_IRQ 32  // 0+32
+#define A1_DSPB_RECV_IRQ 36  // 4+32
 #define A1_I2C_A_IRQ 64      // 32+32
 #define A1_SPICC0_IRQ 80     // 32+48
 #define A1_GPIO_IRQ_0 81     // 32+49

@@ -26,7 +26,6 @@ constexpr uint8_t kRpcuintSize = 64;
 constexpr uint16_t kCmdRpcuintTest = 0x61;
 constexpr uint8_t kAocpuResponse[] = "Response AOCPU";
 
-#define MBX_COMPOSE_MSG(mod, func) ((mod << 10) | (func & 0x3FF))
 #define MBX_TEST_DEMO MBX_COMPOSE_MSG(kMboxSystem, kCmdMboxTest)
 #define MBX_CMD_RPCUINT_TESTA MBX_COMPOSE_MSG(kMboxSystem, kCmdRpcuintTest)
 
