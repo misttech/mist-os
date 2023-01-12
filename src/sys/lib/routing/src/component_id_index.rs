@@ -80,7 +80,7 @@ pub struct ComponentIdIndex {
 }
 
 impl ComponentIdIndex {
-    pub async fn new(index_file_path: &str) -> Result<Self, ComponentIdIndexError> {
+    pub fn new(index_file_path: &str) -> Result<Self, ComponentIdIndexError> {
         let raw_content = std::fs::read(index_file_path)
             .map_err(|err| ComponentIdIndexError::index_unreadable(index_file_path, err))?;
 
@@ -135,7 +135,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn look_up_moniker_no_exists() {
         let index_file = make_index_file(component_id_index::Index::default()).unwrap();
-        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).await.unwrap();
+        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert!(index.look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap()).is_none());
     }
 
@@ -151,7 +151,7 @@ pub mod tests {
             ..component_id_index::Index::default()
         })
         .unwrap();
-        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).await.unwrap();
+        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert_eq!(
             Some(&iid),
             index.look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
@@ -170,7 +170,7 @@ pub mod tests {
             ..component_id_index::Index::default()
         })
         .unwrap();
-        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).await.unwrap();
+        let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert_eq!(
             Some(&iid),
             index.look_up_moniker(&AbsoluteMoniker::new(vec![
@@ -201,7 +201,7 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn index_unreadable() {
-        let result = ComponentIdIndex::new("/this/path/doesnt/exist").await;
+        let result = ComponentIdIndex::new("/this/path/doesnt/exist");
         assert!(matches!(result, Err(ComponentIdIndexError::IndexUnreadable { path: _, err: _ })));
     }
 }

@@ -44,8 +44,6 @@ pub enum ModelError {
     DynamicOfferSourceNotFound { offer: cm_rust::OfferDecl },
     #[error("name length is longer than the allowed max {}", max_len)]
     NameTooLong { max_len: usize },
-    #[error("context not found")]
-    ContextNotFound,
     #[error(
         "component address could not be computed for component '{}' at url '{}': {:#?}",
         moniker,
@@ -217,10 +215,6 @@ impl ModelError {
 
     pub fn name_too_long(max_len: usize) -> ModelError {
         ModelError::NameTooLong { max_len }
-    }
-
-    pub fn context_not_found() -> ModelError {
-        ModelError::ContextNotFound {}
     }
 
     pub fn unsupported(feature: impl Into<String>) -> ModelError {

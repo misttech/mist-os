@@ -141,6 +141,7 @@ mod tests {
         super::*,
         crate::model::{
             component::ComponentInstance,
+            context::ModelContext,
             environment::Environment,
             testing::{mocks, test_helpers, test_helpers::*},
         },
@@ -154,7 +155,7 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         std::{
             convert::{TryFrom, TryInto},
-            sync::Weak,
+            sync::{Arc, Weak},
         },
         vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path},
     };
@@ -174,7 +175,7 @@ mod tests {
         };
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test://root".to_string(),
         );
@@ -246,7 +247,7 @@ mod tests {
         };
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test://root".to_string(),
         );
@@ -324,7 +325,7 @@ mod tests {
         };
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test://root".to_string(),
         );

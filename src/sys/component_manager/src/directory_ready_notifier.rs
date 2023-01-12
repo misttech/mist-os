@@ -401,6 +401,7 @@ impl Hook for DirectoryReadyNotifier {
 mod tests {
     use super::*;
     use crate::model::{
+        context::ModelContext,
         environment::Environment,
         testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
     };
@@ -422,7 +423,7 @@ mod tests {
 
         let component = Arc::new(ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test:///root".to_string(),
         ));

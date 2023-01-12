@@ -186,7 +186,6 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
         config.component_id_index_path = self.component_id_index_path;
         let component_id_index = match config.component_id_index_path {
             Some(ref index_path) => ComponentIdIndex::new(index_path)
-                .await
                 .expect(&format!("failed to create component ID index with path {}", index_path)),
             None => ComponentIdIndex::default(),
         };

@@ -419,7 +419,7 @@ pub mod tests {
             ShutdownAction::new(),
             component.clone(),
             tx2,
-            Err(ModelError::ContextNotFound), // Some random error.
+            Err(ModelError::ModelNotAvailable), // Some random error.
         )
         .await;
         let (tx3, rx3) = oneshot::channel();
@@ -433,7 +433,7 @@ pub mod tests {
         ActionSet::finish(&component, &ActionKey::Shutdown).await;
         assert_matches!(
             rx2.await.expect("Unable to receive result of Notification"),
-            Err(ModelError::ContextNotFound)
+            Err(ModelError::ModelNotAvailable)
         );
     }
 }

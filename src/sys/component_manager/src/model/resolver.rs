@@ -206,7 +206,7 @@ mod tests {
         super::*,
         crate::model::{
             component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
-            context::WeakModelContext,
+            context::ModelContext,
             environment::Environment,
             hooks::Hooks,
         },
@@ -222,7 +222,7 @@ mod tests {
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::{ComponentAddress, ComponentResolutionContext},
         serde_json::json,
-        std::sync::{Mutex, Weak},
+        std::sync::{Arc, Mutex, Weak},
     };
 
     #[derive(Debug)]
@@ -363,7 +363,7 @@ mod tests {
 
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
         );
@@ -572,7 +572,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
         );
@@ -616,7 +616,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
         );
@@ -626,7 +626,7 @@ mod tests {
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -687,7 +687,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///package#meta/comp.cm".to_string(),
         );
@@ -697,7 +697,7 @@ mod tests {
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -746,7 +746,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000/package#meta/comp.cm".to_string(),
         );
@@ -756,7 +756,7 @@ mod tests {
             "subpackage#meta/subcomp.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -804,7 +804,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
         );
@@ -815,7 +815,7 @@ mod tests {
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -868,7 +868,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
         );
@@ -879,7 +879,7 @@ mod tests {
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -892,7 +892,7 @@ mod tests {
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             None,
@@ -942,7 +942,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/my-root.cm".to_string(),
         );
@@ -953,7 +953,7 @@ mod tests {
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1000,7 +1000,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000#meta/my-root.cm".to_string(),
         );
@@ -1011,7 +1011,7 @@ mod tests {
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1041,7 +1041,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "#meta/my-root.cm".to_string(),
         );
@@ -1052,7 +1052,7 @@ mod tests {
             "#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1099,7 +1099,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
         );
@@ -1110,7 +1110,7 @@ mod tests {
             "my-subpackage#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1123,7 +1123,7 @@ mod tests {
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             None,
@@ -1183,7 +1183,7 @@ mod tests {
         );
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
         );
@@ -1194,7 +1194,7 @@ mod tests {
             "my-subpackage#meta/my-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1207,7 +1207,7 @@ mod tests {
             "#meta/my-child2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             None,
@@ -1220,7 +1220,7 @@ mod tests {
             "#meta/my-child3.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
             None,
@@ -1293,7 +1293,7 @@ mod tests {
 
         let root = ComponentInstance::new_root(
             environment,
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
         );
@@ -1304,7 +1304,7 @@ mod tests {
             "realm-builder://0/my-realm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             None,
@@ -1317,7 +1317,7 @@ mod tests {
             "my-subpackage1#meta/sub1.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&realm)),
             Arc::new(Hooks::new()),
             None,
@@ -1330,7 +1330,7 @@ mod tests {
             "#meta/sub1-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             None,
@@ -1343,7 +1343,7 @@ mod tests {
             "my-subpackage2#meta/sub2.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
             None,
@@ -1358,7 +1358,7 @@ mod tests {
             "#meta/sub2-child.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_three)),
             Arc::new(Hooks::new()),
             None,

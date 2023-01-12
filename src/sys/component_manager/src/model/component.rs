@@ -8,7 +8,7 @@ use {
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
             ShutdownAction, StartAction, StopAction, UnresolveAction,
         },
-        context::{ModelContext, WeakModelContext},
+        context::ModelContext,
         environment::Environment,
         error::{ModelError, StructuredConfigError},
         exposed_dir::ExposedDir,
@@ -354,7 +354,7 @@ pub struct ComponentInstance {
     pub persistent_storage: bool,
 
     /// The context this instance is under.
-    context: WeakModelContext,
+    pub context: Arc<ModelContext>,
 
     // These locks must be taken in the order declared if held simultaneously.
     /// The component's mutable state.
@@ -375,7 +375,7 @@ impl ComponentInstance {
     /// Instantiates a new root component instance.
     pub fn new_root(
         environment: Environment,
-        context: Weak<ModelContext>,
+        context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
         component_url: String,
     ) -> Arc<Self> {
@@ -385,7 +385,7 @@ impl ComponentInstance {
             component_url,
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(context),
+            context,
             WeakExtendedInstance::AboveRoot(component_manager_instance),
             Arc::new(Hooks::new()),
             None,
@@ -400,7 +400,7 @@ impl ComponentInstance {
         component_url: String,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
-        context: WeakModelContext,
+        context: Arc<ModelContext>,
         parent: WeakExtendedInstance,
         hooks: Arc<Hooks>,
         numbered_handles: Option<Vec<fprocess::HandleInfo>>,
@@ -440,11 +440,6 @@ impl ComponentInstance {
     /// Locks and returns the instance's action set.
     pub async fn lock_actions(&self) -> MutexGuard<'_, ActionSet> {
         self.actions.lock().await
-    }
-
-    /// Gets the context, if it exists, or returns a `ContextNotFound` error.
-    pub fn try_get_context(&self) -> Result<Arc<ModelContext>, ModelError> {
-        self.context.upgrade()
     }
 
     /// Returns a scope for this instance where tasks can be run. Tasks run in this scope will
@@ -1154,9 +1149,7 @@ impl ComponentInstance {
     }
 
     pub fn instance_id(self: &Arc<Self>) -> Option<ComponentInstanceId> {
-        self.try_get_context()
-            .map(|ctx| ctx.component_id_index().look_up_moniker(&self.abs_moniker).cloned())
-            .unwrap_or(None)
+        self.context.component_id_index().look_up_moniker(&self.abs_moniker).cloned()
     }
 
     /// Run the provided closure with this component's logger (if any) as the default. If the
@@ -1262,17 +1255,11 @@ impl ComponentInstanceInterface for ComponentInstance {
     }
 
     fn try_get_policy_checker(&self) -> Result<GlobalPolicyChecker, ComponentInstanceError> {
-        let context = self.try_get_context().map_err(|_| {
-            ComponentInstanceError::PolicyCheckerNotFound { moniker: self.abs_moniker.clone() }
-        })?;
-        Ok(context.policy().clone())
+        Ok(self.context.policy().clone())
     }
 
     fn try_get_component_id_index(&self) -> Result<Arc<ComponentIdIndex>, ComponentInstanceError> {
-        let context = self.try_get_context().map_err(|_| {
-            ComponentInstanceError::ComponentIdIndexNotFound { moniker: self.abs_moniker.clone() }
-        })?;
-        Ok(context.component_id_index())
+        Ok(self.context.component_id_index())
     }
 
     fn try_get_parent(&self) -> Result<ExtendedInstance, ComponentInstanceError> {
@@ -3270,7 +3257,7 @@ pub mod tests {
             "fuchsia-pkg://fuchsia.com/foo#at_root.cm".to_string(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
-            WeakModelContext::new(Weak::new()),
+            Arc::new(ModelContext::new_for_test()),
             WeakExtendedInstanceInterface::AboveRoot(Weak::new()),
             Arc::new(Hooks::new()),
             None,

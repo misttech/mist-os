@@ -177,6 +177,7 @@ mod tests {
         super::*,
         crate::model::{
             component::StartReason,
+            context::ModelContext,
             error::ModelError,
             model::{Model, ModelParams},
             testing::mocks::MockResolver,
@@ -199,7 +200,7 @@ mod tests {
     fn test_from_decl() {
         let component = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "test:///root".to_string(),
         );

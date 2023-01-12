@@ -394,7 +394,9 @@ impl BuiltinCapability for FuchsiaBootResolver {
 mod tests {
     use {
         super::*,
-        crate::model::{component::ComponentInstance, environment::Environment},
+        crate::model::{
+            component::ComponentInstance, context::ModelContext, environment::Environment,
+        },
         ::routing::resolving::ResolvedPackage,
         assert_matches::assert_matches,
         cm_rust::{FidlIntoNative, NativeIntoFidl},
@@ -404,7 +406,7 @@ mod tests {
         fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
         fuchsia_fs::directory::open_in_namespace,
-        std::sync::Weak,
+        std::sync::{Arc, Weak},
         vfs::{
             self, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
             file::vmo::asynchronous::read_only_static, pseudo_directory, remote::remote_dir,
@@ -441,7 +443,7 @@ mod tests {
 
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
         );
@@ -556,7 +558,7 @@ mod tests {
 
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
         );
@@ -616,7 +618,7 @@ mod tests {
 
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
         );
@@ -662,7 +664,7 @@ mod tests {
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let root = ComponentInstance::new_root(
             Environment::empty(),
-            Weak::new(),
+            Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
         );

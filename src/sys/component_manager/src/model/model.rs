@@ -47,10 +47,10 @@ pub struct Model {
 impl Model {
     /// Creates a new component model and initializes its topology.
     pub async fn new(params: ModelParams) -> Result<Arc<Model>, ModelError> {
-        let context = Arc::new(ModelContext::new(params.runtime_config).await?);
+        let context = Arc::new(ModelContext::new(params.runtime_config)?);
         let root = ComponentInstance::new_root(
             params.root_environment,
-            Arc::downgrade(&context),
+            context.clone(),
             Arc::downgrade(&params.top_instance),
             params.root_component_url,
         );

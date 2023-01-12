@@ -9,7 +9,7 @@ use {
         config::{AbiRevisionPolicy, RuntimeConfig},
         policy::GlobalPolicyChecker,
     },
-    std::sync::{Arc, Weak},
+    std::sync::Arc,
 };
 
 /// The ModelContext provides the API boundary between the Model and Realms. It
@@ -24,16 +24,22 @@ pub struct ModelContext {
 
 impl ModelContext {
     /// Constructs a new ModelContext from a RuntimeConfig.
-    pub async fn new(runtime_config: Arc<RuntimeConfig>) -> Result<Self, ModelError> {
+    pub fn new(runtime_config: Arc<RuntimeConfig>) -> Result<Self, ModelError> {
         Ok(Self {
             component_id_index: match &runtime_config.component_id_index_path {
-                Some(path) => Arc::new(ComponentIdIndex::new(&path).await?),
+                Some(path) => Arc::new(ComponentIdIndex::new(&path)?),
                 None => Arc::new(ComponentIdIndex::default()),
             },
             abi_revision_policy: runtime_config.abi_revision_policy.clone(),
             runtime_config: runtime_config.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config),
         })
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test() -> Self {
+        let runtime_config = Arc::new(RuntimeConfig::default());
+        Self::new(runtime_config).unwrap()
     }
 
     /// Returns the runtime policy checker for the model.
@@ -51,43 +57,5 @@ impl ModelContext {
 
     pub fn abi_revision_policy(&self) -> &AbiRevisionPolicy {
         &self.abi_revision_policy
-    }
-}
-
-/// A wrapper for a weak reference to `ModelContext`. It implements an upgrade()
-/// member function that returns a ModelError which is useful for error
-/// reporting.
-#[derive(Default, Clone)]
-pub struct WeakModelContext {
-    inner: Weak<ModelContext>,
-}
-
-impl From<&Arc<ModelContext>> for WeakModelContext {
-    fn from(context: &Arc<ModelContext>) -> Self {
-        Self { inner: Arc::downgrade(context) }
-    }
-}
-
-impl WeakModelContext {
-    /// Constructs the weak context wrapper from a weak reference.
-    pub fn new(inner: Weak<ModelContext>) -> Self {
-        Self { inner }
-    }
-
-    /// Attempts to upgrade this `WeakModelContext` into an `Arc<ModelContext>`, if the
-    /// context has not been destroyed.
-    pub fn upgrade(&self) -> Result<Arc<ModelContext>, ModelError> {
-        self.inner.upgrade().ok_or_else(|| ModelError::context_not_found())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-
-    #[fuchsia::test]
-    fn weak_context_returns_error() {
-        let weak_context = WeakModelContext::new(Weak::new());
-        assert!(weak_context.upgrade().is_err());
     }
 }
