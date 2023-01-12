@@ -66,13 +66,23 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithMutedVolumeCurve) {
   EXPECT_FLOAT_EQ(config.default_volume_curve().VolumeToDb(1.0), 0.0);
 }
 
-TEST(ProcessConfigLoaderTest, LoadProcessConfigWithMixProfile) {
-  static const std::string kConfigWithMixProfile =
+TEST(ProcessConfigLoaderTest, LoadProcessConfigWithMixProfiles) {
+  static const std::string kConfigWithMixProfiles =
       R"JSON({
     "mix_profile": {
         "capacity_usec": 1000,
         "deadline_usec": 2000,
         "period_usec": 3000
+    },
+    "input_mix_profile": {
+        "capacity_usec": 21000,
+        "deadline_usec": 22000,
+        "period_usec": 23000
+    },
+    "output_mix_profile": {
+        "capacity_usec": 31000,
+        "deadline_usec": 32000,
+        "period_usec": 33000
     },
     "volume_curve": [
       {
@@ -85,8 +95,8 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithMixProfile) {
       }
     ]
   })JSON";
-  ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kConfigWithMixProfile.data(),
-                               kConfigWithMixProfile.size()));
+  ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kConfigWithMixProfiles.data(),
+                               kConfigWithMixProfiles.size()));
 
   auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
   ASSERT_TRUE(result.is_ok()) << result.error();
@@ -94,6 +104,12 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithMixProfile) {
   EXPECT_EQ(config.mix_profile_config().capacity.to_usecs(), 1000);
   EXPECT_EQ(config.mix_profile_config().deadline.to_usecs(), 2000);
   EXPECT_EQ(config.mix_profile_config().period.to_usecs(), 3000);
+  EXPECT_EQ(config.input_mix_profile_config().capacity.to_usecs(), 21000);
+  EXPECT_EQ(config.input_mix_profile_config().deadline.to_usecs(), 22000);
+  EXPECT_EQ(config.input_mix_profile_config().period.to_usecs(), 23000);
+  EXPECT_EQ(config.output_mix_profile_config().capacity.to_usecs(), 31000);
+  EXPECT_EQ(config.output_mix_profile_config().deadline.to_usecs(), 32000);
+  EXPECT_EQ(config.output_mix_profile_config().period.to_usecs(), 33000);
   EXPECT_FLOAT_EQ(config.default_volume_curve().VolumeToDb(0.0), -160.0);
   EXPECT_FLOAT_EQ(config.default_volume_curve().VolumeToDb(1.0), 0.0);
 }

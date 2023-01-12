@@ -36,6 +36,8 @@ class ProcessConfigBuilder {
                 DeviceConfig::InputDeviceProfile>
           keyed_profile);
   ProcessConfigBuilder& SetMixProfile(MixProfileConfig mix_profile_config);
+  ProcessConfigBuilder& SetInputMixProfile(MixProfileConfig mix_profile_config);
+  ProcessConfigBuilder& SetOutputMixProfile(MixProfileConfig mix_profile_config);
   ProcessConfigBuilder& AddThermalConfigState(ThermalConfig::State thermal_state);
 
   ProcessConfig Build();
@@ -54,6 +56,8 @@ class ProcessConfigBuilder {
       input_device_profiles_;
   std::optional<DeviceConfig::InputDeviceProfile> default_input_device_profile_;
   MixProfileConfig mix_profile_config_;
+  MixProfileConfig input_mix_profile_config_;
+  MixProfileConfig output_mix_profile_config_;
   std::vector<ThermalConfig::State> thermal_config_states_;
 };
 
@@ -61,27 +65,39 @@ class ProcessConfig {
  public:
   using Builder = ProcessConfigBuilder;
   ProcessConfig(VolumeCurve curve, DeviceConfig device_config, MixProfileConfig mix_profile_config,
-                ThermalConfig thermal_config)
+                MixProfileConfig input_mix_profile_config,
+                MixProfileConfig output_mix_profile_config, ThermalConfig thermal_config)
       : default_volume_curve_(std::move(curve)),
         default_loudness_transform_(
             std::make_shared<MappedLoudnessTransform>(default_volume_curve_)),
         device_config_(std::move(device_config)),
         mix_profile_config_(mix_profile_config),
+        input_mix_profile_config_(input_mix_profile_config),
+        output_mix_profile_config_(output_mix_profile_config),
         thermal_config_(std::move(thermal_config)) {}
 
   const VolumeCurve& default_volume_curve() const { return default_volume_curve_; }
   const DeviceConfig& device_config() const { return device_config_; }
-  const MixProfileConfig& mix_profile_config() const { return mix_profile_config_; }
   const ThermalConfig& thermal_config() const { return thermal_config_; }
   const std::shared_ptr<LoudnessTransform>& default_loudness_transform() const {
     return default_loudness_transform_;
   }
+
+  // audio_core/v1 uses this config for all mixer threads.
+  const MixProfileConfig& mix_profile_config() const { return mix_profile_config_; }
+
+  // audio_Core/v2 has just two mixer threads, for input and output pipelines respectively, and each
+  // thread has a different config.
+  const MixProfileConfig& input_mix_profile_config() const { return input_mix_profile_config_; }
+  const MixProfileConfig& output_mix_profile_config() const { return output_mix_profile_config_; }
 
  private:
   VolumeCurve default_volume_curve_;
   std::shared_ptr<LoudnessTransform> default_loudness_transform_;
   DeviceConfig device_config_;
   MixProfileConfig mix_profile_config_;
+  MixProfileConfig input_mix_profile_config_;
+  MixProfileConfig output_mix_profile_config_;
   ThermalConfig thermal_config_;
 };
 

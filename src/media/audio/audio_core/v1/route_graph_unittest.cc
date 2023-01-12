@@ -111,9 +111,9 @@ class RouteGraphTest : public testing::ThreadingModelFixture {
   RouteGraphTest() : RouteGraphTest(kConfigNoPolicy) {}
 
   RouteGraphTest(const DeviceConfig& device_config)
-      : ThreadingModelFixture(
-            ProcessConfig(VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume),
-                          device_config, MixProfileConfig{}, ThermalConfig({}))) {}
+      : ThreadingModelFixture(ProcessConfig(
+            VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume), device_config,
+            MixProfileConfig{}, MixProfileConfig{}, MixProfileConfig{}, ThermalConfig({}))) {}
 
   struct FakeOutputAndDriver {
     std::shared_ptr<FakeAudioOutput> output;

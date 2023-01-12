@@ -27,6 +27,8 @@ namespace media::audio {
 namespace {
 
 constexpr char kJsonKeyMixProfile[] = "mix_profile";
+constexpr char kJsonKeyInputMixProfile[] = "input_mix_profile";
+constexpr char kJsonKeyOutputMixProfile[] = "output_mix_profile";
 constexpr char kJsonKeyMixProfileCapacityUsec[] = "capacity_usec";
 constexpr char kJsonKeyMixProfileDeadlineUsec[] = "deadline_usec";
 constexpr char kJsonKeyMixProfilePeriodUsec[] = "period_usec";
@@ -722,9 +724,14 @@ fpromise::result<ProcessConfig, std::string> ProcessConfigLoader::ParseProcessCo
   auto config_builder = ProcessConfig::Builder();
   config_builder.SetDefaultVolumeCurve(curve_result.take_value());
 
-  auto mix_profile_it = doc.FindMember(kJsonKeyMixProfile);
-  if (mix_profile_it != doc.MemberEnd()) {
-    config_builder.SetMixProfile(ParseMixProfileFromJsonObject(mix_profile_it->value));
+  if (auto it = doc.FindMember(kJsonKeyMixProfile); it != doc.MemberEnd()) {
+    config_builder.SetMixProfile(ParseMixProfileFromJsonObject(it->value));
+  }
+  if (auto it = doc.FindMember(kJsonKeyInputMixProfile); it != doc.MemberEnd()) {
+    config_builder.SetInputMixProfile(ParseMixProfileFromJsonObject(it->value));
+  }
+  if (auto it = doc.FindMember(kJsonKeyOutputMixProfile); it != doc.MemberEnd()) {
+    config_builder.SetOutputMixProfile(ParseMixProfileFromJsonObject(it->value));
   }
 
   auto output_devices_it = doc.FindMember(kJsonKeyOutputDevices);

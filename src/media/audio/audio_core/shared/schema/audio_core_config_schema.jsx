@@ -118,6 +118,15 @@
       },
       "additionalProperties": false
     },
+    "mix_profile": {
+      "type": "object",
+      "properties" : {
+        "capacity_usec": { "type": "integer", "minimum": 1 },
+        "deadline_usec": { "type": "integer", "minimum": 1 },
+        "period_usec": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
     "output_device_profile" : {
       "type": "object",
       "properties" : {
@@ -209,13 +218,13 @@
   "type": "object",
   "properties": {
     "mix_profile": {
-      "type": "object",
-      "properties" : {
-        "capacity_usec": { "type": "integer", "minimum": 1 },
-        "deadline_usec": { "type": "integer", "minimum": 1 },
-        "period_usec": { "type": "integer", "minimum": 1 }
-      },
-      "additionalProperties": false
+      "$ref" : "#/definitions/mix_profile"
+    },
+    "input_mix_profile": {
+      "$ref" : "#/definitions/mix_profile"
+    },
+    "output_mix_profile": {
+      "$ref" : "#/definitions/mix_profile"
     },
     "volume_curve": {
       "type": "array",
