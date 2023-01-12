@@ -64,6 +64,7 @@ source_set("fidl") {
     "lib/tables_generator.cc",
     "lib/template_string.cc",
     "lib/token_list.cc",
+    "lib/transformer.cc",
     "lib/tree_visitor.cc",
     "lib/type_shape.cc",
     "lib/utils.cc",

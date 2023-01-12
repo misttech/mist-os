@@ -30,7 +30,7 @@
   auto mut = static_cast<raw::RAW_AST_NODE*>(GetAsMutable(el.get()));                  \
   auto comp = source_map_->Get##ENTRY<flat::FLAT_AST_NODE>(el->source_signature());    \
   TokenSlice token_slice = GetTokenSlice(el->start(), el->end());                      \
-  TokenPointerResolver resolver = GetTokenPointerResolver(&token_slice);               \
+  internal::TokenPointerResolver resolver = GetTokenPointerResolver(&token_slice);     \
   When##WHEN(mut, token_slice, comp);                                                  \
   std::unique_ptr<raw::RAW_AST_NODE> uptr(mut);                                        \
   resolver.On##RAW_AST_NODE(uptr);                                                     \
@@ -39,13 +39,13 @@
 // A few visitor methods defined by |TreeVisitor| supply const references, rather than const
 // |unique_ptr<...>| references, as their sole parameter. This macro does the same thing as
 // |TRANSFORM_UNIQUE_PTR_WITH_SOURCE_MAP| for such cases.
-#define TRANSFORM_REFERENCE_WITH_SOURCE_MAP(RAW_AST_NODE, FLAT_AST_NODE)          \
-  DeclarationOrderTreeVisitor::On##RAW_AST_NODE(el);                              \
-  auto mut = static_cast<raw::RAW_AST_NODE*>(GetAsMutable(&el));                  \
-  auto comp = source_map_->GetUnique<flat::FLAT_AST_NODE>(el.source_signature()); \
-  TokenSlice token_slice = GetTokenSlice(el.start(), el.end());                   \
-  TokenPointerResolver resolver = GetTokenPointerResolver(&token_slice);          \
-  When##RAW_AST_NODE(mut, token_slice, comp);                                     \
+#define TRANSFORM_REFERENCE_WITH_SOURCE_MAP(RAW_AST_NODE, FLAT_AST_NODE)           \
+  DeclarationOrderTreeVisitor::On##RAW_AST_NODE(el);                               \
+  auto mut = static_cast<raw::RAW_AST_NODE*>(GetAsMutable(&el));                   \
+  auto comp = source_map_->GetUnique<flat::FLAT_AST_NODE>(el.source_signature());  \
+  TokenSlice token_slice = GetTokenSlice(el.start(), el.end());                    \
+  internal::TokenPointerResolver resolver = GetTokenPointerResolver(&token_slice); \
+  When##RAW_AST_NODE(mut, token_slice, comp);                                      \
   resolver.On##RAW_AST_NODE(*mut);
 
 namespace fidl::fix {

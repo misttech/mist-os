@@ -42,30 +42,26 @@ void GoodTransform(const std::string& library, std::vector<std::string> deps,
 
   auto transformer = T(library_input, deps_input, experimental_flags, &reporter);
   bool prepared = transformer.Prepare();
-  if (!prepared) {
-    for (const auto& error : transformer.GetErrors()) {
-      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
-    }
-    for (const auto& error : reporter.errors()) {
-      ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
-    }
-    for (const auto& warning : reporter.warnings()) {
-      ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
-    }
+  for (const auto& error : transformer.GetErrors()) {
+    ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+  }
+  for (const auto& error : reporter.errors()) {
+    ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
+  }
+  for (const auto& warning : reporter.warnings()) {
+    ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
   }
   ASSERT_TRUE(prepared);
 
   bool transformed = transformer.Transform();
-  if (!transformed) {
-    for (const auto& error : transformer.GetErrors()) {
-      ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
-    }
-    for (const auto& error : reporter.errors()) {
-      ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
-    }
-    for (const auto& warning : reporter.warnings()) {
-      ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
-    }
+  for (const auto& error : transformer.GetErrors()) {
+    ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
+  }
+  for (const auto& error : reporter.errors()) {
+    ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
+  }
+  for (const auto& warning : reporter.warnings()) {
+    ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
   }
   ASSERT_TRUE(transformed);
 
