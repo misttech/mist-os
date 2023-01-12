@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/platform-device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
@@ -21,6 +22,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/smc.h>
 
+#include <soc/aml-common/aml-power-domain.h>
+
 #include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
 #include "src/media/audio/drivers/aml-dsp/aml_dsp_bind.h"
 
@@ -31,9 +34,7 @@ using fuchsia_hardware_mailbox::wire::MboxTx;
 
 constexpr uint32_t kDspDefaultLoadAddress = 0xfffa0000; /* DSP default load address */
 constexpr DspStartMode kStartMode =
-    DspStartMode::kSmcStartMode;  /* 0: scpi start mode, 1: smc start mode */
-constexpr bool kPmSupport = true; /* Support power management */
-constexpr uint8_t kPmDspa = 10;
+    DspStartMode::kSmcStartMode; /* 0: scpi start mode, 1: smc start mode */
 constexpr uint8_t kPwrOn = 1;
 constexpr uint8_t kPwrOff = 0;
 constexpr uint8_t kStrobe = 1;
@@ -97,6 +98,23 @@ zx_status_t AmlDsp::Init() {
   if (status != ZX_OK) {
     zxlogf(ERROR, "unable to pin memory: %s", zx_status_get_string(status));
     return status;
+  }
+
+  pdev_device_info_t dev_info;
+  if ((status = pdev.GetDeviceInfo(&dev_info)) != ZX_OK) {
+    zxlogf(ERROR, "failed to get device info: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (dev_info.pid == PDEV_PID_AMLOGIC_A5) {
+    power_dspa_ = A5_PDID_DSPA;
+    power_manage_support_ = true;
+  } else if (dev_info.pid == PDEV_PID_AMLOGIC_A1) {
+    power_dspa_ = A1_PDID_DSPA;
+    power_manage_support_ = false;  // A1's DSP does not support power management.
+  } else {
+    zxlogf(ERROR, "The driver does not support this board.");
+    return ZX_ERR_INTERNAL;
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_mailbox::Device>();
@@ -166,7 +184,7 @@ void AmlDsp::DdkResume(ddk::ResumeTxn txn) {
   zxlogf(DEBUG, "begin DdkResume() - Requested State: %d", txn.requested_state());
   /* DspResume() will only be executed when the DSP core is powered and needs to be managed with
    * power to the DSP core. */
-  if ((dsp_start_) && (kPmSupport)) {
+  if ((dsp_start_) && (power_manage_support_)) {
     zxlogf(DEBUG, "AP send resume cmd to dsp.\n");
     DspResume();
   }
@@ -185,7 +203,7 @@ void AmlDsp::DdkSuspend(ddk::SuspendTxn txn) {
                   DEVICE_SUSPEND_REASON_MEXEC);
   /* DspSuspend() will only be executed when the DSP core is powered and needs to be managed with
    * power to the DSP core.*/
-  if ((dsp_start_) && (kPmSupport)) {
+  if ((dsp_start_) && (power_manage_support_)) {
     zxlogf(DEBUG, "AP send suspend cmd to dsp.");
     DspSuspend();
   }
@@ -223,7 +241,7 @@ zx_status_t AmlDsp::DspLoadFw(fidl::StringView fw_name) {
 
 zx_status_t AmlDsp::DspStop() {
   if (dsp_start_) {
-    zx_status_t status = DspSmcCall(kDspSecPowerSrt, kPmDspa, kPwrOff, kNone);
+    zx_status_t status = DspSmcCall(kDspSecPowerSrt, power_dspa_, kPwrOff, kNone);
     if (status != ZX_OK) {
       return status;
     }
@@ -250,7 +268,7 @@ zx_status_t AmlDsp::DspStart() {
     return ZX_ERR_BAD_STATE;
   }
 
-  zx_status_t status = DspSmcCall(kDspSecPowerSrt, kPmDspa, kPwrOn, kNone);
+  zx_status_t status = DspSmcCall(kDspSecPowerSrt, power_dspa_, kPwrOn, kNone);
   if (status != ZX_OK) {
     return status;
   }
@@ -277,6 +295,18 @@ zx_status_t AmlDsp::DspStart() {
     default:
       zxlogf(ERROR, "The dsp start mode error, Start dsp failed");
       return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  // For A1, the DSP_CHG0 register needs to be configured.
+  if (power_dspa_ == A1_PDID_DSPA) {
+    uint32_t reg_dsp_cfg0 = 0;
+    uint32_t cfg0_value = dsp_addr_.Read32(reg_dsp_cfg0);
+    cfg0_value = cfg0_value & ~(0xffff << 0);  // bit[15:0] IP ports: PRID.
+    cfg0_value = cfg0_value | (0x2018 << 0);   // Set the value of PRID is 0x2018.
+    cfg0_value = cfg0_value | (1 << 29);       // bit29: irq_clken.
+    cfg0_value = cfg0_value & ~(1 << 31);      // bit31: IP ports: DReset.
+    cfg0_value = cfg0_value & ~(1 << 30);      // bit30: IP ports: BReset.
+    dsp_addr_.Write32(cfg0_value, reg_dsp_cfg0);
   }
 
   dsp_start_ = 1;

@@ -22,6 +22,8 @@ constexpr uint32_t kPowerOn = 1;
 #define A5_PDID_SYS_WRAP 9
 #define A5_PDID_DSPA 10
 
+#define A1_PDID_DSPA 8
+
 // Copy from datasheet table 7-3
 #define A1_PDID_SD_EMMC 18
 

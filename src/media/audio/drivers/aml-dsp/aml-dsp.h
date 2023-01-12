@@ -12,6 +12,7 @@
 #include <lib/device-protocol/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/svc/outgoing.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 
 #include <ddktl/device.h>
@@ -79,6 +80,8 @@ class AmlDsp : public DeviceType {
   bool dsp_start_ = false;
   bool firmware_loaded_ = false;
   zx_paddr_t hifi_base_;
+  uint8_t power_dspa_;
+  bool power_manage_support_ = false;
   zx::resource smc_resource_;
   const ddk::ClockProtocolClient dsp_clk_sel_;
   const ddk::ClockProtocolClient dsp_clk_gate_;

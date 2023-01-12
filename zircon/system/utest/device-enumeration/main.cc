@@ -260,6 +260,7 @@ TEST_F(DeviceEnumerationTest, CloverTest) {
       "sys/platform/05:08:1d/aml-pwm-device",  // pwm
       "sys/platform/05:08:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:08:b/aml-pl-mailbox",
+      "sys/platform/05:08:31/dsp/aml-dsp",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

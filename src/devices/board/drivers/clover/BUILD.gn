@@ -71,6 +71,19 @@ driver_bind_rules("clover-i2c-bind") {
   ]
 }
 
+driver_bind_rules("clover-dsp-bind") {
+  rules = "bind/clover-dsp.bind"
+  header_output = "clover-dsp-bind.h"
+  bind_output = "clover-dsp-bind.bc"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson",
+    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.mailbox",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 fuchsia_driver("clover-driver") {
   output_name = "clover"
   configs += [
@@ -80,6 +93,7 @@ fuchsia_driver("clover-driver") {
   sources = [
     "clover-clk.cc",
     "clover-cpu.cc",
+    "clover-dsp.cc",
     "clover-gpio.cc",
     "clover-i2c.cc",
     "clover-mailbox.cc",
@@ -97,6 +111,7 @@ fuchsia_driver("clover-driver") {
   deps = [
     ":clover-bind",
     ":clover-cpu-bind_header",
+    ":clover-dsp-bind_header",
     ":clover-i2c-bind_header",
     ":clover-sdio-bind_header",
     ":clover-spi-0-bind_header",

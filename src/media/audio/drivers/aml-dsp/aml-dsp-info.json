@@ -3,7 +3,8 @@
     "manufacturer": "AMLogic",
     "families": [],
     "models": [
-        "A5"
+        "A5",
+        "A1"
     ],
     "areas": [
         "Misc"
