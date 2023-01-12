@@ -78,7 +78,7 @@ fuchsia_test_component(
 fuchsia_test_package(
     name = "test_pkg",
     package_name = "hello_rust_test",
-    components = [":test_component"],
+    test_components = [":test_component"],
     visibility = ["//visibility:public"],
 )
 

@@ -98,7 +98,7 @@ fuchsia_test_component(
 fuchsia_test_package(
     name = "test_pkg",
     package_name = "hello_cpp_test",
-    components = [
+    test_components = [
         ":hello_gtest_component",
         ":hello_test_component",
     ],
