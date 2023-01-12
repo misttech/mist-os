@@ -27,34 +27,66 @@ serversuite.UnknownMethodType convertUnknownMethodType(
   }
 }
 
-class ClosedTargetImpl extends ClosedTarget {
-  ClosedTargetImpl({ReporterProxy reporter, ClosedTargetBinding binding})
-      : _reporter = reporter,
-        _binding = binding {
-    _binding.whenClosed.then((_) {
-      try {
-        _reporter.willTeardown(serversuite.TeardownReason.other);
-      } catch (e) {}
+SendEventError classifyEventError(dynamic e) {
+  return SendEventError.otherError;
+}
+
+class ClosedTargetControllerImpl extends ClosedTargetController {
+  ClosedTargetControllerImpl({ClosedTargetBinding sutBinding})
+      : _sutBinding = sutBinding {
+    _sutBinding.whenClosed.then((_) {
+      _willTeardown.add(TeardownReason.other);
     });
   }
 
-  final ReporterProxy _reporter;
-  final ClosedTargetBinding _binding;
+  ClosedTargetBinding _sutBinding;
 
-  Future<void> oneWayNoPayload() async {
-    await _reporter.receivedOneWayNoPayload();
+  @override
+  Future<void> closeWithEpitaph(int epitaphStatus) async {
+    _sutBinding.close(epitaphStatus);
   }
 
+  StreamController<TeardownReason> _willTeardown = StreamController.broadcast();
+
+  @override
+  Stream<TeardownReason> get willTeardown => _willTeardown.stream;
+
+  void reportReceivedOneWayNoPayload() {
+    _receivedOneWayNoPayload.add(null);
+  }
+
+  StreamController<void> _receivedOneWayNoPayload =
+      StreamController.broadcast();
+
+  @override
+  Stream<void> get receivedOneWayNoPayload => _receivedOneWayNoPayload.stream;
+}
+
+class ClosedTargetImpl extends ClosedTarget {
+  ClosedTargetImpl({ClosedTargetControllerImpl controller})
+      : _controller = controller;
+
+  final ClosedTargetControllerImpl _controller;
+
+  @override
+  Future<void> oneWayNoPayload() async {
+    _controller.reportReceivedOneWayNoPayload();
+  }
+
+  @override
   Future<void> twoWayNoPayload() async {}
+  @override
   Future<int> twoWayStructPayload(int v) async {
     return v;
   }
 
+  @override
   Future<ClosedTargetTwoWayTablePayloadResponse> twoWayTablePayload(
       ClosedTargetTwoWayTablePayloadRequest payload) async {
     return ClosedTargetTwoWayTablePayloadResponse(v: payload.v);
   }
 
+  @override
   Future<ClosedTargetTwoWayUnionPayloadResponse> twoWayUnionPayload(
       ClosedTargetTwoWayUnionPayloadRequest payload) async {
     if (payload.v == null) {
@@ -63,6 +95,7 @@ class ClosedTargetImpl extends ClosedTarget {
     return ClosedTargetTwoWayUnionPayloadResponse.withV(payload.v);
   }
 
+  @override
   Future<String> twoWayResult(ClosedTargetTwoWayResultRequest payload) async {
     if (payload.payload != null) {
       return payload.payload;
@@ -73,104 +106,193 @@ class ClosedTargetImpl extends ClosedTarget {
     }
   }
 
+  @override
   Future<Rights> getHandleRights(Handle handle) async {
     throw UnsupportedError(
         "Handle does not provide a method to get handle rights in Dart");
   }
 
+  @override
   Future<Rights> getSignalableEventRights(Handle handle) {
     throw UnsupportedError(
         "Handle does not provide a method to get handle rights in Dart");
   }
 
+  @override
   Future<Handle> echoAsTransferableSignalableEvent(Handle handle) async {
     return handle;
   }
 
-  Future<void> closeWithEpitaph(int epitaphStatus) async {
-    _binding.close(epitaphStatus);
-  }
-
+  @override
   Future<int> byteVectorSize(Uint8List vec) async {
     return vec.length;
   }
 
+  @override
   Future<int> handleVectorSize(List<Handle> vec) async {
     return vec.length;
   }
 
+  @override
   Future<Uint8List> createNByteVector(int n) async {
     print('returning $n byte vector');
     return Uint8List(n);
   }
 
+  @override
   Future<List<Handle>> createNHandleVector(int n) async {
     throw UnsupportedError("Dart does not support creating zircon Events");
   }
 }
 
-class AjarTargetImpl extends AjarTargetServer {
-  AjarTargetImpl({ReporterProxy reporter, AjarTargetBinding binding})
-      : _reporter = reporter,
-        _binding = binding {
-    _binding.whenClosed.then((_) {
-      try {
-        _reporter.willTeardown(serversuite.TeardownReason.other);
-      } catch (e) {}
+class AjarTargetControllerImpl extends AjarTargetController {
+  AjarTargetControllerImpl({AjarTargetBinding sutBinding})
+      : _sutBinding = sutBinding {
+    _sutBinding.whenClosed.then((_) {
+      _willTeardown.add(TeardownReason.other);
     });
   }
+  AjarTargetBinding _sutBinding;
 
-  final ReporterProxy _reporter;
-  final AjarTargetBinding _binding;
+  StreamController<TeardownReason> _willTeardown = StreamController.broadcast();
 
+  @override
+  Stream<TeardownReason> get willTeardown => _willTeardown.stream;
+
+  void reportReceivedUnknownMethod(
+      int ordinal, serversuite.UnknownMethodType unknownMethodType) {
+    _receivedUnknownMethod.add(
+        AjarTargetController$ReceivedUnknownMethod$Response(
+            ordinal, unknownMethodType));
+  }
+
+  StreamController<AjarTargetController$ReceivedUnknownMethod$Response>
+      _receivedUnknownMethod = StreamController.broadcast();
+  @override
+  Stream<AjarTargetController$ReceivedUnknownMethod$Response>
+      get receivedUnknownMethod => _receivedUnknownMethod.stream;
+}
+
+class AjarTargetImpl extends AjarTargetServer {
+  AjarTargetImpl({AjarTargetControllerImpl controller})
+      : _controller = controller;
+
+  final AjarTargetControllerImpl _controller;
+
+  @override
   Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
-    await _reporter.receivedUnknownMethod(
+    _controller.reportReceivedUnknownMethod(
         metadata.ordinal, convertUnknownMethodType(metadata.unknownMethodType));
   }
 }
 
-class OpenTargetImpl extends OpenTargetServer {
-  OpenTargetImpl({ReporterProxy reporter, OpenTargetBinding binding})
-      : _reporter = reporter,
-        _binding = binding {
-    _binding.whenClosed.then((_) {
-      try {
-        _reporter.willTeardown(serversuite.TeardownReason.other);
-      } catch (e) {}
+class OpenTargetControllerImpl extends OpenTargetController {
+  OpenTargetControllerImpl({OpenTargetBinding sutBinding})
+      : _sutBinding = sutBinding {
+    _sutBinding.whenClosed.then((_) {
+      _willTeardown.add(TeardownReason.other);
     });
   }
 
-  final ReporterProxy _reporter;
-  final OpenTargetBinding _binding;
-  final StreamController<void> _strictEvent = StreamController.broadcast();
-  final StreamController<void> _flexibleEvent = StreamController.broadcast();
+  // Used to send events. Because of a circular reference, this can't be set in
+  // the constructor.
+  OpenTargetImpl target;
 
-  Future<void> sendEvent(EventType eventType) async {
-    if (eventType == EventType.strict) {
-      _strictEvent.add(null);
-    } else if (eventType == EventType.flexible) {
-      _flexibleEvent.add(null);
-    } else {
-      throw ArgumentError(
-          "Request had an unknown EventType variant ${eventType.$value}");
+// Binding used to track when teardown happens.
+  OpenTargetBinding _sutBinding;
+
+  StreamController<TeardownReason> _willTeardown = StreamController.broadcast();
+
+  @override
+  Stream<TeardownReason> get willTeardown => _willTeardown.stream;
+
+  @override
+  Future<void> sendStrictEvent() async {
+    try {
+      target.sendStrictEvent();
+    } catch (e) {
+      throw MethodException(classifyEventError(e));
     }
   }
 
+  @override
+  Future<void> sendFlexibleEvent() async {
+    try {
+      target.sendFlexibleEvent();
+    } catch (e) {
+      throw MethodException(classifyEventError(e));
+    }
+  }
+
+  void reportReceivedStrictOneWay() {
+    _receivedStrictOneWay.add(null);
+  }
+
+  StreamController<void> _receivedStrictOneWay = StreamController.broadcast();
+  @override
+  Stream<void> get receivedStrictOneWay => _receivedStrictOneWay.stream;
+
+  void reportReceivedFlexibleOneWay() {
+    _receivedFlexibleOneWay.add(null);
+  }
+
+  StreamController<void> _receivedFlexibleOneWay = StreamController.broadcast();
+  @override
+  Stream<void> get receivedFlexibleOneWay => _receivedFlexibleOneWay.stream;
+
+  void reportReceivedUnknownMethod(
+      int ordinal, serversuite.UnknownMethodType unknownMethodType) {
+    _receivedUnknownMethod.add(
+        OpenTargetController$ReceivedUnknownMethod$Response(
+            ordinal, unknownMethodType));
+  }
+
+  StreamController<OpenTargetController$ReceivedUnknownMethod$Response>
+      _receivedUnknownMethod = StreamController.broadcast();
+  @override
+  Stream<OpenTargetController$ReceivedUnknownMethod$Response>
+      get receivedUnknownMethod => _receivedUnknownMethod.stream;
+}
+
+class OpenTargetImpl extends OpenTargetServer {
+  OpenTargetImpl({OpenTargetControllerImpl controller})
+      : _controller = controller;
+
+  final OpenTargetControllerImpl _controller;
+  final StreamController<void> _strictEvent = StreamController.broadcast();
+  final StreamController<void> _flexibleEvent = StreamController.broadcast();
+
+  void sendStrictEvent() {
+    _strictEvent.add(null);
+  }
+
+  void sendFlexibleEvent() {
+    _flexibleEvent.add(null);
+  }
+
+  @override
   Stream<void> get strictEvent => _strictEvent.stream;
+  @override
   Stream<void> get flexibleEvent => _flexibleEvent.stream;
+
+  @override
   Future<void> strictOneWay() async {
-    await _reporter.receivedStrictOneWay();
+    _controller.reportReceivedStrictOneWay();
   }
 
+  @override
   Future<void> flexibleOneWay() async {
-    await _reporter.receivedFlexibleOneWay();
+    _controller.reportReceivedFlexibleOneWay();
   }
 
+  @override
   Future<void> strictTwoWay() async {}
+  @override
   Future<int> strictTwoWayFields(int replyWith) async {
     return replyWith;
   }
 
+  @override
   Future<void> strictTwoWayErr(OpenTargetStrictTwoWayErrRequest payload) async {
     if (payload.replySuccess != null) {
       return;
@@ -182,6 +304,7 @@ class OpenTargetImpl extends OpenTargetServer {
     }
   }
 
+  @override
   Future<int> strictTwoWayFieldsErr(
       OpenTargetStrictTwoWayFieldsErrRequest payload) async {
     if (payload.replySuccess != null) {
@@ -194,11 +317,14 @@ class OpenTargetImpl extends OpenTargetServer {
     }
   }
 
+  @override
   Future<void> flexibleTwoWay() async {}
+  @override
   Future<int> flexibleTwoWayFields(int replyWith) async {
     return replyWith;
   }
 
+  @override
   Future<void> flexibleTwoWayErr(
       OpenTargetFlexibleTwoWayErrRequest payload) async {
     if (payload.replySuccess != null) {
@@ -211,6 +337,7 @@ class OpenTargetImpl extends OpenTargetServer {
     }
   }
 
+  @override
   Future<int> flexibleTwoWayFieldsErr(
       OpenTargetFlexibleTwoWayFieldsErrRequest payload) async {
     if (payload.replySuccess != null) {
@@ -223,42 +350,100 @@ class OpenTargetImpl extends OpenTargetServer {
     }
   }
 
+  @override
   Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
-    await _reporter.receivedUnknownMethod(
+    _controller.reportReceivedUnknownMethod(
         metadata.ordinal, convertUnknownMethodType(metadata.unknownMethodType));
   }
 }
 
-class LargeMessageTargetImpl extends LargeMessageTargetServer {
-  LargeMessageTargetImpl({ReporterProxy reporter}) : _reporter = reporter;
+class LargeMessageTargetControllerImpl extends LargeMessageTargetController {
+  LargeMessageTargetControllerImpl({LargeMessageTargetBinding sutBinding})
+      : _sutBinding = sutBinding {
+    _sutBinding.whenClosed.then((_) {
+      _willTeardown.add(TeardownReason.other);
+    });
+  }
 
-  final ReporterProxy _reporter;
+// Binding used to track when teardown happens.
+  LargeMessageTargetBinding _sutBinding;
+
+  StreamController<TeardownReason> _willTeardown = StreamController.broadcast();
+
+  @override
+  Stream<TeardownReason> get willTeardown => _willTeardown.stream;
+
+  void reportReceivedUnknownMethod(
+      int ordinal, serversuite.UnknownMethodType unknownMethodType) {
+    _receivedUnknownMethod.add(
+        LargeMessageTargetController$ReceivedUnknownMethod$Response(
+            ordinal, unknownMethodType));
+  }
+
+  StreamController<LargeMessageTargetController$ReceivedUnknownMethod$Response>
+      _receivedUnknownMethod = StreamController.broadcast();
+  @override
+  Stream<LargeMessageTargetController$ReceivedUnknownMethod$Response>
+      get receivedUnknownMethod => _receivedUnknownMethod.stream;
+
+  void reportReplyEncodingFailed(EncodingFailureKind failureKind) {
+    _replyEncodingFailed.add(failureKind);
+  }
+
+  StreamController<EncodingFailureKind> _replyEncodingFailed =
+      StreamController.broadcast();
+  @override
+  Stream<EncodingFailureKind> get replyEncodingFailed =>
+      _replyEncodingFailed.stream;
+
+  void reportReceivedOneWay(LargeMessageTargetOneWayMethod method) {
+    _receivedOneWay.add(method);
+  }
+
+  StreamController<LargeMessageTargetOneWayMethod> _receivedOneWay =
+      StreamController.broadcast();
+  @override
+  Stream<LargeMessageTargetOneWayMethod> get receivedOneWay =>
+      _receivedOneWay.stream;
+}
+
+class LargeMessageTargetImpl extends LargeMessageTargetServer {
+  LargeMessageTargetImpl({LargeMessageTargetControllerImpl controller})
+      : _controller = controller;
+
+  final LargeMessageTargetControllerImpl _controller;
 
   Future<void> decodeBoundedKnownToBeSmall(Uint8List bytes) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeBoundedKnownToBeSmall);
   }
 
   Future<void> decodeBoundedMaybeLarge(Uint8List bytes) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeBoundedMaybeLarge);
   }
 
   Future<void> decodeSemiBoundedBelievedToBeSmall(
       SemiBoundedBelievedToBeSmall payload) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeSemiBoundedBelievedToBeSmall);
   }
 
   Future<void> decodeSemiBoundedMaybeLarge(
       SemiBoundedMaybeLarge payload) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeSemiBoundedMaybeLarge);
   }
 
   Future<void> decodeUnboundedMaybeLargeValue(Uint8List bytes) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeUnboundedMaybeLargeValue);
   }
 
   Future<void> decodeUnboundedMaybeLargeResource(
       List<Elements> elements) async {
-    await _reporter.receivedStrictOneWay();
+    await _controller.reportReceivedOneWay(
+        LargeMessageTargetOneWayMethod.decodeUnboundedMaybeLargeResource);
   }
 
   Future<Uint8List> encodeBoundedKnownToBeSmall(Uint8List bytes) async {
@@ -291,12 +476,13 @@ class LargeMessageTargetImpl extends LargeMessageTargetServer {
   }
 
   Future<void> $unknownMethod(UnknownMethodMetadata metadata) async {
-    await _reporter.receivedUnknownMethod(
+    await _controller.reportReceivedUnknownMethod(
         metadata.ordinal, convertUnknownMethodType(metadata.unknownMethodType));
   }
 }
 
 class RunnerImpl extends Runner {
+  @override
   Future<bool> isTestEnabled(Test test) async {
     switch (test) {
       // This case will forever be false, as it is intended to validate the "test disabling"
@@ -347,26 +533,47 @@ class RunnerImpl extends Runner {
     return false;
   }
 
-  Future<void> start(
-      InterfaceHandle<Reporter> reporterHandle, AnyTarget target) async {
-    var reporter = ReporterProxy();
-    reporter.ctrl.bind(reporterHandle);
+  @override
+  Future<void> start(AnyTarget target) async {
     if (target.closedTarget != null) {
-      var binding = ClosedTargetBinding();
-      var server = ClosedTargetImpl(reporter: reporter, binding: binding);
-      binding.bind(server, target.closedTarget);
+      var controllerBinding = ClosedTargetControllerBinding();
+      var sutBinding = ClosedTargetBinding();
+
+      var controllerServer = ClosedTargetControllerImpl(sutBinding: sutBinding);
+      var sutServer = ClosedTargetImpl(controller: controllerServer);
+
+      controllerBinding.bind(controllerServer, target.closedTarget.controller);
+      sutBinding.bind(sutServer, target.closedTarget.sut);
     } else if (target.ajarTarget != null) {
-      var binding = AjarTargetBinding();
-      var server = AjarTargetImpl(reporter: reporter, binding: binding);
-      binding.bind(server, target.ajarTarget);
+      var controllerBinding = AjarTargetControllerBinding();
+      var sutBinding = AjarTargetBinding();
+
+      var controllerServer = AjarTargetControllerImpl(sutBinding: sutBinding);
+      var sutServer = AjarTargetImpl(controller: controllerServer);
+
+      controllerBinding.bind(controllerServer, target.ajarTarget.controller);
+      sutBinding.bind(sutServer, target.ajarTarget.sut);
     } else if (target.openTarget != null) {
-      var binding = OpenTargetBinding();
-      var server = OpenTargetImpl(reporter: reporter, binding: binding);
-      binding.bind(server, target.openTarget);
+      var controllerBinding = OpenTargetControllerBinding();
+      var sutBinding = OpenTargetBinding();
+
+      var controllerServer = OpenTargetControllerImpl(sutBinding: sutBinding);
+      var sutServer = OpenTargetImpl(controller: controllerServer);
+      controllerServer.target = sutServer;
+
+      controllerBinding.bind(controllerServer, target.openTarget.controller);
+      sutBinding.bind(sutServer, target.openTarget.sut);
     } else if (target.largeMessageTarget != null) {
-      var binding = LargeMessageTargetBinding();
-      var server = LargeMessageTargetImpl(reporter: reporter);
-      binding.bind(server, target.largeMessageTarget);
+      var controllerBinding = LargeMessageTargetControllerBinding();
+      var sutBinding = LargeMessageTargetBinding();
+
+      var controllerServer =
+          LargeMessageTargetControllerImpl(sutBinding: sutBinding);
+      var sutServer = LargeMessageTargetImpl(controller: controllerServer);
+
+      controllerBinding.bind(
+          controllerServer, target.largeMessageTarget.controller);
+      sutBinding.bind(sutServer, target.largeMessageTarget.sut);
     } else {
       throw ArgumentError("Unknown AnyTarget variant: ${target.$ordinal}");
     }

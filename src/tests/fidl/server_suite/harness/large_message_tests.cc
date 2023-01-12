@@ -304,7 +304,11 @@ class UnboundedMaybeLargeResourceWriter {
 // Good decode tests
 // ////////////////////////////////////////////////////////////////////////
 
-void GoodDecodeSmallStructOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+using LargeMessageServerTestBase =
+    ServerTest<fidl_serversuite::AnyTarget::Tag::kLargeMessageTarget>;
+
+void GoodDecodeSmallStructOfByteVector(LargeMessageServerTestBase* testing,
+                                       uint64_t method_ordinal) {
   uint32_t n = kSmallStructByteVectorSize;
   Bytes bytes_in = {
       header(kOneWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
@@ -313,10 +317,11 @@ void GoodDecodeSmallStructOfByteVector(ServerTest* testing, uint64_t method_ordi
   };
 
   ASSERT_OK(testing->client_end().write(bytes_in));
-  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_one_way().has_value(); });
 }
 
-void GoodDecodeLargeStructOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodDecodeLargeStructOfByteVector(LargeMessageServerTestBase* testing,
+                                       uint64_t method_ordinal) {
   uint32_t n = kLargeStructByteVectorSize;
   uint32_t pad = FIDL_ALIGNMENT - (kLargeStructByteVectorSize % FIDL_ALIGNMENT);
   Bytes channel_bytes_in = {
@@ -330,10 +335,11 @@ void GoodDecodeLargeStructOfByteVector(ServerTest* testing, uint64_t method_ordi
   };
 
   ASSERT_OK(testing->client_end().write_with_overflow(channel_bytes_in, vmo_bytes_in));
-  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_one_way().has_value(); });
 }
 
-void GoodDecodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodDecodeSmallUnionOfByteVector(LargeMessageServerTestBase* testing,
+                                      uint64_t method_ordinal) {
   uint32_t n = kSmallUnionByteVectorSize;
   Bytes bytes_in = {
       header(kOneWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
@@ -344,10 +350,10 @@ void GoodDecodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordin
   };
 
   ASSERT_OK(testing->client_end().write(bytes_in));
-  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_one_way().has_value(); });
 }
 
-void GoodDecodeLargeUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal,
+void GoodDecodeLargeUnionOfByteVector(LargeMessageServerTestBase* testing, uint64_t method_ordinal,
                                       fidl_xunion_tag_t xunion_ordinal) {
   uint32_t n = kLargeUnionByteVectorSize;
   uint32_t pad = FIDL_ALIGNMENT - (kLargeUnionByteVectorSize % FIDL_ALIGNMENT);
@@ -364,7 +370,7 @@ void GoodDecodeLargeUnionOfByteVector(ServerTest* testing, uint64_t method_ordin
   };
 
   ASSERT_OK(testing->client_end().write_with_overflow(channel_bytes_in, vmo_bytes_in));
-  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_strict_one_way(); });
+  WAIT_UNTIL_EXT(testing, [&]() { return testing->reporter().received_one_way().has_value(); });
 }
 
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeBoundedKnownSmallMessage) {
@@ -409,7 +415,7 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecode64HandleSmallMessage) {
                                     header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource,
                                            fidl::MessageDynamicFlags::kStrictMethod));
 
-  WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
+  WAIT_UNTIL([this]() { return reporter().received_one_way().has_value(); });
 }
 
 LARGE_MESSAGE_SERVER_TEST(GoodDecode63HandleLargeMessage) {
@@ -418,7 +424,7 @@ LARGE_MESSAGE_SERVER_TEST(GoodDecode63HandleLargeMessage) {
       client_end(),
       header(kOneWayTxid, kDecodeUnboundedMaybeLargeResource, kStrictMethodAndByteOverflow));
 
-  WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
+  WAIT_UNTIL([this]() { return reporter().received_one_way().has_value(); });
 }
 
 LARGE_MESSAGE_SERVER_TEST(GoodDecodeUnknownSmallMessage) {
@@ -751,7 +757,8 @@ LARGE_MESSAGE_SERVER_TEST(BadDecodeLargeMessageVmoTooSmall) {
 // Good encode tests
 // ////////////////////////////////////////////////////////////////////////
 
-void GoodEncodeSmallStructOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodEncodeSmallStructOfByteVector(LargeMessageServerTestBase* testing,
+                                       uint64_t method_ordinal) {
   uint32_t n = kSmallStructByteVectorSize;
   Bytes bytes_in = {
       header(kTwoWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
@@ -765,7 +772,8 @@ void GoodEncodeSmallStructOfByteVector(ServerTest* testing, uint64_t method_ordi
   ASSERT_OK(testing->client_end().read_and_check(bytes_out));
 }
 
-void GoodEncodeLargeStructOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodEncodeLargeStructOfByteVector(LargeMessageServerTestBase* testing,
+                                       uint64_t method_ordinal) {
   uint32_t n = kLargeStructByteVectorSize;
   uint32_t pad = FIDL_ALIGNMENT - (kLargeStructByteVectorSize % FIDL_ALIGNMENT);
   Bytes channel_bytes_in = {
@@ -786,7 +794,8 @@ void GoodEncodeLargeStructOfByteVector(ServerTest* testing, uint64_t method_ordi
       channel_bytes_out, vmo_bytes_out, {kExpectedOverflowBufferHandleInfo}));
 }
 
-void GoodEncodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodEncodeSmallUnionOfByteVector(LargeMessageServerTestBase* testing,
+                                      uint64_t method_ordinal) {
   uint32_t n = kSmallUnionByteVectorSize;
   Bytes bytes_in = {
       header(kTwoWayTxid, method_ordinal, fidl::MessageDynamicFlags::kStrictMethod),
@@ -802,7 +811,8 @@ void GoodEncodeSmallUnionOfByteVector(ServerTest* testing, uint64_t method_ordin
   ASSERT_OK(testing->client_end().read_and_check(bytes_out));
 }
 
-void GoodEncodeLargeUnionOfByteVector(ServerTest* testing, uint64_t method_ordinal) {
+void GoodEncodeLargeUnionOfByteVector(LargeMessageServerTestBase* testing,
+                                      uint64_t method_ordinal) {
   uint32_t n = kLargeUnionByteVectorSize;
   uint32_t pad = FIDL_ALIGNMENT - (kLargeUnionByteVectorSize % FIDL_ALIGNMENT);
   Bytes channel_bytes_in = {

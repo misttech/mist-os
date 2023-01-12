@@ -10,7 +10,7 @@
 
 namespace servertest_util {
 
-inline fidl_serversuite::TeardownReason ClassifyError(const fidl::UnbindInfo& info) {
+inline fidl_serversuite::TeardownReason ClassifyTeardownReason(const fidl::UnbindInfo& info) {
   switch (info.reason()) {
     case fidl::Reason::kUnbind:
     case fidl::Reason::kClose:
@@ -30,6 +30,26 @@ inline fidl_serversuite::TeardownReason ClassifyError(const fidl::UnbindInfo& in
     default:
       auto description = info.FormatDescription();
       ZX_PANIC("UnbindInfo had an unsupported reason: %s", description.c_str());
+  }
+}
+
+inline fidl_serversuite::SendEventError ClassifySendEventError(const fidl::OneWayStatus& status) {
+  ZX_ASSERT(!status.ok());
+  switch (status.reason()) {
+    case fidl::Reason::kUnbind:
+    case fidl::Reason::kClose:
+    case fidl::Reason::kDispatcherError:
+    case fidl::Reason::kTransportError:
+    case fidl::Reason::kEncodeError:
+    case fidl::Reason::kUnexpectedMessage:
+    case fidl::Reason::kDecodeError:
+    case fidl::Reason::kUnknownMethod:
+      return fidl_serversuite::SendEventError::kOtherError;
+    case fidl::Reason::kPeerClosedWhileReading:
+      ZX_PANIC("One-Way Status should not have reason kPeerClosedWhileReading");
+    default:
+      auto description = status.FormatDescription();
+      ZX_PANIC("Status had an unspported reason: %s", description.c_str());
   }
 }
 

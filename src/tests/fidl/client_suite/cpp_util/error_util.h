@@ -10,7 +10,7 @@
 
 namespace clienttest_util {
 
-fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status) {
+inline fidl_clientsuite::FidlErrorKind ClassifyError(const fidl::Status& status) {
   ZX_ASSERT(!status.ok());
   switch (status.reason()) {
     case fidl::Reason::kUnbind:

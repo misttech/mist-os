@@ -17,11 +17,10 @@ const fidl_xunion_tag_t kResultUnionError = 2;
 const fidl_xunion_tag_t kResultUnionTransportError = 3;
 
 OPEN_SERVER_TEST(SendStrictEvent) {
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalSendEvent, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(fidl_serversuite::OpenTargetSendEventRequest(fidl_serversuite::EventType::kStrict)),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
+  controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
+    MarkControllerCallbackRun();
+    ASSERT_TRUE(result.is_ok());
+  });
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
 
@@ -29,14 +28,15 @@ OPEN_SERVER_TEST(SendStrictEvent) {
       header(kOneWayTxid, kOrdinalStrictEvent, fidl::MessageDynamicFlags::kStrictMethod),
   };
   ASSERT_OK(client_end().read_and_check(bytes_out));
+
+  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
 
 OPEN_SERVER_TEST(SendFlexibleEvent) {
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalSendEvent, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(fidl_serversuite::OpenTargetSendEventRequest(fidl_serversuite::EventType::kFlexible)),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
+  controller()->SendFlexibleEvent().ThenExactlyOnce([&](auto result) {
+    MarkControllerCallbackRun();
+    ASSERT_TRUE(result.is_ok());
+  });
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
 
@@ -44,6 +44,8 @@ OPEN_SERVER_TEST(SendFlexibleEvent) {
       header(kOneWayTxid, kOrdinalFlexibleEvent, fidl::MessageDynamicFlags::kFlexibleMethod),
   };
   ASSERT_OK(client_end().read_and_check(bytes_out));
+
+  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
 
 OPEN_SERVER_TEST(ReceiveStrictOneWay) {
@@ -498,7 +500,6 @@ CLOSED_SERVER_TEST(UnknownStrictOneWayClosedProtocol) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
 }
 
 CLOSED_SERVER_TEST(UnknownFlexibleOneWayClosedProtocol) {
@@ -509,7 +510,6 @@ CLOSED_SERVER_TEST(UnknownFlexibleOneWayClosedProtocol) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
 }
 
 CLOSED_SERVER_TEST(UnknownStrictTwoWayClosedProtocol) {
@@ -520,7 +520,6 @@ CLOSED_SERVER_TEST(UnknownStrictTwoWayClosedProtocol) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
 }
 
 CLOSED_SERVER_TEST(UnknownFlexibleTwoWayClosedProtocol) {
@@ -531,7 +530,6 @@ CLOSED_SERVER_TEST(UnknownFlexibleTwoWayClosedProtocol) {
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
 }
 
 }  // namespace server_suite

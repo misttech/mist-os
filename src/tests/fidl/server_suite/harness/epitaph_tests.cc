@@ -13,12 +13,7 @@ namespace server_suite {
 CLOSED_SERVER_TEST(ServerSendsEpitaph) {
   constexpr zx_status_t sent_status = 456;
 
-  Bytes bytes_out = {
-      header(kOneWayTxid, kOrdinalCloseWithEpitaph, fidl::MessageDynamicFlags::kStrictMethod),
-      i32(sent_status),
-      padding(4),
-  };
-  ASSERT_OK(client_end().write(bytes_out));
+  ASSERT_TRUE(controller()->CloseWithEpitaph({{.epitaph_status = sent_status}}).is_ok());
 
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
 

@@ -10,12 +10,12 @@ using namespace channel_util;
 namespace server_suite {
 
 OPEN_SERVER_TEST(EventSendingDoNotReportPeerClosed) {
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalSendEvent, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(fidl_serversuite::OpenTargetSendEventRequest(fidl_serversuite::EventType::kStrict)),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
   client_end().reset();
+
+  controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
+    MarkControllerCallbackRun();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+  });
 
   WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
   EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);

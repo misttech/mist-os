@@ -13,15 +13,36 @@
 #include <stdio.h>
 
 #include <iostream>
+#include <memory>
+
+#include "lib/fidl/cpp/interface_request.h"
+
+template <fidl::serversuite::AnyTarget::Tag TARGET>
+struct TargetTypes;
+
+class ClosedTargetControllerServer : public fidl::serversuite::ClosedTargetController {
+ public:
+  ClosedTargetControllerServer() = default;
+
+  void CloseWithEpitaph(int32_t epitaph_status) override {
+    ZX_ASSERT(ZX_OK == sut_binding_->Close(epitaph_status));
+  }
+
+  void set_sut_binding(fidl::Binding<fidl::serversuite::ClosedTarget>* sut_binding) {
+    sut_binding_ = sut_binding;
+  }
+
+ private:
+  fidl::Binding<fidl::serversuite::ClosedTarget>* sut_binding_ = nullptr;
+};
 
 class ClosedTargetServer : public fidl::serversuite::ClosedTarget {
  public:
-  explicit ClosedTargetServer(fidl::InterfacePtr<fidl::serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  ClosedTargetServer() = default;
 
   void OneWayNoPayload() override {
     std::cout << "ClosedTarget.OneWayNoPayload()" << std::endl;
-    reporter_->ReceivedOneWayNoPayload();
+    controller_binding_->events().ReceivedOneWayNoPayload();
   }
 
   void TwoWayNoPayload(TwoWayNoPayloadCallback callback) override {
@@ -87,10 +108,6 @@ class ClosedTargetServer : public fidl::serversuite::ClosedTarget {
     callback(zx::event(handle.release()));
   }
 
-  void CloseWithEpitaph(int32_t epitaph_status) override {
-    ZX_ASSERT(ZX_OK == binding_->Close(epitaph_status));
-  }
-
   void ByteVectorSize(std::vector<uint8_t> vec, ByteVectorSizeCallback callback) override {
     callback(static_cast<uint32_t>(vec.size()));
   }
@@ -112,66 +129,90 @@ class ClosedTargetServer : public fidl::serversuite::ClosedTarget {
     callback(std::move(handles));
   }
 
-  void set_binding(fidl::Binding<fidl::serversuite::ClosedTarget>* binding) {
-    binding_ = binding;
-    binding_->set_error_handler([this](zx_status_t status) {
-      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
-    });
+  void set_controller_binding(
+      fidl::Binding<fidl::serversuite::ClosedTargetController>* controller_binding) {
+    controller_binding_ = controller_binding;
   }
 
  private:
-  fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
-  fidl::Binding<fidl::serversuite::ClosedTarget>* binding_ = nullptr;
+  fidl::Binding<fidl::serversuite::ClosedTargetController>* controller_binding_ = nullptr;
+};
+
+template <>
+struct TargetTypes<fidl::serversuite::AnyTarget::Tag::kClosedTarget> {
+  using Controller = fidl::serversuite::ClosedTargetController;
+  using Sut = fidl::serversuite::ClosedTarget;
+
+  using ControllerServer = ClosedTargetControllerServer;
+  using SutServer = ClosedTargetServer;
+
+  using ServerPair = fidl::serversuite::ClosedTargetServerPair;
+};
+
+class AjarTargetControllerServer : public fidl::serversuite::AjarTargetController {
+ public:
+  AjarTargetControllerServer() = default;
 };
 
 class AjarTargetServer : public fidl::serversuite::AjarTarget {
  public:
-  explicit AjarTargetServer(fidl::InterfacePtr<fidl::serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  AjarTargetServer() = default;
 
-  void set_binding(fidl::Binding<fidl::serversuite::AjarTarget>* binding) {
-    binding_ = binding;
-    binding_->set_error_handler([this](zx_status_t status) {
-      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
-    });
+  void set_controller_binding(
+      fidl::Binding<fidl::serversuite::AjarTargetController>* controller_binding) {
+    controller_binding_ = controller_binding;
   }
 
  protected:
   void handle_unknown_method(uint64_t ordinal) override {
-    reporter_->ReceivedUnknownMethod(ordinal, fidl::serversuite::UnknownMethodType::ONE_WAY);
+    controller_binding_->events().ReceivedUnknownMethod(
+        ordinal, fidl::serversuite::UnknownMethodType::ONE_WAY);
   }
 
  private:
-  fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
-  fidl::Binding<fidl::serversuite::AjarTarget>* binding_ = nullptr;
+  fidl::Binding<fidl::serversuite::AjarTargetController>* controller_binding_ = nullptr;
+};
+
+template <>
+struct TargetTypes<fidl::serversuite::AnyTarget::Tag::kAjarTarget> {
+  using Controller = fidl::serversuite::AjarTargetController;
+  using Sut = fidl::serversuite::AjarTarget;
+
+  using ControllerServer = AjarTargetControllerServer;
+  using SutServer = AjarTargetServer;
+
+  using ServerPair = fidl::serversuite::AjarTargetServerPair;
+};
+
+class OpenTargetControllerServer : public fidl::serversuite::OpenTargetController {
+ public:
+  OpenTargetControllerServer() = default;
+
+  void SendStrictEvent(SendStrictEventCallback callback) override {
+    sut_binding_->events().StrictEvent();
+    callback(fidl::serversuite::OpenTargetController_SendStrictEvent_Result::WithResponse({}));
+  }
+
+  void SendFlexibleEvent(SendFlexibleEventCallback callback) override {
+    sut_binding_->events().FlexibleEvent();
+    callback(fidl::serversuite::OpenTargetController_SendFlexibleEvent_Result::WithResponse({}));
+  }
+
+  void set_sut_binding(fidl::Binding<fidl::serversuite::OpenTarget>* sut_binding) {
+    sut_binding_ = sut_binding;
+  }
+
+ private:
+  fidl::Binding<fidl::serversuite::OpenTarget>* sut_binding_ = nullptr;
 };
 
 class OpenTargetServer : public fidl::serversuite::OpenTarget {
  public:
-  explicit OpenTargetServer(fidl::InterfacePtr<fidl::serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  OpenTargetServer() = default;
 
-  void set_event_sender(fidl::serversuite::OpenTarget_EventSender* event_sender) {
-    ZX_ASSERT_MSG(!event_sender_, "event sender already set");
-    event_sender_ = event_sender;
-  }
+  void StrictOneWay() override { controller_binding_->events().ReceivedStrictOneWay(); }
 
-  void SendEvent(::fidl::serversuite::EventType event_type) override {
-    switch (event_type) {
-      case fidl::serversuite::EventType::STRICT:
-        event_sender_->StrictEvent();
-        return;
-      case fidl::serversuite::EventType::FLEXIBLE:
-        event_sender_->FlexibleEvent();
-        return;
-      default:
-        ZX_PANIC("Unknown EventType");
-    }
-  }
-
-  void StrictOneWay() override { reporter_->ReceivedStrictOneWay(); }
-
-  void FlexibleOneWay() override { reporter_->ReceivedFlexibleOneWay(); }
+  void FlexibleOneWay() override { controller_binding_->events().ReceivedFlexibleOneWay(); }
 
   void StrictTwoWay(StrictTwoWayCallback callback) override { callback(); }
 
@@ -239,24 +280,65 @@ class OpenTargetServer : public fidl::serversuite::OpenTarget {
     }
   }
 
-  void set_binding(fidl::Binding<fidl::serversuite::OpenTarget>* binding) {
-    binding_ = binding;
-    binding_->set_error_handler([this](zx_status_t status) {
-      reporter_->WillTeardown(fidl::serversuite::TeardownReason::OTHER);
-    });
+  void set_controller_binding(
+      fidl::Binding<fidl::serversuite::OpenTargetController>* controller_binding) {
+    controller_binding_ = controller_binding;
   }
 
  protected:
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
     auto unknown_method_type = method_has_response ? fidl::serversuite::UnknownMethodType::TWO_WAY
                                                    : fidl::serversuite::UnknownMethodType::ONE_WAY;
-    reporter_->ReceivedUnknownMethod(ordinal, unknown_method_type);
+    controller_binding_->events().ReceivedUnknownMethod(ordinal, unknown_method_type);
   }
 
  private:
-  fidl::InterfacePtr<fidl::serversuite::Reporter> reporter_;
-  fidl::Binding<fidl::serversuite::OpenTarget>* binding_ = nullptr;
-  fidl::serversuite::OpenTarget_EventSender* event_sender_ = nullptr;
+  fidl::Binding<fidl::serversuite::OpenTargetController>* controller_binding_ = nullptr;
+};
+
+template <>
+struct TargetTypes<fidl::serversuite::AnyTarget::Tag::kOpenTarget> {
+  using Controller = fidl::serversuite::OpenTargetController;
+  using Sut = fidl::serversuite::OpenTarget;
+
+  using ControllerServer = OpenTargetControllerServer;
+  using SutServer = OpenTargetServer;
+
+  using ServerPair = fidl::serversuite::OpenTargetServerPair;
+};
+
+class ActiveServerBase {
+ public:
+  virtual ~ActiveServerBase() = default;
+};
+
+template <fidl::serversuite::AnyTarget::Tag TARGET>
+class ActiveServer : public ActiveServerBase {
+ public:
+  using Controller = typename TargetTypes<TARGET>::Controller;
+  using Sut = typename TargetTypes<TARGET>::Sut;
+  using ControllerServer = typename TargetTypes<TARGET>::ControllerServer;
+  using SutServer = typename TargetTypes<TARGET>::SutServer;
+  using ServerPair = typename TargetTypes<TARGET>::ServerPair;
+
+  ActiveServer() = default;
+  ~ActiveServer() override = default;
+
+  void Bind(ServerPair& server_pair, async_dispatcher_t* dispatcher) {
+    sut_binding_->set_error_handler([this](zx_status_t status) {
+      controller_binding_->events().WillTeardown(fidl::serversuite::TeardownReason::OTHER);
+    });
+
+    controller_binding_->Bind(std::move(server_pair.controller), dispatcher);
+    sut_binding_->Bind(std::move(server_pair.sut), dispatcher);
+  }
+
+  std::unique_ptr<ControllerServer> controller_server_ = std::make_unique<ControllerServer>();
+  std::unique_ptr<SutServer> sut_server_ = std::make_unique<SutServer>();
+  std::unique_ptr<fidl::Binding<Controller>> controller_binding_ =
+      std::make_unique<fidl::Binding<Controller>>(controller_server_.get());
+  std::unique_ptr<fidl::Binding<Sut>> sut_binding_ =
+      std::make_unique<fidl::Binding<Sut>>(sut_server_.get());
 };
 
 class RunnerServer : public fidl::serversuite::Runner {
@@ -343,32 +425,36 @@ class RunnerServer : public fidl::serversuite::Runner {
     callback(false);
   }
 
-  void Start(fidl::InterfaceHandle<fidl::serversuite::Reporter> reporter,
-             fidl::serversuite::AnyTarget target, StartCallback callback) override {
+  void Start(fidl::serversuite::AnyTarget target, StartCallback callback) override {
     if (target.is_closed_target()) {
-      closed_target_server_ = std::make_unique<ClosedTargetServer>(reporter.Bind());
-      closed_target_binding_ = std::make_unique<fidl::Binding<fidl::serversuite::ClosedTarget>>(
-          closed_target_server_.get());
-      closed_target_server_->set_binding(closed_target_binding_.get());
+      auto active_server =
+          std::make_unique<ActiveServer<fidl::serversuite::AnyTarget::Tag::kClosedTarget>>();
 
-      closed_target_binding_->Bind(std::move(target.closed_target()), dispatcher_);
+      active_server->controller_server_->set_sut_binding(active_server->sut_binding_.get());
+      active_server->sut_server_->set_controller_binding(active_server->controller_binding_.get());
+
+      active_server->Bind(target.closed_target(), dispatcher_);
+      active_server_ = std::move(active_server);
+
       callback();
     } else if (target.is_ajar_target()) {
-      ajar_target_server_ = std::make_unique<AjarTargetServer>(reporter.Bind());
-      ajar_target_binding_ =
-          std::make_unique<fidl::Binding<fidl::serversuite::AjarTarget>>(ajar_target_server_.get());
-      ajar_target_server_->set_binding(ajar_target_binding_.get());
+      auto active_server =
+          std::make_unique<ActiveServer<fidl::serversuite::AnyTarget::Tag::kAjarTarget>>();
 
-      ajar_target_binding_->Bind(std::move(target.ajar_target()), dispatcher_);
+      active_server->sut_server_->set_controller_binding(active_server->controller_binding_.get());
+
+      active_server->Bind(target.ajar_target(), dispatcher_);
+      active_server_ = std::move(active_server);
       callback();
     } else if (target.is_open_target()) {
-      open_target_server_ = std::make_unique<OpenTargetServer>(reporter.Bind());
-      open_target_binding_ =
-          std::make_unique<fidl::Binding<fidl::serversuite::OpenTarget>>(open_target_server_.get());
-      open_target_server_->set_binding(open_target_binding_.get());
-      open_target_server_->set_event_sender(&open_target_binding_->events());
+      auto active_server =
+          std::make_unique<ActiveServer<fidl::serversuite::AnyTarget::Tag::kOpenTarget>>();
 
-      open_target_binding_->Bind(std::move(target.open_target()), dispatcher_);
+      active_server->controller_server_->set_sut_binding(active_server->sut_binding_.get());
+      active_server->sut_server_->set_controller_binding(active_server->controller_binding_.get());
+
+      active_server->Bind(target.open_target(), dispatcher_);
+      active_server_ = std::move(active_server);
       callback();
     } else if (target.is_large_message_target()) {
       // TODO(fxbug.dev/114261): Test decoding large messages.
@@ -383,12 +469,7 @@ class RunnerServer : public fidl::serversuite::Runner {
 
  private:
   async_dispatcher_t* dispatcher_;
-  std::unique_ptr<ClosedTargetServer> closed_target_server_;
-  std::unique_ptr<fidl::Binding<fidl::serversuite::ClosedTarget>> closed_target_binding_;
-  std::unique_ptr<AjarTargetServer> ajar_target_server_;
-  std::unique_ptr<fidl::Binding<fidl::serversuite::AjarTarget>> ajar_target_binding_;
-  std::unique_ptr<OpenTargetServer> open_target_server_;
-  std::unique_ptr<fidl::Binding<fidl::serversuite::OpenTarget>> open_target_binding_;
+  std::unique_ptr<ActiveServerBase> active_server_;
 };
 
 int main(int argc, const char** argv) {

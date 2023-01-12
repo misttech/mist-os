@@ -20,15 +20,25 @@ import (
 	fidlzx "fidl/zx"
 )
 
+type closedTargetControllerImpl struct {
+	sutChannel zx.Channel
+}
+
+var _ serversuite.ClosedTargetControllerWithCtx = (*closedTargetControllerImpl)(nil)
+
+func (c *closedTargetControllerImpl) CloseWithEpitaph(_ fidl.Context, epitaph int32) error {
+	return component.CloseWithEpitaph(c.sutChannel, zx.Status(epitaph))
+}
+
 type closedTargetImpl struct {
-	reporter serversuite.ReporterWithCtxInterface
+	controllerEventProxy serversuite.ClosedTargetControllerEventProxy
 }
 
 var _ serversuite.ClosedTargetWithCtx = (*closedTargetImpl)(nil)
 
 func (t *closedTargetImpl) OneWayNoPayload(_ fidl.Context) error {
 	log.Println("serversuite.ClosedTarget OneWayNoPayload() called")
-	t.reporter.ReceivedOneWayNoPayload(context.Background())
+	t.controllerEventProxy.ReceivedOneWayNoPayload()
 	return nil
 }
 
@@ -236,8 +246,7 @@ func (*runnerImpl) IsTeardownReasonSupported(_ fidl.Context) (bool, error) {
 }
 
 func (*runnerImpl) Start(
-	ctx fidl.Context,
-	reporter serversuite.ReporterWithCtxInterface,
+	_ fidl.Context,
 	target serversuite.AnyTarget) error {
 
 	if target.Which() == serversuite.AnyTargetLargeMessageTarget {
@@ -249,17 +258,28 @@ func (*runnerImpl) Start(
 		return errors.New("Go only supports closed protocols")
 	}
 
+	controllerChannel := target.ClosedTarget.Controller.Channel
+	sutChannel := target.ClosedTarget.Sut.Channel
 	go func() {
-		stub := serversuite.ClosedTargetWithCtxStub{
-			Impl: &closedTargetImpl{
-				reporter: reporter,
+		stub := serversuite.ClosedTargetControllerWithCtxStub{
+			Impl: &closedTargetControllerImpl{
+				sutChannel: sutChannel,
 			},
 		}
-		component.Serve(context.Background(), &stub, target.ClosedTarget.Channel, component.ServeOptions{
+		component.Serve(context.Background(), &stub, controllerChannel, component.ServeOptions{})
+	}()
+	go func() {
+		controllerEventProxy := serversuite.ClosedTargetControllerEventProxy(fidl.ChannelProxy{Channel: controllerChannel})
+		stub := serversuite.ClosedTargetWithCtxStub{
+			Impl: &closedTargetImpl{
+				controllerEventProxy: controllerEventProxy,
+			},
+		}
+		component.Serve(context.Background(), &stub, sutChannel, component.ServeOptions{
 			OnError: func(err error) {
 				// Failures are expected as part of tests.
 				log.Printf("serversuite.ClosedTarget errored: %s", err)
-				reporter.WillTeardown(ctx, serversuite.TeardownReasonOther)
+				controllerEventProxy.WillTeardown(serversuite.TeardownReasonOther)
 			},
 		})
 	}()

@@ -11,14 +11,32 @@
 
 #include "src/tests/fidl/server_suite/cpp_util/error_util.h"
 
+class ClosedTargetControllerServer
+    : public fidl::WireServer<fidl_serversuite::ClosedTargetController> {
+ public:
+  ClosedTargetControllerServer() = default;
+
+  void CloseWithEpitaph(CloseWithEpitaphRequestView request,
+                        CloseWithEpitaphCompleter::Sync& completer) override {
+    sut_binding_->Close(request->epitaph_status);
+  }
+
+  void set_sut_binding(fidl::ServerBindingRef<fidl_serversuite::ClosedTarget> sut_binding) {
+    ZX_ASSERT_MSG(!sut_binding_, "sut binding already set");
+    sut_binding_ = std::move(sut_binding);
+  }
+
+ private:
+  std::optional<fidl::ServerBindingRef<fidl_serversuite::ClosedTarget>> sut_binding_;
+};
+
 class ClosedTargetServer : public fidl::WireServer<fidl_serversuite::ClosedTarget> {
  public:
-  explicit ClosedTargetServer(fidl::ClientEnd<fidl_serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  ClosedTargetServer() = default;
 
   void OneWayNoPayload(OneWayNoPayloadCompleter::Sync& completer) override {
     std::cout << "Target.OneWayNoPayload()" << std::endl;
-    auto result = reporter_->ReceivedOneWayNoPayload();
+    auto result = fidl::WireSendEvent(controller_binding_.value())->ReceivedOneWayNoPayload();
     ZX_ASSERT(result.ok());
   }
 
@@ -86,11 +104,6 @@ class ClosedTargetServer : public fidl::WireServer<fidl_serversuite::ClosedTarge
     completer.Reply(zx::event(request->handle.release()));
   }
 
-  void CloseWithEpitaph(CloseWithEpitaphRequestView request,
-                        CloseWithEpitaphCompleter::Sync& completer) override {
-    completer.Close(request->epitaph_status);
-  }
-
   void ByteVectorSize(ByteVectorSizeRequestView request,
                       ByteVectorSizeCompleter::Sync& completer) override {
     completer.Reply(static_cast<uint32_t>(request->vec.count()));
@@ -120,22 +133,31 @@ class ClosedTargetServer : public fidl::WireServer<fidl_serversuite::ClosedTarge
     if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
       std::cout << "ClosedTarget unbound with error: " << info.FormatDescription() << std::endl;
     }
-    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+    (void)fidl::WireSendEvent(controller_binding_.value())
+        ->WillTeardown(servertest_util::ClassifyTeardownReason(info));
+  }
+
+  void set_controller_binding(
+      fidl::ServerBindingRef<fidl_serversuite::ClosedTargetController> controller_binding) {
+    ZX_ASSERT_MSG(!controller_binding_, "controller binding already set");
+    controller_binding_ = std::move(controller_binding);
   }
 
  private:
-  fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
+  std::optional<fidl::ServerBindingRef<fidl_serversuite::ClosedTargetController>>
+      controller_binding_;
 };
 
 class AjarTargetServer : public fidl::WireServer<fidl_serversuite::AjarTarget> {
  public:
-  explicit AjarTargetServer(fidl::ClientEnd<fidl_serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  explicit AjarTargetServer(fidl::ServerEnd<fidl_serversuite::AjarTargetController> controller)
+      : controller_(std::move(controller)) {}
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fidl_serversuite::AjarTarget> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    auto result = reporter_->ReceivedUnknownMethod(
-        metadata.method_ordinal, fidl_serversuite::wire::UnknownMethodType::kOneWay);
+    auto result = fidl::WireSendEvent(controller_)
+                      ->ReceivedUnknownMethod(metadata.method_ordinal,
+                                              fidl_serversuite::wire::UnknownMethodType::kOneWay);
     ZX_ASSERT(result.ok());
   }
 
@@ -143,41 +165,56 @@ class AjarTargetServer : public fidl::WireServer<fidl_serversuite::AjarTarget> {
     if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
       std::cout << "AjarTarget unbound with error: " << info.FormatDescription() << std::endl;
     }
-    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+    (void)fidl::WireSendEvent(controller_)
+        ->WillTeardown(servertest_util::ClassifyTeardownReason(info));
   }
 
  private:
-  fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
+  fidl::ServerEnd<fidl_serversuite::AjarTargetController> controller_;
+};
+
+class OpenTargetControllerServer : public fidl::WireServer<fidl_serversuite::OpenTargetController> {
+ public:
+  OpenTargetControllerServer() = default;
+
+  void SendStrictEvent(SendStrictEventCompleter::Sync& completer) override {
+    auto result = fidl::WireSendEvent(sut_binding_.value())->StrictEvent();
+    if (result.ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(servertest_util::ClassifySendEventError(result));
+    }
+  }
+
+  void SendFlexibleEvent(SendFlexibleEventCompleter::Sync& completer) override {
+    auto result = fidl::WireSendEvent(sut_binding_.value())->FlexibleEvent();
+    if (result.ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(servertest_util::ClassifySendEventError(result));
+    }
+  }
+
+  void set_sut_binding(fidl::ServerBindingRef<fidl_serversuite::OpenTarget> sut_binding) {
+    ZX_ASSERT_MSG(!sut_binding_, "sut binding already set");
+    sut_binding_ = std::move(sut_binding);
+  }
+
+ private:
+  std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTarget>> sut_binding_;
 };
 
 class OpenTargetServer : public fidl::WireServer<fidl_serversuite::OpenTarget> {
  public:
-  explicit OpenTargetServer(fidl::ClientEnd<fidl_serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
-
-  void SendEvent(SendEventRequestView request, SendEventCompleter::Sync& completer) override {
-    ZX_ASSERT_MSG(binding_ref_, "missing binding ref");
-    switch (request->event_type) {
-      case fidl_serversuite::wire::EventType::kStrict: {
-        auto result = fidl::WireSendEvent(binding_ref_.value())->StrictEvent();
-        ZX_ASSERT(result.ok());
-        break;
-      }
-      case fidl_serversuite::wire::EventType::kFlexible: {
-        auto result = fidl::WireSendEvent(binding_ref_.value())->FlexibleEvent();
-        ZX_ASSERT(result.ok());
-        break;
-      }
-    }
-  }
+  OpenTargetServer() = default;
 
   void StrictOneWay(StrictOneWayCompleter::Sync& completer) override {
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result = fidl::WireSendEvent(controller_binding_.value())->ReceivedStrictOneWay();
     ZX_ASSERT(result.ok());
   }
 
   void FlexibleOneWay(FlexibleOneWayCompleter::Sync& completer) override {
-    auto result = reporter_->ReceivedFlexibleOneWay();
+    auto result = fidl::WireSendEvent(controller_binding_.value())->ReceivedFlexibleOneWay();
     ZX_ASSERT(result.ok());
   }
 
@@ -254,69 +291,88 @@ class OpenTargetServer : public fidl::WireServer<fidl_serversuite::OpenTarget> {
         method_type = fidl_serversuite::wire::UnknownMethodType::kTwoWay;
         break;
     }
-    auto result = reporter_->ReceivedUnknownMethod(metadata.method_ordinal, method_type);
+    auto result = fidl::WireSendEvent(controller_binding_.value())
+                      ->ReceivedUnknownMethod(metadata.method_ordinal, method_type);
     ZX_ASSERT(result.ok());
-  }
-
-  void set_binding_ref(fidl::ServerBindingRef<fidl_serversuite::OpenTarget> binding_ref) {
-    ZX_ASSERT_MSG(!binding_ref_, "binding ref already set");
-    binding_ref_ = std::move(binding_ref);
   }
 
   void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::OpenTarget>) {
     if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
       std::cout << "OpenTarget unbound with error: " << info.FormatDescription() << std::endl;
     }
-    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+    (void)fidl::WireSendEvent(controller_binding_.value())
+        ->WillTeardown(servertest_util::ClassifyTeardownReason(info));
+  }
+
+  void set_controller_binding(
+      fidl::ServerBindingRef<fidl_serversuite::OpenTargetController> controller_binding) {
+    ZX_ASSERT_MSG(!controller_binding_, "controller binding already set");
+    controller_binding_ = std::move(controller_binding);
   }
 
  private:
-  fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
-  std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTarget>> binding_ref_;
+  std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTargetController>> controller_binding_;
 };
 
 class LargeMessageTargetServer : public fidl::WireServer<fidl_serversuite::LargeMessageTarget> {
  public:
-  explicit LargeMessageTargetServer(fidl::ClientEnd<fidl_serversuite::Reporter> reporter)
-      : reporter_(std::move(reporter)) {}
+  explicit LargeMessageTargetServer(
+      fidl::ServerEnd<fidl_serversuite::LargeMessageTargetController> controller)
+      : controller_(std::move(controller)) {}
 
   void DecodeBoundedKnownToBeSmall(::fidl_serversuite::wire::BoundedKnownToBeSmall* request,
                                    DecodeBoundedKnownToBeSmallCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeBoundedKnownToBeSmall()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result =
+        fidl::WireSendEvent(controller_)
+            ->ReceivedOneWay(
+                fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeBoundedKnownToBeSmall);
     ZX_ASSERT(result.ok());
   }
   void DecodeBoundedMaybeLarge(::fidl_serversuite::wire::BoundedMaybeLarge* request,
                                DecodeBoundedMaybeLargeCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeBoundedMaybeLarge()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result =
+        fidl::WireSendEvent(controller_)
+            ->ReceivedOneWay(
+                fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeBoundedMaybeLarge);
     ZX_ASSERT(result.ok());
   }
   void DecodeSemiBoundedBelievedToBeSmall(
       ::fidl_serversuite::wire::SemiBoundedBelievedToBeSmall* request,
       DecodeSemiBoundedBelievedToBeSmallCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeSemiBoundedBelievedToBeSmall()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result = fidl::WireSendEvent(controller_)
+                      ->ReceivedOneWay(fidl_serversuite::LargeMessageTargetOneWayMethod::
+                                           kDecodeSemiBoundedBelievedToBeSmall);
     ZX_ASSERT(result.ok());
   }
   void DecodeSemiBoundedMaybeLarge(::fidl_serversuite::wire::SemiBoundedMaybeLarge* request,
                                    DecodeSemiBoundedMaybeLargeCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeSemiBoundedMaybeLarge()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result =
+        fidl::WireSendEvent(controller_)
+            ->ReceivedOneWay(
+                fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeSemiBoundedMaybeLarge);
     ZX_ASSERT(result.ok());
   }
   void DecodeUnboundedMaybeLargeValue(
       ::fidl_serversuite::wire::UnboundedMaybeLargeValue* request,
       DecodeUnboundedMaybeLargeValueCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeUnboundedMaybeLargeValue()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result =
+        fidl::WireSendEvent(controller_)
+            ->ReceivedOneWay(
+                fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeUnboundedMaybeLargeValue);
     ZX_ASSERT(result.ok());
   }
   void DecodeUnboundedMaybeLargeResource(
       ::fidl_serversuite::wire::UnboundedMaybeLargeResource* request,
       DecodeUnboundedMaybeLargeResourceCompleter::Sync& completer) override {
     std::cout << "LargeMessageTarget.DecodeUnboundedMaybeLargeResource()" << std::endl;
-    auto result = reporter_->ReceivedStrictOneWay();
+    auto result = fidl::WireSendEvent(controller_)
+                      ->ReceivedOneWay(fidl_serversuite::LargeMessageTargetOneWayMethod::
+                                           kDecodeUnboundedMaybeLargeResource);
     ZX_ASSERT(result.ok());
   }
   void EncodeBoundedKnownToBeSmall(::fidl_serversuite::wire::BoundedKnownToBeSmall* request,
@@ -358,7 +414,8 @@ class LargeMessageTargetServer : public fidl::WireServer<fidl_serversuite::Large
     if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
       std::cout << "ClosedTarget unbound with error: " << info.FormatDescription() << std::endl;
     }
-    (void)reporter_->WillTeardown(servertest_util::ClassifyError(info));
+    (void)fidl::WireSendEvent(controller_)
+        ->WillTeardown(servertest_util::ClassifyTeardownReason(info));
   }
 
   void handle_unknown_method(
@@ -373,12 +430,13 @@ class LargeMessageTargetServer : public fidl::WireServer<fidl_serversuite::Large
         method_type = fidl_serversuite::wire::UnknownMethodType::kTwoWay;
         break;
     }
-    auto result = reporter_->ReceivedUnknownMethod(metadata.method_ordinal, method_type);
+    auto result = fidl::WireSendEvent(controller_)
+                      ->ReceivedUnknownMethod(metadata.method_ordinal, method_type);
     ZX_ASSERT(result.ok());
   }
 
  private:
-  fidl::WireSyncClient<fidl_serversuite::Reporter> reporter_;
+  fidl::ServerEnd<fidl_serversuite::LargeMessageTargetController> controller_;
 };
 
 class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
@@ -394,6 +452,7 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
           // functionality of the runner itself.
           return false;
 
+        case fidl_serversuite::Test::kEventSendingDoNotReportPeerClosed:
         case fidl_serversuite::Test::kOneWayWithNonZeroTxid:
         case fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid:
           return false;
@@ -449,37 +508,69 @@ class RunnerServer : public fidl::WireServer<fidl_serversuite::Runner> {
 
     switch (request->target.Which()) {
       case ::fidl_serversuite::wire::AnyTarget::Tag::kClosedTarget: {
-        auto target_server = std::make_unique<ClosedTargetServer>(std::move(request->reporter));
-        fidl::BindServer(dispatcher_, std::move(request->target.closed_target()),
-                         std::move(target_server), std::mem_fn(&ClosedTargetServer::OnUnbound));
+        auto& server_pair = request->target.closed_target();
+        auto controller_server = std::make_shared<ClosedTargetControllerServer>();
+        auto sut_server = std::make_shared<ClosedTargetServer>();
+
+        auto controller_binding =
+            fidl::BindServer(dispatcher_, std::move(server_pair.controller), controller_server,
+                             [](auto*, fidl::UnbindInfo info, auto) {
+                               if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
+                                   !info.is_peer_closed()) {
+                                 std::cerr << "ClosedTargetController unbound with error: "
+                                           << info.FormatDescription() << std::endl;
+                               }
+                             });
+        auto sut_binding = fidl::BindServer(dispatcher_, std::move(server_pair.sut), sut_server,
+                                            std::mem_fn(&ClosedTargetServer::OnUnbound));
+
+        // This is thread safe because the new server runs in the same
+        // dispatcher thread as the request to start it.
+        controller_server->set_sut_binding(std::move(sut_binding));
+        sut_server->set_controller_binding(std::move(controller_binding));
         completer.Reply();
         break;
       }
       case ::fidl_serversuite::wire::AnyTarget::Tag::kAjarTarget: {
-        auto target_server = std::make_unique<AjarTargetServer>(std::move(request->reporter));
-        fidl::BindServer(dispatcher_, std::move(request->target.ajar_target()),
-                         std::move(target_server), std::mem_fn(&AjarTargetServer::OnUnbound));
+        auto& server_pair = request->target.ajar_target();
+        auto sut_server = std::make_unique<AjarTargetServer>(std::move(server_pair.controller));
+        fidl::BindServer(dispatcher_, std::move(server_pair.sut), std::move(sut_server),
+                         std::mem_fn(&AjarTargetServer::OnUnbound));
         completer.Reply();
         break;
       }
       case ::fidl_serversuite::wire::AnyTarget::Tag::kOpenTarget: {
-        auto target_server = std::make_shared<OpenTargetServer>(std::move(request->reporter));
-        auto binding_ref =
-            fidl::BindServer(dispatcher_, std::move(request->target.open_target()), target_server,
-                             std::mem_fn(&OpenTargetServer::OnUnbound));
+        auto& server_pair = request->target.open_target();
+        auto controller_server = std::make_shared<OpenTargetControllerServer>();
+        auto sut_server = std::make_shared<OpenTargetServer>();
+
+        auto controller_binding = fidl::BindServer(
+            dispatcher_, std::move(server_pair.controller), controller_server,
+            [](auto*, fidl::UnbindInfo info, auto) {
+              if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
+                  !info.is_peer_closed()) {
+                std::cerr << "OpenTargetController unbound with error: " << info.FormatDescription()
+                          << std::endl;
+              }
+            });
+        auto sut_binding = fidl::BindServer(dispatcher_, std::move(server_pair.sut), sut_server,
+                                            std::mem_fn(&OpenTargetServer::OnUnbound));
+
         // This is thread safe because the new server runs in the same
         // dispatcher thread as the request to start it.
-        target_server->set_binding_ref(std::move(binding_ref));
+        controller_server->set_sut_binding(std::move(sut_binding));
+        sut_server->set_controller_binding(std::move(controller_binding));
         completer.Reply();
         break;
       }
       case ::fidl_serversuite::wire::AnyTarget::Tag::kLargeMessageTarget: {
-        auto target_server =
-            std::make_shared<LargeMessageTargetServer>(std::move(request->reporter));
-        auto binding_ref =
-            fidl::BindServer(dispatcher_, std::move(request->target.large_message_target()),
-                             target_server, std::mem_fn(&LargeMessageTargetServer::OnUnbound));
+        auto& server_pair = request->target.large_message_target();
+        auto sut_server =
+            std::make_unique<LargeMessageTargetServer>(std::move(server_pair.controller));
+        fidl::BindServer(dispatcher_, std::move(server_pair.sut), std::move(sut_server),
+                         std::mem_fn(&LargeMessageTargetServer::OnUnbound));
         completer.Reply();
+        break;
       }
     }
   }

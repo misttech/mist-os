@@ -2,32 +2,49 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::RequestStream;
+
 use {
     anyhow::{Context as _, Error},
     fidl::endpoints::{ControlHandle, ServerEnd, UnknownMethodType},
     fidl::{AsHandleRef, Event, Status},
     fidl_fidl_serversuite::{
-        AjarTargetMarker, AjarTargetRequest, AnyTarget, ClosedTargetMarker, ClosedTargetRequest,
-        ClosedTargetTwoWayResultRequest, ClosedTargetTwoWayTablePayloadResponse,
-        ClosedTargetTwoWayUnionPayloadRequest, ClosedTargetTwoWayUnionPayloadResponse, Elements,
-        Empty, EncodingFailureKind, EventType, LargeMessageTargetMarker, LargeMessageTargetRequest,
+        AjarTargetControllerMarker, AjarTargetMarker, AjarTargetRequest, AjarTargetServerPair,
+        AnyTarget, ClosedTargetControllerMarker, ClosedTargetControllerRequest, ClosedTargetMarker,
+        ClosedTargetRequest, ClosedTargetServerPair, ClosedTargetTwoWayResultRequest,
+        ClosedTargetTwoWayTablePayloadResponse, ClosedTargetTwoWayUnionPayloadRequest,
+        ClosedTargetTwoWayUnionPayloadResponse, Elements, Empty, EncodingFailureKind,
+        LargeMessageTargetControllerMarker, LargeMessageTargetMarker,
+        LargeMessageTargetOneWayMethod, LargeMessageTargetRequest, LargeMessageTargetServerPair,
+        OpenTargetControllerMarker, OpenTargetControllerRequest,
         OpenTargetFlexibleTwoWayErrRequest, OpenTargetFlexibleTwoWayFieldsErrRequest,
-        OpenTargetMarker, OpenTargetRequest, OpenTargetStrictTwoWayErrRequest,
-        OpenTargetStrictTwoWayFieldsErrRequest, ReporterProxy, RunnerRequest, RunnerRequestStream,
-        Test, UnknownMethodType as DynsuiteUnknownMethodType,
+        OpenTargetMarker, OpenTargetRequest, OpenTargetServerPair,
+        OpenTargetStrictTwoWayErrRequest, OpenTargetStrictTwoWayFieldsErrRequest, RunnerRequest,
+        RunnerRequestStream, SendEventError, Test, UnknownMethodType as DynsuiteUnknownMethodType,
     },
     fuchsia_component::server::ServiceFs,
     futures::prelude::*,
 };
 
-const EXPECT_STRICT_ONE_WAY: &'static str = "failed to report strict one way request";
+fn peek_to_anyhow<P, E>(peeker: P) -> impl FnOnce(E) -> Error
+where
+    P: FnOnce(&Error),
+    E: Into<Error>,
+{
+    |e| {
+        let e = e.into();
+        peeker(&e);
+        e
+    }
+}
+
+const EXPECT_ONE_WAY: &'static str = "failed to report one way request";
 const EXPECT_REPLY_FAILED: &'static str = "failed to send reply";
 
-fn get_teardown_reason(error: Error) -> fidl_fidl_serversuite::TeardownReason {
+fn get_teardown_reason(error: &Error) -> fidl_fidl_serversuite::TeardownReason {
     use fidl_fidl_serversuite::TeardownReason;
-    let error: Result<fidl::Error, anyhow::Error> = error.downcast();
-    match error {
-        Ok(error) => match error {
+    match error.downcast_ref::<fidl::Error>() {
+        Some(error) => match error {
             fidl::Error::InvalidBoolean
             | fidl::Error::InvalidHeader
             | fidl::Error::IncompatibleMagicNumber(_)
@@ -63,24 +80,51 @@ fn get_teardown_reason(error: Error) -> fidl_fidl_serversuite::TeardownReason {
             fidl::Error::ClientChannelClosed { .. } => TeardownReason::ChannelPeerClosed,
             _ => TeardownReason::Other,
         },
-        Err(_) => TeardownReason::Other,
+        None => TeardownReason::Other,
     }
 }
 
+fn classify_send_event_error(_err: fidl::Error) -> SendEventError {
+    SendEventError::OtherError
+}
+
 async fn run_closed_target_server(
-    server_end: ServerEnd<ClosedTargetMarker>,
-    reporter_proxy: &ReporterProxy,
+    controller: ServerEnd<ClosedTargetControllerMarker>,
+    sut: ServerEnd<ClosedTargetMarker>,
 ) -> Result<(), Error> {
-    server_end
-        .into_stream()?
+    let controller_stream = controller.into_stream()?;
+    let controller_handle = &controller_stream.control_handle();
+
+    let sut_stream = sut.into_stream().map_err(peek_to_anyhow(|e| {
+        _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+    }))?;
+    let sut_handle = &sut_stream.control_handle();
+
+    let controller_runner = controller_stream
+        .map(|result| result.context("failed controller request"))
+        .try_for_each(|request| async move {
+            println!("Got controller request");
+            match request {
+                ClosedTargetControllerRequest::CloseWithEpitaph {
+                    epitaph_status,
+                    control_handle: _,
+                } => {
+                    sut_handle.shutdown_with_epitaph(Status::from_raw(epitaph_status));
+                    println!("Sent shutdown_with_epitaph");
+                }
+            }
+            Ok(())
+        });
+
+    let sut_runner = sut_stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async move {
             match request {
                 ClosedTargetRequest::OneWayNoPayload { control_handle: _ } => {
                     println!("OneWayNoPayload");
-                    reporter_proxy
-                        .received_one_way_no_payload()
-                        .expect("calling received_one_way_no_payload failed");
+                    controller_handle
+                        .send_received_one_way_no_payload()
+                        .expect("sending ReceivedOneWayNoPayload failed");
                 }
                 ClosedTargetRequest::TwoWayNoPayload { responder } => {
                     println!("TwoWayNoPayload");
@@ -144,9 +188,6 @@ async fn run_closed_target_server(
                 ClosedTargetRequest::EchoAsTransferableSignalableEvent { handle, responder } => {
                     responder.send(fidl::Event::from(handle)).expect("failed to send response");
                 }
-                ClosedTargetRequest::CloseWithEpitaph { epitaph_status, control_handle } => {
-                    control_handle.shutdown_with_epitaph(Status::from_raw(epitaph_status));
-                }
                 ClosedTargetRequest::ByteVectorSize { vec, responder } => {
                     responder.send(vec.len().try_into().unwrap()).expect("failed to send response");
                 }
@@ -167,53 +208,88 @@ async fn run_closed_target_server(
             }
             Ok(())
         })
-        .await
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }));
+
+    future::try_join(controller_runner, sut_runner).await?;
+    Ok(())
 }
 
 async fn run_ajar_target_server(
-    server_end: ServerEnd<AjarTargetMarker>,
-    reporter_proxy: &ReporterProxy,
+    controller: ServerEnd<AjarTargetControllerMarker>,
+    sut: ServerEnd<AjarTargetMarker>,
 ) -> Result<(), Error> {
-    server_end
-        .into_stream()?
+    println!("Running Ajar Target");
+    let controller_stream = controller.into_stream()?;
+    let controller_handle = &controller_stream.control_handle();
+
+    let controller_runner = controller_stream
+        .map(|result| result.context("failed controller request"))
+        .try_for_each(|request| async move { match request {} });
+
+    let sut_runner = sut
+        .into_stream()
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }))?
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async move {
             match request {
                 AjarTargetRequest::_UnknownMethod { ordinal, control_handle: _, .. } => {
-                    reporter_proxy
-                        .received_unknown_method(ordinal, DynsuiteUnknownMethodType::OneWay)
+                    controller_handle
+                        .send_received_unknown_method(ordinal, DynsuiteUnknownMethodType::OneWay)
                         .expect("failed to report unknown method call");
                 }
             }
             Ok(())
         })
-        .await
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }));
+
+    future::try_join(controller_runner, sut_runner).await?;
+    Ok(())
 }
 
 async fn run_open_target_server(
-    server_end: ServerEnd<OpenTargetMarker>,
-    reporter_proxy: &ReporterProxy,
+    controller: ServerEnd<OpenTargetControllerMarker>,
+    sut: ServerEnd<OpenTargetMarker>,
 ) -> Result<(), Error> {
-    server_end
-        .into_stream()?
+    println!("Running Open Target");
+    let controller_stream = controller.into_stream()?;
+    let controller_handle = &controller_stream.control_handle();
+    let sut_stream = sut.into_stream().map_err(peek_to_anyhow(|e| {
+        _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+    }))?;
+    let sut_handle = &sut_stream.control_handle();
+
+    let controller_runner = controller_stream
+        .map(|result| result.context("failed controller request"))
+        .try_for_each(|request| async move {
+            match request {
+                OpenTargetControllerRequest::SendStrictEvent { responder } => {
+                    let mut res = sut_handle.send_strict_event().map_err(classify_send_event_error);
+                    responder.send(&mut res).expect(EXPECT_REPLY_FAILED);
+                }
+                OpenTargetControllerRequest::SendFlexibleEvent { responder } => {
+                    let mut res =
+                        sut_handle.send_flexible_event().map_err(classify_send_event_error);
+                    responder.send(&mut res).expect(EXPECT_REPLY_FAILED);
+                }
+            }
+            Ok(())
+        });
+
+    let sut_runner = sut_stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async move {
             match request {
-                OpenTargetRequest::SendEvent { event_type, control_handle } => match event_type {
-                    EventType::Strict => {
-                        control_handle.send_strict_event().expect("failed to send event")
-                    }
-                    EventType::Flexible => {
-                        control_handle.send_flexible_event().expect("failed to send event")
-                    }
-                },
                 OpenTargetRequest::StrictOneWay { .. } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle.send_received_strict_one_way().expect(EXPECT_ONE_WAY);
                 }
                 OpenTargetRequest::FlexibleOneWay { .. } => {
-                    reporter_proxy
-                        .received_flexible_one_way()
-                        .expect("failed to report flexible one way request");
+                    controller_handle.send_received_flexible_one_way().expect(EXPECT_ONE_WAY);
                 }
                 OpenTargetRequest::StrictTwoWay { responder } => {
                     responder.send().expect(EXPECT_REPLY_FAILED);
@@ -271,22 +347,37 @@ async fn run_open_target_server(
                         UnknownMethodType::OneWay => DynsuiteUnknownMethodType::OneWay,
                         UnknownMethodType::TwoWay => DynsuiteUnknownMethodType::TwoWay,
                     };
-                    reporter_proxy
-                        .received_unknown_method(ordinal, unknown_method_type)
+                    controller_handle
+                        .send_received_unknown_method(ordinal, unknown_method_type)
                         .expect("failed to report unknown method call");
                 }
             }
             Ok(())
         })
-        .await
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }));
+
+    future::try_join(controller_runner, sut_runner).await?;
+    Ok(())
 }
 
 async fn run_large_message_target_server(
-    server_end: ServerEnd<LargeMessageTargetMarker>,
-    reporter_proxy: &ReporterProxy,
+    controller: ServerEnd<LargeMessageTargetControllerMarker>,
+    sut: ServerEnd<LargeMessageTargetMarker>,
 ) -> Result<(), Error> {
-    server_end
-        .into_stream()?
+    let controller_stream = controller.into_stream()?;
+    let controller_handle = &controller_stream.control_handle();
+
+    let controller_stream = controller_stream
+        .map(|result| result.context("failed controller request"))
+        .try_for_each(|request| async move { match request {} });
+
+    let sut_stream = sut
+        .into_stream()
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }))?
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async move {
             match request {
@@ -294,37 +385,61 @@ async fn run_large_message_target_server(
                     bytes: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeBoundedKnownToBeSmall,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::DecodeBoundedMaybeLarge {
                     bytes: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeBoundedMaybeLarge,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::DecodeSemiBoundedBelievedToBeSmall {
                     payload: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeSemiBoundedBelievedToBeSmall,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::DecodeSemiBoundedMaybeLarge {
                     payload: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeSemiBoundedMaybeLarge,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::DecodeUnboundedMaybeLargeValue {
                     bytes: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeUnboundedMaybeLargeValue,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::DecodeUnboundedMaybeLargeResource {
                     elements: _,
                     control_handle: _,
                 } => {
-                    reporter_proxy.received_strict_one_way().expect(EXPECT_STRICT_ONE_WAY);
+                    controller_handle
+                        .send_received_one_way(
+                            LargeMessageTargetOneWayMethod::DecodeUnboundedMaybeLargeResource,
+                        )
+                        .expect(EXPECT_ONE_WAY);
                 }
                 LargeMessageTargetRequest::EncodeBoundedKnownToBeSmall { bytes, responder } => {
                     responder.send(&bytes).expect(EXPECT_REPLY_FAILED);
@@ -372,8 +487,10 @@ async fn run_large_message_target_server(
 
                     if let Err(err) = responder.send(&mut elements) {
                         match err {
-                            fidl::Error::LargeMessage64Handles => reporter_proxy
-                                .reply_encoding_failed(EncodingFailureKind::LargeMessage64Handles)
+                            fidl::Error::LargeMessage64Handles => controller_handle
+                                .send_reply_encoding_failed(
+                                    EncodingFailureKind::LargeMessage64Handles,
+                                )
                                 .expect("failed to report reply encoding failure"),
                             _ => panic!("{}", EXPECT_REPLY_FAILED),
                         }
@@ -389,14 +506,19 @@ async fn run_large_message_target_server(
                         UnknownMethodType::OneWay => DynsuiteUnknownMethodType::OneWay,
                         UnknownMethodType::TwoWay => DynsuiteUnknownMethodType::TwoWay,
                     };
-                    reporter_proxy
-                        .received_unknown_method(ordinal, unknown_method_type)
+                    controller_handle
+                        .send_received_unknown_method(ordinal, unknown_method_type)
                         .expect("failed to report unknown method call");
                 }
             }
             Ok(())
         })
-        .await
+        .map_err(peek_to_anyhow(|e| {
+            _ = controller_handle.send_will_teardown(get_teardown_reason(e));
+        }));
+
+    future::try_join(controller_stream, sut_stream).await?;
+    Ok(())
 }
 
 async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
@@ -411,6 +533,10 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                             // "test disabling" functionality of the runner itself.
                             false
                         }
+                        // TODO(fxbug.dev/74241): shutdown_with_epitaph sends an epitaph and puts
+                        // the server in a shutting down state, but doesn't actually close the
+                        // channel until dropped.
+                        Test::ServerSendsEpitaph => false,
                         Test::OneWayWithNonZeroTxid
                         | Test::TwoWayNoPayloadWithZeroTxid
                         | Test::ServerSendsTooFewRights
@@ -433,45 +559,37 @@ async fn run_runner_server(stream: RunnerRequestStream) -> Result<(), Error> {
                 RunnerRequest::IsTeardownReasonSupported { responder } => {
                     responder.send(true)?;
                 }
-                RunnerRequest::Start { reporter, target, responder } => {
+                RunnerRequest::Start { target, responder } => {
                     println!("Runner.Start() called");
-                    let reporter_proxy: &ReporterProxy = &reporter.into_proxy()?;
                     match target {
-                        AnyTarget::ClosedTarget(server_end) => {
+                        AnyTarget::ClosedTarget(ClosedTargetServerPair { controller, sut }) => {
                             responder.send().expect("sending response failed");
-                            run_closed_target_server(server_end, reporter_proxy)
-                                .await
-                                .unwrap_or_else(|e| {
-                                    println!("closed target server failed {:?}", e);
-                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
-                                });
+                            run_closed_target_server(controller, sut).await.unwrap_or_else(|e| {
+                                println!("closed target server failed {:?}", e);
+                            });
                         }
-                        AnyTarget::AjarTarget(server_end) => {
+                        AnyTarget::AjarTarget(AjarTargetServerPair { controller, sut }) => {
                             responder.send().expect("sending response failed");
-                            run_ajar_target_server(server_end, reporter_proxy)
-                                .await
-                                .unwrap_or_else(|e| {
-                                    println!("ajar target server failed {:?}", e);
-                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
-                                });
+                            run_ajar_target_server(controller, sut).await.unwrap_or_else(|e| {
+                                println!("ajar target server failed {:?}", e);
+                            });
                         }
-                        AnyTarget::OpenTarget(server_end) => {
+                        AnyTarget::OpenTarget(OpenTargetServerPair { controller, sut }) => {
                             responder.send().expect("sending response failed");
-                            run_open_target_server(server_end, reporter_proxy)
-                                .await
-                                .unwrap_or_else(|e| {
-                                    println!("open target server failed {:?}", e);
-                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
-                                });
+                            run_open_target_server(controller, sut).await.unwrap_or_else(|e| {
+                                println!("open target server failed {:?}", e);
+                            });
                         }
-                        AnyTarget::LargeMessageTarget(server_end) => {
+                        AnyTarget::LargeMessageTarget(LargeMessageTargetServerPair {
+                            controller,
+                            sut,
+                        }) => {
                             responder.send().expect("sending response failed");
-                            run_large_message_target_server(server_end, reporter_proxy)
-                                .await
-                                .unwrap_or_else(|e| {
+                            run_large_message_target_server(controller, sut).await.unwrap_or_else(
+                                |e| {
                                     println!("large message target server failed {:?}", e);
-                                    _ = reporter_proxy.will_teardown(get_teardown_reason(e));
-                                });
+                                },
+                            );
                         }
                     }
                 }
