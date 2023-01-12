@@ -677,13 +677,13 @@ pub fn run(args: &[impl AsRef<str>]) -> Result<(), Error> {
 
     if let Some(gn_bin) = opt.gn_bin {
         eprintln!("Formatting output file: {}", opt.output.display());
-        let output = Command::new(&gn_bin)
+        let status = Command::new(&gn_bin)
             .arg("format")
             .arg(opt.output)
-            .output()
+            .status()
             .with_context(|| format!("could not spawn GN: {}", gn_bin.display()))?;
-        if !output.status.success() {
-            anyhow::bail!("GN format command failed:\n{:?}", output);
+        if !status.success() {
+            anyhow::bail!("GN format command failed:{:?}", status);
         }
     }
 
