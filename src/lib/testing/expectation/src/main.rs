@@ -343,6 +343,7 @@ impl ExpectationsComparer {
     }
 }
 
+const EXPECTATIONS_SPECIFIC_PATH: &str = "/expectations/expectations.json5";
 const EXPECTATIONS_PKG_PATH: &str = "/pkg/expectations.json5";
 
 #[fuchsia::main]
@@ -353,10 +354,17 @@ async fn main() {
     let _: &mut fuchsia_component::server::ServiceFs<_> =
         fs.take_and_serve_directory_handle().expect("failed to serve ServiceFs directory");
 
-    let expectations =
+    let expectations = if let Ok(expectations) =
+        read_in_namespace_to_string(EXPECTATIONS_SPECIFIC_PATH).await
+    {
+        expectations
+    } else {
         read_in_namespace_to_string(EXPECTATIONS_PKG_PATH).await.unwrap_or_else(|err| {
-            panic!("failed to read expectations file at {EXPECTATIONS_PKG_PATH}: {err}")
-        });
+                panic!("failed to read expectations file at either {EXPECTATIONS_SPECIFIC_PATH} (for component-specific expectations) \
+                        or {EXPECTATIONS_PKG_PATH} (for test-package-wide expectations): {err}")
+            })
+    };
+
     let comparer = ExpectationsComparer {
         expectations: serde_json5::from_str(&expectations).expect("failed to parse expectations"),
     };

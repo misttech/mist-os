@@ -1,0 +1,45 @@
+# Copyright 2023 The Fuchsia Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+import("//build/dist/resource.gni")
+
+# TODO(jamesr): Document this template properly.
+# Required: expectations, output_path
+template("preprocess_expectations") {
+  assert(defined(invoker.expectations))
+  assert(defined(invoker.output_path))
+
+  _base_target_name = target_name
+  _preprocessed_target_name = "${_base_target_name}-preprocessed"
+  compiled_action(_preprocessed_target_name) {
+    tool = "//src/lib/testing/expectation/preprocess:bin"
+    tool_output_name = "expectation_file_preprocessor"
+    _preprocessed_expectations =
+        "${target_gen_dir}/${_base_target_name}-expectations-preprocessed.json5"
+    depfile = "$target_out_dir/${_preprocessed_target_name}.d"
+    args = [
+      "--root-expectations-file",
+      rebase_path(invoker.expectations, root_build_dir),
+      "--preprocessed-expectations-file",
+      rebase_path(_preprocessed_expectations, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+
+    outputs = [ _preprocessed_expectations ]
+    sources = [ invoker.expectations ]
+
+    visibility = [ ":*" ]
+  }
+  _preprocessed_target_name = ":$_preprocessed_target_name"
+
+  resource(target_name) {
+    sources = get_target_outputs(_preprocessed_target_name)
+    outputs = [ invoker.output_path ]
+    deps = [ _preprocessed_target_name ]
+
+    visibility = [ ":*" ]
+  }
+}

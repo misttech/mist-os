@@ -15,6 +15,13 @@
             protocol: "fuchsia.test.Suite",
             from: "parent",
         },
+        {
+            directory: "expectations",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/expectations",
+            availability: "optional",
+        },
     ],
     expose: [
         {

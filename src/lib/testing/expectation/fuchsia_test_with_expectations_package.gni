@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/components.gni")
 import("//build/dist/resource.gni")
+import("//src/lib/testing/expectation/preprocess/preprocess.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 # Defines a fuchsia_test_package that carries a set of expectations to apply to
@@ -49,38 +50,11 @@ template("fuchsia_test_with_expectations_package") {
 
   _base_target_name = target_name
 
-  _preprocessed_target_name = "${_base_target_name}-expectations-preprocessed"
-  compiled_action(_preprocessed_target_name) {
-    tool = "//src/lib/testing/expectation/preprocess:bin"
-    tool_output_name = "expectation_file_preprocessor"
-    _preprocessed_expectations =
-        "${target_gen_dir}/${_base_target_name}-expectations-preprocessed.json5"
-    depfile = "$target_out_dir/${_preprocessed_target_name}.d"
-    args = [
-      "--root-expectations-file",
-      rebase_path(invoker.expectations, root_build_dir),
-      "--preprocessed-expectations-file",
-      rebase_path(_preprocessed_expectations, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-    ]
-
-    outputs = [ _preprocessed_expectations ]
-    sources = [ invoker.expectations ]
-
-    visibility = [ ":*" ]
+  _expectations_target = "${target_name}-expectations"
+  preprocess_expectations(_expectations_target) {
+    expectations = invoker.expectations
+    output_path = "expectations.json5"
   }
-  _preprocessed_target_name = ":$_preprocessed_target_name"
-
-  _expectations_target_name = "${_base_target_name}-expectations"
-  resource(_expectations_target_name) {
-    sources = get_target_outputs(_preprocessed_target_name)
-    outputs = [ "expectations.json5" ]
-    deps = [ _preprocessed_target_name ]
-
-    visibility = [ ":*" ]
-  }
-  _expectations_target_name = ":$_expectations_target_name"
 
   # The standard expect_includes build-time check allows you to enforce that, if
   # a component depends on your client library, then its manifest must include
@@ -179,8 +153,8 @@ template("fuchsia_test_with_expectations_package") {
                              "visibility",
                            ])
     deps = _include_check_targets + [
+             ":${_expectations_target}",
              "//src/lib/testing/expectation:expectation_comparer",
-             _expectations_target_name,
            ]
     if (defined(invoker.deps)) {
       deps += invoker.deps

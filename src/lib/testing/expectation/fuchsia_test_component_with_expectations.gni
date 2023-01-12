@@ -1,0 +1,83 @@
+# Copyright 2023 The Fuchsia Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//src/lib/testing/expectation/preprocess/preprocess.gni")
+
+# Defines a fuchsia_test_component with an expectations file for this test.
+#
+# Parameters
+#  expectations (required)
+#    Path to expectations file for this test.
+#    Type: path
+#
+#  manifest (required)
+#    The component manifest.
+#    Type: path
+#
+#  All others - same as fuchsia_test_component.
+template("fuchsia_test_component_with_expectations") {
+  assert(defined(invoker.expectations),
+         "Must define path to expectations file.")
+  assert(defined(invoker.manifest), "Must define path to manifest file.")
+
+  _test_component_name = target_name
+
+  _expectations_target = "${target_name}_expectations"
+  preprocess_expectations(_expectations_target) {
+    expectations = invoker.expectations
+    output_path =
+        "data/tests/expectations/${_test_component_name}/expectations.json5"
+  }
+
+  _expectations_offer_cml_shard_target = "${target_name}_offer_cml_shard"
+  _expectations_offer_cml_shard_file =
+      "${target_gen_dir}/${_test_component_name}_expectations_offer.shard.cml"
+  generated_file(_expectations_offer_cml_shard_target) {
+    contents = {
+      offer = [
+        {
+          directory = "pkg"
+          from = "framework"
+          as = "expectations"
+          to = "#expectation-comparer"
+          subdir = "data/tests/expectations/${_test_component_name}"
+        },
+      ]
+    }
+    outputs = [ _expectations_offer_cml_shard_file ]
+    output_conversion = "json"
+  }
+
+  _merged_cml_target = "${target_name}_merged_cml"
+  _merged_cml_file = "${_test_component_name}_merged.cml"
+  cmc_merge(_merged_cml_target) {
+    deps = [ ":${_expectations_offer_cml_shard_target}" ]
+    sources = [
+      _expectations_offer_cml_shard_file,
+      invoker.manifest,
+    ]
+    output_name = _merged_cml_file
+  }
+  cmc_merge_outputs = get_target_outputs(":${_merged_cml_target}")
+
+  fuchsia_test_component(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "manifest",
+                           ])
+
+    deps = [
+      ":${_expectations_target}",
+      ":${_merged_cml_target}",
+    ]
+    manifest = cmc_merge_outputs[0]
+
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+  }
+}
