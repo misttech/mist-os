@@ -55,7 +55,9 @@ void SetConstraintsAndClose(fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
   ASSERT_EQ(sysmem_allocator->BindSharedCollection(std::move(token), collection.NewRequest()),
             ZX_OK);
   ASSERT_EQ(collection->SetConstraints(true, constraints), ZX_OK);
-  ASSERT_EQ(collection->Close(), ZX_OK);
+  // If SetConstraints() fails there's a race where Sysmem may drop the channel. Don't assert on the
+  // success of Close().
+  collection->Close();
 }
 
 // Creates a thread that waits until |num_messages| have been received by |mock|, then calls join()
