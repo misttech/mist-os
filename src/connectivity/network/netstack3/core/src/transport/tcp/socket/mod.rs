@@ -71,7 +71,7 @@ use crate::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
         socket::{demux::tcp_serialize_segment, isn::IsnGenerator},
         state::{CloseError, Closed, Initial, State, Takeable},
-        BufferSizes, KeepAlive, DEFAULT_MAXIMUM_SEGMENT_SIZE,
+        BufferSizes, KeepAlive, NagleAlgorithm, DEFAULT_MAXIMUM_SEGMENT_SIZE,
     },
     DeviceId, Instant, SyncCtx,
 };
@@ -1294,9 +1294,12 @@ fn do_send_inner<I, SC, C>(
     C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
-    while let Some(seg) =
-        conn.state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, ctx.now(), &conn.keep_alive)
-    {
+    while let Some(seg) = conn.state.poll_send(
+        DEFAULT_MAXIMUM_SEGMENT_SIZE,
+        ctx.now(),
+        &conn.keep_alive,
+        NagleAlgorithm::default(),
+    ) {
         let ser = tcp_serialize_segment(seg, addr.ip.clone());
         ip_transport_ctx.send_ip_packet(ctx, &conn.ip_sock, ser, None).unwrap_or_else(
             |(body, err)| {

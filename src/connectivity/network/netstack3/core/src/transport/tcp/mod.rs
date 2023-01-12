@@ -128,3 +128,22 @@ impl Default for KeepAlive {
         }
     }
 }
+
+/// If the connection is using nagle algorithm.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum NagleAlgorithm {
+    Enabled,
+    // TODO(https://fxbug.dev/117115): This is unused before we can change the
+    // option value.
+    #[allow(unused)]
+    Disabled,
+}
+
+impl Default for NagleAlgorithm {
+    fn default() -> Self {
+        // RFC 9293 Section 3.7.4:
+        //   A TCP implementation SHOULD implement the Nagle algorithm to
+        //   coalesce short segments
+        NagleAlgorithm::Enabled
+    }
+}

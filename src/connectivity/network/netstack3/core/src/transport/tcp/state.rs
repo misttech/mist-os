@@ -25,7 +25,7 @@ use crate::{
         rtt::Estimator,
         segment::{Payload, Segment},
         seqnum::{SeqNum, WindowSize},
-        BufferSizes, Control, KeepAlive, UserError,
+        BufferSizes, Control, KeepAlive, NagleAlgorithm, UserError,
     },
     Instant,
 };
@@ -626,6 +626,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         mss: u32,
         now: I,
         keep_alive: &KeepAlive,
+        nagle: NagleAlgorithm,
     ) -> Option<Segment<SendPayload<'_>>> {
         let Self {
             nxt: snd_nxt,
@@ -712,7 +713,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             });
         let available = u32::try_from(buffer.len() + usize::from(FIN_QUEUED) - offset)
             .unwrap_or(WindowSize::MAX.into());
-
         // We can only send the minimum of the open window and the bytes that
         // are available, additionally, if in zero window probe mode, allow at
         // least one byte past the limit to be sent.
@@ -733,6 +733,24 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 can_send - u32::from(has_fin),
                 u32::try_from(readable.len()).unwrap_or(u32::MAX),
             );
+            // Per RFC 9293 Section 3.7.4:
+            //   If there is unacknowledged data (i.e., SND.NXT > SND.UNA), then
+            //   the sending TCP endpoint buffers all user data (regardless of
+            //   the PSH bit) until the outstanding data has been acknowledged
+            //   or until the TCP endpoint can send a full-sized segment
+            //   (Eff.snd.MSS bytes).
+            // Note: There is one special case that isn't covered by the RFC:
+            // If the current segment would contain a FIN, then even if it's a
+            // small segment, there is no reason to wait for more - there won't
+            // be more as the application has indicated.
+            match nagle {
+                NagleAlgorithm::Enabled => {
+                    if bytes_to_send < mss && !has_fin && snd_nxt.after(*snd_una) {
+                        return None;
+                    }
+                }
+                NagleAlgorithm::Disabled => {}
+            }
             // Don't send a segment if there isn't any data to read, unless that
             // segment would carry the FIN.
             if bytes_to_send == 0 && !has_fin {
@@ -1604,6 +1622,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         mss: u32,
         now: I,
         keep_alive: &KeepAlive,
+        nagle: NagleAlgorithm,
     ) -> Option<Segment<SendPayload<'_>>> {
         if self.poll_close(now, keep_alive) {
             return None;
@@ -1633,17 +1652,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 Segment::syn_ack(*iss, *irs + 1, WindowSize::DEFAULT).into()
             }),
             State::Established(Established { snd, rcv }) => {
-                snd.poll_send(rcv.nxt(), rcv.wnd(), mss, now, keep_alive)
+                snd.poll_send(rcv.nxt(), rcv.wnd(), mss, now, keep_alive, nagle)
             }
             State::CloseWait(CloseWait { snd, last_ack, last_wnd }) => {
-                snd.poll_send(*last_ack, *last_wnd, mss, now, keep_alive)
+                snd.poll_send(*last_ack, *last_wnd, mss, now, keep_alive, nagle)
             }
             State::LastAck(LastAck { snd, last_ack, last_wnd })
             | State::Closing(Closing { snd, last_ack, last_wnd }) => {
-                snd.poll_send(*last_ack, *last_wnd, mss, now, keep_alive)
+                snd.poll_send(*last_ack, *last_wnd, mss, now, keep_alive, nagle)
             }
             State::FinWait1(FinWait1 { snd, rcv }) => {
-                snd.poll_send(rcv.nxt(), rcv.wnd(), mss, now, keep_alive)
+                snd.poll_send(rcv.nxt(), rcv.wnd(), mss, now, keep_alive, nagle)
             }
             State::Closed(_) | State::Listen(_) | State::FinWait2(_) | State::TimeWait(_) => None,
         }
@@ -2029,7 +2048,7 @@ mod test {
             mss: u32,
             now: FakeInstant,
         ) -> Option<Segment<SendPayload<'_>>> {
-            self.poll_send(mss, now, &KeepAlive::default())
+            self.poll_send(mss, now, &KeepAlive::default(), NagleAlgorithm::default())
         }
 
         fn on_segment_with_default_options<P: Payload, BP: BufferProvider<R, S, ActiveOpen = ()>>(
@@ -2913,7 +2932,7 @@ mod test {
         );
 
         assert_eq!(
-            established.poll_send_with_default_options(u32::MAX, clock.now()),
+            established.poll_send_with_default_options(1, clock.now()),
             Some(Segment::data(
                 ISS_1 + 4,
                 ISS_2 + 1,
@@ -2923,7 +2942,7 @@ mod test {
         );
 
         // We've exhausted our send buffer.
-        assert_eq!(established.poll_send_with_default_options(u32::MAX, clock.now()), None);
+        assert_eq!(established.poll_send_with_default_options(1, clock.now()), None);
     }
 
     #[test]
@@ -3652,7 +3671,15 @@ mod test {
         let keep_alive = &keep_alive;
 
         // Currently we have nothing to send,
-        assert_eq!(state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), keep_alive), None,);
+        assert_eq!(
+            state.poll_send(
+                DEFAULT_MAXIMUM_SEGMENT_SIZE,
+                clock.now(),
+                keep_alive,
+                NagleAlgorithm::default(),
+            ),
+            None,
+        );
         // so the above poll_send call will install a timer, which will fire
         // after `keep_alive.idle`.
         assert_eq!(
@@ -3681,7 +3708,12 @@ mod test {
         // `interval` seconds.
         for _ in 0..keep_alive.count.get() {
             assert_eq!(
-                state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), keep_alive),
+                state.poll_send(
+                    DEFAULT_MAXIMUM_SEGMENT_SIZE,
+                    clock.now(),
+                    keep_alive,
+                    NagleAlgorithm::default(),
+                ),
                 Some(Segment::ack(ISS_1 - 1, ISS_2, WindowSize::DEFAULT).into())
             );
             clock.sleep(keep_alive.interval.into());
@@ -3690,7 +3722,15 @@ mod test {
 
         // At this time the connection is closed and we don't have anything to
         // send.
-        assert_eq!(state.poll_send(DEFAULT_MAXIMUM_SEGMENT_SIZE, clock.now(), keep_alive), None,);
+        assert_eq!(
+            state.poll_send(
+                DEFAULT_MAXIMUM_SEGMENT_SIZE,
+                clock.now(),
+                keep_alive,
+                NagleAlgorithm::default()
+            ),
+            None,
+        );
         assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
     }
 
@@ -3775,6 +3815,7 @@ mod test {
                     DEFAULT_MAXIMUM_SEGMENT_SIZE,
                     FakeInstant::default(),
                     &KeepAlive::default(),
+                    NagleAlgorithm::default(),
                 )
                 .expect("has data"))
         }
@@ -3893,6 +3934,55 @@ mod test {
                 ISS_2 + 1,
                 WindowSize::new(BUFFER_SIZE).unwrap(),
                 SendPayload::Contiguous(&TEST_BYTES[1..])
+            ))
+        );
+    }
+
+    #[test]
+    fn nagle() {
+        let clock = FakeInstantCtx::default();
+        let mut send_buffer = RingBuffer::new(BUFFER_SIZE);
+        assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
+        // Set up the state machine to start with Established.
+        let mut state: State<_, _, _, ()> = State::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                buffer: send_buffer.clone(),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic(),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                assembler: Assembler::new(ISS_2 + 1),
+            },
+        });
+        assert_eq!(
+            state.poll_send(3, clock.now(), &KeepAlive::default(), NagleAlgorithm::Enabled),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                WindowSize::new(BUFFER_SIZE).unwrap(),
+                SendPayload::Contiguous(&TEST_BYTES[0..3])
+            ))
+        );
+        assert_eq!(
+            state.poll_send(3, clock.now(), &KeepAlive::default(), NagleAlgorithm::Enabled),
+            None
+        );
+        assert_eq!(
+            state.poll_send(3, clock.now(), &KeepAlive::default(), NagleAlgorithm::Disabled),
+            Some(Segment::data(
+                ISS_1 + 4,
+                ISS_2 + 1,
+                WindowSize::new(BUFFER_SIZE).unwrap(),
+                SendPayload::Contiguous(&TEST_BYTES[3..5])
             ))
         );
     }
