@@ -461,6 +461,180 @@ void Server::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
 }
 
 void Server::SignalProcessingConnect(SignalProcessingConnectRequestView request,
-                                     SignalProcessingConnectCompleter::Sync& completer) {}
+                                     SignalProcessingConnectCompleter::Sync& completer) {
+  if (!is_input_) {
+    if (signal_) {
+      request->protocol.Close(ZX_ERR_ALREADY_BOUND);
+      return;
+    }
+    auto on_unbound =
+        [this](
+            fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing>*,
+            fidl::UnbindInfo info,
+            fidl::ServerEnd<fuchsia_hardware_audio_signalprocessing::SignalProcessing> server_end) {
+          if (info.is_peer_closed()) {
+            DA7219_LOG(DEBUG, "Client disconnected");
+          } else if (!info.is_user_initiated()) {
+            // Do not log canceled cases which happens too often in particular in test cases.
+            if (info.status() != ZX_ERR_CANCELED) {
+              DA7219_LOG(ERROR, "Client connection unbound: %s", info.status_string());
+            }
+          }
+          if (signal_) {
+            signal_.reset();
+          }
+        };
+    signal_.emplace(fidl::BindServer(core_->dispatcher(), std::move(request->protocol), this,
+                                     std::move(on_unbound)));
+  } else {
+    request->protocol.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::GetElements(GetElementsCompleter::Sync& completer) {
+  if (!is_input_) {
+    fidl::Arena arena;
+
+    auto gain = fuchsia_hardware_audio_signalprocessing::wire::Gain::Builder(arena)
+                    .type(fuchsia_hardware_audio_signalprocessing::GainType::kDecibels)
+                    .min_gain(kMinHeadphoneGainDb)
+                    .max_gain(kMaxHeadphoneGainDb)
+                    .min_gain_step(kGainStepHeadphoneGainDb);
+
+    auto element =
+        fuchsia_hardware_audio_signalprocessing::wire::Element::Builder(arena)
+            .id(kHeadphoneGainPeId)
+            .type(fuchsia_hardware_audio_signalprocessing::ElementType::kGain)
+            .type_specific(
+                fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElement::WithGain(
+                    arena, gain.Build()))
+            .can_disable(false)
+            .description("Headphones gain");
+
+    fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::Element> elements(arena, 1);
+    elements[0] = element.Build();
+    completer.ReplySuccess(std::move(elements));
+  } else {
+    DA7219_LOG(ERROR, "Get elements is not supported on input");
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::WatchElementState(WatchElementStateRequestView request,
+                               WatchElementStateCompleter::Sync& completer) {
+  if (!is_input_) {
+    if (request->processing_element_id != kHeadphoneGainPeId) {
+      DA7219_LOG(ERROR, "Bad element id %lu", request->processing_element_id);
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+
+    if (!last_gain_update_reported_) {
+      last_gain_update_reported_ = true;
+
+      fidl::Arena arena;
+      auto gain_param =
+          fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+      gain_param.gain(gain_);
+      auto type_specific_gain =
+          fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+              arena, gain_param.Build());
+      auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+      gain_state.type_specific(type_specific_gain);
+      completer.Reply(gain_state.Build());
+    } else if (!gain_completer_) {
+      gain_completer_.emplace(completer.ToAsync());
+    } else {
+      // The client called WatchElementState when another hanging get was pending.
+      // This is an error condition and hence we unbind the channel.
+      signal_->Unbind();
+    }
+
+  } else {
+    DA7219_LOG(ERROR, "Watch element state is not supported on input");
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::GetTopologies(GetTopologiesCompleter::Sync& completer) {
+  if (!is_input_) {
+    fidl::Arena arena;
+
+    auto topology = fuchsia_hardware_audio_signalprocessing::wire::Topology::Builder(arena);
+    topology.id(kTopologyId);
+
+    fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::EdgePair> pairs(arena, 1);
+    pairs[0] = {.processing_element_id_from = kHeadphoneGainPeId,
+                .processing_element_id_to = kHeadphoneGainPeId};
+    topology.processing_elements_edge_pairs(std::move(pairs));
+
+    fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::Topology> topologies(arena, 1);
+    topologies[0] = topology.Build();
+    completer.ReplySuccess(std::move(topologies));
+  } else {
+    DA7219_LOG(ERROR, "Get topologies is not supported on input");
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::SetElementState(SetElementStateRequestView request,
+                             SetElementStateCompleter::Sync& completer) {
+  if (!is_input_) {
+    if (request->processing_element_id != kHeadphoneGainPeId) {
+      DA7219_LOG(ERROR, "Bad element id %lu", request->processing_element_id);
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    if (!request->state.has_type_specific()) {
+      // Nothing more to do if no type specific args are provided.
+      completer.ReplySuccess();
+      return;
+    }
+    if (!request->state.type_specific().is_gain() ||
+        !request->state.type_specific().gain().has_gain()) {
+      // If type specific info is there, then gain must be provided.
+      DA7219_LOG(ERROR, "Bad set element with no gain");
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    gain_ = request->state.type_specific().gain().gain();
+    if (gain_ < kMinHeadphoneGainDb || gain_ > kMaxHeadphoneGainDb) {
+      float new_gain = std::clamp(gain_, kMinHeadphoneGainDb, kMaxHeadphoneGainDb);
+      DA7219_LOG(WARNING, "Set element state gain %f out of bounds clamping to %f",
+                 request->state.type_specific().gain().gain(), new_gain);
+      gain_ = new_gain;
+    }
+    static_assert(kGainStepHeadphoneGainDb == 1.0f);
+    // We report gain step of 1dB that is applied in the conversion to integer here.
+    constexpr int32_t kRegDeltaFrom0dB = 0x39;
+    uint8_t gain_reg = static_cast<uint8_t>(static_cast<int32_t>(gain_) + kRegDeltaFrom0dB);
+    HpLGain::Get().set_hp_l_amp_gain(gain_reg).Write(core_->i2c());
+    HpRGain::Get().set_hp_r_amp_gain(gain_reg).Write(core_->i2c());
+    if (gain_completer_) {
+      gain_completer_->Reply(std::move(request->state));
+      gain_completer_.reset();
+      last_gain_update_reported_ = true;
+    } else {
+      last_gain_update_reported_ = false;
+    }
+    completer.ReplySuccess();
+  } else {
+    DA7219_LOG(ERROR, "Set elements is not supported on input");
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) {
+  if (!is_input_) {
+    if (request->topology_id != kTopologyId) {
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    completer.ReplySuccess();
+  } else {
+    DA7219_LOG(ERROR, "Set topology is not supported on input");
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+}
 
 }  // namespace audio::da7219

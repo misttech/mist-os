@@ -57,12 +57,20 @@ class Core {
   std::optional<PlugCallback> plug_callback_output_;
 };
 
-class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec> {
+class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
+               public fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
   explicit Server(Logger* logger, std::shared_ptr<Core> core, bool is_input);
   async_dispatcher_t* dispatcher() { return core_->dispatcher(); }
 
  private:
+  static constexpr uint64_t kTopologyId = 1;
+  static constexpr uint64_t kHeadphoneGainPeId = 1;  // Processing element.
+
+  static constexpr float kMinHeadphoneGainDb = -57.0f;
+  static constexpr float kMaxHeadphoneGainDb = 6.0f;
+  static constexpr float kGainStepHeadphoneGainDb = 1.0f;
+
   // LLCPP implementation for the Codec API.
   void Reset(ResetCompleter::Sync& completer) override;
   void Stop(StopCompleter::Sync& completer) override;
@@ -80,9 +88,20 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec> {
   void SignalProcessingConnect(SignalProcessingConnectRequestView request,
                                SignalProcessingConnectCompleter::Sync& completer) override;
 
+  // LLCPP implementation for the SignalProcessing API.
+  void GetElements(GetElementsCompleter::Sync& completer) override;
+  void WatchElementState(WatchElementStateRequestView request,
+                         WatchElementStateCompleter::Sync& completer) override;
+  void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
+  void SetElementState(SetElementStateRequestView request,
+                       SetElementStateCompleter::Sync& completer) override;
+  void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
+
   Logger* logger_;
   std::shared_ptr<Core> core_;
   bool is_input_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
+      signal_;
 
   // Plug state. Must reply to the first Watch request, if there is no plug state update before the
   // first Watch, reply with unplugged at time 0.
@@ -90,6 +109,10 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec> {
   zx::time plugged_time_;
   bool plug_state_updated_ = true;
   std::optional<WatchPlugStateCompleter::Async> plug_state_completer_;
+
+  bool last_gain_update_reported_ = false;  // So we return the gain state on the first call.
+  float gain_ = 0.0f;
+  std::optional<WatchElementStateCompleter::Async> gain_completer_;
 };
 
 }  // namespace audio::da7219

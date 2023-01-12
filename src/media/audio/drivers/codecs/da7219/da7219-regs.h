@@ -137,6 +137,16 @@ struct CpCtrl : public I2cRegister<CpCtrl, 0x47> {
   static constexpr uint8_t kCpMchangeSignalMagnitude = 3;
 };
 
+// HP_L_GAIN
+struct HpLGain : public I2cRegister<HpLGain, 0x48> {
+  DEF_FIELD(5, 0, hp_l_amp_gain);
+};
+
+// HP_R_GAIN
+struct HpRGain : public I2cRegister<HpRGain, 0x49> {
+  DEF_FIELD(5, 0, hp_r_amp_gain);
+};
+
 // MIXOUT_L_SELECT.
 struct MixoutLSelect : public I2cRegister<MixoutLSelect, 0x4b> {
   DEF_BIT(0, mixout_l_mix_select);

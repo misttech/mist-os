@@ -12,6 +12,11 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/media/audio/drivers/codecs/da7219/da7219-dfv1.h"
 
+namespace {
+static constexpr uint64_t kTopologyId = 1;
+static constexpr uint64_t kHeadphoneGainPeId = 1;
+}  // namespace
+
 namespace audio::da7219 {
 
 class Da7219Test : public zxtest::Test {
@@ -50,7 +55,8 @@ class Da7219Test : public zxtest::Test {
     EXPECT_TRUE(codec_endpoints.is_ok());
     codec_ = fidl::WireSyncClient(std::move(codec_endpoints->client));
 
-    [[maybe_unused]] auto unused = codec_connector_->Connect(std::move(codec_endpoints->server));
+    auto connect_ret = codec_connector_->Connect(std::move(codec_endpoints->server));
+    ASSERT_TRUE(connect_ret.ok());
 
     ASSERT_OK(output_device->DdkAdd(ddk::DeviceAddArgs("DA7219-output")));
     output_device.release();
@@ -132,7 +138,8 @@ TEST_F(Da7219Test, Reset) {
   mock_i2c_.ExpectWriteStop({0xc5, 0xff}, ZX_OK);  // Mask buttons.
   mock_i2c_.ExpectWriteStop({0xc3, 0xff}, ZX_OK);  // Clear buttons.
 
-  [[maybe_unused]] auto unused = codec_->Reset();
+  auto codec_ret = codec_->Reset();
+  ASSERT_TRUE(codec_ret.ok());
 }
 
 TEST_F(Da7219Test, GoodSetDai48kHz) {
@@ -212,7 +219,8 @@ TEST_F(Da7219Test, PlugDetectInitiallyUnplugged) {
       .ExpectWriteStop({0x6c, 0x77}, ZX_OK);       // HP Routing (Right HP disabled).
   mock_i2c_.ExpectWriteStop({0xc2, 0x07}, ZX_OK);  // Clear all.
 
-  [[maybe_unused]] auto unused = codec_->Reset();
+  auto codec_ret = codec_->Reset();
+  ASSERT_TRUE(codec_ret.ok());
 
   // Initial Watch gets status from Reset.
   auto initial_plugged_state = codec_->WatchPlugState();
@@ -309,7 +317,8 @@ TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
       .ExpectWriteStop({0x6c, 0xff}, ZX_OK);       // HP Routing (Right HP enabled).
   mock_i2c_.ExpectWriteStop({0xc2, 0x07}, ZX_OK);  // Clear all.
 
-  [[maybe_unused]] auto unused = codec_->Reset();
+  auto codec_ret = codec_->Reset();
+  ASSERT_TRUE(codec_ret.ok());
 
   // Initial Watch gets status from Reset.
   auto initial_plugged_state = codec_->WatchPlugState();
@@ -387,8 +396,8 @@ TEST_F(Da7219Test, PlugDetectNoMicrophoneWatchBeforeReset) {
   EXPECT_TRUE(input_codec_endpoints.is_ok());
   fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
 
-  [[maybe_unused]] auto unused =
-      input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
   input_device.release();
@@ -456,8 +465,8 @@ TEST_F(Da7219Test, PlugDetectWithMicrophoneWatchBeforeReset) {
   EXPECT_TRUE(input_codec_endpoints.is_ok());
   fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
 
-  [[maybe_unused]] auto unused =
-      input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  ASSERT_TRUE(connect_ret.ok());
 
   ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
   input_device.release();
@@ -488,4 +497,250 @@ TEST_F(Da7219Test, PlugDetectWithMicrophoneWatchBeforeReset) {
   ASSERT_TRUE(input_state.value().plug_state.plugged());  // With mic reports plugged.
   // The last 2-way sync call makes sure the IRQ processing is completed in the server.
 }
+
+TEST_F(Da7219Test, InputSignalProcessingNotSupported) {
+  auto input_codec_connector_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
+  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+  auto input_codec_connector =
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+  auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+                   input_device.get());
+
+  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
+  EXPECT_TRUE(input_codec_endpoints.is_ok());
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  ASSERT_TRUE(connect_ret.ok());
+
+  ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
+  input_device.release();
+
+  auto signal_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  EXPECT_TRUE(signal_endpoints.is_ok());
+  auto signal_connect_ret =
+      input_codec->SignalProcessingConnect(std::move(signal_endpoints->server));
+  ASSERT_TRUE(signal_connect_ret.ok());
+
+  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+
+  auto topologies = signal->GetTopologies();
+  ASSERT_EQ(topologies.status(), ZX_ERR_PEER_CLOSED);
+}
+
+TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
+  auto signal_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  EXPECT_TRUE(signal_endpoints.is_ok());
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+  ASSERT_TRUE(signal_connect_ret.ok());
+
+  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+
+  // 1 gain element.
+  auto elements = signal->GetElements();
+  ASSERT_OK(elements.status());
+  ASSERT_EQ(elements.value()->processing_elements.count(), 1);
+  auto& element0 = elements.value()->processing_elements[0];
+  ASSERT_EQ(element0.id(), kHeadphoneGainPeId);
+  ASSERT_EQ(element0.type(), fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
+  ASSERT_EQ(element0.can_disable(), false);
+  ASSERT_STREQ(element0.description().data(), "Headphones gain");
+
+  // Topology with 1 element id 1.
+  auto topologies = signal->GetTopologies();
+  ASSERT_OK(topologies.status());
+  ASSERT_EQ(topologies.value()->topologies.count(), 1);
+  auto& topology0 = topologies.value()->topologies[0];
+  ASSERT_EQ(topology0.id(), kTopologyId);
+  ASSERT_EQ(topology0.processing_elements_edge_pairs().count(), 1);
+  auto& edge0 = topology0.processing_elements_edge_pairs()[0];
+  ASSERT_EQ(edge0.processing_element_id_from, kHeadphoneGainPeId);
+  ASSERT_EQ(edge0.processing_element_id_to, kHeadphoneGainPeId);
+}
+
+TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
+  auto signal_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  EXPECT_TRUE(signal_endpoints.is_ok());
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+  ASSERT_TRUE(signal_connect_ret.ok());
+
+  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+
+  // Set gain to 0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x39}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x39}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(0.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // Set gain to -57.0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x00}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x00}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(-57.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // Set gain to 6.0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x3f}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x3f}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(6.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // Set gain out of bounds too high, still set registers to 6.0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x3f}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x3f}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(7.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // Set gain out of bounds too low, still set registers to -57.0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x00}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x00}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(-99.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // One watch for initial reply.
+  auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);
+  ASSERT_OK(gain_state.status());
+  ASSERT_EQ(gain_state.value().state.type_specific().gain().gain(), -57.0f);
+
+  // A second watch with no reply since there is no change of gain.
+  std::thread th([&]() -> void {
+    auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);
+    ASSERT_OK(gain_state.status());
+    ASSERT_EQ(gain_state.value().state.type_specific().gain().gain(), 0.0f);
+  });
+
+  // Allow for the thread to execute and start the watch.
+  // This must work regardless of the watch actually starting, it is ok if this is not long enough.
+  zx::nanosleep(zx::deadline_after(zx::msec(1)));
+
+  // Set gain to 0dB.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x39}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x39}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(0.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  th.join();
+
+  // Set gain again (to 3dB) to allow for a new Watch to reply since there is a new value.
+  {
+    mock_i2c_.ExpectWriteStop({0x48, 0x3c}, ZX_OK);
+    mock_i2c_.ExpectWriteStop({0x49, 0x3c}, ZX_OK);
+    fidl::Arena arena;
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(3.0f);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    gain_state.type_specific(type_specific_gain);
+    auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
+    ASSERT_OK(gain_ret.status());
+  }
+
+  // And then the new Watch does not get stuck because there was a new value.
+  {
+    auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);
+    ASSERT_OK(gain_state.status());
+    ASSERT_EQ(gain_state.value().state.type_specific().gain().gain(), 3.0f);
+  }
+}
+
+TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainBadWatchBehavior) {
+  auto signal_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  EXPECT_TRUE(signal_endpoints.is_ok());
+  auto signal_connect_ret = codec_->SignalProcessingConnect(std::move(signal_endpoints->server));
+  ASSERT_TRUE(signal_connect_ret.ok());
+
+  fidl::WireSyncClient signal(std::move(signal_endpoints->client));
+
+  // One watch for initial reply.
+  auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);
+  ASSERT_OK(gain_state.status());
+  ASSERT_EQ(gain_state.value().state.type_specific().gain().gain(), 0.0f);
+
+  // A watch calls while another one is pending must close the channel.
+  auto watch = [&]() -> void {
+    auto gain_state = signal->WatchElementState(kHeadphoneGainPeId);
+    ASSERT_EQ(gain_state.status(), ZX_ERR_PEER_CLOSED);
+  };
+  std::thread th1(watch);
+  std::thread th2(watch);
+
+  // We are able to join because both threads complete with peer closed errors.
+  th1.join();
+  th2.join();
+}
+
 }  // namespace audio::da7219
