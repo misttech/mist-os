@@ -8,6 +8,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a5;
 using fuchsia.platform;
 using fuchsia.dsp;
+using fuchsia.gpio;
 using fuchsia.mailbox;
 
 primary node "pdev" {

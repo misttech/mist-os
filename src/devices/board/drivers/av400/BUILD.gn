@@ -190,6 +190,7 @@ driver_bind_rules("tdm-i2s-in-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.dsp",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
   ]
