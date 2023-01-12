@@ -424,3 +424,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0203_system_energy_info.md
   - title: "RFC-0204: VMO Reference Child"
     path: /docs/contribute/governance/rfcs/0204_vmo_reference_child.md
+  - title: "RFC-0205: Vulkan Loader"
+    path: /docs/contribute/governance/rfcs/0205_vulkan_loader.md

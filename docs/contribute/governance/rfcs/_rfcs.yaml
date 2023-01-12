@@ -2669,3 +2669,16 @@
   consulted: ['brettw@google.com', 'cdrllrd@google.com', 'csuter@google.com', 'travisg@google.com']
   submitted: '2023-01-04'
   reviewed: '2023-01-03'
+
+- name: 'RFC-0205'
+  title: 'Vulkan Loader'
+  short_description: 'A description of how applications load Vulkan ICDs and layers'
+  authors: ['jbauman@google.com']
+  file: '0205_vulkan_loader.md'
+  area: ['Graphics']
+  issue: ['87685']
+  gerrit_change_id: ['739772']
+  status: 'Accepted'
+  reviewers: ['cstout@google.com', 'costan@google.com', 'jhowarth@google.com', 'msandy@google.com', 'rosasco@google.com', 'palmer@google.com', 'wittrock@google.com']
+  submitted: '2023-01-12'
+  reviewed: '2023-01-12'
