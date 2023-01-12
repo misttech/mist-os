@@ -12,10 +12,14 @@
 
 #![deny(missing_docs)]
 
+#[cfg(test)]
+mod testutil;
+
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use fidl_fuchsia_net_routes as fnet_routes;
+use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::{
-    ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet},
+    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet},
     SpecifiedAddr, UnicastAddress,
 };
 use thiserror::Error;
@@ -336,15 +340,152 @@ impl TryFrom<fnet_routes::EventV6> for Event<Ipv6> {
     }
 }
 
+/// Route watcher creation errors.
+#[derive(Clone, Debug, Error)]
+pub enum WatcherCreationError {
+    /// Proxy creation failed.
+    #[error("failed to create route watcher proxy: {0}")]
+    CreateProxy(fidl::Error),
+    /// Watcher acquisition failed.
+    #[error("failed to get route watcher: {0}")]
+    GetWatcher(fidl::Error),
+}
+
+/// Route watcher `Watch` errors.
+#[derive(Clone, Debug, Error)]
+pub enum WatchError {
+    /// The call to `Watch` returned a FIDL error.
+    #[error("the call to `Watch()` failed: {0}")]
+    Fidl(fidl::Error),
+    /// The event returned by `Watch` encountered a conversion error.
+    #[error("failed to convert event returned by `Watch()`: {0}")]
+    Conversion(FidlConversionError),
+    /// The server returned an empty batch of events.
+    #[error("the call to `Watch()` returned an empty batch of events")]
+    EmptyEventBatch,
+}
+
+/// IP Extension for the `fuchsia.net.routes` FIDL API.
+pub trait FidlRouteIpExt: Ip {
+    /// The "state" protocol to use for this IP version.
+    type StateMarker: fidl::endpoints::ProtocolMarker;
+    /// The "watcher" protocol to use for this IP version.
+    type WatcherMarker: fidl::endpoints::ProtocolMarker;
+    /// The type of "event" returned by the this IP version's watcher protocol.
+    type WatchEvent: TryInto<Event<Self>, Error = FidlConversionError>
+        + Clone
+        + std::fmt::Debug
+        + PartialEq
+        + Unpin;
+}
+
+impl FidlRouteIpExt for Ipv4 {
+    type StateMarker = fnet_routes::StateV4Marker;
+    type WatcherMarker = fnet_routes::WatcherV4Marker;
+    type WatchEvent = fnet_routes::EventV4;
+}
+
+impl FidlRouteIpExt for Ipv6 {
+    type StateMarker = fnet_routes::StateV6Marker;
+    type WatcherMarker = fnet_routes::WatcherV6Marker;
+    type WatchEvent = fnet_routes::EventV6;
+}
+
+// Dispatches either `GetWatcherV4` or `GetWatcherV6` on the state proxy.
+pub(crate) fn get_watcher<I: FidlRouteIpExt>(
+    state_proxy: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError> {
+    let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy::<I::WatcherMarker>()
+        .map_err(WatcherCreationError::CreateProxy)?;
+
+    #[derive(GenericOverIp)]
+    struct GetWatcherInputs<'a, I: Ip + FidlRouteIpExt> {
+        watcher_server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
+        state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    }
+    let IpInvariant(result) = I::map_ip::<GetWatcherInputs<'_, I>, _>(
+        GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy },
+        |GetWatcherInputs { watcher_server_end, state_proxy }| {
+            IpInvariant(
+                state_proxy
+                    .get_watcher_v4(watcher_server_end, fnet_routes::WatcherOptionsV4::EMPTY),
+            )
+        },
+        |GetWatcherInputs { watcher_server_end, state_proxy }| {
+            IpInvariant(
+                state_proxy
+                    .get_watcher_v6(watcher_server_end, fnet_routes::WatcherOptionsV6::EMPTY),
+            )
+        },
+    );
+
+    result.map_err(WatcherCreationError::GetWatcher)?;
+    Ok(watcher_proxy)
+}
+
+// Calls `Watch()` on the provided `WatcherV4` or `WatcherV6` proxy.
+fn watch<'a, I: FidlRouteIpExt>(
+    watcher_proxy: &'a <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> impl Future<Output = Result<Vec<I::WatchEvent>, fidl::Error>> {
+    #[derive(GenericOverIp)]
+    struct WatchInputs<'a, I: Ip + FidlRouteIpExt> {
+        watcher_proxy: &'a <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    }
+    #[derive(GenericOverIp)]
+    struct WatchOutputs<I: Ip + FidlRouteIpExt> {
+        watch_fut: fidl::client::QueryResponseFut<Vec<I::WatchEvent>>,
+    }
+    let WatchOutputs { watch_fut } = I::map_ip::<WatchInputs<'_, I>, WatchOutputs<I>>(
+        WatchInputs { watcher_proxy },
+        |WatchInputs { watcher_proxy }| WatchOutputs { watch_fut: watcher_proxy.watch() },
+        |WatchInputs { watcher_proxy }| WatchOutputs { watch_fut: watcher_proxy.watch() },
+    );
+    watch_fut
+}
+
+/// Connects to the watcher protocol and converts the Hanging-Get style API into
+/// an Event stream.
+///
+/// Each call to `Watch` returns a batch of events, which are flattened into a
+/// single stream. If an error is encountered while calling `Watch` or while
+/// converting the event, the stream is immediately terminated.
+pub fn event_stream_from_state<I: FidlRouteIpExt>(
+    routes_state: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
+    let watcher = get_watcher::<I>(routes_state)?;
+    Ok(futures::stream::try_unfold(watcher, |watcher| async {
+        let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
+        if events_batch.is_empty() {
+            return Err(WatchError::EmptyEventBatch);
+        }
+        // Convert the `I::WatchEvent` into an `Event<I>` and return any error.
+        let events_batch = events_batch
+            .into_iter()
+            .map(|event| event.try_into())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(WatchError::Conversion)?;
+        // Below, `try_flatten` requires that the inner stream yields `Result`s.
+        let event_stream = futures::stream::iter(events_batch).map(Ok);
+        Ok(Some((event_stream, watcher)))
+    })
+    // Flatten the stream of event streams into a single event stream.
+    .try_flatten())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil;
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as _;
+    use fuchsia_zircon_status as zx_status;
+    use futures::FutureExt;
     use net_declare::{
         fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, net_ip_v4,
         net_ip_v6, net_subnet_v4, net_subnet_v6,
     };
+    use netstack_testing_macros::netstack_test;
+    use test_case::test_case;
 
     /// Allows types to provided an arbitrary but valid value for tests.
     trait ArbitraryTestValue {
@@ -844,5 +985,253 @@ mod tests {
             fnet_routes::EventV6::Removed(DEFAULT_ROUTE).try_into(),
             Ok(Event::Removed(expected_route))
         );
+    }
+
+    // Tests the `event_stream_from_state` with various "shapes". The test
+    // parameter is a vec of ranges, where each range corresponds to the batch
+    // of events that will be sent in response to a single call to `Watch().
+    #[netstack_test]
+    #[test_case(Vec::new(); "no events")]
+    #[test_case(vec![0..1]; "single_batch_single_event")]
+    #[test_case(vec![0..10]; "single_batch_many_events")]
+    #[test_case(vec![0..10, 10..20, 20..30]; "many_batches_many_events")]
+    async fn event_stream_from_state_against_shape<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+        test_shape: Vec<std::ops::Range<u32>>,
+    ) {
+        // Build the event stream based on the `test_shape`. Use a channel
+        // so that the stream stays open until `close_channel` is called later.
+        let (batches_sender, batches_receiver) =
+            futures::channel::mpsc::unbounded::<Vec<I::WatchEvent>>();
+        for batch_shape in &test_shape {
+            batches_sender
+                .unbounded_send(testutil::generate_events_in_range::<I>(batch_shape.clone()))
+                .expect("failed to send event batch");
+        }
+
+        // Instantiate the fake Watcher implementation.
+        let (state, state_server_end) =
+            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (mut state_request_stream, _control_handle) = state_server_end
+            .into_stream_and_control_handle()
+            .expect("failed to get `State` request stream");
+        let watcher_fut = state_request_stream
+            .next()
+            .then(|req| {
+                testutil::serve_state_request::<I>(
+                    req.expect("State request_stream unexpectedly ended"),
+                    batches_receiver,
+                )
+            })
+            .fuse();
+
+        let event_stream =
+            event_stream_from_state::<I>(&state).expect("failed to connect to watcher").fuse();
+
+        futures::pin_mut!(watcher_fut, event_stream);
+
+        for batch_shape in test_shape {
+            for event_idx in batch_shape.into_iter() {
+                futures::select! {
+                    () = watcher_fut => panic!("fake watcher implementation unexpectedly finished"),
+                    event = event_stream.next() => {
+                        let actual_event = event
+                            .expect("event stream unexpectedly empty")
+                            .expect("error processing event");
+                        let expected_event = testutil::generate_event::<I>(event_idx)
+                                .try_into()
+                                .expect("test event is unexpectedly invalid");
+                        assert_eq!(actual_event, expected_event);
+                    }
+                };
+            }
+        }
+
+        // Close `batches_sender` and observe that the `event_stream` ends.
+        batches_sender.close_channel();
+        let ((), mut events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
+        assert_matches!(
+            events.pop(),
+            Some(Err(WatchError::Fidl(fidl::Error::ClientChannelClosed {
+                status: zx_status::Status::PEER_CLOSED,
+                ..
+            })))
+        );
+        assert_matches!(events[..], []);
+    }
+
+    // Verify that calling `event_stream_from_state` multiple times with the
+    // same `State` proxy, results in independent `Watcher` clients.
+    #[netstack_test]
+    async fn event_stream_from_state_multiple_watchers<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+    ) {
+        // Events for 3 watchers. Each receives one batch containing 10 events.
+        let test_data = vec![
+            vec![testutil::generate_events_in_range::<I>(0..10)],
+            vec![testutil::generate_events_in_range::<I>(10..20)],
+            vec![testutil::generate_events_in_range::<I>(20..30)],
+        ];
+
+        // Instantiate the fake Watcher implementations.
+        let (state, state_server_end) =
+            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (state_request_stream, _control_handle) = state_server_end
+            .into_stream_and_control_handle()
+            .expect("failed to get `State` request stream");
+        let watchers_fut = state_request_stream
+            .zip(futures::stream::iter(test_data.clone()))
+            .for_each_concurrent(std::usize::MAX, |(request, watcher_data)| {
+                testutil::serve_state_request::<I>(request, futures::stream::iter(watcher_data))
+            });
+
+        let validate_event_streams_fut =
+            futures::future::join_all(test_data.into_iter().map(|watcher_data| {
+                let events_fut = event_stream_from_state::<I>(&state)
+                    .expect("failed to connect to watcher")
+                    .collect::<std::collections::VecDeque<_>>();
+                events_fut.then(|mut events| {
+                    for expected_event in watcher_data.into_iter().flatten() {
+                        assert_eq!(
+                            events
+                                .pop_front()
+                                .expect("event_stream unexpectedly empty")
+                                .expect("error processing event"),
+                            expected_event.try_into().expect("test event is unexpectedly invalid"),
+                        );
+                    }
+                    assert_matches!(
+                        events.pop_front(),
+                        Some(Err(WatchError::Fidl(fidl::Error::ClientChannelClosed {
+                            status: zx_status::Status::PEER_CLOSED,
+                            ..
+                        })))
+                    );
+                    assert_matches!(events.make_contiguous(), []);
+                    futures::future::ready(())
+                })
+            }));
+
+        let ((), _): ((), Vec<()>) = futures::join!(watchers_fut, validate_event_streams_fut);
+    }
+
+    // Verify that failing to convert an event results in an error and closes
+    // the event stream. `trailing_event` and `trailing_batch` control whether
+    // a good event is sent after the bad event, either as part of the same
+    // batch or in a subsequent batch. The test expects this data to be
+    // truncated from the resulting event_stream.
+    #[netstack_test]
+    #[test_case(false, false; "no_trailing")]
+    #[test_case(true, false; "trailing_event")]
+    #[test_case(false, true; "trailing_batch")]
+    #[test_case(true, true; "trailing_event_and_batch")]
+    async fn event_stream_from_state_conversion_error<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+        trailing_event: bool,
+        trailing_batch: bool,
+    ) {
+        // Define an event with an invalid destination subnet; receiving it
+        // from a call to `Watch` will result in conversion errors.
+        #[derive(GenericOverIp)]
+        struct EventHolder<I: Ip + FidlRouteIpExt>(I::WatchEvent);
+        let EventHolder(bad_event) = I::map_ip(
+            (),
+            |()| {
+                EventHolder(fnet_routes::EventV4::Added(fnet_routes::InstalledRouteV4 {
+                    route: Some(fnet_routes::RouteV4 {
+                        destination: fidl_ip_v4_with_prefix!("192.168.0.1/24"),
+                        ..fnet_routes::RouteV4::ARBITRARY_TEST_VALUE
+                    }),
+                    ..fnet_routes::InstalledRouteV4::ARBITRARY_TEST_VALUE
+                }))
+            },
+            |()| {
+                EventHolder(fnet_routes::EventV6::Added(fnet_routes::InstalledRouteV6 {
+                    route: Some(fnet_routes::RouteV6 {
+                        destination: fidl_ip_v6_with_prefix!("fe80::1/64"),
+                        ..fnet_routes::RouteV6::ARBITRARY_TEST_VALUE
+                    }),
+                    ..fnet_routes::InstalledRouteV6::ARBITRARY_TEST_VALUE
+                }))
+            },
+        );
+
+        let batch = std::iter::once(bad_event)
+            // Optionally append a known good event to the batch.
+            .chain(trailing_event.then(|| testutil::generate_event::<I>(0)).into_iter())
+            .collect::<Vec<_>>();
+        let batches = std::iter::once(batch)
+            // Optionally append a known good batch to the sequence of batches.
+            .chain(trailing_batch.then(|| vec![testutil::generate_event::<I>(1)]))
+            .collect::<Vec<_>>();
+
+        // Instantiate the fake Watcher implementation.
+        let (state, state_server_end) =
+            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (mut state_request_stream, _control_handle) = state_server_end
+            .into_stream_and_control_handle()
+            .expect("failed to get `State` request stream");
+        let watcher_fut = state_request_stream
+            .next()
+            .then(|req| {
+                testutil::serve_state_request::<I>(
+                    req.expect("State request_stream unexpectedly ended"),
+                    futures::stream::iter(batches),
+                )
+            })
+            .fuse();
+
+        let event_stream =
+            event_stream_from_state::<I>(&state).expect("failed to connect to watcher").fuse();
+
+        futures::pin_mut!(watcher_fut, event_stream);
+        let ((), mut events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
+        assert_matches!(events.pop(), Some(Err(WatchError::Conversion(_))));
+        assert_matches!(events[..], []);
+    }
+
+    // Verify that watching an empty batch results in an error and closes
+    // the event stream. When `trailing_batch` is true, an additional "good"
+    // batch will be sent after the empty batch; the test expects this data to
+    // be truncated from the resulting event_stream.
+    #[netstack_test]
+    #[test_case(false; "no_trailing_batch")]
+    #[test_case(true; "trailing_batch")]
+    async fn event_stream_from_state_empty_batch_error<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+        trailing_batch: bool,
+    ) {
+        let batches = std::iter::once(Vec::new())
+            // Optionally append a known good batch to the sequence of batches.
+            .chain(trailing_batch.then(|| vec![testutil::generate_event::<I>(0)]))
+            .collect::<Vec<_>>();
+
+        // Instantiate the fake Watcher implementation.
+        let (state, state_server_end) =
+            fidl::endpoints::create_proxy::<I::StateMarker>().expect("failed to create proxy");
+        let (mut state_request_stream, _control_handle) = state_server_end
+            .into_stream_and_control_handle()
+            .expect("failed to get `State` request stream");
+        let watcher_fut = state_request_stream
+            .next()
+            .then(|req| {
+                testutil::serve_state_request::<I>(
+                    req.expect("State request_stream unexpectedly ended"),
+                    futures::stream::iter(batches),
+                )
+            })
+            .fuse();
+
+        let event_stream =
+            event_stream_from_state::<I>(&state).expect("failed to connect to watcher").fuse();
+
+        futures::pin_mut!(watcher_fut, event_stream);
+        let ((), mut events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
+        assert_matches!(events.pop(), Some(Err(WatchError::EmptyEventBatch)));
+        assert_matches!(events[..], []);
     }
 }
