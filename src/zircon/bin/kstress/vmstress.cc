@@ -1524,8 +1524,9 @@ class MultiVmoTestInstance : public TestInstance {
         }
         case 51 ... 60: {  // vmo_create_child
           Printf("C");
-          static const uint32_t type[] = {
-              ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, ZX_VMO_CHILD_SLICE};
+          static const uint32_t type[] = {ZX_VMO_CHILD_SNAPSHOT,
+                                          ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE,
+                                          ZX_VMO_CHILD_SLICE, ZX_VMO_CHILD_REFERENCE};
           uint32_t options = type[uniform_rand(std::size(type), rng)];
           bool child_reliable_mappings = reliable_mappings;
           if (uniform_rand(3, rng) == 0) {
