@@ -128,8 +128,14 @@ impl OpenRequestHandler for OpenFailOrTempFs {
         } else {
             let (tempdir_proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            fdio::service_connect(self.tempdir.path().to_str().unwrap(), server_end.into_channel())
-                .unwrap();
+            fdio::open(
+                self.tempdir.path().to_str().unwrap(),
+                fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+                server_end.into_channel(),
+            )
+            .unwrap();
             tempdir_proxy.open(flags, mode, &path, object).unwrap();
         }
     }
@@ -382,8 +388,14 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         // Set up proxy to tmpdir and delegate to it on success.
         let (tempdir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::service_connect(self.tempdir.path().to_str().unwrap(), server_end.into_channel())
-            .unwrap();
+        fdio::open(
+            self.tempdir.path().to_str().unwrap(),
+            fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            server_end.into_channel(),
+        )
+        .unwrap();
         if !self.should_fail() || path != "." {
             tempdir_proxy.open(flags, mode, &path, object).unwrap();
             return;
