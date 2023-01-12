@@ -7,7 +7,7 @@ use {
         cfg::{cfg_to_gn_conditional, target_to_gn_conditional},
         target::GnTarget,
         types::*,
-        BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility,
+        BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility, RuleRenaming,
     },
     anyhow::{Context, Error},
     cargo_metadata::Package,
@@ -46,11 +46,16 @@ pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<(),
 }
 
 /// Writes rules at the top of the GN file that don't have the version appended
+///
+/// Args:
+///   - `rule_renaming`: if set, the renaming rules will be used to generate
+///     appropriate group and rule names. See [RuleRenaming] for details.
 pub fn write_top_level_rule<'a, W: io::Write>(
     output: &mut W,
     platform: Option<String>,
     pkg: &Package,
     group_visibility: Option<&GroupVisibility>,
+    rule_renaming: Option<&RuleRenaming>,
     has_tests: bool,
 ) -> Result<(), Error> {
     let target_name = if pkg.is_proc_macro() {
@@ -65,6 +70,8 @@ pub fn write_top_level_rule<'a, W: io::Write>(
             conditional = target_to_gn_conditional(&platform)?
         )?;
     }
+
+    let group_rule = rule_renaming.and_then(|t| t.group_name.as_deref()).unwrap_or("group");
     let optional_visibility =
         group_visibility.map(|v| format!("visibility = {}", v.variable)).unwrap_or_default();
     writeln!(
@@ -72,6 +79,7 @@ pub fn write_top_level_rule<'a, W: io::Write>(
         include_str!("../templates/top_level_gn_rule.template"),
         group_name = pkg.name,
         dep_name = target_name,
+        group_rule_name = group_rule,
         optional_visibility = optional_visibility,
         optional_testonly = "",
     )?;
@@ -82,6 +90,7 @@ pub fn write_top_level_rule<'a, W: io::Write>(
             output,
             include_str!("../templates/top_level_gn_rule.template"),
             group_name = name,
+            group_rule_name = group_rule,
             dep_name = target_name + "-test",
             optional_visibility = optional_visibility,
             optional_testonly = "testonly = true",
@@ -238,7 +247,13 @@ impl GnField {
     }
 }
 
-/// Write a Target to the GN file. Includes information from the build script.
+/// Write a Target to the GN file.
+///
+/// Includes information from the build script.
+///
+/// Args:
+///   - `renamed_rule`: if this is set, the rule that is written out is changed
+///     to be the content of this arg.
 pub fn write_rule<W: io::Write>(
     output: &mut W,
     target: &GnTarget<'_>,
@@ -247,6 +262,7 @@ pub fn write_rule<W: io::Write>(
     custom_build: Option<&CombinedTargetCfg<'_>>,
     output_name: Option<&str>,
     is_test: bool,
+    renamed_rule: Option<&str>,
 ) -> Result<(), Error> {
     // Generate a section for dependencies that is paramaterized on toolchain
     let mut dependencies = String::from("deps = []\n");
@@ -436,7 +452,13 @@ pub fn write_rule<W: io::Write>(
     writeln!(
         output,
         include_str!("../templates/gn_rule.template"),
-        gn_rule = if is_test { "executable".to_owned() } else { target.gn_target_type() },
+        gn_rule = if let Some(renamed_rule) = renamed_rule {
+            renamed_rule.to_owned()
+        } else if is_test {
+            "executable".to_owned()
+        } else {
+            target.gn_target_type()
+        },
         target_name = target_name,
         crate_name = target.name().replace("-", "_"),
         output_name = output_name,
@@ -459,6 +481,10 @@ mod tests {
     use cargo_metadata::Version;
     use std::collections::HashMap;
 
+    // WARNING: the expected output tests below have non-printable artifacts
+    // due to the way the templates are generated. Do not remove extra spaces
+    // in the quoted strings.
+
     #[test]
     fn simple_target() {
         let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
@@ -477,8 +503,17 @@ mod tests {
         );
 
         let mut output = vec![];
-        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, None, false)
-            .unwrap();
+        write_rule(
+            &mut output,
+            &target,
+            Path::new("somewhere/over"),
+            None,
+            None,
+            None,
+            false,
+            None,
+        )
+        .unwrap();
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
@@ -521,12 +556,74 @@ mod tests {
 
         let outname = Some("rainbow_binary");
         let mut output = vec![];
-        write_rule(&mut output, &target, Path::new("somewhere/over"), None, None, outname, false)
-            .unwrap();
+        write_rule(
+            &mut output,
+            &target,
+            Path::new("somewhere/over"),
+            None,
+            None,
+            outname,
+            false,
+            None,
+        )
+        .unwrap();
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
             r#"executable("test_package-test_target-v0_1_0") {
+  crate_name = "test_target"
+  crate_root = "//the/rainbow.rs"
+  output_name = "rainbow_binary"
+  
+  deps = []
+
+  rustenv = []
+
+  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
+
+  
+  visibility = [":*"]
+
+  
+}
+
+"#
+        );
+    }
+    #[test]
+    fn renamed_target() {
+        let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
+        let version = Version::new(0, 1, 0);
+        let target = GnTarget::new(
+            &pkg_id,
+            "test_target",
+            "test_package",
+            "2018",
+            Utf8Path::new("somewhere/over/the/rainbow.rs"),
+            &version,
+            GnRustType::Binary,
+            &[],
+            None,
+            HashMap::new(),
+        );
+
+        let outname = Some("rainbow_binary");
+        let mut output = vec![];
+        write_rule(
+            &mut output,
+            &target,
+            Path::new("somewhere/over"),
+            None,
+            None,
+            outname,
+            false,
+            Some(&"renamed_rule"),
+        )
+        .unwrap();
+        let output = String::from_utf8(output).unwrap();
+        assert_eq!(
+            output,
+            r#"renamed_rule("test_package-test_target-v0_1_0") {
   crate_name = "test_target"
   crate_root = "//the/rainbow.rs"
   output_name = "rainbow_binary"

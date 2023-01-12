@@ -151,6 +151,11 @@ fn main() {
             golden_expected_filename: vec!["visibility", "BUILD.gn"],
             extra_args: vec!["--skip-root"],
         },
+        TestCase {
+            manifest_path: vec!["target_renaming", "Cargo.toml"],
+            golden_expected_filename: vec!["target_renaming", "BUILD.gn"],
+            extra_args: vec!["--skip-root"],
+        },
     ];
 
     let run_gnaw = |manifest_path: &[&str], extra_args: &[&str]| {

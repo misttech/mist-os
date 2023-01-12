@@ -4,7 +4,7 @@
 
 use {
     crate::{build::BuildScript, graph::GnBuildGraph, target::GnTarget, types::*},
-    anyhow::{Context, Error},
+    anyhow::{Context, Error, Result},
     argh::FromArgs,
     camino::Utf8PathBuf,
     cargo_metadata::{CargoOpt, DependencyKind, Package},
@@ -122,8 +122,28 @@ pub struct GroupVisibility {
     variable: String,
 }
 
-// Configuration for a Cargo package. Contains configuration for its (single) library target at the
-// top level and optionally zero or more binaries to generate.
+/// Defines a per-target rule for rule renaming.
+///
+/// Some external crates require additional post-processing. For those we define custom rules,
+/// and force a rename of the rule and the group so that post-processing can be done by GN.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct RuleRenaming {
+    /// The label of the `.gni` file used to make the group and target renaming
+    /// available.
+    ///
+    /// Only a single file can be imported. This is on purpose so as
+    /// not to pollute the generated file with many imports.  The same file will
+    /// be imported only once.
+    import: String,
+    /// If set, this name will be used instead of `group` for the top level group.
+    group_name: Option<String>,
+    /// If set, this rule name will be used instead of the name suggested by
+    /// the target type (e.g. `my_rule` instead of `rust_library`).
+    rule_name: Option<String>,
+}
+
+/// Configuration for a Cargo package. Contains configuration for its (single) library target at the
+/// top level and optionally zero or more binaries to generate.
 #[derive(Default, Clone, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct PackageCfg {
@@ -145,6 +165,12 @@ pub struct PackageCfg {
     group_visibility: Option<GroupVisibility>,
     /// Build tests for this target.
     tests: bool,
+    /// Used to rename the group and target names used to bring this particular package
+    /// in.  Normally, `cargo-gnaw` will use `group` and `rust_*` target name, but this
+    /// allows us to define custom replacement targets. An import is required, but the
+    /// feature is deliberately limited to just a single definition and a limited number
+    /// of renames, as it should be used in very special cases only.
+    target_renaming: Option<RuleRenaming>,
 }
 
 /// Configs added to all GN targets in the BUILD.gn
@@ -233,6 +259,23 @@ macro_rules! define_combined_cfg {
 define_combined_cfg!(PackageCfg);
 define_combined_cfg!(BinaryCfg);
 
+/// Writes out an import to the provided `output`.
+///
+/// The import is written out only the first time it appears. `imported_files`
+/// is updated so that the next appearance of the same import does not result
+/// in a repeated import.
+fn write_import_once<W: io::Write>(
+    mut output: &mut W,
+    imported_files: &mut HashSet<String>,
+    import: &String,
+) -> Result<()> {
+    if !imported_files.contains(import) {
+        gn::write_import(&mut output, import).with_context(|| "writing import")?;
+        imported_files.insert(import.clone());
+    }
+    Ok(())
+}
+
 pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Result<(), Error> {
     let manifest_path = &opt.manifest_path;
     let path_from_root_to_generated = opt
@@ -308,17 +351,28 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
 
                             let visibility = cfg.and_then(|cfg| cfg.group_visibility.as_ref());
                             if let Some(visibility) = visibility {
-                                if !imported_files.contains(&visibility.import) {
-                                    gn::write_import(&mut output, &visibility.import)
-                                        .with_context(|| "writing import")?;
-                                    imported_files.insert(visibility.import.clone());
-                                }
+                                write_import_once(
+                                    &mut output,
+                                    &mut imported_files,
+                                    &visibility.import,
+                                )?;
                             }
+
+                            let target_renaming = cfg.and_then(|cfg| cfg.target_renaming.as_ref());
+                            if let Some(target_renaming) = target_renaming {
+                                write_import_once(
+                                    &mut output,
+                                    &mut imported_files,
+                                    &target_renaming.import,
+                                )?;
+                            }
+
                             gn::write_top_level_rule(
                                 &mut output,
                                 platform,
                                 package,
                                 visibility,
+                                target_renaming,
                                 cfg.map(|c| c.tests).unwrap_or(false),
                             )
                             .with_context(|| {
@@ -335,20 +389,22 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 let package = &metadata[&top_level_id];
                 top_level_metadata.insert(package.name.to_owned());
                 let cfg = metadata_configs.gn.as_ref().and_then(|cfg| cfg.find_package(package));
+
                 let visibility = cfg.and_then(|cfg| cfg.group_visibility.as_ref());
                 if let Some(visibility) = visibility {
-                    if !imported_files.contains(&visibility.import) {
-                        gn::write_import(&mut output, &visibility.import)
-                            .with_context(|| "writing import")?;
-                        imported_files.insert(visibility.import.clone());
-                    }
+                    write_import_once(&mut output, &mut imported_files, &visibility.import)?;
                 }
 
+                let target_renaming = cfg.and_then(|cfg| cfg.target_renaming.as_ref());
+                if let Some(target_renaming) = target_renaming {
+                    write_import_once(&mut output, &mut imported_files, &target_renaming.import)?;
+                }
                 gn::write_top_level_rule(
                     &mut output,
                     None,
                     package,
                     visibility,
+                    target_renaming,
                     cfg.map(|c| c.tests).unwrap_or(false),
                 )
                 .with_context(|| "writing top level rule")?;
@@ -382,6 +438,10 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     let mut target_binaries = HashMap::<&GnTarget<'_>, BinaryRenderOptions<'_>>::new();
     let mut targets_with_tests = HashSet::<&GnTarget<'_>>::new();
     let mut reviewed_features_map = HashMap::<&GnTarget<'_>, Option<&[String]>>::new();
+    // An entry for each target that needs a renamed rule.  There is no connection between
+    // PackageCfg and GnTarget, so to use the setting from PackageCfg, we need to build this map as
+    // we iterate through targets.
+    let mut renamed_rules = HashMap::<&GnTarget<'_>, &'_ str>::new();
     let mut unused_configs = String::new();
     if let Some(gn_pkg_cfgs) = gn_pkg_cfgs {
         for (pkg_name, versions) in gn_pkg_cfgs {
@@ -398,6 +458,15 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                             .is_none(),
                         "Duplicate library config somehow specified"
                     );
+
+                    if let Some(renamed_rule) = pkg_cfg
+                        .target_renaming
+                        .as_ref()
+                        .and_then(|r| r.rule_name.as_ref())
+                        .map(|x| x.as_str())
+                    {
+                        renamed_rules.insert(target, renamed_rule);
+                    }
 
                     if pkg_cfg.tests {
                         targets_with_tests.insert(target);
@@ -608,6 +677,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             target_cfg,
             binary_name,
             false,
+            renamed_rules.get(target).as_deref().copied(),
         )
         .context(format!("writing rule for: {} {}", target.name(), target.version()))?;
 
@@ -620,6 +690,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 target_cfg,
                 binary_name,
                 true,
+                renamed_rules.get(&target).as_deref().copied(),
             )
             .context(format!(
                 "writing rule for: {} {}",

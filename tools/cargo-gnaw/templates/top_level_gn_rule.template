@@ -1,4 +1,4 @@
-group("{group_name}") {{
+{group_rule_name}("{group_name}") {{
   public_deps = [":{dep_name}"]
   {optional_testonly}
   {optional_visibility}
