@@ -31,6 +31,15 @@ use {
     },
 };
 
+/// Each mm of physical movement by the mouse translates to the cursor moving
+/// on the display by 10 logical pixels.
+/// Because pointer_display_scale_handler scaled for device pixel ratio, here
+/// only need to apply mm * logical pixel scale factor to get physical pixel.
+/// TODO(fxbug.dev/115618): need to revisit this
+/// 1. allow users to adjust how fast the mouse move.
+/// 2. allow different value per monitor model.
+const MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL: f32 = 10.0;
+
 /// A [`MouseInjectorHandler`] parses mouse events and forwards them to Scenic through the
 /// fidl_fuchsia_pointerinjector protocols.
 pub struct MouseInjectorHandler {
@@ -376,12 +385,12 @@ impl MouseInjectorHandler {
         let new_position = match (mouse_event.location, mouse_descriptor) {
             (
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                    millimeters: offset,
+                    millimeters,
                 }),
-                mouse_binding::MouseDeviceDescriptor { counts_per_mm, .. },
+                _,
             ) => {
                 self.inner().current_position
-                    + self.position_in_counts(offset, *counts_per_mm as f32)
+                    + self.relative_movement_mm_to_phyical_pixel(millimeters)
             }
             (
                 mouse_binding::MouseLocation::Absolute(position),
@@ -517,8 +526,7 @@ impl MouseInjectorHandler {
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                     millimeters: offset_mm,
                 }) if mouse_event.phase == mouse_binding::MousePhase::Move => {
-                    let offset =
-                        self.position_in_counts(offset_mm, mouse_descriptor.counts_per_mm as f32);
+                    let offset = self.relative_movement_mm_to_phyical_pixel(offset_mm);
                     Some([offset.x, offset.y])
                 }
                 _ => None,
@@ -655,9 +663,14 @@ impl MouseInjectorHandler {
         }
     }
 
-    /// Converts a Position given in millimeters to a Position given in counts.
-    fn position_in_counts(&self, pos_mm: Position, counts_per_mm: f32) -> Position {
-        Position { x: pos_mm.x * counts_per_mm, y: pos_mm.y * counts_per_mm }
+    /// Converts a relative movement given in millimeters to movement in phyical pixel.
+    /// Because pointer_display_scale_handler scaled for device pixel ratio, this method
+    /// only need to apply phyical distance to logical pixel scale factor.
+    fn relative_movement_mm_to_phyical_pixel(&self, movement_mm: Position) -> Position {
+        Position {
+            x: movement_mm.x * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            y: movement_mm.y * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+        }
     }
 }
 
@@ -684,9 +697,8 @@ mod tests {
         test_case::test_case,
     };
 
-    // const MOUSE_ID: u32 = 1;
-    const DISPLAY_WIDTH: f32 = 100.0;
-    const DISPLAY_HEIGHT: f32 = 100.0;
+    const DISPLAY_WIDTH_IN_PHYSICAL_PX: f32 = 100.0;
+    const DISPLAY_HEIGHT_IN_PHYSICAL_PX: f32 = 100.0;
 
     /// Returns an |input_device::InputDeviceDescriptor::MouseDescriptor|.
     const DESCRIPTOR: input_device::InputDeviceDescriptor =
@@ -878,10 +890,7 @@ mod tests {
     ) -> input_device::InputEvent {
         create_mouse_event(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                millimeters: Position {
-                    x: position.x / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                    y: position.y / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                },
+                millimeters: position,
             }),
             None, /* wheel_delta_v */
             None, /* wheel_delta_h */
@@ -946,7 +955,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let config_request_stream_fut =
@@ -1057,22 +1066,49 @@ mod tests {
     // Tests that a mouse move event both sends an update to scenic and sends the current cursor
     // location via the cursor location sender.
     #[test_case(
-        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: 10.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: 15.0/mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
-        Position { x: DISPLAY_WIDTH / 2.0 + 10.0, y: DISPLAY_HEIGHT / 2.0 + 15.0 },
-        [10.0, 15.0]; "Valid move event."
-    )]
-    #[test_case(
-        mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: (DISPLAY_WIDTH  + 2.0)/ mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: (DISPLAY_HEIGHT + 2.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32 }}),
+        mouse_binding::MouseLocation::Relative(
+            mouse_binding::RelativeLocation {
+                millimeters: Position { x: 1.0, y: 2.0 }
+            }),
         Position {
-          x: DISPLAY_WIDTH,
-          y: DISPLAY_HEIGHT,
+            x: DISPLAY_WIDTH_IN_PHYSICAL_PX / 2.0
+                + 1.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            y: DISPLAY_HEIGHT_IN_PHYSICAL_PX / 2.0
+                + 2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
         },
-        [DISPLAY_WIDTH + 2.0, DISPLAY_HEIGHT + 2.0]; "Move event exceeds max bounds."
+        [
+            1.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+        ]; "Valid move event."
     )]
     #[test_case(
-      mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {millimeters: Position { x: -(DISPLAY_WIDTH + 20.0) / mouse_binding::DEFAULT_COUNTS_PER_MM as f32, y: -(DISPLAY_HEIGHT + 15.0)  / mouse_binding::DEFAULT_COUNTS_PER_MM as f32}}),
-      Position { x: 0.0, y: 0.0 },
-      [-(DISPLAY_WIDTH + 20.0), -(DISPLAY_HEIGHT + 15.0)]; "Move event exceeds min bounds."
+        mouse_binding::MouseLocation::Relative(
+            mouse_binding::RelativeLocation {
+                millimeters: Position {
+                    x: DISPLAY_WIDTH_IN_PHYSICAL_PX / MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL + 2.0,
+                    y: DISPLAY_HEIGHT_IN_PHYSICAL_PX / MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL + 1.0,
+                }}),
+        Position {
+          x: DISPLAY_WIDTH_IN_PHYSICAL_PX,
+          y: DISPLAY_HEIGHT_IN_PHYSICAL_PX,
+        },
+        [
+            DISPLAY_WIDTH_IN_PHYSICAL_PX + 2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            DISPLAY_HEIGHT_IN_PHYSICAL_PX + 1.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+        ]; "Move event exceeds max bounds."
+    )]
+    #[test_case(
+        mouse_binding::MouseLocation::Relative(
+            mouse_binding::RelativeLocation {
+                millimeters: Position {
+                    x: -(DISPLAY_WIDTH_IN_PHYSICAL_PX / MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL + 2.0),
+                    y: -(DISPLAY_HEIGHT_IN_PHYSICAL_PX / MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL + 1.0),
+                }}),
+        Position { x: 0.0, y: 0.0 },
+        [
+            -(DISPLAY_WIDTH_IN_PHYSICAL_PX + 2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL),
+            -(DISPLAY_HEIGHT_IN_PHYSICAL_PX + 1.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL),
+        ]; "Move event exceeds min bounds."
     )]
     #[fuchsia::test(allow_stalls = false)]
     async fn move_event(
@@ -1099,7 +1135,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1204,7 +1240,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1252,7 +1288,10 @@ mod tests {
 
         // Handle event.
         let handle_event_fut = mouse_handler.handle_input_event(input_event);
-        let expected_position = Position { x: DISPLAY_WIDTH * 0.25, y: DISPLAY_HEIGHT * 0.75 };
+        let expected_position = Position {
+            x: DISPLAY_WIDTH_IN_PHYSICAL_PX * 0.25,
+            y: DISPLAY_WIDTH_IN_PHYSICAL_PX * 0.75,
+        };
         let expected_events = vec![
             create_mouse_pointer_sample_event(
                 pointerinjector::EventPhase::Add,
@@ -1346,7 +1385,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1453,7 +1492,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1596,7 +1635,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1813,7 +1852,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -1823,8 +1862,14 @@ mod tests {
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let zero_position = Position { x: 0.0, y: 0.0 };
-        let expected_position = Position { x: 10.0, y: 15.0 };
-        let expected_relative_motion = [10.0, 15.0];
+        let expected_position = Position {
+            x: 10.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            y: 5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+        };
+        let expected_relative_motion = [
+            10.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+        ];
         let event1 = create_mouse_event(
             mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 }),
             None, /* wheel_delta_v */
@@ -1838,10 +1883,7 @@ mod tests {
         );
         let event2 = create_mouse_event(
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
-                millimeters: Position {
-                    x: 10.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                    y: 15.0 / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                },
+                millimeters: Position { x: 10.0, y: 5.0 },
             }),
             None, /* wheel_delta_v */
             None, /* wheel_delta_h */
@@ -2000,7 +2042,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -2214,7 +2256,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -2288,7 +2330,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -2478,7 +2520,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -2537,7 +2579,7 @@ mod tests {
             aggregator_proxy,
             configuration_proxy,
             injector_registry_proxy,
-            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             cursor_message_sender,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
@@ -2619,7 +2661,7 @@ mod tests {
         // event2/event3 cause pointerinjector events to be sent, and since the cursor is visible,
         // also causes cursor position messages to be sent.
         let event2 = create_relative_mouse_move_event(Position { x: 3.0, y: 5.0 }, event_time2);
-        let event3 = create_relative_mouse_move_event(Position { x: 4.0, y: 6.0 }, event_time3);
+        let event3 = create_relative_mouse_move_event(Position { x: 2.0, y: 4.0 }, event_time3);
 
         mouse_handler.clone().handle_input_event(event2).await;
         mouse_handler.clone().handle_input_event(event3).await;
@@ -2628,13 +2670,25 @@ mod tests {
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
                 create_expected_pointerinjector_mouse_change_sample_event(
-                    Position { x: 3.0, y: 5.0 },
-                    Some([3.0, 5.0]),
+                    Position {
+                        x: 3.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        y: 5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    },
+                    Some([
+                        3.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    ]),
                     event_time2
                 ),
                 create_expected_pointerinjector_mouse_change_sample_event(
-                    Position { x: 7.0, y: 11.0 },
-                    Some([4.0, 6.0]),
+                    Position {
+                        x: 5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        y: 9.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    },
+                    Some([
+                        2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        4.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    ]),
                     event_time3
                 ),
             ]),
@@ -2643,11 +2697,17 @@ mod tests {
 
         expect_cursor_position_message(
             cursor_message_receiver.next().await,
-            Position { x: 3.0, y: 5.0 },
+            Position {
+                x: 3.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                y: 5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            },
         );
         expect_cursor_position_message(
             cursor_message_receiver.next().await,
-            Position { x: 7.0, y: 11.0 },
+            Position {
+                x: 5.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                y: 9.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            },
         );
 
         // Make the cursor invisible.  The MouseInjectorHandler will continue to generate
@@ -2668,13 +2728,25 @@ mod tests {
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
                 create_expected_pointerinjector_mouse_change_sample_event(
-                    Position { x: 5.0, y: 9.0 },
-                    Some([-2.0, -2.0]),
+                    Position {
+                        x: 3.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        y: 7.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    },
+                    Some([
+                        -2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        -2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    ]),
                     event_time4
                 ),
                 create_expected_pointerinjector_mouse_change_sample_event(
-                    Position { x: 4.0, y: 6.0 },
-                    Some([-1.0, -3.0]),
+                    Position {
+                        x: 2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        y: 4.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    },
+                    Some([
+                        -1.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                        -3.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL
+                    ]),
                     event_time5
                 ),
             ]),
@@ -2693,7 +2765,10 @@ mod tests {
         assert_eq!(false, mouse_handler.toggle_immersive_mode().await.unwrap());
         expect_cursor_position_message(
             cursor_message_receiver.next().await,
-            Position { x: 4.0, y: 6.0 },
+            Position {
+                x: 2.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+                y: 4.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
+            },
         );
         expect_cursor_visibility_message(cursor_message_receiver.next().await, true);
     }
