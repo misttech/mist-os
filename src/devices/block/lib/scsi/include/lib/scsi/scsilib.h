@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include <ddktl/device.h>
+#include <hwreg/bitfields.h>
 
 #include "scsilib_controller.h"
 
@@ -188,9 +189,6 @@ static_assert(sizeof(ReportLunsParameterDataHeader) == 16, "Report LUNs Header m
 // Count the number of addressable LUNs attached to a target.
 uint32_t CountLuns(Controller* controller, uint8_t target);
 
-constexpr uint8_t kDpo = 1 << 4;
-constexpr uint8_t kFua = 1 << 3;
-
 struct Read16CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -201,6 +199,9 @@ struct Read16CDB {
   uint32_t transfer_length;
   uint8_t reserved;
   uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
 } __PACKED;
 
 static_assert(sizeof(Read16CDB) == 16, "Read 16 CDB must be 16 bytes");
@@ -216,6 +217,9 @@ struct Write16CDB {
   uint32_t transfer_length;
   uint8_t reserved;
   uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
 } __PACKED;
 
 static_assert(sizeof(Write16CDB) == 16, "Write 16 CDB must be 16 bytes");

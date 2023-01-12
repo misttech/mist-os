@@ -208,7 +208,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
     Write16CDB cdb = {};
     cdb.opcode = Opcode::WRITE_16;
     if (op->command & BLOCK_FL_FORCE_ACCESS) {
-      cdb.dpo_fua |= kFua;
+      cdb.set_force_unit_access(true);
     }
     cdb.logical_block_address = htobe64(op->rw.offset_dev);
     cdb.transfer_length = htonl(op->rw.length);
