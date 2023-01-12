@@ -73,11 +73,7 @@ pub fn construct_zbi(
         let manifest = PackageManifest::try_load_from(bootfs_package)?;
 
         for blob_info in manifest.blobs() {
-            // Every file that is part of a package included in the bootfs image
-            // will exist under a `blob` directory, and will be identified by
-            // its merkle root.
-            let bootfs_path = format!("blob/{}", blob_info.merkle);
-            zbi_builder.add_bootfs_file(&blob_info.source_path, &bootfs_path);
+            zbi_builder.add_bootfs_blob(&blob_info.source_path, blob_info.merkle);
         }
 
         // Note: this utility does not assert uniqueness of bootfs packages.

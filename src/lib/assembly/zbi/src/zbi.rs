@@ -52,6 +52,19 @@ impl ZbiBuilder {
         self.kernel = Some(kernel.into());
     }
 
+    /// Add a file to the bootfs as a merkle root identified blob.
+    pub fn add_bootfs_blob(
+        &mut self,
+        source: impl Into<Utf8PathBuf>,
+        merkle_root: impl std::fmt::Display,
+    ) {
+        // Every file that is part of a package included in the bootfs image
+        // will exist under a `blob` directory, and will be identified by
+        // its merkle root.
+        let bootfs_path = format!("blob/{}", merkle_root);
+        self.bootfs_files.insert(bootfs_path.to_string(), source.into());
+    }
+
     /// Add a BootFS file to the ZBI.
     pub fn add_bootfs_file(
         &mut self,
@@ -237,10 +250,11 @@ mod tests {
 
         builder.add_bootfs_file("path/to/file2", "bin/file2");
         builder.add_bootfs_file("path/to/file1", "lib/file1");
+        builder.add_bootfs_blob("path/to/file1", "my_merkle");
         builder.write_bootfs_manifest("devmgr_config.txt", &mut output).unwrap();
         assert_eq!(
             output,
-            b"bin/file2=path/to/file2\nconfig/devmgr=devmgr_config.txt\nlib/file1=path/to/file1\n"
+            b"bin/file2=path/to/file2\nblob/my_merkle=path/to/file1\nconfig/devmgr=devmgr_config.txt\nlib/file1=path/to/file1\n"
         );
     }
 
