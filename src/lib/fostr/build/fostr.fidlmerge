@@ -120,7 +120,7 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value);
 {{- define "ImplementationHeader" }}
     {{- template "FileHeader" }}
 
-#include "src/lib/fostr/fidl/{{ template "LibrarySlashes" . }}formatting.h"
+#include "formatting.h"
 
 #include "src/lib/fostr/fidl_types.h"
 {{- $this_name := .Name }}
