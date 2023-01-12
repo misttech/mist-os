@@ -94,6 +94,7 @@ entry_deps = [
   "//src/devices/lib/driver",
   "//src/graphics/lib/magma/src/magma_util:macros",
   "//src/graphics/lib/magma/src/sys_driver",
+  "//src/graphics/lib/magma/src/sys_driver:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/zx",
