@@ -36,39 +36,7 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
         };
     }
 
-    let mut engine = None;
-    if cmd.reuse && cmd.config.is_none() {
-        let mut name = Some(cmd.name.clone());
-        let result = get_engine_by_name(&mut name).await;
-        engine = match result {
-            Ok(EngineOption::DoesExist(engine)) => {
-                cmd.name = name.unwrap();
-                Some(engine)
-            }
-            Ok(EngineOption::DoesNotExist(warning)) => {
-                let name = name.unwrap();
-                tracing::debug!("{}", warning);
-                println!(
-                    "Instance '{}' not found with --reuse flag. \
-                    Creating a new emulator named '{}'.",
-                    name, name
-                );
-                cmd.reuse = false;
-                None
-            }
-            Err(e) => {
-                ffx_bail!("{:?}", e);
-            }
-        }
-    }
-    let mut engine = if engine.is_none() {
-        match new_engine(&cmd).await {
-            Err(e) => ffx_bail!("{:?}", e),
-            Ok(engine) => engine,
-        }
-    } else {
-        engine.unwrap()
-    };
+    let mut engine = get_engine(&mut cmd).await?;
 
     // We do an initial build here, because we need an initial configuration before staging.
     let mut emulator_cmd = engine.build_emulator_cmd();
@@ -117,6 +85,33 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
         Ok(_) => ffx_bail!("Non zero return code"),
         Err(e) => ffx_bail!("{:?}", e.context("The emulator failed to start.")),
     }
+}
+
+async fn get_engine(cmd: &mut StartCommand) -> Result<Box<dyn EmulatorEngine>> {
+    Ok(if cmd.reuse && cmd.config.is_none() {
+        let mut name = Some(cmd.name.clone());
+        match get_engine_by_name(&mut name)
+            .await
+            .or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
+        {
+            EngineOption::DoesExist(engine) => {
+                cmd.name = name.unwrap();
+                engine
+            }
+            EngineOption::DoesNotExist(warning) => {
+                tracing::debug!("{}", warning);
+                println!(
+                    "Instance '{name}' not found with --reuse flag. \
+                    Creating a new emulator named '{name}'.",
+                    name = name.unwrap()
+                );
+                cmd.reuse = false;
+                new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
+            }
+        }
+    } else {
+        new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
+    })
 }
 
 async fn new_engine(cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>> {
