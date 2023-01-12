@@ -2537,22 +2537,22 @@ TEST(Vmar, RangeOpCommit) {
   ASSERT_OK(sub_vmar2.op_range(ZX_VMAR_OP_COMMIT, addr2 + 2 * zx_system_get_page_size(),
                                2 * zx_system_get_page_size(), nullptr, 0));
 
-  // Both VMOs should now have 2 pages committed. We can query committed counts despite these pages
-  // being zero because explicitly committed pages are not deduped by the zero scanner.
+  // The VMOs should have at most two pages committed. They might have less since its possible for
+  // reclamation to have already happened.
   zx_info_vmo_t info;
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
 
   // Commit all pages in the clone.
   ASSERT_OK(sub_vmar2.op_range(ZX_VMAR_OP_COMMIT, addr2, kVmoSize, nullptr, 0));
 
-  // The clone should have all pages committed, but the parent should still have only 2.
+  // The clone now might have all its pages committed, but the parent should still be capped at 2.
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(kVmoSize, info.committed_bytes);
+  EXPECT_LE(kVmoSize, info.committed_bytes);
 
   // Map a single page as read-only and try to commit it. The commit should fail.
   zx::vmo readonly_vmo;

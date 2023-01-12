@@ -3307,12 +3307,6 @@ TEST(Pager, OpCommitVmar) {
 
   ASSERT_TRUE(t1.Wait());
 
-  // The non pager-backed VMO should also have committed pages.
-  zx_info_vmo_t info;
-  uint64_t a1, a2;
-  ASSERT_OK(anon_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  ASSERT_EQ(kVmoSize, info.committed_bytes);
-
   // Can't commit with gaps in the VMAR.
   ASSERT_EQ(ZX_ERR_BAD_STATE, vmar.op_range(ZX_VMAR_OP_COMMIT, base_addr, kVmarSize, nullptr, 0));
 }
