@@ -3,21 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        async_enter,
-        filesystem::SyncOptions,
-        log::*,
-        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{StoreObjectHandle, Timestamp},
-        platform::fuchsia::{
-            directory::FxDirectory,
-            errors::map_to_status,
-            node::{FxNode, OpenedNode},
-            paged_object_handle::PagedObjectHandle,
-            pager::PagerBackedVmo,
-            volume::{info_to_filesystem_info, FxVolume},
-        },
-        round::{round_down, round_up},
+    crate::fuchsia::{
+        directory::FxDirectory,
+        errors::map_to_status,
+        node::{FxNode, OpenedNode},
+        paged_object_handle::PagedObjectHandle,
+        pager::PagerBackedVmo,
+        volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -25,6 +17,14 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},
     futures::{channel::oneshot, join},
+    fxfs::{
+        async_enter,
+        filesystem::SyncOptions,
+        log::*,
+        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
+        object_store::{StoreObjectHandle, Timestamp},
+        round::{round_down, round_up},
+    },
     once_cell::sync::Lazy,
     std::{
         ops::Range,
@@ -535,16 +535,13 @@ impl PagerBackedVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            filesystem::Filesystem,
-            object_handle::INVALID_OBJECT_ID,
-            platform::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
-        },
+        crate::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
         anyhow::format_err,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         futures::join,
+        fxfs::{filesystem::Filesystem, object_handle::INVALID_OBJECT_ID},
         std::sync::{
             atomic::{self, AtomicBool},
             Arc,

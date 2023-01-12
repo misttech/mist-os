@@ -3,18 +3,18 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        crypt::insecure::InsecureCrypt,
-        filesystem::{FxFilesystem, OpenFxFilesystem},
-        fsck::{errors::FsckIssue, fsck_volume_with_options, fsck_with_options, FsckOptions},
-        object_store::volume::root_volume,
-        platform::fuchsia::{file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot},
-    },
+    crate::fuchsia::{file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot},
     anyhow::Context,
     anyhow::Error,
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},
+    fxfs::{
+        filesystem::{FxFilesystem, OpenFxFilesystem},
+        fsck::{errors::FsckIssue, fsck_volume_with_options, fsck_with_options, FsckOptions},
+        object_store::volume::root_volume,
+    },
+    fxfs_insecure_crypto::InsecureCrypt,
     std::sync::{Arc, Weak},
     storage_device::{fake_device::FakeDevice, DeviceHolder},
     vfs::{directory::entry::DirectoryEntry, path::Path},

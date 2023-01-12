@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::log::*,
     event_listener::{Event, EventListener},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_memorypressure::{
@@ -17,6 +16,7 @@ use {
         task::{self, Poll},
         FutureExt, StreamExt,
     },
+    fxfs::log::*,
     std::{
         convert::TryFrom,
         pin::Pin,

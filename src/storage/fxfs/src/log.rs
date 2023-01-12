@@ -5,10 +5,7 @@
 // This is designed to be imported by users as `use crate::log::*` so we should be judicious when
 // adding to this module.
 
-pub use {
-    crate::platform::log::*,
-    tracing::{debug, error, info, warn},
-};
+pub use tracing::{debug, error, info, warn};
 
 pub trait AsValue<'a> {
     type ValueType;
@@ -23,3 +20,27 @@ impl<'a> AsValue<'a> for anyhow::Error {
         self.as_ref()
     }
 }
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use super::AsValue;
+
+    impl<'a> AsValue<'a> for fuchsia_zircon::Status {
+        type ValueType = &'a (dyn std::error::Error + 'static);
+
+        fn as_value(&'a self) -> Self::ValueType {
+            self
+        }
+    }
+
+    impl<'a> AsValue<'a> for fidl::Error {
+        type ValueType = &'a (dyn std::error::Error + 'static);
+
+        fn as_value(&'a self) -> Self::ValueType {
+            self
+        }
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+pub use self::fuchsia::*;

@@ -5,11 +5,11 @@
 // TODO(fxbug.dev/96139): need validation after deserialization.
 use {
     crate::{
-        crypt::WrappedKeys,
         lsm_tree::types::{Item, ItemRef, NextKey, OrdLowerBound, OrdUpperBound, RangeKey},
         object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
         serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
+    fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
     std::convert::From,
     std::time::{Duration, SystemTime, UNIX_EPOCH},
@@ -307,9 +307,30 @@ pub enum ObjectKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
-#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum EncryptionKeys {
     AES256XTS(WrappedKeys),
+}
+
+#[cfg(fuzz)]
+impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <u8>::arbitrary(u).and_then(|count| {
+            let mut keys = vec![];
+            for _ in 0..count {
+                keys.push(<(u64, u64)>::arbitrary(u).map(|(id, wrapping_key_id)| {
+                    (
+                        id,
+                        fxfs_crypto::WrappedKey {
+                            wrapping_key_id,
+                            // There doesn't seem to be much point to randomly generate crypto keys.
+                            key: fxfs_crypto::WrappedKeyBytes::default(),
+                        },
+                    )
+                })?);
+            }
+            Ok(EncryptionKeys::AES256XTS(WrappedKeys(keys)))
+        })
+    }
 }
 
 /// Object-level attributes.  Note that these are not the same as "attributes" in the

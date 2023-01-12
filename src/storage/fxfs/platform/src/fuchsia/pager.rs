@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::{drop_event::DropEvent, log::*},
     anyhow::{Context, Error},
     async_trait::async_trait,
     bitflags::bitflags,
@@ -18,6 +17,7 @@ use {
         AsHandleRef, PacketContents, PagerPacket, SignalPacket,
     },
     futures::channel::oneshot,
+    fxfs::{drop_event::DropEvent, log::*},
     once_cell::sync::OnceCell,
     std::{
         collections::{hash_map::Entry, HashMap},

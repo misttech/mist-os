@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{data_buffer::DataBuffer, object_handle::ReadObjectHandle},
     anyhow::Error,
     async_trait::async_trait,
     fuchsia_zircon::{self as zx},
+    fxfs::{data_buffer::DataBuffer, object_handle::ReadObjectHandle},
     std::convert::{TryFrom, TryInto},
 };
 

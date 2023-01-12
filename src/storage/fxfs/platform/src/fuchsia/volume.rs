@@ -3,25 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{self, Filesystem, SyncOptions},
-        log::*,
-        object_store::{
-            directory::{Directory, ObjectDescriptor},
-            transaction::{LockKey, Mutation, Options},
-            HandleOptions, HandleOwner, ObjectKey, ObjectKind, ObjectStore, ObjectValue,
-        },
-        platform::fuchsia::{
-            component::map_to_raw_status,
-            directory::FxDirectory,
-            file::FxFile,
-            memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-            node::{FxNode, GetResult, NodeCache},
-            pager::{Pager, PagerExecutor},
-            vmo_data_buffer::VmoDataBuffer,
-            volumes_directory::VolumesDirectory,
-        },
+    crate::fuchsia::{
+        component::map_to_raw_status,
+        directory::FxDirectory,
+        file::FxFile,
+        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
+        node::{FxNode, GetResult, NodeCache},
+        pager::{Pager, PagerExecutor},
+        vmo_data_buffer::VmoDataBuffer,
+        volumes_directory::VolumesDirectory,
     },
     anyhow::{anyhow, bail, ensure, Error},
     async_trait::async_trait,
@@ -34,6 +24,16 @@ use {
         channel::oneshot,
         stream::{self, FusedStream, Stream},
         FutureExt, StreamExt, TryStreamExt,
+    },
+    fxfs::{
+        errors::FxfsError,
+        filesystem::{self, Filesystem, SyncOptions},
+        log::*,
+        object_store::{
+            directory::{Directory, ObjectDescriptor},
+            transaction::{LockKey, Mutation, Options},
+            HandleOptions, HandleOwner, ObjectKey, ObjectKind, ObjectStore, ObjectValue,
+        },
     },
     std::{
         convert::TryInto,
@@ -746,8 +746,24 @@ pub fn info_to_filesystem_info(
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            crypt::insecure::InsecureCrypt,
+        crate::fuchsia::{
+            file::FxFile,
+            memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
+            testing::{
+                close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
+                open_file_checked, write_at, TestFixture,
+            },
+            volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot},
+            volumes_directory::VolumesDirectory,
+        },
+        anyhow::Error,
+        fidl::endpoints::ServerEnd,
+        fidl_fuchsia_fxfs::{ProjectIdMarker, VolumeMarker},
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_component::client::connect_to_protocol_at_dir_svc,
+        fuchsia_fs::file,
+        fuchsia_zircon::Status,
+        fxfs::{
             errors::FxfsError,
             filesystem::FxFilesystem,
             fsck::{fsck, fsck_volume},
@@ -758,24 +774,8 @@ mod tests {
                 volume::root_volume,
                 HandleOptions, ObjectKey, ObjectStore, ObjectValue,
             },
-            platform::fuchsia::{
-                file::FxFile,
-                memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-                testing::{
-                    close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-                    open_file_checked, write_at, TestFixture,
-                },
-                volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot},
-                volumes_directory::VolumesDirectory,
-            },
         },
-        anyhow::Error,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_fxfs::{ProjectIdMarker, VolumeMarker},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
+        fxfs_insecure_crypto::InsecureCrypt,
         std::{
             sync::{Arc, Weak},
             time::Duration,

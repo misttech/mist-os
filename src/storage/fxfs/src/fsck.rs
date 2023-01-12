@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::Crypt,
         filesystem::Filesystem,
         fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
         log::*,
@@ -27,6 +26,7 @@ use {
     },
     anyhow::{anyhow, Context, Error},
     futures::try_join,
+    fxfs_crypto::Crypt,
     std::{
         collections::{BTreeMap, HashSet},
         iter::zip,

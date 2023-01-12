@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        errors::FxfsError,
-        platform::fuchsia::{errors::map_to_status, file::FxFile, node::OpenedNode},
-        round::{round_down, round_up},
-    },
+    crate::fuchsia::{errors::map_to_status, file::FxFile, node::OpenedNode},
     anyhow::Error,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_hardware_block as block,
@@ -17,6 +13,10 @@ use {
     fuchsia_async::{self as fasync, FifoReadable, FifoWritable},
     fuchsia_zircon as zx,
     futures::{stream::TryStreamExt, try_join},
+    fxfs::{
+        errors::FxfsError,
+        round::{round_down, round_up},
+    },
     remote_block_device::{BlockFifoRequest, BlockFifoResponse},
     std::{
         collections::{BTreeMap, HashMap},
@@ -596,7 +596,7 @@ impl BlockServer {
 #[cfg(test)]
 mod tests {
     use {
-        crate::platform::fuchsia::testing::{open_file_checked, TestFixture},
+        crate::fuchsia::testing::{open_file_checked, TestFixture},
         fidl::endpoints::{ClientEnd, ServerEnd},
         fidl_fuchsia_hardware_block::BlockMarker,
         fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker,

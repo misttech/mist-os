@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        object_handle::ObjectProperties,
-        platform::fuchsia::{directory::FxDirectory, file::FxFile},
-    },
+    crate::fuchsia::{directory::FxDirectory, file::FxFile},
     anyhow::Error,
     async_trait::async_trait,
     futures::future::poll_fn,
+    fxfs::object_handle::ObjectProperties,
     std::{
         any::TypeId,
         collections::{btree_map::Entry, BTreeMap},
@@ -257,17 +255,15 @@ impl<N: FxNode + ?Sized> std::ops::Deref for OpenedNode<N> {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            object_handle::ObjectProperties,
-            platform::fuchsia::{
-                directory::FxDirectory,
-                node::{FxNode, GetResult, NodeCache},
-            },
+        crate::fuchsia::{
+            directory::FxDirectory,
+            node::{FxNode, GetResult, NodeCache},
         },
         anyhow::Error,
         async_trait::async_trait,
         fuchsia_async as fasync,
         futures::future::join_all,
+        fxfs::object_handle::ObjectProperties,
         std::{
             sync::{
                 atomic::{AtomicU64, Ordering},

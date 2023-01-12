@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::{insecure::InsecureCrypt, Crypt, WrappedKeys},
         filesystem::{Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, OpenOptions},
         fsck::{
             errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
@@ -29,6 +28,8 @@ use {
     },
     anyhow::{Context, Error},
     assert_matches::assert_matches,
+    fxfs_crypto::{Crypt, WrappedKeys},
+    fxfs_insecure_crypto::InsecureCrypt,
     std::{
         ops::{Bound, Deref},
         sync::{Arc, Mutex},

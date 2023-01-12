@@ -390,7 +390,6 @@ impl ObjectStore {
 mod tests {
     use {
         crate::{
-            crypt::insecure::InsecureCrypt,
             filesystem::{self, Filesystem, FxFilesystem, JournalingObject, SyncOptions},
             object_handle::ObjectHandle,
             object_store::{
@@ -400,6 +399,7 @@ mod tests {
                 HandleOptions, ObjectStore,
             },
         },
+        fxfs_insecure_crypto::InsecureCrypt,
         std::sync::Arc,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };

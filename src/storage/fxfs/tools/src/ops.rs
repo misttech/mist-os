@@ -6,7 +6,6 @@ use {
     anyhow::{bail, Error},
     chrono::{TimeZone, Utc},
     fxfs::{
-        crypt::Crypt,
         filesystem::{Filesystem, OpenFxFilesystem},
         fsck,
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
@@ -17,6 +16,7 @@ use {
             Directory, HandleOptions, ObjectDescriptor, ObjectStore,
         },
     },
+    fxfs_crypto::Crypt,
     std::{io::Write, ops::Deref, path::Path, sync::Arc},
 };
 

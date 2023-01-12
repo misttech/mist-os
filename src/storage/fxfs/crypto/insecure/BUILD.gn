@@ -1,0 +1,28 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("insecure") {
+  edition = "2021"
+  with_unit_tests = false
+  name = "fxfs-insecure-crypto"
+
+  deps = [
+    "//build/validate:non_production_tag",
+    "//src/storage/fxfs/crypto",
+    "//third_party/rust_crates:aes-gcm-siv",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:rand",
+  ]
+
+  sources = [ "src/lib.rs" ]
+
+  features = []
+  if (is_fuchsia) {
+    features += [ "tracing" ]
+  }
+  visibility = [ "//src/storage/fxfs/*" ]
+}

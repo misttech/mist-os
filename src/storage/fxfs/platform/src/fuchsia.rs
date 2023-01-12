@@ -7,7 +7,6 @@ mod device;
 mod directory;
 mod errors;
 pub mod file;
-pub mod log;
 mod memory_pressure;
 pub mod node;
 mod paged_object_handle;

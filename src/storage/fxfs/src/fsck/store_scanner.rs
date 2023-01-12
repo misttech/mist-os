@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::WrappedKeys,
         fsck::{
             errors::{FsckError, FsckFatal, FsckWarning},
             Fsck,
@@ -22,6 +21,7 @@ use {
         round::round_up,
     },
     anyhow::{self, Error},
+    fxfs_crypto::WrappedKeys,
     std::{
         cell::UnsafeCell,
         collections::{btree_map::BTreeMap, hash_set::HashSet},

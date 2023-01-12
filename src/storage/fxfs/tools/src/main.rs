@@ -6,10 +6,11 @@ use {
     anyhow::Error,
     argh::FromArgs,
     fxfs::{
-        crypt::{insecure::InsecureCrypt, Crypt},
         filesystem::{mkfs_with_default, FxFilesystem, OpenOptions},
         fsck,
     },
+    fxfs_crypto::Crypt,
+    fxfs_insecure_crypto::InsecureCrypt,
     std::{io::Read, ops::Deref, path::Path, sync::Arc},
     storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
     tools::ops,

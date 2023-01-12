@@ -7,10 +7,11 @@ use {
     anyhow::{bail, Context, Error},
     chrono::Local,
     fxfs::{
-        crypt::{insecure::InsecureCrypt, Crypt},
         filesystem::{mkfs_with_default, Filesystem, FxFilesystem, SyncOptions},
         serialized_types::LATEST_VERSION,
     },
+    fxfs_crypto::Crypt,
+    fxfs_insecure_crypto::InsecureCrypt,
     std::{
         io::Write,
         path::{Path, PathBuf},

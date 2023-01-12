@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::Crypt,
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, JournalingObject},
         log::*,
@@ -25,6 +24,7 @@ use {
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     futures::FutureExt as _,
+    fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
     std::{
         collections::{hash_map::Entry, HashMap},

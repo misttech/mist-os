@@ -3,7 +3,20 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
+    crate::fuchsia::{
+        device::BlockServer,
+        errors::map_to_status,
+        file::FxFile,
+        node::{FxNode, GetResult, OpenedNode},
+        volume::{info_to_filesystem_info, FxVolume},
+    },
+    anyhow::{bail, Error},
+    async_trait::async_trait,
+    either::{Left, Right},
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon::Status,
+    fxfs::{
         errors::FxfsError,
         filesystem::SyncOptions,
         log::*,
@@ -14,20 +27,7 @@ use {
             transaction::{LockKey, Options, Transaction},
             ObjectStore, Timestamp,
         },
-        platform::fuchsia::{
-            device::BlockServer,
-            errors::map_to_status,
-            file::FxFile,
-            node::{FxNode, GetResult, OpenedNode},
-            volume::{info_to_filesystem_info, FxVolume},
-        },
     },
-    anyhow::{bail, Error},
-    async_trait::async_trait,
-    either::{Left, Right},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
     std::{
         any::Any,
         sync::{Arc, Mutex},
@@ -756,7 +756,7 @@ impl Directory for FxDirectory {
 #[cfg(test)]
 mod tests {
     use {
-        crate::platform::fuchsia::testing::{
+        crate::fuchsia::testing::{
             close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
             open_file_checked, TestFixture,
         },

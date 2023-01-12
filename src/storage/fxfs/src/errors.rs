@@ -66,3 +66,34 @@ impl FxfsError {
         }
     }
 }
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use {super::*, fuchsia_zircon::Status};
+
+    impl From<FxfsError> for Status {
+        fn from(err: FxfsError) -> Status {
+            match err {
+                FxfsError::AlreadyExists => Status::ALREADY_EXISTS,
+                FxfsError::Inconsistent => Status::IO_DATA_INTEGRITY,
+                FxfsError::Internal => Status::INTERNAL,
+                FxfsError::NotDir => Status::NOT_DIR,
+                FxfsError::NotFile => Status::NOT_FILE,
+                FxfsError::NotFound => Status::NOT_FOUND,
+                FxfsError::NotEmpty => Status::NOT_EMPTY,
+                FxfsError::ReadOnlyFilesystem => Status::ACCESS_DENIED,
+                FxfsError::NoSpace => Status::NO_SPACE,
+                FxfsError::Deleted => Status::ACCESS_DENIED,
+                FxfsError::InvalidArgs => Status::INVALID_ARGS,
+                FxfsError::TooBig => Status::FILE_BIG,
+                FxfsError::InvalidVersion => Status::NOT_SUPPORTED,
+                FxfsError::JournalFlushError => Status::IO,
+                FxfsError::NotSupported => Status::NOT_SUPPORTED,
+                FxfsError::AccessDenied => Status::ACCESS_DENIED,
+                FxfsError::OutOfRange => Status::OUT_OF_RANGE,
+                FxfsError::AlreadyBound => Status::ALREADY_BOUND,
+                FxfsError::BadPath => Status::BAD_PATH,
+            }
+        }
+    }
+}

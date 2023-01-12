@@ -14,11 +14,11 @@ use {
         filesystem::{mkfs_with_default, FxFilesystem, OpenOptions},
         fsck,
         log::*,
-        platform::{
-            component::{new_block_client, Component},
-            RemoteCrypt,
-        },
         serialized_types::LATEST_VERSION,
+    },
+    fxfs_platform::{
+        component::{new_block_client, Component},
+        RemoteCrypt,
     },
     std::sync::Arc,
     storage_device::{block_device::BlockDevice, DeviceHolder},

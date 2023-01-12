@@ -3,19 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        filesystem::{
-            mkfs, Filesystem as _, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,
-        },
-        fsck,
-        log::*,
-        metrics::{DETAIL_NODE, OBJECT_STORES_NODE},
-        object_store::volume::root_volume,
-        platform::fuchsia::{
-            errors::map_to_status, memory_pressure::MemoryPressureMonitor, pager::PagerExecutor,
-            volumes_directory::VolumesDirectory,
-        },
-        serialized_types::LATEST_VERSION,
+    crate::fuchsia::{
+        errors::map_to_status, memory_pressure::MemoryPressureMonitor, pager::PagerExecutor,
+        volumes_directory::VolumesDirectory,
     },
     anyhow::{Context, Error},
     async_trait::async_trait,
@@ -35,6 +25,16 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::TryStreamExt,
+    fxfs::{
+        filesystem::{
+            mkfs, Filesystem as _, FxFilesystem, OpenFxFilesystem, OpenOptions, MIN_BLOCK_SIZE,
+        },
+        fsck,
+        log::*,
+        metrics::{DETAIL_NODE, OBJECT_STORES_NODE},
+        object_store::volume::root_volume,
+        serialized_types::LATEST_VERSION,
+    },
     inspect_runtime::service::{TreeServerSendPreference, TreeServerSettings},
     remote_block_device::{BlockClient as _, RemoteBlockClient},
     std::ops::Deref,
@@ -294,7 +294,7 @@ impl Component {
         let fs: Arc<InspectedFxFilesystem> = Arc::new(fs.into());
         let weak_fs = Arc::downgrade(&fs) as Weak<dyn FsInspect + Send + Sync>;
         let inspect_tree =
-            Arc::new(FsInspectTree::new(weak_fs, &crate::metrics::FXFS_ROOT_NODE.lock().unwrap()));
+            Arc::new(FsInspectTree::new(weak_fs, &fxfs::metrics::FXFS_ROOT_NODE.lock().unwrap()));
         let mem_monitor = match MemoryPressureMonitor::start().await {
             Ok(v) => Some(v),
             Err(e) => {
@@ -456,7 +456,6 @@ impl Component {
 mod tests {
     use {
         super::{new_block_client, Component},
-        crate::{filesystem::FxFilesystem, object_store::volume::root_volume},
         fidl::{
             encoding::Decodable,
             endpoints::{Proxy, ServerEnd},
@@ -472,6 +471,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::future::{BoxFuture, FusedFuture},
         futures::{future::FutureExt, pin_mut, select},
+        fxfs::{filesystem::FxFilesystem, object_store::volume::root_volume},
         ramdevice_client::RamdiskClientBuilder,
         std::{collections::HashSet, pin::Pin},
         storage_device::block_device::BlockDevice,

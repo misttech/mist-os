@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::WrappedKey,
         debug_assert_not_too_long,
         log::*,
         lsm_tree::types::Item,
@@ -20,6 +19,7 @@ use {
     async_trait::async_trait,
     either::{Either, Left, Right},
     futures::{future::poll_fn, pin_mut},
+    fxfs_crypto::WrappedKey,
     scopeguard::ScopeGuard,
     serde::{Deserialize, Serialize},
     std::{
@@ -323,8 +323,20 @@ pub enum AllocatorMutation {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeHash)]
-#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct UpdateMutationsKey(pub WrappedKey);
+
+#[cfg(fuzz)]
+impl<'a> arbitrary::Arbitrary<'a> for UpdateMutationsKey {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <u64>::arbitrary(u).map(|wrapping_key_id| {
+            UpdateMutationsKey(WrappedKey {
+                wrapping_key_id,
+                // There doesn't seem to be much point to randomly generate crypto keys.
+                key: fxfs_crypto::WrappedKeyBytes::default(),
+            })
+        })
+    }
+}
 
 impl Ord for UpdateMutationsKey {
     fn cmp(&self, other: &Self) -> Ordering {

@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::Crypt,
         debug_assert_not_too_long,
         errors::FxfsError,
         fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
@@ -37,6 +36,7 @@ use {
         channel::oneshot::{channel, Sender},
         FutureExt,
     },
+    fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
     static_assertions::const_assert,

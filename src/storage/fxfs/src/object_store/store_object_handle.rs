@@ -5,7 +5,6 @@
 use {
     crate::{
         checksum::fletcher64,
-        crypt::{UnwrappedKeys, XtsCipherSet},
         errors::FxfsError,
         log::*,
         lsm_tree::types::{ItemRef, LayerIterator},
@@ -36,6 +35,7 @@ use {
         stream::{FuturesOrdered, FuturesUnordered},
         try_join, TryStreamExt,
     },
+    fxfs_crypto::{UnwrappedKeys, XtsCipherSet},
     std::{
         cmp::min,
         ops::{Bound, Range},
@@ -1514,7 +1514,6 @@ pub struct NeedsTrim(pub bool);
 mod tests {
     use {
         crate::{
-            crypt::{insecure::InsecureCrypt, Crypt},
             errors::FxfsError,
             filesystem::{
                 self, Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, OpenOptions,
@@ -1538,6 +1537,8 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         futures::{channel::oneshot::channel, join, FutureExt},
+        fxfs_crypto::Crypt,
+        fxfs_insecure_crypto::InsecureCrypt,
         rand::Rng,
         std::{
             ops::Range,

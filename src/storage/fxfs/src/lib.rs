@@ -11,11 +11,9 @@
 //! Fuchsia specific bindings are primarily found under [server].
 
 pub mod checksum;
-pub mod crypt;
-mod data_buffer;
+pub mod data_buffer;
 pub mod drop_event;
 pub mod errors;
-pub mod ff1;
 pub mod filesystem;
 pub mod fsck;
 pub mod log;
@@ -23,9 +21,8 @@ mod lsm_tree;
 pub mod metrics;
 pub mod object_handle;
 pub mod object_store;
-pub mod platform;
-mod range;
-mod round;
+pub mod range;
+pub mod round;
 pub mod serialized_types;
 #[cfg(test)]
 mod testing;

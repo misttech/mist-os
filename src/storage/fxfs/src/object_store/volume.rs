@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        crypt::Crypt,
         errors::FxfsError,
         filesystem::Filesystem,
         object_store::{
@@ -13,6 +12,7 @@ use {
         },
     },
     anyhow::{anyhow, bail, Context, Error},
+    fxfs_crypto::Crypt,
     std::sync::Arc,
 };
 
@@ -174,7 +174,6 @@ mod tests {
     use {
         super::root_volume,
         crate::{
-            crypt::insecure::InsecureCrypt,
             filesystem::{Filesystem, FxFilesystem, JournalingObject, SyncOptions},
             object_handle::{ObjectHandle, WriteObjectHandle},
             object_store::{
@@ -183,6 +182,7 @@ mod tests {
                 transaction::{Options, TransactionHandler},
             },
         },
+        fxfs_insecure_crypto::InsecureCrypt,
         std::sync::Arc,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };

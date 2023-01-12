@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::crypt::UnwrappedKey,
+    crate::UnwrappedKey,
     aes::{cipher::generic_array::GenericArray, Aes256, BlockEncrypt, NewBlockCipher},
     byteorder::{BigEndian, ByteOrder},
 };
@@ -78,7 +78,7 @@ impl Ff1 {
 
 #[cfg(test)]
 mod tests {
-    use {super::Ff1, crate::crypt::UnwrappedKey, rand};
+    use {super::Ff1, crate::UnwrappedKey, rand};
 
     #[test]
     fn test_ff1() {

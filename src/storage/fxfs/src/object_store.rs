@@ -27,11 +27,9 @@ pub use store_object_handle::StoreObjectHandle;
 
 use {
     crate::{
-        crypt::{Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
         data_buffer::{DataBuffer, MemDataBuffer},
         debug_assert_not_too_long,
         errors::FxfsError,
-        ff1::Ff1,
         filesystem::{
             ApplyContext, ApplyMode, Filesystem, FxFilesystem, JournalingObject, SyncOptions,
             MAX_FILE_SIZE,
@@ -61,6 +59,7 @@ use {
     async_trait::async_trait,
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
+    fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
     serde::{Deserialize, Serialize},
@@ -1943,9 +1942,6 @@ mod tests {
     use {
         super::{StoreInfo, MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK},
         crate::{
-            crypt::{
-                insecure::InsecureCrypt, Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE,
-            },
             errors::FxfsError,
             filesystem::{
                 Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions,
@@ -1965,6 +1961,8 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         futures::join,
+        fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE},
+        fxfs_insecure_crypto::InsecureCrypt,
         std::{
             ops::Bound,
             sync::{Arc, Mutex},

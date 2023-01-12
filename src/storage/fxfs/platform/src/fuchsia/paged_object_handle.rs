@@ -3,7 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
+    crate::fuchsia::{
+        file::FxFile,
+        pager::Pager,
+        pager::{PagerVmoStatsOptions, VmoDirtyRange},
+        vmo_data_buffer::VmoDataBuffer,
+        volume::FxVolume,
+    },
+    anyhow::{ensure, Context, Error},
+    fuchsia_zircon as zx,
+    fxfs::{
         data_buffer::DataBuffer,
         debug_assert_not_too_long,
         errors::FxfsError,
@@ -18,17 +27,8 @@ use {
             AttributeKey, HandleOwner, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
             Timestamp,
         },
-        platform::fuchsia::{
-            file::FxFile,
-            pager::Pager,
-            pager::{PagerVmoStatsOptions, VmoDirtyRange},
-            vmo_data_buffer::VmoDataBuffer,
-            volume::FxVolume,
-        },
         round::{how_many, round_up},
     },
-    anyhow::{ensure, Context, Error},
-    fuchsia_zircon as zx,
     scopeguard::ScopeGuard,
     std::{
         ops::{FnOnce, Range},
@@ -857,7 +857,7 @@ impl FlushRange {
 mod tests {
     use {
         super::*,
-        crate::platform::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
+        crate::fuchsia::testing::{close_file_checked, open_file_checked, TestFixture},
         fidl_fuchsia_io as fio,
         fuchsia_fs::file,
         fuchsia_zircon as zx,

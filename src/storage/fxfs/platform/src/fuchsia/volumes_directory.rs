@@ -3,27 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        crypt::Crypt,
-        errors::FxfsError,
-        fsck,
-        log::*,
-        metrics::OBJECT_STORES_NODE,
-        object_store::{
-            allocator::Allocator,
-            directory::ObjectDescriptor,
-            transaction::{LockKey, Options},
-            volume::RootVolume,
-            ObjectStore,
-        },
-        platform::{
-            fuchsia::{
-                component::map_to_raw_status,
-                memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-                volume::{FlushTaskConfig, FxVolumeAndRoot},
-            },
-            RemoteCrypt,
-        },
+    crate::fuchsia::{
+        component::map_to_raw_status,
+        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
+        volume::{FlushTaskConfig, FxVolumeAndRoot},
+        RemoteCrypt,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
@@ -37,6 +21,20 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef, Status},
     futures::{stream::FuturesUnordered, StreamExt, TryStreamExt},
+    fxfs::{
+        errors::FxfsError,
+        fsck,
+        log::*,
+        metrics::OBJECT_STORES_NODE,
+        object_store::{
+            allocator::Allocator,
+            directory::ObjectDescriptor,
+            transaction::{LockKey, Options},
+            volume::RootVolume,
+            ObjectStore,
+        },
+    },
+    fxfs_crypto::Crypt,
     std::{
         collections::{hash_map::Entry::Occupied, HashMap},
         sync::{
@@ -569,19 +567,7 @@ impl VolumesDirectory {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            crypt::{
-                insecure::{self, InsecureCrypt},
-                Crypt,
-            },
-            errors::FxfsError,
-            filesystem::{Filesystem, FxFilesystem},
-            fsck::fsck,
-            object_store::allocator::SimpleAllocator,
-            object_store::volume::root_volume,
-            platform::fuchsia::testing::open_file_checked,
-            platform::fuchsia::volumes_directory::VolumesDirectory,
-        },
+        crate::fuchsia::{testing::open_file_checked, volumes_directory::VolumesDirectory},
         fidl::encoding::Decodable,
         fidl::endpoints::{create_request_stream, ServerEnd},
         fidl_fuchsia_fs::AdminMarker,
@@ -590,6 +576,15 @@ mod tests {
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_zircon::Status,
         futures::join,
+        fxfs::{
+            errors::FxfsError,
+            filesystem::{Filesystem, FxFilesystem},
+            fsck::fsck,
+            object_store::allocator::SimpleAllocator,
+            object_store::volume::root_volume,
+        },
+        fxfs_crypto::Crypt,
+        fxfs_insecure_crypto::InsecureCrypt,
         std::{
             sync::{Arc, Weak},
             time::Duration,
@@ -934,10 +929,10 @@ mod tests {
 
         let crypt_service = fxfs_crypt::CryptService::new();
         crypt_service
-            .add_wrapping_key(0, insecure::DATA_KEY.to_vec())
+            .add_wrapping_key(0, fxfs_insecure_crypto::DATA_KEY.to_vec())
             .expect("add_wrapping_key failed");
         crypt_service
-            .add_wrapping_key(1, insecure::METADATA_KEY.to_vec())
+            .add_wrapping_key(1, fxfs_insecure_crypto::METADATA_KEY.to_vec())
             .expect("add_wrapping_key failed");
         crypt_service.set_active_key(KeyPurpose::Data, 0).expect("set_active_key failed");
         crypt_service.set_active_key(KeyPurpose::Metadata, 1).expect("set_active_key failed");
