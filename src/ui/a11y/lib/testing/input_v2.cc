@@ -21,16 +21,16 @@ using fuchsia::ui::pointer::EventPhase;
 PointerParams::PointerParams(PointerId pointer_id, EventPhase phase, const glm::vec2& coordinate)
     : pointer_id(pointer_id), phase(phase), coordinate(coordinate) {}
 
-std::vector<PointerParams> DownEvents(PointerId pointer_id, const glm::vec2& coordinate) {
+std::vector<PointerParams> AddEvent(PointerId pointer_id, const glm::vec2& coordinate) {
   return {{pointer_id, EventPhase::ADD, coordinate}};
 }
 
-std::vector<PointerParams> UpEvents(PointerId pointer_id, const glm::vec2& coordinate) {
+std::vector<PointerParams> RemoveEvent(PointerId pointer_id, const glm::vec2& coordinate) {
   return {{pointer_id, EventPhase::REMOVE, coordinate}};
 }
 
 std::vector<PointerParams> TapEvents(PointerId pointer_id, const glm::vec2& coordinate) {
-  return DownEvents(pointer_id, coordinate) + UpEvents(pointer_id, coordinate);
+  return AddEvent(pointer_id, coordinate) + RemoveEvent(pointer_id, coordinate);
 }
 
 // Pointer move events between two endpoints, (start, end]. The start point is exclusive and the end
@@ -50,8 +50,8 @@ std::vector<PointerParams> MoveEvents(PointerId pointer_id, const glm::vec2& sta
 
 std::vector<PointerParams> DragEvents(PointerId pointer_id, const glm::vec2& start,
                                       const glm::vec2& end, size_t moves) {
-  return DownEvents(pointer_id, start) + MoveEvents(pointer_id, start, end, moves) +
-         UpEvents(pointer_id, end);
+  return AddEvent(pointer_id, start) + MoveEvents(pointer_id, start, end, moves) +
+         RemoveEvent(pointer_id, end);
 }
 
 fuchsia::ui::pointer::augment::TouchEventWithLocalHit ToTouchEvent(const PointerParams& params,

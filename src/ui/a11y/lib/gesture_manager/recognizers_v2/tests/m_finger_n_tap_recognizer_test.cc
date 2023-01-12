@@ -24,10 +24,10 @@ namespace {
 constexpr uint32_t kDefaultFingers = 2;
 
 using fuchsia::ui::pointer::EventPhase;
-using input_v2::DownEvents;
+using input_v2::AddEvent;
 using input_v2::DragEvents;
+using input_v2::RemoveEvent;
 using input_v2::TapEvents;
-using input_v2::UpEvents;
 
 class MFingerNTapRecognizerTest : public gtest::TestLoopFixture {
  public:
@@ -67,7 +67,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapWonAfterGestureDetected) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send two-finger-tap event.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   EXPECT_FALSE(token_.is_held());
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
@@ -80,10 +80,10 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapWonAfterGestureDetected) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   // Send event for the second tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   EXPECT_FALSE(token_.is_held());
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
@@ -94,7 +94,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapGestureDetectedWin) {
   CreateGestureRecognizer(kDefaultFingers, 1);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
@@ -109,10 +109,10 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapGestureDetectedWin) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   // Send event for the second tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   recognizer_->OnWin();
 
@@ -128,7 +128,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapGestureDetectedLoss) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   recognizer_->OnDefeat();
 
@@ -144,10 +144,10 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapGestureDetectedLoss) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   // Send event for the second tap.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   recognizer_->OnDefeat();
 
@@ -163,7 +163,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapGestureTimeout) {
   CreateGestureRecognizer(kDefaultFingers, 1);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {})));
 
   // Wait until the timeout, after which the gesture should abandon.
   RunLoopFor(a11y::recognizers_v2::kMaxTapDuration);
@@ -178,7 +178,7 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapGestureTimeoutBetweenTaps) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {})));
 
   // Wait until the timeout, after which the gesture should abandon.
   RunLoopFor(a11y::recognizers_v2::kMaxTapDuration);
@@ -191,7 +191,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapThirdFingerDetected) {
   CreateGestureRecognizer(kDefaultFingers, 1);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kUndecided);
 
@@ -207,7 +207,7 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapThirdFingerDetected) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(1, {}) + UpEvents(2, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(1, {}) + RemoveEvent(2, {})));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kUndecided);
 
@@ -222,9 +222,9 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapGestureWithMoveUnderThreshold) {
   CreateGestureRecognizer(kDefaultFingers, 1);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}) +
+  SendPointerEvents(AddEvent(1, {}) +
                     DragEvents(2, {}, {a11y::gesture_util_v2::kGestureMoveThreshold - .1f, 0}) +
-                    UpEvents(1, {}));
+                    RemoveEvent(1, {}));
 
   EXPECT_FALSE(token_.is_held());
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
@@ -236,7 +236,7 @@ TEST_F(MFingerNTapRecognizerTest, SingleTapGesturePerformedOverLargerArea) {
   CreateGestureRecognizer(kDefaultFingers, 1);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}) +
+  SendPointerEvents(AddEvent(1, {}) +
                     DragEvents(2, {}, {a11y::gesture_util_v2::kGestureMoveThreshold + .1f, 0}));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
@@ -249,12 +249,12 @@ TEST_F(MFingerNTapRecognizerTest, DoubleTapPerformedWithDistantTapsFromEachOther
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents(DownEvents(1, {0, 0}) + DownEvents(2, {0, 0}) + UpEvents(1, {0, 0}) +
-                    UpEvents(2, {0, 0}));
+  SendPointerEvents(AddEvent(1, {0, 0}) + AddEvent(2, {0, 0}) + RemoveEvent(1, {0, 0}) +
+                    RemoveEvent(2, {0, 0}));
 
   // Send event for the second tap.
-  SendPointerEvents(DownEvents(1, {1, 1}) + DownEvents(2, {1, 1}) + UpEvents(1, {1, 1}) +
-                    UpEvents(2, {1, 1}));
+  SendPointerEvents(AddEvent(1, {1, 1}) + AddEvent(2, {1, 1}) + RemoveEvent(1, {1, 1}) +
+                    RemoveEvent(2, {1, 1}));
 
   EXPECT_FALSE(token_.is_held());
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
@@ -318,8 +318,8 @@ TEST_F(MFingerNTapRecognizerTest, LiftAndReplaceSecondFingerIsNotRecognized) {
 
   // Send events for holding one finger down, and double-tapping with the
   // other finger.
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + UpEvents(2, {}) + DownEvents(2, {}) +
-                    UpEvents(1, {}) + UpEvents(2, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + RemoveEvent(2, {}) + AddEvent(2, {}) +
+                    RemoveEvent(1, {}) + RemoveEvent(2, {}));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
 }
@@ -340,8 +340,8 @@ TEST_F(MFingerNTapRecognizerTest, OneFingerTripleTapDetected) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + UpEvents(1, {})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + RemoveEvent(1, {})));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
 }
@@ -352,12 +352,12 @@ TEST_F(MFingerNTapRecognizerTest, ThreeFingerDoubleTapDetected) {
   recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   // Send events for second tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
 }
@@ -367,7 +367,7 @@ TEST_F(MFingerNTapRecognizerTest, ThreeFingerDoubleTapRejected) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/);
   recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}));
+  SendPointerEvents(AddEvent(1, {}));
   RunLoopFor(a11y::recognizers_v2::kMaxTapDuration);
 
   EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);

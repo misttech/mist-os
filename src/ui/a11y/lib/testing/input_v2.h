@@ -75,8 +75,8 @@ constexpr size_t kDefaultMoves = 10;
 // to obtain local coordinates.
 constexpr float kTestNDCToLocalMultiplier = 50;
 
-std::vector<PointerParams> DownEvents(PointerId pointer_id, const glm::vec2& coordinate);
-std::vector<PointerParams> UpEvents(PointerId pointer_id, const glm::vec2& coordinate);
+std::vector<PointerParams> AddEvent(PointerId pointer_id, const glm::vec2& coordinate);
+std::vector<PointerParams> RemoveEvent(PointerId pointer_id, const glm::vec2& coordinate);
 std::vector<PointerParams> TapEvents(PointerId pointer_id, const glm::vec2& coordinate);
 
 // Pointer move events between two endpoints, (start, end]. The start point is exclusive and the end
