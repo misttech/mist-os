@@ -7,14 +7,14 @@
 
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
-use core::{convert::TryFrom, num::NonZeroU16};
+use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16};
 use log::trace;
 
 use net_types::{
     ip::{IpAddress, IpVersionMarker},
     SpecifiedAddr,
 };
-use packet::{Buf, BufferMut, Nested, Serializer as _};
+use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{
     ip::IpProto,
     tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilder},
@@ -409,7 +409,7 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
 pub(super) fn tcp_serialize_segment<'a, S, A>(
     segment: S,
     conn_addr: ConnIpAddr<A, NonZeroU16, NonZeroU16>,
-) -> Nested<Buf<Vec<u8>>, TcpSegmentBuilder<A>>
+) -> impl Serializer<Buffer = Buf<Vec<u8>>> + Debug + 'a
 where
     S: Into<Segment<SendPayload<'a>>>,
     A: IpAddress,
@@ -425,15 +425,82 @@ where
         ack.map(Into::into),
         u16::try_from(u32::from(wnd)).unwrap_or(u16::MAX),
     );
-    let payload = match contents.data() {
-        SendPayload::Contiguous(p) => (*p).to_vec(),
-        SendPayload::Straddle(p1, p2) => [*p1, *p2].concat(),
-    };
     match contents.control() {
         None => {}
         Some(Control::SYN) => builder.syn(true),
         Some(Control::FIN) => builder.fin(true),
         Some(Control::RST) => builder.rst(true),
     }
-    Buf::new(payload, ..).encapsulate(builder)
+    contents.data().encapsulate(builder)
+}
+
+#[cfg(test)]
+mod test {
+    use ip_test_macro::ip_test;
+    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use nonzero_ext::nonzero;
+    use packet::ParseBuffer as _;
+    use test_case::test_case;
+
+    use crate::{testutil::TestIpExt, transport::tcp::seqnum::SeqNum};
+
+    use super::*;
+
+    const SEQ: SeqNum = SeqNum::new(12345);
+    const ACK: SeqNum = SeqNum::new(67890);
+
+    impl Segment<SendPayload<'static>> {
+        const FAKE_DATA: &'static [u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        fn with_fake_data(split: bool) -> Self {
+            let (segment, discarded) = Self::with_data(
+                SEQ,
+                Some(ACK),
+                None,
+                WindowSize::DEFAULT,
+                if split {
+                    let (first, second) = Self::FAKE_DATA.split_at(Self::FAKE_DATA.len() / 2);
+                    SendPayload::Straddle(first, second)
+                } else {
+                    SendPayload::Contiguous(Self::FAKE_DATA)
+                },
+            );
+            assert_eq!(discarded, 0);
+            segment
+        }
+    }
+
+    #[ip_test]
+    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT).into(), &[]; "syn")]
+    #[test_case(Segment::ack(SEQ, ACK, WindowSize::DEFAULT).into(), &[]; "ack")]
+    #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
+    #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
+    fn tcp_serialize_segment<I: Ip + TestIpExt>(
+        segment: Segment<SendPayload<'_>>,
+        expected_body: &[u8],
+    ) {
+        const SOURCE_PORT: NonZeroU16 = nonzero!(1111u16);
+        const DEST_PORT: NonZeroU16 = nonzero!(2222u16);
+
+        let serializer = super::tcp_serialize_segment(
+            segment,
+            ConnIpAddr {
+                local: (I::FAKE_CONFIG.local_ip, SOURCE_PORT),
+                remote: (I::FAKE_CONFIG.remote_ip, DEST_PORT),
+            },
+        );
+
+        let mut serialized = serializer.serialize_vec_outer().unwrap().into_inner();
+        let parsed_segment = serialized
+            .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
+                *I::FAKE_CONFIG.remote_ip,
+                *I::FAKE_CONFIG.local_ip,
+            ))
+            .expect("is valid segment");
+
+        assert_eq!(parsed_segment.src_port(), SOURCE_PORT);
+        assert_eq!(parsed_segment.dst_port(), DEST_PORT);
+        assert_eq!(parsed_segment.seq_num(), u32::from(SEQ));
+        assert_eq!(WindowSize::from_u16(parsed_segment.window_size()), WindowSize::DEFAULT);
+        assert_eq!(parsed_segment.into_body(), expected_body);
+    }
 }

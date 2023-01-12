@@ -92,9 +92,9 @@ impl From<u32> for SeqNum {
     }
 }
 
-impl Into<u32> for SeqNum {
-    fn into(self) -> u32 {
-        let Self(x) = self;
+impl From<SeqNum> for u32 {
+    fn from(x: SeqNum) -> Self {
+        let SeqNum(x) = x;
         x
     }
 }

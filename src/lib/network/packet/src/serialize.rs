@@ -1212,6 +1212,22 @@ pub trait BufferProvider<Input, Output> {
     /// [`reuse_or_realloc`]: BufferProvider::reuse_or_realloc
     type Error;
 
+    /// Attempts to produce an output buffer with the given constraints by
+    /// allocating a new one.
+    ///
+    /// `alloc_no_reuse` produces a new buffer with the following invariants:
+    /// - The output buffer must have at least `prefix` bytes of prefix
+    /// - The output buffer must have at least `suffix` bytes of suffix
+    /// - The output buffer must have a body of length `body` bytes.
+    ///
+    /// If these requirements cannot be met, then an error is returned.
+    fn alloc_no_reuse(
+        self,
+        prefix: usize,
+        body: usize,
+        suffix: usize,
+    ) -> Result<Output, Self::Error>;
+
     /// Consumes an input buffer and attempts to produce an output buffer with
     /// the given constraints, either by reusing the input buffer or by
     /// allocating a new one and copying the body into it.
@@ -1366,6 +1382,19 @@ impl<I: ReusableBuffer, O: ReusableBuffer, A: BufferAlloc<O>> BufferProvider<I, 
 {
     type Error = A::Error;
 
+    fn alloc_no_reuse(
+        self,
+        prefix: usize,
+        body: usize,
+        suffix: usize,
+    ) -> Result<Either<I, O>, Self::Error> {
+        let need_capacity = prefix + body + suffix;
+        BufferAlloc::alloc(self, need_capacity).map(|mut buf| {
+            buf.shrink(prefix..(prefix + body));
+            Either::B(buf)
+        })
+    }
+
     /// If `buffer` has enough capacity to store `need_prefix + need_suffix +
     /// buffer.len()` bytes, then reuse `buffer`. Otherwise, allocate a new
     /// buffer using `A`'s [`BufferAlloc`] implementation.
@@ -1389,19 +1418,21 @@ impl<I: ReusableBuffer, O: ReusableBuffer, A: BufferAlloc<O>> BufferProvider<I, 
             Ok(buffer) => Ok(Either::A(buffer)),
             Err(buffer) => {
                 let have_body = buffer.len();
-                let need_capacity = need_prefix + have_body + need_suffix;
-
-                let mut buf = match BufferAlloc::alloc(self, need_capacity) {
+                let mut buf = match BufferProvider::<I, Either<I, O>>::alloc_no_reuse(
+                    self,
+                    need_prefix,
+                    have_body,
+                    need_suffix,
+                ) {
                     Ok(buf) => buf,
                     Err(err) => return Err((err, buffer)),
                 };
-                buf.shrink(need_prefix..(need_prefix + have_body));
 
                 buf.copy_from(&buffer);
                 debug_assert_eq!(buf.prefix_len(), need_prefix);
                 debug_assert!(buf.suffix_len() >= need_suffix);
                 debug_assert_eq!(buf.len(), have_body);
-                Ok(Either::B(buf))
+                Ok(buf)
             }
         }
     }
@@ -1411,6 +1442,11 @@ impl<I: ReusableBuffer, O: ReusableBuffer, A: BufferAlloc<O>> BufferProvider<I, 
 /// B>` where `B` implements [`GrowBufferMut`] and [`ShrinkBuffer`].
 impl<B: ReusableBuffer, A: BufferAlloc<B>> BufferProvider<B, B> for A {
     type Error = A::Error;
+
+    fn alloc_no_reuse(self, prefix: usize, body: usize, suffix: usize) -> Result<B, Self::Error> {
+        BufferProvider::<B, Either<B, B>>::alloc_no_reuse(self, prefix, body, suffix)
+            .map(Either::into_inner)
+    }
 
     /// If `buffer` has enough capacity to store `need_prefix + need_suffix +
     /// buffer.len()` bytes, then reuse `buffer`. Otherwise, allocate a new
@@ -2693,6 +2729,15 @@ mod tests {
 
     impl<B: BufferMut> BufferProvider<B, ScatterGatherBuf<B>> for ScatterGatherProvider {
         type Error = Never;
+
+        fn alloc_no_reuse(
+            self,
+            _prefix: usize,
+            _body: usize,
+            _suffix: usize,
+        ) -> Result<ScatterGatherBuf<B>, Self::Error> {
+            unimplemented!("not used in tests")
+        }
 
         fn reuse_or_realloc(
             self,

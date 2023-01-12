@@ -15,6 +15,10 @@ use core::{
     ops::Range,
 };
 use either::Either;
+use packet::{
+    Buf, BufferProvider, FragmentedBytes, NestedPacketBuilder, SerializeError, Serializer,
+    TargetBuffer,
+};
 
 use crate::transport::tcp::{
     segment::Payload,
@@ -86,8 +90,7 @@ pub trait SendBuffer: Buffer {
 }
 
 /// A type for the payload being sent.
-#[derive(Debug, PartialEq)]
-#[cfg_attr(test, derive(Clone))]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SendPayload<'a> {
     /// The payload is contained in a single chunk of memory.
     Contiguous(&'a [u8]),
@@ -149,6 +152,64 @@ impl Payload for SendPayload<'_> {
                     p2.partial_copy(offset - p1.len(), dst);
                 }
             }
+        }
+    }
+}
+
+impl packet::FragmentedBuffer for SendPayload<'_> {
+    fn len(&self) -> usize {
+        Payload::len(self)
+    }
+
+    fn with_bytes<R, F>(&self, f: F) -> R
+    where
+        F: for<'a, 'b> FnOnce(FragmentedBytes<'a, 'b>) -> R,
+    {
+        match self {
+            Self::Contiguous(c) => f(FragmentedBytes::new(&mut [c])),
+            Self::Straddle(a, b) => f(FragmentedBytes::new(&mut [a, b])),
+        }
+    }
+}
+
+impl Serializer for SendPayload<'_> {
+    type Buffer = Buf<Vec<u8>>;
+
+    fn serialize<B: TargetBuffer, PB: NestedPacketBuilder, P: BufferProvider<Self::Buffer, B>>(
+        self,
+        outer: PB,
+        provider: P,
+    ) -> Result<B, (SerializeError<P::Error>, Self)> {
+        let c = match outer.try_constraints() {
+            Some(c) => c,
+            None => return Err((SerializeError::Mtu, self)),
+        };
+
+        let len = Payload::len(&self);
+        if len > c.max_body_len() {
+            return Err((SerializeError::Mtu, self));
+        }
+
+        let footer_padding = c.min_body_len().saturating_sub(len);
+        debug_assert!(len + footer_padding <= c.max_body_len());
+
+        let header = c.header_len();
+        let footer = c.footer_len() + footer_padding;
+
+        // There's no allocation that can be reused since SendPayload only holds
+        // views into a larger allocation, hence using
+        // `BufferProvider::alloc_no_reuse` instead of
+        // `BufferProvider::try_reuse_or_realloc`.
+        match provider.alloc_no_reuse(header, len, footer) {
+            Ok(mut buffer) => {
+                // Copy `len` bytes from `self` into the body portion of the
+                // buffer, then hand it off to the outer serializer to write the
+                // headers and footers.
+                buffer.copy_from(&self);
+                outer.serialize_into(&mut buffer);
+                Ok(buffer)
+            }
+            Err(err) => Err((SerializeError::Alloc(err), self)),
         }
     }
 }
@@ -603,6 +664,8 @@ impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for 
 
 #[cfg(test)]
 mod test {
+    use assert_matches::assert_matches;
+    use packet::{serialize::PacketConstraints, PacketBuilder, SerializeBuffer};
     use proptest::{
         proptest,
         strategy::{Just, Strategy},
@@ -818,6 +881,78 @@ mod test {
                 assert_eq!(*x, expected, "i={}, rb={:?}", i, rb);
             }
         }
+    }
+
+    #[derive(Debug)]
+    struct OuterBuilder(PacketConstraints);
+
+    impl OuterBuilder {
+        const HEADER_BYTE: u8 = b'H';
+        const FOOTER_BYTE: u8 = b'H';
+    }
+
+    impl PacketBuilder for OuterBuilder {
+        fn constraints(&self) -> PacketConstraints {
+            let Self(constraints) = self;
+            constraints.clone()
+        }
+
+        fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
+            buffer.header().fill(Self::HEADER_BYTE);
+            buffer.footer().fill(Self::FOOTER_BYTE);
+        }
+    }
+
+    const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    #[test_case(SendPayload::Contiguous(&EXAMPLE_DATA); "contiguous")]
+    #[test_case(SendPayload::Straddle(&EXAMPLE_DATA[0..5], &EXAMPLE_DATA[5..]); "split")]
+    #[test_case(SendPayload::Straddle(&[], &EXAMPLE_DATA); "split empty front")]
+    #[test_case(SendPayload::Straddle(&EXAMPLE_DATA, &[]); "split empty back")]
+    fn send_payload_serializer_data(payload: SendPayload<'static>) {
+        const HEADER_LEN: usize = 5;
+        const FOOTER_LEN: usize = 6;
+        let outer = OuterBuilder(PacketConstraints::new(HEADER_LEN, FOOTER_LEN, 0, usize::MAX));
+
+        assert_eq!(
+            payload
+                .encapsulate(outer)
+                .serialize_vec_outer()
+                .expect("should serialize")
+                .into_inner(),
+            Buf::new(
+                [OuterBuilder::HEADER_BYTE; HEADER_LEN]
+                    .into_iter()
+                    .chain(EXAMPLE_DATA)
+                    .chain([OuterBuilder::FOOTER_BYTE; FOOTER_LEN])
+                    .collect(),
+                ..
+            )
+        );
+    }
+
+    #[test]
+    fn send_payload_serializer_body_too_large() {
+        let outer = OuterBuilder(PacketConstraints::new(0, 0, 0, EXAMPLE_DATA.len() - 1));
+        let payload = SendPayload::Contiguous(&EXAMPLE_DATA);
+
+        assert_matches!(
+            payload.encapsulate(outer).serialize_vec_outer(),
+            Err((SerializeError::Mtu, _))
+        );
+    }
+
+    #[test]
+    fn send_payload_serializer_body_needs_padding() {
+        const PADDING: usize = 3;
+        let outer =
+            OuterBuilder(PacketConstraints::new(0, 0, EXAMPLE_DATA.len() + PADDING, usize::MAX));
+        let payload = SendPayload::Contiguous(&EXAMPLE_DATA);
+
+        // The body gets padded with zeroes.
+        assert_eq!(
+            payload.encapsulate(outer).serialize_vec_outer().expect("can serialize").into_inner(),
+            Buf::new(EXAMPLE_DATA.into_iter().chain([0; PADDING]).collect(), ..)
+        );
     }
 
     #[test_case([Range { start: 0, end: 0 }]
