@@ -13,15 +13,17 @@
 
 namespace diagnostics::accessor2logger {
 
+// Convenience method that calls the function below with |use_host_encoding| to false.
 fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
                  std::string>
 ConvertFormattedContentToLogMessages(fuchsia::diagnostics::FormattedContent content);
 
-// Does the same conversion as above, but formats with the same output
-// that you would have on a host system.
+// Prints formatted content to the log. If |use_host_encoding| is true, then use necessary escape
+// sequences for log messages on the host.
 fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
                  std::string>
-ConvertFormattedContentToHostLogMessages(fuchsia::diagnostics::FormattedContent content);
+ConvertFormattedContentToLogMessages(fuchsia::diagnostics::FormattedContent content,
+                                     bool use_host_encoding);
 
 }  // namespace diagnostics::accessor2logger
 

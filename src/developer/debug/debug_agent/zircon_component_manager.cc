@@ -151,8 +151,8 @@ void SendLogs(DebugAgent* debug_agent, std::vector<fuchsia::diagnostics::Formatt
   notify.type = debug_ipc::NotifyIO::Type::kStderr;
 
   for (auto& content : batch) {
-    auto res =
-        diagnostics::accessor2logger::ConvertFormattedContentToHostLogMessages(std::move(content));
+    auto res = diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(
+        std::move(content), true);
     if (res.is_error()) {
       LOGS(Warn) << "Failed to parse log: " << res.error();
     } else {

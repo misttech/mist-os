@@ -76,7 +76,7 @@ DecodedLogMessage decode_log_message_to_struct(uint8_t* data, size_t len) {
   content.set_json(std::move(buffer));
   DecodedLogMessage ret;
   ret.message =
-      diagnostics::accessor2logger::ConvertFormattedContentToHostLogMessages(std::move(content))
+      diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content), true)
           .take_value()[0]
           .take_value();
   ret.document.Parse(msg);

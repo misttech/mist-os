@@ -194,8 +194,8 @@ static std::string RetrieveLogs(std::string guid, zx::channel remote) {
     if (exit) {
       return;
     }
-    auto chunk_result =
-        diagnostics::accessor2logger::ConvertFormattedContentToHostLogMessages(std::move(content));
+    auto chunk_result = diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(
+        std::move(content), true);
     auto messages = chunk_result.take_value();  // throws exception if conversion fails.
     for (auto& msg : messages) {
       std::string formatted = Format(msg.value());
@@ -567,7 +567,7 @@ TEST_F(LoggingFixture, SLog) {
                               "(" + std::to_string(line5) + ")] String log"));
   EXPECT_THAT(
       log, testing::HasSubstr("ERROR: [" + std::string("sdk/lib/syslog/cpp/logging_unittest.cc") +
-                              "(" + std::to_string(line6) + ")] float=0.250000"));
+                              "(" + std::to_string(line6) + ")] float=0.25"));
 
   EXPECT_THAT(log, testing::HasSubstr(
                        "ERROR: [" + std::string("sdk/lib/syslog/cpp/logging_unittest.cc") + "(" +

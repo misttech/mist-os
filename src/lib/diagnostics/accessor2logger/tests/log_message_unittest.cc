@@ -154,7 +154,7 @@ TEST(LogMessage, LegacyHostEncoding) {
   buffer.size = sizeof(kSampleLogPayload);
   content.set_json(std::move(buffer));
   auto messages =
-      diagnostics::accessor2logger::ConvertFormattedContentToHostLogMessages(std::move(content))
+      diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content), true)
           .take_value();
   auto message = messages[0].value();
   auto encoded_message =
@@ -165,7 +165,7 @@ TEST(LogMessage, LegacyHostEncoding) {
                         SeverityToString(message.severity).c_str(), message.msg.c_str());
   ASSERT_TRUE(encoded_message.find("[some tag, some other tag] INFO: "
                                    "[src/diagnostics/lib/cpp-log-decoder/test.cc(24)] test "
-                                   "message user property=5.200000") != std::string::npos);
+                                   "message user property=5.2") != std::string::npos);
 }
 
 struct ValidationTestCase {
