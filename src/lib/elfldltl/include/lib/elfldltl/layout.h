@@ -397,6 +397,10 @@ struct Elf : private Layout<Class, Data> {
     static constexpr auto kSymndxShift = Layout<Class, Data>::kRelTypeBits;
     static constexpr auto kTypeMask = (size_type{1} << kSymndxShift) - 1;
 
+    static constexpr Addr MakeInfo(Addr sym_name, uint32_t type) {
+      return (sym_name << kSymndxShift) | (static_cast<Addr>(type) & kTypeMask);
+    }
+
     Addr offset;
     Addr info;
   };
@@ -407,6 +411,10 @@ struct Elf : private Layout<Class, Data> {
 
     static constexpr auto kSymndxShift = Layout<Class, Data>::kRelTypeBits;
     static constexpr auto kTypeMask = (size_type{1} << kSymndxShift) - 1;
+
+    static constexpr Addr MakeInfo(Addr sym_name, uint32_t type) {
+      return (sym_name << kSymndxShift) | (static_cast<Addr>(type) & kTypeMask);
+    }
 
     Addr offset;
     Addr info;

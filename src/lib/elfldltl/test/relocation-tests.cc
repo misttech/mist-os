@@ -71,8 +71,8 @@ void VisitRelativeRel() {
   using Rel = typename RelocInfo::Rel;
 
   constexpr Rel relocs[] = {
-      {8, kRelativeType},
-      {24, kRelativeType},
+      {8, Rel::MakeInfo(0, kRelativeType)},
+      {24, Rel::MakeInfo(0, kRelativeType)},
   };
 
   RelocInfo info;
@@ -110,8 +110,8 @@ void VisitRelativeRela() {
   using Rela = typename RelocInfo::Rela;
 
   constexpr Rela relocs[] = {
-      {8, kRelativeType, 0x11111111},
-      {24, kRelativeType, 0x33333333},
+      {8, Rela::MakeInfo(0, kRelativeType), 0x11111111},
+      {24, Rela::MakeInfo(0, kRelativeType), 0x33333333},
   };
 
   RelocInfo info;
