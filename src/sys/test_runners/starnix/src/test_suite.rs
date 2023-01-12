@@ -29,7 +29,7 @@ pub async fn handle_suite_requests(
     namespace: ComponentNamespace,
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
-    let is_gtest = is_gtest(&program.as_ref().expect("No program."))?;
+    let test_type = test_type(&program.as_ref().expect("No program."));
     while let Some(event) = stream.try_next().await? {
         let mut program = program.clone();
         let kernel_name = format!("starnix-kernel-{}", rand::thread_rng().gen::<u64>());
@@ -39,13 +39,14 @@ pub async fn handle_suite_requests(
             ftest::SuiteRequest::GetTests { iterator, .. } => {
                 let stream = iterator.into_stream()?;
 
-                if is_gtest {
+                if test_type.is_gtest_like() {
                     handle_case_iterator_for_gtests(
                         test_url,
                         program,
                         &namespace,
                         starnix_kernel,
                         stream,
+                        &test_type,
                     )
                     .await?;
                 } else {
@@ -62,7 +63,7 @@ pub async fn handle_suite_requests(
 
                 let run_listener_proxy =
                     listener.into_proxy().context("Can't convert run listener channel to proxy")?;
-                if is_gtest {
+                if test_type.is_gtest_like() {
                     let num_parallel = options.parallel.unwrap_or(1);
                     let tests = stream::iter(tests);
                     tests
@@ -75,6 +76,7 @@ pub async fn handle_suite_requests(
                                 &run_listener_proxy,
                                 &namespace,
                                 &starnix_kernel,
+                                &test_type,
                             )
                         })
                         .await?;

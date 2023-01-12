@@ -37,11 +37,35 @@ const PREFIXES_TO_EXCLUDE: [&[u8]; 10] = [
 ];
 const SOCKET_BUFFER_SIZE: usize = 4096;
 
-/// Returns true if the program arguments specify the tests are gtests.
-pub fn is_gtest(program: &fdata::Dictionary) -> Result<bool, Error> {
+pub enum TestType {
+    Gtest,
+    Gunit,
+    Unknown,
+}
+
+impl TestType {
+    pub fn is_gtest_like(&self) -> bool {
+        match self {
+            TestType::Gtest => true,
+            TestType::Gunit => true,
+            _ => false,
+        }
+    }
+}
+
+/// Determines what type of tests the program is.
+pub fn test_type(program: &fdata::Dictionary) -> TestType {
     // The program argument that specifies if the test is a gtest.
-    const GTEST_KEY: &str = "is_gtest";
-    runner::get_bool(program, GTEST_KEY).map_err(|_| anyhow!("Couldn't read program."))
+    const GTEST_KEY: &str = "test_type";
+    let test_type_val = runner::get_value(program, GTEST_KEY);
+    match test_type_val {
+        Some(fdata::DictionaryValue::Str(value)) => match value.as_str() {
+            "gtest" => TestType::Gtest,
+            "gunit" => TestType::Gunit,
+            _ => TestType::Unknown,
+        },
+        _ => TestType::Unknown,
+    }
 }
 
 /// Runs the test component with `--gunit_list_tests` and returns the parsed test cases from stdout
@@ -52,8 +76,15 @@ pub async fn handle_case_iterator_for_gtests(
     namespace: &ComponentNamespace,
     starnix_kernel: frunner::ComponentRunnerProxy,
     mut stream: ftest::CaseIteratorRequestStream,
+    test_type: &TestType,
 ) -> Result<(), Error> {
-    const LIST_TESTS_ARG: &str = "--gunit_list_tests";
+    let list_tests_arg = match test_type {
+        TestType::Gtest => "--gtest_list_tests",
+        TestType::Gunit => "--gunit_list_tests",
+        _ => {
+            return Err(anyhow!("Unknown test type"));
+        }
+    };
 
     let (test_stdout, stdout_client) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
     let stdout_handle_info = fprocess::HandleInfo {
@@ -68,7 +99,7 @@ pub async fn handle_case_iterator_for_gtests(
     let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
 
     // Replace the program args with `gunit_list_tests`.
-    replace_program_args(vec![LIST_TESTS_ARG.to_string()], program.as_mut().expect("No program."));
+    replace_program_args(vec![list_tests_arg.to_string()], program.as_mut().expect("No program."));
     let start_info = frunner::ComponentStartInfo {
         resolved_url: Some(test_url.to_string()),
         program,
@@ -130,6 +161,7 @@ pub async fn run_gtest_case(
     run_listener_proxy: &ftest::RunListenerProxy,
     namespace: &ComponentNamespace,
     starnix_kernel: &frunner::ComponentRunnerProxy,
+    test_type: &TestType,
 ) -> Result<(), Error> {
     // Start a starnix kernel.
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
@@ -151,9 +183,17 @@ pub async fn run_gtest_case(
         case_listener,
     )?;
 
+    let test_filter_arg = match test_type {
+        TestType::Gtest => "--gtest_filter",
+        TestType::Gunit => "--gunit_filter",
+        _ => {
+            return Err(anyhow!("Unknown test type"));
+        }
+    };
+
     // Update program arguments to only run the test case.
     append_program_args(
-        vec![format!("{}={}", "--gunit_filter", test_name)],
+        vec![format!("{test_filter_arg}={test_name}")],
         program.as_mut().expect("No program."),
     );
 
