@@ -49,6 +49,8 @@ void ScriptTest::TestBody() {
       } else {
         GTEST_FAIL() << "Unknown directive: " << directive;
       }
+    } else if (StringStartsWith(line, "#")) {
+      continue;
     } else {
       // Put the line back.
       script_file_.seekg(-static_cast<int>(line.size() + 1), std::ios::cur);

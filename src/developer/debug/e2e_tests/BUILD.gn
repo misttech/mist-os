@@ -26,7 +26,6 @@ if (is_host) {
       "main.cc",
       "script_test.cc",
       "script_test.h",
-      "test_conditional_breakpoint.cc",
       "test_run_failing_test_component.cc",
     ]
 
