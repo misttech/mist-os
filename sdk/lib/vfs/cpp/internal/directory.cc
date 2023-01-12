@@ -221,8 +221,7 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
   bool path_is_dir = false;
   size_t new_path_len = path_len;
   const char* new_path = path;
-  /// TODO(fxbug.dev/82672): Path handling does not conform to in-tree behavior. Update to comply
-  /// with open_path() test in io1_tests.rs, and remove `non_conformant_path_handling` option.
+  // TODO(fxbug.dev/119413): Path handling does not conform to in-tree behavior.
   zx_status_t status = LookupPath(path, path_len, &path_is_dir, &n, &new_path, &new_path_len);
   if (status != ZX_OK) {
     return SendOnOpenEventOnError(open_flags, std::move(request), status);

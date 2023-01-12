@@ -67,8 +67,7 @@ type Io1Config = table {
    10: supports_get_token bool;
 
     /// Path handling conforms to in-tree behavior.
-    /// TODO(fxbug.dev/82672): Ensure all libraries are conformant and remove this option.
-    /// Currently the only non-conformant implementation being tested is the SDK VFS.
+    // TODO(fxbug.dev/119413): Remove this option when all harnesses have conformant path handling.
    11: conformant_path_handling bool;
 
     /// Unlink is supported.
