@@ -39,7 +39,7 @@ TEST(StubRuntimeServicesTest, NoVariablesSet) {
   StubRuntimeServices stub;
   char16_t buf[] = u"";
   size_t buf_size = 1;
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   uint32_t attr = 0;
   uint8_t data[] = {0x00};
   size_t data_size = 1;
@@ -52,7 +52,7 @@ TEST(StubRuntimeServicesTest, SomeVariablesReturnCorrectErrors) {
   StubRuntimeServices stub;
   char16_t buf[] = u"";
   size_t buf_size = sizeof(buf);
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   uint32_t attr = 0;
   uint8_t data[] = {0x00};
   size_t data_size = 1;
@@ -68,7 +68,7 @@ TEST(StubRuntimeServicesTest, SomeVariablesSetAskForBiggerBuffer) {
   StubRuntimeServices stub;
   char16_t buf[] = u"";
   size_t buf_size = sizeof(buf);
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   uint32_t attr = 0;
   uint8_t data[] = {0x00};
   size_t data_size = sizeof(data);
@@ -87,7 +87,7 @@ TEST(StubRuntimeServicesTest, SomeVariablesSetAskForBiggerBuffer) {
 
 TEST(StubRuntimeServicesTest, GetOneVariable) {
   StubRuntimeServices stub;
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   uint32_t attr = 0;
   uint8_t data[2];
   size_t data_size = sizeof(data);
@@ -110,7 +110,7 @@ TEST(StubRuntimeServicesTest, GetOneVariable) {
 
 TEST(StubRuntimeServicesTest, GetOneVariableAfterSmallBuffer) {
   StubRuntimeServices stub;
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   uint32_t attr = 0;
   uint8_t data[2];
   size_t data_size = 0;
@@ -143,7 +143,7 @@ TEST(StubRuntimeServicesTest, GetAllVariableNames) {
   StubRuntimeServices stub;
   char16_t buf[128] = {0x0000};
   size_t buf_size = sizeof(buf);
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
       test_vars{
           {{u"var_1", vendor_guid}, {0x00}},
@@ -176,7 +176,7 @@ TEST(StubRuntimeServicesTest, DifferentGuidSameVariableName) {
   StubRuntimeServices stub;
   char16_t buf[128] = {0x0000};
   size_t buf_size = sizeof(buf);
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
       test_vars{
           {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
@@ -229,7 +229,7 @@ TEST(StubRuntimeServicesTest, GetCorrectVariableValue) {
   uint8_t buf[128] = {0x0000};
   size_t buf_size = sizeof(buf);
   uint32_t attr = 0;
-  efi_guid vendor_guid;
+  efi_guid vendor_guid = {};
   std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
       test_vars{
           {{u"var_1", vendor_guid}, {0x00}},
