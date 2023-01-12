@@ -121,7 +121,13 @@ bool inspector_get_gwp_asan_info(const zx::process& process,
   }
 
   if (!faulting_addr) {
+// TODO(fxbug.dev/119315): Remove this workaround after gwp-asan rolls
+#ifndef NEW_CRASH_ADDR_API
     faulting_addr = __gwp_asan_get_internal_crash_address(&state);
+#else
+    faulting_addr =
+        __gwp_asan_get_internal_crash_address(&state, state.internallyDetectedErrorFaultAddress());
+#endif
   }
 
   info->faulting_addr = faulting_addr;
