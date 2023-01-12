@@ -176,6 +176,7 @@ driver_bind_rules("pdm-i2s-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.dsp",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
   ]
