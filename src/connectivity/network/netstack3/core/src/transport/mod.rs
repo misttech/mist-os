@@ -59,14 +59,10 @@ mod integration;
 pub mod tcp;
 pub mod udp;
 
-use net_types::{
-    ip::{IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr, ZonedAddr,
-};
+use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     device::DeviceId,
-    error::ZonedAddressError,
     transport::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
@@ -137,35 +133,3 @@ impl_timer_context!(
     TransportLayerTimerId::Tcp(id),
     id
 );
-
-/// Returns the address and device that should be used for a socket.
-///
-/// Given an address for a socket and an optional device that the socket is
-/// already bound on, returns the address and device that should be used
-/// for the socket. If `addr` and `device` require inconsistent devices,
-/// or if `addr` requires a zone but there is none specified (by `addr` or
-/// `device`), an error is returned.
-pub(crate) fn resolve_addr_with_device<A: IpAddress, D: PartialEq + Clone>(
-    addr: ZonedAddr<A, D>,
-    device: Option<&D>,
-) -> Result<(SpecifiedAddr<A>, Option<D>), ZonedAddressError> {
-    let (addr, zone) = addr.into_addr_zone();
-    let device = match (zone, device) {
-        (Some(zone), Some(device)) => {
-            if &zone != device {
-                return Err(ZonedAddressError::DeviceZoneMismatch);
-            }
-            Some(device.clone())
-        }
-        (Some(zone), None) => Some(zone),
-        (None, Some(device)) => Some(device.clone()),
-        (None, None) => {
-            if crate::socket::must_have_zone(&addr) {
-                return Err(ZonedAddressError::RequiredZoneNotProvided);
-            } else {
-                None
-            }
-        }
-    };
-    Ok((addr, device))
-}
