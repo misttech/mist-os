@@ -196,7 +196,7 @@ function check-for-package-server {
 
     if [[ "${ffx_port}" -eq 0 ]]; then
       fx-warn "WARNING: The server is configured to listen on a random port."
-      fx-warn "WARNING: We can't determine port this is, so assuming it's running."
+      fx-warn "WARNING: We can't determine which port this is, so assuming it's running."
     else
       if ! is-listening-on-port "${ffx_port}"; then
         fx-error "It looks like the ffx package server is not running."
