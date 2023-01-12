@@ -156,6 +156,11 @@ int Sherlock::Thread() {
     return -1;
   }
 
+  // GPIO C is managed by a separate driver instance, so these fields need to be populated before
+  // any of its client devices are added.
+  GetBoardRev();
+  GetBoardOption();
+
   if (RegistersInit() != ZX_OK) {
     zxlogf(ERROR, "RegistersInit() failed");
     return -1;

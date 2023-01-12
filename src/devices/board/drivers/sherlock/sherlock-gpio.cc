@@ -69,7 +69,8 @@ static const std::vector<fpbus::Irq> gpio_irqs{
     }},
 };
 
-// GPIOs to expose from generic GPIO driver.
+// GPIOs to expose from generic GPIO driver. Do not expose bank C GPIOs here, as they are managed by
+// a separate device below.
 #ifdef FACTORY_BUILD
 #define GPIO_PIN_COUNT 120
 static const gpio_pin_t gpio_pins[] = {
@@ -97,10 +98,6 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(T931_GPIOBOOT(10)), DECL_GPIO_PIN(T931_GPIOBOOT(11)),
     DECL_GPIO_PIN(T931_GPIOBOOT(12)), DECL_GPIO_PIN(T931_GPIOBOOT(13)),
     DECL_GPIO_PIN(T931_GPIOBOOT(14)), DECL_GPIO_PIN(T931_GPIOBOOT(15)),
-    DECL_GPIO_PIN(T931_GPIOC(0)),     DECL_GPIO_PIN(T931_GPIOC(1)),
-    DECL_GPIO_PIN(T931_GPIOC(2)),     DECL_GPIO_PIN(T931_GPIOC(3)),
-    DECL_GPIO_PIN(T931_GPIOC(4)),     DECL_GPIO_PIN(T931_GPIOC(5)),
-    DECL_GPIO_PIN(T931_GPIOC(6)),     DECL_GPIO_PIN(T931_GPIOC(7)),
     DECL_GPIO_PIN(T931_GPIOX(0)),     DECL_GPIO_PIN(T931_GPIOX(1)),
     DECL_GPIO_PIN(T931_GPIOX(2)),     DECL_GPIO_PIN(T931_GPIOX(3)),
     DECL_GPIO_PIN(T931_GPIOX(4)),     DECL_GPIO_PIN(T931_GPIOX(5)),
@@ -154,8 +151,6 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(GPIO_VDIG_ENABLE),
     DECL_GPIO_PIN(GPIO_CAM_RESET),
     DECL_GPIO_PIN(GPIO_LIGHT_INTERRUPT),
-    // For SPI interface.
-    DECL_GPIO_PIN(GPIO_SPICC0_SS0),
     // For buttons.
     DECL_GPIO_PIN(GPIO_VOLUME_UP),
     DECL_GPIO_PIN(GPIO_VOLUME_DOWN),
@@ -202,26 +197,81 @@ static const fpbus::Node gpio_dev = []() {
   dev.mmio() = gpio_mmios;
   dev.irq() = gpio_irqs;
   dev.metadata() = gpio_metadata;
+  dev.instance_id() = 0;
+  return dev;
+}();
+
+// Add a separate device for GPIO C pins to allow the GPIO driver to be colocated with SPI and
+// ot-radio. This eliminates two channel round-trips for each SPI transfer.
+static const gpio_pin_t gpio_c_pins[] = {
+#ifdef FACTORY_BUILD
+    DECL_GPIO_PIN(T931_GPIOC(0)), DECL_GPIO_PIN(T931_GPIOC(1)), DECL_GPIO_PIN(T931_GPIOC(2)),
+    DECL_GPIO_PIN(T931_GPIOC(3)), DECL_GPIO_PIN(T931_GPIOC(4)), DECL_GPIO_PIN(T931_GPIOC(5)),
+    DECL_GPIO_PIN(T931_GPIOC(6)), DECL_GPIO_PIN(T931_GPIOC(7)),
+#else
+    // For SPI interface.
+    DECL_GPIO_PIN(GPIO_SPICC0_SS0),
+#endif
+};
+
+static const std::vector<fpbus::Metadata> gpio_c_metadata{
+    {{
+        .type = DEVICE_METADATA_GPIO_PINS,
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&gpio_c_pins),
+            reinterpret_cast<const uint8_t*>(&gpio_c_pins) + sizeof(gpio_c_pins)),
+    }},
+};
+
+static const fpbus::Node gpio_c_dev = []() {
+  fpbus::Node dev = {};
+  dev.name() = "gpio-c";
+  dev.vid() = PDEV_VID_AMLOGIC;
+  dev.pid() = PDEV_PID_AMLOGIC_T931;
+  dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  dev.mmio() = gpio_mmios;
+  dev.metadata() = gpio_c_metadata;
+  dev.instance_id() = 1;
   return dev;
 }();
 
 zx_status_t Sherlock::GpioInit() {
-  static_assert(std::size(gpio_pins) == GPIO_PIN_COUNT, "Incorrect pin count.");
+  static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
+                "Incorrect pin count.");
 
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('GPIO');
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
-                                                     fidl::ToWire(fidl_arena, gpio_dev));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+  {
+    fidl::Arena<> fidl_arena;
+    fdf::Arena arena('GPIO');
+    auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
+                                                       fidl::ToWire(fidl_arena, gpio_dev));
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) request failed: %s", __func__,
+             result.FormatDescription().data());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) failed: %s", __func__,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+
+  {
+    fidl::Arena<> fidl_arena;
+    fdf::Arena arena('GPIO');
+    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_c_dev));
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) request failed: %s", __func__,
+             result.FormatDescription().data());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_c_dev) failed: %s", __func__,
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
+
 // This test binds to system/dev/gpio/gpio-test to check that GPIOs work at all.
 // gpio-test enables interrupts and write/read on the test GPIOs configured below.
 // #define GPIO_TEST
