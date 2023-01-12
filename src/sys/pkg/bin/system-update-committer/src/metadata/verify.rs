@@ -45,32 +45,30 @@ pub fn do_health_verification<'a>(
     proxies: &'a [&dyn VerifierProxy],
     node: &'a finspect::Node,
 ) -> impl Future<Output = Result<(), VerifyErrors>> + 'a {
+    let start_time = Instant::now();
     let futures: Vec<_> = proxies
         .iter()
         .map(|proxy| async {
             let now = Instant::now();
-            let res = proxy
+            proxy
                 .call_verify(VerifyOptions::EMPTY)
                 .map(|res| {
                     let res = res.map_err(VerifyFailureReason::Fidl)?;
                     res.map_err(VerifyFailureReason::Verify)
                 })
                 .on_timeout(VERIFY_TIMEOUT, || Err(VerifyFailureReason::Timeout))
-                .map_err(|e| VerifyError::VerifyError(proxy.source(), e))
-                .await;
-            let () = write_to_inspect(node, &res, now.elapsed());
-            res
+                .map_err(|e| VerifyError::VerifyError(proxy.source(), e, now.elapsed()))
+                .await
         })
         .collect();
 
     async move {
-        let res: Vec<VerifyError> =
+        let errors: Vec<VerifyError> =
             join_all(futures).await.into_iter().filter_map(|r| r.err()).collect();
-        if res.is_empty() {
-            Ok(())
-        } else {
-            Err(VerifyErrors::VerifyErrors(res))
-        }
+        let result =
+            if errors.is_empty() { Ok(()) } else { Err(VerifyErrors::VerifyErrors(errors)) };
+        let () = write_to_inspect(node, &result, start_time.elapsed());
+        result
     }
 }
 
@@ -106,7 +104,7 @@ mod tests {
             Err(VerifyErrors::VerifyErrors(s)) => s);
         assert_matches!(
             errors[..],
-            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_))]
+            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _)]
         );
     }
 
@@ -124,7 +122,7 @@ mod tests {
             );
             assert_matches!(
                 errors[..],
-                [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_))]
+                [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _)]
             );
         }
 
@@ -136,7 +134,7 @@ mod tests {
             Err(VerifyErrors::VerifyErrors(s)) => s);
             assert_matches!(
                 errors[..],
-                [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_))]
+                [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _)]
             );
         }
     }
@@ -168,8 +166,8 @@ mod tests {
         assert_matches!(
             errors[..],
             [
-                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_)),
-                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_)),
+                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _),
+                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _),
             ]
         );
     }
@@ -186,7 +184,7 @@ mod tests {
             Err(VerifyErrors::VerifyErrors(s)) => s);
         assert_matches!(
             errors[..],
-            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Fidl(_))]
+            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Fidl(_), _)]
         );
     }
 
@@ -231,7 +229,11 @@ mod tests {
                     Err(VerifyErrors::VerifyErrors(s)) => s);
                 assert_matches!(
                     errors[..],
-                    [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout)]
+                    [VerifyError::VerifyError(
+                        VerifySource::Blobfs,
+                        VerifyFailureReason::Timeout,
+                        _
+                    )]
                 );
             }
             Poll::Pending => panic!("future unexpectedly pending"),

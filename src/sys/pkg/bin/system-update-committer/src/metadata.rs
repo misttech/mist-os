@@ -408,7 +408,7 @@ mod tests {
             Err(MetadataError::Verify(VerifyErrors::VerifyErrors(s))) => s);
         assert_matches!(
             errors[..],
-            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_))]
+            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _)]
         );
         assert_eq!(
             paver.take_events(),

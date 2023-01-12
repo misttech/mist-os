@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_paver as paver, fidl_fuchsia_update_verify as verify, fuchsia_zircon::Status,
-    thiserror::Error,
+    std::time::Duration, thiserror::Error,
 };
 
 /// Error condition that may be returned by a boot manager client.
@@ -50,8 +50,8 @@ pub enum VerifyErrors {
 /// Error condition that may be returned when doing health verification.
 #[derive(Error, Debug)]
 pub enum VerifyError {
-    #[error("the {_0:?} verification failed")]
-    VerifyError(VerifySource, #[source] VerifyFailureReason),
+    #[error("the {_0:?} verification failed in {_2:?}")]
+    VerifyError(VerifySource, #[source] VerifyFailureReason, Duration),
 }
 
 #[derive(Error, Debug)]

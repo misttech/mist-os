@@ -86,9 +86,9 @@ impl PolicyEngine {
             Ok(()) => Ok(()),
             Err(VerifyErrors::VerifyErrors(v)) => {
                 // For any existing verification errors,
-                let errors: Vec<VerifyError> = v
+                let errors: Vec<_> = v
                     .into_iter()
-                    .filter(|VerifyError::VerifyError(source, _)| {
+                    .filter(|VerifyError::VerifyError(source, _, _)| {
                         // filter out the ones which config says to ignore.
                         match source {
                             VerifySource::Blobfs => config.blobfs() != &Mode::Ignore,
@@ -270,17 +270,21 @@ mod tests {
     }
 
     fn test_blobfs_verify_errors(config: ComponentConfig, expect_err: bool) {
+        let duration = std::time::Duration::from_secs(1);
         let timeout_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
             VerifySource::Blobfs,
             VerifyFailureReason::Timeout,
+            duration,
         )]));
         let verify_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
             VerifySource::Blobfs,
             VerifyFailureReason::Verify(verify::VerifyError::Internal),
+            duration,
         )]));
         let fidl_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
             VerifySource::Blobfs,
             VerifyFailureReason::Fidl(fidl::Error::OutOfRange),
+            duration,
         )]));
 
         assert_eq!(PolicyEngine::apply_config(timeout_err, &config).is_err(), expect_err);
@@ -296,10 +300,13 @@ mod tests {
 
     #[test]
     fn test_errors_all_ignored() {
-        let ve1 = VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout);
+        let duration = std::time::Duration::from_secs(1);
+        let ve1 =
+            VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, duration);
         let ve2 = VerifyError::VerifyError(
             VerifySource::Blobfs,
             VerifyFailureReason::Verify(verify::VerifyError::Internal),
+            duration,
         );
 
         let config = ComponentConfig::builder().blobfs(Mode::Ignore).build();
@@ -314,10 +321,13 @@ mod tests {
 
     #[test]
     fn test_errors_none_ignored() {
-        let ve1 = VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout);
+        let duration = std::time::Duration::from_secs(1);
+        let ve1 =
+            VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, duration);
         let ve2 = VerifyError::VerifyError(
             VerifySource::Blobfs,
             VerifyFailureReason::Verify(verify::VerifyError::Internal),
+            duration,
         );
 
         let config = ComponentConfig::builder().blobfs(Mode::RebootOnFailure).build();
@@ -329,10 +339,11 @@ mod tests {
         assert_matches!(
             &filtered_errors[..],
             [
-                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout),
+                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, _),
                 VerifyError::VerifyError(
                     VerifySource::Blobfs,
-                    VerifyFailureReason::Verify(verify::VerifyError::Internal)
+                    VerifyFailureReason::Verify(verify::VerifyError::Internal),
+                    _
                 )
             ]
         );

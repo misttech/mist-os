@@ -3,40 +3,56 @@
 // found in the LICENSE file.
 
 use {
-    super::errors::{VerifyError, VerifyFailureReason, VerifySource},
+    super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource},
     fuchsia_inspect as finspect,
     std::{convert::TryInto, time::Duration},
 };
+
+fn reason_to_string(reason: &VerifyFailureReason) -> &'static str {
+    match reason {
+        VerifyFailureReason::Fidl(_) => "fidl",
+        VerifyFailureReason::Verify(_) => "verify",
+        VerifyFailureReason::Timeout => "timeout",
+    }
+}
+fn source_to_string(source: &VerifySource) -> &'static str {
+    match source {
+        VerifySource::Blobfs => "blobfs",
+    }
+}
 
 /// Updates inspect state based on the result of the verifications. The inspect hierarchy is
 /// constructed in a way that's compatible with Lapis.
 pub(super) fn write_to_inspect(
     node: &finspect::Node,
-    res: &Result<(), VerifyError>,
-    duration: Duration,
+    res: &Result<(), VerifyErrors>,
+    total_duration: Duration,
 ) {
     // We need to convert duration to a u64 because that's the largest size integer that inspect
     // can accept. This is safe because duration will be max 1 hour, which fits into u64.
     // For context, 2^64 microseconds is over 5000 centuries.
-    let duration_u64 = duration.as_micros().try_into().unwrap_or(u64::MAX);
+    let total_duration_u64 = total_duration.as_micros().try_into().unwrap_or(u64::MAX);
 
     match res {
         Ok(()) => node.record_child("ota_verification_duration", |duration_node| {
-            duration_node.record_uint("success", duration_u64)
+            duration_node.record_uint("success", total_duration_u64)
         }),
-        Err(error) => {
-            let (name, reason) = match error {
-                VerifyError::VerifyError(VerifySource::Blobfs, reason) => {
-                    ("failure_blobfs", reason)
-                }
-            };
+        Err(VerifyErrors::VerifyErrors(errors)) => {
             node.record_child("ota_verification_duration", |duration_node| {
-                duration_node.record_uint(name, duration_u64)
+                for VerifyError::VerifyError(source, _reason, duration) in errors {
+                    let duration_u64 = duration.as_micros().try_into().unwrap_or(u64::MAX);
+
+                    duration_node
+                        .record_uint(format!("failure_{}", source_to_string(source)), duration_u64);
+                }
             });
-            node.record_child("ota_verification_failure", |reason_node| match reason {
-                VerifyFailureReason::Fidl(_) => reason_node.record_uint("blobfs_fidl", 1),
-                VerifyFailureReason::Verify(_) => reason_node.record_uint("blobfs_verify", 1),
-                VerifyFailureReason::Timeout => reason_node.record_uint("blobfs_timeout", 1),
+            node.record_child("ota_verification_failure", |reason_node| {
+                for VerifyError::VerifyError(source, reason, _duration) in errors {
+                    reason_node.record_uint(
+                        format!("{}_{}", source_to_string(source), reason_to_string(reason)),
+                        1,
+                    );
+                }
             });
         }
     };
@@ -73,11 +89,12 @@ mod tests {
 
         let () = write_to_inspect(
             inspector.root(),
-            &Err(VerifyError::VerifyError(
+            &Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
                 VerifySource::Blobfs,
                 VerifyFailureReason::Fidl(fidl::Error::ExtraBytes),
-            )),
-            Duration::from_micros(2),
+                Duration::from_micros(2),
+            )])),
+            Duration::from_micros(4),
         );
 
         assert_data_tree! {
@@ -99,8 +116,12 @@ mod tests {
 
         let () = write_to_inspect(
             inspector.root(),
-            &Err(VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout)),
-            Duration::from_micros(2),
+            &Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
+                VerifySource::Blobfs,
+                VerifyFailureReason::Timeout,
+                Duration::from_micros(2),
+            )])),
+            Duration::from_micros(4),
         );
 
         assert_data_tree! {
@@ -122,11 +143,12 @@ mod tests {
 
         let () = write_to_inspect(
             inspector.root(),
-            &Err(VerifyError::VerifyError(
+            &Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
                 VerifySource::Blobfs,
                 VerifyFailureReason::Verify(verify::VerifyError::Internal),
-            )),
-            Duration::from_micros(2),
+                Duration::from_micros(2),
+            )])),
+            Duration::from_micros(4),
         );
 
         assert_data_tree! {
