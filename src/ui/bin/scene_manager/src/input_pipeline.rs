@@ -331,15 +331,10 @@ async fn register_mouse_related_input_handlers(
 ) -> InputPipelineAssembly {
     let (sender, mut receiver) = futures::channel::mpsc::channel(0);
 
-    // Add the click-drag handler before the mouse handler, to allow
-    // the click-drag handler to filter events seen by the mouse
-    // handler.
-    let mut assembly = add_click_drag_handler(assembly);
-
     // Add the touchpad gestures handler after the click-drag handler,
     // since the gestures handler creates mouse events but already
     // disambiguates between click and drag gestures.
-    assembly = add_touchpad_gestures_handler(assembly, node);
+    let mut assembly = add_touchpad_gestures_handler(assembly, node);
 
     // Add handler to scale pointer motion based on speed of sensor
     // motion. This allows touchpads and mice to be easily used for
@@ -386,14 +381,6 @@ async fn register_mouse_related_input_handlers(
     .detach();
     assembly
 }
-
-// Maximum pointer movement during a clickpad press for the gesture to
-// be guaranteed to be interpreted as a click. For movement greater than
-// this value, upper layers may, e.g., interpret the gesture as a drag.
-//
-// This value has been tuned for Atlas, and may need further tuning or
-// configuration for other devices.
-const CLICK_TO_DRAG_THRESHOLD_MM: f32 = 16.0 / 12.0;
 
 async fn build_input_pipeline_assembly(
     use_flatland: bool,
@@ -542,12 +529,6 @@ async fn add_ime(mut assembly: InputPipelineAssembly) -> InputPipelineAssembly {
         assembly = assembly.add_handler(ime_handler);
     }
     assembly
-}
-
-fn add_click_drag_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::click_drag_handler::ClickDragHandler::new(
-        CLICK_TO_DRAG_THRESHOLD_MM,
-    ))
 }
 
 fn add_pointer_display_scale_handler(

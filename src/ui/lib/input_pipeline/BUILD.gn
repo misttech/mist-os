@@ -84,7 +84,6 @@ rustc_library("input_pipeline") {
     "src/activity.rs",
     "src/autorepeater.rs",
     "src/chromebook_keyboard_handler.rs",
-    "src/click_drag_handler.rs",
     "src/consumer_controls_binding.rs",
     "src/dead_keys_handler.rs",
     "src/display_ownership.rs",
