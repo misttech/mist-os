@@ -843,8 +843,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed interval value: " << interval_str << std::endl;
       return false;
     }
-    if (parsed_interval < static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanInterval::MIN) ||
-        parsed_interval > static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanInterval::MAX)) {
+    if (parsed_interval < static_cast<uint16_t>(::pw::bluetooth::emboss::ScanInterval::MIN) ||
+        parsed_interval > static_cast<uint16_t>(::pw::bluetooth::emboss::ScanInterval::MAX)) {
       std::cout << "  Interval value is out of the allowed range." << std::endl;
       return false;
     }
@@ -863,8 +863,8 @@ bool HandleWritePageScanActivity(const CommandData* cmd_data, const fxl::Command
       std::cout << "  Malformed window value: " << window_str << std::endl;
       return false;
     }
-    if (parsed_window < static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanWindow::MIN) ||
-        parsed_window > static_cast<uint16_t>(::pw::bluetooth::emboss::PageScanWindow::MAX)) {
+    if (parsed_window < static_cast<uint16_t>(::pw::bluetooth::emboss::ScanWindow::MIN) ||
+        parsed_window > static_cast<uint16_t>(::pw::bluetooth::emboss::ScanWindow::MAX)) {
       std::cout << "  Window value is out of the allowed range." << std::endl;
       return false;
     }
