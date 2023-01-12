@@ -15,7 +15,6 @@ use super::Id;
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum NeighborHealth {
     Unknown,
-    Stale { last_observed: zx::Time, last_healthy: Option<zx::Time> },
     Healthy { last_observed: zx::Time },
     Unhealthy { last_healthy: Option<zx::Time> },
 }
@@ -25,8 +24,7 @@ impl NeighborHealth {
         match self {
             NeighborHealth::Unknown => None,
             NeighborHealth::Healthy { last_observed } => Some(*last_observed),
-            NeighborHealth::Unhealthy { last_healthy }
-            | NeighborHealth::Stale { last_observed: _, last_healthy } => *last_healthy,
+            NeighborHealth::Unhealthy { last_healthy } => *last_healthy,
         }
     }
 
@@ -34,27 +32,34 @@ impl NeighborHealth {
     /// [`fnet_neighbor::EntryState`].
     ///
     /// Entry states that do not explicitly encode healthy or unhealthy status
-    /// (`Delay`, `Probe`, `Static`) will maintain the state machine in the
-    /// current state.
+    /// (`Delay`, `Probe`, `Static`, `Stale`) will maintain the state machine in
+    /// the current state.
+    ///
+    /// `Stale` does not change the current neighbor health because it can't
+    /// infer two-way reachability. There are two notable cases where a neighbor
+    /// could be in `Stale` repeatedly or for long periods:
+    /// - If interest in the neighbor goes away. The neighbor health state
+    ///   machine is only used for gateway health, and the reachability
+    ///   component generates traffic directed at gateways. So we can expect
+    ///   neighbors to not be parked in the stale state for very long.
+    /// - If the neighbor repeatedly changes its Mac address. This is taken to
+    ///   be a pathological corner case and probably causes the network to be
+    ///   unhealthy either way.
     ///
     /// A `Reachable` entry will always move to a `Healthy` state.
     ///
     /// An `Incomplete` or `Unreachable` entry will always move to an
     /// `Unhealthy` state.
-    ///
-    /// A `Stale` entry will always move to the `Stale` health state.
     fn transition(&self, now: zx::Time, state: fnet_neighbor::EntryState) -> Self {
         match state {
             fnet_neighbor::EntryState::Incomplete | fnet_neighbor::EntryState::Unreachable => {
                 NeighborHealth::Unhealthy { last_healthy: self.last_healthy() }
             }
             fnet_neighbor::EntryState::Reachable => NeighborHealth::Healthy { last_observed: now },
-            fnet_neighbor::EntryState::Stale => {
-                NeighborHealth::Stale { last_observed: now, last_healthy: self.last_healthy() }
-            }
             fnet_neighbor::EntryState::Delay
             | fnet_neighbor::EntryState::Probe
-            | fnet_neighbor::EntryState::Static => self.clone(),
+            | fnet_neighbor::EntryState::Static
+            | fnet_neighbor::EntryState::Stale => self.clone(),
         }
     }
 }
@@ -330,12 +335,12 @@ mod tests {
             [(NEIGH1, NeighborHealth::Healthy { last_observed: events.now })],
         );
 
-        let last_healthy = Some(events.now);
+        let last_healthy = events.now;
         events.advance_secs(1);
         cache.process_neighbor_event(events.stale(IFACE1, NEIGH1).into_changed());
         cache.assert_neighbors(
             IFACE1,
-            [(NEIGH1, NeighborHealth::Stale { last_observed: events.now, last_healthy })],
+            [(NEIGH1, NeighborHealth::Healthy { last_observed: last_healthy })],
         );
     }
 
@@ -345,18 +350,11 @@ mod tests {
         let mut events = EventSource::new();
 
         cache.process_neighbor_event(events.stale(IFACE1, NEIGH1).into_added());
-        let last_observed = events.now;
-        cache.assert_neighbors(
-            IFACE1,
-            [(NEIGH1, NeighborHealth::Stale { last_observed, last_healthy: None })],
-        );
+        cache.assert_neighbors(IFACE1, [(NEIGH1, NeighborHealth::Unknown)]);
 
         events.advance_secs(1);
         cache.process_neighbor_event(events.delay(IFACE1, NEIGH1).into_changed());
-        cache.assert_neighbors(
-            IFACE1,
-            [(NEIGH1, NeighborHealth::Stale { last_observed, last_healthy: None })],
-        );
+        cache.assert_neighbors(IFACE1, [(NEIGH1, NeighborHealth::Unknown)]);
 
         events.advance_secs(1);
         cache.process_neighbor_event(events.reachable(IFACE1, NEIGH1).into_changed());
@@ -403,10 +401,7 @@ mod tests {
         let mut events = EventSource::new();
 
         cache.process_neighbor_event(events.stale(IFACE1, NEIGH1).into_added());
-        cache.assert_neighbors(
-            IFACE1,
-            [(NEIGH1, NeighborHealth::Stale { last_observed: events.now, last_healthy: None })],
-        );
+        cache.assert_neighbors(IFACE1, [(NEIGH1, NeighborHealth::Unknown)]);
 
         events.advance_secs(1);
         cache.process_neighbor_event(events.unreachable(IFACE1, NEIGH1).into_changed());

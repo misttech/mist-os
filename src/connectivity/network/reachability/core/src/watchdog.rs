@@ -23,10 +23,6 @@ const DEVICE_COUNTERS_UNHEALTHY_TIME: zx::Duration = zx::Duration::from_minutes(
 /// information.
 const DEBUG_INFO_COOLDOWN: zx::Duration = zx::Duration::from_minutes(15);
 
-/// The minimum amount of time for a neighbor in stale state to be considered
-/// unhealthy and trigger any actions.
-const NEIGHBOR_STALE_AS_UNHEALTHY_TIME: zx::Duration = zx::Duration::from_minutes(2);
-
 /// The minimum amount of time for a neighbor in unhealthy state to trigger
 /// actions.
 const NEIGHBOR_UNHEALTHY_TIME: zx::Duration = zx::Duration::from_minutes(1);
@@ -315,10 +311,6 @@ where
                     // Unknown gateway state is assumed to be healthy. Expected
                     // to shift once neighbor table fills up.
                     | GatewayHealth::Unknown
-                    // A gateway that has been in the stale state for a short
-                    // time may simply be observing loss of traffic interest in
-                    // it.
-                    | GatewayHealth::RecentlyStale
                     => {
                         itertools::FoldWhile::Done(Some(true))
                     }
@@ -438,7 +430,6 @@ enum GatewayHealth {
     Unknown,
     Healthy,
     RecentlyUnhealthy,
-    RecentlyStale,
     Unhealthy,
     NeverHealthy,
 }
@@ -449,15 +440,7 @@ impl GatewayHealth {
         match health {
             NeighborHealth::Unknown => Self::Unknown,
             NeighborHealth::Healthy { last_observed: _ } => Self::Healthy,
-            NeighborHealth::Stale { last_observed: _, last_healthy: None }
-            | NeighborHealth::Unhealthy { last_healthy: None } => Self::NeverHealthy,
-            NeighborHealth::Stale { last_observed, last_healthy: Some(_) } => {
-                if now - *last_observed < NEIGHBOR_STALE_AS_UNHEALTHY_TIME {
-                    Self::RecentlyStale
-                } else {
-                    Self::Unhealthy
-                }
-            }
+            NeighborHealth::Unhealthy { last_healthy: None } => Self::NeverHealthy,
             NeighborHealth::Unhealthy { last_healthy: Some(last_healthy) } => {
                 if now - *last_healthy < NEIGHBOR_UNHEALTHY_TIME {
                     Self::RecentlyUnhealthy
@@ -781,37 +764,6 @@ mod tests {
             GatewayHealth::from_neighbor_health(
                 &NeighborHealth::Unhealthy { last_healthy: Some(now) },
                 now + NEIGHBOR_UNHEALTHY_TIME
-            ),
-            GatewayHealth::Unhealthy
-        );
-
-        // Stale neighbor is considered unhealthy gateway after some time *and*
-        // if it's been healthy at some point.
-        assert_eq!(
-            GatewayHealth::from_neighbor_health(
-                &NeighborHealth::Stale { last_observed: now, last_healthy: None },
-                now
-            ),
-            GatewayHealth::NeverHealthy
-        );
-        assert_eq!(
-            GatewayHealth::from_neighbor_health(
-                &NeighborHealth::Stale { last_observed: now, last_healthy: None },
-                now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
-            ),
-            GatewayHealth::NeverHealthy
-        );
-        assert_eq!(
-            GatewayHealth::from_neighbor_health(
-                &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
-                now
-            ),
-            GatewayHealth::RecentlyStale
-        );
-        assert_eq!(
-            GatewayHealth::from_neighbor_health(
-                &NeighborHealth::Stale { last_observed: now, last_healthy: Some(now) },
-                now + NEIGHBOR_STALE_AS_UNHEALTHY_TIME
             ),
             GatewayHealth::Unhealthy
         );
