@@ -203,7 +203,7 @@ pub trait ComponentManagerConfiguration {}
 
 /// Model of a data source that a [`Scrutiny`] instance is using as a source of truth about the
 /// underlying system.
-pub trait DataSource {
+pub trait DataSource: Debug {
     /// Concrete type used to refer to the path to this data source, if any.
     type SourcePath: AsRef<Path>;
 
@@ -229,11 +229,16 @@ pub trait DataSource {
 
 impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePath> {
     fn eq(&self, other: &dyn DataSource<SourcePath = SourcePath>) -> bool {
-        if self.kind() != other.kind()
-            || self.parent() != other.parent()
-            || self.version() != other.version()
-        {
+        if self.kind() != other.kind() || self.version() != other.version() {
             return false;
+        }
+
+        match (self.parent(), other.parent()) {
+            (Some(p1), Some(p2)) => {
+                return p1 == p2;
+            }
+            (None, Some(_)) | (Some(_), None) => return false,
+            (None, None) => {}
         }
 
         match (self.path(), other.path()) {
@@ -358,23 +363,24 @@ pub trait Package {
     /// Concrete type for accessing components in the package.
     type Component: Component;
 
-    /// Accessor for the content-addressed hash of the package's "meta.far" file.
+    /// Get the content-addressed hash of the package's "meta.far" file.
     fn hash(&self) -> Self::Hash;
 
-    /// Accessor for the package's "meta/package" file.
+    /// Gets the package's "meta/package" file.
     fn meta_package(&self) -> Self::MetaPackage;
 
-    /// Accessor for the package's "meta/contents" file.
+    /// Gets the package's "meta/contents" file.
     fn meta_contents(&self) -> Self::MetaContents;
 
-    /// Iterate over blobs designated in the "meta/contents" of the package.
+    /// Constructs iterator over blobs designated in the "meta/contents" of the package.
     fn content_blobs(&self) -> Box<dyn Iterator<Item = (Self::PackagePath, Self::Blob)>>;
 
-    /// Iterate over files in the package's "meta.far" file. This includes, but is not limited to
-    /// "meta/package" and "meta/contents" which have their own structured type access APIs.
+    /// Constructs iterator over files in the package's "meta.far" file. This includes, but is not
+    /// limited to "meta/package" and "meta/contents" which have their own structured type access
+    /// APIs.
     fn meta_blobs(&self) -> Box<dyn Iterator<Item = (Self::PackagePath, Self::Blob)>>;
 
-    /// Iterate over blobs that appear to be component manifests.
+    /// Constructs iterator over blobs that appear to be component manifests.
     fn components(&self) -> Box<dyn Iterator<Item = (Self::PackagePath, Self::Component)>>;
 }
 
@@ -388,7 +394,17 @@ pub trait MetaPackage {}
 
 /// Model of a Fuchsia package's "meta/contents" file. See
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package#structure-of-a-package for details.
-pub trait MetaContents {}
+pub trait MetaContents {
+    /// Concrete type for the content-addressed hash used to identify the blobs.
+    type Hash: Hash;
+
+    /// Concrete type used for describing a paths to content blobs.
+    type EntryPath: AsRef<Path>;
+
+    /// Returns an iterator over all path -> content hash mappings stored in this "meta/contents"
+    /// file.
+    fn contents(&self) -> Box<dyn Iterator<Item = (Self::EntryPath, Self::Hash)>>;
+}
 
 /// Model for a package resolution strategy. See
 /// https://fuchsia.dev/fuchsia-src/get-started/learn/intro/packages#hosting_and_serving_packages

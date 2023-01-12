@@ -739,6 +739,54 @@ mod tests {
 }
 
 #[cfg(test)]
+pub mod test {
+    /// Assert that two `crate::api::Blob` objects, possibly of different underlying types, refer
+    /// to the same blob.
+    macro_rules! assert_blobs_eq {
+        ($b1:expr, $t1:ty, $b2:expr, $t2:ty) => {
+            assert_eq!($b1.hash(), $b2.hash());
+
+            // Convince type system to invoke `<dyn crate::api::DataSource as PartialEq>::eq()`.
+            let ds1: Vec<_> = $b1
+                .data_sources()
+                .map(|data_source| {
+                    let data_source: Box<
+                        dyn crate::api::DataSource<
+                            SourcePath = <<$t1 as crate::api::Blob>::DataSource as crate::api::DataSource>::SourcePath,
+                        >,
+                    > = Box::new(data_source);
+                    data_source
+                })
+                .collect();
+            let ds2: Vec<_> = $b2
+                .data_sources()
+                .map(|data_source| {
+                    let data_source: Box<
+                        dyn crate::api::DataSource<
+                            SourcePath = <<$t2 as crate::api::Blob>::DataSource as crate::api::DataSource>::SourcePath,
+                        >,
+                    > = Box::new(data_source);
+                    data_source
+                })
+                .collect();
+            assert_eq!(ds1, ds2);
+
+            let mut rs1 = $b1.reader_seeker().unwrap();
+            let mut data1 = vec![];
+            rs1.read_to_end(&mut data1).unwrap();
+
+            let mut rs2 = $b2.reader_seeker().unwrap();
+            let mut data2 = vec![];
+            rs2.read_to_end(&mut data2).unwrap();
+
+            assert_eq!(data1, data2);
+        };
+    }
+
+    pub(crate) use assert_blobs_eq;
+}
+
+#[cfg(test)]
 pub mod fake {
     use super::BlobSet as BlobSetApi;
     use crate::api::Blob as BlobApi;
@@ -746,7 +794,6 @@ pub mod fake {
     use crate::data_source::fake::DataSource;
     use crate::hash::test::HashGenerator;
     use std::collections::HashMap;
-    use std::hash;
     use std::io::Cursor;
     use thiserror::Error;
 
@@ -770,15 +817,6 @@ pub mod fake {
                 blob: Ok(Cursor::new(vec![])),
                 data_sources: vec![DataSource::default()],
             }
-        }
-    }
-
-    impl<H: HashApi> hash::Hash for Blob<H> {
-        fn hash<S>(&self, state: &mut S)
-        where
-            S: hash::Hasher,
-        {
-            self.hash.hash(state)
         }
     }
 
@@ -944,7 +982,6 @@ pub mod fake {
         use crate::data_source::fake::DataSource;
         use crate::hash::fake::Hash;
         use maplit::hashmap;
-        use maplit::hashset;
 
         #[fuchsia::test]
         fn test_blob_new() {
@@ -1046,13 +1083,11 @@ pub mod fake {
             assert_eq!(blob_set.blob(3), Err(BlobSetError::BlobNotFound));
 
             // Assert each member of `blobs` appears exactly once in iteration.
-            let mut blobs = hashset! {
-                Blob::new(0, vec![]),
-                Blob::new(7, vec![]),
-            };
+            let mut blobs = vec![Blob::new(0, vec![]), Blob::new(7, vec![])];
             for blob in blob_set.iter() {
-                // HashSet::remove() == true iff value was found in the set.
-                assert!(blobs.remove(&blob));
+                // Remove blob at position matching location of blob in `blobs`.
+                // This will panic on `.unwrap()` if `blob` appears nowhere in `blobs`.
+                blobs.remove(blobs.iter().position(|b| b == &blob).unwrap());
             }
             assert_eq!(blobs.len(), 0);
         }
