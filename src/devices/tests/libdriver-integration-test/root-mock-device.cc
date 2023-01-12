@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 
+#include "lib/stdcompat/string_view.h"
+
 #define DRIVER_TEST_DIR "/boot/driver"
 #define MOCK_DEVICE_LIB "/boot/driver/mock-device.so"
 
@@ -66,18 +68,44 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     const IsolatedDevmgr& devmgr, async_dispatcher_t* dispatcher,
     fidl::SynchronousInterfacePtr<fuchsia::device::test::RootDevice> test_root,
     std::unique_ptr<MockDeviceHooks> hooks, std::unique_ptr<RootMockDevice>* mock_out) {
+  const std::string kName = "mock";
+
   fuchsia::device::test::RootDevice_CreateDevice_Result create_result;
-  zx_status_t status = test_root->CreateDevice("mock", &create_result);
-  if (status != ZX_OK) {
+  if (zx_status_t status = test_root->CreateDevice(kName, &create_result); status != ZX_OK) {
     return status;
   }
   if (create_result.is_err()) {
     return create_result.err();
   }
 
+  // Ignore the |devpath| return and construct it ourselves, since the test
+  // driver makes an assumption about where it's bound which isn't true in the
+  // case where we're testing composite devices
+  fidl::SynchronousInterfacePtr<fuchsia::device::Controller> test_root_controller;
+  test_root_controller.Bind(test_root.Unbind().TakeChannel());
+  fuchsia::device::Controller_GetTopologicalPath_Result result;
+  if (zx_status_t status = test_root_controller->GetTopologicalPath(&result); status != ZX_OK) {
+    return status;
+  }
+  if (result.is_err()) {
+    return result.err();
+  }
+  fidl::StringPtr path_opt = result.response().path;
+  if (!path_opt.has_value()) {
+    return ZX_ERR_BAD_STATE;
+  }
+  std::string path = std::move(path_opt.value());
+  constexpr std::string_view kDevPrefix = "/dev/";
+  if (!cpp20::starts_with(std::string_view{path}, kDevPrefix)) {
+    return ZX_ERR_BAD_STATE;
+  }
+  path.erase(0, kDevPrefix.length());
+  path.append("/");
+  path.append(kName);
+
   // Connect to the created device.
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
-                                                            create_result.response().path.c_str());
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), path.c_str());
   if (channel.is_error()) {
     return channel.error_value();
   }
@@ -92,33 +120,9 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     return ZX_ERR_BAD_STATE;
   }
 
-  status = test_dev->SetChannel(client.TakeChannel());
-  if (status != ZX_OK) {
+  if (zx_status_t status = test_dev->SetChannel(client.TakeChannel()); status != ZX_OK) {
     return status;
   }
-
-  // Ignore the |devpath| return and construct it ourselves, since the test
-  // driver makes an assumption about where it's bound which isn't true in the
-  // case where we're testing composite devices
-  fidl::SynchronousInterfacePtr<fuchsia::device::Controller> test_root_controller;
-  test_root_controller.Bind(test_root.Unbind().TakeChannel());
-  fuchsia::device::Controller_GetTopologicalPath_Result result;
-  status = test_root_controller->GetTopologicalPath(&result);
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (result.is_err()) {
-    return status;
-  }
-  fidl::StringPtr devpath = result.response().path;
-  test_root.Bind(test_root_controller.Unbind().TakeChannel());
-
-  const char* kDevPrefix = "/dev/";
-  if (!devpath.has_value() || devpath.value().find(kDevPrefix) != 0) {
-    return ZX_ERR_BAD_STATE;
-  }
-  std::string relative_devpath(devpath.value(), strlen(kDevPrefix));
-  relative_devpath += "/mock";
 
   // Open a new connection to the test device to return.  We do to simplify
   // handling around the blocking nature of fuchsia.device.Controller/Bind.  Needs to
@@ -127,6 +131,7 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
   //
   // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   fidl::InterfacePtr<fuchsia::device::test::Device> test_device;
+  fidl::SynchronousInterfacePtr<fuchsia::device::Controller> controller;
   {
     fidl::SynchronousInterfacePtr node =
         fidl::InterfaceHandle<fuchsia::io::Node>(test_dev.Unbind().TakeChannel()).BindSync();
@@ -136,31 +141,26 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
         status != ZX_OK) {
       return status;
     }
-    test_dev.Bind(node.Unbind().TakeChannel());
+    controller.Bind(node.Unbind().TakeChannel());
   }
 
   // Bind the mock device driver in a separate thread, since this call is
   // synchronous.
-  thrd_t thrd;
-  int ret = thrd_create(
-      &thrd,
-      [](void* ctx) {
-        zx::channel test_dev(static_cast<zx_handle_t>(reinterpret_cast<uintptr_t>(ctx)));
-        fidl::SynchronousInterfacePtr<fuchsia::device::Controller> controller;
-        controller.Bind(std::move(test_dev));
-        fuchsia::device::Controller_Bind_Result result;
-        controller->Bind(MOCK_DEVICE_LIB, &result);
-        return 0;
-      },
-      reinterpret_cast<void*>(static_cast<uintptr_t>(test_dev.Unbind().TakeChannel().release())));
-  ZX_ASSERT(ret == thrd_success);
-  thrd_detach(thrd);
+  std::thread thrd{[controller = std::move(controller)]() {
+    fuchsia::device::Controller_Bind_Result result;
+    zx_status_t status = controller->Bind(MOCK_DEVICE_LIB, &result);
+    ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+    // BasicLifecycleTest.BindError.
+    if (result.is_err()) {
+      ZX_ASSERT_MSG(result.err() == ZX_ERR_NOT_SUPPORTED, "%s", zx_status_get_string(result.err()));
+    }
+  }};
+  thrd.detach();
 
   destroy_device.cancel();
 
-  auto mock =
-      std::make_unique<RootMockDevice>(std::move(hooks), std::move(test_device), std::move(server),
-                                       dispatcher, std::move(relative_devpath));
+  auto mock = std::make_unique<RootMockDevice>(std::move(hooks), std::move(test_device),
+                                               std::move(server), dispatcher, std::move(path));
   *mock_out = std::move(mock);
   return ZX_OK;
 }

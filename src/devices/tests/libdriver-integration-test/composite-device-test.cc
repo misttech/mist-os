@@ -54,8 +54,8 @@ class CompositeDeviceTest : public IntegrationTest {
                         completer.complete_ok();
                         return actions;
                       })
-        .and_then(child1_bridge.consumer.promise_or(::fpromise::error("child1 create abandoned")))
-        .and_then(child2_bridge.consumer.promise_or(::fpromise::error("child2 create abandoned")));
+        .and_then(child1_bridge.consumer.promise_or(fpromise::error("child1 create abandoned")))
+        .and_then(child2_bridge.consumer.promise_or(fpromise::error("child2 create abandoned")));
   }
 };
 
@@ -82,17 +82,14 @@ TEST_F(CompositeDeviceTest, CreateTest) {
   RunPromise(std::move(promise));
 }
 
-// TODO(https://fxbug.dev/8452): Re-enable once flake is fixed.
-//
 // This test creates the well-known composite, and force binds a test driver
 // stack to the composite.  It then forces one of the fragments to unbind.
 // It verifies that the composite mock-device's unbind hook is called.
-TEST_F(CompositeDeviceTest, DISABLED_UnbindFragment) {
+TEST_F(CompositeDeviceTest, UnbindFragment) {
   std::unique_ptr<RootMockDevice> root_device, composite_mock;
   std::unique_ptr<MockDevice> child_device1, child_device2, composite_child_device;
   fidl::InterfacePtr<fuchsia::io::Node> client;
-  fidl::InterfacePtr<fuchsia::device::Controller> composite, child1_controller;
-  fidl::SynchronousInterfacePtr<fuchsia::device::test::RootDevice> composite_test;
+  fidl::InterfacePtr<fuchsia::device::Controller> child1_controller;
 
   constexpr char kName[] = "sys/test/test/mock/fragment1/composite/test";
 
@@ -101,6 +98,7 @@ TEST_F(CompositeDeviceTest, DISABLED_UnbindFragment) {
           .and_then(DoWaitForPath(kName))
           .and_then([&]() { return DoOpen(kName, &client); })
           .and_then([&]() -> Promise<void> {
+            fidl::SynchronousInterfacePtr<fuchsia::device::test::RootDevice> composite_test;
             composite_test.Bind(client.Unbind().TakeChannel());
 
             auto bind_callback = [&composite_mock, &composite_child_device](
@@ -123,7 +121,7 @@ TEST_F(CompositeDeviceTest, DISABLED_UnbindFragment) {
                 &composite_mock);
             PROMISE_ASSERT(ASSERT_EQ(status, ZX_OK));
 
-            return bridge.consumer.promise_or(::fpromise::error("bind abandoned"));
+            return bridge.consumer.promise_or(fpromise::error("bind abandoned"));
           })
           .and_then([&]() -> Promise<void> {
             // Open up child1, so we can send it an unbind request
@@ -163,7 +161,7 @@ TEST_F(CompositeDeviceTest, DISABLED_UnbindFragment) {
                 }).and_then(ExpectUnbindThenRelease(composite_child_device));
 
             return unbind_promise.and_then(
-                bridge.consumer.promise_or(::fpromise::error("Unbind abandoned")));
+                bridge.consumer.promise_or(fpromise::error("Unbind abandoned")));
           })
           .and_then([&]() -> Promise<void> {
             child1_controller.Unbind();
