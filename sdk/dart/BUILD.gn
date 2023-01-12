@@ -117,7 +117,7 @@ group("tests") {
   public_deps = [
                   # TODO: This target should just aggregate the top-level directories and
                   # most of these dependencies should be in those subdirectories.
-                  "//bundles/packages/tests:scenic",
+                  "//examples:tests",
                   "//sdk/dart/fuchsia_component_test:tests",
                   "//sdk/dart/fuchsia_inspect:tests",
                   "//sdk/dart/fuchsia_inspect/test/validator_puppet:tests",
@@ -130,6 +130,8 @@ group("tests") {
                   "//src/fonts",
                   "//src/modular/bundles:framework",
                   "//src/modular/bundles:integration_testing",
+                  "//src/ui/examples",
+                  "//src/ui/scenic:tests",
                   "//src/ui/tools:scenic",
                 ] + _flutter_tester_tests
 }
