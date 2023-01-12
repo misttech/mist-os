@@ -38,6 +38,7 @@ const SVC_DIR: &'static str = "/svc";
 const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
     .union(fio::OpenFlags::RIGHT_READABLE)
     .union(fio::OpenFlags::POSIX_WRITABLE);
+const SERVICE_DIR_FLAGS: fio::OpenFlags = SERVICE_FLAGS.union(fio::OpenFlags::DIRECTORY);
 
 /// A protocol connection request that allows checking if the protocol exists.
 pub struct ProtocolConnector<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> {
@@ -248,7 +249,8 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     instance: &str,
 ) -> Result<S::Proxy, Error> {
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
-    let directory_proxy = fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_FLAGS)?;
+    let directory_proxy =
+        fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_DIR_FLAGS)?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
@@ -270,8 +272,11 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
     instance: &str,
 ) -> Result<S::Proxy, Error> {
     let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
-    let directory_proxy =
-        fuchsia_fs::directory::open_directory_no_describe(directory, &service_path, SERVICE_FLAGS)?;
+    let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
+        directory,
+        &service_path,
+        SERVICE_DIR_FLAGS,
+    )?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
@@ -291,20 +296,18 @@ pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
     directory: &zx::Channel,
     instance: &str,
 ) -> Result<S::Proxy, Error> {
-    const FLAGS: fio::OpenFlags = SERVICE_FLAGS.union(fio::OpenFlags::DIRECTORY);
-
     let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     // NB: This has to use `fdio` because we are holding a channel rather than a
     // proxy, and we can't make FIDL calls on unowned channels in Rust.
-    let () = fdio::open_at(directory, &service_path, FLAGS, server_end.into_channel())?;
+    let () = fdio::open_at(directory, &service_path, SERVICE_DIR_FLAGS, server_end.into_channel())?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
-    fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_FLAGS)
+    fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_DIR_FLAGS)
         .context("namespace open failed")
 }
 
@@ -313,7 +316,7 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_no_describe(directory, S::SERVICE_NAME, SERVICE_FLAGS)
+    fuchsia_fs::directory::open_directory_no_describe(directory, S::SERVICE_NAME, SERVICE_DIR_FLAGS)
         .map_err(Into::into)
 }
 
