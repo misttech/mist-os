@@ -36,6 +36,7 @@ if (is_host) {
       "plugins:tests",
       "tests:host_tests",
       "utils:tests",
+      "x:tests",
     ]
   }
 }
