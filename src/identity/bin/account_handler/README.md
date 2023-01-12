@@ -71,6 +71,14 @@ whose responsibilities and key interactions are summarized below:
   information about the account to other components. The `account` module also
   uses the `persona` module to serve requests for personae. No other modules
   should understand the details of an unlocked account.
+- **`interaction_lock_state`** - This module manages:
+  - the enum which represents the state of the account with respect to being
+    interaction-locked, i.e. whether or not the account is currently closed
+    to interaction because of either a manual lock action or inactivity.
+  - enum variants for managing various interaction lock states and state
+    transitions.
+  - a mechanism for listening for inactivity and automatically moving between
+    interaction lock states.
 - **`persona`** - This module defines the state of an account persona and
   implements a `fuchsia.identity.account.Persona` server to expose information
   about the persona to other components. No other modules should understand

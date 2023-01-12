@@ -18,6 +18,7 @@ mod account_handler;
 mod common;
 mod inspect;
 mod interaction;
+mod interaction_lock_state;
 mod lock_request;
 mod persona;
 mod pre_auth;
