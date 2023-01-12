@@ -9,6 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/fit/defer.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,7 +107,7 @@ typedef struct {
   bool active;
   cnd_t event;
   mtx_t mtx;
-  atomic_int pending_request_count;
+  std::atomic_int pending_request_count;
 } usb_ums_t;
 
 static void ums_cbw_complete(void* ctx, usb_request_t* req);
@@ -183,7 +184,8 @@ static void ums_continue_transfer(usb_ums_t* ums) {
   req->header.length = length;
 
   if (ums->data_state == DATA_STATE_READ) {
-    size_t result = usb_request_copy_to(req, ums->storage + ums->data_offset, length, 0);
+    size_t result =
+        usb_request_copy_to(req, static_cast<char*>(ums->storage) + ums->data_offset, length, 0);
     ZX_ASSERT(result == length);
     ums_function_queue_data(ums, req);
   } else if (ums->data_state == DATA_STATE_WRITE) {
@@ -431,26 +433,26 @@ static void ums_handle_cbw(usb_ums_t* ums, ums_cbw_t* cbw) {
 }
 
 static void ums_cbw_complete(void* ctx, usb_request_t* req) {
-  usb_ums_t* ums = ctx;
+  usb_ums_t* ums = static_cast<usb_ums_t*>(ctx);
 
   zxlogf(DEBUG, "ums_cbw_complete %d %ld", req->response.status, req->response.actual);
 
   if (req->response.status == ZX_OK && req->response.actual == sizeof(ums_cbw_t)) {
     ums_cbw_t* cbw = &ums->current_cbw;
     memset(cbw, 0, sizeof(*cbw));
-    __UNUSED size_t result = usb_request_copy_from(req, cbw, sizeof(*cbw), 0);
+    [[maybe_unused]] size_t result = usb_request_copy_from(req, cbw, sizeof(*cbw), 0);
     ums_handle_cbw(ums, cbw);
   }
 }
 
 static void ums_data_complete(void* ctx, usb_request_t* req) {
-  usb_ums_t* ums = ctx;
+  usb_ums_t* ums = static_cast<usb_ums_t*>(ctx);
 
   zxlogf(DEBUG, "ums_data_complete %d %ld", req->response.status, req->response.actual);
 
   if (ums->data_state == DATA_STATE_WRITE) {
-    size_t result =
-        usb_request_copy_from(req, ums->storage + ums->data_offset, req->response.actual, 0);
+    size_t result = usb_request_copy_from(req, static_cast<char*>(ums->storage) + ums->data_offset,
+                                          req->response.actual, 0);
     ZX_ASSERT(result == req->response.actual);
   } else if (ums->data_state == DATA_STATE_FAILED) {
     ums->data_state = DATA_STATE_NONE;
@@ -509,7 +511,7 @@ static zx_status_t ums_control(void* ctx, const usb_setup_t* setup, const uint8_
 
 static zx_status_t ums_set_configured(void* ctx, bool configured, usb_speed_t speed) {
   zxlogf(DEBUG, "ums_set_configured %d %d", configured, speed);
-  usb_ums_t* ums = ctx;
+  usb_ums_t* ums = static_cast<usb_ums_t*>(ctx);
   zx_status_t status;
 
   // TODO(voydanoff) fullspeed and superspeed support
@@ -550,7 +552,7 @@ usb_function_interface_protocol_ops_t ums_device_ops = {
 
 static void usb_ums_unbind(void* ctx) {
   zxlogf(DEBUG, "usb_ums_unbind");
-  usb_ums_t* ums = ctx;
+  usb_ums_t* ums = static_cast<usb_ums_t*>(ctx);
 
   usb_function_cancel_all(&ums->function, ums->bulk_out_addr);
   usb_function_cancel_all(&ums->function, ums->bulk_in_addr);
@@ -567,7 +569,7 @@ static void usb_ums_unbind(void* ctx) {
 
 static void usb_ums_release(void* ctx) {
   zxlogf(DEBUG, "usb_ums_release");
-  usb_ums_t* ums = ctx;
+  usb_ums_t* ums = static_cast<usb_ums_t*>(ctx);
 
   if (ums->storage) {
     zx_vmar_unmap(zx_vmar_root_self(), (uintptr_t)ums->storage, STORAGE_SIZE);
@@ -657,7 +659,7 @@ static int usb_ums_thread(void* ctx) {
 zx_status_t usb_ums_bind(void* ctx, zx_device_t* parent) {
   zxlogf(INFO, "usb_ums_bind");
 
-  usb_ums_t* ums = calloc(1, sizeof(usb_ums_t));
+  usb_ums_t* ums = static_cast<usb_ums_t*>(calloc(1, sizeof(usb_ums_t)));
   if (!ums) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -669,9 +671,12 @@ zx_status_t usb_ums_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status = ZX_OK;
   ums->writeback_cache = false;
   ums->writeback_cache_report = false;
+
+  auto cleanup = fit::defer([&] { usb_ums_release(ums); });
+
   status = device_get_protocol(parent, ZX_PROTOCOL_USB_FUNCTION, &ums->function);
   if (status != ZX_OK) {
-    goto fail;
+    return status;
   }
 
   ums->parent_req_size = usb_function_get_request_size(&ums->function);
@@ -680,17 +685,17 @@ zx_status_t usb_ums_bind(void* ctx, zx_device_t* parent) {
   status = usb_function_alloc_interface(&ums->function, &descriptors.intf.b_interface_number);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_ums_bind: usb_function_alloc_interface failed");
-    goto fail;
+    return status;
   }
   status = usb_function_alloc_ep(&ums->function, USB_DIR_OUT, &ums->bulk_out_addr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_ums_bind: usb_function_alloc_ep failed");
-    goto fail;
+    return status;
   }
   status = usb_function_alloc_ep(&ums->function, USB_DIR_IN, &ums->bulk_in_addr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_ums_bind: usb_function_alloc_ep failed");
-    goto fail;
+    return status;
   }
   descriptors.out_ep.b_endpoint_address = ums->bulk_out_addr;
   descriptors.in_ep.b_endpoint_address = ums->bulk_in_addr;
@@ -698,31 +703,31 @@ zx_status_t usb_ums_bind(void* ctx, zx_device_t* parent) {
   status =
       usb_request_alloc(&ums->cbw_req, BULK_MAX_PACKET, ums->bulk_out_addr, ums->parent_req_size);
   if (status != ZX_OK) {
-    goto fail;
+    return status;
   }
   // Endpoint for data_req depends on current_cbw.bmCBWFlags,
   // and will be set in ums_function_queue_data.
   status = usb_request_alloc(&ums->data_req, DATA_REQ_SIZE, 0, ums->parent_req_size);
   if (status != ZX_OK) {
-    goto fail;
+    return status;
   }
   status =
       usb_request_alloc(&ums->csw_req, BULK_MAX_PACKET, ums->bulk_in_addr, ums->parent_req_size);
   if (status != ZX_OK) {
-    goto fail;
+    return status;
   }
   // create and map a VMO
   if (!vmo) {
     status = zx_vmo_create(STORAGE_SIZE, 0, &vmo);
     if (status != ZX_OK) {
-      goto fail;
+      return status;
     }
   }
   ums->storage_handle = vmo;
   status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0,
                        ums->storage_handle, 0, STORAGE_SIZE, (zx_vaddr_t*)&ums->storage);
   if (status != ZX_OK) {
-    goto fail;
+    return status;
   }
 
   ums->csw_req->header.length = sizeof(ums_csw_t);
@@ -738,16 +743,13 @@ zx_status_t usb_ums_bind(void* ctx, zx_device_t* parent) {
   status = device_add(parent, &args, &ums->zxdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_device_bind add_device failed %d", status);
-    goto fail;
+    return status;
   }
 
   usb_function_set_interface(&ums->function, ums, &ums_device_ops);
   thrd_create_with_name(&ums->thread, usb_ums_thread, ums, "ums_worker");
+  cleanup.cancel();
   return ZX_OK;
-
-fail:
-  usb_ums_release(ums);
-  return status;
 }
 
 static zx_driver_ops_t usb_ums_ops = {
