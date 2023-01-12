@@ -5,6 +5,7 @@
 //! Utilities for interacting with devices during integration tests.
 
 use fidl_fuchsia_hardware_network as fhardware_network;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_tun as fnet_tun;
 
@@ -44,35 +45,38 @@ pub fn install_device(
 
 /// Create a port on the given Tun device, returning handles to the created
 /// `fuchsia.net.tun/Port` and the underlying network port.
-pub async fn create_tun_port(
+pub async fn create_tun_port_with(
     tun_device: &fnet_tun::DeviceProxy,
-    id: Option<u8>,
+    id: u8,
+    frame_types: impl IntoIterator<Item = fhardware_network::FrameType>,
+    mac: Option<fnet::MacAddress>,
 ) -> (fnet_tun::PortProxy, fhardware_network::PortProxy) {
     let (port, server_end) =
         fidl::endpoints::create_proxy::<fnet_tun::PortMarker>().expect("create proxy");
-    // At the time of writing, netstack only supports dual-mode devices.
-    const IP_FRAME_TYPES: [fhardware_network::FrameType; 2] =
-        [fhardware_network::FrameType::Ipv4, fhardware_network::FrameType::Ipv6];
+    let (rx_types, tx_types): (Vec<_>, Vec<_>) = frame_types
+        .into_iter()
+        .map(|frame_type| {
+            (
+                frame_type,
+                fhardware_network::FrameTypeSupport {
+                    type_: frame_type,
+                    features: fhardware_network::FRAME_FEATURES_RAW,
+                    supported_flags: fhardware_network::TxFlags::empty(),
+                },
+            )
+        })
+        .unzip();
     tun_device
         .add_port(
             fnet_tun::DevicePortConfig {
                 base: Some(fnet_tun::BasePortConfig {
-                    id: id,
-                    rx_types: Some(IP_FRAME_TYPES.to_vec()),
-                    tx_types: Some(
-                        IP_FRAME_TYPES
-                            .iter()
-                            .copied()
-                            .map(|type_| fhardware_network::FrameTypeSupport {
-                                type_,
-                                features: fhardware_network::FRAME_FEATURES_RAW,
-                                supported_flags: fhardware_network::TxFlags::empty(),
-                            })
-                            .collect(),
-                    ),
+                    id: Some(id),
+                    rx_types: Some(rx_types),
+                    tx_types: Some(tx_types),
                     mtu: Some(netemul::DEFAULT_MTU.into()),
                     ..fnet_tun::BasePortConfig::EMPTY
                 }),
+                mac,
                 ..fnet_tun::DevicePortConfig::EMPTY
             },
             server_end,
@@ -84,4 +88,29 @@ pub async fn create_tun_port(
     port.get_port(server_end).expect("get port");
 
     (port, network_port)
+}
+
+/// Creates a port on the given Tun device that supports IPv4 and IPv6 frame
+/// types.
+pub async fn create_ip_tun_port(
+    tun_device: &fnet_tun::DeviceProxy,
+    id: u8,
+) -> (fnet_tun::PortProxy, fhardware_network::PortProxy) {
+    create_tun_port_with(
+        tun_device,
+        id,
+        [fhardware_network::FrameType::Ipv4, fhardware_network::FrameType::Ipv6],
+        None,
+    )
+    .await
+}
+
+/// Creates a port on the given Tun device that supports the Ethernet frame
+/// type.
+pub async fn create_eth_tun_port(
+    tun_device: &fnet_tun::DeviceProxy,
+    id: u8,
+    mac: fnet::MacAddress,
+) -> (fnet_tun::PortProxy, fhardware_network::PortProxy) {
+    create_tun_port_with(tun_device, id, [fhardware_network::FrameType::Ethernet], Some(mac)).await
 }

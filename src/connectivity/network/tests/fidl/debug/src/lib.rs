@@ -14,7 +14,7 @@ use fuchsia_zircon as zx;
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
 use netstack_testing_common::{
-    devices::{create_tun_device, create_tun_port, install_device},
+    devices::{create_ip_tun_port, create_tun_device, install_device},
     realms::{Netstack, Netstack2, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
@@ -176,7 +176,7 @@ async fn get_mac_pure_ip() {
     let (tun_device, network_device) = create_tun_device();
     let admin_device_control = install_device(&realm, network_device);
     // Retain `_tun_port` to keep the FIDL channel open.
-    let (_tun_port, network_port) = create_tun_port(&tun_device, Some(PORT_ID)).await;
+    let (_tun_port, network_port) = create_ip_tun_port(&tun_device, PORT_ID).await;
     let admin_control =
         add_pure_ip_interface(&network_port, &admin_device_control, INTERFACE_NAME).await;
     let virtual_id = admin_control.get_id().await.expect("get id");

@@ -197,6 +197,20 @@ impl DeviceHandler {
             })?
         };
 
+        // Always set the interface to multicast promiscuous mode because we
+        // don't really plumb through multicast filtering.
+        // TODO(https://fxbug.dev/58919): Remove this when multicast filtering
+        // is available.
+        fuchsia_zircon::Status::ok(
+            mac_proxy
+                .set_mode(fhardware_network::MacFilterMode::MulticastPromiscuous)
+                .await
+                .map_err(Error::CantConnectToPort)?,
+        )
+        .unwrap_or_else(|e| {
+            log::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
+        });
+
         let mut state = state.lock().await;
         let state_entry = match state.entry(port) {
             netdevice_client::port_slab::Entry::Occupied(occupied) => {
@@ -251,7 +265,12 @@ impl DeviceHandler {
                     control_hook: control_hook,
                     addresses: HashMap::new(),
                 },
-                handler: PortHandler { id, port_id: port, inner: self.inner.clone() },
+                handler: PortHandler {
+                    id,
+                    port_id: port,
+                    inner: self.inner.clone(),
+                    _mac_proxy: mac_proxy,
+                },
                 mac: mac_addr,
                 phy_up,
             })
@@ -271,6 +290,9 @@ pub struct PortHandler {
     id: BindingId,
     port_id: netdevice_client::Port,
     inner: Inner,
+    // We must keep the mac proxy alive to maintain our multicast filtering mode
+    // selection set.
+    _mac_proxy: fhardware_network::MacAddressingProxy,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -283,17 +305,20 @@ pub(crate) enum SendError {
 
 impl PortHandler {
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ } } = self;
+        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
+            self;
         session.attach(*port_id, [fhardware_network::FrameType::Ethernet]).await
     }
 
     pub(crate) async fn detach(&self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ } } = self;
+        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
+            self;
         session.detach(*port_id).await
     }
 
     pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ } } = self;
+        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
+            self;
         // NB: We currently send on a dispatcher, so we can't wait for new
         // buffers to become available. If that ends up being the long term way
         // of enqueuing outgoing buffers we might want to fix this impedance
@@ -309,7 +334,8 @@ impl PortHandler {
     }
 
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state } } = self;
+        let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
+            self;
         let _: DeviceId<_> = assert_matches::assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
@@ -321,14 +347,15 @@ impl PortHandler {
         &self,
         port: fidl::endpoints::ServerEnd<fhardware_network::PortMarker>,
     ) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device, session: _, state: _ } } = self;
+        let Self { id: _, port_id, inner: Inner { device, session: _, state: _ }, _mac_proxy: _ } =
+            self;
         device.connect_port_server_end(*port_id, port)
     }
 }
 
 impl std::fmt::Debug for PortHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, port_id, inner: _ } = self;
+        let Self { id, port_id, inner: _, _mac_proxy: _ } = self;
         f.debug_struct("PortHandler").field("id", id).field("port_id", port_id).finish()
     }
 }

@@ -4,10 +4,13 @@
 
 #![cfg(test)]
 
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_tun as fnet_tun;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
-use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack, Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::icmp::MessageBody as _;
@@ -279,5 +282,65 @@ async fn ping_succeeds_with_expected_payload(
             target_address: SOURCE_SUBNET.addr,
             payload_length: expected_payload_length,
         })),
+    );
+}
+
+#[netstack_test]
+async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create source realm");
+
+    let (tun, netdevice) = netstack_testing_common::devices::create_tun_device();
+    let (tun_port, dev_port) = netstack_testing_common::devices::create_eth_tun_port(
+        &tun,
+        /* port_id */ 1,
+        TARGET_MAC_ADDRESS,
+    )
+    .await;
+
+    let mac_state_stream = futures::stream::unfold(
+        (tun_port, Option::<fnet_tun::MacState>::None),
+        |(tun_port, last_observed)| async move {
+            loop {
+                let fnet_tun::InternalState { mac, .. } =
+                    tun_port.watch_state().await.expect("watch_state");
+                let mac = mac.expect("missing mac state");
+                if last_observed.as_ref().map(|l| l != &mac).unwrap_or(true) {
+                    let last_observed = Some(mac.clone());
+                    break Some((mac, (tun_port, last_observed)));
+                }
+            }
+        },
+    );
+    futures::pin_mut!(mac_state_stream);
+
+    assert_matches::assert_matches!(
+        mac_state_stream.next().await,
+        Some(fnet_tun::MacState {
+            mode: Some(fhardware_network::MacFilterMode::MulticastFilter),
+            multicast_filters: Some(mcast_filters),
+            ..
+        }) if mcast_filters == vec![]
+    );
+
+    let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
+    let mut port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
+    let (control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+            .expect("create proxy");
+    device_control
+        .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::EMPTY)
+        .expect("create interface");
+
+    // Read the interface ID to make sure device install succeeded.
+    let _id: u64 = control.get_id().await.expect("get id");
+
+    assert_matches::assert_matches!(
+        mac_state_stream.next().await,
+        Some(fnet_tun::MacState {
+            mode: Some(fhardware_network::MacFilterMode::MulticastPromiscuous),
+            multicast_filters: Some(mcast_filters),
+            ..
+        }) if mcast_filters == vec![]
     );
 }
