@@ -1326,9 +1326,9 @@ class BlobfsMetricIntegrationTest : public FdioTest {
   void GetReadBytes(uint64_t* total_read_bytes) {
     const std::array<std::string, 2> algorithms = {"uncompressed", "chunked"};
     const std::array<std::string, 2> read_methods = {"paged_read_stats", "unpaged_read_stats"};
-    fpromise::result<inspect::Hierarchy> hierarchy_or_error = TakeSnapshot();
-    ASSERT_TRUE(hierarchy_or_error.is_ok());
-    inspect::Hierarchy hierarchy = std::move(hierarchy_or_error.value());
+    fpromise::result<inspect::Hierarchy> snapshot = TakeSnapshot();
+    ASSERT_TRUE(snapshot.is_ok());
+    inspect::Hierarchy hierarchy = std::move(snapshot.value());
     *total_read_bytes = 0;
     for (const std::string& algorithm : algorithms) {
       for (const std::string& stat : read_methods) {
@@ -1378,21 +1378,20 @@ TEST_F(BlobfsMetricIntegrationTest, BlobfsInspectTree) {
   using namespace inspect::testing;
   using namespace ::testing;
 
-  fpromise::result<inspect::Hierarchy> hierarchy_or_error = TakeSnapshot();
-  ASSERT_TRUE(hierarchy_or_error.is_ok());
+  fpromise::result<inspect::Hierarchy> snapshot = TakeSnapshot();
+  ASSERT_TRUE(snapshot.is_ok());
 
-  const inspect::Hierarchy* blobfs_root = hierarchy_or_error.value().GetByPath({"blobfs"});
-  ASSERT_NE(blobfs_root, nullptr);
+  const inspect::Hierarchy* root_node = &snapshot.value();
 
   // Ensure that all nodes we expect exist.
   for (const char* name :
        {fs_inspect::kInfoNodeName, fs_inspect::kUsageNodeName, fs_inspect::kFvmNodeName}) {
-    ASSERT_NE(blobfs_root->GetByPath({name}), nullptr)
+    ASSERT_NE(root_node->GetByPath({name}), nullptr)
         << "Could not find expected node in Blobfs inspect hierarchy: " << name;
   }
 
   // Test known values specific to Blobfs.
-  const inspect::Hierarchy* info_node = blobfs_root->GetByPath({fs_inspect::kInfoNodeName});
+  const inspect::Hierarchy* info_node = root_node->GetByPath({fs_inspect::kInfoNodeName});
   ASSERT_NE(info_node, nullptr);
   EXPECT_THAT(
       *info_node,
@@ -1403,7 +1402,7 @@ TEST_F(BlobfsMetricIntegrationTest, BlobfsInspectTree) {
                                      StringIs(fs_inspect::InfoData::kPropOldestVersion,
                                               ::testing::MatchesRegex("^[0-9]+\\/[0-9]+$"))})))));
 
-  const inspect::Hierarchy* usage_node = blobfs_root->GetByPath({fs_inspect::kUsageNodeName});
+  const inspect::Hierarchy* usage_node = root_node->GetByPath({fs_inspect::kUsageNodeName});
   ASSERT_NE(usage_node, nullptr);
   EXPECT_THAT(*usage_node,
               NodeMatches(AllOf(
@@ -1421,12 +1420,11 @@ TEST_F(BlobfsMetricIntegrationTest, BlobfsInspectTree) {
   }
 
   // Take a new snapshot of the tree and check that the used node count went up.
-  hierarchy_or_error = TakeSnapshot();
-  ASSERT_TRUE(hierarchy_or_error.is_ok());
-  blobfs_root = hierarchy_or_error.value().GetByPath({"blobfs"});
-  ASSERT_NE(blobfs_root, nullptr);
+  snapshot = TakeSnapshot();
+  ASSERT_TRUE(snapshot.is_ok());
+  root_node = &snapshot.value();
 
-  usage_node = blobfs_root->GetByPath({fs_inspect::kUsageNodeName});
+  usage_node = root_node->GetByPath({fs_inspect::kUsageNodeName});
   ASSERT_NE(usage_node, nullptr);
   EXPECT_THAT(*usage_node,
               NodeMatches(AllOf(

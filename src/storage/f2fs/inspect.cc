@@ -39,8 +39,7 @@ void InspectTree::Initialize() {
     UpdateFvmSizeInfo();
   }
 
-  tree_root_ = inspector_.GetRoot().CreateChild("f2fs");
-  fs_inspect_nodes_ = fs_inspect::CreateTree(tree_root_, CreateCallbacks());
+  fs_inspect_nodes_ = fs_inspect::CreateTree(inspector_.GetRoot(), CreateCallbacks());
   inspector_.CreateStatsNode();
 }
 

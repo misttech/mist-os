@@ -38,12 +38,6 @@ class InspectTree final {
   // The Inspector to which the tree is attached.
   inspect::Inspector inspector_;
 
-  // In order to distinguish filesystem instances, we must attach the InspectTree to a uniquely
-  // named child node instead of the Inspect root. This is because fshost currently serves all
-  // filesystem inspect trees, and is not be required when filesystems are componentized (the tree
-  // can be attached directly to the inspect root in that case).
-  inspect::Node tree_root_;
-
   // Filesystem inspect tree nodes.
   // **MUST be declared last**, as the callbacks passed to this object use the above properties.
   // This ensures that the callbacks are destroyed before any properties that they may reference.

@@ -22,8 +22,7 @@ fs_inspect::UsageData CalculateSpaceUsage(const Superblock& superblock, uint64_t
 
 MinfsInspectTree::MinfsInspectTree(const block_client::BlockDevice* device)
     : device_(device),
-      tree_root_(inspector_.GetRoot().CreateChild("minfs")),
-      opstats_node_(tree_root_.CreateChild("fs.opstats")),
+      opstats_node_(inspector_.GetRoot().CreateChild("fs.opstats")),
       node_operations_(opstats_node_) {
   ZX_ASSERT(device_);
   inspector_.CreateStatsNode();
@@ -47,7 +46,7 @@ void MinfsInspectTree::Initialize(const fs::FilesystemInfo& fs_info, const Super
     };
   }
   UpdateSpaceUsage(superblock, reserved_blocks);
-  fs_inspect_nodes_ = fs_inspect::CreateTree(tree_root_, CreateCallbacks());
+  fs_inspect_nodes_ = fs_inspect::CreateTree(inspector_.GetRoot(), CreateCallbacks());
 }
 
 void MinfsInspectTree::UpdateSpaceUsage(const Superblock& superblock, uint64_t reserved_blocks) {

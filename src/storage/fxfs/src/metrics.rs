@@ -10,8 +10,8 @@
 //!     let my_metric = IntMetric::new("metric_name", /*initial_value*/ 0);
 //!     my_metric.set(5);
 //!
-//! Any metrics created will be available under the "fxfs/fs.detail" inspect node, which can be
-//! queried by running `ffx inspect show bootstrap/fshost:root/fxfs`.
+//! Any metrics created will be available under the "fs.detail" inspect node, which can be
+//! queried by running `ffx inspect show bootstrap/fshost/fxfs`.
 //!
 //! The metric will remain available in the inspect tree until the metric object is dropped.
 //!
@@ -40,14 +40,10 @@ pub type UintMetric = ScalarMetric<fuchsia_inspect::UintProperty>;
 /// Metric equivalent to [`fuchsia_inspect::DoubleProperty`].
 pub type DoubleMetric = ScalarMetric<fuchsia_inspect::DoubleProperty>;
 
-/// Root "fxfs" node to which all filesystem metrics will be attached.
-///
-/// We cannot attach properties directly to the root node as all Inspect trees are forwarded by
-/// fshost, and thus we need a uniquely named root node in order for Inspect queries to
-/// differentiate different filesystems.
+/// Root inspect node to which all Fxfs metrics will be attached.
 #[cfg(target_os = "fuchsia")]
 pub static FXFS_ROOT_NODE: Lazy<Mutex<fuchsia_inspect::Node>> =
-    Lazy::new(|| Mutex::new(fuchsia_inspect::component::inspector().root().create_child("fxfs")));
+    Lazy::new(|| Mutex::new(fuchsia_inspect::component::inspector().root().clone_weak()));
 #[cfg(not(target_os = "fuchsia"))]
 pub static FXFS_ROOT_NODE: Lazy<Mutex<fuchsia_inspect::Node>> =
     Lazy::new(|| Mutex::new(fuchsia_inspect::Node::default()));

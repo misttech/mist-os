@@ -30,13 +30,12 @@ namespace blobfs {
 
 BlobfsInspectTree::BlobfsInspectTree()
     : inspector_(CreateInspector()),
-      tree_root_(inspector_.GetRoot().CreateChild("blobfs")),
-      opstats_node_(tree_root_.CreateChild("fs.opstats")),
+      opstats_node_(inspector_.GetRoot().CreateChild("fs.opstats")),
       node_operations_(opstats_node_),
-      detail_node_(tree_root_.CreateChild(fs_inspect::kDetailNodeName)),
+      detail_node_(inspector_.GetRoot().CreateChild(fs_inspect::kDetailNodeName)),
       fragmentation_metrics_node_(detail_node_.CreateChild("fragmentation_metrics")),
       compression_metrics_node_(detail_node_.CreateChild("compression_metrics")),
-      fs_inspect_nodes_(fs_inspect::CreateTree(tree_root_, CreateCallbacks())) {}
+      fs_inspect_nodes_(fs_inspect::CreateTree(inspector_.GetRoot(), CreateCallbacks())) {}
 
 // Set general filesystem information.
 void BlobfsInspectTree::SetInfo(const fs_inspect::InfoData& info) {

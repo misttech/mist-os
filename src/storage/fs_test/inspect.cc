@@ -169,57 +169,35 @@ class InspectTest : public FilesystemTest {
     ASSERT_NO_FATAL_FAILURE(UpdateAndValidateSnapshot());
   }
 
-  // Take a new snapshot of the filesystem's inspect tree and validate the layout for compliance.
-  // Invalidates the previous hierarchy obtained by calling Root().
+  // Take a new snapshot of the filesystem's inspect tree, and validate the layout for compliance.
   //
   // All calls to this function *must* be wrapped with ASSERT_NO_FATAL_FAILURE. Failure to do so
   // can result in some test fixture methods segfaulting.
   void UpdateAndValidateSnapshot() {
     snapshot_ = fs().TakeSnapshot();
     // Validate the inspect hierarchy. Ensures all nodes/properties exist and are the correct types.
-    ASSERT_NO_FATAL_FAILURE(ValidateHierarchy(Root(), fs().options()));
-  }
-
-  // Reference to root hierarchy from last snapshot. After calling UpdateAndValidateSnapshot(),
-  // existing references are invalidated and *must not* be used.
-  const inspect::Hierarchy& Root() const {
-    // All inspect properties are attached under a unique name based on the filesystem type.
-    // This allows a unique path to query the properties which is important for lapis sampling.
-    const inspect::Hierarchy* root = snapshot_.GetByPath({fs().GetTraits().name});
-    ZX_ASSERT_MSG(
-        root != nullptr,
-        "Could not find named root node in filesystem hierarchy (expected node name = %s).",
-        fs().GetTraits().name.c_str());
-    return *root;
+    ASSERT_NO_FATAL_FAILURE(ValidateHierarchy(snapshot_, fs().options()));
   }
 
   // Obtains InfoData containing values from the latest snapshot's fs.info node.
-  // All calls to UpdateAndValidateSnapshot() must be wrapped by ASSERT_NO_FATAL_FAILURE,
-  // otherwise this function can dereference a nullptr causing a segfault.
   fs_inspect::InfoData GetInfoData() const {
-    return GetInfoProperties(Root().GetByPath({fs_inspect::kInfoNodeName})->node());
+    return GetInfoProperties(snapshot_.GetByPath({fs_inspect::kInfoNodeName})->node());
   }
 
   // Obtains UsageData containing values from the latest snapshot's fs.usage node.
-  // All calls to UpdateAndValidateSnapshot() must be wrapped by ASSERT_NO_FATAL_FAILURE,
-  // otherwise this function can dereference a nullptr causing a segfault.
   fs_inspect::UsageData GetUsageData() const {
-    return GetUsageProperties(Root().GetByPath({fs_inspect::kUsageNodeName})->node());
+    return GetUsageProperties(snapshot_.GetByPath({fs_inspect::kUsageNodeName})->node());
   }
 
   // Obtains FvmData containing values from the latest snapshot's fs.fvm node.
-  // All calls to UpdateAndValidateSnapshot() must be wrapped by ASSERT_NO_FATAL_FAILURE,
-  // otherwise this function can dereference a nullptr causing a segfault.
   fs_inspect::FvmData GetFvmData() const {
-    return GetFvmProperties(Root().GetByPath({fs_inspect::kFvmNodeName})->node());
+    return GetFvmProperties(snapshot_.GetByPath({fs_inspect::kFvmNodeName})->node());
   }
 
   // Obtains FvmData containing values from the latest snapshot's fs.volumes.`volume_name` node.
-  // All calls to UpdateAndValidateSnapshot() must be wrapped by ASSERT_NO_FATAL_FAILURE,
-  // otherwise this function can dereference a nullptr causing a segfault.
   fs_inspect::VolumeData GetVolumeData(const char* volume_name) const {
     return GetVolumeProperties(
-        Root().GetByPath({fs_inspect::kVolumesNodeName, volume_name})->node());
+        snapshot_.GetByPath({fs_inspect::kVolumesNodeName, volume_name})->node());
   }
 
  private:
@@ -231,14 +209,14 @@ class InspectTest : public FilesystemTest {
 TEST_P(InspectTest, ValidateInfoNode) {
   fs_inspect::InfoData info_data = GetInfoData();
   // The filesystem name (type) should match those in the filesystem traits.
-  ASSERT_EQ(info_data.name, fs().GetTraits().name);
+  EXPECT_EQ(info_data.name, fs().GetTraits().name);
   // The filesystem instance identifier should be a valid handle (i.e. non-zero).
-  ASSERT_NE(info_data.id, ZX_HANDLE_INVALID);
+  EXPECT_NE(info_data.id, ZX_HANDLE_INVALID);
   // The maximum filename length should be set (i.e. > 0).
-  ASSERT_GT(info_data.max_filename_length, 0u);
+  EXPECT_GT(info_data.max_filename_length, 0u);
   // If the filesystem reports oldest_version, ensure it is the correct format (oldest maj/min).
   if (info_data.oldest_version.has_value()) {
-    ASSERT_THAT(info_data.oldest_version.value(), ::testing::MatchesRegex("^[0-9]+\\/[0-9]+$"));
+    EXPECT_THAT(info_data.oldest_version.value(), ::testing::MatchesRegex("^[0-9]+\\/[0-9]+$"));
   }
 }
 

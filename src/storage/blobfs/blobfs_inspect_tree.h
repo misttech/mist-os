@@ -69,12 +69,6 @@ class BlobfsInspectTree final {
   // The Inspector to which the tree is attached.
   inspect::Inspector inspector_;
 
-  // In order to distinguish filesystem instances, we must attach the InspectTree to a uniquely
-  // named child node instead of the Inspect root. This is because fshost currently serves all
-  // filesystem inspect trees, and is not be required when filesystems are componentized (the tree
-  // can be attached directly to the inspect root in that case).
-  inspect::Node tree_root_;
-
   // Node to which operational statistics (latency/error counters) are added.
   inspect::Node opstats_node_;
 
