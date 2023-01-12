@@ -92,9 +92,7 @@ class IntegrationTest : public testing::Test {
   // connection into |client|.  The promise returned completes when the open
   // result is sent.  We must setup an open hook handler in order for that
   // promise to be completed.
-  Promise<void> DoOpen(const std::string& path, fidl::InterfacePtr<fuchsia::io::Node>* client,
-                       fuchsia::io::OpenFlags flags = fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                      fuchsia::io::OpenFlags::RIGHT_WRITABLE);
+  Promise<void> DoOpen(const std::string& path, fidl::InterfacePtr<fuchsia::io::Node>* client);
 
   // Waits for the given |path| relative to devfs to be available.  Currently
   // waiting for paths in which non-terminal directories don't yet exist is
