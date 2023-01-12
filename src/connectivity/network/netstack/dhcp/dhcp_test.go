@@ -2178,10 +2178,9 @@ func TestClientRestartIPHeader(t *testing.T) {
 			expected.Options = append(expected.Options, option{
 				optParamReq,
 				[]byte{
-					1,  // request subnet mask
-					3,  // request router
-					15, // domain name
-					6,  // domain name server
+					byte(optSubnetMask),
+					byte(optRouter),
+					byte(optDomainNameServer),
 				},
 			})
 			if typ == dhcpREQUEST {

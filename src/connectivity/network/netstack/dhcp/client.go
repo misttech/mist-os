@@ -669,10 +669,9 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 
 	commonOpts := options{
 		{optParamReq, []byte{
-			1,  // request subnet mask
-			3,  // request router
-			15, // domain name
-			6,  // domain name server
+			byte(optSubnetMask),
+			byte(optRouter),
+			byte(optDomainNameServer),
 		}},
 	}
 	requestedAddr := info.Acquired
