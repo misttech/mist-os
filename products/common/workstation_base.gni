@@ -54,7 +54,7 @@ legacy_base_package_labels += [
   "//src/connectivity/bluetooth/tools/bt-pairing-tool",
 ]
 
-legacy_cache_package_labels += [ "//src/chromium:chrome_browser" ]
+legacy_cache_package_labels += [ "//src/chromium:chrome_browser_if_available" ]
 
 # Explicitly prefer wired networking on workstation
 legacy_base_package_labels +=

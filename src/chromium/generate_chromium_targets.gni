@@ -130,17 +130,28 @@ template("generate_chromium_targets") {
     outputs = [ "scheme_map/http.config" ]
   }
 
-  group("chrome_browser") {
-    # TODO(crbug.com/1320078): Remove the condition if arm64 becomes available.
+  # This target is provided for use by the Workstation product, which cannot be
+  # conditioned on `target_cpu` because that is not set in the product config.
+  # TODO(crbug.com/1320078): If arm64 builds become available, remove this
+  # target and the `target_cpu` condition below it.
+  group("chrome_browser_if_available") {
+    visibility = [
+      "//:legacy_cache_packages",  # Used by workstation_base.gni.
+    ]
+
     if (target_cpu == "x64") {
+      deps = [ ":chrome_browser" ]
+    }
+  }
+
+  if (target_cpu == "x64") {
+    group("chrome_browser") {
       deps = [
         ":chrome_browser_pkg",
         ":tzdata_for_chrome_browser",
       ]
     }
-  }
 
-  if (target_cpu == "x64") {
     icu_tzdata_config_data("tzdata_for_chrome_browser") {
       for_pkg = "chrome"
     }
