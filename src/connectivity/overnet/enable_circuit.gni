@@ -3,5 +3,5 @@
 # found in the LICENSE file.
 
 declare_args() {
-  enable_circuit = false
+  enable_circuit = true
 }
