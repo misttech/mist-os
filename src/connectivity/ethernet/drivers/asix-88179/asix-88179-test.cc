@@ -126,8 +126,9 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
   }
 
   void SetDeviceOnline() {
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), test_function_path_.c_str(), O_RDWR));
-    zx::result test_client_end = fdio_cpp::FdioCaller(std::move(fd)).take_as<ax88179::Hooks>();
+    fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
+    zx::result test_client_end =
+        component::ConnectAt<ax88179::Hooks>(caller.directory(), test_function_path_);
     ASSERT_OK(test_client_end.status_value());
     fidl::WireSyncClient test_client{std::move(*test_client_end)};
 
