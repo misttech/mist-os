@@ -9,6 +9,7 @@
 #include <fuchsia/ui/policy/cpp/fidl.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
+#include <zircon/status.h>
 
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -23,10 +24,10 @@ SceneProvider::SceneProvider(sys::ComponentContext* context) : context_(context)
   use_flatland_ = scene_provider_config.use_flatland();
   use_scene_manager_ = scene_provider_config.use_scene_manager();
 
-  FX_CHECK(!use_flatland_ || use_scene_manager_) << "flatland x root presenter not supported";
-
   if (use_scene_manager_) {
     context_->svc()->Connect(scene_manager_.NewRequest());
+  } else if (use_flatland_) {
+    FX_LOGS(FATAL) << "flatland x root presenter not supported";
   } else {
     context_->svc()->Connect(root_presenter_.NewRequest());
   }
@@ -41,9 +42,11 @@ void SceneProvider::AttachClientView(
 
   if (use_scene_manager_) {
     fuchsia::session::scene::Manager_SetRootView_Result set_root_view_result;
-    scene_manager_->SetRootView(std::move(*request.mutable_view_provider()), &set_root_view_result);
+    zx_status_t status = scene_manager_->SetRootView(std::move(*request.mutable_view_provider()),
+                                                     &set_root_view_result);
+    FX_CHECK(status == ZX_OK) << "Failed to call SetRootView: " << zx_status_get_string(status);
     FX_CHECK(set_root_view_result.is_response())
-        << "Failed to attach client view due to internal error in scene manager";
+        << "Failed to set root view: " << set_root_view_result.err();
     client_view_ref = std::move(set_root_view_result.response().view_ref);
   } else {
     auto client_view_tokens = scenic::ViewTokenPair::New();
@@ -113,11 +116,13 @@ void SceneProvider::PresentView(
         << "Client attempted to present a view using GFX tokens when flatland is enabled";
     if (use_scene_manager_) {
       fuchsia::session::scene::Manager_PresentRootViewLegacy_Result set_root_view_result;
-      scene_manager_->PresentRootViewLegacy(std::move(*view_spec.mutable_view_holder_token()),
-                                            std::move(*view_spec.mutable_view_ref()),
-                                            &set_root_view_result);
-      FX_CHECK(!set_root_view_result.is_err())
-          << "Failed to present view due to internal error in scene manager";
+      zx_status_t status = scene_manager_->PresentRootViewLegacy(
+          std::move(*view_spec.mutable_view_holder_token()),
+          std::move(*view_spec.mutable_view_ref()), &set_root_view_result);
+      FX_CHECK(status == ZX_OK) << "Failed to call PresentRootViewLegacy: "
+                                << zx_status_get_string(status);
+      FX_CHECK(set_root_view_result.is_response())
+          << "Failed to present root view: " << set_root_view_result.err();
     } else {
       root_presenter_->PresentOrReplaceView2(std::move(*view_spec.mutable_view_holder_token()),
                                              std::move(*view_spec.mutable_view_ref()),
@@ -159,10 +164,13 @@ void SceneProvider::DismissView() {
 
   fuchsia::session::scene::Manager_PresentRootViewLegacy_Result set_root_view_result;
 
-  scene_manager_->PresentRootViewLegacy(std::move(client_view_tokens.view_holder_token),
-                                        fidl::Clone(client_view_ref), &set_root_view_result);
-  FX_CHECK(!set_root_view_result.is_err())
-      << "Got a PresentRootViewLegacyError when trying to attach an empty view";
+  zx_status_t status =
+      scene_manager_->PresentRootViewLegacy(std::move(client_view_tokens.view_holder_token),
+                                            fidl::Clone(client_view_ref), &set_root_view_result);
+  FX_CHECK(status == ZX_OK) << "Failed to call PresentRootViewLegacy: "
+                            << zx_status_get_string(status);
+  FX_CHECK(set_root_view_result.is_response())
+      << "Failed to present empty root view: " << set_root_view_result.err();
 }
 
 }  // namespace ui_testing

@@ -51,7 +51,7 @@ class SceneProvider : public fuchsia::ui::test::scene::Controller,
 
   // |fuchsia::ui::test::scene::Controller|
   void RegisterViewTreeWatcher(
-      fidl::InterfaceRequest<fuchsia::ui::observation::geometry::ViewTreeWatcher> geometry_observer,
+      fidl::InterfaceRequest<fuchsia::ui::observation::geometry::ViewTreeWatcher> view_tree_watcher,
       RegisterViewTreeWatcherCallback callback) override;
 
   // |fuchsia::element::GraphicalPresenter|
