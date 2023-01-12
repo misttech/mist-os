@@ -7,14 +7,13 @@ use {
     anyhow::{anyhow, Error},
     fidl::endpoints::create_proxy,
     fidl::HandleBased,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_process as fprocess,
     fidl_fuchsia_test::{self as ftest},
     fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::io::AsyncReadExt,
     futures::TryStreamExt,
-    rand::Rng,
     runner::component::ComponentNamespace,
     rust_measure_tape_for_case::Measurable as _,
     std::convert::TryInto,
@@ -130,11 +129,9 @@ pub async fn run_gtest_case(
     mut program: Option<fdata::Dictionary>,
     run_listener_proxy: &ftest::RunListenerProxy,
     namespace: &ComponentNamespace,
+    starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     // Start a starnix kernel.
-    let kernel_name = format!("starnix-kernel-{}", rand::thread_rng().gen::<u64>());
-    let (starnix_kernel, realm) = instantiate_kernel_in_realm(&namespace, &kernel_name).await?;
-
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
 
@@ -175,15 +172,6 @@ pub async fn run_gtest_case(
     // Read and report the result.
     let result = read_result(component_controller.take_event_stream()).await;
     case_listener_proxy.finished(result)?;
-
-    // Cleanup the starnix kernel.
-    realm
-        .destroy_child(&mut fdecl::ChildRef {
-            name: kernel_name.to_string(),
-            collection: Some(RUNNERS_COLLECTION.into()),
-        })
-        .await?
-        .map_err(|e| anyhow::anyhow!("failed to destory runner child: {:?}", e))?;
 
     Ok(())
 }

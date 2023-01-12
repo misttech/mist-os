@@ -74,6 +74,7 @@ pub async fn handle_suite_requests(
                                 program.clone(),
                                 &run_listener_proxy,
                                 &namespace,
+                                &starnix_kernel,
                             )
                         })
                         .await?;
