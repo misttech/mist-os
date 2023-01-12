@@ -246,37 +246,30 @@ zx_status_t GetBlockCount(int fd, uint64_t* out);
 // Returns -1 on error, 0 on success.
 int Mkfs(int fd, uint64_t block_count, const FilesystemOptions& options);
 
-// Copies into |out_size| the number of bytes used by data in fs contained in a partition between
-// bytes |start| and |end|. If |start| and |end| are not passed, start is assumed to be zero and
-// no safety checks are made for size of partition.
-zx_status_t UsedDataSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t start = 0,
-                         std::optional<off_t> end = std::nullopt);
+// Copies into |out_size| the number of bytes used by data in a blobfs partition contained in |fd|.
+// blobfs is assumed to start at offset 0 in the provided file handle.
+zx_status_t UsedDataSize(const fbl::unique_fd& fd, uint64_t* out_size);
 
-// Copies into |out_inodes| the number of allocated inodes in fs contained in a partition
-// between bytes |start| and |end|.  If |start| and |end| are not passed, start is assumed to be
-// zero and no safety checks are made for size of partition.
-zx_status_t UsedInodes(const fbl::unique_fd& fd, uint64_t* out_inodes, off_t start = 0,
-                       std::optional<off_t> end = std::nullopt);
+// Copies into |out_inodes| the number of allocated inodes in a blobfs partition contained in |fd|.
+// blobfs is assumed to start at offset 0 in the provided file handle.
+zx_status_t UsedInodes(const fbl::unique_fd& fd, uint64_t* out_inodes);
 
 // Copies into |out_size| the number of bytes used by data and bytes reserved for superblock,
-// bitmaps, inodes and journal on fs contained in a partition between bytes |start| and |end|.
-// If |start| and |end| are not passed, start is assumed to be zero and no safety checks are made
-// for size of partition.
-zx_status_t UsedSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t start = 0,
-                     std::optional<off_t> end = std::nullopt);
+// bitmaps, inodes and journal for a blobfs partition contained in |fd|.
+// blobfs is assumed to start at offset 0 in the provided file handle.
+zx_status_t UsedSize(const fbl::unique_fd& fd, uint64_t* out_size);
 
 zx_status_t blobfs_create(std::unique_ptr<Blobfs>* out, fbl::unique_fd blockfd);
 
-zx_status_t blobfs_fsck(fbl::unique_fd fd, off_t start, off_t end,
-                        const std::vector<size_t>& extent_lengths);
+zx_status_t blobfs_fsck(fbl::unique_fd fd, const std::vector<size_t>& extent_lengths);
 
 // Create a blobfs from a sparse file.
 // |start| indicates where the blobfs partition starts within the file (in bytes).
 // |end| indicates the end of the blobfs partition (in bytes).
 // |extent_lengths| contains the length (in bytes) of each blobfs extent: currently this includes
 // the superblock, block bitmap, inode table, and data blocks.
-zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd, off_t start,
-                                 off_t end, const std::vector<size_t>& extent_vector);
+zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd,
+                                 const std::vector<size_t>& extent_vector);
 
 // Write each blob contained in this image into |output_dir| as a standalone file, with the merkle
 // root hash as the filename.

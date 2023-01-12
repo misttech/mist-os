@@ -160,11 +160,10 @@ struct MerkleTreeInfo {
 
 // Returns ZX_OK and copies blobfs info_block_t, which is a block worth of data containing
 // superblock, into |out_info_block| if the block read from fd belongs to blobfs.
-zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_info_block,
-                                   off_t start = 0, std::optional<off_t> end = std::nullopt) {
+zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_info_block) {
   info_block_t info_block;
 
-  if (ReadBlockWithOffset(fd.get(), /*block_number=*/0, start,
+  if (ReadBlockWithOffset(fd.get(), /*block_number=*/0, kSuperblockOffset * kBlobfsBlockSize,
                           reinterpret_cast<void*>(info_block.block))
           .is_error()) {
     return ZX_ERR_IO;
@@ -175,11 +174,6 @@ zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_i
     return status;
   }
 
-  if (end &&
-      ((block_count * kBlobfsBlockSize) < safemath::checked_cast<uint64_t>(end.value() - start))) {
-    FX_LOGS(ERROR) << "Invalid file size " << safemath::checked_cast<uint64_t>(end.value() - start);
-    return ZX_ERR_BAD_STATE;
-  }
   if (zx_status_t status = CheckSuperblock(&info_block.info, block_count); status != ZX_OK) {
     FX_LOGS(ERROR) << "Info check failed " << status;
     return status;
@@ -190,12 +184,9 @@ zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_i
   return ZX_OK;
 }
 
-zx_status_t get_superblock(const fbl::unique_fd& fd, off_t start, std::optional<off_t> end,
-                           Superblock* info) {
+zx_status_t get_superblock(const fbl::unique_fd& fd, Superblock* info) {
   info_block_t info_block;
-  zx_status_t status;
-
-  if ((status = blobfs_load_info_block(fd, &info_block, start, end)) != ZX_OK) {
+  if (zx_status_t status = blobfs_load_info_block(fd, &info_block); status != ZX_OK) {
     FX_LOGS(ERROR) << "Load of info block failed " << status;
     return status;
   }
@@ -399,12 +390,9 @@ int Mkfs(int fd, uint64_t block_count, const FilesystemOptions& options) {
   return 0;
 }
 
-zx_status_t UsedDataSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t start,
-                         std::optional<off_t> end) {
+zx_status_t UsedDataSize(const fbl::unique_fd& fd, uint64_t* out_size) {
   Superblock info;
-  zx_status_t status;
-
-  if ((status = get_superblock(fd, start, end, &info)) != ZX_OK) {
+  if (zx_status_t status = get_superblock(fd, &info); status != ZX_OK) {
     return status;
   }
 
@@ -412,12 +400,9 @@ zx_status_t UsedDataSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t sta
   return ZX_OK;
 }
 
-zx_status_t UsedInodes(const fbl::unique_fd& fd, uint64_t* out_inodes, off_t start,
-                       std::optional<off_t> end) {
+zx_status_t UsedInodes(const fbl::unique_fd& fd, uint64_t* out_inodes) {
   Superblock info;
-  zx_status_t status;
-
-  if ((status = get_superblock(fd, start, end, &info)) != ZX_OK) {
+  if (zx_status_t status = get_superblock(fd, &info); status != ZX_OK) {
     return status;
   }
 
@@ -425,12 +410,9 @@ zx_status_t UsedInodes(const fbl::unique_fd& fd, uint64_t* out_inodes, off_t sta
   return ZX_OK;
 }
 
-zx_status_t UsedSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t start,
-                     std::optional<off_t> end) {
+zx_status_t UsedSize(const fbl::unique_fd& fd, uint64_t* out_size) {
   Superblock info;
-  zx_status_t status;
-
-  if ((status = get_superblock(fd, start, end, &info)) != ZX_OK) {
+  if (zx_status_t status = get_superblock(fd, &info); status != ZX_OK) {
     return status;
   }
 
@@ -440,9 +422,7 @@ zx_status_t UsedSize(const fbl::unique_fd& fd, uint64_t* out_size, off_t start,
 
 zx_status_t blobfs_create(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd) {
   info_block_t info_block;
-  zx_status_t status;
-
-  if ((status = blobfs_load_info_block(fd, &info_block)) != ZX_OK) {
+  if (zx_status_t status = blobfs_load_info_block(fd, &info_block); status != ZX_OK) {
     return status;
   }
 
@@ -479,21 +459,15 @@ zx_status_t blobfs_create(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd) {
   return ZX_OK;
 }
 
-zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd, off_t start,
-                                 off_t end, const std::vector<size_t>& extent_vector) {
-  if (start >= end) {
-    FX_LOGS(ERROR) << "Insufficient space allocated";
-    return ZX_ERR_INVALID_ARGS;
-  }
+zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd,
+                                 const std::vector<size_t>& extent_vector) {
   if (extent_vector.size() != kExtentCount) {
     FX_LOGS(ERROR) << "Incorrect number of extents";
     return ZX_ERR_INVALID_ARGS;
   }
 
   info_block_t info_block;
-  zx_status_t status;
-
-  if ((status = blobfs_load_info_block(fd, &info_block, start, end)) != ZX_OK) {
+  if (zx_status_t status = blobfs_load_info_block(fd, &info_block); status != ZX_OK) {
     return status;
   }
 
@@ -505,7 +479,7 @@ zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd
   extent_lengths[3] = extent_vector[3];
   extent_lengths[4] = extent_vector[4];
 
-  auto blobfs = Blobfs::Create(std::move(fd), start, info_block, extent_lengths);
+  auto blobfs = Blobfs::Create(std::move(fd), /*start=*/0, info_block, extent_lengths);
   if (blobfs.is_error()) {
     FX_LOGS(ERROR) << "mount failed; could not create blobfs";
     return blobfs.status_value();
@@ -515,14 +489,13 @@ zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd
   return ZX_OK;
 }
 
-zx_status_t blobfs_fsck(fbl::unique_fd fd, off_t start, off_t end,
-                        const std::vector<size_t>& extent_lengths) {
+zx_status_t blobfs_fsck(fbl::unique_fd fd, const std::vector<size_t>& extent_lengths) {
   std::unique_ptr<Blobfs> blob;
-  zx_status_t status;
-  if ((status = blobfs_create_sparse(&blob, std::move(fd), start, end, extent_lengths)) != ZX_OK) {
+  if (zx_status_t status = blobfs_create_sparse(&blob, std::move(fd), extent_lengths);
+      status != ZX_OK) {
     return status;
   }
-  if ((status = Fsck(blob.get())) != ZX_OK) {
+  if (zx_status_t status = Fsck(blob.get()); status != ZX_OK) {
     return status;
   }
   return ZX_OK;
