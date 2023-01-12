@@ -108,7 +108,7 @@ int I2cBus::I2cThread() {
       auto p_writes = reinterpret_cast<uint8_t*>(op_list) + op_count * sizeof(I2cBus::TransactOp);
       uint8_t* p_reads = read_buffer.data();
 
-      ZX_ASSERT(op_count < I2C_IMPL_MAX_RW_OPS);
+      ZX_ASSERT(op_count <= I2C_IMPL_MAX_RW_OPS);
       i2c_impl_op_t impl_ops[I2C_IMPL_MAX_RW_OPS];
       for (size_t i = 0; i < op_count; ++i) {
         // Same address for all ops, since there is one address per channel.

@@ -259,7 +259,7 @@ zx_status_t IntelI2cController::I2cImplTransact(const uint32_t bus_id, const i2c
 
   IntelI2cSubordinateSegment segs[I2C_IMPL_MAX_RW_OPS];
 
-  if (op_count >= I2C_IMPL_MAX_RW_OPS) {
+  if (op_count > I2C_IMPL_MAX_RW_OPS) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

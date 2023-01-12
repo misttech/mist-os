@@ -193,7 +193,7 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
 
 void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
                                  EdidTransferCompleter::Sync& completer) {
-  if (request->ops.count() < 1 || request->ops.count() >= I2C_IMPL_MAX_RW_OPS) {
+  if (request->ops.count() < 1 || request->ops.count() > I2C_IMPL_MAX_RW_OPS) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
