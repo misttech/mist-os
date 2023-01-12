@@ -2,23 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
-import("//build/dist/component_manifest_resources.gni")
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":meta",
-    ":miscsvc",
-  ]
-}
+import("//build/components.gni")
 
 executable("miscsvc") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   sources = [ "miscsvc.cc" ]
   deps = [
     "//sdk/lib/fdio",
@@ -33,6 +19,13 @@ executable("miscsvc") {
   output_dir = "$root_out_dir/zircon-migrated"
 }
 
-component_manifest_resources("meta") {
-  sources = [ "meta/miscsvc.cml" ]
+fuchsia_component("component") {
+  component_name = "miscsvc"
+  manifest = "meta/miscsvc.cml"
+  deps = [ ":miscsvc" ]
+}
+
+fuchsia_package("package") {
+  package_name = "miscsvc"
+  deps = [ ":component" ]
 }

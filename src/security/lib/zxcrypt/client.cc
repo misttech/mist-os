@@ -41,22 +41,29 @@ const char kHardwareKeyInfo[] = "zxcrypt";
 
 // How many bytes to read from /boot/config/zxcrypt?
 const size_t kMaxKeySourcePolicyLength = 32;
-const char kZxcryptConfigFile[] = "/pkg/config/zxcrypt";
+const char kZxcryptConfigFileLocation1[] = "/pkg/config/zxcrypt";
+const char kZxcryptConfigFileLocation2[] = "/boot/config/zxcrypt";
 
 }  // namespace
 
 __EXPORT
 zx::result<KeySourcePolicy> SelectKeySourcePolicy() {
-  fbl::unique_fd fd(open(kZxcryptConfigFile, O_RDONLY));
+  const char* file_used = kZxcryptConfigFileLocation1;
+  fbl::unique_fd fd(open(file_used, O_RDONLY));
   if (!fd) {
-    xprintf("zxcrypt: couldn't open %s\n", kZxcryptConfigFile);
-    return zx::error(ZX_ERR_NOT_FOUND);
+    xprintf("zxcrypt: couldn't open %s\n", file_used);
+    file_used = kZxcryptConfigFileLocation2;
+    fd.reset(open(file_used, O_RDONLY));
+    if (!fd) {
+      xprintf("zxcrypt: couldn't open %s\n", file_used);
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
   }
 
   char key_source_buf[kMaxKeySourcePolicyLength + 1];
   ssize_t len = read(fd.get(), key_source_buf, sizeof(key_source_buf) - 1);
   if (len < 0) {
-    xprintf("zxcrypt: couldn't read %s\n", kZxcryptConfigFile);
+    xprintf("zxcrypt: couldn't read %s\n", file_used);
     return zx::error(ZX_ERR_IO);
   } else {
     // add null terminator

@@ -51,7 +51,7 @@
         },
         {
             name: "miscsvc",
-            url: "fuchsia-boot:///#meta/miscsvc.cm",
+            url: "fuchsia-boot:///miscsvc#meta/miscsvc.cm",
         },
         {
             name: "live_usb",
