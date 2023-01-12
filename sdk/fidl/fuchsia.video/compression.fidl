@@ -31,4 +31,5 @@ type CompressionType = flexible enum {
     VP9 = 7;
     HEVC = 8;
     AV1 = 9;
+    MJPEG = 10;
 };
