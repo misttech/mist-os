@@ -76,7 +76,7 @@ class Symbolize {
   elfldltl::ElfNote BuildId() const;
 
   // Print the contextual markup elements describing each loaded module.
-  void ContextAlways();
+  void ContextAlways(FILE* log = nullptr);
 
   // Same, but idempotent: the first call prints and others do nothing.
   void Context();

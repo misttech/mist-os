@@ -268,7 +268,10 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/libc",
     ]
 
-    deps = [ "//zircon/kernel/lib/boot-options" ]
+    deps = [
+      ":log",
+      "//zircon/kernel/lib/boot-options",
+    ]
 
     sources = [ "stdio.cc" ]
   }
@@ -508,6 +511,17 @@ if (toolchain_environment == "kernel.phys" ||
       "//src/lib/symbolizer-markup",
     ]
   }
+
+  source_set("log") {
+    public = [ "log.h" ]
+    public_deps = [
+      ":allocation",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+    sources = [ "log.cc" ]
+    deps = [ "//zircon/kernel/lib/boot-options" ]
+  }
 }
 
 config("includes") {
@@ -547,6 +561,7 @@ zbi_executable("physboot") {
     ":handoff",
     ":handoff-prep",
     ":kernel-package",
+    ":log",
     ":main",
     ":stdio",
     ":symbolize",

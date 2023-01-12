@@ -43,7 +43,7 @@ class Allocation {
 
   ~Allocation() { reset(); }
 
-  auto data() const { return data_; }
+  ktl::span<ktl::byte> data() const { return data_; }
 
   size_t size_bytes() const { return data_.size(); }
 
@@ -66,6 +66,10 @@ class Allocation {
   }
 
   explicit operator bool() const { return !data_.empty(); }
+
+  ktl::span<ktl::byte> operator*() const { return data_; }
+
+  const ktl::span<ktl::byte>* operator->() const { return &data_; }
 
   void Resize(fbl::AllocChecker& ac, size_t new_size);
 

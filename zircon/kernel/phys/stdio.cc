@@ -10,6 +10,8 @@
 
 #include <phys/stdio.h>
 
+#include "log.h"
+
 FILE FILE::stdout_;
 
 PhysConsole::PhysConsole()
@@ -29,11 +31,22 @@ void PhysConsole::SetMux(size_t idx, const FILE& f) {
 }
 
 void debugf(const char* fmt, ...) {
+  FILE* outfile = stdout;
+
+  // If kernel.phys.verbose=false then only write to the log.
+  FILE log_only_file;
   if (gBootOptions && !gBootOptions->phys_verbose) {
-    return;
+    if (!gLog) {
+      // The log isn't initialized yet, so write nothing.
+      return;
+    }
+
+    log_only_file = gLog->LogOnlyFile();
+    outfile = &log_only_file;
   }
+
   va_list args;
   va_start(args, fmt);
-  vprintf(fmt, args);
+  vfprintf(outfile, fmt, args);
   va_end(args);
 }

@@ -64,10 +64,12 @@ void Symbolize::Printf(const char* fmt, ...) {
   va_end(args);
 }
 
-void Symbolize::ContextAlways() {
-  writer_.Prefix(name_).Reset().Newline();
+void Symbolize::ContextAlways(FILE* log) {
+  decltype(writer_) log_writer{{log}};
+  auto& writer = log ? log_writer : writer_;
+  writer.Prefix(name_).Reset().Newline();
   for (size_t i = 0; i < modules_.size(); ++i) {
-    modules_[i]->SymbolizerContext(writer_, static_cast<unsigned int>(i), name_);
+    modules_[i]->SymbolizerContext(writer, static_cast<unsigned int>(i), name_);
   }
 }
 

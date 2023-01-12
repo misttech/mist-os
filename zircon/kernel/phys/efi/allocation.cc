@@ -78,6 +78,47 @@ Allocation Allocation::New(fbl::AllocChecker& ac, memalloc::Type type, size_t si
   return alloc;
 }
 
+void Allocation::Resize(fbl::AllocChecker& ac, size_t new_size) {
+  ZX_ASSERT(!data_.empty());
+  ZX_ASSERT(new_size > 0);
+
+  const size_t old_pages = EfiPageCount(size_bytes());
+  const size_t new_pages = EfiPageCount(new_size);
+
+  if (new_pages <= old_pages) {
+    if (new_pages < old_pages) {
+      const efi_physical_addr addr =
+          reinterpret_cast<uintptr_t>(get()) + (old_pages * kEfiPageSize);
+      const size_t free_pages = old_pages - new_pages;
+      efi_status status = gEfiSystemTable->BootServices->FreePages(addr, free_pages);
+      ZX_ASSERT_MSG(status == EFI_SUCCESS, "FreePages(%#" PRIx64 ", %#zx) -> %#zx", addr,
+                    free_pages, status);
+    }
+
+    // Even if no pages were freed, adjust our tracked sub-page size.
+    ac.arm(new_size, true);
+    data_ = {data_.data(), new_size};
+    return;
+  }
+
+  // Try first to allocate the immediately following pages.
+  efi_physical_addr addr = reinterpret_cast<uintptr_t>(get()) + old_pages;
+  efi_status status = gEfiSystemTable->BootServices->AllocatePages(AllocateAddress, EfiLoaderData,
+                                                                   new_pages - old_pages, &addr);
+  if (status == EFI_SUCCESS) {
+    ZX_DEBUG_ASSERT(addr == reinterpret_cast<uintptr_t>(get()) + old_pages);
+    ac.arm(new_size, true);
+    data_ = {data_.data(), new_size};
+    return;
+  }
+
+  // No dice.  Allocate a fresh block and copy the data in.
+  if (Allocation new_block = New(ac, memalloc::Type::kPhysScratch, new_size, alignment_)) {
+    memcpy(new_block.get(), get(), size_bytes());
+    *this = ktl::move(new_block);
+  }
+}
+
 // This is where actual deallocation happens.  The destructor just calls this.
 void Allocation::reset() {
   if (!data_.empty()) {

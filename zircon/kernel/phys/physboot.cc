@@ -25,6 +25,7 @@
 #include <phys/uart.h>
 
 #include "handoff-prep.h"
+#include "log.h"
 
 #include <ktl/enforce.h>
 
@@ -188,15 +189,32 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 }  // namespace
 
 void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
+  gBootTimes.Set(PhysBootTimes::kZbiEntry, ticks);
+
   MainSymbolize symbolize("physboot");
 
   InitMemory(zbi_ptr);
 
-  gBootTimes.Set(PhysBootTimes::kZbiEntry, ticks);
-
   // This marks the interval between handoff from the boot loader (kZbiEntry)
   // and phys environment setup with identity-mapped memory management et al.
   gBootTimes.SampleNow(PhysBootTimes::kPhysSetup);
+
+  // Start collecting the log in memory as well as logging to the console.
+  Log log;
+
+  {
+    // Prime the log with what would already have been written to the console
+    // under kernel.phys.verbose=true (even if it wasn't), but don't send that
+    // to the console.
+    FILE log_file{&log};
+    symbolize.ContextAlways(&log_file);
+    Allocation::GetPool().PrintMemoryRanges(symbolize.name(), &log_file);
+  }
+
+  // Now mirror all stdout to the log, and write debugf there even if verbose
+  // logging to stdout is disabled.
+  gLog = &log;
+  log.SetStdout();
 
   auto zbi_header = static_cast<zbi_header_t*>(zbi_ptr);
   auto zbi = zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(zbi_header);

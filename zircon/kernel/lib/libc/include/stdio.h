@@ -38,6 +38,14 @@ class FILE {
   // This is what fprintf calls to do output.
   int Write(ktl::string_view s) { return write_(ptr_, s); }
 
+  constexpr explicit operator bool() const { return write_; }
+
+  constexpr bool operator==(const FILE& other) const {
+    return write_ == other.write_ && ptr_ == other.ptr_;
+  }
+
+  constexpr bool operator!=(const FILE& other) const { return !(*this == other); }
+
   // This is not defined by libc itself.  The kernel defines it to point at
   // the default console output mechanism.
   static FILE stdout_;

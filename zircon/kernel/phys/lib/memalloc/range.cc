@@ -31,6 +31,8 @@ std::string_view ToString(Type type) {
       return "phys ZBI kernel image"sv;
     case Type::kPhysElf:
       return "phys ELF image"sv;
+    case Type::kPhysLog:
+      return "phys log file"sv;
     case Type::kKernel:
       return "kernel image"sv;
     case Type::kFixedAddressKernel:

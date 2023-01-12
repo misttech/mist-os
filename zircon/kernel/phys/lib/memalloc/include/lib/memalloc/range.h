@@ -51,6 +51,9 @@ enum class Type : uint64_t {
   // A phys ELF memory image.
   kPhysElf,
 
+  // A phys log file.
+  kPhysLog,
+
   // The kernel memory image.
   kKernel,
 
