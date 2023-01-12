@@ -2788,7 +2788,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:101
+From //build/bazel/legacy_ninja_build_outputs.gni:103
 
 ### extra_package_labels
 
@@ -6668,7 +6668,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"Hoyauoi3cc1n8OJu0nrV6SZckoaCvTCy9PIcvVPE-T8C"`
+**Current value (from the default):** `"rvIb9J8anJOu6EBzg_jElWkFNlGJERIku4GThIYOncQC"`
 
 From //build/rust/config.gni:32
 
