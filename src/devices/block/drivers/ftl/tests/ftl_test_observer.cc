@@ -20,11 +20,11 @@ void FtlTestObserver::OnProgramStart() {
     return;
   }
 
-  fbl::unique_fd block(open(kTestDevice, O_RDWR));
+  fbl::unique_fd block(open(kTestDevice, O_RDONLY));
   if (block) {
     ok_ = true;
   } else {
-    printf("Unable to open remapped device. Error: %d\n", errno);
+    printf("Unable to open remapped device. Error: %s\n", strerror(errno));
   }
 }
 

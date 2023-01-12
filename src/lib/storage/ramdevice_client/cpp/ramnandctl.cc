@@ -74,6 +74,8 @@ zx_status_t RamNandCtl::CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo c
 
   zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root().get(), path.c_str());
   if (channel.is_error()) {
+    fprintf(stderr, "Could not open ram_nand device (%s): %s\n", path.c_str(),
+            channel.status_string());
     return channel.status_value();
   }
   fidl::ClientEnd<fuchsia_device::Controller> client_end(std::move(channel.value()));
