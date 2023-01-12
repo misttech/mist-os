@@ -67,6 +67,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "pmic",
     },
     // 1 - I2C_B: Type-C CC controller
     {
@@ -75,31 +76,14 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "usb",
     },
     // 2 - I2C_C: Temperature sensor
-    {
-        .bus_id = 2,
-        .address = 0x48,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
+    {.bus_id = 2, .address = 0x48, .vid = 0, .pid = 0, .did = 0, .name = "temp"},
     // 3 - I2C_C: Woofer codec
-    {
-        .bus_id = 2,
-        .address = 0x3C,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
+    {.bus_id = 2, .address = 0x3C, .vid = 0, .pid = 0, .did = 0, .name = "woofer"},
     // 4 - I2C_C: SHTV3 temperature sensor
-    {
-        .bus_id = 2,
-        .address = 0x70,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
+    {.bus_id = 2, .address = 0x70, .vid = 0, .pid = 0, .did = 0, .name = "shtv3"},
     // 5 - I2C_D: Ambient light sensor
     {
         .bus_id = 3,
@@ -107,6 +91,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "als1",
     },
     // 6 - I2C_D: Ambient light sensor
     {
@@ -115,6 +100,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "als2",
     },
 
 };

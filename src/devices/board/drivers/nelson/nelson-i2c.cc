@@ -66,6 +66,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "backlight",
     },
     // Focaltech touch screen
     {
@@ -75,6 +76,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "focaltech",
     },
     // Goodix touch screen
     {
@@ -84,6 +86,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "goodix",
     },
     // Light sensor
     {
@@ -93,6 +96,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "als",
     },
     // Audio output
     {
@@ -102,6 +106,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "codec",
     },
     // Audio output
     {
@@ -111,6 +116,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "codec_p2",
     },
     // Power sensors
     {
@@ -119,6 +125,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "mlb_power",
     },
     {
         .bus_id = NELSON_I2C_3,
@@ -126,6 +133,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "audio_power",
     },
     {
         .bus_id = NELSON_I2C_A0_0,
@@ -133,6 +141,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = PDEV_VID_SENSIRION,
         .pid = 0,
         .did = PDEV_DID_SENSIRION_SHTV3,
+        .name = "temperature",
     },
     {
         .bus_id = NELSON_I2C_3,
@@ -140,6 +149,7 @@ static const i2c_channel_t i2c_channels[] = {
         .vid = 0,
         .pid = 0,
         .did = 0,
+        .name = "mlb_power_proto",
     },
 };
 
