@@ -162,9 +162,16 @@ struct MerkleTreeInfo {
 // superblock, into |out_info_block| if the block read from fd belongs to blobfs.
 zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_info_block) {
   info_block_t info_block;
+  info_block_t fvm_backup_info_block;
 
-  if (ReadBlockWithOffset(fd.get(), /*block_number=*/0, kSuperblockOffset * kBlobfsBlockSize,
+  if (ReadBlockWithOffset(fd.get(), kSuperblockOffset, kSuperblockOffset * kBlobfsBlockSize,
                           reinterpret_cast<void*>(info_block.block))
+          .is_error()) {
+    return ZX_ERR_IO;
+  }
+  if (ReadBlockWithOffset(fd.get(), kFVMBackupSuperblockOffset,
+                          kSuperblockOffset * kBlobfsBlockSize,
+                          reinterpret_cast<void*>(fvm_backup_info_block.block))
           .is_error()) {
     return ZX_ERR_IO;
   }
@@ -174,12 +181,24 @@ zx_status_t blobfs_load_info_block(const fbl::unique_fd& fd, info_block_t* out_i
     return status;
   }
 
-  if (zx_status_t status = CheckSuperblock(&info_block.info, block_count); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Info check failed " << status;
-    return status;
+  if (zx_status_t status = CheckSuperblock(&info_block.info, block_count); status == ZX_OK) {
+    memcpy(out_info_block, &info_block, sizeof(*out_info_block));
+  } else {
+    // Try backup superblock before giving up.
+    if (CheckSuperblock(&fvm_backup_info_block.info, block_count) == ZX_OK) {
+      // The backup super block is only good after applying pending journal changes and only
+      // written when using blobfs on FVM. It doesn't get updated for all super-block updates.
+      //
+      // For forensic purposes, it may be useful to continue on anyway, but note
+      // that it is most likely stale.
+      FX_LOGS(INFO) << "Primary superblock check failed with status: " << status;
+      FX_LOGS(INFO) << "Continuing with backup superblock. Note that this likely stale.";
+      memcpy(out_info_block, &fvm_backup_info_block, sizeof(*out_info_block));
+    } else {
+      FX_LOGS(ERROR) << "Info check failed " << status;
+      return status;
+    }
   }
-
-  memcpy(out_info_block, &info_block, sizeof(*out_info_block));
 
   return ZX_OK;
 }
