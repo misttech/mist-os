@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/lib/fostr/build/fostr_fidl.gni")
 
 group("tests") {
   testonly = true
