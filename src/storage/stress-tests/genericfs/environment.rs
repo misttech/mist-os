@@ -198,7 +198,9 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             let compressibility = Compressibility::Compressible;
             let factory = FileFactory::new(rng, uncompressed_size, compressibility);
             let home_dir = open_dir_at_root("home1");
-            Arc::new(Mutex::new(FileActor::new(factory, home_dir)))
+            let file_actor = FileActor::new(factory, home_dir);
+            file_actor.set_progress_timer(std::time::Duration::from_secs(60)).await;
+            Arc::new(Mutex::new(file_actor))
         };
         let deletion_actor = {
             let rng = SmallRng::from_seed(rng.gen());

@@ -13,9 +13,9 @@
     program: {
         binary: "bin/fs_stressor",
         args: [
-            // Ramdisk disconnection every 30 seconds
+            // Ramdisk disconnection every 90 seconds
             "--disconnect-secs",
-            "30",
+            "90",
 
             // 6 hour time limit
             "--time-limit-secs",

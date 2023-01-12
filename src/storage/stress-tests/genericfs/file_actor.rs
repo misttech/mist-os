@@ -4,8 +4,10 @@
 
 use {
     async_trait::async_trait,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::Status,
+    futures::{SinkExt as _, StreamExt as _},
+    once_cell::sync::OnceCell,
     storage_stress_test_utils::{data::FileFactory, io::Directory},
     stress_test::actor::{Actor, ActorError},
     tracing::info,
@@ -17,11 +19,34 @@ use {
 pub struct FileActor {
     pub factory: FileFactory,
     pub home_dir: Directory,
+    progress_channel_and_task:
+        OnceCell<(futures::channel::mpsc::UnboundedSender<()>, fasync::Task<()>)>,
 }
 
 impl FileActor {
     pub fn new(factory: FileFactory, home_dir: Directory) -> Self {
-        Self { factory, home_dir }
+        Self { factory, home_dir, progress_channel_and_task: OnceCell::new() }
+    }
+
+    /// Arms a timer which will expire after `duration` and fail the test.
+    /// Each time a file is successfully created, the timer is reset.  This ensures forward
+    /// progress.
+    pub async fn set_progress_timer(&self, duration: std::time::Duration) {
+        let (tx, mut rx) = futures::channel::mpsc::unbounded();
+        let task = fasync::Task::spawn(async move {
+            use futures::future::FutureExt;
+            loop {
+                let duration_clone = duration.clone();
+                futures::select! {
+                    () = fuchsia_async::Timer::new(duration_clone).fuse() =>
+                        {
+                            panic!("No progress made after {:?}", duration_clone);
+                        }
+                    _ = rx.next().fuse() => continue,
+                }
+            }
+        });
+        self.progress_channel_and_task.set((tx, task)).expect("Failed to set timer channel");
     }
 
     async fn create_file(&mut self) -> Result<(), Status> {
@@ -47,7 +72,10 @@ impl FileActor {
 impl Actor for FileActor {
     async fn perform(&mut self) -> Result<(), ActorError> {
         match self.create_file().await {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                self.progress_channel_and_task.get_mut().unwrap().0.send(()).await.unwrap();
+                Ok(())
+            }
             Err(Status::NO_SPACE) => Ok(()),
             // Any other error is assumed to come from an intentional crash.
             // The environment verifies that an intentional crash occurred
