@@ -16,7 +16,7 @@ use {
     },
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ErrorLevel {
     Info,
     Warning,
@@ -33,12 +33,12 @@ impl fmt::Display for ErrorLevel {
 }
 
 /// An error reported by a [`DocCheck`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub struct DocCheckError {
+    pub level: ErrorLevel,
     pub doc_line: DocLine,
     pub message: String,
     pub help_suggestion: Option<String>,
-    pub level: ErrorLevel,
 }
 
 impl DocCheckError {

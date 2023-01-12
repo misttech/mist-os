@@ -119,11 +119,12 @@ async fn main() -> Result<()> {
         .canonicalize()
         .context(format!("invalid root dir for source: {:?} ", &opt.root))?;
 
-    if let Some(errors) = do_main(opt).await? {
+    if let Some(mut errors) = do_main(opt).await? {
         // Output the result
         let mut error_count = 0;
         let mut warning_count = 0;
         let mut info_count = 0;
+        errors.sort();
         for e in &errors {
             match e.level {
                 ErrorLevel::Info => info_count += 1,

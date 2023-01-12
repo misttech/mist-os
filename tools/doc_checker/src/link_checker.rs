@@ -184,22 +184,38 @@ impl DocCheck for LinkChecker {
         if let Some(links) = element.get_links() {
             for ele in links {
                 let link: &'a CowStr<'a> = match ele {
-                    Element::Link(link_type, link_url, link_title, _, _) => {
+                    Element::Link(link_type, link_url, link_title, elements, _) => {
                         let link = match link_type {
                             LinkType::Inline => link_url,
                             LinkType::Reference => link_url,
                             LinkType::ReferenceUnknown => {
-                                errors.push(DocCheckError::new_error_helpful(
-                                    ele.doc_line().line_num,
-                                    ele.doc_line().file_name.clone(),
-                                    &format!(
-                                        "Unknown reference link to {} ({})",
-                                        link_url, link_title
-                                    ),
-                                &format!(
-                                    "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
-                                link_url)));
-                                link_url
+                                let text = elements
+                                    .iter()
+                                    .map(|e| e.get_contents())
+                                    .collect::<Vec<String>>()
+                                    .join("");
+                                if text == link_url.to_string() && link_url == link_title {
+                                    errors.push(DocCheckError::new_info_helpful(
+                                            ele.doc_line().line_num,
+                                            ele.doc_line().file_name.clone(),
+                                            &format!(
+                                                "unescaped [{}] not treating this as a reference link. this is brackets ",
+                                                link_url),
+                                            &format!("escaped \\[{}\\] or make a link [{}](/docs/{}", link_title, link_url,link_url)
+                                        ));
+                                } else {
+                                    errors.push(DocCheckError::new_error_helpful(
+                                            ele.doc_line().line_num,
+                                            ele.doc_line().file_name.clone(),
+                                            &format!(
+                                                "Unknown reference link to [{}][{}]",
+                                                text ,link_url
+                                            ),
+                                        &format!(
+                                            "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
+                                        link_url)));
+                                }
+                                continue;
                             }
                             LinkType::Collapsed => link_url,
                             LinkType::CollapsedUnknown => {
@@ -215,15 +231,39 @@ impl DocCheck for LinkChecker {
                             }
                             LinkType::Shortcut => link_url,
                             LinkType::ShortcutUnknown => {
-                                errors.push(DocCheckError::new_error(
-                                    ele.doc_line().line_num,
-                                    ele.doc_line().file_name.clone(),
-                                    &format!(
-                                        "Unknown shortcut link to {} ({})",
-                                        link_url, link_title
-                                    ),
-                                ));
-                                link_url
+                                // Check if this is a case where the text is in [].
+                                let text = elements
+                                    .iter()
+                                    .map(|e| e.get_contents())
+                                    .collect::<Vec<String>>()
+                                    .join("");
+                                if text == link_url.to_string() && link_url == link_title {
+                                    errors.push(DocCheckError::new_info_helpful(
+                                        ele.doc_line().line_num,
+                                        ele.doc_line().file_name.clone(),
+                                        &format!(
+                                            "unescaped [{}] not treating this as a shortcut link.",
+                                            link_url
+                                        ),
+                                        &format!(
+                                            "escaped \\[{}\\] or make a link [{}](/docs/{}",
+                                            link_title, link_url, link_url
+                                        ),
+                                    ));
+                                } else {
+                                    errors.push(DocCheckError::new_error_helpful(
+                                            ele.doc_line().line_num,
+                                            ele.doc_line().file_name.clone(),
+                                            &format!(
+                                                "Unknown reference link to [{}][{}]",
+                                                text ,link_url
+                                            ),
+                                        &format!(
+                                            "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
+                                        link_url)));
+                                }
+
+                                continue;
                             }
                             LinkType::Autolink => link_url,
                             LinkType::Email => return Ok(None),
@@ -234,7 +274,7 @@ impl DocCheck for LinkChecker {
                         }
                         link
                     }
-                    Element::Image(link_type, link_url, link_title, _, _) => {
+                    Element::Image(link_type, link_url, link_title, elements, _) => {
                         let link = match link_type {
                             LinkType::Inline => link_url,
                             LinkType::Reference => link_url,
@@ -253,14 +293,36 @@ impl DocCheck for LinkChecker {
                             LinkType::CollapsedUnknown => todo!(),
                             LinkType::Shortcut => link_url,
                             LinkType::ShortcutUnknown => {
-                                errors.push(DocCheckError::new_error(
-                                    ele.doc_line().line_num,
-                                    ele.doc_line().file_name.clone(),
-                                    &format!(
-                                        "Unknown image shortcut link to {} ({})",
-                                        link_url, link_title
-                                    ),
-                                ));
+                                // Check if this is a case where the text is in [].
+                                let text = elements
+                                    .iter()
+                                    .map(|e| e.get_contents())
+                                    .collect::<Vec<String>>()
+                                    .join("");
+                                if text == link_url.to_string() && link_url == link_title {
+                                    errors.push(DocCheckError::new_info_helpful(
+                                        ele.doc_line().line_num,
+                                        ele.doc_line().file_name.clone(),
+                                        &format!(
+                                            "unescaped brackets - treated as text [{}]",
+                                            link_url
+                                        ),
+                                        &format!(
+                                            "escaping \\[{}\\] or an inline link [{}][/docs/{}",
+                                            link_title, link_url, link_url
+                                        ),
+                                    ));
+                                    continue;
+                                } else {
+                                    errors.push(DocCheckError::new_error(
+                                        ele.doc_line().line_num,
+                                        ele.doc_line().file_name.clone(),
+                                        &format!(
+                                            "Unknown image shortcut link to {} ({})",
+                                            link_url, link_title
+                                        ),
+                                    ));
+                                }
                                 link_url
                             }
                             LinkType::Autolink => link_url,
@@ -905,7 +967,7 @@ mod tests {
             (
             DocContext::new(
                 PathBuf::from("/docs/README.md"),
-                "This is a line to [something](/docs/something.md",
+                "This is a line to [something](/docs/something.md)",
             ),
             None,
         ),
@@ -1035,6 +1097,98 @@ mod tests {
             );
             assert_eq!(result, expected_error);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_check_reference_links() -> Result<()> {
+        let opt = DocCheckerArgs {
+            root: PathBuf::from("/path/to/fuchsia"),
+            project: "fuchsia".to_string(),
+            docs_folder: PathBuf::from("docs"),
+            local_links_only: true,
+            check_reference_links: true,
+        };
+
+        let mut checks = register_markdown_checks(&opt)?;
+        assert_eq!(checks.len(), 1);
+
+        let test_data: Vec<(DocContext<'_>, Option<Vec<DocCheckError>>)> = vec![
+            (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                "This is a line to [something](/docs/something.md)",
+                true
+            ),
+            None,
+        ),
+        (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                "invalid url [oops](https:///nowhere/something.md?xx)",
+                true
+            ),
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
+             "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
+        ),
+        (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                "A reference link to [`topaz`][flutter-gni]\n\n\
+                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\"",
+                true
+            ),
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
+            "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
+        ),
+        (
+        DocContext::new_with_checks(
+            PathBuf::from("/docs/README.md"),
+            "brackets which are not a link [your name here]",
+            true
+        ),
+        Some([DocCheckError::new_info_helpful(1, PathBuf::from("/docs/README.md"),
+            "unescaped [your name here] not treating this as a shortcut link.",
+            "escaped \\[your name here\\] or make a link [your name here](/docs/your name here")
+            ].to_vec()),
+        ),
+        (
+            DocContext::new_with_checks(
+                PathBuf::from("/docs/README.md"),
+                "missing [text][link-to-text]", true),
+                Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
+                "Unknown reference link to [text][link-to-text]",
+                "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference"
+            )].to_vec())
+        )
+        ];
+
+        for (ctx, expected_errors) in test_data {
+            for ele in ctx {
+                let errors = checks[0].check(&ele)?;
+                if let Some(ref expected_list) = expected_errors {
+                    let mut expected_iter = expected_list.iter();
+                    if let Some(actual_errors) = errors {
+                        for actual in actual_errors {
+                            if let Some(expected) = expected_iter.next() {
+                                assert_eq!(&actual, expected);
+                            } else {
+                                panic!("Got unexpected error returned: {:?}", actual);
+                            }
+                        }
+                        let unused_errors: Vec<&DocCheckError> = expected_iter.collect();
+                        if !unused_errors.is_empty() {
+                            panic!("Expected more errors: {:?}", unused_errors);
+                        }
+                    } else if expected_errors.is_some() {
+                        panic!("No errors, but expected {:?}", expected_errors);
+                    }
+                } else if errors.is_some() {
+                    panic!("Got unexpected errors {:?}", errors.unwrap());
+                }
+            }
+        }
+
         Ok(())
     }
 }
