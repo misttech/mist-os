@@ -506,7 +506,16 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
       fuchsia::ui::composition::TransformId{.value = kMagnifierTransformId},
       fuchsia::math::VecF{.x = scale, .y = scale});
 
-  // TODO(fxbug.dev/111799): Remove this hack to accommodate a translation
+  // HACK HACK HACK
+  // TODO(fxbug.dev/95570): Remove this when we move to the new gesture disambiguation protocols.
+  // The input to this method is not properly adjusted for display rotation
+  // (https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/scenic/config/display_rotation)
+  // We adjust it here for the default display rotation value of 270 degrees, but this won't be
+  // correct for any product with a different display rotation value.
+  auto rotated_x = -y;
+  auto rotated_y = x;
+
+  // TODO(fxbug.dev/111799): Remove these hacks to accommodate a translation
   // specified in scaled NDC space.
   //
   // Translation arguments to this method are in "scaled NDC" space, i.e. NDC
@@ -531,8 +540,10 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
   // Finally, we compute the end translation such that it moves the top-left
   // corner of the viewport to the top-left corner of the a11y view; i.e. the
   // final translation is (-left, -top).
-  auto viewport_center_x = (-x + scale) / 2;
-  auto viewport_center_y = (-y + scale) / 2;
+
+  auto viewport_center_x = (-rotated_x + scale) / 2;
+  auto viewport_center_y = (-rotated_y + scale) / 2;
+
   auto viewport_left_f =
       (viewport_center_x - 0.5f) * static_cast<float>(layout_info_->logical_size().width);
   auto viewport_top_f =

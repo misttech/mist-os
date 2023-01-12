@@ -223,8 +223,17 @@ TEST_F(CoordinateGridTest, TestSceneConnected) {
 }
 
 TEST_F(CoordinateGridTest, TestMagnification) {
-  a11y_view_->SetMagnificationTransform(/* scale = */ 4, /* translation_x = */ -1.25f,
-                                        /* translation_y = */ 1.5f, [this]() { QuitLoop(); });
+  auto translation_x = -1.25f;
+  auto translation_y = 1.5f;
+
+  // HACK HACK HACK
+  // TODO(fxbug.dev/95570): Remove this when we move to the new gesture disambiguation protocols.
+  auto rotated_translation_x = translation_y;
+  auto rotated_translation_y = -translation_x;
+
+  a11y_view_->SetMagnificationTransform(
+      /* scale = */ 4, /* translation_x = */ rotated_translation_x,
+      /* translation_y = */ rotated_translation_y, [this]() { QuitLoop(); });
   RunLoop();
 
   auto data = ui_test_manager_->TakeScreenshot();
