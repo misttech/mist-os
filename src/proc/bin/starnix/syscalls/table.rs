@@ -223,6 +223,7 @@ pub fn dispatch_syscall(
         signalfd4[4],
         socket[3],
         socketpair[4],
+        splice[6],
         stat[2],
         statfs[2],
         symlink[2],

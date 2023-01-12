@@ -81,7 +81,7 @@
                 "EpollTest.DoubleEpollOneShot",
                 "EpollTest.CloseFile",
 
-                // eventfd_test - https://fxbug.dev/79262
+                // eventfd_test - splice() isn't implemented fxbug.dev/119324
                 "EventfdTest.SpliceReturnsEINVAL",
 
                 // exec_test
@@ -1019,8 +1019,7 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
                 "AllUnixDomainSockets/UnboundUnixStreamSocketPairTest.SendtoWithoutConnect/*",
 
-                // splice_test
-                "SpliceTest.TwoRegularFiles",
+                // splice_test, splice() isn't implemented: fxbug.dev/119324
                 "SpliceTest.FromPipeMaxFileSize",
                 "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
                 "SpliceTest.PipeOffsets",

@@ -1861,6 +1861,30 @@ pub fn sys_utimensat(
     Ok(())
 }
 
+pub fn sys_splice(
+    current_task: &CurrentTask,
+    fd_in: FdNumber,
+    _off_in: UserRef<off_t>,
+    fd_out: FdNumber,
+    _off_out: UserRef<off_t>,
+    _len: usize,
+    _flags: u32,
+) -> Result<usize, Errno> {
+    let in_file = current_task.files.get(fd_in)?;
+    let out_file = current_task.files.get(fd_out)?;
+
+    // Splice can only be used when one of the files is a pipe.
+    if in_file.downcast_file::<PipeFileObject>().is_none()
+        && out_file.downcast_file::<PipeFileObject>().is_none()
+    {
+        return error!(EINVAL);
+    }
+
+    // TODO(fxbug.dev/119324) implement splice().
+    not_implemented!(current_task, "splice");
+    error!(ENOSYS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

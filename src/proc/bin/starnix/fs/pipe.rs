@@ -248,7 +248,7 @@ fn pipe_fs(kernel: &Kernel) -> &FileSystemHandle {
     kernel.pipe_fs.get_or_init(|| FileSystem::new(kernel, PipeFs))
 }
 
-struct PipeFileObject {
+pub struct PipeFileObject {
     pipe: Arc<Mutex<Pipe>>,
 }
 
