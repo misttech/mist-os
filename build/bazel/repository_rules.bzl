@@ -47,7 +47,7 @@ exports_files(
 '''
 
     # The Ninja output directory is passed by the launcher script at
-    # gen/build/bazel/bazel as an environment variable.
+    # $BAZEL_TOPDIR/bazel as an environment variable.
     #
     # This is the root directory for all source entries in the manifest.
     # Create a //:ninja_output symlink in the repository to point to it.

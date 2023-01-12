@@ -16,7 +16,7 @@ assert(
 # A GN target used to generate at GN-gen time a bazel inputs manifest file
 # under the following path which is hard-coded in toplevel.WORKSPACE.bazel:
 #
-# $BUILD_DIR/gen/build/bazel/legacy_ninja_build_outputs.inputs_manifest.json
+# $BAZEL_TOPDIR/legacy_ninja_build_outputs.inputs_manifest.json
 #
 # See bazel_inputs.gni comments for details on the manifest file format,
 # and repository_rules.bzl:bazel_inputs_repository() to see how it is parsed
@@ -35,7 +35,7 @@ assert(
 # non-testonly bazel_action() targets to depend on
 # :generate_main_workspace below, without depending on this target.
 #
-bazel_inputs_manifest("legacy_ninja_build_outputs") {
+generate_bazel_inputs_manifest("legacy_ninja_build_outputs") {
   testonly = true
 
   output = bazel_inputs_manifest
@@ -56,12 +56,6 @@ if (current_toolchain == default_toolchain) {
 }
 
 action("generate_main_workspace") {
-  assert(
-      bazel_top_dir == target_gen_dir,
-      "Bazel workspace generation action was moved, please update " +
-          "//build/bazel/bazel_workspace.gni$0x0aOld bazel_top_dir location " +
-          "[${bazel_top_dir}] new location [${target_gen_dir}")
-
   script = "//build/bazel/scripts/update_workspace.py"
 
   # The update script tracks the file and directory entries of FUCHSIA_DIR
@@ -99,6 +93,9 @@ action("generate_main_workspace") {
     "//build/bazel/templates/template.fuchsia_build_config.bzl",
     "//build/bazel/templates/template.platform_mappings",
 
+    # The script reads this configuration file
+    "//build/bazel/config/main_workspace_top_dir",
+
     # The script reads RBE configs
     rbe_config_file,
   ]
@@ -114,15 +111,15 @@ action("generate_main_workspace") {
   depfile = "${target_gen_dir}/${target_name}.d"
 
   outputs = [
-    "$target_gen_dir/bazel",
-    "$target_gen_dir/download_config_file",
-    "$target_gen_dir/generated-info.json",
-    "$target_gen_dir/workspace/.bazelrc",
-    "$target_gen_dir/workspace/WORKSPACE.bazel",
-    "$target_gen_dir/workspace/fuchsia_build_config.bzl",
-    "$target_gen_dir/workspace/fuchsia_sdk_hash",
-    "$target_gen_dir/workspace/internal_sdk_hash",
-    "$target_gen_dir/workspace/platform_mappings",
+    "${bazel_main_top_dir}/bazel",
+    "${bazel_main_top_dir}/download_config_file",
+    "${bazel_main_top_dir}/generated-info.json",
+    "${bazel_main_top_dir}/workspace/.bazelrc",
+    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_config.bzl",
+    "${bazel_main_top_dir}/workspace/fuchsia_sdk_hash",
+    "${bazel_main_top_dir}/workspace/internal_sdk_hash",
+    "${bazel_main_top_dir}/workspace/platform_mappings",
   ]
 
   args = [
@@ -142,11 +139,11 @@ action("generate_main_workspace") {
 
 # Generate a symlink to the @fuchsia_sdk repository, after ensuring it was
 # properly populated by Bazel. The symlink has a stable path of
-# gen/build/bazel/fuchsia_sdk while the actual location of the repository
+# $BAZEL_TOPDIR/fuchsia_sdk while the actual location of the repository
 # depends on Bazel internals (e.g. whether BzlMod is enabled or not).
 action("generate_fuchsia_sdk_repository") {
   script = "//build/bazel/scripts/generate-fuchsia-sdk-symlink.py"
-  outputs = [ "$target_gen_dir/fuchsia_sdk" ]
+  outputs = [ "$bazel_main_top_dir/fuchsia_sdk" ]
   deps = [
     ":generate_main_workspace",
     "//sdk:core",

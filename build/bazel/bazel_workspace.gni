@@ -2,18 +2,20 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Location of the bazel top directory that contains the workspace
-# and output_base directories. This must match the action that generates
-# the workspace's content, which is currently in //build/bazel/BUILD.gn
+# Location of the main bazel top directory that contains the workspace
+# and output_base directories, relative to the Ninja output directory.
+# See //build/bazel/config/README.md.
 #
-# Bazel workspace is only generated in the default_toolchain to avoid duplicates.
-bazel_top_dir =
-    get_label_info("//build/bazel:foo($default_toolchain)", "target_gen_dir")
+bazel_main_top_dir_rebased =
+    read_file("//build/bazel/config/main_workspace_top_dir", "trim string")
+
+# The Bazel main top directory, as a GN path (e.g. `//out/default/bazel`)
+# derived from bazel_main_top_dir_rebased.
+bazel_main_top_dir =
+    "//" + rebase_path(bazel_main_top_dir_rebased, "//", root_build_dir)
 
 # Location of the bazel launcher script, relative to the source root
-bazel_launcher = bazel_top_dir + "/bazel"
+bazel_launcher = bazel_main_top_dir + "/bazel"
 
 # Location of the Bazel workspace, relative to the source root.
-# LINT.IfChange
-bazel_workspace_dir = bazel_top_dir + "/workspace"
-# LINT.ThenChange(/tools/devshell/get-workspace-dir)
+bazel_workspace_dir = bazel_main_top_dir + "/workspace"

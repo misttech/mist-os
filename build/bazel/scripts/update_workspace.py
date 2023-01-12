@@ -154,6 +154,16 @@ def create_clean_dir(path):
     os.makedirs(path)
 
 
+def get_bazel_relative_topdir(fuchsia_dir, workspace_name):
+    """Return Bazel topdir for a given workspace, relative to Ninja output dir."""
+    input_file = os.path.join(
+        fuchsia_dir, 'build', 'bazel', 'config',
+        f'{workspace_name}_workspace_top_dir')
+    assert os.path.exists(input_file), 'Missing input file: ' + input_file
+    with open(input_file) as f:
+        return f.read().strip()
+
+
 def get_fx_build_dir(fuchsia_dir):
     """Return the path to the Ninja build directory set through 'fx set'.
 
@@ -447,7 +457,8 @@ def main():
             args.target_arch = target_cpu
 
     if not args.topdir:
-        args.topdir = os.path.join(gn_output_dir, 'gen/build/bazel')
+        default_topdir = get_bazel_relative_topdir(fuchsia_dir, 'main')
+        args.topdir = os.path.join(gn_output_dir, default_topdir)
 
     topdir = os.path.abspath(args.topdir)
 
@@ -501,8 +512,14 @@ def main():
             bazel_launcher))
 
     if maybe_regenerate_ninja(gn_output_dir, ninja_binary):
-        log('Re-generating Ninja build plan and incrementally rebuilding Bazel main workspace (to make sure all dependencies are up-to-date)!')
-        subprocess.run([ninja_binary, '-C', gn_output_dir, 'build.ninja', 'bazel_workspace'])
+        log(
+            'Re-generating Ninja build plan and incrementally rebuilding Bazel main workspace (to make sure all dependencies are up-to-date)!'
+        )
+        subprocess.run(
+            [
+                ninja_binary, '-C', gn_output_dir, 'build.ninja',
+                'bazel_workspace'
+            ])
     else:
         log2('Ninja build plan up to date.')
 

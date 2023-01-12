@@ -64,6 +64,16 @@ def get_product_name(fuchsia_build_dir):
         return product_name
 
 
+def get_bazel_relative_topdir(fuchsia_dir, workspace_name):
+    """Return Bazel topdir for a given workspace, relative to Ninja output dir."""
+    input_file = os.path.join(
+        fuchsia_dir, 'build', 'bazel', 'config',
+        f'{workspace_name}_workspace_top_dir')
+    assert os.path.exists(input_file), 'Missing input file: ' + input_file
+    with open(input_file) as f:
+        return f.read().strip()
+
+
 def get_host_bazel_platform():
     """Return host --platform name for the current build machine."""
     sysname = os.uname().sysname
@@ -280,7 +290,10 @@ def main():
     command_launcher.run(update_workspace_cmd)
 
     # Prepare bazel wrapper script invocations.
-    bazel_script = os.path.join(build_dir, 'gen', 'build', 'bazel', 'bazel')
+    bazel_main_top_dir = os.path.join(
+        build_dir, get_bazel_relative_topdir(fuchsia_dir, 'main'))
+
+    bazel_script = os.path.join(bazel_main_top_dir, 'bazel')
     assert os.path.exists(bazel_script), (
         'Bazel script does not exist: ' + bazel_script)
 
@@ -376,11 +389,11 @@ def main():
     run_fx_command(['build', 'build/bazel/tests/build_action'])
 
     log('//build/bazel:generate_fuchsia_sdk_repository check')
-    output_base_dir = os.path.join(
-        build_dir, 'gen', 'build', 'bazel', 'output_base')
+    output_base_dir = os.path.join(bazel_main_top_dir, 'output_base')
     shutil.rmtree(output_base_dir)
-    fuchsia_sdk_symlink = os.path.join(
-        build_dir, 'gen', 'build', 'bazel', 'fuchsia_sdk')
+
+    fuchsia_sdk_symlink = os.path.join(bazel_main_top_dir, 'fuchsia_sdk')
+
     if os.path.exists(fuchsia_sdk_symlink):
         os.unlink(fuchsia_sdk_symlink)
     run_fx_command(['build', 'build/bazel:generate_fuchsia_sdk_repository'])

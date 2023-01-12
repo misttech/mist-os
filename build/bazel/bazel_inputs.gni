@@ -72,7 +72,7 @@
 #
 # After creating the symlinks as:
 #
-#  out/default/gen/build/bazel/output_base/external/legacy_ninja_build_outputs/
+#  $BAZEL_TOPDIR/output_base/external/legacy_ninja_build_outputs/
 #    foo.h --> ../../../../../src/foo/foo.h
 #    foo.cc --> ../../../../../src/foo/foo.cc
 #
@@ -166,7 +166,7 @@ template("bazel_input_resource") {
 #
 # Will declare the following symlinks:
 #
-#   out/default/bazel/legacy_ninja_build_outputs/
+#   $BAZEL_TOPDIR/legacy_ninja_build_outputs/
 #     data/resources/
 #       foo.resource ---> .../res/foo.resource
 #       bar/bar.resource ---> .../res/bar/bar.resource
@@ -396,7 +396,7 @@ template("bazel_input_resource_directory") {
 #     A list of targets, all transitive dependencies which are bazel_input_xxx()
 #     target will generate one entry in the manifest.
 #
-template("bazel_inputs_manifest") {
+template("generate_bazel_inputs_manifest") {
   # Generate a single manifest file that collects all bazel_input_xxx()
   # resources. Each metadata entry is a scope that describes a single
   # Bazel filegroup() target that will appear at the top of the

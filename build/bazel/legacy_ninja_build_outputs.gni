@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_workspace.gni")
 import("//build/product.gni")
 import("//bundles/assembly/platform_aibs.gni")
 
@@ -10,7 +11,8 @@ import("//bundles/assembly/platform_aibs.gni")
 # to the Ninja output directory, and must be kept in sync with
 # toplevel.WORKSPACE.bazel and toplevel.MODULE.bazel. For more details
 # see comments in //build/bazel/BUILD.gn
-bazel_inputs_manifest = "$root_build_dir/gen/build/bazel/legacy_ninja_build_outputs.inputs_manifest.json"
+bazel_inputs_manifest =
+    "${bazel_main_top_dir}/legacy_ninja_build_outputs.inputs_manifest.json"
 
 # This header defines the list of all dependencies used to collect the
 # bazel_input_xxx() target definitions that will populate the special
