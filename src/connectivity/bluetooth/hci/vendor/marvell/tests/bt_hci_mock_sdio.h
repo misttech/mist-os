@@ -10,14 +10,30 @@
 #include "src/connectivity/bluetooth/hci/vendor/marvell/device_oracle.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
-// This function is used by the mock SDIO library to validate calls to DoRwTxn. This is currently
-// not expected to be used, so fail if it is.
-bool operator==(const sdio_rw_txn_t& actual, const sdio_rw_txn_t& expected) { return false; }
+// This function is used by the mock SDIO library to validate calls to DoRwTxn.
+bool operator==(const sdio_rw_txn_t& actual, const sdio_rw_txn_t& expected);
 
 namespace bt_hci_marvell {
 
 // An implementation of MockSdio designed for use with testing general lifecycle operation.
 class BtHciMockSdio : public ddk::MockSdio {
+ public:
+  MockSdio& ExpectDoRwTxn(zx_status_t out_status, sdio_rw_txn_t txn) override {
+    if (txn.write) {
+      block_write_complete_.Reset();
+    }
+    return ddk::MockSdio::ExpectDoRwTxn(out_status, txn);
+  }
+
+  MockSdio& ExpectAckInBandIntr() override {
+    ack_complete_.Reset();
+    return ddk::MockSdio::ExpectAckInBandIntr();
+  }
+
+  // Allow test synchronization with important events.
+  libsync::Completion block_write_complete_;
+  libsync::Completion ack_complete_;
+
  private:
   zx_status_t SdioDoRwByte(bool write, uint32_t addr, uint8_t write_byte,
                            uint8_t* out_read_byte) override {
@@ -38,7 +54,20 @@ class BtHciMockSdio : public ddk::MockSdio {
     return ddk::MockSdio::SdioDoRwByte(write, addr, write_byte, out_read_byte);
   }
 
-  std::unique_ptr<DeviceOracle> device_oracle_;
+  zx_status_t SdioDoRwTxn(const sdio_rw_txn_t* txn) override {
+    zx_status_t result = ddk::MockSdio::SdioDoRwTxn(txn);
+    if (txn->write) {
+      block_write_complete_.Signal();
+    }
+    return result;
+  }
+
+  void SdioAckInBandIntr() override {
+    ddk::MockSdio::SdioAckInBandIntr();
+    ack_complete_.Signal();
+  }
+
+  std::optional<DeviceOracle> device_oracle_;
 };
 
 }  // namespace bt_hci_marvell

@@ -9,7 +9,9 @@
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <threads.h>
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
@@ -57,14 +59,39 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
 
  private:
+  // Entry point into the driver thread
+  int Thread();
+
   // Initialize hardware registers and load firmware as needed
   zx_status_t Init();
 
   // Load firmware (or wait for notification that firmware has been loaded by another driver)
   zx_status_t LoadFirmware();
 
+  // Control whether interrupts will be sent for a host channel
+  zx_status_t ArmChannelInterrupts(const HostChannel* host_channel);
+  zx_status_t DisarmChannelInterrupts(const HostChannel* host_channel);
+
+  // The main event processing loop
+  void EventHandler();
+
+  // Handle an interrupt event (a frame is ready to read, and/or the controller is ready to receive
+  // the next frame from the host).
+  zx_status_t ProcessSdioInterrupt();
+
+  // Read a frame from the controller.
+  zx_status_t ReadFromCard() TA_REQ(mutex_);
+
+  // Handle an event on the host channel. This can either be because data is ready to read, or
+  // because the channel has closed.
+  void ProcessChannelEvent(const zx_port_packet_t& packet);
+
+  // Add a Marvell-specific header to a frame from the host, and then send it to the controller.
+  zx_status_t WriteToCard(const HostChannel* host_channel) TA_REQ(mutex_);
+
+  void TerminateEventHandler();
+
   zx_status_t EnableHostInterrupts();
-  zx_status_t DisableHostInterrupts();
 
   // Bytewide SDIO operations
   zx_status_t Read8(uint32_t addr, uint8_t* out_value);
@@ -75,6 +102,9 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   // Read from register |addr|, modify the bits corresponding to the locations of bits set in |mask|
   // with bits in the same location from |value|, and then write back out to the register.
   zx_status_t ModifyBits(uint32_t addr, uint8_t mask, uint8_t value);
+
+  // Perform a DMA write to the address specified in the ioport address registers.
+  zx_status_t WriteToIoport(uint32_t size, const zx::vmo& vmo);
 
   // Create a HostChannel object that will use |in_channel| to communicate with the host. |read_id|
   // is the channel id that will be used in the controller header when we read from this host
@@ -89,7 +119,15 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   // Initialized once (during Init()) and then never written to again.
   zx::interrupt sdio_int_;
 
+  // The baton used to provide an asynchronous status of DdkInit().
+  std::unique_ptr<ddk::InitTxn> init_txn_;
+
   fbl::Mutex mutex_;
+  thrd_t driver_thread_;
+
+  // The controller only allows one outstanding transaction at a time, keep track of whether the
+  // controller can currently accept another frame.
+  bool tx_allowed_ TA_GUARDED(mutex_) = true;
 
   // Tracks all currently-allocated interrupt keys
   InterruptKeyAllocator interrupt_key_mgr_ TA_GUARDED(mutex_);
@@ -106,12 +144,7 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
   zx::port port_;
 
   // The oracle of all values that are device-specific
-  std::unique_ptr<DeviceOracle> device_oracle_;
-
-  // The async loop (and corresponding dispatcher) on which all our driver tasks will run. The
-  // dispatcher is initialized during the call to DdkInit().
-  std::optional<async::Loop> loop_;
-  async_dispatcher_t* dispatcher_;
+  std::optional<DeviceOracle> device_oracle_;
 
   // The address where we will exchange data frames with the target
   uint32_t ioport_addr_ = 0xffffffff;

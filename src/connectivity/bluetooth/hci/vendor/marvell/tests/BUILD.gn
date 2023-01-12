@@ -41,13 +41,17 @@ executable("driver-channel-tests") {
   output_name = "bt-hci-marvell-driver-channel-tests"
   sources = [
     "bt_hci_mock_sdio.h",
+    "bt_hci_mock_sdio_test.cc",
     "bt_hci_mock_sdio_test.h",
     "driver_channel_unittest.cc",
+    "test_frame.h",
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp_mock",
     "//src/connectivity/bluetooth/hci/vendor/marvell:common",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -87,13 +91,17 @@ executable("lifecycle-tests") {
   output_name = "bt-hci-marvell-lifecycle-tests"
   sources = [
     "bt_hci_mock_sdio.h",
+    "bt_hci_mock_sdio_test.cc",
     "bt_hci_mock_sdio_test.h",
     "lifecycle_unittest.cc",
+    "test_frame.h",
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp_mock",
     "//src/connectivity/bluetooth/hci/vendor/marvell:common",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]
 }

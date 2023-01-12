@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//third_party/github.com/google/emboss/build_defs.gni")
 
 driver_bind_rules("bt_hci_marvell_bind") {
   rules = "bt_hci_marvell.bind"
@@ -37,14 +38,21 @@ source_set("common") {
     ":bt_hci_marvell_bind",
     "//src/devices/lib/driver",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
   ]
   public_deps = [
+    ":marvell-frame",
     "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
+}
+
+emboss_cc_library("marvell-frame") {
+  source = "marvell_frame.emb"
 }
 
 fuchsia_driver("bt-hci-marvell-driver") {

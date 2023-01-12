@@ -17,11 +17,11 @@ static constexpr struct {
   DeviceType device_type;
 } kPidLookupTable[] = {{0x914a, DeviceType::k88W8987}};
 
-zx::result<std::unique_ptr<DeviceOracle>> DeviceOracle::Create(uint32_t pid) {
+zx::result<DeviceOracle> DeviceOracle::Create(uint32_t pid) {
   for (size_t ndx = 0; ndx < std::size(kPidLookupTable); ndx++) {
     if (kPidLookupTable[ndx].product_id == pid) {
-      std::unique_ptr<DeviceOracle> result(new DeviceOracle(kPidLookupTable[ndx].device_type));
-      return zx::ok(std::move(result));
+      DeviceOracle result(kPidLookupTable[ndx].device_type);
+      return zx::ok(result);
     }
   }
   return zx::error(ZX_ERR_INVALID_ARGS);
@@ -85,6 +85,24 @@ uint32_t DeviceOracle::GetRegAddrMiscCfg() const {
   switch (device_type_) {
     case DeviceType::k88W8987:
       return 0xd8;
+  }
+  ZX_PANIC("Internal error: device type not properly set");
+  return 0;
+}
+
+uint32_t DeviceOracle::GetRegAddrRxLen() const {
+  switch (device_type_) {
+    case DeviceType::k88W8987:
+      return 0xea;
+  }
+  ZX_PANIC("Internal error: device type not properly set");
+  return 0;
+}
+
+uint32_t DeviceOracle::GetRegAddrRxUnit() const {
+  switch (device_type_) {
+    case DeviceType::k88W8987:
+      return 0xeb;
   }
   ZX_PANIC("Internal error: device type not properly set");
   return 0;

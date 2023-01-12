@@ -16,6 +16,9 @@ enum class DeviceType {
   k88W8987,
 };
 
+// The largest frame that we can expect the hardware to send (including header).
+constexpr size_t kMarvellMaxRxFrameSize = 2048;
+
 // Value that indicates that firmware has been successfully loaded
 constexpr uint16_t kFirmwareStatusReady = 0xfedc;
 
@@ -38,7 +41,7 @@ constexpr uint8_t kInterruptMaskPacketAvailable = 0x01;
 class DeviceOracle {
  public:
   // Factory method
-  static zx::result<std::unique_ptr<DeviceOracle>> Create(uint32_t pid);
+  static zx::result<DeviceOracle> Create(uint32_t pid);
 
   DeviceOracle() = delete;
 
@@ -49,6 +52,8 @@ class DeviceOracle {
   uint32_t GetRegAddrInterruptStatus() const;
   uint32_t GetRegAddrIoportAddr() const;
   uint32_t GetRegAddrMiscCfg() const;
+  uint32_t GetRegAddrRxLen() const;
+  uint32_t GetRegAddrRxUnit() const;
 
  private:
   explicit DeviceOracle(DeviceType device_type) : device_type_(device_type) {}
