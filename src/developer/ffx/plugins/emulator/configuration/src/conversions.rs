@@ -139,11 +139,14 @@ pub async fn convert_bundle_to_configs(
 fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
     let cwd = std::env::current_dir().ok()?;
     path.as_ref().and_then(|name| {
+        if name.is_empty() {
+            return None;
+        }
         // See if the "name" is actually a path to a virtual device file.
         let path =
             Utf8PathBuf::from_path_buf(cwd).expect("Current directory is not utf8").join(name);
-        if !path.exists() {
-            tracing::debug!("Value '{}' doesn't appear to be a valid path.", name);
+        if !path.is_file() {
+            tracing::debug!("Value '{}' doesn't appear to be a valid file.", name);
             return None;
         }
         match VirtualDeviceManifest::parse_virtual_device_file(&path) {
@@ -160,7 +163,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
             Err(_) => {
                 println!(
                     "Attempted to use the file at '{}' to configure the device, but the contents \
-                    of that file are not a valid Virtual Device specification. Checking the \
+                    of that file are not a valid Virtual Device specification. \nChecking the \
                     Product Bundle for a device with that name...",
                     path
                 );
@@ -564,6 +567,11 @@ mod tests {
     #[test]
     fn test_parse_device_name_as_path_none() {
         assert_eq!(parse_device_name_as_path(&None), None);
+    }
+
+    #[test]
+    fn test_parse_device_name_as_path_empty() {
+        assert_eq!(parse_device_name_as_path(&Some(String::new())), None);
     }
 
     #[test]
