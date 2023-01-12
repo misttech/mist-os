@@ -13,7 +13,9 @@
 #include <stddef.h>
 #include <zircon/assert.h>
 #include <zircon/boot/image.h>
+#include <zircon/types.h>
 
+#include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
@@ -59,13 +61,20 @@ class PhysBootTimes {
   arch::EarlyTicks timestamps_[kCount] = {};
 };
 
-// This is instrumentation data (if any) about physboot itself.  The data
-// handed off may be updated in place by physboot's instrumented code.
-struct PhysInstrumentationData {
-  PhysHandoffTemporaryString symbolizer_log;
-  PhysHandoffTemporarySpan<const ktl::byte> llvm_profdata;
+// VMOs to publish as is.
+struct PhysVmo {
+  using Name = ktl::array<char, ZX_MAX_NAME_LEN>;
+
+  void set_name(ktl::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
+
+  // TODO(fxbug.dev/84107): Currently these are actually copied like everything
+  // else into temporary handoff space (the only kind), so only the actual
+  // content size is allocated.  Eventually these will just be handed off here
+  // as a paddr and size of whole physical pages plus a precise content size.
+  PhysHandoffTemporarySpan<const ktl::byte> data;
+  Name name{};
 };
-static_assert(ktl::is_default_constructible_v<PhysInstrumentationData>);
+static_assert(ktl::is_default_constructible_v<PhysVmo>);
 
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
@@ -82,7 +91,9 @@ struct PhysHandoff {
   PhysBootTimes times;
   static_assert(ktl::is_default_constructible_v<PhysBootTimes>);
 
-  PhysInstrumentationData instrumentation;
+  // VMOs to be published to userland as is and not otherwise used by the
+  // kernel proper.
+  PhysHandoffTemporarySpan<const PhysVmo> vmos;
 
   // Physical address of the data ZBI.
   uint64_t zbi = 0;

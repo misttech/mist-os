@@ -47,6 +47,8 @@ class Log {
   // This can be used to track the current total size of the accumulated log.
   size_t size_bytes() const { return size_; }
 
+  bool empty() const { return size_ == 0; }
+
   // This takes ownership of the log's contiguous pages.  After this, no other
   // methods can be used.  In particular, size_bytes() should be taken first to
   // get the exact content size rather than the page-rounded buffer size.

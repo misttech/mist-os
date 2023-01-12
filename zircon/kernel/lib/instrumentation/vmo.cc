@@ -13,6 +13,7 @@
 #include <ktl/iterator.h>
 #include <ktl/string_view.h>
 #include <object/vm_object_dispatcher.h>
+#include <phys/handoff.h>
 #include <vm/vm_object_paged.h>
 
 #include "private.h"
@@ -123,10 +124,6 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
   // compiler to check that every enum case is handled.
   constexpr auto get_getter = [](Vmo idx) -> InstrumentationDataVmo (*)() {
     switch (idx) {
-      case kPhysSymbolizerVmo:
-        return PhysSymbolizerVmo;
-      case kPhysLlvmProfdataVmo:
-        return PhysLlvmProfdataVmo;
       case kLlvmProfdataVmo:
         return LlvmProfdataVmo;
       case kSancovVmo:
@@ -134,6 +131,8 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
       case kSancovCountsVmo:
         return SancovGetCountsVmo;
 
+        // The phys ones are done separately with no extra logging.
+      case kPhysFirst ... kPhysLast:
         // The symbolizer file is done separately below since it must be last.
       case kSymbolizerVmo:
       case kVmoCount:
@@ -142,7 +141,7 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
     return nullptr;
   };
   bool have_data = false;
-  for (uint32_t idx = 0; idx < kVmoCount; ++idx) {
+  for (uint32_t idx = 0; idx < kPhysFirst; ++idx) {
     if (auto getter = get_getter(static_cast<Vmo>(idx))) {
       InstrumentationDataVmo data = getter();
       if (data.handle) {
@@ -155,7 +154,22 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
         handles[idx] = get_stub_vmo();
       }
     }
-  };
+  }
+
+  // The phys VMOs just need to be published to userland.
+  // They already include their own logging.
+  constexpr size_t kPhysMax = kPhysLast - kPhysFirst + 1;
+  ktl::span<const PhysVmo> phys_vmos = gPhysHandoff->vmos.get();
+  ZX_ASSERT_MSG(phys_vmos.size() <= kPhysMax,
+                "too many VMOs from phys! %zu > userboot protocol max %zu", phys_vmos.size(),
+                kPhysMax);
+  for (uint32_t idx = kPhysFirst; idx <= kPhysLast; ++idx) {
+    const size_t phys_idx = idx - kPhysFirst;
+    Handle* handle = phys_vmos.size() > phys_idx  //
+                         ? MakePhysVmo(phys_vmos[phys_idx])
+                         : nullptr;
+    handles[idx] = handle ? handle : get_stub_vmo();
+  }
 
   handles[kSymbolizerVmo] = have_data ? ktl::move(symbolizer).Finish() : get_stub_vmo();
 

@@ -14,6 +14,7 @@
 #include <zircon/boot/image.h>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/intrusive_single_list.h>
 #include <ktl/byte.h>
 #include <ktl/initializer_list.h>
 #include <ktl/move.h>
@@ -24,6 +25,8 @@
 
 struct BootOptions;
 class PhysBootTimes;
+class ElfImage;
+class Log;
 
 class HandoffPrep {
  public:
@@ -77,11 +80,35 @@ class HandoffPrep {
   // Add physboot's own instrumentation data to the handoff.  After this, the
   // live instrumented physboot code is updating the handoff data directly up
   // through the very last compiled basic block that jumps into the kernel.
+  // This calls PublishVmo, so it must come before FinishVmos.
   void SetInstrumentation();
+
+  // Add a generic VMO to be simply published to userland.  The kernel proper
+  // won't ever look at it.
+  //
+  // TODO(fxbug.dev/84107): Currently this returns the buffer to copy the
+  // contents into.  Later this will require a whole-page allocation that gets
+  // handed off.  It can be changed in place hereafter until the moment of
+  // handoff.
+  ktl::span<ktl::byte> PublishVmo(ktl::string_view name, size_t content_size);
+
+  // Do PublishVmo with a Log buffer, which is consumed.
+  void PublishLog(ktl::string_view vmo_name, Log&& log);
+
+  // Do final handoff of the VMO list.  The contents are already in place,
+  // so this does not invalidate pointers from PublishVmo.
+  void FinishVmos();
 
  private:
   using AllocateFunction = trivial_allocator::SingleHeapAllocator;
   using Allocator = trivial_allocator::BasicLeakyAllocator<AllocateFunction>;
+
+  // A list in scratch memory of the pending PhysVmo structs so they
+  // can be packed into a single array at the end.
+  struct HandoffVmo : public fbl::SinglyLinkedListable<HandoffVmo*> {
+    PhysVmo vmo;
+  };
+  using HandoffVmoList = fbl::SizedSinglyLinkedList<HandoffVmo*>;
 
   struct Debugdata {
     ktl::string_view announce, sink_name, vmo_name;
@@ -98,11 +125,10 @@ class HandoffPrep {
   // Defined in //zircon/kernel/arch/$cpu/phys/arch-handoff-prep-zbi.cc.
   void ArchSummarizeMiscZbiItem(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 
-  void SetSymbolizerLog(ktl::initializer_list<Debugdata> dumps);
-
   Allocator allocator_;
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
+  HandoffVmoList vmos_;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_HANDOFF_PREP_H_

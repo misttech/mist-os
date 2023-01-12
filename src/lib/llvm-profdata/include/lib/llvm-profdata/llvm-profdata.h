@@ -86,6 +86,7 @@ class LlvmProfdata {
   // This is the name associated with the data in the fuchsia.debugdata FIDL
   // protocol.
   static constexpr std::string_view kDataSinkName = "llvm-profile";
+  static constexpr std::string_view kFileSuffix = ".profraw";
 
   // This is a human-readable title used in log messages about the dump.
   static constexpr std::string_view kAnnounce = "LLVM Profile";

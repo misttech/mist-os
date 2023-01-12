@@ -479,21 +479,28 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [ ":handoff-prep.h" ]
     deps = [
       ":allocation",
+      ":elf-image",
       ":handoff",
       ":handoff-entropy",
+      ":log",
+      ":new",
       ":symbolize",
       ":zbitl-allocation",
       "$arch_phys:arch-handoff-prep",
       "//src/lib/llvm-profdata",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/instrumentation",
       "//zircon/kernel/phys/lib/memalloc",
     ]
   }
 
-  source_set("elf-image") {
+  static_library("elf-image") {
     public = [ "include/phys/elf-image.h" ]
-    sources = [ "elf-image.cc" ]
+    sources = [
+      "elf-image-vmos.cc",
+      "elf-image.cc",
+    ]
     public_configs = [ ":includes" ]
     public_deps = [
       "//sdk/lib/fit",
@@ -506,6 +513,8 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     deps = [
       ":allocation",
+      ":handoff",
+      "//src/lib/llvm-profdata",
 
       # Indirect dep via circular :symbolize dep.
       "//src/lib/symbolizer-markup",

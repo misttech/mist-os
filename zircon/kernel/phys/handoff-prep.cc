@@ -18,8 +18,12 @@
 
 #include <ktl/algorithm.h>
 #include <phys/allocation.h>
+#include <phys/elf-image.h>
 #include <phys/handoff.h>
+#include <phys/new.h>
 #include <phys/symbolize.h>
+
+#include "log.h"
 
 #include <ktl/enforce.h>
 
@@ -84,75 +88,45 @@ void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
 }
 
 void HandoffPrep::SetInstrumentation() {
-  ZX_DEBUG_ASSERT(gSymbolize);
-
-  // Publish llvm-profdata if present.
-  LlvmProfdata profdata;
-  profdata.Init(gSymbolize->BuildId().desc);
-  if (profdata.size_bytes() != 0) {
-    fbl::AllocChecker ac;
-    ktl::span buffer = New(handoff()->instrumentation.llvm_profdata, ac, profdata.size_bytes());
-    ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for llvm-profdata", profdata.size_bytes());
-    ZX_DEBUG_ASSERT(buffer.size() == profdata.size_bytes());
-
-    // Copy the fixed data and initial counter values and then start updating
-    // the handoff data in place.
-    ktl::span counters = profdata.WriteFixedData(buffer);
-    profdata.CopyCounters(counters);
-    LlvmProfdata::UseCounters(counters);
+  auto publish_vmo = [this](ktl::string_view name, size_t content_size) {
+    return PublishVmo(name, content_size);
+  };
+  for (const ElfImage* module : gSymbolize->modules()) {
+    module->PublishInstrumentation(publish_vmo);
   }
-
-  // Collect the symbolizer logging, including logs for each nonempty dump.
-  SetSymbolizerLog({
-      {
-          .announce = LlvmProfdata::kAnnounce,
-          .sink_name = LlvmProfdata::kDataSinkName,
-          .vmo_name = "physboot.profraw",
-          .size_bytes = profdata.size_bytes(),
-      },
-  });
 }
 
-void HandoffPrep::SetSymbolizerLog(ktl::initializer_list<Debugdata> dumps) {
-  auto log_to = [dumps](FILE& file) {
-    Symbolize symbolize(ProgramName(), &file);
-    symbolize.Context();
-    for (const Debugdata& dump : dumps) {
-      if (dump.size_bytes != 0) {
-        symbolize.DumpFile(dump.sink_name, dump.vmo_name, dump.announce, dump.size_bytes);
-      }
-    }
-  };
+ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t content_size) {
+  if (content_size == 0) {
+    return {};
+  }
 
-  // First generate the symbolzer log text just to count its size.
-  struct CountFile {
-   public:
-    size_t size() const { return size_; }
-
-    int Write(ktl::string_view str) {
-      size_ += str.size();
-      return static_cast<int>(str.size());
-    }
-
-   private:
-    size_t size_ = 0;
-  };
-  CountFile counter;
-  FILE count_file(&counter);
-  log_to(count_file);
-
-  // Now we can allocate the handoff buffer for that data.
   fbl::AllocChecker ac;
-  ktl::span buffer = New(handoff()->instrumentation.symbolizer_log, ac, counter.size() + 1);
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for symbolizer log", counter.size());
+  HandoffVmo* handoff_vmo = new (gPhysNew<memalloc::Type::kPhysScratch>, ac) HandoffVmo;
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu scratch bytes for HandoffVmo",
+                sizeof(*handoff_vmo));
 
-  // Finally, generate the same text again to fill the buffer.
-  StringFile buffer_file(buffer);
-  log_to(buffer_file);
+  handoff_vmo->vmo.set_name(name);
 
-  // We had to add an extra char to the buffer since StringFile wants to
-  // NUL-terminate it.  But we don't want the NUL, so make it whitespace.
-  ktl::move(buffer_file).take().back() = '\n';
+  ktl::span buffer = New(handoff_vmo->vmo.data, ac, content_size);
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for %.*s", content_size,
+                static_cast<int>(name.size()), name.data());
+  ZX_DEBUG_ASSERT(buffer.size() == content_size);
+
+  vmos_.push_front(handoff_vmo);
+  return buffer;
+}
+
+void HandoffPrep::FinishVmos() {
+  fbl::AllocChecker ac;
+  ktl::span phys_vmos = New(handoff()->vmos, ac, vmos_.size());
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", vmos_.size(),
+                sizeof(PhysVmo));
+  ZX_DEBUG_ASSERT(phys_vmos.size() == vmos_.size());
+
+  for (PhysVmo& phys_vmo : phys_vmos) {
+    phys_vmo = ktl::move(vmos_.pop_front()->vmo);
+  }
 }
 
 BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {
@@ -165,4 +139,18 @@ BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {
   }
 
   return *handoff_options;
+}
+
+void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
+  if (log.empty()) {
+    return;
+  }
+
+  const size_t content_size = log.size_bytes();
+  Allocation buffer = ktl::move(log).TakeBuffer();
+  ZX_ASSERT(content_size <= buffer.size_bytes());
+
+  ktl::span copy = PublishVmo(name, content_size);
+  ZX_ASSERT(copy.size_bytes() == content_size);
+  memcpy(copy.data(), buffer.get(), content_size);
 }

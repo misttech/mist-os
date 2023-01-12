@@ -164,10 +164,17 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   gBootOptions = &handoff_options;
 
   prep.SummarizeMiscZbiItems(boot.DataZbi().storage());
+  gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
 
   prep.SetInstrumentation();
 
-  gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
+  // This transfers the log, so logging after this is not preserved.
+  // Extracting the log buffer will automatically detach it from stdout.
+  // TODO(mcgrathr): Rename to physboot.log with some prefix.
+  prep.PublishLog("data/phys/symbolizer.log", ktl::move(*ktl::exchange(gLog, nullptr)));
+
+  // Finalize the published VMOs, including the log just published above.
+  prep.FinishVmos();
 
   // Now that all time samples have been collected, copy gBootTimes into the
   // hand-off.

@@ -123,10 +123,13 @@ template <typename T, PhysHandoffPtrEncoding Encoding, PhysHandoffPtrLifetime Li
 class PhysHandoffSpan {
  public:
   PhysHandoffSpan() = default;
-  PhysHandoffSpan(const PhysHandoffSpan&) = default;
+  PhysHandoffSpan(const PhysHandoffSpan&) = delete;
+  PhysHandoffSpan(PhysHandoffSpan&&) noexcept = default;
 
   PhysHandoffSpan(PhysHandoffPtr<T, Encoding, Lifetime> ptr, size_t size)
       : ptr_(ptr), size_(size) {}
+
+  PhysHandoffSpan& operator=(PhysHandoffSpan&&) noexcept = default;
 
 #ifdef _KERNEL
   ktl::span<T> get() const { return {ptr_.get(), size_}; }

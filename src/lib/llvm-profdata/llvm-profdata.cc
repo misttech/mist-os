@@ -184,7 +184,7 @@ struct ProfRawHeader {
     if constexpr (INSTR_PROF_RAW_VERSION < 6) {
       return 0;
     } else {
-      return BinaryIdsSize;
+      return static_cast<size_t>(BinaryIdsSize);
     }
   }
 
@@ -261,14 +261,15 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   const ProfRawHeader header = GetHeader(build_id_);
 
   counters_offset_ = sizeof(header) + header.binary_ids_size() +
-                     (header.DataSize * sizeof(__llvm_profile_data)) +
-                     header.PaddingBytesBeforeCounters;
-  counters_size_bytes_ = header.CountersSize * sizeof(uint64_t);
+                     (static_cast<size_t>(header.DataSize) * sizeof(__llvm_profile_data)) +
+                     static_cast<size_t>(header.PaddingBytesBeforeCounters);
+  counters_size_bytes_ = static_cast<size_t>(header.CountersSize) * sizeof(uint64_t);
   ZX_ASSERT(counters_size_bytes_ == ProfCountersData().size_bytes());
 
-  size_bytes_ = counters_offset_ + counters_size_bytes_ + header.PaddingBytesAfterCounters;
+  size_bytes_ = counters_offset_ + counters_size_bytes_ +
+                static_cast<size_t>(header.PaddingBytesAfterCounters);
 
-  const size_t PaddingBytesAfterNames = PaddingSize(header.NamesSize);
+  const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
   size_bytes_ += header.NamesSize + PaddingBytesAfterNames;
 }
 
@@ -313,7 +314,8 @@ cpp20::span<std::byte> LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
 
   auto prof_data = cpp20::span(DataBegin, DataEnd - DataBegin);
   write_bytes(cpp20::as_bytes(prof_data), INSTR_PROF_DATA_SECT_NAME);
-  write_bytes(kPadding.subspan(0, header.PaddingBytesBeforeCounters), kPaddingDoc);
+  write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesBeforeCounters)),
+              kPaddingDoc);
 
   // Skip over the space in the data blob for the counters.
   ZX_ASSERT(counters_size_bytes_ == ProfCountersData().size_bytes());
@@ -323,10 +325,11 @@ cpp20::span<std::byte> LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
   cpp20::span counters_data = data.subspan(0, counters_size_bytes_);
   data = data.subspan(counters_size_bytes_);
 
-  write_bytes(kPadding.subspan(0, header.PaddingBytesAfterCounters), kPaddingDoc);
+  write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesAfterCounters)),
+              kPaddingDoc);
 
   auto prof_names = cpp20::span(NamesBegin, NamesEnd - NamesBegin);
-  const size_t PaddingBytesAfterNames = PaddingSize(header.NamesSize);
+  const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
   write_bytes(cpp20::as_bytes(prof_names), INSTR_PROF_NAME_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingBytesAfterNames), kPaddingDoc);
 
@@ -419,7 +422,7 @@ cpp20::span<const std::byte> LlvmProfdata::BuildIdFromRawProfile(
   if (data.size() < build_id_size) {
     return {};
   }
-  return data.subspan(0, build_id_size);
+  return data.subspan(0, static_cast<size_t>(build_id_size));
 }
 
 bool LlvmProfdata::Match(cpp20::span<const std::byte> data) {

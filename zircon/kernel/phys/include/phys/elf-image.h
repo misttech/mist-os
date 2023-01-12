@@ -12,6 +12,7 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/static-vector.h>
+#include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/zbitl/items/bootfs.h>
 #include <lib/zbitl/view.h>
@@ -41,6 +42,9 @@ class ElfImage {
 
   using BootfsDir = zbitl::BootfsView<ktl::span<ktl::byte>>;
   using Error = BootfsDir::Error;
+
+  using PublishVmoFunction =
+      fit::inline_function<ktl::span<ktl::byte>(ktl::string_view name, size_t content_size)>;
 
   // An ELF image is found at "dir/name". That can be an ELF file or a subtree.
   // The subtree should contain "image.elf", "code-patches.bin", etc.  A
@@ -139,6 +143,10 @@ class ElfImage {
     return load_.SymbolizerContext(writer, id, name(), build_id_->desc, LoadAddress(), prefix);
   }
 
+  // Publish instrumentation VMOs for this module.  The argument is something
+  // called like HandoffPrep::PublishVmo, which see.
+  void PublishInstrumentation(PublishVmoFunction publish_vmo) const;
+
   // Call the image's entry point as a function type F.
   template <typename F, typename... Args>
   ktl::invoke_result_t<F*, Args...> Call(Args&&... args) const {
@@ -159,6 +167,8 @@ class ElfImage {
 
   ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch,
                                        const Allocation& loaded);
+
+  void PublishSelfLlvmProfdata(PublishVmoFunction& publish_vmo) const;
 
   ktl::string_view name_;
   elfldltl::DirectMemory image_{{}};

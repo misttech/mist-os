@@ -97,7 +97,7 @@ void Symbolize::BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt) {
 void Symbolize::DumpFile(ktl::string_view type, ktl::string_view name, ktl::string_view desc,
                          size_t size_bytes) {
   Context();
-  writer_.Prefix(name_).Dumpfile(type, name);
+  writer_.Prefix(name_).Prefix(desc).Dumpfile(type, name);
   Printf(" %zu bytes\n", size_bytes);
 }
 

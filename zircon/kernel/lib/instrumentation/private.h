@@ -9,9 +9,11 @@
 
 #include <stddef.h>
 
+#include <ktl/span.h>
 #include <ktl/string_view.h>
 
 class Handle;
+struct PhysVmo;
 
 struct InstrumentationDataVmo {
   // A descriptive string used in the kernel log message.
@@ -35,7 +37,6 @@ InstrumentationDataVmo SancovGetPcVmo();
 InstrumentationDataVmo SancovGetCountsVmo();
 
 // phys.cc
-InstrumentationDataVmo PhysSymbolizerVmo();
-InstrumentationDataVmo PhysLlvmProfdataVmo();
+Handle* MakePhysVmo(const PhysVmo&);
 
 #endif  // ZIRCON_KERNEL_LIB_INSTRUMENTATION_PRIVATE_H_
