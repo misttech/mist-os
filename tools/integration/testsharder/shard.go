@@ -60,7 +60,12 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 
 	// The path to the package repository should be unique so as to not
 	// conflict with other shards' repositories.
-	localRepoRel := fmt.Sprintf("repo_%s", url.PathEscape(s.Name))
+	localRepoRel := fmt.Sprintf(
+		"repo_%s",
+		// Escape the shard name so it can be used as a filename, and replace
+		// colons so it can be passed unambiguously to the CAS CLI, which uses
+		// colons as separators.
+		url.PathEscape(strings.ReplaceAll(s.Name, ":", "_")))
 	localRepo := filepath.Join(buildDir, localRepoRel)
 	// Remove the localRepo if it exists in the incremental build cache.
 	if err := os.RemoveAll(localRepo); err != nil {
