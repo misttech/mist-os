@@ -9,6 +9,7 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <variant>
 
 #include "constants.h"
 #include "field.h"
@@ -111,6 +112,24 @@ struct ShdrBase {
   };
 };
 
+// A base class for the sym layout, allowing the Elf<...>::Sym definitions
+// below to share these methods.
+template <class Sym>
+struct SymBase {
+  constexpr ElfSymBind bind() const {
+    return static_cast<ElfSymBind>(static_cast<const Sym*>(this)->info() >> 4);
+  }
+
+  constexpr ElfSymType type() const {
+    return static_cast<ElfSymType>(static_cast<const Sym*>(this)->info() & 0xf);
+  }
+
+  static constexpr uint8_t MakeInfo(ElfSymBind bind, ElfSymType type) {
+    return static_cast<uint8_t>((static_cast<uint8_t>(bind) << 4) |
+                                (static_cast<uint8_t>(type) << 0));
+  }
+};
+
 // Some header layouts vary by ElfClass, i.e. address size used in ELF
 // metadata.  This is partially specialized by class below.
 template <ElfClass Class, ElfData Data>
@@ -140,7 +159,7 @@ struct Layout<ElfClass::k32, Data> : public LayoutBase<Data> {
     Addr align;
   };
 
-  struct Sym {
+  struct Sym : public SymBase<Sym> {
     Word name;
     Addr value;
     Addr size;
@@ -176,7 +195,7 @@ struct Layout<ElfClass::k64, Data> : public LayoutBase<Data> {
     Addr align;
   };
 
-  struct Sym {
+  struct Sym : public SymBase<Sym> {
     Word name;
     Byte info;
     Byte other;
@@ -358,22 +377,18 @@ struct Elf : private Layout<Class, Data> {
     Addr val;
   };
 
-  struct Sym : public Layout<Class, Data>::Sym {
-    using Layout<Class, Data>::Sym::Sym;
-    using Layout<Class, Data>::Sym::operator=;
+  using typename Layout<Class, Data>::Sym;
 
-    // The layout differs completely by class, but the one-byte info field is
-    // always encoded the same way.
-
-    constexpr ElfSymBind bind() const { return static_cast<ElfSymBind>(this->info() >> 4); }
-
-    constexpr ElfSymType type() const { return static_cast<ElfSymType>(this->info() & 0xf); }
-
-    static constexpr uint8_t MakeInfo(ElfSymBind bind, ElfSymType type) {
-      return static_cast<uint8_t>((static_cast<uint8_t>(bind) << 4) |
-                                  (static_cast<uint8_t>(type) << 0));
-    }
-  };
+  // These two classes are copied so that these types can be both easily
+  // aggregate initialized and designated initialized. We can't have both
+  // if we opt to use inheritance to save some code duplication in these
+  // two classes. Note, Phdr and Sym types use inheritance in this way
+  // and the syntax to aggregate initialize them is ugly {{}, fields...}.
+  // In practice, those types are never aggregate initialized because their
+  // layout differs between elf classes. The Rel types do not so we wish
+  // for them to be easily aggregate initializable. Likewise, we want
+  // these types to follow Phdr and Sym and be designated initializable
+  // even if this pattern is unlikely to be used on these types.
 
   struct Rel {
     constexpr uint32_t symndx() const { return info() >> kSymndxShift; }
@@ -386,7 +401,15 @@ struct Elf : private Layout<Class, Data> {
     Addr info;
   };
 
-  struct Rela : public Rel {
+  struct Rela {
+    constexpr uint32_t symndx() const { return info() >> kSymndxShift; }
+    constexpr uint32_t type() const { return info() & kTypeMask; }
+
+    static constexpr auto kSymndxShift = Layout<Class, Data>::kRelTypeBits;
+    static constexpr auto kTypeMask = (size_type{1} << kSymndxShift) - 1;
+
+    Addr offset;
+    Addr info;
     SignedField<size_type, kSwap> addend;
   };
 };

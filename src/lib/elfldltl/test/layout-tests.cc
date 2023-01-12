@@ -337,4 +337,17 @@ TYPED_TEST(ElfldltlLayoutTests, DiagnosticsTests) {
              AllMachinesEhdrTests<typename TestFixture::Elf>::kTests);
 }
 
+TYPED_TEST(ElfldltlLayoutTests, DesignatedInitializers) {
+  using Elf = typename TestFixture::Elf;
+
+  [[maybe_unused]] constexpr typename Elf::Ehdr ehdr{.magic = 0};
+  [[maybe_unused]] constexpr typename Elf::Nhdr nhdr{.namesz = 0};
+  [[maybe_unused]] constexpr typename Elf::Phdr phdr{.offset = 0};
+  [[maybe_unused]] constexpr typename Elf::Shdr shdr{.name = 0};
+  [[maybe_unused]] constexpr typename Elf::Dyn dyn{.val = 0};
+  [[maybe_unused]] constexpr typename Elf::Sym sym{.name = 0};
+  [[maybe_unused]] constexpr typename Elf::Rel rel{.offset = 0};
+  [[maybe_unused]] constexpr typename Elf::Rela rela{.offset = 0};
+}
+
 }  // namespace

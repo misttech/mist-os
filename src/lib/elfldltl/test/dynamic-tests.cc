@@ -212,9 +212,9 @@ class RelocInfoTestImage {
     };
 
     Rela rela[3] = {
-        {{8, kRelativeType}, 0x11111111},
-        {{24, kRelativeType}, 0x33333333},
-        {{4096, kAbsoluteType}, 0x1234},
+        {8, kRelativeType, 0x11111111},
+        {24, kRelativeType, 0x33333333},
+        {4096, kAbsoluteType, 0x1234},
     };
 
     Addr relr[3] = {
