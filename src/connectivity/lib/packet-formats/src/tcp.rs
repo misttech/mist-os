@@ -408,11 +408,9 @@ impl<B: ByteSlice> TcpSegment<B> {
                 let mut options = ArrayVec::new();
                 // Safe because we validate that `self.options` is no longer
                 // than MAX_OPTIONS_LEN.
-                expect!(
-                    options.try_extend_from_slice(self.options.bytes()),
-                    "TCP segment options longer than {} bytes",
-                    MAX_OPTIONS_LEN
-                );
+                options.try_extend_from_slice(self.options.bytes()).unwrap_or_else(|e| {
+                    panic!("TCP segment options longer than {} bytes: {:?}", MAX_OPTIONS_LEN, e)
+                });
                 options
             },
         }
@@ -589,11 +587,9 @@ impl<B: ByteSlice> TcpSegmentRaw<B> {
                     let mut opts = ArrayVec::new();
                     // Safe because we validate that `self.options` is no longer
                     // than MAX_OPTIONS_LEN.
-                    expect!(
-                        opts.try_extend_from_slice(options.bytes()),
-                        "TCP segment options longer than {} bytes",
-                        MAX_OPTIONS_LEN
-                    );
+                    opts.try_extend_from_slice(options.bytes()).unwrap_or_else(|e| {
+                        panic!("TCP segment options longer than {} bytes: {:?}", MAX_OPTIONS_LEN, e)
+                    });
                     opts
                 },
             })
