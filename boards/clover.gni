@@ -62,7 +62,7 @@ fvm_partition = "fvm"
 fvm_ftl_nand_page_size = 4096
 fvm_ftl_nand_oob_size = 128
 fvm_ftl_nand_pages_per_block = 64
-fvm_ftl_nand_block_count = 2048
+fvm_ftl_nand_block_count = 1604
 
 # Supports only physical devices.
 board_is_emu = false

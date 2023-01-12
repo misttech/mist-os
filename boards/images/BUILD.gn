@@ -141,7 +141,7 @@ generated_images_config("clover") {
     page_size = 4096
     oob_size = 128
     pages_per_block = 64
-    block_count = 2048
+    block_count = 1604
 
     truncate_to_length = 3221225472
   }
