@@ -36,6 +36,7 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
 
 // Print a wide string to console
 int puts16(char16_t *str);
+int write_to_serial(char16_t *buffer, uint64_t len);
 
 __END_CDECLS
 

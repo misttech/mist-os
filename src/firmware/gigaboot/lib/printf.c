@@ -10,6 +10,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <xefi.h>
+
 int sprintf(char *str, const char *fmt, ...) {
   int err;
 
@@ -386,4 +388,18 @@ int _printf_engine(_printf_engine_output_func out, void *state, const char *fmt,
 
 exit:
   return (err < 0) ? err : (int)chars_written;
+}
+
+int write_to_serial(char16_t *buffer, uint64_t len) {
+  if (gSerial == NULL) {
+    return 0;
+  }
+  len *= sizeof(char16_t);
+  return gSerial->Write(gSerial, &len, buffer) == EFI_SUCCESS ? len : -1;
+}
+
+int puts16(char16_t *str) {
+  int r1 = write_to_serial(str, strlen_16(str));
+  int r2 = (gConOut->OutputString(gConOut, str) == EFI_SUCCESS ? 0 : -1);
+  return (r1 < 0 || r2 < 0) ? -1 : 0;
 }

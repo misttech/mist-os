@@ -23,7 +23,6 @@ config("legacy_includes") {
 source_set("legacy_c_gigaboot") {
   sources = [
     "$dir_gigaboot/lib/cmdline.c",
-    "$dir_gigaboot/lib/console-printf.c",
     "$dir_gigaboot/lib/inet.c",
     "$dir_gigaboot/lib/loadfile.c",
     "$dir_gigaboot/lib/printf.c",

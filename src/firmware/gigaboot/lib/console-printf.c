@@ -13,14 +13,6 @@ typedef struct {
   char16_t buf[PCBUFMAX + 2];
 } _pcstate;
 
-int write_to_serial(char16_t* buffer, uint64_t len) {
-  if (gSerial == NULL) {
-    return 0;
-  }
-  len *= sizeof(char16_t);
-  return gSerial->Write(gSerial, &len, buffer) == EFI_SUCCESS ? len : -1;
-}
-
 static int _printf_console_out(const char* str, size_t len, void* _state) {
   _pcstate* state = _state;
   char16_t* buf = state->buf;
@@ -65,10 +57,4 @@ int vprintf(const char* fmt, va_list ap) {
     gConOut->OutputString(gConOut, state.buf);
   }
   return r;
-}
-
-int puts16(char16_t* str) {
-  int r1 = write_to_serial(str, strlen_16(str));
-  int r2 = (gConOut->OutputString(gConOut, str) == EFI_SUCCESS ? 0 : -1);
-  return (r1 < 0 || r2 < 0) ? -1 : 0;
 }
