@@ -2,15 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/110255): Remove when all bringup builder bots with DFv2 enabled
-# include //bundles/buildbot/bringup instead of :bringup  into their base
-# package set.
-group("bringup") {
-  testonly = true
-
-  deps = [ "//bundles/buildbot/dfv2/bringup" ]
-}
-
 # The dependencies of this group should be the same as //src/buildbot/core. If
 # there is a target in //src/buildbot/core's dependencies that is not in this
 # group then that either means the target includes a test that is failing and
