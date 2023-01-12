@@ -59,7 +59,7 @@ impl Galaxy {
         let task = Task::create_process_without_parent(
             &self.kernel,
             binary_path.clone(),
-            Some(self.root_fs.clone()),
+            Some(self.root_fs.fork()),
         )?;
         let init_task = self.kernel.pids.read().get_task(1);
         if let Some(init_task) = init_task {
@@ -114,7 +114,7 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
         .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
     // TODO: This should probably be part of the "feature" CONFIGuration.
     let kernel = init_task.kernel().clone();
-    let root_fs = init_task.fs().clone();
+    let root_fs = init_task.fs().fork();
 
     let startup_file_path = if CONFIG.startup_file_path.is_empty() {
         None
