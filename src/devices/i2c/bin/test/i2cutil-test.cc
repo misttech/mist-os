@@ -268,11 +268,27 @@ class I2cUtilTest : public zxtest::Test {
 
   void TearDown() override { loop_->Shutdown(); }
 
+  std::vector<i2cutil::TransactionData> CreateTransactions(size_t n);
+
  protected:
   std::unique_ptr<async::Loop> loop_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> client_;
   FakeI2cDevice i2c_;
 };
+
+std::vector<i2cutil::TransactionData> I2cUtilTest::CreateTransactions(size_t n) {
+  std::vector<i2cutil::TransactionData> transactions;
+  transactions.reserve(n);
+
+  for (size_t i = 0; i < n; i++) {
+    i2cutil::TransactionData t;
+    t.type = i2cutil::TransactionType::Write;
+    t.bytes.push_back(static_cast<uint8_t>(i));
+    transactions.push_back(t);
+  }
+
+  return transactions;
+}
 
 TEST_F(I2cUtilTest, TestWriteBytes) {
   i2cutil::TransactionData t1;
@@ -352,6 +368,42 @@ TEST_F(I2cUtilTest, TestMultiTransaction) {
   EXPECT_EQ(transactions.at(1).bytes.at(0), 0x4);
   EXPECT_EQ(transactions.at(1).bytes.at(1), 0x5);
   EXPECT_EQ(transactions.at(1).bytes.at(2), 0x6);
+}
+
+TEST_F(I2cUtilTest, TestPaginatedLessThanOnePage) {
+  // In this test we want to test that pagination works correctly when there are
+  // fewer than one page worth of transactions.
+  constexpr size_t kNumTransactions = i2cutil::kMaxTransactionCount - 1;
+
+  std::vector<i2cutil::TransactionData> transactions = CreateTransactions(kNumTransactions);
+
+  i2cutil::execute(std::move(client_), transactions);
+
+  EXPECT_EQ(i2c_.Writes().size(), transactions.size());
+}
+
+TEST_F(I2cUtilTest, TestPaginatedExactlyOnePage) {
+  // In this test we want to test that pagination works correctly when the number
+  // of transactions exactly matches the max allowable number of transactions.
+  constexpr size_t kNumTransactions = i2cutil::kMaxTransactionCount;
+
+  std::vector<i2cutil::TransactionData> transactions = CreateTransactions(kNumTransactions);
+
+  i2cutil::execute(std::move(client_), transactions);
+
+  EXPECT_EQ(i2c_.Writes().size(), transactions.size());
+}
+
+TEST_F(I2cUtilTest, TestPaginatedMoreThanOnePage) {
+  // In this test we want to test that pagination works correctly when there are
+  // more than one page worth of transactions.
+  constexpr size_t kNumTransactions = i2cutil::kMaxTransactionCount + 1;
+
+  std::vector<i2cutil::TransactionData> transactions = CreateTransactions(kNumTransactions);
+
+  i2cutil::execute(std::move(client_), transactions);
+
+  EXPECT_EQ(i2c_.Writes().size(), transactions.size());
 }
 
 }  // namespace

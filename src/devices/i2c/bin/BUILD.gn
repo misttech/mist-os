@@ -12,6 +12,7 @@ executable("i2cutil2") {
     "main.cc",
   ]
   deps = [
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
@@ -44,6 +45,7 @@ test("i2cutil-test-bin") {
   ]
   include_dirs = [ "." ]
   deps = [
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/fdio",
     "//src/devices/i2c/testing/fake-i2c",

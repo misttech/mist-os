@@ -4,11 +4,13 @@
 
 #include "i2cutil2.h"
 
-namespace i2cutil {
+#include <span>
 
-zx_status_t execute(fidl::ClientEnd<fuchsia_hardware_i2c::Device> client,
-                    std::vector<i2cutil::TransactionData>& transactions) {
-  if (transactions.size() > fuchsia_hardware_i2c::wire::kMaxCountTransactions) {
+namespace {
+
+zx_status_t execute_paginated(fidl::ClientEnd<fuchsia_hardware_i2c::Device>& client,
+                              cpp20::span<i2cutil::TransactionData> transactions) {
+  if (transactions.size() > i2cutil::kMaxTransactionCount) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -62,6 +64,24 @@ zx_status_t execute(fidl::ClientEnd<fuchsia_hardware_i2c::Device> client,
                 transactions[i].bytes.size());
       }
       read_txn_num++;
+    }
+  }
+
+  return ZX_OK;
+}
+
+}  // namespace
+
+namespace i2cutil {
+
+zx_status_t execute(fidl::ClientEnd<fuchsia_hardware_i2c::Device> client,
+                    std::vector<i2cutil::TransactionData>& transactions) {
+  for (size_t i = 0; i < transactions.size(); i += kMaxTransactionCount) {
+    const size_t start = i;
+    const size_t count = std::min(kMaxTransactionCount, transactions.size() - i);
+    zx_status_t result = execute_paginated(client, {transactions.data() + start, count});
+    if (result != ZX_OK) {
+      return result;
     }
   }
 
