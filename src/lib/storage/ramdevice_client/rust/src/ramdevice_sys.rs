@@ -123,3 +123,6 @@ extern "C" {
 extern "C" {
     pub fn ramdisk_destroy(client: *mut ramdisk_client_t) -> zx_status_t;
 }
+extern "C" {
+    pub fn ramdisk_forget(client: *mut ramdisk_client_t) -> zx_status_t;
+}

@@ -99,8 +99,11 @@ zx_status_t ramdisk_set_flags(const ramdisk_client_t* client, uint32_t flags);
 // Rebinds a ramdisk.
 zx_status_t ramdisk_rebind(ramdisk_client_t* client);
 
-// Destroys a ramdisk, given the "ramdisk_client" returned from "ramdisk_create".
+// Unbind and destroy the ramdisk, and delete |client|.
 zx_status_t ramdisk_destroy(ramdisk_client_t* client);
+
+// Delete |client| *without* unbinding/destroying the ramdisk itself.
+zx_status_t ramdisk_forget(ramdisk_client_t* client);
 
 __END_CDECLS
 

@@ -264,9 +264,21 @@ impl RamdiskClient {
     /// Remove the underlying ramdisk. This deallocates all resources for this ramdisk, which will
     /// remove all data written to the associated ramdisk.
     pub fn destroy(self) -> Result<(), zx::Status> {
-        let Self { ramdisk } = self;
-        // we are doing the same thing as the `Drop` impl, so tell rust not to drop it
-        let status = unsafe { ramdevice_sys::ramdisk_destroy(ramdisk) };
+        // Safety: `self` must not be used again after calling this.
+        let status = unsafe { ramdevice_sys::ramdisk_destroy(self.ramdisk) };
+        // Forget `self` so that we don't call `drop` again.
+        std::mem::forget(self);
+        zx::Status::ok(status)
+    }
+
+    /// Consume the RamdiskClient without destroying the underlying ramdisk. The caller must
+    /// manually destroy the ramdisk device after calling this function.
+    ///
+    /// This should be used instead of `std::mem::forget`, as the latter will leak memory.
+    pub fn forget(self) -> Result<(), zx::Status> {
+        // Safety: `self` must not be used again after calling this.
+        let status = unsafe { ramdevice_sys::ramdisk_forget(self.ramdisk) };
+        // Forget `self` so that we don't call `drop` again.
         std::mem::forget(self);
         zx::Status::ok(status)
     }
@@ -336,8 +348,20 @@ mod tests {
     #[fuchsia::test]
     async fn create_open_destroy() {
         let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let _: fidl::endpoints::ClientEnd<fhardware_block::BlockMarker> = ramdisk.open().unwrap();
+        let client = ramdisk.open().unwrap().into_proxy().unwrap();
+        client.get_info().await.expect("get_info failed").unwrap();
         assert_eq!(ramdisk.destroy(), Ok(()));
+        // The ramdisk will be scheduled to be unbound, so `client` may be valid for some time.
+    }
+
+    #[fuchsia::test]
+    async fn create_open_forget() {
+        let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
+        let client = ramdisk.open().unwrap().into_proxy().unwrap();
+        client.get_info().await.expect("get_info failed").unwrap();
+        assert_eq!(ramdisk.forget(), Ok(()));
+        // We should succeed calling `get_info` as the ramdisk should still exist.
+        client.get_info().await.expect("get_info failed").unwrap();
     }
 
     #[fuchsia::test]

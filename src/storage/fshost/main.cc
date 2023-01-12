@@ -133,10 +133,12 @@ int RamctlWatcher(void* arg) {
 
   ramdisk_client* client;
   if (zx_status_t status = ramdisk_create_from_vmo(vmo.release(), &client); status != ZX_OK) {
-    FX_LOGS(ERROR) << "failed to create ramdisk from ZBI_TYPE_STORAGE_RAMDISK";
-  } else {
-    FX_LOGS(INFO) << "ZBI_TYPE_STORAGE_RAMDISK attached";
+    FX_PLOGS(ERROR, status) << "failed to create ramdisk from ZBI_TYPE_STORAGE_RAMDISK";
+    return -1;
   }
+  FX_LOGS(INFO) << "ZBI_TYPE_STORAGE_RAMDISK attached";
+  // Ensure the boot image remains attached for the system lifetime.
+  ramdisk_forget(client);
   return 0;
 }
 

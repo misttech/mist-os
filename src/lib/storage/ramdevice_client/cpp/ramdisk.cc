@@ -146,6 +146,18 @@ struct ramdisk_client {
     return ZX_OK;
   }
 
+  // Destroy all open handles to the ramdisk, while leaving the ramdisk itself attached.
+  // After calling this method, destroying this object will have no effect.
+  zx_status_t Forget() {
+    if (!ramdisk_interface_) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    ramdisk_interface_.reset();
+    block_interface_.reset();
+    return ZX_OK;
+  }
+
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller_interface() const {
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     return fidl::UnownedClientEnd<fuchsia_device::Controller>(ramdisk_interface().channel());
@@ -405,6 +417,13 @@ zx_status_t ramdisk_rebind(ramdisk_client_t* client) { return client->Rebind(); 
 __EXPORT
 zx_status_t ramdisk_destroy(ramdisk_client* client) {
   zx_status_t status = client->Destroy();
+  delete client;
+  return status;
+}
+
+__EXPORT
+zx_status_t ramdisk_forget(ramdisk_client* client) {
+  zx_status_t status = client->Forget();
   delete client;
   return status;
 }

@@ -74,9 +74,9 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<(), Error> {
         .build()
         .await
         .context("building ramdisk from vmo")?;
-    // We want the ramdisk to continue to exist for the lifetime of the system, so we just leak the
-    // pointer instead of running the Drop implementation, which attempts to destroy the ramdisk.
-    std::mem::forget(ramdisk);
+
+    // Ensure the boot image remains attached for the system lifetime.
+    ramdisk.forget().context("detaching/forgetting ramdisk client")?;
 
     Ok(())
 }
