@@ -168,4 +168,13 @@ TYPED_TEST(ElfldltlSymbolTests, EnumerateGnuHash) {
   EnumerateHashTable<typename TestFixture::Elf, GnuHash>();
 }
 
+TYPED_TEST(ElfldltlSymbolTests, SymbolInfoForSingleLookup) {
+  using Elf = typename TestFixture::Elf;
+
+  constexpr static elfldltl::SymbolInfoForSingleLookup<Elf> si{"sym"};
+
+  elfldltl::SymbolName name{si, si.symbol()};
+  EXPECT_EQ(name, "sym");
+}
+
 }  // namespace

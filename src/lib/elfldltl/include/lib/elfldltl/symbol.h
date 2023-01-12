@@ -367,11 +367,11 @@ class SymbolInfoForSingleLookup : public SymbolInfo<Elf> {
 
   constexpr SymbolInfoForSingleLookup(const SymbolInfoForSingleLookup&) = default;
 
-  explicit constexpr SymbolInfoForSingleLookup(std::string_view name,
+  explicit constexpr SymbolInfoForSingleLookup(const char* name,
                                                ElfSymType type = ElfSymType::kNoType,
                                                ElfSymBind bind = ElfSymBind::kGlobal)
       : symbol_{.info = Sym::MakeInfo(bind, type)} {
-    this->set_strtab(name);
+    this->set_strtab({name, std::string_view{name}.size() + 1});
     this->set_symtab(cpp20::span{&symbol_, 1});
   }
 
