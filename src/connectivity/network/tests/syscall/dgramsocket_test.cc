@@ -25,7 +25,7 @@
 #include "src/connectivity/network/netstack/udp_serde/udp_serde.h"
 #endif
 
-#include "os.h"
+#include "src/connectivity/network/tests/os.h"
 #include "util.h"
 
 // TODO(C++20): Remove this; std::chrono::duration defines operator<< in c++20. See

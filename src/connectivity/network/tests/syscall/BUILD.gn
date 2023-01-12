@@ -1,0 +1,272 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+test("name_provider_service_not_present_test") {
+  sources = [ "name_provider_service_not_present_test.cc" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_hlcpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+test("netstack_bsdsocket_c_api_test") {
+  sources = [
+    "../os.h",
+    "bsdsocket_test.cc",
+    "if_nameindex_test.cc",
+    "no_network_test.cc",
+    "util.cc",
+    "util.h",
+  ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire",
+      "//src/lib/testing/predicates",
+    ]
+  }
+}
+
+test("netstack_dgramsocket_c_api_test") {
+  sources = [
+    "../os.h",
+    "dgramsocket_test.cc",
+    "util.cc",
+    "util.h",
+  ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire",
+      "//sdk/lib/fdio",
+      "//src/connectivity/network/netstack/udp_serde",
+      "//src/lib/testing/predicates",
+    ]
+  }
+}
+
+test("netstack_if_nameindex_c_api_test") {
+  sources = [ "if_nameindex_test.cc" ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire",
+      "//src/lib/testing/predicates",
+    ]
+  }
+}
+
+test("netstack_streamsocket_c_api_test") {
+  sources = [
+    "../os.h",
+    "streamsocket_test.cc",
+    "util.cc",
+    "util.h",
+  ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire",
+      "//src/lib/testing/predicates",
+    ]
+  }
+}
+
+test("netstack_fuchsia_c_api_test") {
+  sources = [
+    "../os.h",
+    "fdio_test.cc",
+    "util.cc",
+    "util.h",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp_wire",
+    "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync",
+  ]
+}
+
+test("netstack_packetsocket_c_api_test") {
+  sources = [ "packetsocket_test.cc" ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+test("netstack_rawsocket_c_api_test") {
+  sources = [
+    "../os.h",
+    "rawsocket_test.cc",
+  ]
+
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+netstack_socket_tests_without_manifest = [
+  "netstack_dgramsocket_c_api_test",
+  "netstack_streamsocket_c_api_test",
+  "netstack_bsdsocket_c_api_test",
+  "netstack_if_nameindex_c_api_test",
+]
+
+foreach(test, netstack_socket_tests_without_manifest) {
+  fuchsia_unittest_component("${test}_component") {
+    component_name = test
+    deps = [
+      ":${test}",
+      ":socket_test_includes",
+    ]
+  }
+}
+
+expect_includes("socket_test_includes") {
+  includes = [
+    "//src/connectivity/network/dns/meta/client.shard.cml",
+    "//src/connectivity/network/netstack/meta/client-with-sync-udp-debug.shard.cml",
+    "//src/sys/test_runners/gtest/default.shard.cml",
+    "//sdk/lib/syslog/client.shard.cml",
+  ]
+}
+
+name_provider_test_name = "name_provider_service_not_present_test"
+
+fuchsia_unittest_component("${name_provider_test_name}_component") {
+  component_name = name_provider_test_name
+  deps = [
+    ":${name_provider_test_name}",
+    ":name_provider_includes",
+  ]
+}
+
+expect_includes("name_provider_includes") {
+  includes = [
+    "//src/sys/test_runners/gtest/default.shard.cml",
+    "//sdk/lib/syslog/client.shard.cml",
+  ]
+}
+
+netstack_tests_without_manifest =
+    netstack_socket_tests_without_manifest + [ name_provider_test_name ]
+
+netstack_tests_with_manifest = [
+  "netstack_packetsocket_c_api_test",
+  "netstack_fuchsia_c_api_test",
+  "netstack_rawsocket_c_api_test",
+]
+
+foreach(test, netstack_tests_with_manifest) {
+  fuchsia_unittest_component("${test}_component") {
+    component_name = test
+    deps = [ ":${test}" ]
+    manifest = "meta/${test}.cml"
+  }
+}
+
+tests_with_fast_udp = [
+  "bsdsocket_c_api_test",
+  "dgramsocket_c_api_test",
+  "fuchsia_c_api_test",
+  "if_nameindex_c_api_test",
+]
+
+netstack_tests_with_fast_udp = []
+
+foreach(test, tests_with_fast_udp) {
+  name = "netstack_with_fast_udp_${test}"
+  netstack_tests_with_fast_udp += [ name ]
+  fuchsia_unittest_component("${name}_component") {
+    component_name = name
+    deps = [ ":netstack_${test}" ]
+    manifest = "meta/${name}.cml"
+  }
+}
+
+tests_with_netstack3 = [ "if_nameindex_c_api_test" ]
+
+netstack3_tests = []
+
+foreach(test, tests_with_netstack3) {
+  name = "netstack3_${test}"
+  netstack3_tests += [ name ]
+  fuchsia_unittest_component("${name}_component") {
+    component_name = name
+    deps = [ ":netstack_${test}" ]
+    manifest = "meta/${name}.cml"
+  }
+}
+
+fuchsia_test_package("netstack-c-api-tests") {
+  test_components = []
+  foreach(test,
+          netstack_tests_without_manifest + netstack_tests_with_manifest +
+              netstack_tests_with_fast_udp + netstack3_tests) {
+    test_components += [ ":${test}_component" ]
+  }
+
+  deps = [
+    # dns_resolver is under test.
+    "//src/connectivity/network/dns:component",
+
+    # netstack is under test.
+    "//src/connectivity/network/netstack:component-with-fast-udp-debug",
+    "//src/connectivity/network/netstack:component-with-sync-udp-debug",
+    "//src/connectivity/network/netstack3:component-debug",
+
+    # cat is used to test FD passing in :netstack_fuchsia_c_api_test.
+    "//third_party/sbase:cat_bin",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":netstack-c-api-tests" ]
+  if (host_os == "linux") {
+    public_deps += [
+      ":netstack_bsdsocket_c_api_test($host_toolchain)",
+      ":netstack_dgramsocket_c_api_test($host_toolchain)",
+      ":netstack_if_nameindex_c_api_test($host_toolchain)",
+      ":netstack_packetsocket_c_api_test($host_toolchain)",
+      ":netstack_rawsocket_c_api_test($host_toolchain)",
+      ":netstack_streamsocket_c_api_test($host_toolchain)",
+    ]
+  }
+}

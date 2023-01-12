@@ -20,7 +20,7 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "os.h"
+#include "src/connectivity/network/tests/os.h"
 
 namespace {
 
