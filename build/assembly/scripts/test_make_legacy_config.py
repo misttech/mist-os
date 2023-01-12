@@ -176,8 +176,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     FileEntry(
                         os.path.join(SOURCE_DIR, "some/core/package/file"),
                         "core/package/file/destination")
-                ],
-                core_package_name="core")
+                ])
             file_paths = aib.all_file_paths()
 
             # Validate the contents of the AssemblyInputBundle itself
@@ -527,8 +526,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
-                "core")
+                image_assembly, [], OUTDIR, [], [], dict(), set(), [], [])
 
             # Asserts that the duplicate package is present in the base package set after
             # being copied to the AIB
@@ -569,7 +567,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     {make_package_path(duplicate_package)}, list())
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
                     image_assembly, [], OUTDIR, [manifest_path], [], dict(),
-                    set(), [], [], "core")
+                    set(), [], [])
 
             self.assertNotIn(make_package_path(duplicate_package), aib.base)
             self.assertIn(
@@ -617,5 +615,4 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], [],
-                    "core"))
+                    image_assembly, [], OUTDIR, [], [], dict(), set(), [], []))

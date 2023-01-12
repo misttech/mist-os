@@ -31,13 +31,12 @@ DepSet = Set[FilePath]
 
 
 def copy_to_assembly_input_bundle(
-        legacy: ImageAssemblyConfig, config_data_entries: FileEntryList,
-        outdir: FilePath, base_driver_packages_list: List[str],
-        base_driver_components_files_list: List[dict],
-        shell_commands: Dict[str, List], core_realm_shards: Set[FilePath],
-        core_realm_includes: FileEntryList,
-        core_package_contents: FileEntryList,
-        core_package_name: str) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
+    legacy: ImageAssemblyConfig, config_data_entries: FileEntryList,
+    outdir: FilePath, base_driver_packages_list: List[str],
+    base_driver_components_files_list: List[dict],
+    shell_commands: Dict[str, List], core_realm_shards: Set[FilePath],
+    core_realm_includes: FileEntryList, core_package_contents: FileEntryList
+) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
     Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
     outdir, tracking all copy operations in a DepFile that is returned with the resultant bundle.
@@ -73,19 +72,10 @@ def copy_to_assembly_input_bundle(
     aib_creator.shell_commands = shell_commands
 
     if (core_realm_shards):
-        # The core packages component is always called "core"
-        aib_creator.component_shards = {
-            core_package_name: {
-                "core": core_realm_shards
-            }
-        }
-        aib_creator.component_includes = {
-            core_package_name: core_realm_includes
-        }
-        aib_creator.compiled_package_contents = {
-            core_package_name: core_package_contents
-        }
-        aib_creator.core_package_name = core_package_name
+        # The core package and component are always called "core"
+        aib_creator.component_shards = {"core": {"core": core_realm_shards}}
+        aib_creator.component_includes = {"core": core_realm_includes}
+        aib_creator.compiled_package_contents = {"core": core_package_contents}
 
     return aib_creator.build()
 
@@ -161,7 +151,6 @@ def main():
     core_realm_shards: Set[FilePath] = set()
     core_realm_includes: FileEntryList = []
     core_package_contents: FileEntryList = []
-    core_package_name = args.core_package_name
     if args.core_realm_shards_list:
         for shard in json.load(args.core_realm_shards_list):
             core_realm_shards.add(shard)
@@ -184,8 +173,7 @@ def main():
          base_driver_components_files_list, {
              package: sorted(list(components))
              for (package, components) in shell_commands.items()
-         }, core_realm_shards, core_realm_includes, core_package_contents,
-         core_package_name)
+         }, core_realm_shards, core_realm_includes, core_package_contents)
 
     deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a
