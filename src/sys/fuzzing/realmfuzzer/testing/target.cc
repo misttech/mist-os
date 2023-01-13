@@ -29,8 +29,12 @@ zx::process TestTarget::Launch() {
   auto status = zx::channel::create(0, &local_, &remote);
   FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
 
-  target_.AddArg("bin/realmfuzzer_test_target");
-  target_.AddChannel(kTestChannelId, std::move(remote));
+  status = target_.AddArg("bin/realmfuzzer_test_target");
+  FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
+
+  status = target_.AddChannel(kTestChannelId, std::move(remote));
+  FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
+
   status = target_.Spawn();
   FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
 

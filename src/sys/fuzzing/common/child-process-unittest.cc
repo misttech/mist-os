@@ -20,15 +20,35 @@ class ChildProcessTest : public AsyncTest {};
 
 // Unit tests.
 
+TEST_F(ChildProcessTest, AddArg) {
+  ChildProcess process(executor());
+  EXPECT_EQ(process.AddArg("small"), ZX_OK);
+
+  auto large = std::string(100000, 'A');
+  EXPECT_EQ(process.AddArg(large), ZX_ERR_OUT_OF_RANGE);
+}
+
+TEST_F(ChildProcessTest, AddChannel) {
+  ChildProcess process(executor());
+  uint32_t id = 1;
+  zx_status_t status = ZX_OK;
+  while (status == ZX_OK) {
+    zx::channel channel;
+    status = process.AddChannel(id++, std::move(channel));
+  }
+  EXPECT_GT(id, 1U);
+  EXPECT_EQ(status, ZX_ERR_OUT_OF_RANGE);
+}
+
 TEST_F(ChildProcessTest, Spawn) {
   ChildProcess process(executor());
-  process.AddArg("bogus");
+  EXPECT_EQ(process.AddArg("bogus"), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_ERR_NOT_FOUND);
   RunUntilIdle();
 
   // Can respawn after reset.
   process.Reset();
-  process.AddArg(kEcho);
+  EXPECT_EQ(process.AddArg(kEcho), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
 
   // Cannot spawn when spawned.
@@ -37,7 +57,7 @@ TEST_F(ChildProcessTest, Spawn) {
 
 TEST_F(ChildProcessTest, Wait) {
   ChildProcess process(executor());
-  process.AddArg(kEcho);
+  EXPECT_EQ(process.AddArg(kEcho), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
 
   process.CloseStdin();
@@ -51,7 +71,7 @@ TEST_F(ChildProcessTest, ReadFromStdout) {
   std::string world("world");
   std::string input = hello + "\n" + world;
 
-  process.AddArgs({kEcho, "--stdout"});
+  EXPECT_EQ(process.AddArgs({kEcho, "--stdout"}), ZX_OK);
   EXPECT_EQ(process.AddStdinPipe(), ZX_OK);
   EXPECT_EQ(process.AddStdoutPipe(), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
@@ -69,7 +89,7 @@ TEST_F(ChildProcessTest, ReadFromStderr) {
   std::string world("world");
   std::string input = hello + "\n" + world;
 
-  process.AddArgs({kEcho, "--stderr"});
+  EXPECT_EQ(process.AddArgs({kEcho, "--stderr"}), ZX_OK);
   EXPECT_EQ(process.AddStdinPipe(), ZX_OK);
   EXPECT_EQ(process.AddStderrPipe(), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
@@ -83,9 +103,13 @@ TEST_F(ChildProcessTest, ReadFromStderr) {
 
 TEST_F(ChildProcessTest, SetEnvVar) {
   ChildProcess process(executor());
-  process.AddArg(kEcho);
-  process.SetEnvVar("FUZZING_COMMON_TESTING_ECHO_EXITCODE", "1");
-  process.SetEnvVar("FUZZING_COMMON_TESTING_ECHO_EXITCODE", "2");
+  EXPECT_EQ(process.AddArg(kEcho), ZX_OK);
+
+  auto large = std::string(100000, 'A');
+  EXPECT_EQ(process.SetEnvVar("foo", large), ZX_ERR_OUT_OF_RANGE);
+
+  EXPECT_EQ(process.SetEnvVar("FUZZING_COMMON_TESTING_ECHO_EXITCODE", "1"), ZX_OK);
+  EXPECT_EQ(process.SetEnvVar("FUZZING_COMMON_TESTING_ECHO_EXITCODE", "2"), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
   RunUntilIdle();
 
@@ -96,7 +120,7 @@ TEST_F(ChildProcessTest, SetEnvVar) {
 
 TEST_F(ChildProcessTest, Kill) {
   ChildProcess process(executor());
-  process.AddArgs({kEcho, "--stdout", "--stderr"});
+  EXPECT_EQ(process.AddArgs({kEcho, "--stdout", "--stderr"}), ZX_OK);
   EXPECT_EQ(process.AddStdinPipe(), ZX_OK);
   EXPECT_EQ(process.AddStdoutPipe(), ZX_OK);
   EXPECT_EQ(process.AddStderrPipe(), ZX_OK);
@@ -117,7 +141,7 @@ TEST_F(ChildProcessTest, Kill) {
 
   // Can respawn after reset.
   process.Reset();
-  process.AddArg(kEcho);
+  EXPECT_EQ(process.AddArg(kEcho), ZX_OK);
   EXPECT_EQ(process.Spawn(), ZX_OK);
 }
 

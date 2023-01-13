@@ -14,6 +14,7 @@
 #include <condition_variable>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -34,13 +35,21 @@ class ChildProcess final {
   // Adds a command line argument for the process. The first |arg| added should be the executable
   // path relative to the "/pkg" directory, i.e. the same value as might be found in
   // `program.binary` field in a component manifest.
-  void AddArg(const std::string& arg);
+  //
+  // Returns `ZX_ERR_OUT_OF_RANGE` if unable to add the arg, e.g. due to insufficient space in the
+  // `fuchsia.process.Launcher` message; `ZX_OK` otherwise.
+  //
+  __WARN_UNUSED_RESULT zx_status_t AddArg(std::string_view arg);
 
   // Adds all of the given |args|.
-  void AddArgs(std::initializer_list<const char*> args);
+  //
+  // Returns `ZX_ERR_OUT_OF_RANGE` if unable to add the arg, e.g. due to insufficient space in the
+  // `fuchsia.process.Launcher` message; `ZX_OK` otherwise.
+  //
+  __WARN_UNUSED_RESULT zx_status_t AddArgs(std::initializer_list<const char*> args);
 
   // Sets an environment variable. Setting the same variable multiple times updates the value.
-  void SetEnvVar(const std::string& name, const std::string& value);
+  __WARN_UNUSED_RESULT zx_status_t SetEnvVar(std::string_view name, std::string_view value);
 
   // Adds a writeable pipe to the standard input of the spawned process.
   // Returns ZX_ERR_BAD_STATE if called twice without `Reset`.
@@ -52,7 +61,11 @@ class ChildProcess final {
   __WARN_UNUSED_RESULT zx_status_t AddStderrPipe();
 
   // Takes a `channel` to be passed as a startup channel to the child process with the given `id`.
-  void AddChannel(uint32_t id, zx::channel channel);
+  //
+  // Returns `ZX_ERR_OUT_OF_RANGE` if unable to add the channel, e.g. due to insufficient space in
+  // the `fuchsia.process.Launcher` message; `ZX_OK` otherwise.
+  //
+  __WARN_UNUSED_RESULT zx_status_t AddChannel(uint32_t id, zx::channel channel);
 
   // Spawns the new child process. Returns an error if a previous process was spawned but has not
   // been |Kill|ed and |Reset|, or if spawning fails.
@@ -66,7 +79,7 @@ class ChildProcess final {
 
   // Writes a line to process's stdin. Returns an error if the process is not alive of if stdin has
   // been closed.
-  zx_status_t WriteToStdin(const std::string& line);
+  zx_status_t WriteToStdin(std::string_view line);
 
   // Returns a promise to read from the process's stdout or stderr, respectively. The promise will
   // read up to a newline or EOF, whichever comes first. The promise will return an error if the
@@ -109,12 +122,20 @@ class ChildProcess final {
   // Returns an error if the process is already spawned or if the pipe couldn;t be created.
   zx_status_t AddPipe(int target_fd, int* out_rpipe, int* out_wpipe);
 
+  // Returns `ZX_OK` if `num_bytes` can be added; otherwise returns `ZX_ERR_OUT_OF_RANGE`.
+  zx_status_t ReserveBytes(size_t num_bytes);
+
+  // Returns `ZX_OK` if `num_handles` can be added; otherwise returns `ZX_ERR_OUT_OF_RANGE`.
+  zx_status_t ReserveHandles(size_t num_handles);
+
   // Kills the process and waits for the output threads to join.
   void KillSync();
 
   ExecutorPtr executor_;
   bool spawned_ = false;
   bool killed_ = false;
+  size_t num_bytes_ = 0;
+  size_t num_handles_ = 0;
 
   // Parameters for |fdio_spawn_etc|.
   std::vector<std::string> args_;

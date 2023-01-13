@@ -81,6 +81,9 @@ int main(int argc, char **argv) {
     if (arg.empty() || arg[0] == '-') {
       continue;
     }
+    if (arg[0] != '/') {
+      arg = "/pkg/" + arg;
+    }
     if (files::IsFile(arg)) {
       ::fuzzing::gTestInputs.push_back(arg);
       continue;

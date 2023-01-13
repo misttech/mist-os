@@ -24,14 +24,30 @@ ZxPromise<ControllerPtr> EngineIntegrationTest::Start() {
   return fpromise::make_promise([this]() -> ZxResult<> {
            fidl::InterfaceHandle<Registrar> registrar = registrar_->NewBinding();
            engine_->Reset();
-           engine_->AddArg(program_binary());
-           engine_->AddArg(component_url());
-           for (const auto& arg : extra_args()) {
-             engine_->AddArg(arg);
+           if (auto status = engine_->AddArg(program_binary()); status != ZX_OK) {
+             return fpromise::error(status);
            }
-           engine_->AddArg(FUZZ_MODE);
-           engine_->AddChannel(ComponentContextForTest::kRegistrarId, registrar.TakeChannel());
-           engine_->AddChannel(ComponentContextForTest::kCoverageId, fuzz_coverage());
+           if (auto status = engine_->AddArg(component_url()); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           for (const auto& arg : extra_args()) {
+             if (auto status = engine_->AddArg(arg); status != ZX_OK) {
+               return fpromise::error(status);
+             }
+           }
+           if (auto status = engine_->AddArg(FUZZ_MODE); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = engine_->AddChannel(ComponentContextForTest::kRegistrarId,
+                                                 registrar.TakeChannel());
+               status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status =
+                   engine_->AddChannel(ComponentContextForTest::kCoverageId, fuzz_coverage());
+               status != ZX_OK) {
+             return fpromise::error(status);
+           }
            return fpromise::ok();
          })
       .and_then([this]() { return AsZxResult(engine_->Spawn()); })

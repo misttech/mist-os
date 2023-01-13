@@ -206,25 +206,72 @@ ZxPromise<> LibFuzzerRunner::Configure(const OptionsPtr& options) {
 }
 
 ZxPromise<FuzzResult> LibFuzzerRunner::Execute(std::vector<Input> inputs) {
-  AddArgs();
+  // Write the inputs out to storage for libFuzzer.
   std::filesystem::remove_all(kTempCorpusPath);
   CreateDirectory(kTempCorpusPath);
+  std::vector<std::string> test_inputs;
+  test_inputs.reserve(inputs.size());
   for (auto& input : inputs) {
     auto test_input = files::JoinPath(kTempCorpusPath, MakeFilename(input));
     WriteInputToFile(input, test_input);
-    process_.AddArg(test_input);
+    test_inputs.emplace_back(std::move(test_input));
   }
-  print_all_ = true;
-  return RunAsync()
-      .and_then([](const Artifact& artifact) { return fpromise::ok(artifact.fuzz_result()); })
+  inputs.clear();
+  return fpromise::make_promise([this, fut = ZxFuture<Artifact>(),
+                                 test_inputs = std::move(test_inputs)](
+                                    Context& context) mutable -> ZxResult<FuzzResult> {
+           // Large corpora can result in a command line that is too big for `fdio_spawn`. Try
+           // inputs in batches.
+           while (true) {
+             if (!fut) {
+               if (test_inputs.empty()) {
+                 return fpromise::ok(FuzzResult::NO_ERRORS);
+               }
+               if (auto status = AddArgs(); status != ZX_OK) {
+                 return fpromise::error(status);
+               }
+               std::vector<std::string> deferred;
+               zx_status_t status = ZX_OK;
+               for (auto& test_input : test_inputs) {
+                 if (status == ZX_OK) {
+                   status = process_.AddArg(test_input);
+                 }
+                 if (status != ZX_OK) {
+                   deferred.emplace_back(std::move(test_input));
+                 }
+               }
+               test_inputs = std::move(deferred);
+               fut = RunAsync();
+             }
+             if (!fut(context)) {
+               return fpromise::pending();
+             }
+             if (fut.is_error()) {
+               return fpromise::error(fut.take_error());
+             }
+             auto artifact = fut.take_value();
+             if (auto fuzz_result = artifact.fuzz_result(); fuzz_result != FuzzResult::NO_ERRORS) {
+               return fpromise::ok(fuzz_result);
+             }
+           }
+         })
       .wrap_with(workflow_);
 }
 
 ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
-  AddArgs();
-  process_.AddArg(kLiveCorpusPath);
-  process_.AddArg(kSeedCorpusPath);
-  return RunAsync()
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (auto status = AddArgs(); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kLiveCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kSeedCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           return fpromise::ok();
+         })
+      .and_then(RunAsync())
       .and_then([this](Artifact& artifact) {
         ReloadLiveCorpus();
         return fpromise::ok(std::move(artifact));
@@ -233,11 +280,20 @@ ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
 }
 
 ZxPromise<Input> LibFuzzerRunner::Minimize(Input input) {
-  AddArgs();
   WriteInputToFile(input.Duplicate(), kTestInputPath);
-  process_.AddArg("-minimize_crash=1");
-  process_.AddArg(kTestInputPath);
-  return RunAsync()
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (auto status = AddArgs(); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg("-minimize_crash=1"); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kTestInputPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           return fpromise::ok();
+         })
+      .and_then(RunAsync())
       .and_then([original = std::move(input)](Artifact& artifact) -> ZxResult<Input> {
         // libFuzzer returns an error and an empty input if the input did not crash.
         auto minimized = artifact.take_input();
@@ -251,11 +307,20 @@ ZxPromise<Input> LibFuzzerRunner::Minimize(Input input) {
 }
 
 ZxPromise<Input> LibFuzzerRunner::Cleanse(Input input) {
-  AddArgs();
   WriteInputToFile(input, kTestInputPath);
-  process_.AddArg("-cleanse_crash=1");
-  process_.AddArg(kTestInputPath);
-  return RunAsync()
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (auto status = AddArgs(); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg("-cleanse_crash=1"); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kTestInputPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           return fpromise::ok();
+         })
+      .and_then(RunAsync())
       .and_then([input = std::move(input)](Artifact& artifact) mutable {
         auto result = artifact.take_input();
         // A quirk of libFuzzer's cleanse workflow is that it returns no error and an empty input if
@@ -267,12 +332,25 @@ ZxPromise<Input> LibFuzzerRunner::Cleanse(Input input) {
 
 ZxPromise<> LibFuzzerRunner::Merge() {
   CreateDirectory(kTempCorpusPath);
-  AddArgs();
-  process_.AddArg("-merge=1");
-  process_.AddArg(kTempCorpusPath);
-  process_.AddArg(kSeedCorpusPath);
-  process_.AddArg(kLiveCorpusPath);
-  return RunAsync()
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (auto status = AddArgs(); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg("-merge=1"); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kTempCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kSeedCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kLiveCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           return fpromise::ok();
+         })
+      .and_then(RunAsync())
       .and_then([this](const Artifact& artifact) {
         std::filesystem::remove_all(kLiveCorpusPath);
         std::filesystem::rename(kTempCorpusPath, kLiveCorpusPath);
@@ -315,27 +393,40 @@ Status LibFuzzerRunner::CollectStatus() {
 ///////////////////////////////////////////////////////////////
 // Process-related methods.
 
-void LibFuzzerRunner::AddArgs() {
+zx_status_t LibFuzzerRunner::AddArgs() {
   auto cmdline_iter = cmdline_.begin();
   while (cmdline_iter != cmdline_.end() && *cmdline_iter != "--") {
-    process_.AddArg(*cmdline_iter++);
+    if (auto status = process_.AddArg(*cmdline_iter++); status != ZX_OK) {
+      return status;
+    }
   }
   if (auto runs = options_->runs(); runs != kDefaultRuns) {
-    process_.AddArg(MakeArg("runs", options_->runs()));
+    if (auto status = process_.AddArg(MakeArg("runs", options_->runs())); status != ZX_OK) {
+      return status;
+    }
   }
   if (auto max_total_time = options_->max_total_time(); max_total_time != kDefaultMaxTotalTime) {
     max_total_time = Clamp(max_total_time, kOneSecond, "duration", "second", "max_total_time");
     options_->set_max_total_time(max_total_time);
-    process_.AddArg(MakeArg("max_total_time", max_total_time / kOneSecond));
+    if (auto status = process_.AddArg(MakeArg("max_total_time", max_total_time / kOneSecond));
+        status != ZX_OK) {
+      return status;
+    }
   }
   if (auto seed = options_->seed(); seed != kDefaultSeed) {
-    process_.AddArg(MakeArg("seed", seed));
+    if (auto status = process_.AddArg(MakeArg("seed", seed)); status != ZX_OK) {
+      return status;
+    }
   }
   if (auto max_input_size = options_->max_input_size(); max_input_size != kDefaultMaxInputSize) {
-    process_.AddArg(MakeArg("max_len", max_input_size));
+    if (auto status = process_.AddArg(MakeArg("max_len", max_input_size)); status != ZX_OK) {
+      return status;
+    }
   }
   if (auto mutation_depth = options_->mutation_depth(); mutation_depth != kDefaultMutationDepth) {
-    process_.AddArg(MakeArg("mutate_depth", mutation_depth));
+    if (auto status = process_.AddArg(MakeArg("mutate_depth", mutation_depth)); status != ZX_OK) {
+      return status;
+    }
   }
   if (options_->dictionary_level() != kDefaultDictionaryLevel) {
     FX_LOGS(WARNING) << "libFuzzer does not support setting the dictionary level.";
@@ -344,27 +435,42 @@ void LibFuzzerRunner::AddArgs() {
     FX_LOGS(WARNING) << "libFuzzer does not support ignoring process exits.";
   }
   if (options_->detect_leaks()) {
-    process_.AddArg(MakeArg("detect_leaks", "1"));
+    if (auto status = process_.AddArg(MakeArg("detect_leaks", "1")); status != ZX_OK) {
+      return status;
+    }
   }
   if (auto run_limit = options_->run_limit(); run_limit != kDefaultRunLimit) {
     run_limit = Clamp(run_limit, kOneSecond, "duration", "second", "run_limit");
     options_->set_run_limit(run_limit);
-    process_.AddArg(MakeArg("timeout", run_limit / kOneSecond));
+    if (auto status = process_.AddArg(MakeArg("timeout", run_limit / kOneSecond));
+        status != ZX_OK) {
+      return status;
+    }
   }
   if (auto malloc_limit = options_->malloc_limit(); malloc_limit != kDefaultMallocLimit) {
     malloc_limit = Clamp(malloc_limit, kOneMb, "memory amount", "MB", "malloc_limit");
     options_->set_malloc_limit(malloc_limit);
-    process_.AddArg(MakeArg("malloc_limit_mb", malloc_limit / kOneMb));
+    if (auto status = process_.AddArg(MakeArg("malloc_limit_mb", malloc_limit / kOneMb));
+        status != ZX_OK) {
+      return status;
+    }
   }
   if (auto oom_limit = options_->oom_limit(); oom_limit != kDefaultOomLimit) {
     oom_limit = Clamp(oom_limit, kOneMb, "memory amount", "MB", "oom_limit");
     options_->set_oom_limit(oom_limit);
-    process_.AddArg(MakeArg("rss_limit_mb", oom_limit / kOneMb));
+    if (auto status = process_.AddArg(MakeArg("rss_limit_mb", oom_limit / kOneMb));
+        status != ZX_OK) {
+      return status;
+    }
   }
   if (auto purge_interval = options_->purge_interval(); purge_interval != kDefaultPurgeInterval) {
     purge_interval = Clamp(purge_interval, kOneSecond, "duration", "second", "purge_interval");
     options_->set_purge_interval(purge_interval);
-    process_.AddArg(MakeArg("purge_allocator_interval", purge_interval / kOneSecond));
+    if (auto status =
+            process_.AddArg(MakeArg("purge_allocator_interval", purge_interval / kOneSecond));
+        status != ZX_OK) {
+      return status;
+    }
   }
   if (options_->malloc_exitcode() != kDefaultMallocExitcode) {
     FX_LOGS(WARNING) << "libFuzzer does not support setting the 'malloc_exitcode'.";
@@ -382,33 +488,57 @@ void LibFuzzerRunner::AddArgs() {
     FX_LOGS(WARNING) << "libFuzzer does not support setting the 'pulse_interval'.";
   }
   if (options_->debug()) {
-    process_.AddArg(MakeArg("handle_segv", 0));
-    process_.AddArg(MakeArg("handle_bus", 0));
-    process_.AddArg(MakeArg("handle_ill", 0));
-    process_.AddArg(MakeArg("handle_fpe", 0));
-    process_.AddArg(MakeArg("handle_abrt", 0));
+    if (auto status = process_.AddArg(MakeArg("handle_segv", 0)); status != ZX_OK) {
+      return status;
+    }
+    if (auto status = process_.AddArg(MakeArg("handle_bus", 0)); status != ZX_OK) {
+      return status;
+    }
+    if (auto status = process_.AddArg(MakeArg("handle_ill", 0)); status != ZX_OK) {
+      return status;
+    }
+    if (auto status = process_.AddArg(MakeArg("handle_fpe", 0)); status != ZX_OK) {
+      return status;
+    }
+    if (auto status = process_.AddArg(MakeArg("handle_abrt", 0)); status != ZX_OK) {
+      return status;
+    }
   }
   if (options_->print_final_stats()) {
-    process_.AddArg(MakeArg("print_final_stats", 1));
+    if (auto status = process_.AddArg(MakeArg("print_final_stats", 1)); status != ZX_OK) {
+      return status;
+    }
   }
   if (options_->use_value_profile()) {
-    process_.AddArg(MakeArg("use_value_profile", 1));
+    if (auto status = process_.AddArg(MakeArg("use_value_profile", 1)); status != ZX_OK) {
+      return status;
+    }
   }
   auto sanitizer_options = options_->sanitizer_options();
   const auto& name = sanitizer_options.name;
   const auto& value = sanitizer_options.value;
   if (!name.empty() && !value.empty()) {
-    process_.SetEnvVar(name, value);
+    if (auto status = process_.SetEnvVar(name, value); status != ZX_OK) {
+      return status;
+    }
   }
 
   if (has_dictionary_) {
-    process_.AddArg(MakeArg("dict", kDictionaryPath));
+    if (auto status = process_.AddArg(MakeArg("dict", kDictionaryPath)); status != ZX_OK) {
+      return status;
+    }
   }
   std::filesystem::remove(kResultInputPath);
-  process_.AddArg(MakeArg("exact_artifact_path", kResultInputPath));
-  while (cmdline_iter != cmdline_.end()) {
-    process_.AddArg(*cmdline_iter++);
+  if (auto status = process_.AddArg(MakeArg("exact_artifact_path", kResultInputPath));
+      status != ZX_OK) {
+    return status;
   }
+  while (cmdline_iter != cmdline_.end()) {
+    if (auto status = process_.AddArg(*cmdline_iter++); status != ZX_OK) {
+      return status;
+    }
+  }
+  return ZX_OK;
 }
 
 ZxPromise<Artifact> LibFuzzerRunner::RunAsync() {

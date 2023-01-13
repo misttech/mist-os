@@ -42,12 +42,13 @@ class RegistryIntegrationTest : public AsyncTest {
   // Launch a fuzzer and give it a channel to register itself with the fuzz-registry.
   void Register() {
     process_->Reset();
-    process_->AddArgs({"bin/fake_fuzzer_for_testing", kFuzzerUrl, FUZZ_MODE});
+    ASSERT_EQ(process_->AddArgs({"bin/fake_fuzzer_for_testing", kFuzzerUrl, FUZZ_MODE}), ZX_OK);
 
     // Connect a channel to the fuzz-registry.
     fidl::InterfaceHandle<Registrar> handle;
     ASSERT_EQ(context_->Connect(handle.NewRequest()), ZX_OK);
-    process_->AddChannel(ComponentContextForTest::kRegistrarId, handle.TakeChannel());
+    ASSERT_EQ(process_->AddChannel(ComponentContextForTest::kRegistrarId, handle.TakeChannel()),
+              ZX_OK);
 
     ASSERT_EQ(process_->Spawn(), ZX_OK);
   }

@@ -89,22 +89,41 @@ ChildProcess::ChildProcess(ExecutorPtr executor) : executor_(std::move(executor)
 
 ChildProcess::~ChildProcess() { KillSync(); }
 
-void ChildProcess::AddArg(const std::string& arg) {
+zx_status_t ChildProcess::AddArg(std::string_view arg) {
+  static const char* kPkgPrefix = "/pkg/";
+  auto arg_len = (args_.empty() ? strlen(kPkgPrefix) : 0) + arg.size();
+  if (auto status = ReserveBytes(arg_len); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to add argument: '" << arg << "'";
+    return status;
+  }
   if (args_.empty()) {
-    args_.emplace_back(std::string("/pkg/") + arg);
+    args_.emplace_back(std::string(kPkgPrefix) + std::string(arg));
   } else {
     args_.emplace_back(arg);
   }
+  return ZX_OK;
 }
 
-void ChildProcess::AddArgs(std::initializer_list<const char*> args) {
+zx_status_t ChildProcess::AddArgs(std::initializer_list<const char*> args) {
+  auto orig_num_args = args_.size();
+  auto orig_num_bytes = num_bytes_;
   for (const auto* arg : args) {
-    AddArg(arg);
+    if (auto status = AddArg(arg); status != ZX_OK) {
+      args_.resize(orig_num_args);
+      num_bytes_ = orig_num_bytes;
+      return status;
+    }
   }
+  return ZX_OK;
 }
 
-void ChildProcess::SetEnvVar(const std::string& name, const std::string& value) {
-  envvars_[name] = value;
+zx_status_t ChildProcess::SetEnvVar(std::string_view name, std::string_view value) {
+  if (auto status = ReserveBytes(name.size() + 1 + value.size()); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to add environment variable: '" << name << "=" << value << "'";
+    return status;
+  }
+  envvars_[std::string(name)] = value;
+  return ZX_OK;
 }
 
 zx_status_t ChildProcess::AddStdinPipe() {
@@ -179,6 +198,10 @@ zx_status_t ChildProcess::AddStderrPipe() {
 }
 
 zx_status_t ChildProcess::AddPipe(int target_fd, int* out_rpipe, int* out_wpipe) {
+  if (auto status = ReserveHandles(1); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to add pipe with fd=" << target_fd;
+    return status;
+  }
   if (spawned_) {
     FX_LOGS(ERROR) << "Cannot add stdio pipes after spawning.";
     return ZX_ERR_BAD_STATE;
@@ -206,13 +229,38 @@ zx_status_t ChildProcess::AddPipe(int target_fd, int* out_rpipe, int* out_wpipe)
   return ZX_OK;
 }
 
-void ChildProcess::AddChannel(uint32_t id, zx::channel channel) {
+zx_status_t ChildProcess::AddChannel(uint32_t id, zx::channel channel) {
+  if (auto status = ReserveHandles(1); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to add channel with id=" << id;
+    return status;
+  }
   fdio_spawn_action_t action{.action = FDIO_SPAWN_ACTION_ADD_HANDLE,
                              .h = {
                                  .id = PA_HND(PA_USER0, id),
                                  .handle = channel.release(),
                              }};
   actions_.emplace_back(std::move(action));
+  return ZX_OK;
+}
+
+zx_status_t ChildProcess::ReserveBytes(size_t num_bytes) {
+  if (num_bytes_ + num_bytes > ZX_CHANNEL_MAX_MSG_BYTES / 2) {
+    FX_LOGS(ERROR) << "Spawn message bytes limit exceeded; " << num_bytes_
+                   << " bytes previously added";
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  num_bytes_ += num_bytes;
+  return ZX_OK;
+}
+
+zx_status_t ChildProcess::ReserveHandles(size_t num_handles) {
+  if (num_handles_ + num_handles > ZX_CHANNEL_MAX_MSG_HANDLES / 2) {
+    FX_LOGS(ERROR) << "Spawn message handles limit exceeded; " << num_handles_
+                   << " handles previously added";
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  num_handles_ += num_handles;
+  return ZX_OK;
 }
 
 zx_status_t ChildProcess::Spawn() {
@@ -276,7 +324,7 @@ zx_status_t ChildProcess::Duplicate(zx::process* out) {
   return process_.duplicate(ZX_RIGHT_SAME_RIGHTS, out);
 }
 
-zx_status_t ChildProcess::WriteToStdin(const std::string& line) {
+zx_status_t ChildProcess::WriteToStdin(std::string_view line) {
   if (!IsAlive()) {
     FX_LOGS(WARNING) << "Cannot write to process standard input: not running";
     return ZX_ERR_BAD_STATE;
@@ -287,7 +335,7 @@ zx_status_t ChildProcess::WriteToStdin(const std::string& line) {
       FX_LOGS(WARNING) << "Cannot write to process standard input: closed";
       return ZX_ERR_PEER_CLOSED;
     }
-    input_lines_.push_back(line);
+    input_lines_.emplace_back(std::string(line));
   }
   input_cond_.notify_one();
   return ZX_OK;

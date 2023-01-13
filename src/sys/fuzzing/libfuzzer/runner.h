@@ -60,7 +60,7 @@ class LibFuzzerRunner : public Runner {
 
   // Construct a set of libFuzzer command-line arguments for the current options and add them to
   // this object's process.
-  void AddArgs();
+  __WARN_UNUSED_RESULT zx_status_t AddArgs();
 
   // Returns a promise that runs a libFuzzer process asynchronously and returns the fuzzing result
   // and the input that caused it.
