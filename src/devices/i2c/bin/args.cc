@@ -23,12 +23,14 @@ constexpr size_t kVargs = 3;    // Variable arguments (data / parameters follow)
 
 const std::map<char, i2cutil::I2cOp> kOrdinalToOperation = {
     {'r', i2cutil::I2cOp::Read}, {'w', i2cutil::I2cOp::Write}, {'t', i2cutil::I2cOp::Transact},
-    {'l', i2cutil::I2cOp::List}, {'p', i2cutil::I2cOp::Ping},  {'h', i2cutil::I2cOp::Help},
+    {'d', i2cutil::I2cOp::Dump}, {'l', i2cutil::I2cOp::List},  {'p', i2cutil::I2cOp::Ping},
+    {'h', i2cutil::I2cOp::Help},
 };
 
 const std::map<i2cutil::I2cOp, int> kOperationToMinArgCount = {
     {i2cutil::I2cOp::Read, 4}, {i2cutil::I2cOp::Write, 4}, {i2cutil::I2cOp::Transact, 5},
-    {i2cutil::I2cOp::List, 2}, {i2cutil::I2cOp::Ping, 2},  {i2cutil::I2cOp::Help, 2},
+    {i2cutil::I2cOp::Dump, 5}, {i2cutil::I2cOp::List, 2},  {i2cutil::I2cOp::Ping, 2},
+    {i2cutil::I2cOp::Help, 2},
 };
 
 std::string inferPath(const char* arg) {
@@ -210,6 +212,31 @@ zx::result<Args> Args::FromArgv(const int argc, const char* argv[]) {
       if (status != ZX_OK) {
         return zx::error(status);
       }
+      break;
+    }
+    case I2cOp::Dump: {
+      int64_t start_address = parse_positive_long(argv[3]);
+      int64_t count = parse_positive_long(argv[4]);
+
+      // Only do up to 8-bit addressing for now.
+      if (start_address == kBadParse || count == kBadParse || count > 255 || start_address > 255 ||
+          (start_address + count) > 255) {
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
+
+      for (int64_t i = 0; i < count; i++) {
+        TransactionData write;
+        TransactionData read;
+
+        write.type = TransactionType::Write;
+        write.bytes.push_back(static_cast<uint8_t>(i + start_address));
+        result.transactions_.push_back(write);
+
+        read.type = TransactionType::Read;
+        read.count = 1;
+        result.transactions_.push_back(read);
+      }
+
       break;
     }
     default:

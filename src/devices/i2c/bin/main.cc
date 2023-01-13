@@ -19,6 +19,7 @@ Usage:
   i2cutil read <device> <address> [<address>...]
   i2cutil write <device> <address> [<address>...] <data> [<data>...]
   i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
+  i2cutil dump <device> <address> <count>
   i2cutil list
   i2cutil ping
   i2cutil help
@@ -42,6 +43,8 @@ Commands:
                         and <address>.
   transact | t          Perform a transaction with multiple segments. Each segment
                         can be a write (`w`) or a read (`r`).
+  dump | d              Reads and prints <count> registers from <device> starting
+                        at the address indicated by <address>.
   list | l              List all the I2C devices available on the system.
   ping | p              Ping all I2C devices under devfs path `/dev/class/i2c` by
                         reading from each device's 0x00 address.
@@ -89,6 +92,12 @@ Examples:
   160: (ANONYMOUS)
   161: temp_sensor
 
+  Print 3 registers from the device named `pmic` starting at address 0x10:
+  $ i2cutil dump pmic 0x10 3
+  0x10: 0x41
+  0x11: 0x00
+  0x12: 0x00
+
 Notes:
   Source code for `i2cutil`: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/i2c/bin/i2cutil.cc
 )""";
@@ -122,6 +131,24 @@ void printTransactions(const std::vector<i2cutil::TransactionData>& transactions
     }
     printBytes(transaction.bytes);
     printf("\n");
+  }
+}
+
+void printDump(const std::vector<i2cutil::TransactionData>& transactions) {
+  // An I2C dump will be a sequence of alternating writes and reads.
+  // {W R  W R  W R  W R}: Each write represents the address of the register
+  // being read and the following read will represent the data read back from
+  // that register.
+  // Start by ensuring that the input conforms to this spec.
+  ZX_ASSERT(transactions.size() % 2 == 0);
+  for (size_t i = 0; i < transactions.size(); i++) {
+    if (i % 2 == 0) {
+      ZX_ASSERT(transactions[i].type == i2cutil::TransactionType::Write);
+      printf("0x%02x: ", transactions[i].bytes.front());
+    } else {
+      ZX_ASSERT(transactions[i].type == i2cutil::TransactionType::Read);
+      printf("0x%02x\n", transactions[i].bytes.front());
+    }
   }
 }
 
@@ -227,7 +254,7 @@ int main(int argc, const char* argv[]) {
   }
 
   if (args->Op() == i2cutil::I2cOp::Read || args->Op() == i2cutil::I2cOp::Write ||
-      args->Op() == i2cutil::I2cOp::Transact) {
+      args->Op() == i2cutil::I2cOp::Transact || args->Op() == i2cutil::I2cOp::Dump) {
     zx::result<fidl::ClientEnd<fuchsia_hardware_i2c::Device>> device;
     if (std::filesystem::exists(args->Path())) {
       device = component::Connect<fuchsia_hardware_i2c::Device>(args->Path());
@@ -246,8 +273,11 @@ int main(int argc, const char* argv[]) {
               zx_status_get_string(result));
       return -1;
     }
-
-    printTransactions(args->Transactions());
+    if (args->Op() == i2cutil::I2cOp::Dump) {
+      printDump(args->Transactions());
+    } else {
+      printTransactions(args->Transactions());
+    }
   } else if (args->Op() == i2cutil::I2cOp::Ping) {
     return ping() == ZX_OK ? 0 : -1;
   } else if (args->Op() == i2cutil::I2cOp::List) {

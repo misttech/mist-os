@@ -230,6 +230,49 @@ TEST(I2cArgsTest, TestParseTransactionBadRead) {
   ASSERT_NOT_OK(parsed.status_value());
 }
 
+TEST(I2cArgsTest, TestCreateDumpTransactions) {
+  const char* argv[] = {"i2cutil", "dump", "somepath", "0x10", "0x3"};
+  int argc = std::size(argv);
+
+  auto parsed = i2cutil::Args::FromArgv(argc, argv);
+  ASSERT_OK(parsed.status_value());
+
+  // We asked for count = 0x3 registers which means that args should generate
+  // 3 reg * 2 txn/reg = 6txn.
+  ASSERT_EQ(parsed->Transactions().size(), 6);
+  for (size_t i = 0; i < parsed->Transactions().size(); i++) {
+    if (i % 2 == 0) {
+      EXPECT_EQ(parsed->Transactions()[i].type, i2cutil::TransactionType::Write);
+    } else {
+      EXPECT_EQ(parsed->Transactions()[i].type, i2cutil::TransactionType::Read);
+    }
+  }
+}
+
+TEST(I2cArgsTest, TestCreateDumpTransactionsOutOfRange) {
+  {
+    const char* argv[] = {"i2cutil", "dump", "somepath", "256", "10"};
+    int argc = std::size(argv);
+
+    auto parsed = i2cutil::Args::FromArgv(argc, argv);
+    EXPECT_NOT_OK(parsed.status_value());
+  }
+  {
+    const char* argv[] = {"i2cutil", "dump", "somepath", "0", "256"};
+    int argc = std::size(argv);
+
+    auto parsed = i2cutil::Args::FromArgv(argc, argv);
+    EXPECT_NOT_OK(parsed.status_value());
+  }
+  {
+    const char* argv[] = {"i2cutil", "dump", "somepath", "129", "129"};
+    int argc = std::size(argv);
+
+    auto parsed = i2cutil::Args::FromArgv(argc, argv);
+    EXPECT_NOT_OK(parsed.status_value());
+  }
+}
+
 class FakeI2cDevice : public fake_i2c::FakeI2c {
  public:
   void PushReadByte(uint8_t byte) { reads_.push_back(byte); }

@@ -18,6 +18,7 @@ enum class I2cOp {
   Read,
   Write,
   Transact,
+  Dump,
   List,
   Ping,
   Help,

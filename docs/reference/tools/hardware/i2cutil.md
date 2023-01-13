@@ -14,6 +14,7 @@ List, read from, and write to I2C devices.
 i2cutil read <device> <address> [<address>...]
 i2cutil write <device> <address> [<address>...] <data> [<data>...]
 i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
+i2cutil dump <device> <address> <count>
 i2cutil list
 i2cutil ping
 i2cutil help
@@ -57,6 +58,14 @@ i2cutil transact <device> (r <bytes>|w <address> [<address>...] [<data>...])...
 Perform a transaction with multiple segments. Each segment can be a write
 (`w`) or a read (`r`).
 
+### dump {#dump}
+
+```none
+i2cutil dump <device> <start> <count>
+```
+
+Reads and prints `<count>` registers from `<device>` starting at the address
+indicated by `<address>`
 
 ### list {#list}
 
@@ -102,6 +111,23 @@ represented by devfs node index `4`:
 
 ```none
 $ i2cutil transact 4 w 0x20 r 3
+```
+
+### Dump nine registers starting at address 0x10
+
+Dump nine registers starting at address 0x10.
+
+```none
+$ i2cutil dump pmic 0x10 9
+0x10: 0x00
+0x11: 0x00
+0x12: 0x00
+0x13: 0x00
+0x14: 0x00
+0x15: 0x00
+0x16: 0x00
+0x17: 0x00
+0x18: 0x00
 ```
 
 ### Read one byte from a multi-byte address
