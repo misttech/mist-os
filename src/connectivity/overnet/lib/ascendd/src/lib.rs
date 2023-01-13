@@ -112,10 +112,7 @@ pub async fn run_stream<'a>(
     }
 
     if read == 8 && id == CIRCUIT_ID {
-        #[cfg(not(feature = "circuit"))]
-        let ret = Err(format_err!("Circuit-switched interconnect disabled"));
-        #[cfg(feature = "circuit")]
-        let ret = circuit::multi_stream::multi_stream_node_connection_to_async(
+        circuit::multi_stream::multi_stream_node_connection_to_async(
             node.circuit_node(),
             rx,
             tx,
@@ -123,8 +120,7 @@ pub async fn run_stream<'a>(
             circuit::Quality::LOCAL_SOCKET,
         )
         .await
-        .map_err(Error::from);
-        ret
+        .map_err(Error::from)
     } else {
         let config = Box::new(move || {
             Some(fidl_fuchsia_overnet_protocol::LinkConfig::AscenddServer(

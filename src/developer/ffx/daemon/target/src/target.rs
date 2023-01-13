@@ -910,21 +910,40 @@ impl Target {
 
         let weak_target = Rc::downgrade(self);
         self.host_pipe.borrow_mut().replace(Task::local(async move {
+            let mode: Option<String> = ffx_config::get("overnet.cso").await.unwrap_or_else(|e| {
+                tracing::warn!("Error getting `overnet.cso` config option: {:?}", e);
+                None
+            });
+
+            let (do_legacy, do_circuit) = match mode.as_ref().map(|x| x.as_str()) {
+                None | Some("enabled") => (true, true),
+                Some("disabled") => (true, false),
+                Some("only") => (false, true),
+                Some(other) => {
+                    tracing::warn!(
+                        "{:?} is not a valid value for the `overnet.cso` config \
+                                    (should be \"enabled\", \"disabled\" or \"only\")",
+                        other
+                    );
+                    (true, true)
+                }
+            };
+
             let legacy = async {
-                let r = HostPipeConnection::new(weak_target.clone()).await;
-                // XXX(raggi): decide what to do with this log data:
-                tracing::info!("HostPipeConnection returned: {:?}", r);
+                if do_legacy {
+                    let r = HostPipeConnection::new(weak_target.clone()).await;
+                    // XXX(raggi): decide what to do with this log data:
+                    tracing::info!("HostPipeConnection returned: {:?}", r);
+                }
             };
-            #[cfg(feature = "circuit")]
             let circuit = async {
-                let r = HostPipeConnection::new_circuit(weak_target.clone()).await;
-                // XXX(raggi): decide what to do with this log data:
-                tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                if do_circuit {
+                    let r = HostPipeConnection::new_circuit(weak_target.clone()).await;
+                    // XXX(raggi): decide what to do with this log data:
+                    tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                }
             };
-            #[cfg(feature = "circuit")]
             futures::future::join(legacy, circuit).await;
-            #[cfg(not(feature = "circuit"))]
-            legacy.await;
             weak_target.upgrade().and_then(|target| target.host_pipe.borrow_mut().take());
         }));
     }

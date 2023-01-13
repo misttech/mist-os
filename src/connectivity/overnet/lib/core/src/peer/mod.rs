@@ -556,7 +556,6 @@ impl Peer {
 
     /// Construct a new client peer - spawns tasks to handle making control stream requests, and
     /// publishing link metadata
-    #[cfg_attr(not(circuit), allow(dead_code))]
     pub(crate) fn new_circuit_client(
         conn: circuit::Connection,
         conn_stream_writer: circuit::stream::Writer,
@@ -595,7 +594,6 @@ impl Peer {
     }
 
     /// Construct a new server peer - spawns tasks to handle responding to control stream requests
-    #[cfg_attr(not(circuit), allow(dead_code))]
     pub(crate) async fn new_circuit_server(
         conn: circuit::Connection,
         router: &Arc<Router>,

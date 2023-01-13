@@ -96,7 +96,6 @@ impl HostPipeChild {
         Self::new_inner(addr, id, stderr_buf, event_queue, false).await
     }
 
-    #[cfg(feature = "circuit")]
     async fn new_circuit(
         addr: SocketAddr,
         id: u64,
@@ -340,7 +339,6 @@ impl HostPipeConnection {
         HostPipeConnection::new_with_cmd(target, HostPipeChild::new, RETRY_DELAY)
     }
 
-    #[cfg(feature = "circuit")]
     pub fn new_circuit(target: Weak<Target>) -> impl Future<Output = Result<()>> {
         HostPipeConnection::new_with_cmd(target, HostPipeChild::new_circuit, RETRY_DELAY)
     }
@@ -408,10 +406,7 @@ fn overnet_pipe(overnet_instance: &hoist::Hoist, circuit: bool) -> Result<fidl::
     let (local_socket, remote_socket) = fidl::Socket::create(fidl::SocketOpts::STREAM)?;
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
     if circuit {
-        #[cfg(feature = "circuit")]
         overnet_instance.start_client_socket(remote_socket).detach();
-        #[cfg(not(feature = "circuit"))]
-        unreachable!("Circuit-switched overnet should be disabled")
     } else {
         overnet_instance.connect_as_mesh_controller()?.attach_socket_link(remote_socket)?;
     }

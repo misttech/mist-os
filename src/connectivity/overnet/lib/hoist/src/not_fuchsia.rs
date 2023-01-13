@@ -14,7 +14,6 @@ use fidl_fuchsia_overnet::{
 };
 use fuchsia_async::TimeoutExt;
 use fuchsia_async::{Task, Timer};
-#[cfg(feature = "circuit")]
 use futures::future::Either;
 use futures::prelude::*;
 use overnet_core::{log_errors, ListPeersContext, Router, RouterOptions, SecurityContext};
@@ -107,7 +106,6 @@ impl Hoist {
     }
 
     /// Runs a circuit link over the given socket. Assumes it is connected as a client.
-    #[cfg(feature = "circuit")]
     pub fn start_client_socket(&self, socket: fidl::Socket) -> Task<()> {
         let router = Arc::clone(&self.node);
         Task::spawn(async move {
@@ -191,10 +189,7 @@ impl Hoist {
         };
 
         let uds_a = loop {
-            #[cfg(feature = "circuit")]
             let fut = futures::future::try_join(connect(), connect());
-            #[cfg(not(feature = "circuit"))]
-            let fut = connect();
             match fut.await {
                 // We got our connections.
                 Ok(conns) => break conns,
@@ -218,20 +213,16 @@ impl Hoist {
                 }
             }
         };
-        #[cfg(feature = "circuit")]
         let (uds_a, uds_b) = uds_a;
 
         let (mut rx_a, mut tx_a) = uds_a.split();
-        #[cfg(feature = "circuit")]
         let (mut rx_b, mut tx_b) = uds_b.split();
 
         run_ascendd_connection(
             &self,
             &mut rx_a,
             &mut tx_a,
-            #[cfg(feature = "circuit")]
             &mut rx_b,
-            #[cfg(feature = "circuit")]
             &mut tx_b,
             Some(label),
             sockpath.to_str().context("Non-unicode in ascendd path")?.to_owned(),
@@ -254,7 +245,6 @@ impl super::OvernetInstance for Hoist {
     }
 }
 
-#[cfg(feature = "circuit")]
 async fn run_ascendd_connection<'a>(
     hoist: &Hoist,
     rx_link: &'a mut (dyn AsyncRead + Unpin + Send),
@@ -301,27 +291,6 @@ async fn run_ascendd_connection<'a>(
         }
         Either::Right((res, _)) => res,
     }
-}
-
-#[cfg(not(feature = "circuit"))]
-async fn run_ascendd_connection<'a>(
-    hoist: &Hoist,
-    rx_link: &'a mut (dyn AsyncRead + Unpin + Send),
-    tx_link: &'a mut (dyn AsyncWrite + Unpin + Send),
-    label: Option<String>,
-    sockpath: String,
-) -> Result<(), Error> {
-    let config = Box::new(move || {
-        Some(fidl_fuchsia_overnet_protocol::LinkConfig::AscenddClient(
-            fidl_fuchsia_overnet_protocol::AscenddLinkConfig {
-                path: Some(sockpath.clone()),
-                connection_label: label.clone(),
-                ..fidl_fuchsia_overnet_protocol::AscenddLinkConfig::EMPTY
-            },
-        ))
-    });
-
-    run_stream_link(hoist.node.clone(), None, rx_link, tx_link, Default::default(), config).await
 }
 
 /// Retry a future until it succeeds or retries run out.

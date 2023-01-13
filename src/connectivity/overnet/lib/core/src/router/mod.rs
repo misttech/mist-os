@@ -311,7 +311,6 @@ pub struct Router {
     implementation: AtomicU32,
     /// Hack to prevent the n^2 scaling of a fully-connected graph of ffxs
     ascendd_client_routing: AtomicBool,
-    #[cfg(feature = "circuit")]
     circuit_node: circuit::ConnectionNode,
 }
 
@@ -339,7 +338,6 @@ impl std::fmt::Debug for Router {
 
 /// This is sent when initiating connections between circuit nodes and must be identical between all
 /// such nodes.
-#[cfg(feature = "circuit")]
 const OVERNET_CIRCUIT_PROTOCOL: &'static str = "Overnet:0";
 
 impl Router {
@@ -360,9 +358,7 @@ impl Router {
         let node_id = options.node_id.unwrap_or_else(generate_node_id);
         let service_map = ServiceMap::new(node_id);
         let (link_state_publisher, link_state_receiver) = futures::channel::mpsc::channel(1);
-        #[cfg(feature = "circuit")]
         let (new_peer_sender, new_peer_receiver) = futures::channel::mpsc::unbounded();
-        #[cfg(feature = "circuit")]
         let (circuit_node, circuit_connections) =
             if let Some(interval) = options.circuit_router_interval {
                 let (a, b) = circuit::ConnectionNode::new_with_router(
@@ -404,7 +400,6 @@ impl Router {
             ),
             // Default is to route all clients to each other. Ffx daemon disabled client routing.
             ascendd_client_routing: AtomicBool::new(true),
-            #[cfg(feature = "circuit")]
             circuit_node,
         });
 
@@ -413,8 +408,7 @@ impl Router {
         *router.task.lock().now_or_never().unwrap() = Some(Task::spawn(log_errors(
             async move {
                 let router = &weak_router;
-                #[cfg(feature = "circuit")]
-                let ret = futures::future::try_join5(
+                futures::future::try_join5(
                     summon_clients(router.clone(), routes.new_forwarding_table_observer()),
                     routes.run_planner(node_id, link_state_observable.new_observer()),
                     run_link_status_updater(link_state_observable, link_state_receiver),
@@ -425,20 +419,7 @@ impl Router {
                     },
                 )
                 .await
-                .map(drop);
-                #[cfg(not(feature = "circuit"))]
-                let ret = futures::future::try_join4(
-                    summon_clients(router.clone(), routes.new_forwarding_table_observer()),
-                    routes.run_planner(node_id, link_state_observable.new_observer()),
-                    run_link_status_updater(link_state_observable, link_state_receiver),
-                    async move {
-                        run_diagostic_service_request_handler(router).await?;
-                        Ok(())
-                    },
-                )
-                .await
-                .map(drop);
-                ret
+                .map(drop)
             },
             format!("router {:?} support loop failed", node_id),
         )));
@@ -448,7 +429,6 @@ impl Router {
 
     /// Get the circuit protocol node for this router. This will let us create new connections to
     /// other nodes.
-    #[cfg(feature = "circuit")]
     pub fn circuit_node(&self) -> &circuit::Node {
         self.circuit_node.node()
     }
@@ -732,46 +712,42 @@ impl Router {
     }
 
     async fn client_peer(self: &Arc<Self>, peer_node_id: NodeId) -> Result<Arc<Peer>, Error> {
-        if !cfg!(feature = "circuit") {
-            self.peers.lock().await.get_client(self.node_id, peer_node_id, self).await
-        } else {
-            let this = Arc::clone(self);
-            let circuit_peer = async move {
-                loop {
-                    let mut peers = this.peers.lock().await;
-                    match peers.circuit_clients.get_mut(&peer_node_id) {
-                        Some(CircuitState::Peer(peer)) => break Arc::clone(&peer),
-                        Some(CircuitState::Waiters(waiters)) => {
-                            let (sender, receiver) = oneshot::channel();
-                            waiters.push(sender);
-                            std::mem::drop(peers);
-                            let _ = receiver.await;
-                        }
-                        None => {
-                            peers
-                                .circuit_clients
-                                .insert(peer_node_id, CircuitState::Waiters(Vec::new()));
-                        }
+        let this = Arc::clone(self);
+        let circuit_peer = async move {
+            loop {
+                let mut peers = this.peers.lock().await;
+                match peers.circuit_clients.get_mut(&peer_node_id) {
+                    Some(CircuitState::Peer(peer)) => break Arc::clone(&peer),
+                    Some(CircuitState::Waiters(waiters)) => {
+                        let (sender, receiver) = oneshot::channel();
+                        waiters.push(sender);
+                        std::mem::drop(peers);
+                        let _ = receiver.await;
+                    }
+                    None => {
+                        peers
+                            .circuit_clients
+                            .insert(peer_node_id, CircuitState::Waiters(Vec::new()));
                     }
                 }
-            };
-            futures::pin_mut!(circuit_peer);
-            let (link_found_sender, link_found) = oneshot::channel();
-            let link_peer = self
-                .peers
-                .lock()
-                .await
-                .new_link_client(self.node_id, peer_node_id, self, Some(link_found_sender))
-                .await?;
+            }
+        };
+        futures::pin_mut!(circuit_peer);
+        let (link_found_sender, link_found) = oneshot::channel();
+        let link_peer = self
+            .peers
+            .lock()
+            .await
+            .new_link_client(self.node_id, peer_node_id, self, Some(link_found_sender))
+            .await?;
 
-            match futures::future::select(circuit_peer, link_found).await {
-                futures::future::Either::Left((peer, _)) => Ok(peer),
-                futures::future::Either::Right((_, circuit_peer)) => {
-                    if let Some(peer) = circuit_peer.now_or_never() {
-                        Ok(peer)
-                    } else {
-                        Ok(link_peer)
-                    }
+        match futures::future::select(circuit_peer, link_found).await {
+            futures::future::Either::Left((peer, _)) => Ok(peer),
+            futures::future::Either::Right((_, circuit_peer)) => {
+                if let Some(peer) = circuit_peer.now_or_never() {
+                    Ok(peer)
+                } else {
+                    Ok(link_peer)
                 }
             }
         }
@@ -1160,7 +1136,6 @@ async fn summon_clients(
 }
 
 /// Runs our `ConnectionNode` to set up circuit-based peers.
-#[cfg(feature = "circuit")]
 async fn run_circuits(
     router: Weak<Router>,
     connections: impl futures::Stream<Item = circuit::Connection> + Send,
