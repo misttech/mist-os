@@ -28,6 +28,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fidl_fuchsia_stash as fstash;
+use fidl_fuchsia_update_verify as fupdate_verify;
 
 use anyhow::Context as _;
 use async_trait::async_trait;
@@ -69,6 +70,7 @@ impl NetstackVersion {
                 fposix_socket_raw::ProviderMarker::PROTOCOL_NAME,
                 fposix_socket::ProviderMarker::PROTOCOL_NAME,
                 fnet_debug::DiagnosticsMarker::PROTOCOL_NAME,
+                fupdate_verify::NetstackVerifierMarker::PROTOCOL_NAME,
                 $($name),*
             ]};
             // Strip trailing comma.

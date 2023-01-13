@@ -14,7 +14,8 @@ use fuchsia_zircon as zx;
 
 use futures::{StreamExt as _, TryStreamExt as _};
 use netemul::{TestRealm, TestSandbox};
-use netstack_testing_common::realms::NetstackVersion;
+use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt as _};
+use netstack_testing_macros::netstack_test;
 
 const MOCK_SERVICES_NAME: &str = "mock";
 
@@ -122,4 +123,20 @@ async fn ns2_requests_inspect_persistence() {
     responder
         .send(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
         .expect("failed to respond");
+}
+
+#[netstack_test]
+async fn serves_update_verify<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let sandbox = &sandbox;
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let verifier = realm
+        .connect_to_protocol::<fidl_fuchsia_update_verify::NetstackVerifierMarker>()
+        .expect("connect to protocol");
+
+    let response = verifier
+        .verify(fidl_fuchsia_update_verify::VerifyOptions::EMPTY)
+        .await
+        .expect("call succeeded");
+    assert_eq!(response, Ok(()));
 }

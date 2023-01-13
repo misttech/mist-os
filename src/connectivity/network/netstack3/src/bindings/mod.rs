@@ -23,6 +23,7 @@ mod socket;
 mod stack_fidl_worker;
 mod timers;
 mod util;
+mod verifier_worker;
 
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
@@ -736,6 +737,7 @@ enum Service {
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
+    Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
 }
 
 enum WorkItem {
@@ -799,7 +801,8 @@ impl NetstackSeed {
             .add_fidl_service(Service::RawSocket)
             .add_fidl_service(Service::Interfaces)
             .add_fidl_service(Service::InterfacesAdmin)
-            .add_fidl_service(Service::Filter);
+            .add_fidl_service(Service::Filter)
+            .add_fidl_service(Service::Verifier);
 
         let services = fs.take_and_serve_directory_handle().context("directory handle")?;
 
@@ -864,6 +867,9 @@ impl NetstackSeed {
                 }
                 WorkItem::Incoming(Service::Filter(filter)) => {
                     filter.serve_with(|rs| filter_worker::serve(rs)).await
+                }
+                WorkItem::Incoming(Service::Verifier(verifier)) => {
+                    verifier.serve_with(|rs| verifier_worker::serve(rs)).await
                 }
                 WorkItem::Task(task) => task.await,
             }
