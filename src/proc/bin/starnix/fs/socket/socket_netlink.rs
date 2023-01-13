@@ -207,7 +207,7 @@ impl NetlinkSocketInner {
     fn query_events(&self) -> FdEvents {
         let mut events = FdEvents::empty();
         let local_events = self.messages.query_events();
-        if local_events & FdEvents::POLLIN {
+        if local_events.contains(FdEvents::POLLIN) {
             events = FdEvents::POLLIN;
         }
         events
@@ -332,10 +332,10 @@ impl SocketOps for NetlinkSocket {
     ) -> WaitKey {
         let mut inner = self.lock();
         let cur_events = inner.query_events();
-        if events & cur_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(cur_events.mask(), handler)
+        if cur_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+            waiter.wake_immediately(cur_events.bits(), handler)
         } else {
-            inner.waiters.wait_async_mask(waiter, events.mask(), handler)
+            inner.waiters.wait_async_mask(waiter, events.bits(), handler)
         }
     }
 

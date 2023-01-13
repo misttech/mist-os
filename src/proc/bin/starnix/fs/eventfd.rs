@@ -92,7 +92,7 @@ impl FileOps for EventFdFileObject {
                 }
                 inner.value += add_value;
                 if inner.value > 0 {
-                    inner.wait_queue.notify_mask(FdEvents::POLLIN.mask());
+                    inner.wait_queue.notify_mask(FdEvents::POLLIN.bits());
                 }
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },
@@ -131,7 +131,7 @@ impl FileOps for EventFdFileObject {
                     }
                 };
                 current_task.mm.write_all(data, &return_value.to_ne_bytes())?;
-                inner.wait_queue.notify_mask(FdEvents::POLLOUT.mask());
+                inner.wait_queue.notify_mask(FdEvents::POLLOUT.bits());
 
                 Ok(BlockableOpsResult::Done(DATA_SIZE))
             },
@@ -151,10 +151,11 @@ impl FileOps for EventFdFileObject {
     ) -> WaitKey {
         let mut inner = self.inner.lock();
         let present_events = query_events_internal(&inner);
-        if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(present_events.mask(), handler)
+        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+        {
+            waiter.wake_immediately(present_events.bits(), handler)
         } else {
-            inner.wait_queue.wait_async_mask(waiter, events.mask(), handler)
+            inner.wait_queue.wait_async_mask(waiter, events.bits(), handler)
         }
     }
 

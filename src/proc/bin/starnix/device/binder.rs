@@ -1363,7 +1363,7 @@ impl BinderThreadState {
         self.command_queue.push_back(command);
         if let Some(waiter) = self.waiter.take() {
             // Wake up the thread that is waiting.
-            waiter.wake_immediately(FdEvents::POLLIN.mask(), WaitCallback::none());
+            waiter.wake_immediately(FdEvents::POLLIN.bits(), WaitCallback::none());
         }
         // Notify any threads that are waiting on events from the binder driver FD.
         if let Some(binder_proc) = self.process.upgrade() {
@@ -3183,7 +3183,7 @@ impl BinderDriver {
         if proc_command_queue.commands.is_empty() && thread_state.command_queue.is_empty() {
             proc_command_queue.waiters.wait_async_events(waiter, events, handler)
         } else {
-            waiter.wake_immediately(FdEvents::POLLIN.mask(), handler)
+            waiter.wake_immediately(FdEvents::POLLIN.bits(), handler)
         }
     }
 

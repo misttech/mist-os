@@ -417,8 +417,9 @@ impl TerminalMutableState<Base = Terminal> {
         options: WaitAsyncOptions,
     ) -> WaitKey {
         let current_events = self.main_query_events();
-        if current_events & events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(current_events.mask(), handler)
+        if current_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+        {
+            waiter.wake_immediately(current_events.bits(), handler)
         } else {
             self.main_wait_queue.wait_async_events(waiter, events, handler)
         }
@@ -486,8 +487,9 @@ impl TerminalMutableState<Base = Terminal> {
         options: WaitAsyncOptions,
     ) -> WaitKey {
         let current_events = self.replica_query_events();
-        if current_events & events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(current_events.mask(), handler)
+        if current_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+        {
+            waiter.wake_immediately(current_events.bits(), handler)
         } else {
             self.replica_wait_queue.wait_async_events(waiter, events, handler)
         }
@@ -547,11 +549,11 @@ impl TerminalMutableState<Base = Terminal> {
     /// Notify any waiters if the state of the terminal changes.
     fn notify_waiters(&mut self) {
         let main_events = self.main_query_events();
-        if main_events.mask() != 0 {
+        if main_events.bits() != 0 {
             self.main_wait_queue.notify_events(main_events);
         }
         let replica_events = self.replica_query_events();
-        if replica_events.mask() != 0 {
+        if replica_events.bits() != 0 {
             self.replica_wait_queue.notify_events(replica_events);
         }
     }

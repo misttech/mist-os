@@ -88,22 +88,22 @@ fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: zxio_node_attributes_t) 
 fn get_zxio_signals_from_events(events: FdEvents) -> zxio::zxio_signals_t {
     let mut signals = ZxioSignals::NONE;
 
-    if events & FdEvents::POLLIN {
+    if events.contains(FdEvents::POLLIN) {
         signals |= ZxioSignals::READABLE;
     }
-    if events & FdEvents::POLLPRI {
+    if events.contains(FdEvents::POLLPRI) {
         signals |= ZxioSignals::OUT_OF_BAND;
     }
-    if events & FdEvents::POLLOUT {
+    if events.contains(FdEvents::POLLOUT) {
         signals |= ZxioSignals::WRITABLE;
     }
-    if events & FdEvents::POLLERR {
+    if events.contains(FdEvents::POLLERR) {
         signals |= ZxioSignals::ERROR;
     }
-    if events & FdEvents::POLLHUP {
+    if events.contains(FdEvents::POLLHUP) {
         signals |= ZxioSignals::PEER_CLOSED;
     }
-    if events & FdEvents::POLLRDHUP {
+    if events.contains(FdEvents::POLLRDHUP) {
         signals |= ZxioSignals::READ_DISABLED;
     }
 
@@ -686,7 +686,7 @@ mod test {
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
-        let event = EpollEvent { events: FdEvents::POLLIN.mask(), data: 0 };
+        let event = EpollEvent { events: FdEvents::POLLIN.bits(), data: 0 };
         epoll_file.add(&current_task, &pipe, &epoll_object, event).expect("poll_file.add");
 
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");

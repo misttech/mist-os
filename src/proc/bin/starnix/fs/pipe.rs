@@ -351,10 +351,11 @@ impl FileOps for PipeFileObject {
     ) -> WaitKey {
         let mut pipe = self.pipe.lock();
         let present_events = pipe.query_events();
-        if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(present_events.mask(), handler)
+        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+        {
+            waiter.wake_immediately(present_events.bits(), handler)
         } else {
-            pipe.waiters.wait_async_mask(waiter, events.mask(), handler)
+            pipe.waiters.wait_async_mask(waiter, events.bits(), handler)
         }
     }
 

@@ -546,15 +546,17 @@ impl SocketOps for UnixSocket {
         options: WaitAsyncOptions,
     ) -> WaitKey {
         let cur_events = self.query_events(socket, current_task);
-        if events & cur_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(cur_events.mask(), handler)
+        if cur_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
+            waiter.wake_immediately(cur_events.bits(), handler)
         } else {
-            let wait_key = self.lock().waiters.wait_async_mask(waiter, events.mask(), handler);
+            let wait_key = self.lock().waiters.wait_async_mask(waiter, events.bits(), handler);
 
             // Resolve the race if the events changed while adding the waiter while unlocked.
             let present_events = self.query_events(socket, current_task);
-            if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-                self.lock().waiters.wake_key_immediately(&wait_key, present_events.mask());
+            if present_events.intersects(events)
+                && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+            {
+                self.lock().waiters.wake_key_immediately(&wait_key, present_events.bits());
             }
             wait_key
         }
@@ -581,7 +583,7 @@ impl SocketOps for UnixSocket {
             let local_events = inner.messages.query_events();
             // From our end's message queue we only care about POLLIN (whether we have data stored
             // that's readable). POLLOUT is based on whether the peer end has room in its buffer.
-            if local_events & FdEvents::POLLIN {
+            if local_events.contains(FdEvents::POLLIN) {
                 events = FdEvents::POLLIN;
             }
 
@@ -609,7 +611,7 @@ impl SocketOps for UnixSocket {
             let unix_socket = downcast_socket_to_unix(&peer);
             let peer_inner = unix_socket.lock();
             let peer_events = peer_inner.messages.query_events();
-            if peer_events & FdEvents::POLLOUT {
+            if peer_events.contains(FdEvents::POLLOUT) {
                 events |= FdEvents::POLLOUT;
             }
         }

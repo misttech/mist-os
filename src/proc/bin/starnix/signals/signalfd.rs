@@ -111,9 +111,9 @@ impl FileOps for SignalFd {
         if task_state.signals.is_any_allowed_by_mask(!self.mask)
             && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
         {
-            waiter.wake_immediately(FdEvents::POLLIN.mask(), handler)
+            waiter.wake_immediately(FdEvents::POLLIN.bits(), handler)
         } else {
-            task_state.signals.signal_wait.wait_async_mask(waiter, events.mask(), handler)
+            task_state.signals.signal_wait.wait_async_mask(waiter, events.bits(), handler)
         }
     }
 

@@ -182,7 +182,8 @@ impl Waiter {
                             let observed = usrpkt.as_u8_array();
                             let mut mask_bytes = [0u8; 4];
                             mask_bytes[..4].copy_from_slice(&observed[..4]);
-                            let events = FdEvents::from(u32::from_ne_bytes(mask_bytes));
+                            let events =
+                                FdEvents::from_bits_truncate(u32::from_ne_bytes(mask_bytes));
                             let key = packet.key();
                             let handler = self.0.key_map.lock().remove(&key);
                             if let Some(callback) = handler {
@@ -421,7 +422,7 @@ impl WaitQueue {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitKey {
-        self.wait_async_mask(waiter, events.mask(), handler)
+        self.wait_async_mask(waiter, events.bits(), handler)
     }
 
     /// Notify any waiters that the given events have occurred.
@@ -496,7 +497,7 @@ impl WaitQueue {
     }
 
     pub fn notify_events(&mut self, events: FdEvents) {
-        self.notify_mask(events.mask());
+        self.notify_mask(events.bits());
     }
 
     pub fn notify_count(&mut self, limit: usize) {
@@ -544,7 +545,7 @@ mod tests {
 
         let test_string = "hello startnix".to_string();
         let report_packet: EventHandler = Box::new(|observed: FdEvents| {
-            assert!(FdEvents::POLLIN & observed);
+            assert!(observed.contains(FdEvents::POLLIN));
             COUNTER.store(FINAL_VAL, Ordering::Relaxed);
         });
         let waiter = Waiter::new();

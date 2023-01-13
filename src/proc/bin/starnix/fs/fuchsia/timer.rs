@@ -136,7 +136,7 @@ impl TimerFile {
     /// Returns the `zx::Signals` to listen for given `events`. Used to wait on a `zx::Timer`
     /// associated with a `TimerFile`.
     fn get_signals_from_events(events: FdEvents) -> zx::Signals {
-        if events & FdEvents::POLLIN {
+        if events.contains(FdEvents::POLLIN) {
             zx::Signals::TIMER_SIGNALED
         } else {
             zx::Signals::NONE

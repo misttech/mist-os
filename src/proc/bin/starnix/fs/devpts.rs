@@ -994,7 +994,8 @@ mod tests {
         let mut buffer = vec![0; 4096];
         let get_buffer = |size: usize| [UserBuffer { address: addr, length: size }];
 
-        let has_data_ready_to_read = |fd: &FileHandle| fd.query_events(&task) & FdEvents::POLLIN;
+        let has_data_ready_to_read =
+            |fd: &FileHandle| fd.query_events(&task).contains(FdEvents::POLLIN);
 
         let write_and_assert = |fd: &FileHandle, data: &[u8]| {
             mm.write_all(&get_buffer(data.len()), data).expect("write_all");

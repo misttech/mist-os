@@ -214,10 +214,12 @@ impl SocketOps for VsockSocket {
             }
             _ => {
                 let present_events = inner.query_events(current_task);
-                if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-                    waiter.wake_immediately(present_events.mask(), handler)
+                if present_events.intersects(events)
+                    && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+                {
+                    waiter.wake_immediately(present_events.bits(), handler)
                 } else {
-                    inner.waiters.wait_async_mask(waiter, events.mask(), handler)
+                    inner.waiters.wait_async_mask(waiter, events.bits(), handler)
                 }
             }
         }
@@ -426,7 +428,7 @@ mod tests {
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
-        let event = EpollEvent { events: FdEvents::POLLIN.mask(), data: 0 };
+        let event = EpollEvent { events: FdEvents::POLLIN.bits(), data: 0 };
         epoll_file.add(&current_task, &socket, &epoll_object, event).expect("poll_file.add");
 
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");

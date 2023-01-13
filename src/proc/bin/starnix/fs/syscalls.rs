@@ -1686,11 +1686,12 @@ fn poll(
         let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd))?;
         let handler_ready_items = ready_items.clone();
         let handler = move |observed: FdEvents| {
-            handler_ready_items.lock().push(ReadyPollItem { index, events: observed.mask() });
+            handler_ready_items.lock().push(ReadyPollItem { index, events: observed.bits() });
         };
 
-        let sought_events =
-            FdEvents::from(poll_descriptor.events as u32) | FdEvents::POLLERR | FdEvents::POLLHUP;
+        let sought_events = FdEvents::from_bits_truncate(poll_descriptor.events as u32)
+            | FdEvents::POLLERR
+            | FdEvents::POLLHUP;
         file.wait_async(
             current_task,
             &waiter,
@@ -1710,10 +1711,11 @@ fn poll(
 
     let ready_items = ready_items.lock();
     for ready_item in ready_items.iter() {
-        let interested_events = FdEvents::from(pollfds[ready_item.index].events as u32)
-            | FdEvents::POLLERR
-            | FdEvents::POLLHUP;
-        let return_events = interested_events.mask() & ready_item.events;
+        let interested_events =
+            FdEvents::from_bits_truncate(pollfds[ready_item.index].events as u32)
+                | FdEvents::POLLERR
+                | FdEvents::POLLHUP;
+        let return_events = interested_events.bits() & ready_item.events;
         pollfds[ready_item.index].revents = return_events as i16;
     }
 

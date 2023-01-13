@@ -182,8 +182,8 @@ impl EpollFileObject {
             return error!(EPERM);
         }
 
-        epoll_event.events |= FdEvents::POLLHUP.mask();
-        epoll_event.events |= FdEvents::POLLERR.mask();
+        epoll_event.events |= FdEvents::POLLHUP.bits();
+        epoll_event.events |= FdEvents::POLLERR.bits();
 
         // Check if adding this file would cause a cycle at a max depth of 5.
         if let Some(epoll_to_add) = file.downcast_file::<EpollFileObject>() {
@@ -199,7 +199,7 @@ impl EpollFileObject {
             Entry::Vacant(entry) => {
                 let wait_object = entry.insert(WaitObject {
                     target: Arc::downgrade(file),
-                    events: FdEvents::from(epoll_event.events),
+                    events: FdEvents::from_bits_truncate(epoll_event.events),
                     data: epoll_event.data,
                     cancel_key: WaitKey::empty(),
                 });
@@ -215,8 +215,8 @@ impl EpollFileObject {
         file: &FileHandle,
         mut epoll_event: EpollEvent,
     ) -> Result<(), Errno> {
-        epoll_event.events |= FdEvents::POLLHUP.mask();
-        epoll_event.events |= FdEvents::POLLERR.mask();
+        epoll_event.events |= FdEvents::POLLHUP.bits();
+        epoll_event.events |= FdEvents::POLLERR.bits();
 
         let mut state = self.state.write();
         let key = as_epoll_key(file);
@@ -229,7 +229,7 @@ impl EpollFileObject {
                     &self.waiter,
                     wait_object.cancel_key,
                 );
-                wait_object.events = FdEvents::from(epoll_event.events);
+                wait_object.events = FdEvents::from_bits_truncate(epoll_event.events);
                 self.wait_on_file(current_task, key, wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
@@ -274,7 +274,7 @@ impl EpollFileObject {
                     // continue.
                     if let Some(target) = wait.target.upgrade() {
                         let observed = target.query_events(current_task);
-                        if observed & wait.events {
+                        if observed.intersects(wait.events) {
                             let ready = ReadyObject { key: pending.key, observed };
                             pending_list.push(ready);
                             added_any = true;
@@ -399,15 +399,15 @@ impl EpollFileObject {
             // The wait could have been deleted by here,
             // so ignore the None case.
             if let Some(wait) = state.wait_objects.get_mut(&pending_event.key) {
-                let reported_events = pending_event.observed.mask() & wait.events.mask();
+                let reported_events = pending_event.observed.bits() & wait.events.bits();
                 result.push(EpollEvent { events: reported_events, data: wait.data });
 
                 // Files marked with `EPOLLONESHOT` should only notify
                 // once and need to be rearmed manually with epoll_ctl_mod().
-                if wait.events.mask() & EPOLLONESHOT != 0 {
+                if wait.events.bits() & EPOLLONESHOT != 0 {
                     continue;
                 }
-                if wait.events.mask() & EPOLLET != 0 {
+                if wait.events.bits() & EPOLLET != 0 {
                     // The file can be closed while registered for epoll which is not an error.
                     // We do not expect other errors from waiting.
                     match self.wait_on_file_with_options(
@@ -466,16 +466,19 @@ impl FileOps for EpollFileObject {
         options: WaitAsyncOptions,
     ) -> WaitKey {
         let present_events = self.query_events(current_task);
-        if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(present_events.mask(), handler)
+        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+        {
+            waiter.wake_immediately(present_events.bits(), handler)
         } else {
             let wait_key =
-                self.state.write().waiters.wait_async_mask(waiter, events.mask(), handler);
+                self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler);
 
             // Resolve the race if the events changed while adding the waiter while unlocked.
             let present_events = self.query_events(current_task);
-            if events & present_events && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-                self.state.write().waiters.wake_key_immediately(&wait_key, present_events.mask());
+            if present_events.intersects(events)
+                && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
+            {
+                self.state.write().waiters.wake_key_immediately(&wait_key, present_events.bits());
             }
             wait_key
         }
@@ -539,7 +542,7 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.mask(), data: EVENT_DATA },
+                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
             )
             .unwrap();
 
@@ -552,7 +555,7 @@ mod tests {
         let _ = thread.join();
         assert_eq!(1, events.len());
         let event = &events[0];
-        assert!(FdEvents::from(event.events) & FdEvents::POLLIN);
+        assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
         let data = event.data;
         assert_eq!(EVENT_DATA, data);
 
@@ -591,14 +594,14 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.mask(), data: EVENT_DATA },
+                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
             )
             .unwrap();
 
         let events = epoll_file.wait(&current_task, 10, zx::Duration::INFINITE).unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
-        assert!(FdEvents::from(event.events) & FdEvents::POLLIN);
+        assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
         let data = event.data;
         assert_eq!(EVENT_DATA, data);
 
@@ -624,7 +627,7 @@ mod tests {
                     &current_task,
                     &event,
                     &epoll_file_handle,
-                    EpollEvent { events: FdEvents::POLLIN.mask(), data: EVENT_DATA },
+                    EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
                 )
                 .unwrap();
 
@@ -665,7 +668,7 @@ mod tests {
             } else {
                 assert_eq!(1, events.len());
                 let event = &events[0];
-                assert!(FdEvents::from(event.events) & FdEvents::POLLIN);
+                assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
                 let data = event.data;
                 assert_eq!(EVENT_DATA, data);
             }
@@ -695,7 +698,7 @@ mod tests {
                     &current_task,
                     &pipe1,
                     &epoll_object,
-                    EpollEvent { events: FdEvents::POLLIN.mask(), data: 1 },
+                    EpollEvent { events: FdEvents::POLLIN.bits(), data: 1 },
                 )
                 .expect("epoll_file.add");
             epoll_file
@@ -703,7 +706,7 @@ mod tests {
                     &current_task,
                     &pipe2,
                     &epoll_object,
-                    EpollEvent { events: FdEvents::POLLIN.mask(), data: 2 },
+                    EpollEvent { events: FdEvents::POLLIN.bits(), data: 2 },
                 )
                 .expect("epoll_file.add");
             epoll_file.wait(&current_task, 2, zx::Duration::from_millis(0)).expect("wait")
@@ -716,7 +719,7 @@ mod tests {
 
         let fds = poll();
         assert_eq!(fds.len(), 1);
-        assert_eq!(FdEvents::from(fds[0].events), FdEvents::POLLIN);
+        assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
         let data = fds[0].data;
         assert_eq!(data, 1);
         assert_eq!(
@@ -731,7 +734,7 @@ mod tests {
 
         let fds = poll();
         assert_eq!(fds.len(), 1);
-        assert_eq!(FdEvents::from(fds[0].events), FdEvents::POLLIN);
+        assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
         let data = fds[0].data;
         assert_eq!(data, 2);
         assert_eq!(
@@ -757,7 +760,7 @@ mod tests {
                 &current_task,
                 &event,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.mask(), data: EVENT_DATA },
+                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
             )
             .unwrap();
 
@@ -805,7 +808,7 @@ mod tests {
                 &current_task,
                 &socket1,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.mask(), data: EVENT_DATA },
+                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
             )
             .unwrap();
         assert_eq!(
@@ -818,7 +821,7 @@ mod tests {
             .modify(
                 &current_task,
                 &socket1,
-                EpollEvent { events: read_write_event.mask(), data: EVENT_DATA },
+                EpollEvent { events: read_write_event.bits(), data: EVENT_DATA },
             )
             .unwrap();
         let triggered_events =
@@ -826,7 +829,7 @@ mod tests {
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
         let events = event.events;
-        assert_eq!(events, FdEvents::POLLOUT.mask());
+        assert_eq!(events, FdEvents::POLLOUT.bits());
         let data = event.data;
         assert_eq!(EVENT_DATA, data);
     }

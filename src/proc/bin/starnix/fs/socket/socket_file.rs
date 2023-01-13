@@ -192,6 +192,6 @@ impl SocketFile {
     fn wait_all(&self, current_task: &CurrentTask, flags: SocketMessageFlags) -> bool {
         self.socket.socket_type == SocketType::Stream
             && flags.contains(SocketMessageFlags::WAITALL)
-            && !(self.socket.query_events(current_task) & FdEvents::POLLHUP)
+            && !self.socket.query_events(current_task).contains(FdEvents::POLLHUP)
     }
 }
