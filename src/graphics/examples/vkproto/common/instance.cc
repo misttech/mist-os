@@ -8,6 +8,9 @@
 #include <memory>
 #include <vector>
 
+#if USE_GLFW
+#include <GLFW/glfw3.h>
+#endif
 #include "src/graphics/examples/vkproto/common/utils.h"
 
 #include <vulkan/vulkan.hpp>
@@ -32,8 +35,21 @@ void PrintProps(const std::vector<const char *> &props, const char *msg) {
 #if USE_GLFW
 std::vector<const char *> GetExtensionsGLFW(bool enable_validation) {
   uint32_t num_extensions = 0;
-  const char **glfw_extensions;
-  glfw_extensions = glfwGetRequiredInstanceExtensions(&num_extensions);
+
+#if __linux__
+  // Linux variant of glfwGetRequiredInstanceExtensions() isn't returning
+  // the required extensions.  Special case until glfw is updated / fixed.
+  // http://fxbug.dev/119341.
+  const char *glfw_extensions[] = {"VK_KHR_surface", "VK_KHR_xcb_surface"};
+  num_extensions = 2;
+#else
+  const char **glfw_extensions = glfwGetRequiredInstanceExtensions(&num_extensions);
+#endif
+
+  printf("\nGLFW Instance Extensions Required: %d\n", num_extensions);
+  for (int i = 0; i < num_extensions; ++i) {
+    printf("\tReqd Instance Ext: %s\n", glfw_extensions[i]);
+  }
   std::vector<const char *> extensions(glfw_extensions, glfw_extensions + num_extensions);
   if (enable_validation) {
     extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -66,7 +82,7 @@ std::vector<const char *> GetExtensionsPrivate(bool validation_layers_enabled) {
 void AddRequiredExtensions(bool validation_layers_enabled, std::vector<const char *> *extensions) {
   std::vector<const char *> required_extensions;
 #if USE_GLFW
-  required_extensions = GetExtensionsGLFW(validation_layers_enabled_);
+  required_extensions = GetExtensionsGLFW(validation_layers_enabled);
 #else
   required_extensions = GetExtensionsPrivate(validation_layers_enabled);
 #endif

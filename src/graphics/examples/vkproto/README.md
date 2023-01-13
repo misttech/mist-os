@@ -87,3 +87,8 @@ When presentable (onscreen) surfaces are required, platform specifics
 come into play.  VkProto uses GLFW to provide surface management
 on non-Fuchsia platforms and image pipe for surface management on
 Fuchsia.  When GLFW is required, USE_GLFW must be defined in the build.
+
+For a linux host build, vkproto must be invoked from the build
+directory in order for vkproto to locate its shader files e.g.:
+`out/default/host_x64/vkproto`.
+

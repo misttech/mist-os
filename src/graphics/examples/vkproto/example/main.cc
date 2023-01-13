@@ -158,9 +158,9 @@ int main(int argc, char* argv[]) {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     if (offscreen) {
-      DrawOffscreenFrame(vkp_device, *command_buffers, offscreen_fence.get());
+      DrawOffscreenFrame(vkp_device, *vkp_command_buffers, offscreen_fence.get());
     } else {
-      DrawFrame(vkp_device, *vkp_swap_chain, *command_buffers, fences);
+      DrawFrame(vkp_device, *vkp_swap_chain, *vkp_command_buffers, fences);
     }
   }
 #else
