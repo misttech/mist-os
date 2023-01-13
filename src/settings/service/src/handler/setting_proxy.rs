@@ -81,7 +81,7 @@ impl RequestInfo {
 
 #[derive(Clone, Debug)]
 struct ActiveRequest {
-    request: Box<RequestInfo>,
+    request: Arc<RequestInfo>,
     // The number of attempts that have been made on this request.
     attempts: u64,
     last_result: Option<SettingHandlerResult>,
@@ -92,7 +92,7 @@ impl ActiveRequest {
         self.request.setting_request.clone()
     }
 
-    pub(crate) fn get_info(&mut self) -> &mut Box<RequestInfo> {
+    pub(crate) fn get_info(&mut self) -> &mut Arc<RequestInfo> {
         &mut self.request
     }
 }
@@ -132,7 +132,7 @@ pub(crate) struct SettingProxy {
     client_signature: Option<service::message::Signature>,
     active_request: Option<ActiveRequest>,
     pending_requests: VecDeque<Box<RequestInfo>>,
-    listen_requests: Vec<RequestInfo>,
+    listen_requests: Vec<Arc<RequestInfo>>,
     next_request_id: usize,
 
     /// Factory for generating a new controller to service requests.
@@ -615,15 +615,29 @@ impl SettingProxy {
     /// Should only be called on the main task spawned in [SettingProxy::create](#method.create).
     async fn execute_next_request(&mut self, id: ftrace::Id, recreate_handler: bool) {
         if self.active_request.is_none() {
+            let mut pending = self
+                .pending_requests
+                .pop_front()
+                .expect("execute should only be called with present requests");
+
+            if matches!(pending.setting_request, Request::Listen) {
+                // Add a callback when the client side goes out of scope. Panic if the
+                // unbounded_send failed, which indicates the channel got dropped and requests
+                // cannot be processed anymore.
+                let proxy_request_sender = self.proxy_request_sender.clone();
+                let request_id = pending.id;
+                pending.bind_to_scope(Box::new(move || {
+                    proxy_request_sender.unbounded_send(ProxyRequest::EndListen(request_id)).expect(
+                        "SettingProxy::execute_next_request, proxy_request_sender failed to send \
+                        EndListen proxy request with info",
+                    );
+                }))
+                .await;
+            }
+
             // Add the request to the queue of requests to process.
-            self.active_request = Some(ActiveRequest {
-                request: self
-                    .pending_requests
-                    .pop_front()
-                    .expect("execute should only be called with present requests"),
-                attempts: 0,
-                last_result: None,
-            });
+            self.active_request =
+                Some(ActiveRequest { request: Arc::from(pending), attempts: 0, last_result: None });
         }
 
         // Recreating signature is always honored, even if the request is not.
@@ -651,21 +665,8 @@ impl SettingProxy {
             // Increment the active listener count in inspect.
             self.listener_logger.lock().await.add_listener(self.setting_type);
 
-            // Add a callback when the client side goes out of scope. Panic if the unbounded_send
-            // failed, which indicates the channel got dropped and requests cannot be processed
-            // anymore.
-            let proxy_request_sender = self.proxy_request_sender.clone();
-            let request_id = info.id;
-            info.bind_to_scope(Box::new(move || {
-                proxy_request_sender.unbounded_send(ProxyRequest::EndListen(request_id)).expect(
-                    "SettingProxy::execute_next_request, proxy_request_sender failed to send \
-                    EndListen proxy request with info",
-                );
-            }))
-            .await;
-
             // Add the request to tracked listen requests.
-            self.listen_requests.push(*info.clone());
+            self.listen_requests.push(info.clone());
 
             // Listening requests must be acknowledged as they are long-living.
             info.acknowledge().await;
