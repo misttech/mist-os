@@ -169,8 +169,9 @@ impl DeviceOps for Arc<DevPtsDevice> {
             // /dev/ptmx
             DeviceType::PTMX => {
                 let terminal = self.state.get_next_terminal(current_task)?;
+                let dev_pts_root = dev_pts_fs(current_task.kernel()).root().clone();
 
-                Ok(Box::new(DevPtmxFile::new(terminal)))
+                Ok(Box::new(DevPtmxFile::new(dev_pts_root, terminal)))
             }
             // /dev/tty
             DeviceType::TTY => {
@@ -184,7 +185,8 @@ impl DeviceOps for Arc<DevPtsDevice> {
                     .clone();
                 if let Some(controlling_terminal) = controlling_terminal {
                     if controlling_terminal.is_main {
-                        Ok(Box::new(DevPtmxFile::new(controlling_terminal.terminal)))
+                        let dev_pts_root = dev_pts_fs(current_task.kernel()).root().clone();
+                        Ok(Box::new(DevPtmxFile::new(dev_pts_root, controlling_terminal.terminal)))
                     } else {
                         Ok(Box::new(DevPtsFile::new(controlling_terminal.terminal)))
                     }
@@ -228,22 +230,23 @@ impl DeviceOps for Arc<DevPtsDevice> {
 }
 
 struct DevPtmxFile {
+    dev_pts_root: DirEntryHandle,
     terminal: Arc<Terminal>,
 }
 
 impl DevPtmxFile {
-    pub fn new(terminal: Arc<Terminal>) -> Self {
+    pub fn new(dev_pts_root: DirEntryHandle, terminal: Arc<Terminal>) -> Self {
         terminal.main_open();
-        Self { terminal }
+        Self { dev_pts_root, terminal }
     }
 }
 
 impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
 
-    fn close(&self, file: &FileObject) {
+    fn close(&self, _file: &FileObject) {
         self.terminal.main_close();
-        file.fs.root().remove_child(format!("{}", self.terminal.id).as_bytes());
+        self.dev_pts_root.remove_child(format!("{}", self.terminal.id).as_bytes());
     }
 
     fn read(
