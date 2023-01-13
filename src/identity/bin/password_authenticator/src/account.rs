@@ -279,13 +279,13 @@ mod test {
         fidl_fuchsia_identity_account::{AccountMarker, AccountProxy},
         fuchsia_fs::{directory, file, node::OpenError},
         fuchsia_zircon::Status,
-        identity_testutil::{
-            insecure_storage_manager::{Args as InsecureArgs, InsecureKeyDirectoryStorageManager},
-            CallCounter, Match,
-        },
         storage_manager::{
             minfs::disk::{DiskError, EncryptedBlockDevice},
             StorageManager,
+        },
+        unittest_util::{
+            insecure_storage_manager::{Args as InsecureArgs, InsecureKeyDirectoryStorageManager},
+            CallCounter, Match,
         },
         vfs::execution_scope::ExecutionScope,
     };
@@ -457,12 +457,12 @@ mod test {
     #[fuchsia::test]
     async fn lock_account_succeeds_with_zxcrypt_seal_bad_state() {
         use {
-            identity_testutil::{
+            storage_manager::minfs::StorageManager as MinfsStorageManager,
+            unittest_util::{
                 MockBlockDevice, MockDiskManager,
                 MockEncryptedBlockDevice as OtherMockEncryptedBlockDevice, MockPartition,
                 UnsealBehavior,
             },
-            storage_manager::minfs::StorageManager as MinfsStorageManager,
         };
         let storage_manager =
             MinfsStorageManager::new(MockDiskManager::new().with_partition(MockPartition {

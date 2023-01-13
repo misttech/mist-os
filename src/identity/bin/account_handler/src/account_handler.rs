@@ -781,11 +781,11 @@ mod tests {
     use fuchsia_inspect::{assert_data_tree, Inspector};
     use fuchsia_zircon as zx;
     use futures::future::join;
-    use identity_testutil::{make_formatted_account_partition_any_key, MockDiskManager};
     use lazy_static::lazy_static;
     use std::sync::Arc;
     use storage_manager::minfs::StorageManager as MinfsStorageManager;
     use typed_builder::TypedBuilder;
+    use unittest_util::{make_formatted_account_partition_any_key, MockDiskManager};
 
     lazy_static! {
         /// Assumed time between a lock request and when the account handler is locked

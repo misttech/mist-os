@@ -358,9 +358,9 @@ mod tests {
     use fuchsia_fs::{directory, file};
     use fuchsia_inspect::Inspector;
     use futures::channel::oneshot;
-    use identity_testutil::{make_formatted_account_partition_any_key, MockDiskManager};
     use storage_manager::{minfs::StorageManager as MinfsStorageManager, Key};
     use typed_builder::TypedBuilder;
+    use unittest_util::{make_formatted_account_partition_any_key, MockDiskManager};
 
     const TEST_ENROLLMENT_ID: u64 = 1337;
 

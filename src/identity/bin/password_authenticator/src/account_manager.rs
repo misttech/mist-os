@@ -783,17 +783,17 @@ mod test {
         async_trait::async_trait,
         fidl_fuchsia_io as fio,
         fuchsia_zircon::Status,
-        identity_testutil::{
+        lazy_static::lazy_static,
+        storage_manager::minfs::{
+            disk::{testing::MockMinfs, DiskError},
+            StorageManager as MinfsStorageManager,
+        },
+        unittest_util::{
             insecure_storage_manager::{Args as InsecureArgs, InsecureKeyDirectoryStorageManager},
             make_formatted_account_partition, make_formatted_account_partition_any_key,
             make_formatted_account_partition_fail_shred, make_unformatted_account_partition, Match,
             MockBlockDevice, MockDiskManager, MockEncryptedBlockDevice, MockPartition,
             UnsealBehavior,
-        },
-        lazy_static::lazy_static,
-        storage_manager::minfs::{
-            disk::{testing::MockMinfs, DiskError},
-            StorageManager as MinfsStorageManager,
         },
         vfs::execution_scope::ExecutionScope,
     };
