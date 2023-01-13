@@ -19,6 +19,7 @@ use {
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
         SinkExt,
     },
+    tracing::info,
 };
 
 /// Processor that collects debug data and serves the iterator sending data back to a test
@@ -173,13 +174,19 @@ pub(crate) async fn serve_debug_data_publisher(
         Ok(())
     }));
 
+    let mut got_requests = false;
+
     loop {
         select_biased! {
             maybe_stream = fs.next().fuse() => match maybe_stream {
                 None => {
+                    if !got_requests {
+                        info!("Got no debug data requests for {}", test_url);
+                    }
                     return drain_tasks.try_collect::<()>().await;
                 },
                 Some(stream) => {
+                    got_requests = true;
                     let sender_clone = debug_data_sender.clone();
                     let url_clone = test_url.clone();
                     drain_tasks.push(fasync::Task::spawn(async move {
@@ -195,7 +202,12 @@ pub(crate) async fn serve_debug_data_publisher(
                 Some(result) => {
                     result?;
                 },
-                None => return Ok(()),
+                None => {
+                    if !got_requests {
+                        info!("Got no debug data requests for {}", test_url);
+                    }
+                    return Ok(());
+                }
             },
         };
     }
