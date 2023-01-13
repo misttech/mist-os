@@ -75,6 +75,7 @@ template("bazel_assembled_system") {
                            [
                              "testonly",
                              "visibility",
+                             "deps",
                            ])
 
     no_output_dir_leaks = false
@@ -83,19 +84,6 @@ template("bazel_assembled_system") {
     # hermetic.
     extra_bazel_args = [ "--spawn_strategy=local" ]
 
-    deps = []
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
-    }
-
-    # Make sure AIBs are built before Bazel assembly.
-    if (defined(invoker.allow_eng_platform_bundle_use) &&
-        invoker.allow_eng_platform_bundle_use) {
-      deps += eng_platform_aib_labels
-    } else {
-      deps += platform_aib_labels
-    }
-
     command = "build"
     bazel_targets = [ invoker.bazel_assembly_target ]
     bazel_inputs = [
@@ -103,6 +91,17 @@ template("bazel_assembled_system") {
       "//build/images/${invoker.gn_image_name}:${invoker.gn_image_name}.bazel_images_config_inputs",
       "//build/images/${invoker.gn_image_name}:${invoker.gn_image_name}.bazel_legacy_aib",
     ]
+
+    # Make sure AIBs are built before Bazel assembly.
+    if (defined(invoker.allow_eng_platform_bundle_use) &&
+        invoker.allow_eng_platform_bundle_use) {
+      _aibs_to_use = eng_platform_aib_labels
+    } else {
+      _aibs_to_use = platform_aib_labels
+    }
+    foreach(_aib, _aibs_to_use) {
+      bazel_inputs += [ "${_aib}_bazel_inputs" ]
+    }
 
     if (defined(invoker.extra_bazel_inputs)) {
       bazel_inputs += invoker.extra_bazel_inputs
