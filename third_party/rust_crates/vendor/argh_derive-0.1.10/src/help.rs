@@ -27,11 +27,11 @@ pub(crate) fn help(
     fields: &[StructField<'_>],
     subcommand: Option<&StructField<'_>>,
 ) -> TokenStream {
-    #![allow(clippy::format_push_string)]
     let mut format_lit = "Usage: {command_name}".to_string();
 
-    let positional =
-        fields.iter().filter(|f| f.kind == FieldKind::Positional && f.attrs.greedy.is_none());
+    let positional = fields.iter().filter(|f| {
+        f.kind == FieldKind::Positional && f.attrs.greedy.is_none() && !f.attrs.hidden_help
+    });
     let mut has_positional = false;
     for arg in positional.clone() {
         has_positional = true;
@@ -39,14 +39,15 @@ pub(crate) fn help(
         positional_usage(&mut format_lit, arg);
     }
 
-    let options = fields.iter().filter(|f| f.long_name.is_some());
+    let options = fields.iter().filter(|f| f.long_name.is_some() && !f.attrs.hidden_help);
     for option in options.clone() {
         format_lit.push(' ');
         option_usage(&mut format_lit, option);
     }
 
-    let remain =
-        fields.iter().filter(|f| f.kind == FieldKind::Positional && f.attrs.greedy.is_some());
+    let remain = fields.iter().filter(|f| {
+        f.kind == FieldKind::Positional && f.attrs.greedy.is_some() && !f.attrs.hidden_help
+    });
     for arg in remain {
         format_lit.push(' ');
         positional_usage(&mut format_lit, arg);
@@ -154,7 +155,7 @@ fn positional_usage(out: &mut String, field: &StructField<'_>) {
     if field.attrs.greedy.is_none() {
         out.push('<');
     }
-    let name = field.arg_name();
+    let name = field.positional_arg_name();
     out.push_str(&name);
     if field.optionality == Optionality::Repeating {
         out.push_str("...");
@@ -229,7 +230,7 @@ Add a doc comment or an `#[argh(description = \"...\")]` attribute.",
 /// Describes a positional argument like this:
 ///  hello       positional argument description
 fn positional_description(out: &mut String, field: &StructField<'_>) {
-    let field_name = field.arg_name();
+    let field_name = field.positional_arg_name();
 
     let mut description = String::from("");
     if let Some(desc) = &field.attrs.description {

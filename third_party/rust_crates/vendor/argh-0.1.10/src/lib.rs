@@ -290,6 +290,29 @@
 //!     }
 //! }
 //! ```
+//!
+//! Programs that are run from an environment such as cargo may find it
+//! useful to have positional arguments present in the structure but
+//! omitted from the usage output. This can be accomplished by adding
+//! the `hidden_help` attribute to that argument:
+//!
+//! ```rust
+//! # use argh::FromArgs;
+//!
+//! #[derive(FromArgs)]
+//! /// Cargo arguments
+//! struct CargoArgs {
+//!     // Cargo puts the command name invoked into the first argument,
+//!     // so we don't want this argument to show up in the usage text.
+//!     #[argh(positional, hidden_help)]
+//!     command: String,
+//!     /// an option used for internal debugging
+//!     #[argh(option, hidden_help)]
+//!     internal_debugging: String,
+//!     #[argh(positional)]
+//!     real_first_arg: String,
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
@@ -646,7 +669,19 @@ fn cmd<'a>(default: &'a str, path: &'a str) -> &'a str {
 /// was unsuccessful or if information like `--help` was requested. Error messages will be printed
 /// to stderr, and `--help` output to stdout.
 pub fn from_env<T: TopLevelCommand>() -> T {
-    let strings: Vec<String> = std::env::args().collect();
+    let strings: Vec<String> = std::env::args_os()
+        .map(|s| s.into_string())
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|arg| {
+            eprintln!("Invalid utf8: {}", arg.to_string_lossy());
+            std::process::exit(1)
+        });
+
+    if strings.is_empty() {
+        eprintln!("No program name, argv is empty");
+        std::process::exit(1)
+    }
+
     let cmd = cmd(&strings[0], &strings[0]);
     let strs: Vec<&str> = strings.iter().map(|s| s.as_str()).collect();
     T::from_args(&[cmd], &strs[1..]).unwrap_or_else(|early_exit| {
@@ -796,6 +831,16 @@ impl Flag for bool {
     }
     fn set_flag(&mut self) {
         *self = true;
+    }
+}
+
+impl Flag for Option<bool> {
+    fn default() -> Self {
+        None
+    }
+
+    fn set_flag(&mut self) {
+        *self = Some(true);
     }
 }
 

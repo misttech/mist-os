@@ -703,6 +703,26 @@ Required options not provided:
             },
         );
     }
+
+    #[derive(FromArgs, Debug, PartialEq)]
+    /// Woot
+    struct Underscores {
+        #[argh(positional)]
+        /// fooey
+        a_: String,
+    }
+
+    #[test]
+    fn positional_name_with_underscores() {
+        assert_output(&["first"], Underscores { a_: "first".into() });
+
+        assert_error::<Underscores>(
+            &[],
+            r###"Required positional arguments not provided:
+    a
+"###,
+        );
+    }
 }
 
 /// Tests derived from
@@ -1167,6 +1187,36 @@ Destroy the contents of <file>.
 
 Positional Arguments:
   name
+
+Options:
+  --help            display usage information
+"###,
+        );
+    }
+
+    #[test]
+    fn hidden_help_attribute() {
+        #[derive(FromArgs)]
+        /// Short description
+        struct Cmd {
+            /// this one should be hidden
+            #[argh(positional, hidden_help)]
+            _one: String,
+            #[argh(positional)]
+            /// this one is real
+            _two: String,
+            /// this one should be hidden
+            #[argh(option, hidden_help)]
+            _three: String,
+        }
+
+        assert_help_string::<Cmd>(
+            r###"Usage: test_arg_0 <two>
+
+Short description
+
+Positional Arguments:
+  two               this one is real
 
 Options:
   --help            display usage information
