@@ -21,6 +21,7 @@ rustc_library("fuchsia") {
     deps += [
       "//src/lib/diagnostics/log/rust",
       "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:tracing",
     ]
   } else {
     sources += [
@@ -59,5 +60,6 @@ group("tests") {
   deps = [
     ":fuchsia-tests",
     ":fuchsia_test($host_toolchain)",
+    "tests",
   ]
 }

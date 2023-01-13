@@ -397,14 +397,34 @@ impl Finish for Transformer {
             // Anything with more than one argument: error.
             (_, n) => panic!("Too many ({}) arguments to function", n),
         };
+        let tokenized_executor = self.executor;
+        let is_nonempty_ret_type = !matches!(ret_type, syn::ReturnType::Default);
 
         // Select executor
-        let run_executor = self.executor;
+        let (run_executor, modified_ret_type) = match (self.logging, is_nonempty_ret_type) {
+            (true, false) | (false, false) => (quote!(#tokenized_executor), quote!(#ret_type)),
+            (false, true) => (quote!(#tokenized_executor), quote!(#ret_type)),
+            _ => (
+                quote! {
+                    let result = #tokenized_executor;
+                    match result {
+                        std::result::Result::Ok(res) => {
+                            std::result::Result::Ok(res)
+                        }
+                        std::result::Result::Err(e) => {
+                            ::fuchsia::error!("{:?}", e);
+                            std::result::Result::Err(e)
+                        }
+                     }
+                },
+                quote!(#ret_type),
+            ),
+        };
 
         // Finally build output.
         let output = quote_spanned! {span =>
             #(#attrs)* #(#func_attrs)*
-            #visibility fn #ident () #ret_type {
+            #visibility fn #ident () #modified_ret_type {
                 // Note: `ItemFn::block` includes the function body braces. Do
                 // not add additional braces (will break source code coverage
                 // analysis).

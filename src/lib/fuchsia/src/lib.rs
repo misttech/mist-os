@@ -13,10 +13,11 @@
 // otherwise pulled in here.
 
 #![deny(missing_docs)]
-
 pub use fidl_fuchsia_diagnostics::{Interest, Severity};
 pub use fuchsia_macro::{main, test};
 use std::future::Future;
+#[doc(hidden)]
+pub use tracing::error;
 
 #[cfg(not(target_os = "fuchsia"))]
 mod host;
