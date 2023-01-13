@@ -86,6 +86,66 @@ impl DataSourceApi for BlobDirectory {
     }
 }
 
+/// Unified `crate::api::DataSource` implementation over production blob types.
+#[derive(Debug, Eq, PartialEq)]
+pub enum BlobSource {
+    BlobFsArchive(BlobFsArchive),
+    BlobDirectory(BlobDirectory),
+}
+
+impl From<BlobFsArchive> for BlobSource {
+    fn from(blob_fs_archive: BlobFsArchive) -> Self {
+        Self::BlobFsArchive(blob_fs_archive)
+    }
+}
+
+impl From<BlobDirectory> for BlobSource {
+    fn from(blob_directory: BlobDirectory) -> Self {
+        Self::BlobDirectory(blob_directory)
+    }
+}
+
+impl DataSourceApi for BlobSource {
+    type SourcePath = PathBuf;
+
+    fn kind(&self) -> DataSourceKind {
+        match self {
+            Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.kind(),
+            Self::BlobDirectory(blob_directory) => blob_directory.kind(),
+        }
+    }
+
+    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+        match self {
+            Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.parent(),
+            Self::BlobDirectory(blob_directory) => blob_directory.parent(),
+        }
+    }
+
+    fn children(
+        &self,
+    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+        match self {
+            Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.children(),
+            Self::BlobDirectory(blob_directory) => blob_directory.children(),
+        }
+    }
+
+    fn path(&self) -> Option<Self::SourcePath> {
+        match self {
+            Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.path(),
+            Self::BlobDirectory(blob_directory) => blob_directory.path(),
+        }
+    }
+
+    fn version(&self) -> DataSourceVersion {
+        match self {
+            Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.version(),
+            Self::BlobDirectory(blob_directory) => blob_directory.version(),
+        }
+    }
+}
+
 // TODO(fxbug.dev/111251): Add additional data source types for production System API.
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ use crate::api::DataSource as DataSourceApi;
 use crate::api::Hash as HashApi;
 use crate::data_source::BlobDirectory;
 use crate::data_source::BlobFsArchive;
+use crate::data_source::BlobSource;
 use crate::hash::Hash;
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
@@ -409,6 +410,65 @@ impl BlobApi for FileBlob {
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
         self.blob_set.data_sources()
+    }
+}
+
+/// Unified error type for production `crate::api::Blob` implementations.
+#[derive(Debug, Error)]
+pub(crate) enum BlobError {
+    #[error("{0}")]
+    BlobFsError(#[from] BlobFsError),
+    #[error("{0}")]
+    BlobDirectoryError(#[from] BlobDirectoryError),
+}
+
+/// Unified `crate::api::Blob` implementation for production blob types.
+pub(crate) enum Blob {
+    BlobFsBlob(BlobFsBlob),
+    FileBlob(FileBlob),
+}
+
+impl From<BlobFsBlob> for Blob {
+    fn from(blob_fs_blob: BlobFsBlob) -> Self {
+        Self::BlobFsBlob(blob_fs_blob)
+    }
+}
+
+impl From<FileBlob> for Blob {
+    fn from(file_blob: FileBlob) -> Self {
+        Self::FileBlob(file_blob)
+    }
+}
+
+impl BlobApi for Blob {
+    type Hash = Hash;
+    type ReaderSeeker = Box<dyn ReadSeek>;
+    type DataSource = BlobSource;
+    type Error = BlobError;
+
+    fn hash(&self) -> Self::Hash {
+        match self {
+            Self::BlobFsBlob(blob_fs_blob) => blob_fs_blob.hash(),
+            Self::FileBlob(file_blob) => file_blob.hash(),
+        }
+    }
+
+    fn reader_seeker(&self) -> Result<Self::ReaderSeeker, Self::Error> {
+        match self {
+            Self::BlobFsBlob(blob_fs_blob) => blob_fs_blob.reader_seeker().map_err(BlobError::from),
+            Self::FileBlob(file_blob) => file_blob.reader_seeker().map_err(BlobError::from),
+        }
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
+        match self {
+            Self::BlobFsBlob(blob_fs_blob) => {
+                Box::new(blob_fs_blob.data_sources().map(|data_source| data_source.into()))
+            }
+            Self::FileBlob(file_blob) => {
+                Box::new(file_blob.data_sources().map(|data_source| data_source.into()))
+            }
+        }
     }
 }
 
