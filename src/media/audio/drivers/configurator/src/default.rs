@@ -282,13 +282,7 @@ impl StreamConfig {
             stream_config_state.dai_format,
             stream_config_state.ring_buffer_format.as_ref(),
         ) {
-            tracing::info!(
-                "Creating ring buffer for DAI: {:?} {:?} formats: {:?} {:?}",
-                dai_state.manufacturer,
-                dai_state.product,
-                dai_format,
-                ring_buffer_format
-            );
+            tracing::info!("DAI {:?} {:?} setup", dai_state.manufacturer, dai_state.product);
             let _ = dai_state
                 .interface
                 .create_ring_buffer(dai_format, ring_buffer_format.clone(), ring_buffer)
@@ -303,8 +297,8 @@ pub struct DefaultConfiguratorInner {
     /// The last channel used
     last_channel_used: u8,
 
-    /// Indexes to the available StreamConfigs.
-    stream_config_indexes: HashMap<Device, StreamConfigIndex>,
+    /// Indexes to the available StreamConfigs not found yet.
+    stream_config_available_indexes: HashMap<Device, Vec<StreamConfigIndex>>,
 
     /// States for each StreamConfigs.
     stream_config_states: HashMap<StreamConfigIndex, Arc<Mutex<StreamConfigInner>>>,
@@ -312,7 +306,6 @@ pub struct DefaultConfiguratorInner {
 
 /// This configurator uses the first element of the DAI formats reported by the codec and
 /// configures one channel to be used per codec.
-//#[derive(Debug, Clone)]
 pub struct DefaultConfigurator {
     /// Inner state.
     inner: Arc<Mutex<DefaultConfiguratorInner>>,
@@ -419,7 +412,7 @@ impl DefaultConfigurator {
         // TODO(95437): Add flexibility instead of only allowing one DAI channel per codec.
         let bitmask: u64 = 1 << (dai_channel as u32 % codec_dai_format.number_of_channels);
         codec_dai_format.channels_to_use_bitmask = bitmask;
-        tracing::info!(
+        tracing::debug!(
             "Setting Codec {:?} {:?} to DAI format {:?}",
             manufacturer,
             product,
@@ -501,20 +494,23 @@ impl Configurator for DefaultConfigurator {
     fn new(config: Config) -> Result<Self, Error> {
         // Create a StreamConfigInner state for each index found in the configuration.
         let mut states = HashMap::new();
-        for (device, index) in &config.stream_config_indexes {
-            if !states.contains_key(index) {
-                states.insert(index.clone(), Arc::new(Mutex::new(StreamConfigInner::default())));
-            }
-            // If there is a device that is not hardwired then make the stream not hardwired.
-            if !device.hardwired {
-                if let Some(state) = states.get_mut(&index) {
-                    state.try_lock().expect("Must exist").hardwired = false;
+        for (device, indexes) in &config.stream_config_indexes {
+            for index in indexes {
+                if !states.contains_key(index) {
+                    states
+                        .insert(index.clone(), Arc::new(Mutex::new(StreamConfigInner::default())));
                 }
-            }
-            // If there is at least one codec, we mark the StreamConfig as codec_needed.
-            if device.is_codec {
-                if let Some(state) = states.get_mut(&index) {
-                    state.try_lock().expect("Must exist").codec_needed = true;
+                // If there is a device that is not hardwired then make the stream not hardwired.
+                if !device.hardwired {
+                    if let Some(state) = states.get_mut(&index) {
+                        state.try_lock().expect("Must exist").hardwired = false;
+                    }
+                }
+                // If there is at least one codec, we mark the StreamConfig as codec_needed.
+                if device.is_codec {
+                    if let Some(state) = states.get_mut(&index) {
+                        state.try_lock().expect("Must exist").codec_needed = true;
+                    }
                 }
             }
         }
@@ -522,7 +518,7 @@ impl Configurator for DefaultConfigurator {
             inner: Arc::new(Mutex::new(DefaultConfiguratorInner {
                 last_channel_used: 0,
                 stream_config_states: states,
-                stream_config_indexes: config.stream_config_indexes,
+                stream_config_available_indexes: config.stream_config_indexes,
             })),
             stream_configs: vec![],
         })
@@ -564,7 +560,7 @@ impl Configurator for DefaultConfigurator {
             }
             Err(e) => {
                 // We allow to continue if the Signal Processing API is not supported.
-                tracing::warn!("Couldn't get elements from signal processing: {:?}", e)
+                tracing::debug!("Couldn't get elements from signal processing: {:?}", e)
             }
         }
 
@@ -586,7 +582,7 @@ impl Configurator for DefaultConfigurator {
         {
             return Err(anyhow!("Codec with bad format reported"));
         }
-        tracing::info!(
+        tracing::debug!(
             "Codec {:?} {:?} formats {:?}",
             properties.manufacturer,
             properties.product_name,
@@ -604,17 +600,20 @@ impl Configurator for DefaultConfigurator {
             product: properties.product_name,
             hardwired: plug_detect_capabilities != PlugDetectCapabilities::CanAsyncNotify,
             is_codec: true,
-            dai_channel: dai_channel,
         };
-        let stream_config_index = inner
-            .stream_config_indexes
+        let stream_config_indexes = inner
+            .stream_config_available_indexes
             .get(&device)
-            .cloned()
-            .ok_or(anyhow!("Codec ({:?}) not in config", device))?;
+            .ok_or(anyhow!("Codec ({:?}) not in config", device))?
+            .clone();
+        let stream_config_index = stream_config_indexes
+            .last()
+            .ok_or(anyhow!("Codec index ({:?}) not in config", device))?;
         let stream_config_state = inner
             .stream_config_states
             .get_mut(&stream_config_index)
-            .ok_or(anyhow!("Codec ({:?}) not in config", device))?;
+            .ok_or(anyhow!("Codec state ({:?}) not found", device))?
+            .clone();
         let mut stream_config_state2 = stream_config_state.lock().await;
 
         // Use codec's hardwired state for the StreamConfig.
@@ -648,7 +647,7 @@ impl Configurator for DefaultConfigurator {
                 );
             }
         } else {
-            tracing::info!("When codec was found, there was no format reported by the DAI yet");
+            tracing::debug!("When codec was found, there was no format reported by the DAI yet");
         }
 
         let proxy = interface.get_proxy()?.clone();
@@ -669,6 +668,14 @@ impl Configurator for DefaultConfigurator {
             _plug_detect_task: task,
         };
         stream_config_state2.codec_states.push(codec_state);
+
+        // All good we can now remove the device from the available indexes to match.
+        _ = inner
+            .stream_config_available_indexes
+            .get_mut(&device)
+            .ok_or(anyhow!("Codec ({:?}) not in config", device))?
+            .pop()
+            .ok_or(anyhow!("Codec index ({:?}) not in config", device))?;
 
         Ok(())
     }
@@ -695,18 +702,18 @@ impl Configurator for DefaultConfigurator {
             product: product,
             hardwired: true, // Set all DAIs to hardwired.
             is_codec: false,
-            dai_channel: 0,
         };
-        let index = &inner
-            .stream_config_indexes
+        let indexes = inner
+            .stream_config_available_indexes
             .get(&device)
-            .cloned()
-            .ok_or(anyhow!("DAI ({:?}) not in config", device))?;
+            .ok_or(anyhow!("DAI ({:?}) not in config", device))?
+            .clone();
+        let index = indexes.last().ok_or(anyhow!("DAI index ({:?}) not in config", device))?;
         let stream_config_state = inner
             .stream_config_states
             .get_mut(&index)
-            .ok_or(anyhow!("DAI ({:?}) not in config", device))?;
-
+            .ok_or(anyhow!("DAI state ({:?}) not found", device))?
+            .clone();
         let mut stream_config_state2 = stream_config_state.lock().await;
 
         let _ = interface.reset().await?;
@@ -721,7 +728,7 @@ impl Configurator for DefaultConfigurator {
         {
             return Err(anyhow!("DAI with bad format reported"));
         }
-        tracing::info!(
+        tracing::debug!(
             "DAI {:?} {:?} formats {:?}",
             device.manufacturer,
             device.product,
@@ -819,6 +826,15 @@ impl Configurator for DefaultConfigurator {
             client: Some(client),
         };
         self.stream_configs.push(stream_config);
+
+        // All good we can now remove the device from the available indexes to match.
+        _ = inner
+            .stream_config_available_indexes
+            .get_mut(&device)
+            .ok_or(anyhow!("DAI ({:?}) not in config", device))?
+            .pop()
+            .ok_or(anyhow!("DAI index ({:?}) not in config", device))?;
+
         Ok(())
     }
 
@@ -876,7 +892,6 @@ mod tests {
                 product: "789".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -887,7 +902,6 @@ mod tests {
                 product: "ghi".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 1,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -898,7 +912,6 @@ mod tests {
                 product: "test".to_string(),
                 hardwired: true,
                 is_codec: false,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -924,7 +937,6 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_MICS,
         );
@@ -934,7 +946,6 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_HEADSET_OUT,
         );
@@ -944,7 +955,6 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -953,7 +963,7 @@ mod tests {
             assert_eq!(
                 e.to_string(),
                 "Codec processing error: Codec (Device { manufacturer: \"456\", product: \"789\", \
-                 is_codec: true, hardwired: true, dai_channel: 0 }) not in config"
+                 is_codec: true, hardwired: true }) not in config"
             );
         }
         if let Err(e) = find_dais(&dai_proxy, 1, configurator).await {
@@ -961,7 +971,7 @@ mod tests {
             assert_eq!(
                 e.to_string(),
                 "DAI processing error: DAI (Device { manufacturer: \"test\", product: \"test\", is\
-                 _codec: false, hardwired: true, dai_channel: 0 }) not in config"
+                 _codec: false, hardwired: true }) not in config"
             );
         }
         Ok(())
@@ -978,7 +988,6 @@ mod tests {
                 product: "test".to_string(),
                 is_codec: false,
                 hardwired: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1022,7 +1031,6 @@ mod tests {
                 product: "789".to_string(),
                 is_codec: true,
                 hardwired: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1033,7 +1041,6 @@ mod tests {
                 product: "test".to_string(),
                 is_codec: false,
                 hardwired: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1626,7 +1633,6 @@ mod tests {
                 product: "testy".to_string(),
                 hardwired: true,
                 is_codec: true,
-                dai_channel: 0,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
