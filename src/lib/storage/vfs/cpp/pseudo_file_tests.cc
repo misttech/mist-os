@@ -48,7 +48,7 @@ class VectorReader {
 
 class VectorWriter {
  public:
-  VectorWriter(size_t max_strings) : max_strings_(max_strings) {}
+  explicit VectorWriter(size_t max_strings) : max_strings_(max_strings) {}
 
   fs::PseudoFile::WriteHandler GetHandler() {
     return [this](std::string_view input) {
@@ -237,25 +237,38 @@ TEST(PseudoFile, OpenValidationUnbuffered) {
 }
 
 TEST(PseudoFile, GetattrBuffered) {
+  const fbl::String kHello = "hello";
+
+  auto reader = [kHello](fbl::String* out) {
+    *out = kHello;
+    return ZX_OK;
+  };
+
   // no read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>();
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
-    EXPECT_RESULT_OK(file->ValidateOptions(VnodeOptions().set_node_reference()));
-    fs::VnodeAttributes path_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&path_attr));
-    EXPECT_ATTR_EQ(attr, path_attr);
+
+    fbl::RefPtr<fs::Vnode> redirect;
+    auto result = file->ValidateOptions(VnodeOptions().set_node_reference());
+    EXPECT_RESULT_OK(result);
+    EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+    fs::VnodeAttributes open_attr;
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
+    EXPECT_ATTR_EQ(attr, open_attr);
   }
 
   // read handler, no write handler
   {
-    auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(&DummyReader);
+    auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(reader);
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -263,7 +276,8 @@ TEST(PseudoFile, GetattrBuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
+    attr.content_size = kHello.size();
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 
@@ -273,6 +287,7 @@ TEST(PseudoFile, GetattrBuffered) {
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IWUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -280,16 +295,17 @@ TEST(PseudoFile, GetattrBuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 
   // read handler, write handler
   {
-    auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(&DummyReader, &DummyWriter);
+    auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(reader, &DummyWriter);
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -297,32 +313,45 @@ TEST(PseudoFile, GetattrBuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
+    attr.content_size = kHello.size();
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 }
 
 TEST(PseudoFile, GetattrUnbuffered) {
+  const fbl::String kHello = "hello";
+
+  auto reader = [kHello](fbl::String* out) {
+    *out = kHello;
+    return ZX_OK;
+  };
+
   // no read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>();
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
-    EXPECT_RESULT_OK(file->ValidateOptions(VnodeOptions().set_node_reference()));
-    fs::VnodeAttributes path_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&path_attr));
-    EXPECT_ATTR_EQ(attr, path_attr);
+    fbl::RefPtr<fs::Vnode> redirect;
+    auto result = file->ValidateOptions(VnodeOptions().set_node_reference());
+    EXPECT_RESULT_OK(result);
+    EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
+    fs::VnodeAttributes open_attr;
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
+    EXPECT_ATTR_EQ(attr, open_attr);
   }
 
   // read handler, no write handler
   {
-    auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(&DummyReader);
+    auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(reader);
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -330,7 +359,7 @@ TEST(PseudoFile, GetattrUnbuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 
@@ -340,6 +369,7 @@ TEST(PseudoFile, GetattrUnbuffered) {
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IWUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -347,16 +377,17 @@ TEST(PseudoFile, GetattrUnbuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 
   // read handler, write handler
   {
-    auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(&DummyReader, &DummyWriter);
+    auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(reader, &DummyWriter);
     fs::VnodeAttributes attr;
     EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
     EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr.mode);
+    EXPECT_EQ(0, attr.content_size);
     EXPECT_EQ(1, attr.link_count);
 
     fbl::RefPtr<fs::Vnode> redirect;
@@ -364,7 +395,7 @@ TEST(PseudoFile, GetattrUnbuffered) {
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(result.value(), &redirect));
     fs::VnodeAttributes open_attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&open_attr));
+    EXPECT_EQ(ZX_OK, redirect->GetAttributes(&open_attr));
     EXPECT_ATTR_EQ(attr, open_attr);
   }
 }

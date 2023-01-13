@@ -9,7 +9,6 @@
 #include <string_view>
 #include <utility>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 
 namespace fio = fuchsia_io;
@@ -81,7 +80,7 @@ zx_status_t BufferedPseudoFile::OpenNode(ValidatedOptions options,
 
 BufferedPseudoFile::Content::Content(fbl::RefPtr<BufferedPseudoFile> file,
                                      VnodeConnectionOptions options, fbl::String output)
-    : file_(std::move(file)), options_(options), output_(std::move(output)) {}
+    : file_(std::move(file)), options_(std::move(options)), output_(std::move(output)) {}
 
 BufferedPseudoFile::Content::~Content() { delete[] input_data_; }
 
@@ -95,7 +94,9 @@ zx_status_t BufferedPseudoFile::Content::CloseNode() {
 }
 
 zx_status_t BufferedPseudoFile::Content::GetAttributes(fs::VnodeAttributes* a) {
-  return file_->GetAttributes(a);
+  zx_status_t status = file_->GetAttributes(a);
+  a->content_size = output_.size();
+  return status;
 }
 
 zx_status_t BufferedPseudoFile::Content::Read(void* data, size_t length, size_t offset,
