@@ -84,10 +84,12 @@ fuchsia_unittest_package("system-update-committer-tests") {
 
 system_update_committer_config("enable_reboot_on_verification_failure") {
   blobfs = "reboot_on_failure"
+  netstack = "reboot_on_failure"
 }
 
 system_update_committer_config("disable") {
   blobfs = "ignore"
+  netstack = "ignore"
   enable = false
 }
 

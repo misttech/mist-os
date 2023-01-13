@@ -13,16 +13,27 @@ import("//build/config.gni")
 #     Whether to ignore or reboot_on_failure when the blobfs verification fails.
 #     Type: string
 #     Possible values: ignore | reboot_on_failure
+#   netstack (required)
+#     Whether to ignore or reboot_on_failure when the netstack verification fails.
+#     Type: string
+#     Possible values: ignore | reboot_on_failure
 #   enable (optional)
 #     If false, completely disable the system-update-committer.
 #     Type: bool
 #     Default: true
 template("system_update_committer_config") {
   cfg = {
-    forward_variables_from(invoker, [ "blobfs" ])
+    forward_variables_from(invoker,
+                           [
+                             "blobfs",
+                             "netstack",
+                           ])
     assert(defined(blobfs), "blobfs must be defined")
     assert(blobfs == "reboot_on_failure" || blobfs == "ignore",
-           "value must be reboot_on_failure or ignore")
+           "blobfs value must be reboot_on_failure or ignore")
+    assert(defined(netstack), "netstack must be defined")
+    assert(netstack == "reboot_on_failure" || netstack == "ignore",
+           "netstack value must be reboot_on_failure or ignore")
     enable = true
     if (defined(invoker.enable)) {
       assert(invoker.enable == true || invoker.enable == false,
