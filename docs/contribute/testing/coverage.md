@@ -100,7 +100,7 @@ fx qemu -kN
 ```
 
 Next, lets start a package server that you'll use to publish updates to your
-test package. If you already have a package server running then you can skip
+test package, this process will run in the background. If you already have a package server running then you can skip
 this step.
 
 In your second terminal:
