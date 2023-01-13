@@ -8,10 +8,8 @@
 use {
     anyhow::anyhow,
     assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{self as paver, PaverRequestStream},
-    fidl_fuchsia_pkg::ResolveError,
-    fidl_fuchsia_space::ErrorCode,
+    fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_space as fspace,
     fidl_fuchsia_update::{
         AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream, CheckOptions,
         CheckingForUpdatesData, CommitStatusProviderMarker, CommitStatusProviderProxy, Initiator,
@@ -20,7 +18,8 @@ use {
         MonitorRequest, MonitorRequestStream, State, UpdateInfo,
     },
     fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy},
-    fidl_fuchsia_update_installer_ext as installer, fuchsia_async as fasync,
+    fidl_fuchsia_update_installer as finstaller, fidl_fuchsia_update_installer_ext as installer,
+    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_pkg_testing::make_packages_json,
@@ -127,7 +126,7 @@ impl TestEnvBuilder {
 
         // Setup the mock paver service
         let paver = Arc::new(self.paver.unwrap_or_else(|| MockPaverServiceBuilder::new().build()));
-        svc.add_fidl_service(move |stream: PaverRequestStream| {
+        svc.add_fidl_service(move |stream: fpaver::PaverRequestStream| {
             fasync::Task::spawn(
                 Arc::clone(&paver)
                     .run_paver_service(stream)
@@ -209,7 +208,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&system_update_checker)
                     .to(&system_update_committer),
@@ -219,7 +218,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
+                    .capability(Capability::protocol::<fpaver::PaverMarker>())
                     .from(&fake_capabilities)
                     .to(&system_update_checker)
                     .to(&system_update_committer),
@@ -229,11 +228,21 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.installer.Installer"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.rewrite.Engine"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.RepositoryManager"))
-                    .capability(Capability::protocol_by_name("fuchsia.space.Manager"))
+                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
+                    .from(&fake_capabilities)
+                    .to(&system_update_committer),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<finstaller::InstallerMarker>())
+                    .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                    .capability(Capability::protocol::<fpkg::RepositoryManagerMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_pkg_rewrite::EngineMarker>())
+                    .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(
                         Capability::directory("pkgfs-system")
                             .path("/pkgfs/system")
@@ -247,11 +256,11 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.channel.Provider"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.update.channelcontrol.ChannelControl",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.update.Manager"))
+                    .capability(Capability::protocol::<ProviderMarker>())
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_update_channelcontrol::ChannelControlMarker,
+                    >())
+                    .capability(Capability::protocol::<ManagerMarker>())
                     .from(&system_update_checker)
                     .to(Ref::parent()),
             )
@@ -260,7 +269,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.CommitStatusProvider"))
+                    .capability(Capability::protocol::<CommitStatusProviderMarker>())
                     .from(&system_update_committer)
                     .to(&system_update_checker)
                     .to(Ref::parent()),
@@ -639,7 +648,7 @@ async fn test_update_manager_out_of_space_gc_succeeds() {
     let env = TestEnvBuilder::new().space(space).build().await;
 
     env.proxies.resolver.url("fuchsia-pkg://fuchsia.com/update").respond_serially(vec![
-        Err(ResolveError::NoSpace),
+        Err(fpkg::ResolveError::NoSpace),
         Ok(env.proxies.resolver
             .package("update", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
             .add_file(
@@ -694,14 +703,14 @@ async fn test_update_manager_out_of_space_gc_fails() {
         let called = Arc::clone(&called);
         MockSpaceService::new(Box::new(move || {
             called.fetch_add(1, Ordering::SeqCst);
-            Err(ErrorCode::Internal)
+            Err(fspace::ErrorCode::Internal)
         }))
     };
 
     let env = TestEnvBuilder::new().space(space).build().await;
 
     env.proxies.resolver.url("fuchsia-pkg://fuchsia.com/update").respond_serially(vec![
-        Err(ResolveError::NoSpace),
+        Err(fpkg::ResolveError::NoSpace),
         Ok(env.proxies.resolver
             .package("update", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
             .add_file(
@@ -752,7 +761,7 @@ async fn test_update_manager_out_of_space_gc_fails() {
 #[fasync::run_singlethreaded(test)]
 async fn test_installation_deferred() {
     let (throttle_hook, throttler) = mphooks::throttle();
-    let config_status_response = Arc::new(Mutex::new(Some(paver::ConfigurationStatus::Pending)));
+    let config_status_response = Arc::new(Mutex::new(Some(fpaver::ConfigurationStatus::Pending)));
     let env = {
         let config_status_response = Arc::clone(&config_status_response);
         TestEnvBuilder::new()
@@ -783,7 +792,7 @@ async fn test_installation_deferred() {
     // few enough to guarantee the commit is still pending.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A },
+        PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::A },
     ]);
 
     // The update attempt should start, but the install should be deferred b/c we're pending commit.
@@ -817,8 +826,8 @@ async fn test_installation_deferred() {
     // update, make sure QueryConfigurationStatus returns Healthy. Otherwise, the update will fail
     // because the system-updater enforces the current slot is Healthy before applying an update.
     assert_eq!(
-        config_status_response.lock().replace(paver::ConfigurationStatus::Healthy).unwrap(),
-        paver::ConfigurationStatus::Pending
+        config_status_response.lock().replace(fpaver::ConfigurationStatus::Healthy).unwrap(),
+        fpaver::ConfigurationStatus::Pending
     );
 
     stream = env.check_now().await;

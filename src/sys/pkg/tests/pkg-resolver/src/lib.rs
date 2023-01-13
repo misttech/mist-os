@@ -13,8 +13,8 @@ use {
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
     fidl::encoding::persist,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
+    fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload},
     fidl_fuchsia_pkg::{
         self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
         PackageResolverProxy, RepositoryManagerMarker, RepositoryManagerProxy, WriteError,
@@ -497,7 +497,7 @@ where
         let boot_arguments_service = Arc::new(boot_arguments_service);
         local_child_svc_dir
             .add_entry(
-                fidl_fuchsia_boot::ArgumentsMarker::PROTOCOL_NAME,
+                fboot::ArgumentsMarker::PROTOCOL_NAME,
                 vfs::service::host(move |stream| {
                     Arc::clone(&boot_arguments_service).handle_request_stream(stream)
                 }),
@@ -508,7 +508,7 @@ where
         let logger_factory_clone = Arc::clone(&logger_factory);
         local_child_svc_dir
             .add_entry(
-                fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME,
+                fmetrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME,
                 vfs::service::host(move |stream| {
                     Arc::clone(&logger_factory_clone).run_logger_factory(stream)
                 }),
@@ -683,7 +683,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&pkg_cache)
                     .to(&system_update_committer)
@@ -697,8 +697,8 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.net.name.Lookup"))
-                    .capability(Capability::protocol_by_name("fuchsia.posix.socket.Provider"))
+                    .capability(Capability::protocol::<fidl_fuchsia_posix_socket::ProviderMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_net_name::LookupMarker>())
                     .from(Ref::parent())
                     .to(&pkg_resolver),
             )
@@ -709,11 +709,11 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.boot.Arguments"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.MetricEventLoggerFactory",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
+                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
+                    .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
+                    .capability(
+                        Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
+                    )
                     .from(&service_reflector)
                     .to(&pkg_cache)
                     .to(&pkg_resolver),
@@ -723,7 +723,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.LocalMirror"))
+                    .capability(Capability::protocol::<fpkg::LocalMirrorMarker>())
                     .from(&local_mirror)
                     .to(&pkg_resolver),
             )
@@ -732,7 +732,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
+                    .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
                     .from(&pkg_cache)
                     .to(&pkg_resolver)
                     .to(Ref::parent()),

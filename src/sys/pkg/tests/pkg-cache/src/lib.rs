@@ -12,9 +12,10 @@ use {
     assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext,
-    fidl_fuchsia_space as fspace, fidl_fuchsia_update as fupdate,
-    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_update as fupdate, fidl_fuchsia_update_verify as fupdate_verify,
+    fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{reader::DiagnosticsHierarchy, testing::TreeAssertion},
     fuchsia_merkle::Hash,
@@ -380,7 +381,7 @@ where
             let logger_factory = Arc::clone(&logger_factory);
             local_child_svc_dir
                 .add_entry(
-                    fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME,
+                    fmetrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME,
                     vfs::service::host(move |stream| {
                         Arc::clone(&logger_factory).run_logger_factory(stream)
                     }),
@@ -443,7 +444,7 @@ where
             let arguments_service = Arc::clone(&arguments_service);
             local_child_svc_dir
                 .add_entry(
-                    fidl_fuchsia_boot::ArgumentsMarker::PROTOCOL_NAME,
+                    fboot::ArgumentsMarker::PROTOCOL_NAME,
                     vfs::service::host(move |stream| {
                         Arc::clone(&arguments_service).handle_request_stream(stream)
                     }),
@@ -506,7 +507,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&pkg_cache)
                     .to(&service_reflector)
@@ -517,11 +518,11 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.MetricEventLoggerFactory",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.boot.Arguments"))
-                    .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
+                    .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
+                    .capability(Capability::protocol::<fboot::ArgumentsMarker>())
+                    .capability(
+                        Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
+                    )
                     .capability(
                         Capability::directory("blob-exec")
                             .path("/blob")
@@ -535,7 +536,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
+                    .capability(Capability::protocol::<fidl_fuchsia_paver::PaverMarker>())
                     .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
                     .from(&service_reflector)
@@ -546,7 +547,7 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.CommitStatusProvider"))
+                    .capability(Capability::protocol::<fupdate::CommitStatusProviderMarker>())
                     .from(&system_update_committer)
                     .to(&pkg_cache) // offer
                     .to(Ref::parent()), // expose
@@ -557,9 +558,9 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.RetainedPackages"))
-                    .capability(Capability::protocol_by_name("fuchsia.space.Manager"))
+                    .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
+                    .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
+                    .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(Capability::directory("pkgfs"))
                     .capability(Capability::directory("system"))
                     .capability(Capability::directory("pkgfs-packages"))

@@ -9,9 +9,8 @@ use {
     anyhow::anyhow,
     assert_matches::assert_matches,
     diagnostics_reader::{ArchiveReader, Inspect},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{self as paver, PaverRequestStream},
-    fidl_fuchsia_pkg::{PackageCacheRequestStream, PackageResolverRequestStream},
+    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_paver as fpaver,
+    fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream},
     fidl_fuchsia_update::{
         AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
         CheckNotStartedReason, CheckOptions, CheckingForUpdatesData, CommitStatusProviderMarker,
@@ -21,9 +20,8 @@ use {
         MonitorRequest, MonitorRequestStream, NoUpdateAvailableData, State, UpdateInfo,
     },
     fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy},
-    fidl_fuchsia_update_installer::UpdateNotStartedReason,
-    fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
-    fuchsia_async as fasync,
+    fidl_fuchsia_update_installer as finstaller, fidl_fuchsia_update_installer_ext as installer,
+    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{
@@ -267,7 +265,7 @@ impl TestEnvBuilder {
         let mut svc = fs.dir("svc");
 
         let paver = Arc::new(self.paver.unwrap_or_else(|| MockPaverServiceBuilder::new().build()));
-        svc.add_fidl_service(move |stream: PaverRequestStream| {
+        svc.add_fidl_service(move |stream: fpaver::PaverRequestStream| {
             fasync::Task::spawn(
                 Arc::clone(&paver)
                     .run_paver_service(stream)
@@ -427,10 +425,10 @@ impl TestEnvBuilder {
                             .path("/config/data")
                             .rights(fio::R_STAR_DIR),
                     )
-                    .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.hardware.power.statecontrol.Admin",
-                    ))
+                    .capability(Capability::protocol::<fpaver::PaverMarker>())
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
+                    >())
                     .from(&fake_capabilities)
                     .to(&omaha_client_service)
                     .to(&system_update_committer),
@@ -445,16 +443,13 @@ impl TestEnvBuilder {
                             .path("/config/build-info")
                             .rights(fio::R_STAR_DIR),
                     )
-                    .capability(Capability::protocol_by_name("fuchsia.ui.interaction.Notifier"))
-                    .capability(Capability::protocol_by_name("fuchsia.feedback.CrashReporter"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.feedback.ComponentDataRegister",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.Cup"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.rewrite.Engine"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.RepositoryManager"))
-                    .capability(Capability::protocol_by_name("fuchsia.update.config.OptOut"))
+                    .capability(Capability::protocol::<fidl_fuchsia_input_interaction::NotifierMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_feedback::CrashReporterMarker>())
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_feedback::ComponentDataRegisterMarker,
+                    >())
+                    .capability(Capability::protocol::<fpkg::CupMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_update_config::OptOutMarker>())
                     .from(&fake_capabilities)
                     .to(&omaha_client_service),
             )
@@ -464,9 +459,9 @@ impl TestEnvBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::directory("root-ssl-certificates"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.MetricEventLoggerFactory",
-                    ))
+                    .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_posix_socket::ProviderMarker>())
+                    .capability(Capability::protocol::<fidl_fuchsia_net_name::LookupMarker>())
                     .from(Ref::parent())
                     .to(&omaha_client_service),
             )
@@ -475,7 +470,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&omaha_client_service)
                     .to(&system_update_committer)
@@ -496,17 +491,6 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.posix.socket.Provider"))
-                    .capability(Capability::protocol_by_name("fuchsia.net.name.Lookup"))
-                    .from(Ref::parent())
-                    .to(&omaha_client_service)
-                    .to(&system_update_committer),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.stash.Store2"))
                     .from(&stash2)
                     .to(&omaha_client_service),
@@ -516,7 +500,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.CommitStatusProvider"))
+                    .capability(Capability::protocol::<CommitStatusProviderMarker>())
                     .from(&system_update_committer)
                     .to(&omaha_client_service)
                     .to(Ref::parent()),
@@ -526,11 +510,11 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.channel.Provider"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.update.channelcontrol.ChannelControl",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.update.Manager"))
+                    .capability(
+                        Capability::protocol::<fidl_fuchsia_update_channel::ProviderMarker>(),
+                    )
+                    .capability(Capability::protocol::<ChannelControlMarker>())
+                    .capability(Capability::protocol::<ManagerMarker>())
                     .from(&omaha_client_service)
                     .to(Ref::parent()),
             )
@@ -550,17 +534,17 @@ impl TestEnvBuilder {
                                 .path("/config/data")
                                 .rights(fio::R_STAR_DIR),
                         )
-                        .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
-                        .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
-                        .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
-                        .capability(Capability::protocol_by_name(
-                            "fuchsia.hardware.power.statecontrol.Admin",
-                        ))
                         .capability(
                             Capability::directory("build-info")
                                 .path("/config/build-info")
                                 .rights(fio::R_STAR_DIR),
                         )
+                        .capability(Capability::protocol::<fpaver::PaverMarker>())
+                        .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
+                        .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                        .capability(Capability::protocol::<
+                            fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
+                        >())
                         .from(&fake_capabilities)
                         .to(&system_updater),
                 )
@@ -570,10 +554,10 @@ impl TestEnvBuilder {
                 .add_route(
                     Route::new()
                         .capability(Capability::storage("data"))
-                        .capability(Capability::protocol_by_name(
-                            "fuchsia.metrics.MetricEventLoggerFactory",
-                        ))
-                        .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                        .capability(
+                            Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>(),
+                        )
+                        .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                         .from(Ref::parent())
                         .to(&system_updater),
                 )
@@ -582,9 +566,7 @@ impl TestEnvBuilder {
             builder
                 .add_route(
                     Route::new()
-                        .capability(Capability::protocol_by_name(
-                            "fuchsia.update.installer.Installer",
-                        ))
+                        .capability(Capability::protocol::<finstaller::InstallerMarker>())
                         .from(&system_updater)
                         .to(&omaha_client_service),
                 )
@@ -594,9 +576,7 @@ impl TestEnvBuilder {
             builder
                 .add_route(
                     Route::new()
-                        .capability(Capability::protocol_by_name(
-                            "fuchsia.update.installer.Installer",
-                        ))
+                        .capability(Capability::protocol::<finstaller::InstallerMarker>())
                         .from(&fake_capabilities)
                         .to(&omaha_client_service),
                 )
@@ -1544,7 +1524,7 @@ async fn test_omaha_client_update_progress_with_mock_installer() {
 #[fasync::run_singlethreaded(test)]
 async fn test_omaha_client_installation_deferred() {
     let (throttle_hook, throttler) = mphooks::throttle();
-    let config_status_response = Arc::new(Mutex::new(Some(paver::ConfigurationStatus::Pending)));
+    let config_status_response = Arc::new(Mutex::new(Some(fpaver::ConfigurationStatus::Pending)));
     let env = {
         let config_status_response = Arc::clone(&config_status_response);
         TestEnvBuilder::new()
@@ -1565,7 +1545,7 @@ async fn test_omaha_client_installation_deferred() {
     // few enough to guarantee the commit is still pending.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A },
+        PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::A },
     ]);
 
     // The update attempt should start, but the install should be deferred b/c we're pending commit.
@@ -1610,8 +1590,8 @@ async fn test_omaha_client_installation_deferred() {
     // update, make sure QueryConfigurationStatus returns Healthy. Otherwise, the update will fail
     // because the system-updater enforces the current slot is Healthy before applying an update.
     assert_eq!(
-        config_status_response.lock().replace(paver::ConfigurationStatus::Healthy).unwrap(),
-        paver::ConfigurationStatus::Pending
+        config_status_response.lock().replace(fpaver::ConfigurationStatus::Healthy).unwrap(),
+        fpaver::ConfigurationStatus::Pending
     );
     env.server.lock().set_all_cohort_assertions(Some("1:1:".to_string()));
     omaha_client_update(
@@ -1978,7 +1958,7 @@ async fn test_crash_report_installation_error() {
     let env = TestEnvBuilder::new()
         .default_with_response(OmahaResponse::Update)
         .installer(MockUpdateInstallerService::with_response(Err(
-            UpdateNotStartedReason::AlreadyInProgress,
+            finstaller::UpdateNotStartedReason::AlreadyInProgress,
         )))
         .crash_reporter(MockCrashReporterService::new(hook))
         .build()

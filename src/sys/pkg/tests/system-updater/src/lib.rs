@@ -11,8 +11,8 @@ use {
     anyhow::{anyhow, Context as _, Error},
     assert_matches::assert_matches,
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_paver as paver,
-    fidl_fuchsia_pkg::{BlobIdIteratorProxy, PackageResolverRequestStream},
-    fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy},
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_update_installer as finstaller,
     fidl_fuchsia_update_installer_ext::{
         start_update, Initiator, Options, UpdateAttempt, UpdateAttemptError,
     },
@@ -271,14 +271,16 @@ impl TestEnvBuilder {
             let should_register = |protocol: Protocol| !blocked_protocols.contains(&protocol);
 
             if should_register(Protocol::PackageResolver) {
-                fs.dir("svc").add_fidl_service(move |stream: PackageResolverRequestStream| {
-                    fasync::Task::spawn(
-                        Arc::clone(&resolver)
-                            .run_resolver_service(stream)
-                            .unwrap_or_else(|e| panic!("error running resolver service: {e:?}")),
-                    )
-                    .detach()
-                });
+                fs.dir("svc").add_fidl_service(
+                    move |stream: fpkg::PackageResolverRequestStream| {
+                        fasync::Task::spawn(
+                            Arc::clone(&resolver).run_resolver_service(stream).unwrap_or_else(
+                                |e| panic!("error running resolver service: {e:?}"),
+                            ),
+                        )
+                        .detach()
+                    },
+                );
             }
             if should_register(Protocol::Paver) {
                 fs.dir("svc").add_fidl_service(move |stream| {
@@ -345,9 +347,11 @@ impl TestEnvBuilder {
         let system_updater = builder
             .add_child(
                 "system_updater",
-                "fuchsia-pkg://fuchsia.com/system-updater-integration-tests#meta/system-updater-isolated.cm",
+                "#meta/system-updater-isolated.cm",
                 ChildOptions::new().eager(),
-            ).await.unwrap();
+            )
+            .await
+            .unwrap();
         let fake_capabilities = builder
             .add_local_child(
                 "fake_capabilities",
@@ -371,7 +375,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&system_updater),
             )
@@ -380,7 +384,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.installer.Installer"))
+                    .capability(Capability::protocol::<finstaller::InstallerMarker>())
                     .from(&system_updater)
                     .to(Ref::parent()),
             )
@@ -389,17 +393,17 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.MetricEventLoggerFactory",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.RetainedPackages"))
-                    .capability(Capability::protocol_by_name("fuchsia.space.Manager"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.hardware.power.statecontrol.Admin",
-                    ))
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
+                    >())
+                    .capability(Capability::protocol::<paver::PaverMarker>())
+                    .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
+                    .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                    .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
+                    .capability(Capability::protocol::<fspace::ManagerMarker>())
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
+                    >())
                     .capability(
                         Capability::directory("build-info")
                             .path("/config/build-info")
@@ -558,8 +562,11 @@ impl TestEnv {
     }
 
     /// Opens a connection to the installer fidl service.
-    fn installer_proxy(&self) -> InstallerProxy {
-        self.realm_instance.root.connect_to_protocol_at_exposed_dir::<InstallerMarker>().unwrap()
+    fn installer_proxy(&self) -> finstaller::InstallerProxy {
+        self.realm_instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<finstaller::InstallerMarker>()
+            .unwrap()
     }
 
     async fn get_ota_metrics(&self) -> OtaMetrics {
@@ -657,7 +664,7 @@ impl MockRetainedPackagesService {
     }
 
     async fn collect_blob_id_iterator(
-        iterator: BlobIdIteratorProxy,
+        iterator: fpkg::BlobIdIteratorProxy,
     ) -> Vec<fidl_fuchsia_pkg_ext::BlobId> {
         let mut blobs = vec![];
         loop {

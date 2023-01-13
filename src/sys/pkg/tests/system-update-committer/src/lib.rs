@@ -11,7 +11,7 @@ use {
     diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, Inspect},
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{Configuration, ConfigurationStatus},
+    fidl_fuchsia_paver::{self as fpaver, Configuration, ConfigurationStatus},
     fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy},
     fidl_fuchsia_update_verify as fupdate_verify,
     fuchsia_async::{self as fasync, OnSignals, TimeoutExt},
@@ -171,7 +171,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&system_update_committer),
             )
@@ -185,10 +185,10 @@ impl TestEnvBuilder {
                             .path("/config/data")
                             .rights(fio::R_STAR_DIR),
                     )
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.hardware.power.statecontrol.Admin",
-                    ))
-                    .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
+                    >())
+                    .capability(Capability::protocol::<fpaver::PaverMarker>())
                     .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
                     .from(&fake_capabilities)
@@ -199,7 +199,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.update.CommitStatusProvider"))
+                    .capability(Capability::protocol::<CommitStatusProviderMarker>())
                     .from(&system_update_committer)
                     .to(Ref::parent()),
             )
