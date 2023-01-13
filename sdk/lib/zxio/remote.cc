@@ -31,21 +31,20 @@ class Directory;
 // Implementation of |zxio_dirent_iterator_t| for |fuchsia.io| v1.
 class DirentIteratorImpl {
  public:
-  explicit DirentIteratorImpl(zxio_t* io) : io_(reinterpret_cast<Directory*>(io)) {
+  explicit DirentIteratorImpl(const zxio_t* io) : io_(reinterpret_cast<const Directory*>(io)) {
     static_assert(offsetof(DirentIteratorImpl, io_) == 0,
                   "zxio_dirent_iterator_t requires first field of implementation to be zxio_t");
   }
 
   zx_status_t Next(zxio_dirent_t* inout_entry) {
-    if (index_ >= count_) {
+    if (remaining_dirents_.empty()) {
       const zx_status_t status = RemoteReadDirents();
       if (status != ZX_OK) {
         return status;
       }
-      if (count_ == 0) {
+      if (remaining_dirents_.empty()) {
         return ZX_ERR_NOT_FOUND;
       }
-      index_ = 0;
     }
 
     // The format of the packed dirent structure, taken from io.fidl.
@@ -61,34 +60,33 @@ class DirentIteratorImpl {
       char name[0];
     } __PACKED;
 
-    auto packed_entry = reinterpret_cast<const dirent*>(&data_[index_]);
-
     // Check if we can read the entry size.
-    if (index_ + sizeof(dirent) > count_) {
+    if (remaining_dirents_.size_bytes() < sizeof(dirent)) {
       // Should not happen
       return ZX_ERR_INTERNAL;
     }
 
-    const size_t packed_entry_size = sizeof(dirent) + packed_entry->size;
+    const dirent& packed_entry = *reinterpret_cast<const dirent*>(remaining_dirents_.data());
+    const size_t packed_entry_size = sizeof(dirent) + packed_entry.size;
 
     // Check if we can read the whole entry.
-    if (index_ + packed_entry_size > count_) {
+    if (remaining_dirents_.size_bytes() < packed_entry_size) {
       // Should not happen
       return ZX_ERR_INTERNAL;
     }
 
     // Check that the name length is within bounds.
-    if (packed_entry->size > fio::wire::kMaxFilename) {
+    if (packed_entry.size > fio::wire::kMaxFilename) {
       return ZX_ERR_INVALID_ARGS;
     }
 
-    index_ += packed_entry_size;
+    remaining_dirents_ = remaining_dirents_.subspan(packed_entry_size);
 
-    ZXIO_DIRENT_SET(*inout_entry, protocols, DTypeToProtocols(packed_entry->type));
-    ZXIO_DIRENT_SET(*inout_entry, id, packed_entry->ino);
-    inout_entry->name_length = packed_entry->size;
+    ZXIO_DIRENT_SET(*inout_entry, protocols, DTypeToProtocols(packed_entry.type));
+    ZXIO_DIRENT_SET(*inout_entry, id, packed_entry.ino);
+    inout_entry->name_length = packed_entry.size;
     if (inout_entry->name != nullptr) {
-      memcpy(inout_entry->name, packed_entry->name, packed_entry->size);
+      memcpy(inout_entry->name, packed_entry.name, packed_entry.size);
     }
 
     return ZX_OK;
@@ -99,7 +97,13 @@ class DirentIteratorImpl {
     if (!result.ok()) {
       return result.status();
     }
-    return result->s;
+    if (result->s != ZX_OK) {
+      return result->s;
+    }
+
+    // Reset the state of the iterator, forcing an update the next time |Next| is called.
+    remaining_dirents_ = {};
+    return ZX_OK;
   }
 
  private:
@@ -119,8 +123,8 @@ class DirentIteratorImpl {
     if (dirents.count() > kBufferSize) {
       return ZX_ERR_IO;
     }
-    data_ = dirents.data();
-    count_ = dirents.count();
+
+    remaining_dirents_ = dirents.get();
     return ZX_OK;
   }
 
@@ -148,7 +152,7 @@ class DirentIteratorImpl {
   // The maximum buffer size that is supported by |fuchsia.io/Directory.ReadDirents|.
   static constexpr size_t kBufferSize = fio::wire::kMaxBuf;
 
-  Directory* io_;
+  const Directory* const io_;
 
   // Issuing a FIDL call requires storage for both the request (16 bytes) and the largest possible
   // response message (8192 bytes of payload).
@@ -156,9 +160,9 @@ class DirentIteratorImpl {
   // this allocation to a single channel message size.
   FIDL_ALIGNDECL uint8_t
       buffer_[fidl::SyncClientMethodBufferSizeInChannel<fio::Directory::ReadDirents>()];
-  const uint8_t* data_ = nullptr;
-  uint64_t count_ = 0;
-  uint64_t index_ = 0;
+
+  // Tracks and holds a view into |buffer_| of remaining unread dirents.
+  cpp20::span<uint8_t> remaining_dirents_;
 };
 
 static_assert(sizeof(DirentIteratorImpl) <= sizeof(zxio_dirent_iterator_t),
