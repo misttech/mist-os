@@ -286,7 +286,7 @@ TEST_F(DeviceEnumerationTest, Av400Test) {
       "sys/platform/05:07:2e/aml-rtc",
       "sys/platform/05:07:12:1/av400-i2s-audio-out",
       "sys/platform/05:07:12:2/av400-i2s-audio-in",
-      "sys/platform/05:07:13/av400-audio-pdm-in",
+      "sys/platform/05:07:13/av400-pdm-audio-in",
       "sys/platform/05:07:b/aml-mailbox",
       "sys/platform/05:07:31/dsp/aml-dsp",
 

@@ -107,8 +107,11 @@ zx_status_t AudioStreamIn::InitPDev() {
   pdev_protocol_t pdev;
   status = device_get_protocol(parent(), ZX_PROTOCOL_PDEV, &pdev);
   if (status) {
-    zxlogf(ERROR, "get pdev protocol failed %d", status);
-    return status;
+    status = device_get_fragment_protocol(parent(), "pdev", ZX_PROTOCOL_PDEV, &pdev);
+    if (status) {
+      zxlogf(ERROR, "get pdev protocol failed %d", status);
+      return status;
+    }
   }
 
   ddk::PDev pdev2(&pdev);

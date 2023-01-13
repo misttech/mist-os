@@ -168,6 +168,16 @@ driver_bind_rules("tdm-i2s-in-bind") {
   deps = [ "//src/devices/bind/fuchsia.gpio" ]
 }
 
+driver_bind_rules("pdm-bind") {
+  rules = "bind/pdm.bind"
+  header_output = "pdm-bind.h"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 driver_bind_rules("pdm-i2s-dsp-bind") {
   rules = "bind/pdm-i2s-dsp.bind"
   header_output = "pdm-i2s-dsp-bind.h"
@@ -334,6 +344,7 @@ fuchsia_driver("av400-driver") {
     ":av400-tee-bind_header",
     ":dwmac-bind_header",
     ":eth-bind_header",
+    ":pdm-bind_header",
     ":pwm_init_bind_header",
     ":spi_1_bind_header",
     ":tdm-i2s-bind_header",
@@ -395,6 +406,7 @@ fuchsia_driver("av400-driver") {
   }
   if (av400_pdm_use_dsp) {
     defines += [ "PDM_USE_DSP" ]
+    deps -= [ ":pdm-bind_header" ]
     deps += [ ":pdm-i2s-dsp-bind_header" ]
   }
 }

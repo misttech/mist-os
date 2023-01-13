@@ -35,6 +35,8 @@
 
 #ifdef PDM_USE_DSP
 #include "src/devices/board/drivers/av400/pdm-i2s-dsp-bind.h"
+#else
+#include "src/devices/board/drivers/av400/pdm-bind.h"
 #endif
 
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
@@ -542,7 +544,11 @@ zx_status_t Av400::AudioInit() {
       return result->error_value();
     }
 #else
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pdm_dev));
+    auto result =
+        pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, pdm_dev),
+                                          platform_bus_composite::MakeFidlFragment(
+                                              fidl_arena, pdm_fragments, std::size(pdm_fragments)),
+                                          "pdev");
     if (!result.ok()) {
       zxlogf(ERROR, "NodeAdd Audio(pdm_dev) request failed: %s", result.FormatDescription().data());
       return result.status();
