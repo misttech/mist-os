@@ -15,7 +15,7 @@ pub async fn run_command(audio_proxy: AudioProxy, audio: Audio) -> Result<()> {
 }
 
 async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
-    let settings = AudioSettings::from(audio);
+    let settings = AudioSettings::try_from(audio).expect("Iuput arguments have errors");
 
     if settings == AudioSettings::EMPTY {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
@@ -46,8 +46,12 @@ mod test {
             }
         });
 
-        let audio =
-            Audio { stream: None, source: None, level: Some(0.5), volume_muted: Some(false) };
+        let audio = Audio {
+            stream: Some(AudioRenderUsage::Background),
+            source: Some(fidl_fuchsia_settings::AudioStreamSettingSource::User),
+            level: Some(0.5),
+            volume_muted: Some(false),
+        };
         let response = run_command(proxy, audio).await;
         assert!(response.is_ok());
     }
@@ -71,7 +75,7 @@ mod test {
         "Test audio set() output with a different non-empty input."
     )]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn validate_do_not_disturb_set_output(expected_audio: Audio) -> Result<()> {
+    async fn validate_audio_set_output(expected_audio: Audio) -> Result<()> {
         let proxy = setup_fake_audio_proxy(move |req| match req {
             AudioRequest::Set { responder, .. } => {
                 let _ = responder.send(&mut Ok(()));
@@ -105,13 +109,15 @@ mod test {
         "Test audio watch() output with non-empty input."
     )]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn validate_do_not_disturb_watch_output(expected_audio: Audio) -> Result<()> {
+    async fn validate_audio_watch_output(expected_audio: Audio) -> Result<()> {
         let proxy = setup_fake_audio_proxy(move |req| match req {
             AudioRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
             AudioRequest::Watch { responder } => {
-                let _ = responder.send(AudioSettings::from(expected_audio));
+                let _ = responder.send(
+                    AudioSettings::try_from(expected_audio).expect("Invalid input arguments"),
+                );
             }
         });
 
@@ -119,7 +125,13 @@ mod test {
             proxy,
             Audio { stream: None, source: None, level: None, volume_muted: None }
         ));
-        assert_eq!(output, format!("{:#?}", AudioSettings::from(expected_audio)));
+        assert_eq!(
+            output,
+            format!(
+                "{:#?}",
+                AudioSettings::try_from(expected_audio).expect("Invalid input arguments")
+            )
+        );
         Ok(())
     }
 }

@@ -58,8 +58,10 @@ fn str_to_audio_source(
     }
 }
 
-impl From<Audio> for AudioSettings {
-    fn from(src: Audio) -> AudioSettings {
+impl TryFrom<Audio> for AudioSettings {
+    type Error = &'static str;
+
+    fn try_from(src: Audio) -> Result<Self, Self::Error> {
         let volume = Volume { level: src.level, muted: src.volume_muted, ..Volume::EMPTY };
         let stream_settings = AudioStreamSettings {
             stream: src.stream,
@@ -68,14 +70,29 @@ impl From<Audio> for AudioSettings {
             ..AudioStreamSettings::EMPTY
         };
 
-        AudioSettings {
+        let result = AudioSettings {
             streams: if stream_settings == AudioStreamSettings::EMPTY {
                 None
             } else {
                 Some(vec![stream_settings])
             },
             ..AudioSettings::EMPTY
+        };
+
+        // TODO(https://fxbug.dev/52556): Clean up this logic once we have a detailed error return
+        // from the FIDL.
+        if result == AudioSettings::EMPTY {
+            // A Watch call request.
+            return Ok(result);
+        } else if src.stream.is_none() {
+            return Err("Missing stream type.");
+        } else if src.source.is_none() {
+            return Err("Missing stream source.");
+        } else if src.level.is_none() && src.volume_muted.is_none() {
+            return Err("User volume level and volume muted cannot be None at the same time.");
         }
+        // A valid Set call request.
+        Ok(result)
     }
 }
 
