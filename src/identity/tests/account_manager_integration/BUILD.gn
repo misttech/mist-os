@@ -27,7 +27,7 @@ rustc_test("test") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//src/identity/tests/ramdisk_common",
+    "//src/identity/testing/ramdisk_common",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
