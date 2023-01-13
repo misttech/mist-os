@@ -31,10 +31,9 @@ func RunChecks() error {
 	if err := AllLicensePatternUsagesMustBeApproved(); err != nil {
 		return err
 	}
-	// TODO: Enable this when running outside of CQ
-	//if err := AllComplianceWorksheetLinksAreGood(); err != nil {
-	//	return err
-	//}
+	if err := AllComplianceWorksheetLinksAreGood(); err != nil {
+		return err
+	}
 	if err := AllProjectsMustHaveALicense(); err != nil {
 		return err
 	}
@@ -140,20 +139,42 @@ OUTER:
 }
 
 func AllComplianceWorksheetLinksAreGood() error {
+	if !Config.CheckURLs {
+		fmt.Println("Not checking URLs")
+		return nil
+	}
+
+	numBadLinks := 0
+	checkedURLs := make(map[string]bool, 0)
 	for _, sr := range license.AllSearchResults {
 		if strings.HasPrefix(sr.Pattern.Name, "_") {
+			fmt.Printf("Not checking URL for pattern %s\n", sr.Pattern.Name)
 			continue
 		}
 		url := sr.LicenseData.URL
+		if checkedURLs[url] {
+			continue
+		}
+		if strings.Contains(url, "3rd party library") {
+			continue
+		}
 		if url != "" {
+			fmt.Printf(" -> %s\n", url)
 			resp, err := http.Get(url)
 			if err != nil {
 				fmt.Printf("%v-%v %v: %v \n", sr.ProjectRoot, sr.Pattern.Name, url, err)
+				numBadLinks = numBadLinks + 1
 			} else if resp.Status != "200 OK" {
 				fmt.Printf("%v-%v %v: %v\n", sr.ProjectRoot, sr.Pattern.Name, url, resp.Status)
+				numBadLinks = numBadLinks + 1
 			}
+			checkedURLs[url] = true
 			time.Sleep(200 * time.Millisecond)
 		}
+	}
+
+	if numBadLinks > 0 {
+		return fmt.Errorf("Encountered %d bad license URLs.\n", numBadLinks)
 	}
 	return nil
 

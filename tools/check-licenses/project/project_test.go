@@ -23,7 +23,7 @@ func TestNameLicenseProvided(t *testing.T) {
 	path := filepath.Join(*testDataDir, "happy", "README.fuchsia")
 	p, err := NewProject(path, filepath.Dir(path))
 	if err != nil {
-		t.Errorf("%v: expected no error, got %v.", t.Name(), err)
+		t.Fatalf("%v: expected no error, got %v.", t.Name(), err)
 	}
 	if p.Name != name {
 		t.Errorf("%v: expected Name == \"%v\", got %v.", t.Name(), name, p.Name)
@@ -54,7 +54,7 @@ func TestMultiLineFields(t *testing.T) {
 	path := filepath.Join(*testDataDir, "multiline", "README.fuchsia")
 	p, err := NewProject(path, filepath.Dir(path))
 	if err != nil {
-		t.Errorf("%v: expected no error, got %v.", t.Name(), err)
+		t.Fatalf("%v: expected no error, got %v.", t.Name(), err)
 	}
 	if p.Name != name {
 		t.Errorf("%v: expected Name == \"%v\", got %v.", t.Name(), name, p.Name)
@@ -79,4 +79,5 @@ func TestMultiLineFields(t *testing.T) {
 func setup() {
 	file.Config = file.NewConfig()
 	Config = NewConfig()
+	Initialize(Config)
 }

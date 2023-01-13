@@ -144,21 +144,10 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 	}
 
 	if Config.OutputLicenseFile {
-		// Retrieve the git repo of the given project by running
-		// "git config" in the project root.
-		url, err := git.GetURL(ctx, projectRootPath)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get git URL for project %v: %v", projectRootPath, err)
+		if url, hash, err := getGitInfo(projectRootPath); err == nil {
+			// This project may not be hosted in a git repo.
+			p.URL = fmt.Sprintf("%v/+/%v", url, hash)
 		}
-		// Turquoise repos return "sso" urls, so convert them to
-		// http links that a user can view in a browser.
-		url = strings.ReplaceAll(url, "sso://turquoise-internal", "https://turquoise-internal.googlesource.com")
-		// Append the current commit hash to the URL.
-		hash, err := git.GetCommitHash(ctx, projectRootPath)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get git commit hash for project %v: %v", projectRootPath, err)
-		}
-		p.URL = fmt.Sprintf("%v/+/%v", url, hash)
 	}
 
 	f, err := os.Open(readmePath)
@@ -249,6 +238,11 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 			return nil, err
 		}
 
+		licenseDir := filepath.Dir(l)
+		if url, hash, err := getGitInfo(licenseDir); err == nil {
+			licenseFile.URL = fmt.Sprintf("%s/+/%s/%s", url, hash, licenseFilePaths[i])
+		}
+
 		if licenseFileUrls[i] != "" {
 			licenseFile.URL = licenseFileUrls[i]
 		}
@@ -324,4 +318,23 @@ func (p *Project) AddFiles(filepaths []string) error {
 		}
 	}
 	return nil
+}
+
+func getGitInfo(path string) (string, string, error) {
+	url, err := git.GetURL(ctx, path)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to get git URL for path %s: %w", path, err)
+	}
+
+	// Turquoise repos return "sso" urls, so convert them to
+	// http links that a user can view in a browser.
+	url = strings.ReplaceAll(url, "sso://turquoise-internal", "https://turquoise-internal.googlesource.com")
+
+	// Retrieve the hash URL for the current commit.
+	hash, err := git.GetCommitHash(ctx, path)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to get git commit hash for path %s: %w", path, err)
+	}
+
+	return url, hash, nil
 }

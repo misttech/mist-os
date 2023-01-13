@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
+)
+
+const (
+	urlPrefixGo = "https://fuchsia.googlesource.com/fuchsia/+/%s/%s"
 )
 
 // NewSpecialProject creates a Project object from a directory.
@@ -73,10 +76,11 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 		p.URL = fmt.Sprintf("https://pub.dev/packages/%v", projectName)
 
 	case strings.Contains(p.Root, "golibs"):
-		re := regexp.MustCompile(`(.*golibs\/vendor\/)`)
-		url := re.ReplaceAllString(p.Root, "")
-		url = strings.ReplaceAll(url, "/LICENSE", "")
-		p.URL = fmt.Sprintf("https://pkg.go.dev/%v", url)
+		if hash, err := git.GetCommitHash(ctx, p.Root); err != nil {
+			return nil, fmt.Errorf("Failed to get git hash for path %s: %w", p.Root, err)
+		} else {
+			p.URL = fmt.Sprintf(urlPrefixGo, hash, p.Root)
+		}
 
 	case strings.Contains(p.Root, "rust_crates"):
 		url, err := git.GetURL(ctx, p.Root)
@@ -105,7 +109,11 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 			licenseFile.URL = fmt.Sprintf("%v/license", p.URL)
 
 		case strings.Contains(l, "golibs"):
-			licenseFile.URL = fmt.Sprintf("%v?tab=licenses", p.URL)
+			relPath, err := filepath.Rel(p.Root, licenseFile.RelPath)
+			if err != nil {
+				return nil, err
+			}
+			licenseFile.URL = fmt.Sprintf("%s/%s", p.URL, relPath)
 
 		case strings.Contains(l, "rust_crates"):
 			rel := l

@@ -49,6 +49,7 @@
           "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/firmware": true
         }
       }
-    ]
+    ],
+    "checkURLs": {CHECK_URLS}
   }
 }

@@ -38,6 +38,8 @@ var (
 	gnPath    = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when target is specified.")
 	gnGenFile = flag.String("gn_gen_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
 
+	checkURLs = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
+
 	outputLicenseFile = flag.Bool("output_license_file", true, "Flag for enabling template expansions.")
 )
 
@@ -144,6 +146,8 @@ func mainImpl() error {
 	ConfigVars["{GN_PATH}"] = *gnPath
 	ConfigVars["{GN_GEN_FILE}"] = *gnPath
 	ConfigVars["{OUTPUT_LICENSE_FILE}"] = strconv.FormatBool(*outputLicenseFile)
+
+	ConfigVars["{CHECK_URLS}"] = strconv.FormatBool(*checkURLs)
 
 	// target
 	if flag.NArg() > 1 {

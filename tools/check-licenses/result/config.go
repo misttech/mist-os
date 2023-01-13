@@ -21,7 +21,8 @@ type ResultConfig struct {
 	BuildInfoProduct  string      `json:"buildInfoProduct"`
 	BuildInfoBoard    string      `json:"buildInfoBoard"`
 
-	Checks []*Check `json:"checks"`
+	Checks    []*Check `json:"checks"`
+	CheckURLs bool
 }
 
 type Template struct {
@@ -77,4 +78,5 @@ func (c *ResultConfig) Merge(other *ResultConfig) {
 		c.SPDXDocName = other.SPDXDocName
 	}
 	c.Checks = append(c.Checks, other.Checks...)
+	c.CheckURLs = c.CheckURLs || other.CheckURLs
 }
