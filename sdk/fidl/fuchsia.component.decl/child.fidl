@@ -20,7 +20,7 @@ type Child = table {
 
     /// The startup mode for the component instance.
     ///
-    /// May be unset, in which case defaults to 'LAZY'.
+    /// Must be set.
     3: startup StartupMode;
 
     /// The environment assigned to this child.
