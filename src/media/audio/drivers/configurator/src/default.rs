@@ -294,9 +294,6 @@ impl StreamConfig {
 
 #[derive(Default)]
 pub struct DefaultConfiguratorInner {
-    /// The last channel used
-    last_channel_used: u8,
-
     /// Indexes to the available StreamConfigs not found yet.
     stream_config_available_indexes: HashMap<Device, Vec<StreamConfigIndex>>,
 
@@ -516,7 +513,6 @@ impl Configurator for DefaultConfigurator {
         }
         Ok(Self {
             inner: Arc::new(Mutex::new(DefaultConfiguratorInner {
-                last_channel_used: 0,
                 stream_config_states: states,
                 stream_config_available_indexes: config.stream_config_indexes,
             })),
@@ -589,11 +585,6 @@ impl Configurator for DefaultConfigurator {
             codec_formats
         );
 
-        // TODO(95437): Add heuristics and configurability for the DAI channel to use instead of
-        // simple increment.
-        let dai_channel = inner.last_channel_used;
-        inner.last_channel_used += 1;
-
         // Update the stream config state for this codec.
         let device = Device {
             manufacturer: properties.manufacturer,
@@ -609,6 +600,11 @@ impl Configurator for DefaultConfigurator {
         let stream_config_index = stream_config_indexes
             .last()
             .ok_or(anyhow!("Codec index ({:?}) not in config", device))?;
+
+        // Use DAI channel matching the StreamConfigIndex used.
+        // TODO(95437): Add configurability for the DAI channel in addition to this heuristic.
+        let dai_channel = (stream_config_indexes.len() - 1) as u8;
+
         let stream_config_state = inner
             .stream_config_states
             .get_mut(&stream_config_index)
@@ -1622,6 +1618,52 @@ mod tests {
         };
         assert_eq!(plug_state.plugged, Some(TEST_CODEC_PLUGGED));
         assert_eq!(plug_state.plug_state_time, Some(TEST_CODEC_PLUG_STATE_TIME));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_default_configurator_find_codecs_check_dai_channel() -> Result<()> {
+        let mut config = Config::new()?;
+        let number_of_codecs = 5;
+        for _ in 0..number_of_codecs {
+            config.load_device(
+                Device {
+                    manufacturer: "test".to_string(),
+                    product: "testy".to_string(),
+                    hardwired: true,
+                    is_codec: true,
+                },
+                STREAM_CONFIG_INDEX_SPEAKERS,
+            );
+        }
+        let mut configurator = DefaultConfigurator::new(config)?;
+        for _ in 0..number_of_codecs {
+            let (codec_client, codec_stream) =
+                fidl::endpoints::create_request_stream::<CodecMarker>()
+                    .expect("Error creating endpoint");
+            let (_signal_client, signal_stream) =
+                fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
+                    .expect("Error creating endpoint");
+            let codec = TestCodec {
+                codec_stream: codec_stream,
+                signal_stream: Some(signal_stream),
+                gain: None,
+            };
+            let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
+            let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+            let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
+            configurator.process_new_codec(codec_interface).await?;
+        }
+        let inner = configurator.inner.lock().await;
+        let codec_state =
+            inner.stream_config_states.get(&STREAM_CONFIG_INDEX_SPEAKERS).unwrap().lock().await;
+
+        assert_eq!(codec_state.codec_states[0].dai_channel, 4);
+        assert_eq!(codec_state.codec_states[1].dai_channel, 3);
+        assert_eq!(codec_state.codec_states[2].dai_channel, 2);
+        assert_eq!(codec_state.codec_states[3].dai_channel, 1);
+        assert_eq!(codec_state.codec_states[4].dai_channel, 0);
+
+        Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
