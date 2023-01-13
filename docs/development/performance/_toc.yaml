@@ -22,5 +22,7 @@ toc:
   path: /docs/development/performance/metric_naming_style.md
 - title: "Metric name expectation files"
   path: /docs/development/performance/metric_name_expectations.md
+- title: "Documenting performance tests"
+  path: /docs/development/performance/documenting_tests.md
 - title: "Chromeperf uploading and config"
   path: /docs/development/performance/chromeperf_uploading_config.md
