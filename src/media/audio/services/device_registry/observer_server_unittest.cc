@@ -32,23 +32,17 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
   }};
 
   std::unique_ptr<FakeAudioDriver> CreateAndEnableDriverWithDefaults();
-  std::pair<fidl::Client<fidl_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer();
-  std::optional<TokenId> WaitForAddedDeviceTokenId(fidl::Client<fidl_device::Registry>& reg_client);
+
+  std::optional<TokenId> WaitForAddedDeviceTokenId(
+      fidl::Client<fidl_device::Registry>& registry_client);
   std::optional<TokenId> WaitForRemovedDeviceTokenId(
-      fidl::Client<fidl_device::Registry>& reg_client);
-  std::pair<fidl::Client<fidl_device::ControlCreator>, std::shared_ptr<ControlCreatorServer>>
-  CreateControlCreatorServer();
-  fidl::Client<fidl_device::Control> ConnectToControl(
-      fidl::Client<fidl_device::ControlCreator>& ctl_creator_client, TokenId token_id);
+      fidl::Client<fidl_device::Registry>& registry_client);
+
   std::pair<fidl::Client<fidl_device::RingBuffer>, fidl::ServerEnd<fidl_device::RingBuffer>>
   CreateRingBufferClient();
-  fidl::Client<fidl_device::Observer> ConnectToObserver(
-      fidl::Client<fidl_device::Registry>& reg_client, TokenId token_id);
-  // Invoked when the underlying driver disconnects its StreamConfig.
-  void on_fidl_error(fidl::UnbindInfo error) override;
 
-  std::optional<zx_status_t> fidl_error_status_;
+  fidl::Client<fidl_device::Observer> ConnectToObserver(
+      fidl::Client<fidl_device::Registry>& registry_client, TokenId token_id);
 };
 
 std::unique_ptr<FakeAudioDriver> ObserverServerTest::CreateAndEnableDriverWithDefaults() {
@@ -65,18 +59,10 @@ std::unique_ptr<FakeAudioDriver> ObserverServerTest::CreateAndEnableDriverWithDe
   return fake_driver;
 }
 
-std::pair<fidl::Client<fidl_device::Registry>, std::shared_ptr<RegistryServer>>
-ObserverServerTest::CreateRegistryServer() {
-  auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fidl_device::Registry>();
-  auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-  auto client = fidl::Client<fidl_device::Registry>(std::move(client_end), dispatcher());
-  return std::make_pair(std::move(client), server);
-}
-
 std::optional<TokenId> ObserverServerTest::WaitForAddedDeviceTokenId(
-    fidl::Client<fidl_device::Registry>& reg_client) {
+    fidl::Client<fidl_device::Registry>& registry_client) {
   std::optional<TokenId> added_device_id;
-  reg_client->WatchDevicesAdded().Then(
+  registry_client->WatchDevicesAdded().Then(
       [&added_device_id](fidl::Result<fidl_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
@@ -89,9 +75,9 @@ std::optional<TokenId> ObserverServerTest::WaitForAddedDeviceTokenId(
 }
 
 std::optional<TokenId> ObserverServerTest::WaitForRemovedDeviceTokenId(
-    fidl::Client<fidl_device::Registry>& reg_client) {
+    fidl::Client<fidl_device::Registry>& registry_client) {
   std::optional<TokenId> removed_device_id;
-  reg_client->WatchDeviceRemoved().Then(
+  registry_client->WatchDeviceRemoved().Then(
       [&removed_device_id](
           fidl::Result<fidl_device::Registry::WatchDeviceRemoved>& result) mutable {
         ASSERT_TRUE(result.is_ok());
@@ -100,36 +86,6 @@ std::optional<TokenId> ObserverServerTest::WaitForRemovedDeviceTokenId(
       });
   RunLoopUntilIdle();
   return removed_device_id;
-}
-
-std::pair<fidl::Client<fidl_device::ControlCreator>, std::shared_ptr<ControlCreatorServer>>
-ObserverServerTest::CreateControlCreatorServer() {
-  auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fidl_device::ControlCreator>();
-  auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
-  auto client = fidl::Client<fidl_device::ControlCreator>(std::move(client_end), dispatcher());
-  return std::make_pair(std::move(client), server);
-}
-
-fidl::Client<fidl_device::Control> ObserverServerTest::ConnectToControl(
-    fidl::Client<fidl_device::ControlCreator>& ctl_creator_client, TokenId token_id) {
-  auto [control_client_end, control_server_end] =
-      CreateNaturalAsyncClientOrDie<fidl_device::Control>();
-  auto control_client = fidl::Client<fidl_device::Control>(
-      fidl::ClientEnd<fidl_device::Control>(std::move(control_client_end)), dispatcher());
-  bool received_callback = false;
-  ctl_creator_client
-      ->Create({{
-          .token_id = token_id,
-          .control_server = fidl::ServerEnd<fidl_device::Control>(std::move(control_server_end)),
-      }})
-      .Then([&received_callback](fidl::Result<fidl_device::ControlCreator::Create>& result) {
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        received_callback = true;
-      });
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control_client.is_valid());
-  return control_client;
 }
 
 std::pair<fidl::Client<fidl_device::RingBuffer>, fidl::ServerEnd<fidl_device::RingBuffer>>
@@ -142,13 +98,13 @@ ObserverServerTest::CreateRingBufferClient() {
 }
 
 fidl::Client<fidl_device::Observer> ObserverServerTest::ConnectToObserver(
-    fidl::Client<fidl_device::Registry>& reg_client, TokenId token_id) {
+    fidl::Client<fidl_device::Registry>& registry_client, TokenId token_id) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fidl_device::Observer>();
   auto observer_client = fidl::Client<fidl_device::Observer>(
       fidl::ClientEnd<fidl_device::Observer>(std::move(observer_client_end)), dispatcher(), this);
   bool received_callback = false;
-  reg_client
+  registry_client
       ->CreateObserver({{
           .token_id = token_id,
           .observer_server = fidl::ServerEnd<fidl_device::Observer>(std::move(observer_server_end)),
@@ -163,87 +119,86 @@ fidl::Client<fidl_device::Observer> ObserverServerTest::ConnectToObserver(
   return observer_client;
 }
 
-// Invoked when the underlying driver disconnects its StreamConfig.
-void ObserverServerTest::on_fidl_error(fidl::UnbindInfo error) {
-  fidl_error_status_ = error.status();
-  if (fidl_error_status_ != ZX_OK && fidl_error_status_ != ZX_ERR_PEER_CLOSED) {
-    FX_LOGS(WARNING) << __func__ << ":" << error;
-  } else {
-    FX_LOGS(DEBUG) << __func__ << ":" << error;
-  }
-}
-
+// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ObserverServer>>(
-      test_loop(), server_thread_, *adr_service_->devices().begin());
-  RunLoopUntilIdle();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
-  wrapper->client() = fidl::Client<fidl_device::Observer>();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(wrapper->server().WaitForShutdown(zx::sec(1)));
+  observer->client() = fidl::Client<fidl_device::Observer>();
 }
 
+// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ObserverServer>>(
-      test_loop(), server_thread_, *adr_service_->devices().begin());
-  RunLoopUntilIdle();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
-  wrapper->server().Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(wrapper->server().WaitForShutdown(zx::sec(1)));
+  observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly creeate an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerTest, Creation) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
+  auto [observer_client_end, observer_server_end] =
+      CreateNaturalAsyncClientOrDie<fidl_device::Observer>();
+  auto observer_client = fidl::Client<fidl_device::Observer>(
+      fidl::ClientEnd<fidl_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
+  bool received_callback = false;
+  registry->client()
+      ->CreateObserver({{
+          .token_id = *added_device_id,
+          .observer_server = fidl::ServerEnd<fidl_device::Observer>(std::move(observer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<fidl_device::Registry::CreateObserver>& result) {
+        ASSERT_TRUE(result.is_ok());
+        received_callback = true;
+      });
   RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer_client.is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_);
 
-  EXPECT_FALSE(fidl_error_status_);
+  observer_client = fidl::Client<fidl_device::Observer>();
 }
 
+// Validate that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerTest, ObservedDeviceRemoved) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
-
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
 
   fake_driver->DropStreamConfig();
   RunLoopUntilIdle();
-  auto removed_device_id = WaitForRemovedDeviceTokenId(reg_client);
+  auto removed_device_id = WaitForRemovedDeviceTokenId(registry->client());
   ASSERT_TRUE(removed_device_id);
 
-  EXPECT_EQ(ObserverServer::count(), 0u);
-  EXPECT_TRUE(fidl_error_status_);
-  EXPECT_EQ(*fidl_error_status_, ZX_ERR_PEER_CLOSED);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
   RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_TRUE(observer_fidl_error_status_);
+  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
 }
 
+// Validate that the Observer receives the initial gain state of the observed device.
 TEST_F(ObserverServerTest, InitialGainState) {
   zx::channel server_end, client_end;
   EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
@@ -263,15 +218,17 @@ TEST_F(ObserverServerTest, InitialGainState) {
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
   bool received_callback = false;
-  observer_client->WatchGainState().Then(
+  observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<fidl_device::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
@@ -284,25 +241,26 @@ TEST_F(ObserverServerTest, InitialGainState) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
 
-  reg_client = fidl::Client<fidl_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
+// Validate that the Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerTest, GainChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
   bool received_callback = false;
-  observer_client->WatchGainState().Then(
+  observer->client()->WatchGainState().Then(
       [&received_callback](fidl::Result<fidl_device::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
@@ -317,7 +275,7 @@ TEST_F(ObserverServerTest, GainChange) {
 
   constexpr float kGainDb = -2.0f;
   received_callback = false;
-  observer_client->WatchGainState().Then(
+  observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<fidl_device::Observer::WatchGainState>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
@@ -337,12 +295,10 @@ TEST_F(ObserverServerTest, GainChange) {
   }});
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
+// Validate that the Observer receives the initial plug state of the observed device.
 TEST_F(ObserverServerTest, InitialPlugState) {
   zx::channel server_end, client_end;
   EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
@@ -358,15 +314,17 @@ TEST_F(ObserverServerTest, InitialPlugState) {
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
   bool received_callback = false;
-  observer_client->WatchPlugState().Then(
+  observer->client()->WatchPlugState().Then(
       [&received_callback,
        initial_plug_time](fidl::Result<fidl_device::Observer::WatchPlugState>& result) {
         received_callback = true;
@@ -378,27 +336,28 @@ TEST_F(ObserverServerTest, InitialPlugState) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
+// Validate that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerTest, PlugChange) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
   auto time_of_plug_change = zx::clock::get_monotonic();
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
   bool received_callback = false;
-  observer_client->WatchPlugState().Then(
+  observer->client()->WatchPlugState().Then(
       [&received_callback,
        time_of_plug_change](fidl::Result<fidl_device::Observer::WatchPlugState>& result) {
         FX_LOGS(DEBUG) << "Received callback 1";
@@ -413,7 +372,7 @@ TEST_F(ObserverServerTest, PlugChange) {
   EXPECT_TRUE(received_callback);
 
   received_callback = false;
-  observer_client->WatchPlugState().Then(
+  observer->client()->WatchPlugState().Then(
       [&received_callback,
        time_of_plug_change](fidl::Result<fidl_device::Observer::WatchPlugState>& result) {
         FX_LOGS(DEBUG) << "Received callback 2";
@@ -430,26 +389,26 @@ TEST_F(ObserverServerTest, PlugChange) {
   fake_driver->InjectPlugChange(false, time_of_plug_change);
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
+// Validate that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerTest, GetReferenceClock) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
-  auto added_device_id = WaitForAddedDeviceTokenId(reg_client);
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
 
-  auto observer_client = ConnectToObserver(reg_client, *added_device_id);
   bool received_callback = false;
-  observer_client->GetReferenceClock().Then(
+  observer->client()->GetReferenceClock().Then(
       [&received_callback](fidl::Result<fidl_device::Observer::GetReferenceClock>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
@@ -459,31 +418,26 @@ TEST_F(ObserverServerTest, GetReferenceClock) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fidl_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
+// Validate that an Observer does not drop, if the observed device's driver RingBuffer is dropped.
 TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
 
-  auto [control_creator_client, control_creator_server] = CreateControlCreatorServer();
-  auto [registry_client, registry_server] = CreateRegistryServer();
-  auto added_device_id = WaitForAddedDeviceTokenId(registry_client);
+  auto registry = CreateTestRegistryServer();
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
 
   ASSERT_TRUE(added_device_id);
-  auto control_client = ConnectToControl(control_creator_client, *added_device_id);
-  auto observer_client = ConnectToObserver(registry_client, *added_device_id);
-
-  control_creator_server->Shutdown();
-  registry_server->Shutdown();
-  RunLoopUntilIdle();
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
+  auto observer = CreateTestObserverServer(added_device);
 
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
   bool received_callback = false;
-  control_client
+  control->client()
       ->CreateRingBuffer(
           {{.options = fidl_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
                                                        .ring_buffer_min_bytes = 2000}},
@@ -500,12 +454,84 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
   RunLoopUntilIdle();
 
   EXPECT_EQ(ObserverServer::count(), 1u);
-  EXPECT_FALSE(fidl_error_status_);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_);
 
-  EXPECT_TRUE(control_creator_server->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
   ring_buffer_client = fidl::Client<fidl_device::RingBuffer>();
-  control_client = fidl::Client<fidl_device::Control>();
+}
+
+// Validate that an Observer does not drop, if the observed device's RingBuffer client is dropped.
+TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientRingBufferDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  fake_driver->AllocateRingBuffer(8192);
+
+  auto registry = CreateTestRegistryServer();
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
+  auto observer = CreateTestObserverServer(added_device);
+
+  {
+    auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
+    bool received_callback = false;
+    control->client()
+        ->CreateRingBuffer(
+            {{.options = fidl_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
+                                                         .ring_buffer_min_bytes = 2000}},
+              .ring_buffer_server =
+                  fidl::ServerEnd<fidl_device::RingBuffer>(std::move(ring_buffer_server_end))}})
+        .Then([&received_callback](fidl::Result<fidl_device::Control::CreateRingBuffer>& result) {
+          received_callback = true;
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        });
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+  }
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_);
+}
+
+// Validate that an Observer does not drop, if the observed device's Control client is dropped.
+TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientControlDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  fake_driver->AllocateRingBuffer(8192);
+
+  auto registry = CreateTestRegistryServer();
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
+  {
+    auto control = CreateTestControlServer(added_device);
+    auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
+    bool received_callback = false;
+    control->client()
+        ->CreateRingBuffer(
+            {{.options = fidl_device::RingBufferOptions{{.format = kDefaultRingBufferFormat,
+                                                         .ring_buffer_min_bytes = 2000}},
+              .ring_buffer_server =
+                  fidl::ServerEnd<fidl_device::RingBuffer>(std::move(ring_buffer_server_end))}})
+        .Then([&received_callback](fidl::Result<fidl_device::Control::CreateRingBuffer>& result) {
+          received_callback = true;
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        });
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+  }
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_);
 }
 
 }  // namespace

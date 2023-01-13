@@ -18,36 +18,23 @@ class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
 
 // Validate that the ControlCreator client can be dropped cleanly without generating a WARNING.
 TEST_F(ControlCreatorServerTest, CleanClientDrop) {
-  auto control_creator_wrapper =
-      std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
-          test_loop(), server_thread_, adr_service_);
-  RunLoopUntilIdle();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  control_creator_wrapper->client() = fidl::Client<fuchsia_audio_device::ControlCreator>();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(control_creator_wrapper->server().WaitForShutdown(zx::sec(1)));
+  control_creator->client() = fidl::Client<fuchsia_audio_device::ControlCreator>();
 }
 
 // Validate that the ControlCreator server can shutdown cleanly without generating a WARNING.
 TEST_F(ControlCreatorServerTest, CleanServerShutdown) {
-  auto control_creator_wrapper =
-      std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
-          test_loop(), server_thread_, adr_service_);
-  RunLoopUntilIdle();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  control_creator_wrapper->server().Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(control_creator_wrapper->server().WaitForShutdown(zx::sec(1)));
+  control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
-// Validate the ControlCfreator/CreateControl method.
+// Validate the ControlCreator/CreateControl method.
 TEST_F(ControlCreatorServerTest, CreateControl) {
-  auto control_creator_wrapper =
-      std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
-          test_loop(), server_thread_, adr_service_);
-  RunLoopUntilIdle();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -64,7 +51,7 @@ TEST_F(ControlCreatorServerTest, CreateControl) {
   auto control_client = fidl::Client<fuchsia_audio_device::Control>(
       fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),

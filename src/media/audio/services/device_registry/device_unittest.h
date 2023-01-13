@@ -100,8 +100,8 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     // ObserverNotify
     //
-    void DeviceIsRemoved() final { FX_LOGS(INFO) << __func__ << " **********"; }
-    void DeviceHasError() final { FX_LOGS(INFO) << __func__ << " **********"; }
+    void DeviceIsRemoved() final { FX_LOGS(INFO) << __func__; }
+    void DeviceHasError() final { FX_LOGS(INFO) << __func__; }
     void GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) final {
       gain_state_ = new_gain_state;
     }
@@ -111,9 +111,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     }
     // ControlNotify
     //
-    void DeviceDroppedRingBuffer() final { FX_LOGS(INFO) << __func__ << " **********"; }
+    void DeviceDroppedRingBuffer() final { FX_LOGS(INFO) << __func__; }
     void DelayInfoChanged(const fuchsia_audio_device::DelayInfo& new_delay_info) final {
-      FX_LOGS(INFO) << __func__ << " **********";
+      FX_LOGS(INFO) << __func__;
       delay_info_ = new_delay_info;
     }
 

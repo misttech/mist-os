@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
@@ -20,7 +21,6 @@ namespace {
 namespace fidl_device = fuchsia_audio_device;
 
 class RingBufferServerWarningTest : public AudioDeviceRegistryServerTestBase,
-                                    public fidl::AsyncEventHandler<fidl_device::Control>,
                                     public fidl::AsyncEventHandler<fidl_device::RingBuffer> {
  protected:
   const fidl_device::RingBufferOptions kDefaultRingBufferOptions = {{
@@ -35,24 +35,10 @@ class RingBufferServerWarningTest : public AudioDeviceRegistryServerTestBase,
   std::unique_ptr<FakeAudioDriver> CreateFakeDriverWithDefaults();
   void EnableDriverAndAddDevice(const std::unique_ptr<FakeAudioDriver>& fake_driver);
 
-  std::pair<fidl::Client<fidl_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer();
   std::optional<TokenId> WaitForAddedDeviceTokenId(fidl::Client<fidl_device::Registry>& reg_client);
-
-  std::pair<fidl::Client<fidl_device::ControlCreator>, std::shared_ptr<ControlCreatorServer>>
-  CreateControlCreatorServer();
-
-  fidl::Client<fidl_device::Control> ConnectToControl(
-      fidl::Client<fidl_device::ControlCreator>& ctl_creator_client, TokenId token_id);
 
   std::pair<fidl::Client<fidl_device::RingBuffer>, fidl::ServerEnd<fidl_device::RingBuffer>>
   CreateRingBufferClient();
-
-  // Invoked when the underlying driver disconnects its StreamConfig.
-  void on_fidl_error(fidl::UnbindInfo error) override;
-
- private:
-  std::optional<zx_status_t> fidl_error_status_;
 };
 
 std::unique_ptr<FakeAudioDriver> RingBufferServerWarningTest::CreateFakeDriverWithDefaults() {
@@ -62,20 +48,13 @@ std::unique_ptr<FakeAudioDriver> RingBufferServerWarningTest::CreateFakeDriverWi
   return std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
                                            dispatcher());
 }
+
 void RingBufferServerWarningTest::EnableDriverAndAddDevice(
     const std::unique_ptr<FakeAudioDriver>& fake_driver) {
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fidl_device::DeviceType::kOutput,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
   RunLoopUntilIdle();
-}
-
-std::pair<fidl::Client<fidl_device::Registry>, std::shared_ptr<RegistryServer>>
-RingBufferServerWarningTest::CreateRegistryServer() {
-  auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fidl_device::Registry>();
-  auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-  auto client = fidl::Client<fidl_device::Registry>(std::move(client_end), dispatcher());
-  return std::make_pair(std::move(client), server);
 }
 
 std::optional<TokenId> RingBufferServerWarningTest::WaitForAddedDeviceTokenId(
@@ -93,36 +72,6 @@ std::optional<TokenId> RingBufferServerWarningTest::WaitForAddedDeviceTokenId(
   return added_device_id;
 }
 
-std::pair<fidl::Client<fidl_device::ControlCreator>, std::shared_ptr<ControlCreatorServer>>
-RingBufferServerWarningTest::CreateControlCreatorServer() {
-  auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fidl_device::ControlCreator>();
-  auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
-  auto client = fidl::Client<fidl_device::ControlCreator>(std::move(client_end), dispatcher());
-  return std::make_pair(std::move(client), server);
-}
-
-fidl::Client<fidl_device::Control> RingBufferServerWarningTest::ConnectToControl(
-    fidl::Client<fidl_device::ControlCreator>& ctl_creator_client, TokenId token_id) {
-  auto [control_client_end, control_server_end] =
-      CreateNaturalAsyncClientOrDie<fidl_device::Control>();
-  auto control_client = fidl::Client<fidl_device::Control>(
-      fidl::ClientEnd<fidl_device::Control>(std::move(control_client_end)), dispatcher(), this);
-  bool received_callback = false;
-  ctl_creator_client
-      ->Create({{
-          .token_id = token_id,
-          .control_server = fidl::ServerEnd<fidl_device::Control>(std::move(control_server_end)),
-      }})
-      .Then([&received_callback](fidl::Result<fidl_device::ControlCreator::Create>& result) {
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        received_callback = true;
-      });
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(control_client.is_valid());
-  return control_client;
-}
-
 std::pair<fidl::Client<fidl_device::RingBuffer>, fidl::ServerEnd<fidl_device::RingBuffer>>
 RingBufferServerWarningTest::CreateRingBufferClient() {
   auto [ring_buffer_client_end, ring_buffer_server_end] =
@@ -133,36 +82,22 @@ RingBufferServerWarningTest::CreateRingBufferClient() {
   return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
 }
 
-// Invoked when the underlying driver disconnects its StreamConfig.
-void RingBufferServerWarningTest::on_fidl_error(fidl::UnbindInfo error) {
-  fidl_error_status_ = error.status();
-  if (fidl_error_status_ != ZX_OK && fidl_error_status_ != ZX_ERR_PEER_CLOSED) {
-    FX_LOGS(WARNING) << __func__ << ":" << error;
-  } else {
-    FX_LOGS(INFO) << __func__ << ":" << error;
-  }
-}
-
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
   auto fake_driver = CreateFakeDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
-  auto [control_creator_client, control_creator_server] = CreateControlCreatorServer();
-  auto [registry_client, registry_server] = CreateRegistryServer();
-  auto token_id = WaitForAddedDeviceTokenId(registry_client);
+  auto registry = CreateTestRegistryServer();
+  auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto control_client = ConnectToControl(control_creator_client, *token_id);
 
-  control_creator_server->Shutdown();
-  registry_server->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(control_creator_server->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
 
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
   bool received_callback = false;
-  control_client
+  control->client()
       ->CreateRingBuffer({{
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server =
@@ -190,9 +125,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x3u);
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
-  RunLoopUntilIdle();
 }
 
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
@@ -200,21 +133,16 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
-  auto [control_creator_client, control_creator_server] = CreateControlCreatorServer();
-  auto [registry_client, registry_server] = CreateRegistryServer();
-  auto token_id = WaitForAddedDeviceTokenId(registry_client);
+  auto registry = CreateTestRegistryServer();
+  auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto control_client = ConnectToControl(control_creator_client, *token_id);
-
-  control_creator_server->Shutdown();
-  registry_server->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(control_creator_server->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
 
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
   bool received_callback = false;
-  control_client
+  control->client()
       ->CreateRingBuffer({{
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server =
@@ -244,9 +172,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x3u);
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
-  RunLoopUntilIdle();
 }
 
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsUnsupported) {
@@ -256,21 +182,17 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsUnsupported) {
   fake_driver->set_active_channels_supported(false);
   EnableDriverAndAddDevice(fake_driver);
 
-  auto [control_creator_client, control_creator_server] = CreateControlCreatorServer();
-  auto [registry_client, registry_server] = CreateRegistryServer();
-  auto token_id = WaitForAddedDeviceTokenId(registry_client);
+  auto registry = CreateTestRegistryServer();
+  auto token_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_TRUE(token_id);
-  auto control_client = ConnectToControl(control_creator_client, *token_id);
 
-  control_creator_server->Shutdown();
-  registry_server->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(control_creator_server->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(registry_server->WaitForShutdown(zx::sec(1)));
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*token_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(added_device);
 
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
   bool received_callback = false;
-  control_client
+  control->client()
       ->CreateRingBuffer({{
           .options = kDefaultRingBufferOptions,
           .ring_buffer_server =
@@ -296,9 +218,7 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsUnsupported) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x3u);
-  control_client = fidl::Client<fuchsia_audio_device::Control>();
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
-  RunLoopUntilIdle();
 }
 
 // TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes

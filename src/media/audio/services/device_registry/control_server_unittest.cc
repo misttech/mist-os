@@ -17,9 +17,7 @@
 namespace media_audio {
 namespace {
 
-class ControlServerTest : public AudioDeviceRegistryServerTestBase,
-                          public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
-                          public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
+class ControlServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
   std::unique_ptr<FakeAudioDriver> CreateAndEnableDriverWithDefaults() {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
@@ -35,18 +33,10 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase,
     return fake_driver;
   }
 
-  std::pair<fidl::Client<fuchsia_audio_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer() {
-    auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
-    auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-    auto client = fidl::Client<fuchsia_audio_device::Registry>(std::move(client_end), dispatcher());
-    return std::make_pair(std::move(client), server);
-  }
-
   std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& reg_client) {
+      fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
-    reg_client->WatchDevicesAdded().Then(
+    registry_client->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
@@ -59,26 +49,17 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase,
     return added_device_id;
   }
 
-  std::pair<fidl::Client<fuchsia_audio_device::ControlCreator>,
-            std::shared_ptr<ControlCreatorServer>>
-  CreateControlCreatorServer() {
-    auto [client_end, server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::ControlCreator>();
-    auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
-    auto client =
-        fidl::Client<fuchsia_audio_device::ControlCreator>(std::move(client_end), dispatcher());
-    return std::make_pair(std::move(client), server);
-  }
-
+  // Obtain a control via ControlCreator/Create (not the synthetic CreateTestControlServer method).
   fidl::Client<fuchsia_audio_device::Control> ConnectToControl(
-      fidl::Client<fuchsia_audio_device::ControlCreator>& ctl_creator_client, TokenId token_id) {
+      fidl::Client<fuchsia_audio_device::ControlCreator>& control_creator_client,
+      TokenId token_id) {
     auto [control_client_end, control_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
     auto control_client = fidl::Client<fuchsia_audio_device::Control>(
         fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(control_client_end)), dispatcher(),
-        this);
+        control_fidl_handler_.get());
     bool received_callback = false;
-    ctl_creator_client
+    control_creator_client
         ->Create({{
             .token_id = token_id,
             .control_server =
@@ -94,95 +75,71 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase,
     EXPECT_TRUE(control_client.is_valid());
     return control_client;
   }
-
-  // Invoked when the underlying driver disconnects its StreamConfig.
-  void on_fidl_error(fidl::UnbindInfo error) override {
-    fidl_error_status_ = error.status();
-    if (fidl_error_status_ != ZX_OK && fidl_error_status_ != ZX_ERR_PEER_CLOSED) {
-      FX_LOGS(WARNING) << __func__ << ":" << error;
-    } else {
-      FX_LOGS(INFO) << __func__ << ":" << error;
-    }
-  }
-
-  std::optional<zx_status_t> fidl_error_status_;
 };
 
 TEST_F(ControlServerTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ControlServer>>(
-      test_loop(), server_thread_, adr_service_, *adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  wrapper->client() = fidl::Client<fuchsia_audio_device::Control>();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(wrapper->server().WaitForShutdown(zx::sec(1)));
+  control->client() = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ControlServer>>(
-      test_loop(), server_thread_, adr_service_, *adr_service_->devices().begin());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  wrapper->server().Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(wrapper->server().WaitForShutdown(zx::sec(1)));
+  control->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
 TEST_F(ControlServerTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto registry = CreateRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry.first);
-  auto control_creator = CreateControlCreatorServer();
-  auto ctl_client = ConnectToControl(control_creator.first, *added_id);
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
   RunLoopUntilIdle();
 
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  registry.first = fidl::Client<fuchsia_audio_device::Registry>();
-  control_creator.first = fidl::Client<fuchsia_audio_device::ControlCreator>();
   RunLoopUntilIdle();
-  EXPECT_TRUE(registry.second->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(control_creator.second->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(ctl_client.is_valid());
+  EXPECT_TRUE(control_client.is_valid());
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, ControlOutlivesControlCreator) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
-  auto registry = CreateRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry.first);
-  auto control_creator = CreateControlCreatorServer();
-  auto ctl_client = ConnectToControl(control_creator.first, *added_id);
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
   RunLoopUntilIdle();
 
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  control_creator.second->Shutdown();
+  control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
   RunLoopUntilIdle();
+  EXPECT_TRUE(control_creator->server().WaitForShutdown(zx::sec(1)));
 
-  EXPECT_TRUE(control_creator.second->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(ctl_client.is_valid());
+  EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-
-  registry.second->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(registry.second->WaitForShutdown(zx::sec(1)));
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, SetGain) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
-  auto registry = CreateRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry.first);
-  auto control_creator = CreateControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator.first, *added_id);
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
@@ -201,21 +158,16 @@ TEST_F(ControlServerTest, SetGain) {
 
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(ControlServer::count(), 1u);
-
-  registry.second->Shutdown();
-  control_creator.second->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(registry.second->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(control_creator.second->WaitForShutdown(zx::sec(1)));
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, CreateRingBuffer) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
-  auto registry = CreateRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry.first);
-  auto control_creator = CreateControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator.first, *added_id);
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
   RunLoopUntilIdle();
 
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -226,7 +178,7 @@ TEST_F(ControlServerTest, CreateRingBuffer) {
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
   auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
       fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
-      dispatcher(), this);
+      dispatcher(), ring_buffer_fidl_handler_.get());
   bool received_callback = false;
   control_client
       ->CreateRingBuffer({{
@@ -249,12 +201,8 @@ TEST_F(ControlServerTest, CreateRingBuffer) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  registry.second->Shutdown();
-  control_creator.second->Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(registry.second->WaitForShutdown(zx::sec(1)));
-  EXPECT_TRUE(control_creator.second->WaitForShutdown(zx::sec(1)));
+  ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 // TODO(fxbug.dev/117826): TEST_F(ControlServerTest, ControlLivesIfClientDropsRingBuffer)

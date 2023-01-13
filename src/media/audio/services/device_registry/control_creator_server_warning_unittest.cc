@@ -13,32 +13,19 @@
 namespace media_audio {
 namespace {
 
-class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {
- protected:
-  std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>> ConnectToControlCreator() {
-    return std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
-        test_loop(), server_thread_, adr_service_);
-  }
-
-  std::pair<fidl::Client<fuchsia_audio_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer() {
-    auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
-    auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-    auto client = fidl::Client<fuchsia_audio_device::Registry>(std::move(client_end), dispatcher());
-    return std::make_pair(std::move(client), server);
-  }
-};
+class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ControlCreatorServerWarningTest, MissingId) {
-  auto control_creator_wrapper = ConnectToControlCreator();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto client = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher(),
+      control_fidl_handler_.get());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           // Missing token_id
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
@@ -57,10 +44,10 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
 }
 
 TEST_F(ControlCreatorServerWarningTest, BadId) {
-  auto control_creator_wrapper = ConnectToControlCreator();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -72,7 +59,7 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
   std::optional<TokenId> added_device_id;
-  reg_client->WatchDevicesAdded().Then(
+  registry->client()->WatchDevicesAdded().Then(
       [&added_device_id](
           fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
@@ -86,10 +73,11 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
 
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto client = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher(),
+      control_fidl_handler_.get());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = *added_device_id - 1,  // Bad token_id
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
@@ -108,10 +96,10 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
 }
 
 TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
-  auto control_creator_wrapper = ConnectToControlCreator();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
+  auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -123,7 +111,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
   std::optional<TokenId> added_device_id;
-  reg_client->WatchDevicesAdded().Then(
+  registry->client()->WatchDevicesAdded().Then(
       [&added_device_id](
           fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
@@ -137,10 +125,11 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
 
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto client = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher(),
+      control_fidl_handler_.get());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
           // Missing server_end
@@ -159,7 +148,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
 }
 
 TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
-  auto control_creator_wrapper = ConnectToControlCreator();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -172,10 +161,10 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
 
   std::optional<TokenId> added_device_id;
   {
-    auto [reg_client, reg_server] = CreateRegistryServer();
+    auto registry = CreateTestRegistryServer();
     ASSERT_EQ(RegistryServer::count(), 1u);
 
-    reg_client->WatchDevicesAdded().Then(
+    registry->client()->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
@@ -190,10 +179,11 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
 
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto client = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
+  auto control_client_unused = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher(),
+      control_fidl_handler_.get());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(),  // Bad server_end
@@ -210,7 +200,7 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
 }
 
 TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
-  auto control_creator_wrapper = ConnectToControlCreator();
+  auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -223,10 +213,10 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
 
   std::optional<TokenId> added_device_id;
   {
-    auto [reg_client, reg_server] = CreateRegistryServer();
+    auto registry = CreateTestRegistryServer();
     ASSERT_EQ(RegistryServer::count(), 1u);
 
-    reg_client->WatchDevicesAdded().Then(
+    registry->client()->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
@@ -241,10 +231,11 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
 
   zx::channel server_end1, client_end1;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end1, &client_end1));
-  auto client1 = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end1)), dispatcher());
+  auto control_client_unused_1 = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end1)), dispatcher(),
+      control_fidl_handler_.get());
   auto received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end1)),
@@ -259,10 +250,11 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
 
   zx::channel server_end2, client_end2;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end2, &client_end2));
-  auto client2 = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end2)), dispatcher());
+  auto control_client_unused_2 = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end2)), dispatcher(),
+      control_fidl_handler_.get());
   received_callback = false;
-  control_creator_wrapper->client()
+  control_creator->client()
       ->Create({{
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end2)),

@@ -51,6 +51,14 @@ class TestServerAndAsyncClient {
     EXPECT_EQ(server_->thread().dispatcher(), loop_.dispatcher());
   }
 
+  explicit TestServerAndAsyncClient(async::TestLoop& test_client_loop,
+                                    std::shared_ptr<ServerT> server, ClientT<Protocol> client)
+      : server_(std::move(server)), client_(std::move(client)), loop_(test_client_loop) {
+    // We expect the server and async test client to share the same thread and dispatcher.
+    EXPECT_TRUE(server_->thread().checker().IsValid());
+    EXPECT_EQ(server_->thread().dispatcher(), loop_.dispatcher());
+  }
+
   ~TestServerAndAsyncClient() {
     client_ = ClientT<Protocol>();
     // RunUntilIdle should run all on_unbound callbacks, so the servers should now be shut down.

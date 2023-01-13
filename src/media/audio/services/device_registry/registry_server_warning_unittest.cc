@@ -8,35 +8,26 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
 
 namespace media_audio {
 namespace {
-class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {
- protected:
-  std::pair<fidl::Client<fuchsia_audio_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer() {
-    auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
-    auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-    auto client = fidl::Client<fuchsia_audio_device::Registry>(std::move(client_end), dispatcher());
-    return std::make_pair(std::move(client), server);
-  }
-};
+class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 // If the required 'id' field is not set, we should fail.
 TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)),
-      dispatcher());
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
   bool received_callback = false;
-  reg_client
+  registry->client()
       ->CreateObserver({{
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
@@ -50,25 +41,20 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 // If the 'id' field does not identify an initialized device, we should fail.
 TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)),
-      dispatcher());
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
   bool received_callback = false;
-  reg_client
+  registry->client()
       ->CreateObserver({{
           .token_id = 0,  // no device is present yet.
           .observer_server =
@@ -83,10 +69,6 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 // If the required 'observer_server' field is not set, we should fail.
@@ -98,12 +80,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   std::optional<TokenId> id;
-  reg_client->WatchDevicesAdded().Then(
+  registry->client()->WatchDevicesAdded().Then(
       [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
@@ -116,11 +97,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
 
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)),
-      dispatcher());
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
   bool received_callback = false;
-  reg_client
+  registry->client()
       ->CreateObserver({{
           .token_id = *id,
       }})
@@ -133,10 +114,6 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 // If 'observer_server' is not set to a valid handle, we should fail.
@@ -148,12 +125,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   std::optional<TokenId> id;
-  reg_client->WatchDevicesAdded().Then(
+  registry->client()->WatchDevicesAdded().Then(
       [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
@@ -166,11 +142,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
 
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
-  auto client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)),
-      dispatcher());
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
   bool received_callback = false;
-  reg_client
+  registry->client()
       ->CreateObserver({{
           .token_id = *id,
           .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
@@ -183,10 +159,6 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 // TODO(fxbug/dev:117199): When Health can change after initialization, we need a test case for:

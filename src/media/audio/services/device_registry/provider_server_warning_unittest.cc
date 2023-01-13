@@ -17,8 +17,7 @@ namespace {
 class ProviderServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ProviderServerWarningTest, MissingDeviceName) {
-  auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-      test_loop(), server_thread_, adr_service_);
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -26,7 +25,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
@@ -46,8 +45,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
 }
 
 TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
-  auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-      test_loop(), server_thread_, adr_service_);
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -55,7 +53,7 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -76,8 +74,7 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
 }
 
 TEST_F(ProviderServerWarningTest, MissingDeviceType) {
-  auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-      test_loop(), server_thread_, adr_service_);
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -85,7 +82,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .stream_config_client = std::move(stream_config_client_end),
@@ -105,12 +102,11 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
 }
 
 TEST_F(ProviderServerWarningTest, MissingStreamConfig) {
-  auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-      test_loop(), server_thread_, adr_service_);
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -130,12 +126,11 @@ TEST_F(ProviderServerWarningTest, MissingStreamConfig) {
 }
 
 TEST_F(ProviderServerWarningTest, InvalidStreamConfig) {
-  auto provider_wrapper = std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
-      test_loop(), server_thread_, adr_service_);
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,

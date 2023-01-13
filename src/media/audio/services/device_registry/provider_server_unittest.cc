@@ -14,37 +14,24 @@
 namespace media_audio {
 namespace {
 
-class ProviderServerTest : public AudioDeviceRegistryServerTestBase {
- protected:
-  std::pair<fidl::Client<fuchsia_audio_device::Registry>, std::shared_ptr<RegistryServer>>
-  CreateRegistryServer() {
-    auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
-    auto server = adr_service_->CreateRegistryServer(std::move(server_end));
-    auto client = fidl::Client<fuchsia_audio_device::Registry>(std::move(client_end), dispatcher());
-    return std::make_pair(std::move(client), server);
-  }
-};
+class ProviderServerTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ProviderServerTest, CleanClientDrop) {
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  provider_wrapper->client() = fidl::Client<fuchsia_audio_device::Provider>();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(provider_wrapper->server().WaitForShutdown(zx::sec(1)));
+  provider->client() = fidl::Client<fuchsia_audio_device::Provider>();
 }
 
 TEST_F(ProviderServerTest, CleanServerShutdown) {
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  provider_wrapper->server().Shutdown();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(provider_wrapper->server().WaitForShutdown(zx::sec(1)));
+  provider->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
 TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
@@ -52,7 +39,7 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -68,21 +55,22 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
   EXPECT_EQ(adr_service_->devices().size(), 1u);
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
-  provider_wrapper.reset();
+  provider->client() = fidl::Client<fuchsia_audio_device::Provider>();
   RunLoopUntilIdle();
+  EXPECT_TRUE(provider->server().WaitForShutdown(zx::sec(1)));
   EXPECT_EQ(adr_service_->devices().size(), 1u);
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
 TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -108,18 +96,17 @@ TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
 
 // For devices added by Provider, ensure that Add-then-Watch works as expected.
 TEST_F(ProviderServerTest, ProviderAddThenWatch) {
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry_wrapper = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   auto fake_driver = CreateFakeDriver();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -136,7 +123,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
   std::optional<TokenId> added_device;
-  reg_client->WatchDevicesAdded().Then(
+  registry_wrapper->client()->WatchDevicesAdded().Then(
       [&added_device](
           fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
@@ -147,20 +134,15 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(added_device);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 // For devices added by Provider, ensure that Watch-then-Add works as expected.
 TEST_F(ProviderServerTest, WatchThenProviderAdd) {
-  auto [reg_client, reg_server] = CreateRegistryServer();
-  RunLoopUntilIdle();
+  auto registry_wrapper = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
   std::optional<TokenId> added_device;
-  reg_client->WatchDevicesAdded().Then(
+  registry_wrapper->client()->WatchDevicesAdded().Then(
       [&added_device](
           fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
@@ -172,7 +154,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
   RunLoopUntilIdle();
   EXPECT_FALSE(added_device);
 
-  auto provider_wrapper = CreateProviderServer();
+  auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
   RunLoopUntilIdle();
   EXPECT_FALSE(added_device);
@@ -181,7 +163,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
-  provider_wrapper->client()
+  provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
@@ -197,10 +179,6 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
   EXPECT_EQ(adr_service_->devices().size(), 1u);
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
   EXPECT_TRUE(added_device);
-
-  reg_client = fidl::Client<fuchsia_audio_device::Registry>();
-  RunLoopUntilIdle();
-  reg_server->WaitForShutdown(zx::sec(1));
 }
 
 }  // namespace
