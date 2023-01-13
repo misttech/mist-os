@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{ComponentInstance, StartReason, WeakComponentInstance},
-            error::ModelError,
+            error::{ModelError, OpenExposedDirError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
         },
@@ -257,11 +257,7 @@ impl RealmCapabilityHost {
                 let mut exposed_dir = exposed_dir.into_channel();
                 let () =
                     child.open_exposed(&mut exposed_dir).await.map_err(|error| match error {
-                        ModelError::InstanceShutDown { .. } => fcomponent::Error::InstanceDied,
-                        _ => {
-                            debug!(%error, "open_exposed() failed");
-                            fcomponent::Error::Internal
-                        }
+                        OpenExposedDirError::InstanceDestroyed => fcomponent::Error::InstanceDied,
                     })?;
             }
             None => {

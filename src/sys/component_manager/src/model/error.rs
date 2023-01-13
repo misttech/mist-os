@@ -79,11 +79,6 @@ pub enum ModelError {
         #[source]
         err: ClonableError,
     },
-    #[error("calling Admin/Reboot failed: {}", err)]
-    RebootFailed {
-        #[source]
-        err: ClonableError,
-    },
     #[error("failed to resolve \"{}\": {}", url, err)]
     ResolverError {
         url: String,
@@ -233,10 +228,6 @@ impl ModelError {
         ModelError::NamespaceCreationFailed { err: err.into().into() }
     }
 
-    pub fn reboot_failed(err: impl Into<Error>) -> ModelError {
-        ModelError::RebootFailed { err: err.into().into() }
-    }
-
     pub fn open_directory_error(
         moniker: AbsoluteMoniker,
         relative_path: impl Into<String>,
@@ -285,4 +276,22 @@ pub enum VfsError {
     AddNodeError { name: String, status: zx::Status },
     #[error("failed to remove node \"{name}\": {status}")]
     RemoveNodeError { name: String, status: zx::Status },
+}
+
+#[derive(Debug, Error)]
+pub enum RebootError {
+    #[error("failed to connect to admin protocol in root component's exposed dir: {0}")]
+    ConnectToAdminFailed(#[source] anyhow::Error),
+    #[error("StateControl Admin protocol encountered FIDL error: {0}")]
+    FidlError(#[from] fidl::Error),
+    #[error("StateControl Admin responded with status: {0}")]
+    AdminError(zx::Status),
+    #[error("failed to open root component's exposed dir: {0}")]
+    OpenRootExposedDirFailed(#[from] OpenExposedDirError),
+}
+
+#[derive(Debug, Error)]
+pub enum OpenExposedDirError {
+    #[error("instance was destroyed")]
+    InstanceDestroyed,
 }

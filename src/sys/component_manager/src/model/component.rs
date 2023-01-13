@@ -10,7 +10,7 @@ use {
         },
         context::ModelContext,
         environment::Environment,
-        error::{ModelError, StructuredConfigError},
+        error::{ModelError, OpenExposedDirError, RebootError, StructuredConfigError},
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
         namespace::{populate_and_get_logsink_decl, IncomingNamespace},
@@ -37,7 +37,6 @@ use {
         },
         DebugRouteMapper,
     },
-    anyhow::format_err,
     async_trait::async_trait,
     cm_moniker::{IncarnationId, InstancedAbsoluteMoniker, InstancedChildMoniker},
     cm_runner::{component_controller::ComponentController, NullRunner, RemoteRunner, Runner},
@@ -273,16 +272,8 @@ impl ComponentManagerInstance {
                 let statecontrol_proxy = this.connect_to_statecontrol_admin().await?;
                 statecontrol_proxy
                     .reboot(fstatecontrol::RebootReason::CriticalComponentFailure)
-                    .await
-                    .map_err(|e| ModelError::reboot_failed(e))
-                    .and_then(|res| {
-                        res.map_err(|s| {
-                            ModelError::reboot_failed(format_err!(
-                                "Admin/Reboot failed with status: {}",
-                                zx::Status::from_raw(s)
-                            ))
-                        })
-                    })
+                    .await?
+                    .map_err(|s| RebootError::AdminError(zx::Status::from_raw(s)))
             }
             .await;
             if let Err(e) = res {
@@ -298,7 +289,9 @@ impl ComponentManagerInstance {
     }
 
     /// Obtains a connection to power_manager's `statecontrol` protocol.
-    async fn connect_to_statecontrol_admin(&self) -> Result<fstatecontrol::AdminProxy, ModelError> {
+    async fn connect_to_statecontrol_admin(
+        &self,
+    ) -> Result<fstatecontrol::AdminProxy, RebootError> {
         let (exposed_dir, server) =
             endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
         let mut server = server.into_channel();
@@ -306,7 +299,7 @@ impl ComponentManagerInstance {
         root.open_exposed(&mut server).await?;
         let statecontrol_proxy =
             client::connect_to_protocol_at_dir_root::<fstatecontrol::AdminMarker>(&exposed_dir)
-                .map_err(|e| ModelError::reboot_failed(e))?;
+                .map_err(RebootError::ConnectToAdminFailed)?;
         Ok(statecontrol_proxy)
     }
 }
@@ -1054,7 +1047,10 @@ impl ComponentInstance {
     /// Connects `server_chan` to this instance's exposed directory if it has
     /// been resolved. Component must be resolved or destroyed before using
     /// this function, otherwise it will panic.
-    pub async fn open_exposed(&self, server_chan: &mut zx::Channel) -> Result<(), ModelError> {
+    pub async fn open_exposed(
+        &self,
+        server_chan: &mut zx::Channel,
+    ) -> Result<(), OpenExposedDirError> {
         let state = self.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
@@ -1071,9 +1067,7 @@ impl ComponentInstance {
                 exposed_dir.open(flags, fio::MODE_TYPE_DIRECTORY, Path::dot(), server_end);
                 Ok(())
             }
-            InstanceState::Destroyed => {
-                Err(ModelError::instance_destroyed(self.abs_moniker.clone()))
-            }
+            InstanceState::Destroyed => Err(OpenExposedDirError::InstanceDestroyed),
             _ => {
                 panic!("Component must be resolved or destroyed before using this function")
             }
