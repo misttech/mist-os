@@ -89,7 +89,7 @@
         },
         {
             name: "sysinfo",
-            url: "fuchsia-boot:///#meta/sysinfo.cm",
+            url: "fuchsia-boot:///sysinfo#meta/sysinfo.cm",
         },
         {
             name: "cr50_agent",

@@ -46,11 +46,8 @@ assembled_system("guest") {
   ]
 
   bootfs_labels = [
-    "//src/bringup/bin/sysinfo:bootfs",
-    "//src/bringup/bin/sysinfo",
-    "//src/power/power-manager:base_config",
     "//src/bringup/bin/virtcon:bootfs",
-    "//src/bringup/bundles:bootstrap",
+    "//src/power/power-manager:base_config",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
     "//src/connectivity/network/bin/ping",

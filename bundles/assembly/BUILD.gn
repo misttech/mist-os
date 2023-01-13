@@ -90,6 +90,7 @@ assembly_input_bundle("common_bringup") {
     "//src/bringup/bin/miscsvc:package",
     "//src/bringup/bin/ptysvc:package",
     "//src/bringup/bin/pwrbtn-monitor:package",
+    "//src/bringup/bin/sysinfo:package",
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver-index:package",
   ]

@@ -2,17 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/dist/component_manifest_resources.gni")
+import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
 executable("sysinfo") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   output_dir = "$root_out_dir/zircon-migrated"
   sources = [ "main.cc" ]
   deps = [
@@ -40,6 +34,13 @@ bootfs_test("sysinfo-bootfs-test") {
   deps = [ ":test" ]
 }
 
-component_manifest_resources("bootfs") {
-  sources = [ "meta/sysinfo.cml" ]
+fuchsia_component("component") {
+  component_name = "sysinfo"
+  manifest = "meta/sysinfo.cml"
+  deps = [ ":sysinfo" ]
+}
+
+fuchsia_package("package") {
+  package_name = "sysinfo"
+  deps = [ ":component" ]
 }

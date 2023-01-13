@@ -59,10 +59,7 @@ group("bootstrap") {
 
 # Binaries that form the base of every single zedboot image.
 group("bootstrap-zedboot") {
-  deps = [
-    "//src/bringup/bundles:bootstrap",
-    "//src/storage/bundles:bootstrap",
-  ]
+  deps = [ "//src/storage/bundles:bootstrap" ]
 }
 
 # Debugging tools installed on the boot image.

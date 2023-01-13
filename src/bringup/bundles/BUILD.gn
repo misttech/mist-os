@@ -2,15 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This target contains elements that are present on the boot partition of all
-# products.
-group("bootstrap") {
-  deps = [
-    "//src/bringup/bin/sysinfo",
-    "//src/bringup/bin/sysinfo:bootfs",
-  ]
-}
-
 group("debugging") {
   deps = [
     ":virtcon",
