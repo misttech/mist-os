@@ -3,5 +3,5 @@
         "PASSWORD",
     ],
     is_ephemeral: false,
-    storage_manager: "MINFS",
+    storage_manager: "FXFS",
 }
