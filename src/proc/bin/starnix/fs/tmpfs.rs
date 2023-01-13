@@ -9,6 +9,7 @@ use super::*;
 use crate::auth::FsCred;
 use crate::lock::{Mutex, MutexGuard};
 use crate::logging::not_implemented;
+use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, Kernel};
 use crate::types::*;
 
@@ -192,7 +193,13 @@ impl FsNodeOps for TmpfsDirectory {
         };
         *self.child_count.lock() += 1;
         let node = node.fs().create_node_box(ops, mode, owner);
-        node.info_write().rdev = dev;
+        {
+            let mut node_info = node.info_write();
+            node_info.rdev = dev;
+            // blksize is PAGE_SIZE for in memory node.
+            node_info.blksize = *PAGE_SIZE as i64;
+        }
+
         Ok(node)
     }
 
