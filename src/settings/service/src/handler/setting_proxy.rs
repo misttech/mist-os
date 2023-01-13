@@ -72,14 +72,8 @@ impl RequestInfo {
     /// Adds a closure that will be triggered when the recipient for a response
     /// to the request goes out of scope. This allows for the message handler to
     /// know when the recipient is no longer valid.
-    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce(RequestInfo) + Sync + Send>) {
-        let request = self.clone();
-
-        let fuse = ActionFuseBuilder::new()
-            .add_action(Box::new(move || {
-                (trigger_fn)(request);
-            }))
-            .build();
+    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce() + Sync + Send>) {
+        let fuse = ActionFuseBuilder::new().add_action(trigger_fn).build();
 
         self.client.bind_to_recipient(fuse).await;
     }
@@ -117,7 +111,7 @@ enum ProxyRequest {
     /// Request to remove the active request.
     RemoveActive,
     /// Request to remove listen request.
-    EndListen(RequestInfo),
+    EndListen(usize),
     /// Starts a timeout for resources be torn down. Called when there are no
     /// more requests to process.
     TeardownTimeout,
@@ -363,10 +357,10 @@ impl SettingProxy {
                 trace!(id, "handle listen");
                 self.handle_listen(event).await;
             }
-            ProxyRequest::EndListen(request_info) => {
+            ProxyRequest::EndListen(request_id) => {
                 trace!(id, "handle end listen");
                 self.listener_logger.lock().await.remove_listener(self.setting_type);
-                self.handle_end_listen(request_info).await;
+                self.handle_end_listen(request_id).await;
             }
         }
     }
@@ -547,10 +541,10 @@ impl SettingProxy {
     /// Notifies handler in the case the notification listener count is
     /// non-zero and we aren't already listening for changes or there
     /// are no more listeners and we are actively listening.
-    async fn handle_end_listen(&mut self, request: RequestInfo) {
+    async fn handle_end_listen(&mut self, request_id: usize) {
         let was_listening = self.is_listening();
 
-        if let Some(pos) = self.listen_requests.iter().position(|target| *target == request) {
+        if let Some(pos) = self.listen_requests.iter().position(|target| target.id == request_id) {
             let _ = self.listen_requests.remove(pos);
         } else {
             return;
@@ -663,8 +657,9 @@ impl SettingProxy {
             // failed, which indicates the channel got dropped and requests cannot be processed
             // anymore.
             let proxy_request_sender = self.proxy_request_sender.clone();
-            info.bind_to_scope(Box::new(move |request_info| {
-                proxy_request_sender.unbounded_send(ProxyRequest::EndListen(request_info)).expect(
+            let request_id = info.id;
+            info.bind_to_scope(Box::new(move || {
+                proxy_request_sender.unbounded_send(ProxyRequest::EndListen(request_id)).expect(
                     "SettingProxy::execute_next_request, proxy_request_sender failed to send \
                     EndListen proxy request with info",
                 );
