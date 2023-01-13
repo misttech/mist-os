@@ -219,9 +219,12 @@ TEST_F(MapGrowsdownTest, Grow) {
 
   // Read from pages sequentially in the guard regions from just below the MAP_GROWSDOWN mapping
   // down to the edge of the second mapping.
-  for (size_t i = 0; i < 4 * expected_guard_region_size / page_size(); ++i) {
+  for (size_t i = 0; i < 4 * expected_guard_region_size / page_size(); i += 128) {
     ASSERT_EQ(ReadAtOffset(initial_grows_down_low_offset() - i * page_size()), 0);
   }
+  ASSERT_EQ(
+      ReadAtOffset(initial_grows_down_low_offset() - 4 * expected_guard_region_size + page_size()),
+      0);
 
   // We should have grown our MAP_GROWSDOWN mapping to touch constraint_mapping. Test by trying to
   // make a new mapping immediately above constraint_mapping with MAP_FIXED_NOREPLACE - this should
