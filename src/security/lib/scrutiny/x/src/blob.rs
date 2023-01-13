@@ -98,17 +98,17 @@ struct BlobFsBlobSetData {
 
 #[derive(Debug, Error)]
 pub(crate) enum BlobFsError {
-    #[error("Blob not found: {hash}, in blobfs archive: {archive_path}")]
+    #[error("blob not found: {hash}, in blobfs archive: {archive_path}")]
     BlobNotFound { archive_path: PathBuf, hash: Hash },
-    #[error("Error reading from blobfs archive: {archive_path}: {error}")]
+    #[error("error reading from blobfs archive: {archive_path}: {error}")]
     BlobFsError { archive_path: PathBuf, error: anyhow::Error },
 }
 
 #[derive(Debug, Error)]
 pub(crate) enum ParseHashPathError {
-    #[error("Blob fuchsia merkle root string path contains non-unicode characters: {path_string}")]
+    #[error("blob fuchsia merkle root string path contains non-unicode characters: {path_string}")]
     NonUnicodeCharacters { path_string: String },
-    #[error("Path does not contain fuchsia merkle root string: {path_string}: {fuchsia_parse_hash_error}")]
+    #[error("path does not contain fuchsia merkle root string: {path_string}: {fuchsia_parse_hash_error}")]
     NonFuchsiaMerkleRoot { path_string: String, fuchsia_parse_hash_error: FuchsiaParseHashError },
 }
 
@@ -219,13 +219,13 @@ impl BlobApi for BlobFsBlob {
 /// Errors that may be emitted by `BlobFsBlobSetBuilder::build`.
 #[derive(Debug, Error)]
 pub(crate) enum BlobFsBlobSetBuilderError {
-    #[error("Attempt to build blobfs set without specifying an archive path")]
+    #[error("attempt to build blobfs set without specifying an archive path")]
     MissingArchivePath,
-    #[error("Failed to open blobfs archive: {0}")]
+    #[error("failed to open blobfs archive: {0}")]
     OpenError(#[from] io::Error),
-    #[error("Error preparing blobfs archive reader: {0}")]
+    #[error("error preparing blobfs archive reader: {0}")]
     BlobFsError(#[from] anyhow::Error),
-    #[error("Failed to process blobfs path: {0}")]
+    #[error("failed to process blobfs path: {0}")]
     PathError(#[from] ParseHashPathError),
 }
 
@@ -317,9 +317,9 @@ impl BlobDirectoryBlobSetData {
 /// Errors that can be encountered accessing blobs via a [`BlobDirectoryBlobSet`].
 #[derive(Debug, Error)]
 pub(crate) enum BlobDirectoryError {
-    #[error("Blob not found: {hash}, in blob directory: {directory}")]
+    #[error("blob not found: {hash}, in blob directory: {directory}")]
     BlobNotFound { directory: PathBuf, hash: Hash },
-    #[error("Error reading from blob directory: {directory}: {error}")]
+    #[error("error reading from blob directory: {directory}: {error}")]
     IoError { directory: PathBuf, error: io::Error },
 }
 
@@ -475,19 +475,19 @@ impl BlobApi for Blob {
 /// Errors that may be emitted by `BlobFsBlobSetBuilder::build`.
 #[derive(Debug, Error)]
 pub(crate) enum BlobDirectoryBlobSetBuilderError {
-    #[error("Attempt to build blob directory blob set without specifying a directory")]
+    #[error("attempt to build blob directory blob set without specifying a directory")]
     MissingDirectory,
-    #[error("Failed to list files in blob directory: {0}")]
+    #[error("failed to list files in blob directory: {0}")]
     ListError(io::Error),
-    #[error("Failed to stat directory entry: {0}")]
+    #[error("failed to stat directory entry: {0}")]
     DirEntryError(io::Error),
-    #[error("Failed to losslessly convert file name to string: {0}")]
+    #[error("failed to losslessly convert file name to string: {0}")]
     PathStringError(String),
-    #[error("Failed to process blob path: {0}")]
+    #[error("failed to process blob path: {0}")]
     PathError(#[from] ParseHashPathError),
-    #[error("Failed to read blob from blob directory: {0}")]
+    #[error("failed to read blob from blob directory: {0}")]
     ReadBlobError(io::Error),
-    #[error("Hash mismatch: hash from path: {hash_from_path}; computed hash: {computed_hash}")]
+    #[error("hash mismatch: hash from path: {hash_from_path}; computed hash: {computed_hash}")]
     HashMismatch { hash_from_path: Hash, computed_hash: Hash },
 }
 
