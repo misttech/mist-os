@@ -31,7 +31,7 @@ sdk://fidl/fuchsia.url
 sdk://fidl/fuchsia.wlan.common
 sdk://fidl/fuchsia.wlan.ieee80211
 sdk://fidl/fuchsia.wlan.internal
-sdk://fidl/fuchsia.wlan.wlanphyimpl
+sdk://fidl/fuchsia.wlan.phyimpl
 sdk://fidl/fuchsia.wlan.softmac
 sdk://fidl/fuchsia.hardware.wlan.associnfo
 sdk://fidl/zx

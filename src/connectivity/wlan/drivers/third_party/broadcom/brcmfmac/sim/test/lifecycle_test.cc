@@ -65,7 +65,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   ASSERT_EQ(status, ZX_OK);
   EXPECT_EQ(dev_mgr->DeviceCountByProtocolId(ZX_PROTOCOL_WLANPHY_IMPL), 1u);
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
   ASSERT_FALSE(endpoints.is_error());
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, __func__, [&](fdf_dispatcher_t*) { completion_.Signal(); });
@@ -73,10 +73,10 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   ASSERT_FALSE(dispatcher.is_error());
   auto client_dispatcher_ = *std::move(dispatcher);
 
-  auto client_ = fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(
+  auto client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(
       std::move(endpoints->client), client_dispatcher_.get());
 
-  device->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+  device->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                             endpoints->server.TakeHandle());
   constexpr uint32_t kTag = 'TEST';
 
@@ -89,7 +89,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   // check that create iface fails when we don't provide role and mlme_channel
   fidl::Arena create_fail_arena;
   auto builder_create_fail =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_fail_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_fail_arena);
   auto result_create_fail =
       client_.sync().buffer(test_arena_)->CreateIface(builder_create_fail.Build());
   EXPECT_TRUE(result_create_fail.ok());
@@ -99,7 +99,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   // create iface successfully
   fidl::Arena create_arena;
   auto builder_create =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena);
   builder_create.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
   builder_create.mlme_channel(std::move(local));
   auto result_create = client_.sync().buffer(test_arena_)->CreateIface(builder_create.Build());
@@ -112,7 +112,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   auto [local_again, _remote_again] = make_channel();
   fidl::Arena create_arena_again;
   auto builder_create_again =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena_again);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena_again);
   builder_create_again.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
   builder_create_again.mlme_channel(std::move(local_again));
   auto result_create_again =
@@ -142,7 +142,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   // check that without specifying iface id, destroy iface fails
   fidl::Arena destroy_fail_arena;
   auto builder_destroy_fail =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_fail_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_fail_arena);
   auto result_destroy_fail =
       client_.sync().buffer(test_arena_)->DestroyIface(builder_destroy_fail.Build());
   EXPECT_TRUE(result_destroy_fail.ok());
@@ -152,7 +152,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   // Now actually destroy the iface
   fidl::Arena destroy_arena;
   auto builder_destroy =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_arena);
   builder_destroy.iface_id(iface_id);
   auto result_destroy = client_.sync().buffer(test_arena_)->DestroyIface(builder_destroy.Build());
   EXPECT_TRUE(result_destroy.ok());

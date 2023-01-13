@@ -17,7 +17,7 @@ extern "C" {
 
 namespace wlan::iwlwifi {
 
-namespace wlanphyimpl_fidl = fuchsia_wlan_wlanphyimpl::wire;
+namespace phyimpl_fidl = fuchsia_wlan_phyimpl::wire;
 
 WlanPhyImplDevice::WlanPhyImplDevice(zx_device_t* parent)
     : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
@@ -30,11 +30,11 @@ void WlanPhyImplDevice::DdkRelease() { delete this; }
 zx_status_t WlanPhyImplDevice::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
   // Ensure they are requesting the correct protocol.
   if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>) {
+      fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
     IWL_ERR(this, "Service name doesn't match. Connection request from a wrong device.\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> server_end(std::move(channel));
+  fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
   return ZX_OK;
 }
@@ -146,7 +146,7 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   IWL_INFO("%s() created iface %u\n", __func__, out_iface_id);
 
   fidl::Arena fidl_arena;
-  auto builder = wlanphyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
+  auto builder = phyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(out_iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
@@ -210,7 +210,7 @@ void WlanPhyImplDevice::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync&
 
   memcpy(alpha2.begin(), country.alpha2, WLANPHY_ALPHA2_LEN);
 
-  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
+  auto out_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   completer.buffer(arena).ReplySuccess(out_country);
 }
 

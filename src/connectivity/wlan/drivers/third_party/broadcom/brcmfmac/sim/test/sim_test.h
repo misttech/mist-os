@@ -234,7 +234,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // Keep track of the ifaces we created during test by iface id.
   std::map<uint16_t, SimInterface*> ifaces_;
 
-  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client_;
+  fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
   fdf::Dispatcher client_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;

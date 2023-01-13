@@ -7,8 +7,8 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_MVM_MLME_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_MVM_MLME_H_
 
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 
 #include "banjo/common.h"

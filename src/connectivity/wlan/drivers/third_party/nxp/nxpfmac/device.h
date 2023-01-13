@@ -14,7 +14,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_DEVICE_H_
 
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/device.h>
 #include <zircon/types.h>
@@ -42,7 +42,7 @@ using DeviceType =
     ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
 
 class Device : public DeviceType,
-               public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+               public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                public DataPlaneIfc {
  public:
   // State accessors.

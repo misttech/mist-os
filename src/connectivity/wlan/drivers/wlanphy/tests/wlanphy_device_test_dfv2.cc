@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -10,7 +10,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.wlan.wlanphyimpl/cpp/wire_types.h"
+#include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/wlanphy/device_dfv2.h"
 #include "src/connectivity/wlan/drivers/wlanphy/driver.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -33,14 +33,14 @@ namespace {
 //    |                         \        +-----+-----+
 //    |                          \             |
 //    |                           \            | <---- [Driver transport FIDL with protocol:
-//    |                            \           |          fuchsia_wlan_wlanphyimpl::WlanPhyImpl]
+//    |                            \           |          fuchsia_wlan_phyimpl::WlanPhyImpl]
 //    |                             \  +---------------+
-//    |                              \ |  wlanphyimpl  |
+//    |                              \ | wlanphyimpl  |
 //    |                                |    device     |
 //    |                                +---------------+
 //    |
 class WlanphyDeviceTest : public ::zxtest::Test,
-                          public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> {
+                          public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:
   WlanphyDeviceTest()
       : client_loop_phy_(async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread)),
@@ -55,9 +55,9 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     auto endpoints_phy = fidl::CreateEndpoints<fuchsia_wlan_device::Phy>();
     ASSERT_FALSE(endpoints_phy.is_error());
 
-    // Create end points for the protocol fuchsia_wlan_wlanphyimpl::WlanPhyImpl, these two end
+    // Create end points for the protocol fuchsia_wlan_phyimpl::WlanPhyImpl, these two end
     // points will be bind with wlanphy device and WlanphyDeviceTest(as fake WlanPhyImplDevice).
-    auto endpoints_phy_impl = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
+    auto endpoints_phy_impl = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
     ASSERT_FALSE(endpoints_phy_impl.is_error());
 
     status = client_loop_phy_.StartThread("fake-wlandevicemonitor-loop");
@@ -72,7 +72,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     client_phy_ = fidl::WireSharedClient<fuchsia_wlan_device::Phy>(std::move(endpoints_phy->client),
                                                                    client_dispatcher_phy_);
 
-    // Create the server dispatcher of fuchsia_wlan_wlanphyimpl::WlanPhyImpl protocol, its lifecycle
+    // Create the server dispatcher of fuchsia_wlan_phyimpl::WlanPhyImpl protocol, its lifecycle
     // will be maintained by this test class.
     auto server_dispatcher_phy_impl_status = fdf::SynchronizedDispatcher::Create(
         {}, "wlan-phy-test",
@@ -80,7 +80,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     ASSERT_FALSE(server_dispatcher_phy_impl_status.is_error());
     server_dispatcher_phy_impl_ = std::move(*server_dispatcher_phy_impl_status);
 
-    // Establish FIDL connection based on fuchsia_wlan_wlanphyimpl::WlanPhyImpl protocol.
+    // Establish FIDL connection based on fuchsia_wlan_phyimpl::WlanPhyImpl protocol.
     wlanphy_device_ =
         new Device(fake_wlan_phy_impl_device_.get(), std::move(endpoints_phy_impl->client));
     EXPECT_EQ(ZX_OK, wlanphy_device_->DeviceAdd());
@@ -105,7 +105,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     server_dispatcher_phy_impl_completion_.Wait();
   }
 
-  // Server end handler functions for fuchsia_wlan_wlanphyimpl::WlanPhyImpl.
+  // Server end handler functions for fuchsia_wlan_phyimpl::WlanPhyImpl.
   void GetSupportedMacRoles(fdf::Arena& arena,
                             GetSupportedMacRolesCompleter::Sync& completer) override {
     std::vector<fuchsia_wlan_common::wire::WlanMacRole> supported_mac_roles_vec;
@@ -128,8 +128,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     }
 
     fidl::Arena fidl_arena;
-    auto builder =
-        fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
     builder.iface_id(kFakeIfaceId);
     completer.buffer(arena).ReplySuccess(builder.Build());
     test_completion_.Signal();
@@ -151,7 +150,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     test_completion_.Signal();
   }
   void GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) override {
-    auto country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(kAlpha2);
+    auto country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2(kAlpha2);
     completer.buffer(arena).ReplySuccess(country);
     test_completion_.Signal();
   }
@@ -164,24 +163,24 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override {
     fidl::Arena fidl_arena;
     auto builder =
-        fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplGetPowerSaveModeResponse::Builder(fidl_arena);
+        fuchsia_wlan_phyimpl::wire::WlanPhyImplGetPowerSaveModeResponse::Builder(fidl_arena);
     builder.ps_mode(kFakePsMode);
 
     completer.buffer(arena).ReplySuccess(builder.Build());
     test_completion_.Signal();
   }
 
-  // Record the create iface request data when fake wlanphyimpl device gets it.
+  // Record the create iface request data when fake phyimpl device gets it.
   fuchsia_wlan_device::wire::CreateIfaceRequest create_iface_req_;
   bool has_init_sta_addr_;
 
-  // Record the destroy iface request data when fake wlanphyimpl device gets it.
+  // Record the destroy iface request data when fake phyimpl device gets it.
   uint16_t destroy_iface_id_;
 
-  // Record the country data when fake wlanphyimpl device gets it.
-  fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry country_;
+  // Record the country data when fake phyimpl device gets it.
+  fuchsia_wlan_phyimpl::wire::WlanPhyCountry country_;
 
-  // Record the power save mode data when fake wlanphyimpl device gets it.
+  // Record the power save mode data when fake phyimpl device gets it.
   fuchsia_wlan_common::wire::PowerSaveType ps_mode_;
 
   static constexpr fuchsia_wlan_common::wire::WlanMacRole kFakeMacRole =
@@ -288,7 +287,7 @@ TEST_F(WlanphyDeviceTest, SetCountry) {
   test_completion_.Wait();
 
   EXPECT_EQ(0, memcmp(&country_code.alpha2.data()[0], &country_.alpha2().data()[0],
-                      fuchsia_wlan_wlanphyimpl::wire::kWlanphyAlpha2Len));
+                      fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len));
 }
 
 TEST_F(WlanphyDeviceTest, GetCountry) {
@@ -297,7 +296,7 @@ TEST_F(WlanphyDeviceTest, GetCountry) {
   test_completion_.Wait();
 
   EXPECT_EQ(0, memcmp(&result->value()->resp.alpha2.data()[0], &kAlpha2.data()[0],
-                      fuchsia_wlan_wlanphyimpl::wire::kWlanphyAlpha2Len));
+                      fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len));
 }
 
 TEST_F(WlanphyDeviceTest, ClearCountry) {

@@ -28,7 +28,7 @@ namespace wlanphy {
 namespace wlan_common = ::fuchsia::wlan::common;
 namespace wlan_internal = ::fuchsia::wlan::internal;
 
-Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client)
+Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client)
     : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                     ::ddk::Unbindable>(parent),
       server_dispatcher_(wlanphy_async_t()) {
@@ -46,8 +46,8 @@ Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::Wla
 
   client_dispatcher_ = std::move(*client_dispatcher);
 
-  client_ = fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(std::move(client),
-                                                                         client_dispatcher_.get());
+  client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(client),
+                                                                     client_dispatcher_.get());
 }
 
 Device::~Device() { ltrace_fn(); }
@@ -75,10 +75,10 @@ void Device::Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end) {
 
 zx_status_t Device::ConnectToWlanPhyImpl(fdf::Channel server_channel) {
   zx_status_t status = ZX_OK;
-  status = DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+  status = DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                              std::move(server_channel));
   if (status != ZX_OK) {
-    lerror("DdkServiceConnect to wlanphyimpl device Failed =: %s", zx_status_get_string(status));
+    lerror("DdkServiceConnect to phyimpl device Failed =: %s", zx_status_get_string(status));
     return status;
   }
   return status;
@@ -108,7 +108,7 @@ void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer
 
   client_.buffer(fdf_arena)->GetSupportedMacRoles().ThenExactlyOnce(
       [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::GetSupportedMacRoles>&
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetSupportedMacRoles>&
               result) mutable {
         if (!result.ok()) {
           completer.ReplyError(result.status());
@@ -137,7 +137,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
   fdf::Arena fdf_arena(kTag);
 
   fidl::Arena fidl_arena;
-  auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
   builder.role(request->req.role);
   builder.mlme_channel(std::move(request->req.mlme_channel));
 
@@ -148,29 +148,27 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
 
   client_.buffer(fdf_arena)
       ->CreateIface(builder.Build())
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::CreateIface>&
-                  result) mutable {
-            if (!result.ok()) {
-              lerror("CreateIface failed with FIDL error %s", result.status_string());
-              completer.ReplyError(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              lerror("CreateIface failed with error %s",
-                     zx_status_get_string(result->error_value()));
-              completer.ReplyError(result->error_value());
-              return;
-            }
+      .ThenExactlyOnce([completer = completer.ToAsync()](
+                           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::CreateIface>&
+                               result) mutable {
+        if (!result.ok()) {
+          lerror("CreateIface failed with FIDL error %s", result.status_string());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("CreateIface failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
 
-            if (!result->value()->has_iface_id()) {
-              lerror("iface_id does not exist");
-              completer.ReplyError(ZX_ERR_INTERNAL);
-              return;
-            }
-            completer.ReplySuccess(result->value()->iface_id());
-          });
+        if (!result->value()->has_iface_id()) {
+          lerror("iface_id does not exist");
+          completer.ReplyError(ZX_ERR_INTERNAL);
+          return;
+        }
+        completer.ReplySuccess(result->value()->iface_id());
+      });
 }
 
 void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter::Sync& completer) {
@@ -179,30 +177,27 @@ void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter
   fdf::Arena fdf_arena(kTag);
 
   fidl::Arena fidl_arena;
-  auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
   builder.iface_id(request->req.id);
 
   client_.buffer(fdf_arena)
       ->DestroyIface(builder.Build())
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::DestroyIface>&
-                  result) mutable {
-            if (!result.ok()) {
-              lerror("DestroyIface failed with FIDL error %s", result.status_string());
-              completer.ReplyError(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              lerror("DestroyIface failed with error %s",
-                     zx_status_get_string(result->error_value()));
-              completer.ReplyError(result->error_value());
-              return;
-            }
+      .ThenExactlyOnce([completer = completer.ToAsync()](
+                           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::DestroyIface>&
+                               result) mutable {
+        if (!result.ok()) {
+          lerror("DestroyIface failed with FIDL error %s", result.status_string());
+          completer.ReplyError(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("DestroyIface failed with error %s", zx_status_get_string(result->error_value()));
+          completer.ReplyError(result->error_value());
+          return;
+        }
 
-            completer.ReplySuccess();
-          });
+        completer.ReplySuccess();
+      });
 }
 
 void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync& completer) {
@@ -214,27 +209,25 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
   auto alpha2 = ::fidl::Array<uint8_t, WLANPHY_ALPHA2_LEN>();
   memcpy(alpha2.data(), request->req.alpha2.data(), WLANPHY_ALPHA2_LEN);
 
-  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
+  auto out_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   client_.buffer(fdf_arena)
       ->SetCountry(out_country)
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::SetCountry>&
-                  result) mutable {
-            if (!result.ok()) {
-              lerror("SetCountry failed with FIDL error %s", result.status_string());
-              completer.Reply(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              lerror("SetCountry failed with error %s",
-                     zx_status_get_string(result->error_value()));
-              completer.Reply(result->error_value());
-              return;
-            }
+      .ThenExactlyOnce([completer = completer.ToAsync()](
+                           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::SetCountry>&
+                               result) mutable {
+        if (!result.ok()) {
+          lerror("SetCountry failed with FIDL error %s", result.status_string());
+          completer.Reply(result.status());
+          return;
+        }
+        if (result->is_error()) {
+          lerror("SetCountry failed with error %s", zx_status_get_string(result->error_value()));
+          completer.Reply(result->error_value());
+          return;
+        }
 
-            completer.Reply(ZX_OK);
-          });
+        completer.Reply(ZX_OK);
+      });
 }
 
 void Device::GetCountry(GetCountryCompleter::Sync& completer) {
@@ -244,8 +237,7 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
 
   client_.buffer(fdf_arena)->GetCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::GetCountry>&
-              result) mutable {
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetCountry>& result) mutable {
         fuchsia_wlan_device::wire::CountryCode resp;
         zx_status_t status;
         if (!result.ok()) {
@@ -279,8 +271,7 @@ void Device::ClearCountry(ClearCountryCompleter::Sync& completer) {
 
   client_.buffer(fdf_arena)->ClearCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::ClearCountry>&
-              result) mutable {
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::ClearCountry>& result) mutable {
         if (!result.ok()) {
           ldebug_device("ClearCountry failed with FIDL error %s", result.status_string());
           completer.Reply(result.status());
@@ -306,14 +297,14 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
 
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
   builder.ps_mode(request->req);
 
   client_.buffer(fdf_arena)
       ->SetPowerSaveMode(builder.Build())
       .ThenExactlyOnce(
           [completer = completer.ToAsync()](
-              fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::SetPowerSaveMode>&
+              fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::SetPowerSaveMode>&
                   result) mutable {
             if (!result.ok()) {
               ldebug_device("SetPowerSaveMode failed with FIDL error %s", result.status_string());
@@ -338,7 +329,7 @@ void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
 
   client_.buffer(fdf_arena)->GetPowerSaveMode().ThenExactlyOnce(
       [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_wlan_wlanphyimpl::WlanPhyImpl::GetPowerSaveMode>&
+          fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetPowerSaveMode>&
               result) mutable {
         if (!result.ok()) {
           ldebug_device("GetPowerSaveMode failed with FIDL error %s", result.status_string());

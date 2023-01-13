@@ -52,7 +52,7 @@ zx_status_t PhyPsModeTest::SetPowerSaveMode(
     const fuchsia_wlan_common::wire::PowerSaveType* ps_mode) {
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
   builder.ps_mode(*ps_mode);
   auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
@@ -93,7 +93,7 @@ TEST_F(PhyPsModeTest, SetPowerSaveModeIncorrect) {
   // that it FAILS
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
   auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   zx_status_t status = result->is_error() ? result->error_value() : ZX_OK;

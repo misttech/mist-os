@@ -15,7 +15,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEVICE_H_
 
 #include <fidl/fuchsia.factory.wlan/cpp/wire.h>
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
@@ -45,7 +45,7 @@ using DeviceType =
     ::ddk::Device<Device, ddk::Initializable, ddk::Messageable<fuchsia_factory_wlan::Iovar>::Mixin,
                   ddk::Suspendable, ddk::ServiceConnectable>;
 class Device : public DeviceType,
-               public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+               public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                public ::wlan::drivers::components::NetworkDevice::Callbacks {
  public:
   virtual ~Device();

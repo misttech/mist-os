@@ -38,7 +38,7 @@ source_set("sim_library") {
     "wlan-pkt-builder.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.wlan.wlanphyimpl:fuchsia.wlan.wlanphyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
@@ -203,7 +203,7 @@ executable("pcie_test") {
   sources = [ "pcie-test.cc" ]
   deps = [
     ":sim_library",
-    "//sdk/fidl/fuchsia.wlan.wlanphyimpl:fuchsia.wlan.wlanphyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie",
@@ -303,7 +303,7 @@ executable("wlan_softmac_device_test") {
   deps = [
     ":sim_library",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
-    "//sdk/fidl/fuchsia.wlan.wlanphyimpl:fuchsia.wlan.wlanphyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
@@ -323,7 +323,7 @@ executable("wlan_phy_impl_device_test") {
   sources = [ "wlanphy-impl-device-test.cc" ]
   deps = [
     ":sim_library",
-    "//sdk/fidl/fuchsia.wlan.wlanphyimpl:fuchsia.wlan.wlanphyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
     "//src/devices/testing/driver-runtime-main:zxtest",

@@ -370,8 +370,7 @@ SimTest::~SimTest() {
   // Clean the ifaces created in test but not deleted.
   for (auto iface : ifaces_) {
     fidl::Arena fidl_arena;
-    auto builder =
-        fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
     builder.iface_id(iface.first);
     auto result = client_.sync().buffer(test_arena_)->DestroyIface(builder.Build());
     if (!result.ok()) {
@@ -418,7 +417,7 @@ zx_status_t SimTest::Init() {
 
   // Create the FIDL endpoints, bind the client end to the test class, and the server end to
   // wlan::brcmfmac::Device class.
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
   if (endpoints.is_error()) {
     BRCMF_ERR("Failed to create endpoints");
     return ZX_ERR_INTERNAL;
@@ -434,10 +433,10 @@ zx_status_t SimTest::Init() {
   }
 
   client_dispatcher_ = *std::move(dispatcher);
-  client_ = fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(
-      std::move(endpoints->client), client_dispatcher_.get());
+  client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client),
+                                                                     client_dispatcher_.get());
 
-  device_->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+  device_->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                              endpoints->server.TakeHandle());
   return ZX_OK;
 }
@@ -469,7 +468,7 @@ zx_status_t SimTest::StartInterface(
 
   fidl::Arena fidl_arena;
 
-  auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
   builder.role(fidl_role);
   builder.mlme_channel(std::move(ch));
   if (mac_addr) {
@@ -543,8 +542,7 @@ zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
   BRCMF_DBG(SIM, "Del IF: %d", ifc->iface_id_);
 
   fidl::Arena fidl_arena;
-  auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
   builder.iface_id(iter->first);
   auto result = client_.sync().buffer(test_arena_)->DestroyIface(builder.Build());
   EXPECT_TRUE(result.ok());

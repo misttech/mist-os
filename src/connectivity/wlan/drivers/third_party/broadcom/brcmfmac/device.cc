@@ -21,7 +21,7 @@
 #include <ddktl/init-txn.h>
 #include <wlan/common/ieee80211.h>
 
-#include "fidl/fuchsia.wlan.wlanphyimpl/cpp/wire_types.h"
+#include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
@@ -90,11 +90,11 @@ void Device::DdkSuspend(ddk::SuspendTxn txn) {
 
 zx_status_t Device::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
   if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>) {
+      fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
     BRCMF_ERR("Service name doesn't match. Connection request from a wrong device.\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  fdf::ServerEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> server_end(std::move(channel));
+  fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
@@ -282,8 +282,7 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
 #endif /* !defined(NDEBUG) */
 
   fidl::Arena fidl_arena;
-  auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
   builder.iface_id(iface_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
   return;
@@ -382,7 +381,7 @@ void Device::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer)
   }
 
   memcpy(alpha2.begin(), country.alpha2, WLANPHY_ALPHA2_LEN);
-  auto out_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
+  auto out_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   completer.buffer(arena).ReplySuccess(out_country);
 }
 
@@ -457,7 +456,7 @@ void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync
   }
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplGetPowerSaveModeResponse::Builder(fidl_arena);
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplGetPowerSaveModeResponse::Builder(fidl_arena);
   builder.ps_mode(ps_mode);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }

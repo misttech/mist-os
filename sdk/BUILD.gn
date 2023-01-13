@@ -626,8 +626,8 @@ sdk_molecule("driver_fidl") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.wlanphyimpl:fuchsia.wlan.wlanphyimpl_sdk($fidl_toolchain)",
   ]
 }
 

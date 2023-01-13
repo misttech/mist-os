@@ -22,7 +22,7 @@ class CountryCodeTest : public SimTest {
   void Init();
   void CreateInterface();
   void DeleteInterface();
-  zx_status_t SetCountryCode(const fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry* country);
+  zx_status_t SetCountryCode(const fuchsia_wlan_phyimpl::wire::WlanPhyCountry* country);
   void GetCountryCodeFromFirmware(brcmf_fil_country_le* ccode);
   zx_status_t SetCountryCodeInFirmware(const wlan_phy_country_t* country);
   zx_status_t ClearCountryCode();
@@ -50,7 +50,7 @@ uint32_t CountryCodeTest::DeviceCountByProtocolId(uint32_t proto_id) {
 }
 
 zx_status_t CountryCodeTest::SetCountryCode(
-    const fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry* country) {
+    const fuchsia_wlan_phyimpl::wire::WlanPhyCountry* country) {
   auto result = client_.sync().buffer(test_arena_)->SetCountry(*country);
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
@@ -92,9 +92,8 @@ TEST_F(CountryCodeTest, SetDefault) {
 }
 
 TEST_F(CountryCodeTest, SetCCode) {
-  const auto valid_country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
-  const auto invalid_country =
-      fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'X', 'X'});
+  const auto valid_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
+  const auto invalid_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2({'X', 'X'});
   struct brcmf_fil_country_le country_code;
   zx_status_t status;
   uint8_t code;

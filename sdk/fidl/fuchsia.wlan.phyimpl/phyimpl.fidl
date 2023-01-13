@@ -8,7 +8,7 @@
 /// Mac:    Medium Access Control
 /// Sta:    Station
 /// Addr:   Address
-library fuchsia.wlan.wlanphyimpl;
+library fuchsia.wlan.phyimpl;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;

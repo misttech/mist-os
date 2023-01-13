@@ -49,7 +49,7 @@ zx_status_t wlanphy_bind(void* ctx, zx_device_t* device) {
   ltrace_fn();
   zx_status_t status;
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
   if (endpoints.is_error()) {
     lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
     return endpoints.status_value();

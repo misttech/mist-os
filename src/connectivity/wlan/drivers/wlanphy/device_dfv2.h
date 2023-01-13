@@ -6,8 +6,8 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANPHY_DEVICE_DFV2_H_
 
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/wire.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -28,13 +28,13 @@ class Device
       public ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                            ::ddk::Unbindable> {
  public:
-  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client);
+  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client);
   ~Device();
 
   // Creates and binds wlanphy device instance. On success hands device off to device lifecycle
   // management.
   static zx_status_t Create(zx_device_t* parent_device,
-                            fdf::ClientEnd<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client);
+                            fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client);
 
   // Overriding DDK functions.
   void DdkRelease();
@@ -66,7 +66,7 @@ class Device
   async_dispatcher_t* server_dispatcher_;
 
   // The FIDL client to communicate with iwlwifi
-  fdf::WireSharedClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client_;
+  fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
 
   // Dispatcher for being a FIDL client firing requests to WlanPhyImpl device.
   fdf::Dispatcher client_dispatcher_;

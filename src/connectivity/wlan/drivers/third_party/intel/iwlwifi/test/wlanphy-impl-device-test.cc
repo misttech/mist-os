@@ -13,7 +13,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.wlan.wlanphyimpl/cpp/wire_types.h"
+#include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/common.h"
 
 extern "C" {
@@ -48,7 +48,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
 
     // Create the FIDL endpoints, bind the client end to the test class, and the server end to
     // wlan::iwlwifi::WlanPhyImplDevice class.
-    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>();
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
     ASSERT_FALSE(endpoints.is_error());
 
     // Create a dispatcher to wait on the runtime channel.
@@ -59,8 +59,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
 
     driver_dispatcher_ = *std::move(dispatcher);
 
-    client_ =
-        fdf::WireSyncClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>(std::move(endpoints->client));
+    client_ = fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client));
 
     // `DdkServiceConnect` starts a FIDL server that bounds to the dispatcher of
     // the caller. The FIDL protocol that is being served uses driver transport
@@ -68,7 +67,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
     libsync::Completion connected;
     async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
       ASSERT_EQ(device_->DdkServiceConnect(
-                    fidl::DiscoverableProtocolName<fuchsia_wlan_wlanphyimpl::WlanPhyImpl>,
+                    fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                     endpoints->server.TakeHandle()),
                 ZX_OK);
       connected.Signal();
@@ -89,7 +88,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
   zx_status_t CreateIface(fuchsia_wlan_common::WlanMacRole role, uint16_t* iface_id_out) {
     auto ch = ::zx::channel(kDummyMlmeChannel);
     static fidl::Arena arena;
-    auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
     builder.role(role);
     builder.mlme_channel(std::move(ch));
 
@@ -107,7 +106,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
 
   zx_status_t DestroyIface(uint16_t iface_id) {
     static fidl::Arena arena;
-    auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(arena);
     builder.iface_id(iface_id);
 
     auto result = client_.buffer(test_arena_)->DestroyIface(builder.Build());
@@ -123,7 +122,7 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
   struct iwl_mvm_vif mvmvif_sta_;  // The mvm_vif settings for station role.
   wlan::iwlwifi::WlanPhyImplDevice* device_;
 
-  fdf::WireSyncClient<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> client_;
+  fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
   fdf::Dispatcher driver_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;
@@ -165,7 +164,7 @@ TEST_F(WlanPhyImplDeviceTest, CreateIfaceNegativeTest) {
 
   // Both role and channel not populated.
   {
-    auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
     auto result = client_.buffer(test_arena_)->CreateIface(builder.Build());
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_error());
@@ -174,7 +173,7 @@ TEST_F(WlanPhyImplDeviceTest, CreateIfaceNegativeTest) {
 
   // Role is set, but not channel.
   {
-    auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
     builder.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
     auto result = client_.buffer(test_arena_)->CreateIface(builder.Build());
     ASSERT_TRUE(result.ok());
@@ -185,7 +184,7 @@ TEST_F(WlanPhyImplDeviceTest, CreateIfaceNegativeTest) {
   // Channel is set, but not the role.
   {
     auto ch = ::zx::channel(kDummyMlmeChannel);
-    auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(arena);
     builder.mlme_channel(std::move(ch));
     auto result = client_.buffer(test_arena_)->CreateIface(builder.Build());
     EXPECT_TRUE(result.ok());
@@ -198,7 +197,7 @@ TEST_F(WlanPhyImplDeviceTest, DestroyIfaceNegativeTest) {
   static fidl::Arena arena;
 
   // ifaceid not populated.
-  auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(arena);
   auto result = client_.buffer(test_arena_)->DestroyIface(builder.Build());
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_error());
@@ -330,7 +329,7 @@ TEST_F(WlanPhyImplDeviceTest, GetCountry) {
 }
 
 TEST_F(WlanPhyImplDeviceTest, SetCountry) {
-  auto country = fuchsia_wlan_wlanphyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
+  auto country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
   auto result = client_.buffer(test_arena_)->SetCountry(country);
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_error());
@@ -346,7 +345,7 @@ TEST_F(WlanPhyImplDeviceTest, ClearCountry) {
 
 TEST_F(WlanPhyImplDeviceTest, SetPowerSaveMode) {
   static fidl::Arena arena;
-  auto builder = fuchsia_wlan_wlanphyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(arena);
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(arena);
   auto result = client_.buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->is_error());

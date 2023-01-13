@@ -14,7 +14,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_WLAN_INTERFACE_H_
 
 #include <fidl/fuchsia.factory.wlan/cpp/wire.h>
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/function.h>

@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_WLANPHY_IMPL_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_WLANPHY_IMPL_DEVICE_H_
 
-#include <fidl/fuchsia.wlan.wlanphyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
@@ -24,7 +24,7 @@ namespace wlan::iwlwifi {
 
 class WlanPhyImplDevice : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable,
                                                ::ddk::Unbindable, ddk::ServiceConnectable>,
-                          public fdf::WireServer<fuchsia_wlan_wlanphyimpl::WlanPhyImpl> {
+                          public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:
   WlanPhyImplDevice(const WlanPhyImplDevice& device) = delete;
   WlanPhyImplDevice& operator=(const WlanPhyImplDevice& other) = delete;
