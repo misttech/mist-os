@@ -80,9 +80,10 @@ class Channel {
 
   // Attempts to write a message to the channel.
   //
-  // The caller retains ownership of |arena|, which must be destroyed via |fdf_arena_destroy|.
-  // It is okay to destroy the arena as soon as the write call returns as the lifetime of
-  // the arena is extended until the data is read.
+  // The caller retains ownership of the |arena| reference, which must be destroyed via
+  // |fdf_arena_drop_ref|. It is okay to call |fdf_arena_drop_ref| on the arena as soon as
+  // the write call returns, as |fdf_arena_write| will take its own reference to the arena,
+  // extending the lifetime of the arena is until the data is read.
   //
   // The pointers |data| and |handles| may be NULL if their respective sizes are zero.
   // |data| and |handles| must be pointers managed by |arena| if they are not NULL.
@@ -115,7 +116,7 @@ class Channel {
   }
 
   struct ReadReturn {
-    // Holds ownership of |arena|, which will be destroyed when it goes out of scope.
+    // Holds ownership of the |arena| reference, which will be destroyed when it goes out of scope.
     Arena arena;
     // The lifetime of |data| and |handles| are tied to the lifetime of |arena|.
     void* data;

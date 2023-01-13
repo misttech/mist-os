@@ -5,7 +5,7 @@ Symbols:
   - { Name: fdf_arena_allocate, Type: Func }
   - { Name: fdf_arena_contains, Type: Func }
   - { Name: fdf_arena_create, Type: Func }
-  - { Name: fdf_arena_destroy, Type: Func }
+  - { Name: fdf_arena_drop_ref, Type: Func }
   - { Name: fdf_arena_free, Type: Func }
   - { Name: fdf_channel_call, Type: Func }
   - { Name: fdf_channel_cancel_wait, Type: Func }

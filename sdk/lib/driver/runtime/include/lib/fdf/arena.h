@@ -11,13 +11,14 @@ __BEGIN_CDECLS
 
 // An arena which supports allocation of memory.
 //
-// The arena owns all the allocated memory. Allocated memory can be freed
-// by calling |fdf_arena_free|, or will be freed when all references to
-// the underlying runtime arena object are destroyed.
+// The arena owns all the allocated memory. Individual memory allocations can be freed
+// by calling |fdf_arena_free|, or will be freed when all references to the underlying
+// runtime arena object are destroyed.
 //
 // |fdf_arena_create| will return a reference to a newly created runtime arena object.
 // Passing an arena to |fdf_channel_write| will create and transfer a new reference to
-// that same arena, and does not take ownership of your arena reference.
+// that same arena, and does not take ownership of your arena reference. The reference
+// may be destroyed using |fdf_arena_drop_ref|.
 //
 // # Thread safety
 //
@@ -34,7 +35,7 @@ __BEGIN_CDECLS
 //
 //   // Use the allocated memory...
 //
-//   fdf_arena_destroy(arena);
+//   fdf_arena_drop_ref(arena);
 typedef struct fdf_arena fdf_arena_t;
 
 typedef uint32_t fdf_arena_tag_t;
@@ -54,11 +55,12 @@ typedef uint32_t fdf_arena_tag_t;
 zx_status_t fdf_arena_create(uint32_t options, fdf_arena_tag_t tag, fdf_arena_t** out_arena);
 
 // Returns a pointer to allocated memory of size |bytes|. The memory is managed by the arena
-// until it is freed by |fdf_arena_free|, or the arena is destroyed with |fdf_arena_destroy|.
+// until it is freed by |fdf_arena_free|, or the arena is destroyed once every reference to
+// the arena hss been destroyed using |fdf_arena_drop_ref|.
 void* fdf_arena_allocate(fdf_arena_t* arena, size_t bytes);
 
 // Hints to the arena that the |ptr| previously allocated by |fdf_arena_allocate| may be reclaimed.
-// Memory is not guaranteed to be reclaimed until |fdf_arena_destroy| is invoked.
+// Memory is not guaranteed to be reclaimed until |fdf_arena_drop_ref| is invoked.
 // Asserts if the memory is not managed by the arena.
 void fdf_arena_free(fdf_arena_t* arena, void* ptr);
 
@@ -69,7 +71,7 @@ bool fdf_arena_contains(fdf_arena_t* arena, const void* ptr, size_t num_bytes);
 // Destroys the reference to the underlying runtime arena object.
 // If there are no more references to the arena, all memory associated with
 // the arena will be freed.
-void fdf_arena_destroy(fdf_arena_t* arena);
+void fdf_arena_drop_ref(fdf_arena_t* arena);
 
 __END_CDECLS
 

@@ -52,7 +52,7 @@ void RuntimeTestCase::AssertRead(fdf_handle_t ch, void* want_data, size_t want_n
     if (out_arena) {
       *out_arena = arena;
     } else {
-      fdf_arena_destroy(arena);
+      fdf_arena_drop_ref(arena);
     }
   } else {
     ASSERT_NULL(read_data);

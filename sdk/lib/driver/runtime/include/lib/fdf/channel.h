@@ -43,7 +43,7 @@ __BEGIN_CDECLS
 //     status = fdf_channel_wait_async(dispatcher, channel_read, 0);
 //
 //     // We are done with the arena.
-//     fdf_arena_destroy(arena);
+//     fdf_arena_drop_ref(arena);
 //   }
 //
 //   void read_handler(fdf_dispatcher_t* dispatcher, fdf_channel_read_t* read,
@@ -59,8 +59,8 @@ __BEGIN_CDECLS
 //     ...
 //
 //     // Read provides you with an arena which you may reuse for other requests.
-//     // You are in charge of destroying it.
-//     fdf_arena_destroy(arena);
+//     // You are in charge of destroying the reference.
+//     fdf_arena_drop_ref(arena);
 //     free(read);
 //   }
 //
@@ -86,9 +86,10 @@ zx_status_t fdf_channel_create(uint32_t options, fdf_handle_t* out0, fdf_handle_
 
 // Attempts to write a message to the channel specified by |channel|.
 //
-// The caller retains ownership of |arena|, which must be destroyed via |fdf_arena_destroy|.
-// It is okay to destroy the arena as soon as the write call returns as the lifetime of
-// the arena is extended until the data is read.
+// The caller retains ownership of the |arena| reference, which must be destroyed via
+// |fdf_arena_drop_ref|. It is okay to call |fdf_arena_drop_ref| on the arena as soon as
+// the write call returns, as |fdf_arena_write| will take its own reference to the arena,
+// extending the lifetime of the arena is until the data is read.
 //
 // The pointers |data| and |handles| may be NULL if their respective sizes are zero.
 // |data| and |handles| must be pointers managed by |arena| if they are not NULL.
@@ -120,7 +121,7 @@ zx_status_t fdf_channel_write(fdf_handle_t channel, uint32_t options, fdf_arena_
 // Attempts to read the first message from the channel specified by |channel| into
 // the |data| and |handles| buffers.
 //
-// Provides ownership of |arena|, which must be destroyed via |fdf_arena_destroy|.
+// Provides ownership of the |arena| reference, which must be destroyed via |fdf_arena_drop_ref|.
 //
 // The lifetime of |data| and |handles| are tied to the lifetime of |arena|.
 // |handles| may be a mix of zircon handles and fdf handles.

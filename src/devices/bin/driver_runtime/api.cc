@@ -32,7 +32,7 @@ __EXPORT bool fdf_arena_contains(fdf_arena_t* arena, const void* data, size_t nu
   return arena->Contains(data, num_bytes);
 }
 
-__EXPORT void fdf_arena_destroy(fdf_arena_t* arena) { arena->Destroy(); }
+__EXPORT void fdf_arena_drop_ref(fdf_arena_t* arena) { arena->Destroy(); }
 
 // fdf_channel_t interface
 

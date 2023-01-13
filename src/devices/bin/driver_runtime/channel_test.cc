@@ -670,7 +670,7 @@ TEST_F(ChannelTest, ReadArenaOwnership) {
   data = read_arena->Allocate(64);
   ASSERT_EQ(ZX_OK, fdf_channel_write(remote_.get(), 0, read_arena, data, 64, NULL, 0));
 
-  fdf_arena_destroy(read_arena);
+  fdf_arena_drop_ref(read_arena);
 
   ASSERT_NO_FATAL_FAILURE(WaitUntilReadReady(local_.get()));
   ASSERT_NO_FATAL_FAILURE(AssertRead(local_.get(), data, 64, nullptr, 0));
@@ -741,7 +741,7 @@ TEST_F(ChannelTest, ConcurrentReadsConsumeUniqueElements) {
       memcpy(data, &i, sizeof(i));
       ASSERT_OK(fdf_channel_write(local_.get(), 0, arena, data, sizeof(i), nullptr, 0));
     }
-    fdf_arena_destroy(arena);
+    fdf_arena_drop_ref(arena);
     ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_0));
     // Join before cleanup.
     worker_1.Join();
@@ -772,7 +772,7 @@ TEST_F(ChannelTest, ConcurrentReadsConsumeUniqueElements) {
             "Read messages do not match the number of written messages.");
 
   for (uint32_t i = 0; i < kNumMessages; i++) {
-    fdf_arena_destroy(read_messages[i].arena);
+    fdf_arena_drop_ref(read_messages[i].arena);
   }
 }
 

@@ -111,7 +111,7 @@ class Arena : public fidl::AnyArena {
 
   void close() {
     if (arena_) {
-      fdf_arena_destroy(arena_);
+      fdf_arena_drop_ref(arena_);
       arena_ = nullptr;
     }
     fidl_arena_.Clean();
