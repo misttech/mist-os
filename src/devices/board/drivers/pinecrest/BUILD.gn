@@ -3,7 +3,19 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/cipd.gni")
 import("//build/drivers.gni")
+
+if (internal_access) {
+  config_tas5825m = "audio/config/tas5825_config/tas5825m_config.h"
+}
+
+if (internal_access) {
+  resource("config-tas5825m") {
+    sources = [ "//prebuilt/$config_tas5825m" ]
+    outputs = [ "lib/$config_tas5825m" ]
+  }
+}
 
 driver_bind_rules("pinecrest-bind") {
   rules = "pinecrest.bind"
@@ -104,6 +116,10 @@ fuchsia_driver("pinecrest-driver") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
+  if (internal_access) {
+    include_dirs = [ "//prebuilt" ]
+    defines = [ "TAS5825M_CONFIG_PATH=\"$config_tas5825m\"" ]
+  }
 
   # TODO(fxbug.dev/47406): restore some form of data dependency on as370 and pinecrest
   # boot shims.

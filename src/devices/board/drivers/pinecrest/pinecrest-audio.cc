@@ -26,6 +26,10 @@
 #include "src/devices/board/drivers/pinecrest/pinecrest-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
+#ifdef TAS5825M_CONFIG_PATH
+#include TAS5825M_CONFIG_PATH
+#endif
+
 namespace board_pinecrest {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
@@ -214,6 +218,22 @@ zx_status_t Pinecrest::AudioInit() {
   constexpr zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
                                         {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx}};
   metadata::ti::TasConfig metadata = {};
+#ifdef TAS5825M_CONFIG_PATH
+  constexpr size_t kNumberOfWrites1 = sizeof(tas5825m_init_sequence1) / sizeof(cfg_reg);
+  metadata.number_of_writes1 = kNumberOfWrites1;
+  static_assert(kNumberOfWrites1 <= metadata::ti::kMaxNumberOfRegisterWrites);
+  for (size_t i = 0; i < metadata.number_of_writes1; ++i) {
+    metadata.init_sequence1[i].address = tas5825m_init_sequence1[i].offset;
+    metadata.init_sequence1[i].value = tas5825m_init_sequence1[i].value;
+  }
+  constexpr size_t kNumberOfWrites2 = sizeof(tas5825m_init_sequence2) / sizeof(cfg_reg);
+  metadata.number_of_writes2 = kNumberOfWrites2;
+  static_assert(kNumberOfWrites2 <= metadata::ti::kMaxNumberOfRegisterWrites);
+  for (size_t i = 0; i < metadata.number_of_writes2; ++i) {
+    metadata.init_sequence2[i].address = tas5825m_init_sequence2[i].offset;
+    metadata.init_sequence2[i].value = tas5825m_init_sequence2[i].value;
+  }
+#endif
   const device_metadata_t codec_metadata[] = {
       {
           .type = DEVICE_METADATA_PRIVATE,
