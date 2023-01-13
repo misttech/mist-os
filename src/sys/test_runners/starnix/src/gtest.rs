@@ -222,6 +222,12 @@ fn parse_gtests(tests: &[u8]) -> Vec<ftest::Case> {
     let mut testcases = vec![];
     let mut testsuite = "";
     for test in test_string.split('\n') {
+        if test.starts_with("Running main() from") {
+            // Many gtest main() wrappers print the location of themselves before entering gtest, for example:
+            // https://github.com/google/googletest/blob/main/googletest/src/gtest_main.cc#L61
+            // Skip this line - it's not a test case.
+            continue;
+        }
         let test = test.trim().split(' ').next();
 
         match test {

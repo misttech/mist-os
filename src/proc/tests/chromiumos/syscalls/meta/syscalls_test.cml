@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/proc/tests/starnix_test.shard.cml" ],
+    include: [ "//src/proc/tests/starnix_test_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/syscalls_test_bin",
-
-        // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
-        args: [ "--gtest_filter=-Mprotect.*:MapGrowsdownTest.Mprotect*:MapGrowsdownTest.Syscall*:MapGrowsdownTest.Protection*:MapGrowsdownTest.MapNoreplaceInGuardRegion" ],
         user: "fuchsia:x:0:0",
         environ: [ "TEST_TMPDIR=/data/tmp" ],
+        test_type: "gtest",
     },
     use: [
         {
