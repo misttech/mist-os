@@ -210,7 +210,7 @@ impl TestEnvironment {
                 futures::select! {
                     event = cmd_receptor_fuse.select_next_some() => {
                         if let MessageEvent::Message(TestEnvironmentPayload::Serve(info),
-                                mut client) = event {
+                                client) = event {
                             client.acknowledge().await;
                             audio_info = info;
                         }
@@ -411,7 +411,7 @@ async fn verify_stream_set(
     stream: impl Into<SetAudioStream>,
 ) {
     while let Some(message_event) = receptor.next().await {
-        if let MessageEvent::Message(incoming_payload, mut client) = message_event {
+        if let MessageEvent::Message(incoming_payload, client) = message_event {
             client.acknowledge().await;
             if let TestEnvironmentPayload::Request(SettingRequest::SetVolume(streams, _)) =
                 incoming_payload

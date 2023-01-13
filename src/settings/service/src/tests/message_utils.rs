@@ -19,7 +19,7 @@ pub(crate) async fn verify_payload<P: Payload + PartialEq + 'static, A: Address 
     client_fn: Option<ClientFn<P, A>>,
 ) {
     while let Some(message_event) = receptor.next().await {
-        if let MessageEvent::Message(incoming_payload, mut client) = message_event {
+        if let MessageEvent::Message(incoming_payload, client) = message_event {
             assert_eq!(payload, incoming_payload);
             if let Some(func) = client_fn {
                 (func)(client).await;

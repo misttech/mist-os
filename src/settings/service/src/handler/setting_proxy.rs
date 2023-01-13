@@ -65,7 +65,7 @@ impl RequestInfo {
     /// Sends an acknowledge message back through the reply client. This used in
     /// long running requests (such a listen) where acknowledge message ensures
     /// the client the request was processed.
-    async fn acknowledge(&mut self) {
+    async fn acknowledge(&self) {
         self.client.acknowledge().await;
     }
 

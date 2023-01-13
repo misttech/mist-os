@@ -107,7 +107,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageClient<P, A> {
     }
 
     /// Report back to the clients that the message has been acknowledged.
-    pub(crate) async fn acknowledge(&mut self) {
+    pub(crate) async fn acknowledge(&self) {
         self.message.report_status(Status::Acknowledged).await;
     }
 
