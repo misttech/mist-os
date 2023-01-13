@@ -34,19 +34,11 @@ use std::sync::Arc;
 // The value was chosen arbitrarily. Feel free to increase if it's too small.
 pub(crate) const MAX_NODE_ERRORS: usize = 10;
 
-/// An enumeration of the different client types that provide requests to
-/// setting handlers.
-#[derive(Clone, Debug)]
-enum Client {
-    /// A client from the service MessageHub.
-    Service(service::message::MessageClient),
-}
-
 /// A container for associating a Handler Request with a given [`Client`].
 #[derive(Clone, Debug)]
 struct RequestInfo {
     setting_request: Request,
-    client: Client,
+    client: service::message::MessageClient,
     // This identifier is unique within each setting proxy to identify a
     // request. This can be used for removing a particular RequestInfo within a
     // set, such as the active change listeners.
@@ -62,26 +54,19 @@ impl PartialEq for RequestInfo {
 impl RequestInfo {
     /// Sends the supplied result as a reply with the associated [`Client`].
     pub(crate) fn reply(&self, result: SettingHandlerResult) {
-        match &self.client {
-            Client::Service(client) => {
-                // TODO(fxbug.dev/70985): return HandlerErrors directly
-                // Ignore the receptor result.
-                let _ = client
-                    .reply(HandlerPayload::Response(result.map_err(HandlerError::from)).into())
-                    .send();
-            }
-        }
+        // TODO(fxbug.dev/70985): return HandlerErrors directly
+        // Ignore the receptor result.
+        let _ = self
+            .client
+            .reply(HandlerPayload::Response(result.map_err(HandlerError::from)).into())
+            .send();
     }
 
     /// Sends an acknowledge message back through the reply client. This used in
     /// long running requests (such a listen) where acknowledge message ensures
     /// the client the request was processed.
     async fn acknowledge(&mut self) {
-        match &mut self.client {
-            Client::Service(client) => {
-                client.acknowledge().await;
-            }
-        }
+        self.client.acknowledge().await;
     }
 
     /// Adds a closure that will be triggered when the recipient for a response
@@ -96,11 +81,7 @@ impl RequestInfo {
             }))
             .build();
 
-        match &mut self.client {
-            Client::Service(client) => {
-                client.bind_to_recipient(fuse).await;
-            }
-        }
+        self.client.bind_to_recipient(fuse).await;
     }
 }
 
@@ -123,6 +104,8 @@ impl ActiveRequest {
 }
 
 #[derive(Clone, Debug)]
+// This has always been too large, it will be cleaned up in a follow up patch.
+#[allow(clippy::large_enum_variant)]
 enum ProxyRequest {
     /// Adds a request to the pending request queue.
     Add(RequestInfo),
@@ -391,16 +374,11 @@ impl SettingProxy {
     async fn process_service_request(
         &mut self,
         request: HandlerRequest,
-        message_client: service::message::MessageClient,
+        client: service::message::MessageClient,
     ) {
         let id = self.next_request_id;
         self.next_request_id += 1;
-        self.process_request(RequestInfo {
-            setting_request: request,
-            id,
-            client: Client::Service(message_client),
-        })
-        .await;
+        self.process_request(RequestInfo { setting_request: request, id, client }).await;
     }
 
     async fn get_handler_signature(
