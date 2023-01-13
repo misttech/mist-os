@@ -92,6 +92,7 @@ impl PolicyEngine {
                         // filter out the ones which config says to ignore.
                         match source {
                             VerifySource::Blobfs => config.blobfs() != &Mode::Ignore,
+                            VerifySource::Netstack => config.netstack() != &Mode::Ignore,
                         }
                     })
                     .collect();

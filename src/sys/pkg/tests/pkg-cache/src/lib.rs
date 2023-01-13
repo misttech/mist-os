@@ -13,7 +13,8 @@ use {
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext,
-    fidl_fuchsia_space as fspace, fidl_fuchsia_update as fupdate, fuchsia_async as fasync,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_update as fupdate,
+    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{reader::DiagnosticsHierarchy, testing::TreeAssertion},
     fuchsia_merkle::Hash,
@@ -413,9 +414,20 @@ where
             let verifier_service = Arc::clone(&verifier_service);
             local_child_svc_dir
                 .add_entry(
-                    fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
+                    fupdate_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
                     vfs::service::host(move |stream| {
                         Arc::clone(&verifier_service).run_blobfs_verifier_service(stream)
+                    }),
+                )
+                .unwrap();
+        }
+        {
+            let verifier_service = Arc::clone(&verifier_service);
+            local_child_svc_dir
+                .add_entry(
+                    fupdate_verify::NetstackVerifierMarker::PROTOCOL_NAME,
+                    vfs::service::host(move |stream| {
+                        Arc::clone(&verifier_service).run_netstack_verifier_service(stream)
                     }),
                 )
                 .unwrap();
@@ -456,7 +468,13 @@ where
             builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
         }
         let system_update_committer = builder
-            .add_child("system_update_committer", "fuchsia-pkg://fuchsia.com/pkg-cache-integration-tests#meta/system-update-committer.cm", ChildOptions::new()).await.unwrap();
+            .add_child(
+                "system_update_committer",
+                "#meta/system-update-committer.cm",
+                ChildOptions::new(),
+            )
+            .await
+            .unwrap();
         let service_reflector = builder
             .add_local_child(
                 "service_reflector",
@@ -518,9 +536,8 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.update.verify.BlobfsVerifier",
-                    ))
+                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
                     .from(&service_reflector)
                     .to(&system_update_committer),
             )

@@ -325,6 +325,11 @@
             to: "#system-update-committer",
         },
         {
+            protocol: [ "fuchsia.update.verify.NetstackVerifier" ],
+            from: "#network",
+            to: "#system-update-committer",
+        },
+        {
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
             to: "#starnix_manager",

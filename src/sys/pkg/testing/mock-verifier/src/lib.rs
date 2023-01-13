@@ -52,6 +52,18 @@ impl MockVerifierService {
         (proxy, task)
     }
 
+    /// Spawns an `fasync::Task` which serves fuchsia.update.verify/NetstackVerifier.
+    pub fn spawn_netstack_verifier_service(
+        self: Arc<Self>,
+    ) -> (fidl::NetstackVerifierProxy, Task<()>) {
+        let (proxy, stream) =
+            ::fidl::endpoints::create_proxy_and_stream::<fidl::NetstackVerifierMarker>().unwrap();
+
+        let task = Task::spawn(self.run_netstack_verifier_service(stream));
+
+        (proxy, task)
+    }
+
     /// Serves fuchsia.update.verify/BlobfsVerifier.Verify requests on the given request stream.
     pub async fn run_blobfs_verifier_service(
         self: Arc<Self>,
@@ -61,6 +73,21 @@ impl MockVerifierService {
         stream
             .for_each(|request| match request.expect("received verifier request") {
                 fidl::BlobfsVerifierRequest::Verify { options, responder } => call_hook
+                    .verify(options)
+                    .map(|mut res| responder.send(&mut res).expect("sent verifier response")),
+            })
+            .await
+    }
+
+    /// Serves fuchsia.update.verify/NetstackVerifier.Verify requests on the given request stream.
+    pub async fn run_netstack_verifier_service(
+        self: Arc<Self>,
+        stream: fidl::NetstackVerifierRequestStream,
+    ) {
+        let Self { call_hook } = &*self;
+        stream
+            .for_each(|request| match request.expect("received verifier request") {
+                fidl::NetstackVerifierRequest::Verify { options, responder } => call_hook
                     .verify(options)
                     .map(|mut res| responder.send(&mut res).expect("sent verifier response")),
             })

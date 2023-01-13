@@ -22,7 +22,8 @@ use {
     },
     fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy},
     fidl_fuchsia_update_installer::UpdateNotStartedReason,
-    fidl_fuchsia_update_installer_ext as installer, fuchsia_async as fasync,
+    fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
+    fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{
@@ -334,6 +335,14 @@ impl TestEnvBuilder {
             });
         }
 
+        {
+            let verifier = Arc::clone(&verifier);
+            svc.add_fidl_service(move |stream| {
+                fasync::Task::spawn(Arc::clone(&verifier).run_netstack_verifier_service(stream))
+                    .detach()
+            });
+        }
+
         // Set up crash reporter service.
         let crash_reporter = Arc::new(
             self.crash_reporter.unwrap_or_else(|| MockCrashReporterService::new(|_| Ok(()))),
@@ -477,9 +486,8 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.update.verify.BlobfsVerifier",
-                    ))
+                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
                     .from(&fake_capabilities)
                     .to(&system_update_committer),
             )

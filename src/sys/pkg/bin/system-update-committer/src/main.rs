@@ -11,7 +11,7 @@ use {
     config::Config,
     fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker,
     fidl_fuchsia_paver::PaverMarker,
-    fidl_fuchsia_update_verify::BlobfsVerifierMarker,
+    fidl_fuchsia_update_verify::{BlobfsVerifierMarker, NetstackVerifierMarker},
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_inspect::{self as finspect, health::Reporter},
@@ -77,6 +77,8 @@ async fn main_inner_async() -> Result<(), Error> {
         .context("while connecting to power state control")?;
     let blobfs_verifier = connect_to_protocol::<BlobfsVerifierMarker>()
         .context("while connecting to blobfs verifier")?;
+    let netstack_verifier = connect_to_protocol::<NetstackVerifierMarker>()
+        .context("while connecting to netstack verifier")?;
 
     let futures = FuturesUnordered::new();
     let (p_internal, p_external) = zx::EventPair::create();
@@ -95,7 +97,7 @@ async fn main_inner_async() -> Result<(), Error> {
                 &boot_manager,
                 &p_internal,
                 unblocker,
-                &[&blobfs_verifier],
+                &[&blobfs_verifier, &netstack_verifier],
                 verification_node_ref,
                 &config,
             )

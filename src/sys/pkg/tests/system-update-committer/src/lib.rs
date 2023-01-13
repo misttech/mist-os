@@ -13,6 +13,7 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_paver::{Configuration, ConfigurationStatus},
     fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy},
+    fidl_fuchsia_update_verify as fupdate_verify,
     fuchsia_async::{self as fasync, OnSignals, TimeoutExt},
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
@@ -28,15 +29,15 @@ use {
     tempfile::TempDir,
 };
 
-const SYSTEM_UPDATE_COMMITTER_CM: &str =
-    "fuchsia-pkg://fuchsia.com/system-update-committer-integration-tests#meta/system-update-committer.cm";
+const SYSTEM_UPDATE_COMMITTER_CM: &str = "#meta/system-update-committer.cm";
 const HANG_DURATION: Duration = Duration::from_millis(500);
 
 struct TestEnvBuilder {
     config_data: Option<(PathBuf, String)>,
     paver_service_builder: Option<MockPaverServiceBuilder>,
     reboot_service: Option<MockRebootService>,
-    verifier_service: Option<MockVerifierService>,
+    blobfs_verifier_service: Option<MockVerifierService>,
+    netstack_verifier_service: Option<MockVerifierService>,
 }
 impl TestEnvBuilder {
     fn config_data(self, path: impl Into<PathBuf>, data: impl Into<String>) -> Self {
@@ -51,8 +52,12 @@ impl TestEnvBuilder {
         Self { reboot_service: Some(reboot_service), ..self }
     }
 
-    fn verifier_service(self, verifier_service: MockVerifierService) -> Self {
-        Self { verifier_service: Some(verifier_service), ..self }
+    fn blobfs_verifier_service(self, blobfs_verifier_service: MockVerifierService) -> Self {
+        Self { blobfs_verifier_service: Some(blobfs_verifier_service), ..self }
+    }
+
+    fn netstack_verifier_service(self, netstack_verifier_service: MockVerifierService) -> Self {
+        Self { netstack_verifier_service: Some(netstack_verifier_service), ..self }
     }
 
     async fn build(self) -> TestEnv {
@@ -107,14 +112,27 @@ impl TestEnvBuilder {
             });
         }
 
-        // Set up verifier service.
-        let verifier_service =
-            Arc::new(self.verifier_service.unwrap_or_else(|| MockVerifierService::new(|_| Ok(()))));
+        // Set up verifier services.
+        let blobfs_verifier_service = Arc::new(
+            self.blobfs_verifier_service.unwrap_or_else(|| MockVerifierService::new(|_| Ok(()))),
+        );
         {
-            let verifier_service = Arc::clone(&verifier_service);
+            let verifier_service = Arc::clone(&blobfs_verifier_service);
             svc.add_fidl_service(move |stream| {
                 fasync::Task::spawn(
                     Arc::clone(&verifier_service).run_blobfs_verifier_service(stream),
+                )
+                .detach()
+            });
+        }
+        let netstack_verifier_service = Arc::new(
+            self.netstack_verifier_service.unwrap_or_else(|| MockVerifierService::new(|_| Ok(()))),
+        );
+        {
+            let verifier_service = Arc::clone(&netstack_verifier_service);
+            svc.add_fidl_service(move |stream| {
+                fasync::Task::spawn(
+                    Arc::clone(&verifier_service).run_netstack_verifier_service(stream),
                 )
                 .detach()
             });
@@ -171,9 +189,8 @@ impl TestEnvBuilder {
                         "fuchsia.hardware.power.statecontrol.Admin",
                     ))
                     .capability(Capability::protocol_by_name("fuchsia.paver.Paver"))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.update.verify.BlobfsVerifier",
-                    ))
+                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
                     .from(&fake_capabilities)
                     .to(&system_update_committer),
             )
@@ -201,7 +218,8 @@ impl TestEnvBuilder {
             commit_status_provider,
             _paver_service: paver_service,
             _reboot_service: reboot_service,
-            _verifier_service: verifier_service,
+            _blobfs_verifier_service: blobfs_verifier_service,
+            _netstack_verifier_service: netstack_verifier_service,
         }
     }
 }
@@ -211,7 +229,8 @@ struct TestEnv {
     commit_status_provider: CommitStatusProviderProxy,
     _paver_service: Arc<MockPaverService>,
     _reboot_service: Arc<MockRebootService>,
-    _verifier_service: Arc<MockVerifierService>,
+    _blobfs_verifier_service: Arc<MockVerifierService>,
+    _netstack_verifier_service: Arc<MockVerifierService>,
 }
 
 impl TestEnv {
@@ -220,7 +239,8 @@ impl TestEnv {
             config_data: None,
             paver_service_builder: None,
             reboot_service: None,
-            verifier_service: None,
+            blobfs_verifier_service: None,
+            netstack_verifier_service: None,
         }
     }
 
@@ -416,6 +436,51 @@ async fn inspect_health_status_ok() {
     );
 }
 
+/// Make sure the inspect data correctly report multiple verification failures.
+#[fasync::run_singlethreaded(test)]
+async fn inspect_multiple_failures() {
+    let env = TestEnv::builder()
+        // Make sure we run health verifications.
+        .paver_service_builder(
+            MockPaverServiceBuilder::new()
+                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
+        )
+        .blobfs_verifier_service(MockVerifierService::new(|_| {
+            Err(fidl_fuchsia_update_verify::VerifyError::Internal)
+        }))
+        .netstack_verifier_service(MockVerifierService::new(|_| {
+            Err(fidl_fuchsia_update_verify::VerifyError::Internal)
+        }))
+        .build()
+        .await;
+
+    // Wait for verifications to complete.
+    let p = env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
+    assert_eq!(OnSignals::new(&p, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
+
+    // Observe verification shows up in inspect.
+    let hierarchy = env.system_update_committer_inspect_hierarchy().await;
+    assert_data_tree!(
+        hierarchy,
+        root: {
+            "verification": {
+                "ota_verification_duration": {
+                    "failure_blobfs": AnyProperty,
+                    "failure_netstack": AnyProperty,
+                },
+                "ota_verification_failure": {
+                    "blobfs_verify": 1u64,
+                    "netstack_verify": 1u64,
+                }
+            },
+            "fuchsia.inspect.Health": {
+                "start_timestamp_nanos": AnyProperty,
+                "status": "OK",
+            }
+        }
+    );
+}
+
 /// When the paver fails, the system-update-committer should trigger a reboot regardless of the
 /// config. Additionally, the inspect state should reflect the system being unhealthy. We could
 /// split this up into several tests, but instead we combine them to reduce redundant lines of code.
@@ -463,9 +528,9 @@ async fn paver_failure_causes_reboot() {
     );
 }
 
-/// When the verifications fail and the config says to reboot, we should reboot.
+/// When the blobfs verifications fail and the config says to reboot, we should reboot.
 #[fasync::run_singlethreaded(test)]
-async fn verification_failure_causes_reboot() {
+async fn blobfs_verification_failure_causes_reboot() {
     let (reboot_sender, reboot_recv) = oneshot::channel();
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
     let env = TestEnv::builder()
@@ -474,8 +539,8 @@ async fn verification_failure_causes_reboot() {
             MockPaverServiceBuilder::new()
                 .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
         )
-        // Make the health verifications fail.
-        .verifier_service(MockVerifierService::new(|_| {
+        // Make the blobfs health verifications fail.
+        .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
         // Make us reboot on failure.
@@ -513,6 +578,56 @@ async fn verification_failure_causes_reboot() {
     );
 }
 
+/// When the netstack verifications fail and the config says to reboot, we should reboot.
+#[fasync::run_singlethreaded(test)]
+async fn netstack_verification_failure_causes_reboot() {
+    let (reboot_sender, reboot_recv) = oneshot::channel();
+    let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
+    let env = TestEnv::builder()
+        // Make sure we run health verifications.
+        .paver_service_builder(
+            MockPaverServiceBuilder::new()
+                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
+        )
+        // Make the netstack health verifications fail.
+        .netstack_verifier_service(MockVerifierService::new(|_| {
+            Err(fidl_fuchsia_update_verify::VerifyError::Internal)
+        }))
+        // Make us reboot on failure.
+        .config_data("config.json", json!({"netstack": "reboot_on_failure"}).to_string())
+        // Handle the reboot requests.
+        .reboot_service(MockRebootService::new(Box::new(move |reason: RebootReason| {
+            reboot_sender.lock().take().unwrap().send(reason).unwrap();
+            Ok(())
+        })))
+        .build()
+        .await;
+
+    // We should observe a reboot.
+    assert_eq!(reboot_recv.await, Ok(RebootReason::RetrySystemUpdate));
+
+    // Observe failed verification shows up in inspect.
+    let hierarchy = env.system_update_committer_inspect_hierarchy().await;
+    assert_data_tree!(
+        hierarchy,
+        root: {
+            "verification": {
+                "ota_verification_duration": {
+                    "failure_netstack": AnyProperty,
+                },
+                "ota_verification_failure": {
+                    "netstack_verify": 1u64,
+                }
+            },
+            "fuchsia.inspect.Health": {
+                "message": AnyProperty,
+                "start_timestamp_nanos": AnyProperty,
+                "status": "UNHEALTHY"
+            }
+        }
+    );
+}
+
 /// When the verifications fail and the config says NOT to reboot, we should NOT reboot.
 #[fasync::run_singlethreaded(test)]
 async fn verification_failure_does_not_cause_reboot() {
@@ -525,7 +640,7 @@ async fn verification_failure_does_not_cause_reboot() {
                 .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
         )
         // Make the health verifications fail.
-        .verifier_service(MockVerifierService::new(|_| {
+        .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
         // Make us IGNORE the verification failure.

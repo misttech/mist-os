@@ -38,6 +38,7 @@ pub enum PolicyError {
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum VerifySource {
     Blobfs,
+    Netstack,
 }
 
 /// Error condition that may be returned when doing health verification.

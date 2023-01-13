@@ -38,6 +38,15 @@ impl VerifierProxy for fidl::BlobfsVerifierProxy {
     }
 }
 
+impl VerifierProxy for fidl::NetstackVerifierProxy {
+    fn call_verify(&self, options: VerifyOptions) -> QueryResponseFut<VerifierVerifyResult> {
+        self.verify(options)
+    }
+    fn source(&self) -> VerifySource {
+        VerifySource::Netstack
+    }
+}
+
 /// Do the health verification and handle associated errors. This is NOT to be confused with
 /// verified execution; health verification is a different process we use to determine if we should
 /// give up on the backup slot.
@@ -109,11 +118,11 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn blobfs_one_succeeds_one_fails() {
+    async fn blobfs_succeeds_netstack_fails() {
         let mock_1 = Arc::new(MockVerifierService::new(|_| Err(fidl::VerifyError::Internal)));
         let (proxy_1, _server_1) = mock_1.spawn_blobfs_verifier_service();
         let mock_2 = Arc::new(MockVerifierService::new(|_| Ok(())));
-        let (proxy_2, _server_2) = mock_2.spawn_blobfs_verifier_service();
+        let (proxy_2, _server_2) = mock_2.spawn_netstack_verifier_service();
 
         {
             let errors = assert_matches!(
@@ -140,11 +149,11 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn blobfs_both_succeed() {
+    async fn both_succeed() {
         let mock_1 = Arc::new(MockVerifierService::new(|_| Ok(())));
         let (proxy_1, _server_1) = mock_1.spawn_blobfs_verifier_service();
         let mock_2 = Arc::new(MockVerifierService::new(|_| Ok(())));
-        let (proxy_2, _server_2) = mock_2.spawn_blobfs_verifier_service();
+        let (proxy_2, _server_2) = mock_2.spawn_netstack_verifier_service();
 
         assert_matches!(
             do_health_verification(&[&proxy_1, &proxy_2], &finspect::Node::default()).await,
@@ -153,11 +162,11 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn blobfs_both_fail() {
+    async fn both_fail() {
         let mock_1 = Arc::new(MockVerifierService::new(|_| Err(fidl::VerifyError::Internal)));
         let (proxy_1, _server_1) = mock_1.spawn_blobfs_verifier_service();
         let mock_2 = Arc::new(MockVerifierService::new(|_| Err(fidl::VerifyError::Internal)));
-        let (proxy_2, _server_2) = mock_2.spawn_blobfs_verifier_service();
+        let (proxy_2, _server_2) = mock_2.spawn_netstack_verifier_service();
 
         let errors = assert_matches!(
             do_health_verification(&[&proxy_1, &proxy_2], &finspect::Node::default()).await,
@@ -167,7 +176,7 @@ mod tests {
             errors[..],
             [
                 VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _),
-                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _),
+                VerifyError::VerifyError(VerifySource::Netstack, VerifyFailureReason::Verify(_), _),
             ]
         );
     }

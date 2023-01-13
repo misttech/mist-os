@@ -18,15 +18,13 @@ pub struct Config {
     blobfs: Mode,
 
     #[builder(default)]
-    #[allow(dead_code)]
-    // TODO(https://fxbug.dev/76636): Make use of this config type.
     netstack: Mode,
 
     #[builder(default = true)]
     enable: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Ignore,
@@ -44,8 +42,6 @@ impl Config {
         &self.blobfs
     }
 
-    // TODO(https://fxbug.dev/76636): Make use of this method.
-    #[allow(dead_code)]
     pub fn netstack(&self) -> &Mode {
         &self.netstack
     }
@@ -115,8 +111,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_load_valid_configs() {
-        for (name, val) in
-            [("ignore", Mode::Ignore), ("reboot_on_failure", Mode::RebootOnFailure)].iter()
+        for (name, val) in [("ignore", Mode::Ignore), ("reboot_on_failure", Mode::RebootOnFailure)]
         {
             // Verify that setting enable explicitly works...
             verify_load(
@@ -125,7 +120,7 @@ pub(crate) mod tests {
                     "netstack": name,
                     "enable": false,
                 }),
-                Config::builder().blobfs(val.clone()).netstack(val.clone()).enable(false).build(),
+                Config::builder().blobfs(val).netstack(val).enable(false).build(),
             );
             // ... and that leaving it unset defaults to true.
             verify_load(
@@ -133,7 +128,7 @@ pub(crate) mod tests {
                     "blobfs": name,
                     "netstack": name,
                 }),
-                Config::builder().blobfs(val.clone()).netstack(val.clone()).enable(true).build(),
+                Config::builder().blobfs(val).netstack(val).enable(true).build(),
             );
         }
     }

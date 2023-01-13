@@ -18,6 +18,7 @@ fn reason_to_string(reason: &VerifyFailureReason) -> &'static str {
 fn source_to_string(source: &VerifySource) -> &'static str {
     match source {
         VerifySource::Blobfs => "blobfs",
+        VerifySource::Netstack => "netstack",
     }
 }
 
@@ -159,6 +160,42 @@ mod tests {
                 },
                 "ota_verification_failure": {
                     "blobfs_verify": 1u64,
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn failure_blobfs_and_netstack() {
+        let inspector = Inspector::new();
+
+        let () = write_to_inspect(
+            inspector.root(),
+            &Err(VerifyErrors::VerifyErrors(vec![
+                VerifyError::VerifyError(
+                    VerifySource::Blobfs,
+                    VerifyFailureReason::Verify(verify::VerifyError::Internal),
+                    Duration::from_micros(2),
+                ),
+                VerifyError::VerifyError(
+                    VerifySource::Netstack,
+                    VerifyFailureReason::Timeout,
+                    Duration::from_micros(999),
+                ),
+            ])),
+            Duration::from_micros(4),
+        );
+
+        assert_data_tree! {
+            inspector,
+            root: {
+                "ota_verification_duration": {
+                    "failure_blobfs" : 2u64,
+                    "failure_netstack" : 999u64,
+                },
+                "ota_verification_failure": {
+                    "blobfs_verify": 1u64,
+                    "netstack_timeout": 1u64,
                 }
             }
         }

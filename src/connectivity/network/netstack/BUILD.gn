@@ -146,6 +146,7 @@ go_library("lib") {
     "//src/diagnostics/persistence/fidl:persist_go($go_toolchain)",
     "//src/lib/component",
     "//src/lib/syslog/go",
+    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_go($go_toolchain)",
     "//third_party/golibs:github.com/google/go-cmp",
     "//third_party/golibs:gvisor.dev/gvisor",
   ]

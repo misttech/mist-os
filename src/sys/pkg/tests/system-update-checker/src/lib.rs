@@ -160,16 +160,32 @@ impl TestEnvBuilder {
                     .detach()
             });
         }
+        {
+            let verifier = Arc::clone(&verifier);
+            svc.add_fidl_service(move |stream| {
+                fasync::Task::spawn(Arc::clone(&verifier).run_netstack_verifier_service(stream))
+                    .detach()
+            });
+        }
 
         let fs_holder = Mutex::new(Some(fs));
         let builder = RealmBuilder::new().await.expect("Failed to create test realm builder");
         let system_update_checker = builder
-            .add_child("system_update_checker",
-                "fuchsia-pkg://fuchsia.com/system-update-checker-integration-tests#meta/system-update-checker.cm",
-                ChildOptions::new().eager()).await.unwrap();
+            .add_child(
+                "system_update_checker",
+                "#meta/system-update-checker.cm",
+                ChildOptions::new().eager(),
+            )
+            .await
+            .unwrap();
         let system_update_committer = builder
-            .add_child("system_update_committer",
-                "fuchsia-pkg://fuchsia.com/system-update-checker-integration-tests#meta/system-update-committer.cm", ChildOptions::new().eager()).await.unwrap();
+            .add_child(
+                "system_update_committer",
+                "#meta/system-update-committer.cm",
+                ChildOptions::new().eager(),
+            )
+            .await
+            .unwrap();
         let fake_capabilities = builder
             .add_local_child(
                 "fake_capabilities",

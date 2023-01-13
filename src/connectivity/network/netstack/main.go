@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"strconv"
 	"syscall/zx"
+	"syscall/zx/fidl"
 	"syscall/zx/zxwait"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 	rawsocket "fidl/fuchsia/posix/socket/raw"
 	"fidl/fuchsia/scheduler"
 	"fidl/fuchsia/stash"
+	"fidl/fuchsia/update/verify"
 
 	"gvisor.dev/gvisor/pkg/atomicbitops"
 	glog "gvisor.dev/gvisor/pkg/log"
@@ -531,6 +533,22 @@ func Main() {
 	startPersistClient(ctx, componentCtx, stk.Clock())
 
 	{
+		stub := verify.NetstackVerifierWithCtxStub{Impl: &verifier{}}
+		componentCtx.OutgoingService.AddService(
+			verify.NetstackVerifierName,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(verify.NetstackVerifierName, "%s", err)
+					},
+				})
+
+				return nil
+			},
+		)
+	}
+
+	{
 		stub := netstack.NetstackWithCtxStub{Impl: &netstackImpl{ns: ns}}
 		componentCtx.OutgoingService.AddService(
 			netstack.NetstackName,
@@ -847,4 +865,14 @@ func getSecretKeyForOpaqueIID(componentCtx *component.Context) ([]byte, error) {
 	default:
 		panic(fmt.Sprintf("unexpected store accessor flush result type: %d", w))
 	}
+}
+
+var _ verify.NetstackVerifierWithCtx = (*verifier)(nil)
+
+type verifier struct{}
+
+func (*verifier) Verify(fidl.Context, verify.VerifyOptions) (verify.VerifierVerifyResult, error) {
+	// Wait an arbitrary amount of time; if we didn't crash, we're probably healthy.
+	<-time.After(15 * time.Second)
+	return verify.VerifierVerifyResultWithResponse(verify.VerifierVerifyResponse{}), nil
 }
