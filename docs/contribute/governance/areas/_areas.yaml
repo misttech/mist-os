@@ -418,7 +418,7 @@
 
 - name: 'Virtualization'
   api_primary: 'abdulla@google.com'
-  api_secondary: ''
+  api_secondary: 'tjdetwiler@google.com'
   description: |
     <p>Virtualization is the combination of:</p>
     <ul>
