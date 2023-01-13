@@ -81,7 +81,7 @@ impl RequestInfo {
 
 #[derive(Clone, Debug)]
 struct ActiveRequest {
-    request: RequestInfo,
+    request: Box<RequestInfo>,
     // The number of attempts that have been made on this request.
     attempts: u64,
     last_result: Option<SettingHandlerResult>,
@@ -92,17 +92,15 @@ impl ActiveRequest {
         self.request.setting_request.clone()
     }
 
-    pub(crate) fn get_info(&mut self) -> &mut RequestInfo {
+    pub(crate) fn get_info(&mut self) -> &mut Box<RequestInfo> {
         &mut self.request
     }
 }
 
 #[derive(Clone, Debug)]
-// This has always been too large, it will be cleaned up in a follow up patch.
-#[allow(clippy::large_enum_variant)]
 enum ProxyRequest {
     /// Adds a request to the pending request queue.
-    Add(RequestInfo),
+    Add(Box<RequestInfo>),
     /// Executes the next pending request, recreating the handler if the
     /// argument is set to true.
     Execute(bool),
@@ -133,7 +131,7 @@ pub(crate) struct SettingProxy {
 
     client_signature: Option<service::message::Signature>,
     active_request: Option<ActiveRequest>,
-    pending_requests: VecDeque<RequestInfo>,
+    pending_requests: VecDeque<Box<RequestInfo>>,
     listen_requests: Vec<RequestInfo>,
     next_request_id: usize,
 
@@ -372,7 +370,7 @@ impl SettingProxy {
     ) {
         let id = self.next_request_id;
         self.next_request_id += 1;
-        self.process_request(RequestInfo { setting_request: request, id, client }).await;
+        self.process_request(Box::new(RequestInfo { setting_request: request, id, client })).await;
     }
 
     async fn get_handler_signature(
@@ -456,7 +454,7 @@ impl SettingProxy {
     /// Ensures we first have an active controller (spun up by
     /// get_handler_signature if not already active) before adding the request
     /// to the proxy's queue.
-    async fn process_request(&mut self, request: RequestInfo) {
+    async fn process_request(&mut self, request: Box<RequestInfo>) {
         match self.get_handler_signature(false).await {
             None => {
                 request.reply(Err(ControllerError::UnhandledType(self.setting_type)));
@@ -472,7 +470,7 @@ impl SettingProxy {
     /// If this is the first request in the queue, processing will begin immediately.
     ///
     /// Should only be called on the main task spawned in [SettingProxy::create](#method.create).
-    fn add_request(&mut self, request: RequestInfo) {
+    fn add_request(&mut self, request: Box<RequestInfo>) {
         if let Some(teardown_cancellation) = self.teardown_cancellation.take() {
             let _ = teardown_cancellation.send(());
         }
@@ -667,7 +665,7 @@ impl SettingProxy {
             .await;
 
             // Add the request to tracked listen requests.
-            self.listen_requests.push(info.clone());
+            self.listen_requests.push(*info.clone());
 
             // Listening requests must be acknowledged as they are long-living.
             info.acknowledge().await;
