@@ -17,9 +17,9 @@
 #include "lib/fidl/cpp/synchronous_interface_ptr.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-const std::string kDriverUrl = "fuchsia-boot:///#driver/bind-test-v2-driver.so";
-const std::string kDriverLibname = "bind-test-v2-driver.so";
-const std::string kChildDeviceName = "child";
+const char kDriverUrl[] = "fuchsia-boot:///#driver/bind-test-v2-driver.so";
+const char kDriverLibname[] = "bind-test-v2-driver.so";
+const char kChildDeviceName[] = "child";
 
 class BindCompilerV2Test : public gtest::TestLoopFixture {
  protected:
@@ -43,20 +43,24 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     ASSERT_EQ(status, ZX_OK);
 
     // Wait for /dev/sys/test/test to appear, then create an endpoint to it.
-    zx::result channel = device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/test");
+    zx::result channel = device_watcher::RecursiveWaitForFile(
+        root_fd.get(), fuchsia_device_test::wire::kControlDevice);
     ASSERT_EQ(channel.status_value(), ZX_OK);
 
     fidl::ClientEnd<fuchsia_device_test::RootDevice> client_end(std::move(channel.value()));
     fidl::WireSyncClient root_device{std::move(client_end)};
 
     // Create the root test device in /dev/sys/test/test, and get its relative path from /dev.
-    auto result = root_device->CreateDevice(fidl::StringView::FromExternal(kDriverLibname));
+    auto result = root_device->CreateDevice(fidl::StringView::FromExternal(kChildDeviceName));
 
     ASSERT_EQ(result.status(), ZX_OK);
     ASSERT_TRUE(result->is_ok()) << "CreateDevice failed "
                                  << zx_status_get_string(result->error_value());
 
-    device_path_ = std::string(result->value()->path.get());
+    device_path_.clear();
+    device_path_.append(fuchsia_device_test::wire::kControlDevice);
+    device_path_.append("/");
+    device_path_.append(kChildDeviceName);
 
     // Connect to the child device and bind a test driver to it.
     {

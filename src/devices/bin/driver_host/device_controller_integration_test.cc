@@ -31,8 +31,8 @@ constexpr const char kFailDriverName[] = "unit-test-fail.so";
 
 void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
                       zx::channel* dev_channel) {
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/test/test");
+  zx::result channel = device_watcher::RecursiveWaitForFile(
+      devmgr.devfs_root().get(), fuchsia_device_test::wire::kControlDevice);
   ASSERT_OK(channel.status_value());
 
   fidl::ClientEnd<fuchsia_device_test::RootDevice> test_client_end(std::move(channel.value()));
@@ -48,8 +48,13 @@ void CreateTestDevice(const IsolatedDevmgr& devmgr, const char* driver_name,
 
   // Connect to the child that we created.
   {
-    zx::result channel = device_watcher::RecursiveWaitForFile(
-        devmgr.devfs_root().get(), std::string(result->value()->path.get()).c_str());
+    std::string device_path;
+    device_path.append(fuchsia_device_test::wire::kControlDevice);
+    device_path.append("/");
+    device_path.append(driver_name);
+
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), device_path.c_str());
     ASSERT_OK(channel.status_value());
     *dev_channel = std::move(channel.value());
   }

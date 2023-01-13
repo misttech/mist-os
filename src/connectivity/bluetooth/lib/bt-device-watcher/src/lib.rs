@@ -247,7 +247,7 @@ mod tests {
     const TIMEOUT: zx::Duration = zx::Duration::from_seconds(10);
 
     // The directory that we watch for new, existing, and removed devices.
-    const DEVICE_TEST_DIRECTORY: &'static str = "/dev/class/test/";
+    const DEVICE_TEST_DIRECTORY: &str = "class/test/";
 
     /// Used to keep track of return values.
     struct IsolatedDevMgrTest {
@@ -277,14 +277,14 @@ mod tests {
         .await?;
         // Block until the test control device is ready.
         let test_dev =
-            device_watcher::recursive_wait_and_open_node(&dev_dir, "sys/test/test").await?;
+            device_watcher::recursive_wait_and_open_node(&dev_dir, CONTROL_DEVICE).await?;
         let test_dev =
             test_dev.into_channel().expect("failed to convert to channel").into_zx_channel();
         let test_dev = RootDeviceSynchronousProxy::new(test_dev);
 
         let dev_test_dir = fuchsia_fs::directory::open_directory(
             &dev_dir,
-            "class/test/",
+            DEVICE_TEST_DIRECTORY,
             fio::OpenFlags::RIGHT_READABLE,
         )
         .await?;
@@ -298,11 +298,9 @@ mod tests {
         realm: &RealmInstance,
     ) -> Result<DeviceFile, Error> {
         // Create a test device under the `/dev/sys/test/test` root device.
-        let path = test_dev
+        let () = test_dev
             .create_device(name, zx::Time::after(TIMEOUT))?
             .map_err(|e| zx::Status::from_raw(e))?;
-
-        let relative_path = Path::new(&path).strip_prefix(CONTROL_DEVICE)?.to_owned();
 
         let dev_dir = fuchsia_fs::directory::open_directory(
             realm.root.get_exposed_dir(),
@@ -311,6 +309,7 @@ mod tests {
         )
         .await?;
 
+        let path = format!("{}/{}", CONTROL_DEVICE, name);
         let created_dev = device_watcher::recursive_wait_and_open_node(&dev_dir, &path).await?;
         let created_dev =
             created_dev.into_channel().expect("failed to convert to channel").into_zx_channel();
@@ -318,7 +317,7 @@ mod tests {
 
         let topo_path = PathBuf::from(fdio::device_get_topo_path(&file)?);
 
-        Ok(DeviceFile { file, relative_path, topo_path })
+        Ok(DeviceFile { file, relative_path: PathBuf::from(name), topo_path })
     }
 
     fn remove_test_dev(dev: &DeviceFile) -> Result<(), Error> {

@@ -31,7 +31,7 @@ using TestDeviceType =
 
 class TestDevice : public TestDeviceType, public ddk::TestProtocol<TestDevice, ddk::base_protocol> {
  public:
-  TestDevice(zx_device_t* parent) : TestDeviceType(parent) {}
+  explicit TestDevice(zx_device_t* parent) : TestDeviceType(parent) {}
 
   // Methods required by the ddk mixins
   void DdkRelease();
@@ -45,13 +45,13 @@ class TestDevice : public TestDeviceType, public ddk::TestProtocol<TestDevice, d
   zx_status_t TestRunTests(test_report_t* out_report);
   void TestDestroy();
 
-  void RunTests(RunTestsCompleter::Sync& completer);
-  void SetOutputSocket(SetOutputSocketRequestView request,
-                       SetOutputSocketCompleter::Sync& completer);
-  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer);
-  void Destroy(DestroyCompleter::Sync& completer);
-
  private:
+  void RunTests(RunTestsCompleter::Sync& completer) override;
+  void SetOutputSocket(SetOutputSocketRequestView request,
+                       SetOutputSocketCompleter::Sync& completer) override;
+  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override;
+  void Destroy(DestroyCompleter::Sync& completer) override;
+
   zx::socket output_;
   zx::channel channel_;
   test_func_callback_t test_func_;
@@ -63,7 +63,7 @@ using TestRootDeviceType =
 
 class TestRootDevice : public TestRootDeviceType {
  public:
-  TestRootDevice(zx_device_t* parent) : TestRootDeviceType(parent) {}
+  explicit TestRootDevice(zx_device_t* parent) : TestRootDeviceType(parent) {}
 
   zx_status_t Bind() {
     return DdkAdd(ddk::DeviceAddArgs("test").set_flags(DEVICE_ADD_NON_BINDABLE));
@@ -72,12 +72,9 @@ class TestRootDevice : public TestRootDeviceType {
   // Methods required by the ddk mixins
   void DdkRelease() { delete this; }
 
-  void CreateDevice(CreateDeviceRequestView request, CreateDeviceCompleter::Sync& completer);
-
  private:
-  // Create a new child device with this |name|
-  zx_status_t CreateDeviceInternal(std::string_view name, char* path_out, size_t path_size,
-                                   size_t* path_actual);
+  void CreateDevice(CreateDeviceRequestView request,
+                    CreateDeviceCompleter::Sync& completer) override;
 };
 
 void TestDevice::TestSetOutputSocket(zx::socket socket) { output_ = std::move(socket); }
@@ -91,7 +88,7 @@ void TestDevice::TestGetChannel(zx::channel* out_channel) { *out_channel = std::
 void TestDevice::TestSetTestFunc(const test_func_callback_t* func) { test_func_ = *func; }
 
 zx_status_t TestDevice::TestRunTests(test_report_t* report) {
-  if (test_func_.callback == NULL) {
+  if (test_func_.callback == nullptr) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   return test_func_.callback(test_func_.ctx, report);
@@ -133,49 +130,21 @@ void TestDevice::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
-zx_status_t TestRootDevice::CreateDeviceInternal(std::string_view name, char* path_out,
-                                                 size_t path_size, size_t* path_actual) {
-  static_assert(fuchsia_device_test::wire::kMaxDeviceNameLen == ZX_DEVICE_NAME_MAX);
-
-  char devname[ZX_DEVICE_NAME_MAX + 1] = {};
-  if (name.size() > 0) {
-    memcpy(devname, name.data(), std::min(sizeof(devname) - 1, name.size()));
-  } else {
-    strncpy(devname, "testdev", sizeof(devname) - 1);
-  }
-  devname[sizeof(devname) - 1] = '\0';
-  // truncate trailing ".so"
-  if (!strcmp(devname + strlen(devname) - 3, ".so")) {
-    devname[strlen(devname) - 3] = 0;
-  }
-
-  if (path_size < strlen(devname) + strlen(fuchsia_device_test::wire::kControlDevice) + 1) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-
-  auto device = std::make_unique<TestDevice>(zxdev());
-  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs(devname));
-  if (status != ZX_OK) {
-    return status;
-  }
-  // devmgr now owns this
-  [[maybe_unused]] auto ptr = device.release();
-
-  *path_actual =
-      snprintf(path_out, path_size, "%s/%s", fuchsia_device_test::wire::kControlDevice, devname);
-  return ZX_OK;
-}
-
 void TestRootDevice::CreateDevice(CreateDeviceRequestView request,
                                   CreateDeviceCompleter::Sync& completer) {
-  char path[fuchsia_device_test::wire::kMaxDevicePathLen];
-  size_t path_size = 0;
-  zx_status_t status = CreateDeviceInternal(request->name.get(), path, sizeof(path), &path_size);
+  std::string_view name = request->name.get();
+
+  auto device = std::make_unique<TestDevice>(zxdev());
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs(std::string(name).c_str()));
   if (status != ZX_OK) {
     completer.ReplyError(status);
     return;
   }
-  completer.ReplySuccess(fidl::StringView::FromExternal(path, path_size));
+
+  // devmgr now owns this
+  [[maybe_unused]] auto ptr = device.release();
+
+  completer.ReplySuccess();
 }
 
 zx_status_t TestDriverBind(void* ctx, zx_device_t* dev) {
