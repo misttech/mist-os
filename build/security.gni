@@ -5,6 +5,9 @@
 # A collection of GN arguments that are used for security purpose.
 
 declare_args() {
+  # Whether the scrutiny verifiers should be ran.
+  run_scrutiny_verifiers = false
+
   # An optional list of golden files for fuchsia.zbi kernel cmdline args. If
   # specified, they would be compared against fuchsia.zbi kernel cmdline during
   # build time.

@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/images/custom_signing.gni")
-import("//build/product.gni")
+import("//build/security/verifier/scrutiny_verifiers_old.gni")
 import("//build/security/verifier/verify_bootfs.gni")
 import("//build/security/verifier/verify_by_build_type.gni")
 import("//build/security/verifier/verify_component_resolvers.gni")
@@ -16,15 +15,6 @@ import("//build/security/verifier/verify_structured_config.gni")
 # Instantiate scrutiny verifiers for an assembled system.
 #
 # Global gn args (see source gni files for documentation)
-#
-#   //build/config/BUILDCONFIG.gn
-#     is_coverage
-#
-#   //build/images/custom_signing.gni
-#     custom_signing_script
-#
-#   //build/product.gni
-#     use_bringup_assembly
 #
 # Basic parameters
 #
@@ -87,7 +77,7 @@ import("//build/security/verifier/verify_structured_config.gni")
 #
 #   testonly (optional)
 #     Usual GN meaning.
-template("scrutiny_verifiers") {
+template("scrutiny_verifiers2") {
   assert(defined(invoker.product_bundle),
          "product_bundle is required for scrutiny_verifiers()")
 
@@ -96,37 +86,44 @@ template("scrutiny_verifiers") {
 
   assert(defined(invoker.product_assembly_config_file),
          "product_assembly_config_file is required for scrutiny_verifiers()")
-  assert(defined(invoker.route_sources_config),
+  assert(defined(invoker.route_sources_config) &&
+             invoker.route_sources_config != "",
          "route_sources_config is required for scrutiny_verifiers()")
-  assert(defined(invoker.static_pkgs_goldens),
-         "static_pkgs_goldens is required for scrutiny_verifiers()")
-  assert(defined(invoker.structured_config_policy),
+  assert(
+      defined(invoker.static_pkgs_goldens) && invoker.static_pkgs_goldens != [],
+      "static_pkgs_goldens is required for scrutiny_verifiers()")
+  assert(defined(invoker.structured_config_policy) &&
+             invoker.structured_config_policy != "",
          "structured_config_policy is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_component_resolvers_allowlist),
+      defined(invoker.verify_component_resolvers_allowlist) &&
+          invoker.verify_component_resolvers_allowlist != "",
       "verify_component_resolvers_allowlist is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_routes_component_tree_config),
+      defined(invoker.verify_routes_component_tree_config) &&
+          invoker.verify_routes_component_tree_config != "",
       "verify_routes_component_tree_config is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_routes_exceptions_allowlist_bootfs),
+      defined(invoker.verify_routes_exceptions_allowlist_bootfs) &&
+          invoker.verify_routes_exceptions_allowlist_bootfs != [],
       "verify_routes_exceptions_allowlist_bootfs is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_routes_exceptions_allowlist_product),
+      defined(invoker.verify_routes_exceptions_allowlist_product) &&
+          invoker.verify_routes_exceptions_allowlist_product != [],
       "verify_routes_exceptions_allowlist_product is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_routes_exceptions_allowlist),
+      defined(invoker.verify_routes_exceptions_allowlist) &&
+          invoker.verify_routes_exceptions_allowlist != "",
       "verify_routes_exceptions_allowlist is required for scrutiny_verifiers()")
-  assert(defined(invoker.zbi_bootfs_filelist_goldens),
+  assert(defined(invoker.zbi_bootfs_filelist_goldens) &&
+             invoker.zbi_bootfs_filelist_goldens != [],
          "zbi_bootfs_filelist_goldens is required for scrutiny_verifiers()")
-  assert(defined(invoker.zbi_bootfs_packages_goldens),
+  assert(defined(invoker.zbi_bootfs_packages_goldens) &&
+             invoker.zbi_bootfs_packages_goldens != [],
          "zbi_bootfs_packages_goldens is required for scrutiny_verifiers()")
-  assert(defined(invoker.zbi_kernel_cmdline_goldens),
+  assert(defined(invoker.zbi_kernel_cmdline_goldens) &&
+             invoker.zbi_kernel_cmdline_goldens != [],
          "zbi_kernel_cmdline_goldens is required for scrutiny_verifiers()")
-
-  # TODO(fxbug.dev/114473): Remove once clients have stopped supplying a ZBI.
-  not_needed(invoker, [ "zbi" ])
-  verifiers = []
 
   verify_structured_config_policy_by_build_type(
       "${invoker.assembly_image_name}_verify_structured_config_policy_exists") {
@@ -142,170 +139,107 @@ template("scrutiny_verifiers") {
       deps += [ invoker.product_assembly_config_dep ]
     }
   }
-  verifiers += [
-    ":${invoker.assembly_image_name}_verify_structured_config_policy_exists",
-  ]
 
-  if (!is_coverage && custom_signing_script == "") {
-    if (invoker.zbi_bootfs_filelist_goldens != [] ||
-        invoker.zbi_bootfs_packages_goldens != []) {
-      verify_bootfs_filelist(
-          "${invoker.assembly_image_name}_verify_bootfs_filelist") {
-        forward_variables_from(invoker,
-                               [
-                                 "deps",
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        goldens = invoker.zbi_bootfs_filelist_goldens
-        golden_packages = invoker.zbi_bootfs_packages_goldens
-      }
-      verifiers += [ ":${invoker.assembly_image_name}_verify_bootfs_filelist" ]
-    }
+  verify_bootfs_filelist(
+      "${invoker.assembly_image_name}_verify_bootfs_filelist") {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    goldens = invoker.zbi_bootfs_filelist_goldens
+    golden_packages = invoker.zbi_bootfs_packages_goldens
+  }
 
-    if (invoker.zbi_kernel_cmdline_goldens != []) {
-      verify_kernel_cmdline(
-          "${invoker.assembly_image_name}_verify_kernel_cmdline") {
-        forward_variables_from(invoker,
-                               [
-                                 "deps",
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        goldens = invoker.zbi_kernel_cmdline_goldens
-      }
-      verifiers += [ ":${invoker.assembly_image_name}_verify_kernel_cmdline" ]
-    }
+  verify_kernel_cmdline(
+      "${invoker.assembly_image_name}_verify_kernel_cmdline") {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    goldens = invoker.zbi_kernel_cmdline_goldens
+  }
 
-    if (invoker.route_sources_config != "") {
-      verify_route_sources(
-          "${invoker.assembly_image_name}_verify_route_sources") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        config_path = invoker.route_sources_config
-      }
-      verifiers += [ ":${invoker.assembly_image_name}_verify_route_sources" ]
-    }
+  verify_route_sources("${invoker.assembly_image_name}_verify_route_sources") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    config_path = invoker.route_sources_config
+  }
 
-    if (invoker.verify_component_resolvers_allowlist != "") {
-      verify_component_resolvers(
-          "${invoker.assembly_image_name}_verify_component_resolvers") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        allowlist = invoker.verify_component_resolvers_allowlist
-      }
-      verifiers +=
-          [ ":${invoker.assembly_image_name}_verify_component_resolvers" ]
-    }
+  verify_component_resolvers(
+      "${invoker.assembly_image_name}_verify_component_resolvers") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    allowlist = invoker.verify_component_resolvers_allowlist
+  }
 
-    if (invoker.verify_routes_exceptions_allowlist != "" ||
-        invoker.verify_routes_exceptions_allowlist_product != [] ||
-        invoker.verify_routes_exceptions_allowlist_bootfs != "") {
-      verify_routes("${invoker.assembly_image_name}_verify_capability_routes") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        allowlist = []
-        if (invoker.verify_routes_exceptions_allowlist != "") {
-          allowlist += [ invoker.verify_routes_exceptions_allowlist ]
-        }
-        allowlist += invoker.verify_routes_exceptions_allowlist_product
-        if (use_bringup_assembly) {
-          allowlist += [ invoker.verify_routes_exceptions_allowlist_bootfs ]
-        } else {
-          not_needed(invoker, [ "verify_routes_exceptions_allowlist_bootfs" ])
-        }
-        if (invoker.verify_routes_component_tree_config != "") {
-          component_tree_config = invoker.verify_routes_component_tree_config
-        }
-      }
-      verifiers +=
-          [ ":${invoker.assembly_image_name}_verify_capability_routes" ]
-    } else {
-      not_needed(invoker, [ "verify_routes_component_tree_config" ])
-    }
-
-    if (invoker.static_pkgs_goldens != []) {
-      verify_static_pkgs("${invoker.assembly_image_name}_verify_static_pkgs") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        goldens = invoker.static_pkgs_goldens
-      }
-      verifiers += [ ":${invoker.assembly_image_name}_verify_static_pkgs" ]
-    }
-
-    if (invoker.structured_config_policy != "") {
-      verify_assembled_structured_config(
-          "${invoker.assembly_image_name}_verify_assembled_structured_config") {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visiblity",
-                                 "recovery",
-                               ])
-        product_bundle = invoker.product_bundle
-        policy = invoker.structured_config_policy
-      }
-      verifiers += [
-        ":${invoker.assembly_image_name}_verify_assembled_structured_config",
-      ]
-    }
-
-    extract_assembled_structured_config(
-        "${invoker.assembly_image_name}_extract_assembled_structured_config") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visiblity",
-                               "recovery",
-                             ])
-      product_bundle = invoker.product_bundle
-      output = "$target_out_dir/${invoker.assembly_image_name}.structured_config.json"
-    }
-    verifiers += [
-      ":${invoker.assembly_image_name}_extract_assembled_structured_config",
+  verify_routes("${invoker.assembly_image_name}_verify_capability_routes") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    allowlist = [
+      invoker.verify_routes_exceptions_allowlist,
+      invoker.verify_routes_exceptions_allowlist_product,
+      invoker.verify_routes_exceptions_allowlist_bootfs,
     ]
-  } else {
-    not_needed(invoker,
-               [
-                 "product_bundle",
-                 "recovery",
-                 "route_sources_config",
-                 "static_pkgs_goldens",
-                 "structured_config_policy",
-                 "verify_component_resolvers_allowlist",
-                 "verify_routes_component_tree_config",
-                 "verify_routes_exceptions_allowlist_bootfs",
-                 "verify_routes_exceptions_allowlist_product",
-                 "verify_routes_exceptions_allowlist",
-                 "zbi_bootfs_filelist_goldens",
-                 "zbi_bootfs_packages_goldens",
-                 "zbi_kernel_cmdline_goldens",
-                 "zbi",
-               ])
+    component_tree_config = invoker.verify_routes_component_tree_config
+  }
+
+  verify_static_pkgs("${invoker.assembly_image_name}_verify_static_pkgs") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    goldens = invoker.static_pkgs_goldens
+  }
+
+  verify_assembled_structured_config(
+      "${invoker.assembly_image_name}_verify_assembled_structured_config") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    policy = invoker.structured_config_policy
+  }
+
+  extract_assembled_structured_config(
+      "${invoker.assembly_image_name}_extract_assembled_structured_config") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visiblity",
+                             "recovery",
+                           ])
+    product_bundle = invoker.product_bundle
+    output =
+        "$target_out_dir/${invoker.assembly_image_name}.structured_config.json"
   }
 
   group(target_name) {
@@ -318,6 +252,17 @@ template("scrutiny_verifiers") {
     if (!defined(deps)) {
       deps = []
     }
-    deps += verifiers
+
+    deps += [
+      ":${invoker.assembly_image_name}_extract_assembled_structured_config",
+      ":${invoker.assembly_image_name}_verify_assembled_structured_config",
+      ":${invoker.assembly_image_name}_verify_bootfs_filelist",
+      ":${invoker.assembly_image_name}_verify_capability_routes",
+      ":${invoker.assembly_image_name}_verify_component_resolvers",
+      ":${invoker.assembly_image_name}_verify_kernel_cmdline",
+      ":${invoker.assembly_image_name}_verify_route_sources",
+      ":${invoker.assembly_image_name}_verify_static_pkgs",
+      ":${invoker.assembly_image_name}_verify_structured_config_policy_exists",
+    ]
   }
 }
