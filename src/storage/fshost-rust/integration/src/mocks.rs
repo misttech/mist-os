@@ -126,15 +126,17 @@ async fn run_boot_args(mut stream: fboot::ArgumentsRequestStream, netboot: bool)
                 responder.send(defaultval).unwrap();
             }
             fboot::ArgumentsRequest::GetBools { keys, responder } => {
-                responder
-                    .send(&mut keys.into_iter().map(|bool_pair| {
+                let vec: Vec<_> = keys
+                    .iter()
+                    .map(|bool_pair| {
                         if bool_pair.key == "netsvc.netboot".to_string() && netboot {
                             true
                         } else {
                             bool_pair.defaultval
                         }
-                    }))
-                    .unwrap();
+                    })
+                    .collect();
+                responder.send(&vec).unwrap();
             }
             fboot::ArgumentsRequest::Collect { .. } => {
                 // This seems to be deprecated. Either way, fshost doesn't use it.

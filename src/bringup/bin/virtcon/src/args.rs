@@ -156,10 +156,11 @@ mod tests {
                         responder.send(&mut vec.into_iter()).unwrap();
                     }
                     ArgumentsRequest::GetBools { keys, responder } => {
-                        let mut iter = keys
+                        let vec: Vec<_> = keys
                             .into_iter()
-                            .map(|key| get_bool_arg(&env, &key.key, key.defaultval));
-                        responder.send(&mut iter).unwrap();
+                            .map(|key| get_bool_arg(&env, &key.key, key.defaultval))
+                            .collect();
+                        responder.send(&vec).unwrap();
                     }
                     _ => assert!(false),
                 }

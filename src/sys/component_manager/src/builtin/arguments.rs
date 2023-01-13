@@ -255,9 +255,11 @@ impl BuiltinCapability for Arguments {
                     responder.send(self.get_bool_arg(key, defaultval))?
                 }
                 fboot::ArgumentsRequest::GetBools { keys, responder } => {
-                    let mut iter =
-                        keys.into_iter().map(|key| self.get_bool_arg(key.key, key.defaultval));
-                    responder.send(&mut iter)?
+                    let vec: Vec<_> = keys
+                        .into_iter()
+                        .map(|key| self.get_bool_arg(key.key, key.defaultval))
+                        .collect();
+                    responder.send(&vec)?
                 }
                 fboot::ArgumentsRequest::Collect { prefix, responder } => {
                     let vec: Vec<_> = self

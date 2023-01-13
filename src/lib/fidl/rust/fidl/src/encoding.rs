@@ -1127,11 +1127,6 @@ macro_rules! impl_layout_int {
 // (owned) for most types. The former is a poor fit for vectors of primitives:
 // we cannot optimize encoding from an iterator. For this reason, vectors of
 // primitives are special-cased in fidlgen to use &[T] as the borrowed type.
-//
-// Caveat: bool uses &mut dyn ExactSizeIterator<Item = bool> because it cannot
-// be optimized. Floats f32 and f64, though they cannot be optimized either, use
-// &[f32] and &[f64].
-// TODO(fxbug.dev/54368): Resolve this inconsistency.
 macro_rules! impl_codable_int { ($($int_ty:ty,)*) => { $(
     impl_layout_int!($int_ty);
 
@@ -1322,6 +1317,13 @@ impl_codable_int!(u16, u32, u64, i16, i32, i64,);
 impl_codable_float!(f32, f64,);
 
 impl_layout!(bool, align: 1, size: 1);
+
+// We can encode bools by memcpy because Rust guarantees they are 0x00 or 0x01.
+// We cannot decode by memcpy since we have to validate `Error::InvalidBoolean`,
+// so we leave `Layout::supports_simple_copy` at its default of false.
+//
+// TODO(fxbug.dev/119240): Distinguish encode/decode in supports_simply_copy.
+impl_slice_encoding_by_copy!(bool);
 
 impl Encodable for bool {
     #[inline]

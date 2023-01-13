@@ -912,10 +912,7 @@ func (c *compiler) compileBorrowedType(val fidlgen.Type) string {
 		t = fmt.Sprintf("&mut [%s; %v]", c.compileBorrowedType(*val.ElementType), *val.ElementCount)
 	case fidlgen.VectorType:
 		t = c.compileBorrowedType(*val.ElementType)
-		// We use slices for primitive numeric types so that encoding becomes a
-		// memcpy. Rust does not guarantee the bit patterns for bool values, so
-		// we omit them from the optimization.
-		if val.ElementType.Kind == fidlgen.PrimitiveType && val.ElementType.PrimitiveSubtype != fidlgen.Bool {
+		if val.ElementType.Kind == fidlgen.PrimitiveType {
 			t = fmt.Sprintf("&[%s]", t)
 		} else {
 			t = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", t)
