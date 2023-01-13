@@ -22,8 +22,8 @@ CicFilter::Filter(uint32_t index,  // e.g. 0.
                   uint32_t input_total_channels,   // e.g. 2.
                   uint32_t input_channel,          // e.g. 0 or 1.
                   uint32_t output_total_channels,  // e.f. 2.
-                  uint32_t output_channel,         // e.g. 0  or 1.
-                  uint32_t multiplier_shift) {
+                  uint32_t output_channel) {       // e.g. 0  or 1.
+
 #ifdef TESTING_CAPTURE_PDM
   static_cast<void>(integrator_state);
   static_cast<void>(differentiator_state);
@@ -64,7 +64,7 @@ CicFilter::Filter(uint32_t index,  // e.g. 0.
   uint32_t amount_pcm = 0;
   while (in < in_end) {
     // Integrate.
-    for (size_t word = 0; word < kInputBitsPerSample / (sizeof(uint32_t) * 8); ++word) {
+    for (size_t word = 0; word < input_bits_per_sample_ / (sizeof(uint32_t) * 8); ++word) {
       uint32_t bits = in[input_channel];
       in += input_total_channels;
       for (uint32_t i = 0; i < sizeof(uint32_t) * 8; ++i, bits >>= 1) {
@@ -88,6 +88,7 @@ CicFilter::Filter(uint32_t index,  // e.g. 0.
     }
 
     // Output pre-amplified by multiplier_shift.
+    uint32_t multiplier_shift = input_bits_per_sample_ == 32 ? 6 : 1;
     int32_t result = acc;
     if (result >= ((1 << (31 - multiplier_shift)) - 1)) {
       result = std::numeric_limits<int32_t>::max();

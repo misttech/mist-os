@@ -20,11 +20,10 @@ TEST(CicFilterTest, OnesFilled) {
   constexpr uint32_t n_input_channels = 1;
   constexpr uint32_t output_channel = 0;
   constexpr uint32_t n_output_channels = 1;
-  constexpr uint32_t multiplication_shift = 4;
   filter.Filter(0, in.begin(), in.size(), out.begin(), n_input_channels, input_channel,
-                n_output_channels, output_channel, multiplication_shift);
-  // Expected values converge to the maximum 16 bits signed integer possible.
-  uint16_t expected[] = {0x09f0, 0x7fff, 0x7ff7, 0x7fef, 0x7fe7, 0x7fdf, 0x7fd7, 0x7fcf};
+                n_output_channels, output_channel);
+  // Expected values initially converge to the maximum 16 bits signed integer possible.
+  uint16_t expected[] = {0x013e, 0x1ea9, 0x64ff, 0x7f0f, 0x7fef, 0x7fe7, 0x7fdf, 0x7fd7};
   ASSERT_EQ(out.size(), std::size(expected) * sizeof(uint16_t));
   EXPECT_BYTES_EQ(out.begin(), expected, out.size());
 }
@@ -40,11 +39,10 @@ TEST(CicFilterTest, MultipleChannels) {
   constexpr uint32_t n_input_channels = 2;
   constexpr uint32_t output_channel = 1;
   constexpr uint32_t n_output_channels = 2;
-  constexpr uint32_t multiplication_shift = 4;
   filter.Filter(0, in.begin(), in.size(), out.begin(), n_input_channels, input_channel,
-                n_output_channels, output_channel, multiplication_shift);
-  // Expected values for filtering in output slot 1.
-  uint16_t expected[] = {0x0000, 0x09f0, 0x0000, 0x7fff, 0x0000, 0x7ff7, 0x0000, 0x7fef};
+                n_output_channels, output_channel);
+  // Non zero values for filtering in output slot 1 only, zeros in slot 2.
+  uint16_t expected[] = {0x0000, 0x013e, 0x0000, 0x1ea9, 0x0000, 0x64ff, 0x0000, 0x7f0f};
   ASSERT_EQ(out.size(), std::size(expected) * sizeof(uint16_t));
   EXPECT_BYTES_EQ(out.begin(), expected, out.size());
 }
@@ -60,9 +58,11 @@ TEST(CicFilterTest, ManyZerosAndOnesEqual) {
   constexpr uint32_t n_input_channels = 2;
   constexpr uint32_t output_channel = 0;
   constexpr uint32_t n_output_channels = 2;
-  constexpr uint32_t multiplication_shift = 0;  // faster convergence than with 4.
-  filter.Filter(0, in.begin(), in.size(), out.begin(), n_input_channels, input_channel,
-                n_output_channels, output_channel, multiplication_shift);
+  constexpr size_t kCountEnoughToGetConvergence = 10;
+  for (size_t i = 0; i < kCountEnoughToGetConvergence; ++i) {
+    filter.Filter(0, in.begin(), in.size(), out.begin(), n_input_channels, input_channel,
+                  n_output_channels, output_channel);
+  }
   // Expected values converge to zero, we check the last half.
   uint16_t expected[out.size() / 2] = {0};
   EXPECT_BYTES_EQ(out.end() - std::size(expected), expected, std::size(expected));
@@ -79,11 +79,10 @@ TEST(CicFilterTest, DirectCurrentRemoval) {
   constexpr uint32_t n_input_channels = 2;
   constexpr uint32_t output_channel = 0;
   constexpr uint32_t n_output_channels = 2;
-  constexpr uint32_t multiplication_shift = 0;  // faster convergence than with 4.
-  constexpr size_t loop_count = 10'000;         // Enough to get DC eventually removed.
-  for (size_t i = 0; i < loop_count; ++i) {
+  constexpr size_t kCountEnoughToGetDcRemoved = 11'000;
+  for (size_t i = 0; i < kCountEnoughToGetDcRemoved; ++i) {
     filter.Filter(0, in.begin(), in.size(), out.begin(), n_input_channels, input_channel,
-                  n_output_channels, output_channel, multiplication_shift);
+                  n_output_channels, output_channel);
   }
   // Expected values converge to zero.
   uint16_t expected[out.size()] = {0};

@@ -205,6 +205,22 @@ struct AIO_PDM_CTRL1 : public hwreg::RegisterBase<AIO_PDM_CTRL1, uint32_t> {
   DEF_BIT(6, RSLB);
   DEF_BIT(5, INVCLK_INT);
   DEF_BIT(4, INVCLK_OUT);
+  static constexpr uint32_t kDivideBy1 = 0;
+  static constexpr uint32_t kDivideBy2 = 1;
+  static constexpr uint32_t kDivideBy4 = 2;
+  static constexpr uint32_t kDivideBy8 = 3;
+  static constexpr uint32_t kDivideBy16 = 4;
+  static constexpr uint32_t kDivideBy32 = 5;
+  static constexpr uint32_t kDivideBy64 = 6;
+  static constexpr uint32_t kDivideBy128 = 7;
+  static constexpr uint32_t kDivideBy256 = 8;
+  static constexpr uint32_t kDivideBy512 = 9;
+  static constexpr uint32_t kDivideBy1024 = 10;
+  static constexpr uint32_t kDivideBy2048 = 11;
+  static constexpr uint32_t kDivideBy4096 = 12;
+  static constexpr uint32_t kDivideBy8192 = 13;
+  static constexpr uint32_t kDivideBy16384 = 14;
+  static constexpr uint32_t kDivideBy32768 = 15;
   DEF_FIELD(3, 0, CLKDIV);
   static auto Get() { return hwreg::RegisterAddr<AIO_PDM_CTRL1>(0x00c0); }
 };

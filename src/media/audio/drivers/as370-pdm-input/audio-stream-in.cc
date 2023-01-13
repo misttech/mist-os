@@ -72,8 +72,10 @@ zx_status_t As370AudioStreamIn::InitPDev() {
     zxlogf(ERROR, "could not get clk");
     return ZX_ERR_NO_RESOURCES;
   }
-  // PLL0 = 196.608MHz = e.g. 48K (FSYNC) * 64 (BCLK) * 8 (MCLK) * 8.
-  clks_[kAvpll0Clk].SetRate(kMaxRate * 64 * 8 * 8);
+  // PLL0 = 196.608MHz / 8 = 24.576MHz / 8 = 3.072MHz PDM clk. For:
+  // PDM 48kHz with mic clk at 3.072MHz / 64 bits per sample.
+  // PDM 96kHz with mic clk at 3.072MHz / 32 bits per sample.
+  clks_[kAvpll0Clk].SetRate(196'608'000);
   clks_[kAvpll0Clk].Enable();
 
   ddk::SharedDmaProtocolClient dma(parent(), "dma");
@@ -139,7 +141,11 @@ zx_status_t As370AudioStreamIn::GetBuffer(const audio_proto::RingBufGetBufferReq
 void As370AudioStreamIn::RingBufferShutdown() { lib_->Shutdown(); }
 
 zx_status_t As370AudioStreamIn::Start(uint64_t* out_start_time) {
-  *out_start_time = lib_->Start();
+  zx::result<uint64_t> start_time = lib_->Start(kMaxRate);
+  if (start_time.is_error()) {
+    return start_time.status_value();
+  }
+  *out_start_time = start_time.value();
 
   uint32_t notifs = LoadNotificationsPerRing();
   if (notifs) {

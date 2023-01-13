@@ -38,7 +38,7 @@ class As370AudioStreamIn : public SimpleAudioStream {
   }
 
  private:
-  static constexpr size_t kMaxRate = 48000;
+  static constexpr uint32_t kMaxRate = 96'000;
 
   enum {
     kAvpll0Clk,

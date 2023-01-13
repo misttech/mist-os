@@ -22,8 +22,7 @@ class CicFilterTest : public CicFilter {
   explicit CicFilterTest() : CicFilter() {}
   uint32_t Filter(uint32_t index, void* input, uint32_t input_size, void* output,
                   uint32_t input_total_channels, uint32_t input_channel,
-                  uint32_t output_total_channels, uint32_t output_channel,
-                  uint32_t multiplier_shift) {
+                  uint32_t output_total_channels, uint32_t output_channel) {
     return 4;  // mock decodes 4 bytes.
   }
 };
@@ -206,7 +205,7 @@ TEST_F(SynAudioInTest, StartTime) {
   dma().ExpectStart(DmaId::kDmaIdPdmW1);
 
   uint64_t before = zx::clock::get_monotonic().get();
-  uint64_t timestamp = device()->Start();
+  uint64_t timestamp = device()->Start(48'000).value();
   uint64_t after = zx::clock::get_monotonic().get();
   EXPECT_GE(timestamp, before);
   EXPECT_LE(timestamp, after);

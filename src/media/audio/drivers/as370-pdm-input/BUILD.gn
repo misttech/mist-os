@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 driver_bind_rules("as370_audio_in_bind") {
   rules = "as370_audio_in.bind"
@@ -13,14 +15,10 @@ driver_bind_rules("as370_audio_in_bind") {
   deps = [ "//src/devices/bind/fuchsia.synaptics.platform" ]
 }
 
-fuchsia_driver("as370-pdm-input-driver") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+source_set("common") {
   sources = [ "audio-stream-in.cc" ]
 
-  deps = [
+  public_deps = [
     ":as370_audio_in_bind",
     "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
@@ -43,6 +41,14 @@ fuchsia_driver("as370-pdm-input-driver") {
     "//zircon/system/ulib/zx",
   ]
 }
+fuchsia_driver("as370-pdm-input-driver") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+
+  deps = [ ":common" ]
+}
 
 fuchsia_driver_component("as370-pdm-input") {
   component_name = "as370-pdm-input"
@@ -51,7 +57,27 @@ fuchsia_driver_component("as370-pdm-input") {
   colocate = true
 }
 
+test("as370-pdm-input-unit-tests") {
+  sources = [ "unit-tests.cc" ]
+  deps = [
+    ":common",
+    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp_mock",
+    "//sdk/banjo/fuchsia.hardware.shareddma:fuchsia.hardware.shareddma_banjo_cpp_mock",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/mock-ddk",
+    "//src/devices/testing/mock-mmio-reg",
+  ]
+}
+
+fuchsia_unittest_package("as370-pdm-input-tests") {
+  deps = [ ":as370-pdm-input-unit-tests" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":as370_audio_in_bind_test" ]
+  deps = [
+    ":as370-pdm-input-tests",
+    ":as370_audio_in_bind_test",
+  ]
 }

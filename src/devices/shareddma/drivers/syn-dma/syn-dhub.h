@@ -83,8 +83,8 @@ class SynDhub : public DeviceType, public ddk::SharedDmaProtocol<SynDhub, ddk::b
   // use a unified profile for deadline scheduling the interrupt handlinug.
   std::map<uint32_t, ChannelInfo> channel_info_ = {
       {kDmaIdMa0, {0, 64}},
-      {kDmaIdPdmW0, {13, 128}},
-      {kDmaIdPdmW1, {14, 128}},
+      {kDmaIdPdmW0, {13, 64}},
+      {kDmaIdPdmW1, {14, 64}},
   };
 
   int Thread();

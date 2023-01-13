@@ -81,7 +81,7 @@ TEST_F(SynAudioOutTest, Start) {
   i2s()[0x000c].ExpectWrite(0x0000'0001);
 
   uint64_t before = zx::clock::get_monotonic().get();
-  uint64_t timestamp = device().Start();
+  uint64_t timestamp = device().Start(48'000).value();
   uint64_t after = zx::clock::get_monotonic().get();
   EXPECT_GE(timestamp, before);
   EXPECT_LE(timestamp, after);

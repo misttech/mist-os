@@ -24,7 +24,7 @@
 
 namespace {
 
-constexpr uint32_t kWantedFrameRate = 48'000;
+constexpr uint32_t kWantedFrameRate = 96'000;
 constexpr size_t kNumberOfChannels = 2;  // Expects L+R.
 
 }  // namespace
@@ -46,8 +46,10 @@ zx_status_t As370AudioStreamOut::InitPdev() {
     zxlogf(ERROR, "GetClk failed");
     return ZX_ERR_NO_RESOURCES;
   }
-  // PLL0 = 196.608MHz = e.g. 48K (FSYNC) * 64 (BCLK) * 8 (MCLK) * 8.
-  clks_[kAvpll0Clk].SetRate(kWantedFrameRate * 64 * 8 * 8);
+  // PLL0 = 196.608MHz e.g.:
+  // I2S 48K (FSYNC) x 64 (BCLK) x 8 (MCLK) x 8 (PRIAUD_CLK_DIV).
+  // I2S 96K (FSYNC) x 64 (BCLK) x 8 (MCLK) x 4 (PRIAUD_CLK_DIV).
+  clks_[kAvpll0Clk].SetRate(196'608'000);
   clks_[kAvpll0Clk].Enable();
 
   size_t actual = 0;
@@ -242,12 +244,17 @@ zx_status_t As370AudioStreamOut::GetBuffer(const audio_proto::RingBufGetBufferRe
 }
 
 zx_status_t As370AudioStreamOut::Start(uint64_t* out_start_time) {
-  *out_start_time = lib_->Start();
+  zx::result<uint64_t> start_time = lib_->Start(kWantedFrameRate);
+  if (start_time.is_error()) {
+    return start_time.status_value();
+  }
+  *out_start_time = start_time.value();
   uint32_t notifs = LoadNotificationsPerRing();
   if (notifs) {
     size_t size = 0;
     ring_buffer_vmo_.get_size(&size);
-    us_per_notification_ = static_cast<uint32_t>(1000 * size / (frame_size_ * 48 * notifs));
+    us_per_notification_ =
+        static_cast<uint32_t>(1000 * size / (frame_size_ * kWantedFrameRate / 1'000 * notifs));
     notify_timer_.PostDelayed(dispatcher(), zx::usec(us_per_notification_));
   } else {
     us_per_notification_ = 0;
@@ -287,7 +294,6 @@ zx_status_t As370AudioStreamOut::AddFormats() {
 
   // TODO(fxbug.dev/117743): Restore AUDIO_SAMPLE_FORMAT_32BIT once the AudioCoreV2 refactor lands.
   format.range.sample_formats = AUDIO_SAMPLE_FORMAT_24BIT_IN32;
-  assert(kWantedFrameRate == 48000);
   format.range.min_frames_per_second = kWantedFrameRate;
   format.range.max_frames_per_second = kWantedFrameRate;
   format.range.flags = ASF_RANGE_FLAG_FPS_CONTINUOUS;  // No need to specify family when min == max.

@@ -104,7 +104,6 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
       amount_pdm = max_dma_to_process;
     }
 
-    constexpr uint32_t multiplier_shift = 5;
     struct Parameter {
       uint32_t filter_index;
       uint32_t input_channel;
@@ -126,7 +125,7 @@ void SynAudioInDevice::ProcessDma(uint32_t index) {
             reinterpret_cast<void*>(dma_base_[index] + dma_buffer_current_[index]), amount_pdm,
             reinterpret_cast<void*>(ring_buffer_base_ + ring_buffer_current_), 2,
             parameters[index][i]->input_channel, kNumberOfChannels,
-            parameters[index][i]->output_channel, multiplier_shift);
+            parameters[index][i]->output_channel);
       }
     }
     // We are done with amount_pdm from the input dma_buffer_current_[index], clean and invalidate
@@ -281,16 +280,23 @@ zx_status_t SynAudioInDevice::GetBuffer(size_t size, zx::vmo* buffer) {
   return ring_buffer_.duplicate(rights, buffer);
 }
 
-uint64_t SynAudioInDevice::Start() {
+zx::result<uint64_t> SynAudioInDevice::Start(uint32_t rate) {
+  if (rate != 48'000 && rate != 96'000) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  const uint32_t input_bits_per_sample = rate == 96'000 ? 32 : 64;
+  if (zx_status_t status = cic_filter_->SetInputBitsPerSample(input_bits_per_sample);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
   AIO_IRQENABLE::Get().ReadFrom(&i2s_).set_PDMIRQ(1).WriteTo(&i2s_);
   AIO_MCLKPDM_ACLK_CTRL::Get().FromValue(0x189).WriteTo(&i2s_);
-  constexpr uint32_t divider = 3;  // divide by 8.
   AIO_PDM_CTRL1::Get()
       .FromValue(0)
       .set_RDM(4)
       .set_RSLB(1)
       .set_INVCLK_INT(1)
-      .set_CLKDIV(divider)
+      .set_CLKDIV(AIO_PDM_CTRL1::kDivideBy8)  // 196.608MHz / 8 = 24.576MHz / 8 = 3.072MHz PDM clk.
       .WriteTo(&i2s_);
 
   AIO_PDM_PDM0_CTRL::Get().FromValue(0).set_MUTE(1).set_ENABLE(0).WriteTo(&i2s_);
@@ -319,7 +325,7 @@ uint64_t SynAudioInDevice::Start() {
 
   // Enable.
   AIO_IOSEL_PDM::Get().FromValue(0).set_GENABLE(1).WriteTo(&i2s_);
-  return before + (after - before) / 2;
+  return zx::ok(before + (after - before) / 2);
 }
 
 uint64_t SynAudioInDevice::Stop() {

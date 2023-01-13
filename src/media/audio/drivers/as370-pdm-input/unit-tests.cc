@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,17 +7,15 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/clock.h>
-#include <lib/zx/interrupt.h>
 #include <zircon/errors.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <soc/as370/as370-hw.h>
 #include <zxtest/zxtest.h>
 
-#include "audio-stream-out.h"
+#include "audio-stream-in.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
@@ -46,7 +44,8 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
 
 class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, ddk::base_protocol> {
  public:
-  FakeSharedDmaDevice() : proto_({&shared_dma_protocol_ops_, this}) {}
+  FakeSharedDmaDevice(fake_pdev::FakePDev& pdev)
+      : pdev_(pdev), proto_({&shared_dma_protocol_ops_, this}) {}
 
   void SharedDmaStart(uint32_t dma_id) {}
   void SharedDmaStop(uint32_t dma_id) {}
@@ -54,62 +53,23 @@ class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, d
   uint32_t SharedDmaGetBufferPosition(uint32_t dma_id) { return 0; }
   zx_status_t SharedDmaInitializeAndGetBuffer(uint32_t dma_id, dma_type_t type, uint32_t size,
                                               zx::vmo* out_vmo) {
+    pdev_.PDevGetBti(0, &bti_);
+    return zx::vmo::create_contiguous(bti_, 4096, 0, out_vmo);
+
     return ZX_OK;
   }
   zx_status_t SharedDmaSetNotifyCallback(uint32_t dma_id, const dma_notify_callback_t* cb,
                                          uint32_t* out_size_per_notification) {
+    *out_size_per_notification = 4096;
     return ZX_OK;
   }
 
   const shared_dma_protocol_t* GetProto() const { return &proto_; }
 
  private:
+  fake_pdev::FakePDev& pdev_;
+  zx::bti bti_;
   shared_dma_protocol_t proto_;
-};
-
-class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_protocol>,
-                        public fidl::WireServer<fuchsia_hardware_audio::Codec> {
- public:
-  FakeCodecDevice() : proto_({&codec_protocol_ops_, this}) {
-    ASSERT_OK(loop_.StartThread("Fake codec thread"));
-  }
-
-  zx_status_t CodecConnect(zx::channel channel) {
-    fidl::ServerEnd<fuchsia_hardware_audio::Codec> server(std::move(channel));
-    fidl::BindServer(loop_.dispatcher(), std::move(server), this);
-    return ZX_OK;
-  }
-
-  // LLCPP implementation for the Codec API.
-  void Reset(ResetCompleter::Sync& completer) override { completer.Reply(); }
-  void Stop(StopCompleter::Sync& completer) override { completer.Reply({}); }
-  void Start(StartCompleter::Sync& completer) override { completer.Reply({}); }
-  void GetInfo(GetInfoCompleter::Sync& completer) override { completer.Reply({}); }
-  void GetHealthState(GetHealthStateCompleter::Sync& completer) override { completer.Reply({}); }
-  void IsBridgeable(IsBridgeableCompleter::Sync& completer) override { completer.Reply({}); }
-  void SetBridgedMode(SetBridgedModeRequestView request,
-                      SetBridgedModeCompleter::Sync& completer) override {}
-  void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override {
-    completer.ReplySuccess({});
-  }
-  void SetDaiFormat(SetDaiFormatRequestView request,
-                    SetDaiFormatCompleter::Sync& completer) override {
-    completer.ReplySuccess({});
-  }
-  void GetPlugDetectCapabilities(GetPlugDetectCapabilitiesCompleter::Sync& completer) override {
-    completer.Reply({});
-  }
-  void WatchPlugState(WatchPlugStateCompleter::Sync& completer) override { completer.Reply({}); }
-  void SignalProcessingConnect(SignalProcessingConnectRequestView request,
-                               SignalProcessingConnectCompleter::Sync& completer) override {
-    request->protocol.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  const codec_protocol_t* GetProto() const { return &proto_; }
-
- private:
-  codec_protocol_t proto_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_protocol> {
@@ -157,8 +117,9 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
-struct As370TdmOutputTest : public zxtest::Test {
+struct As370PdmInputTest : public zxtest::Test {
   void SetUp() override {
+    pdev_.UseFakeBti();
     pdev_.set_mmio(0, mmio0_.mmio_info());
     pdev_.set_mmio(1, mmio1_.mmio_info());
     fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
@@ -166,35 +127,21 @@ struct As370TdmOutputTest : public zxtest::Test {
                               "clock");
     fake_parent_->AddProtocol(ZX_PROTOCOL_SHARED_DMA, dma_.GetProto()->ops, dma_.GetProto()->ctx,
                               "dma");
-    fake_parent_->AddProtocol(ZX_PROTOCOL_CODEC, codec_.GetProto()->ops, codec_.GetProto()->ctx,
-                              "codec");
   }
 
   void TearDown() override {}
 
   std::shared_ptr<zx_device> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  fbl::RefPtr<As370AudioStreamOut> device_;
+  fbl::RefPtr<As370AudioStreamIn> device_;
   fake_pdev::FakePDev pdev_;
   FakeClockDevice clock_;
-  FakeSharedDmaDevice dma_;
-  FakeCodecDevice codec_;
+  FakeSharedDmaDevice dma_{pdev_};
   FakeMmio mmio0_{::as370::kAudioGlobalSize}, mmio1_{::as370::kAudioI2sSize};
 };
 
-TEST_F(As370TdmOutputTest, GetSupportedFormatsWithMetadata) {
-  metadata::As370Config metadata = {};
-  snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "manufacturer");
-  snprintf(metadata.product_name, sizeof(metadata.product_name), "product");
-  metadata.is_input = false;
-  metadata.ring_buffer.number_of_channels = 2;
-  metadata.ring_buffer.frequency_ranges[0].min_frequency = 20;
-  metadata.ring_buffer.frequency_ranges[0].max_frequency = 2'000;
-  metadata.ring_buffer.frequency_ranges[1].min_frequency = 2'000;
-  metadata.ring_buffer.frequency_ranges[1].max_frequency = 48'000;
-  fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
-
-  device_ = audio::SimpleAudioStream::Create<audio::as370::As370AudioStreamOut>(fake_parent_.get());
+TEST_F(As370PdmInputTest, GetSupportedFormats) {
+  device_ = audio::SimpleAudioStream::Create<audio::as370::As370AudioStreamIn>(fake_parent_.get());
   ZX_ASSERT(device_.get());
 
   auto connector_endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
@@ -206,12 +153,6 @@ TEST_F(As370TdmOutputTest, GetSupportedFormatsWithMetadata) {
   auto stream_client = GetStreamClient(std::move(connector_endpoints->client));
   ASSERT_TRUE(stream_client.is_valid());
 
-  auto properties = stream_client->GetProperties();
-  ASSERT_OK(properties.status());
-
-  EXPECT_STREQ(properties->properties.manufacturer(), "manufacturer");
-  EXPECT_STREQ(properties->properties.product(), "product");
-
   auto supported = stream_client->GetSupportedFormats();
   ASSERT_OK(supported.status());
 
@@ -222,31 +163,7 @@ TEST_F(As370TdmOutputTest, GetSupportedFormatsWithMetadata) {
                 .channel_sets()[0]
                 .attributes()
                 .count(),
-            2);
-  EXPECT_EQ(supported->supported_formats[0]
-                .pcm_supported_formats()
-                .channel_sets()[0]
-                .attributes()[0]
-                .min_frequency(),
-            20);
-  EXPECT_EQ(supported->supported_formats[0]
-                .pcm_supported_formats()
-                .channel_sets()[0]
-                .attributes()[0]
-                .max_frequency(),
-            2'000);
-  EXPECT_EQ(supported->supported_formats[0]
-                .pcm_supported_formats()
-                .channel_sets()[0]
-                .attributes()[1]
-                .min_frequency(),
-            2'000);
-  EXPECT_EQ(supported->supported_formats[0]
-                .pcm_supported_formats()
-                .channel_sets()[0]
-                .attributes()[1]
-                .max_frequency(),
-            48'000);
+            3);  // 3 channels.
 
   EXPECT_EQ(supported->supported_formats[0].pcm_supported_formats().frame_rates().count(), 1);
   EXPECT_EQ(supported->supported_formats[0].pcm_supported_formats().frame_rates()[0], 96'000);

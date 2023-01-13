@@ -11,6 +11,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/port.h>
+#include <lib/zx/result.h>
 #include <threads.h>
 #include <zircon/syscalls/port.h>
 
@@ -44,7 +45,7 @@ class SynAudioInDevice {
 
   // Starts clocking data with data fetched from the beginning of the buffer.
   // Returns its best estimation of the actual time the buffer pointer started moving.
-  uint64_t Start();
+  zx::result<uint64_t> Start(uint32_t rate);
 
   // Stops clocking data out (physical bus signals remain active).
   // Returns its best estimation of the actual time the buffer pointer stopped moving.

@@ -46,7 +46,10 @@ zx_status_t SynAudioOutDevice::GetBuffer(size_t size, zx::vmo* buffer) {
                                      buffer);
 }
 
-uint64_t SynAudioOutDevice::Start() {
+zx::result<uint64_t> SynAudioOutDevice::Start(uint32_t rate) {
+  if (rate != 48'000 && rate != 96'000) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
   AIO_PRI_TSD0_PRI_CTRL::Get().FromValue(0).set_ENABLE(true).set_MUTE(true).WriteTo(&i2s_);
 
   // Set MCLK = 24.576MHz = APLL0 (196.608MHz) / 8.
@@ -58,13 +61,14 @@ uint64_t SynAudioOutDevice::Start() {
       .set_clk_Enable(true)
       .WriteTo(&i2s_);
 
-  // Set BCLK = 3.072MHz = MCLK (24.576MHz) / 8.
-  AIO_PRI_PRIAUD_CLKDIV::Get()
-      .FromValue(0)
-      .set_SETTING(AIO_PRI_PRIAUD_CLKDIV::kDivideBy8)
-      .WriteTo(&i2s_);
+  // For 48kHz set BCLK = 3.072MHz = MCLK (24.576MHz) / 8.
+  // For 96kHz set BCLK = 6.144MHz = MCLK (24.576MHz) / 4.
+  uint32_t clk_div =
+      rate == 96'000 ? AIO_PRI_PRIAUD_CLKDIV::kDivideBy4 : AIO_PRI_PRIAUD_CLKDIV::kDivideBy8;
+  AIO_PRI_PRIAUD_CLKDIV::Get().FromValue(0).set_SETTING(clk_div).WriteTo(&i2s_);
 
   // Set I2S, 48K, 32 bits.  So BCLK must be 32 * 2 * 48K = 3.072MHz.
+  // Set I2S, 96K, 32 bits.  So BCLK must be 32 * 2 * 96K = 6.144MHz.
   AIO_PRI_PRIAUD_CTRL::Get()
       .FromValue(0)
       .set_TDMWSHIGH(0)
@@ -84,7 +88,7 @@ uint64_t SynAudioOutDevice::Start() {
   uint64_t after = zx::clock::get_monotonic().get();
 
   AIO_PRI_TSD0_PRI_CTRL::Get().FromValue(0).set_ENABLE(true).set_MUTE(false).WriteTo(&i2s_);
-  return before + (after - before) / 2;
+  return zx::ok(before + (after - before) / 2);
 }
 
 uint64_t SynAudioOutDevice::Stop() {
