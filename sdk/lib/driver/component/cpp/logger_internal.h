@@ -179,9 +179,4 @@ static void fx_slog(fdf::Logger& logger, FuchsiaLogSeverity severity, const char
 
 }  // namespace fdf_internal
 
-// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
-namespace driver_internal {
-using namespace fdf_internal;
-}  // namespace driver_internal
-
 #endif  // LIB_DRIVER_COMPONENT_CPP_LOGGER_INTERNAL_H_

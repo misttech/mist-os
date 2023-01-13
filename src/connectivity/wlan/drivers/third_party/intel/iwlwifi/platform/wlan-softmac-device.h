@@ -97,7 +97,7 @@ class WlanSoftmacDevice
   fdf::WireSyncClient<fuchsia_wlan_softmac::WlanSoftmacIfc> client_;
 
   // Serves fuchsia_wlan_softmac::Service.
-  driver::OutgoingDirectory outgoing_dir_;
+  fdf::OutgoingDirectory outgoing_dir_;
 
   bool serving_wlan_softmac_instance_;
 };

@@ -38,7 +38,7 @@ struct WlantapMacImpl : WlantapMac,
         phy_config_(phy_config),
         listener_(listener),
         sme_channel_(std::move(sme_channel)),
-        outgoing_dir_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
+        outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
         serving_wlan_softmac_instance_(false) {}
 
   zx_status_t InitWlanSoftmacIfcClient() {
@@ -315,7 +315,7 @@ struct WlantapMacImpl : WlantapMac,
   std::optional<::ddk::UnbindTxn> unbind_txn_;
 
   // Serves fuchsia_wlan_softmac::Service.
-  driver::OutgoingDirectory outgoing_dir_;
+  fdf::OutgoingDirectory outgoing_dir_;
 
   bool serving_wlan_softmac_instance_;
 };

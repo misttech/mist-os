@@ -63,9 +63,4 @@ class DevfsExporter {
 
 }  // namespace fdf
 
-// TODO(fxbug.dev/114875): remove this once migration from driver to fdf is complete.
-namespace driver {
-using namespace fdf;
-}  // namespace driver
-
 #endif  // LIB_DRIVER_DEVFS_CPP_EXPORTER_H_

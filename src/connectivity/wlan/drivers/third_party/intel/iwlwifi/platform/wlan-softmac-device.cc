@@ -46,7 +46,7 @@ WlanSoftmacDevice::WlanSoftmacDevice(zx_device* parent, iwl_trans* drvdata, uint
       drvdata_(drvdata),
       iface_id_(iface_id),
       mac_started(false),
-      outgoing_dir_(driver::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
+      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
       serving_wlan_softmac_instance_(false) {}
 
 WlanSoftmacDevice::~WlanSoftmacDevice() {}
