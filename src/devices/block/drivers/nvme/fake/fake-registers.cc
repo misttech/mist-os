@@ -34,6 +34,7 @@ FakeRegisters::FakeRegisters() {
       .set_contiguous_queues_required(true)
       .set_max_queue_entries_raw(65535);
   // Admin queue doorbells.
+  fbl::AutoLock lock(&doorbells_lock_);
   completion_doorbells_.emplace(0, nvme::DoorbellReg{});
   submission_doorbells_.emplace(0, nvme::DoorbellReg{});
 }
@@ -95,15 +96,19 @@ void FakeRegisters::Write32(uint32_t val, zx_off_t offs) {
   if (offs >= nvme::NVME_REG_DOORBELL_BASE) {
     offs -= nvme::NVME_REG_DOORBELL_BASE;
     offs /= (4 << caps_.doorbell_stride());
-    bool is_completion = offs & 1;
-    auto& doorbells = is_completion ? completion_doorbells_ : submission_doorbells_;
-    offs /= 2;
-    auto iter = doorbells.find(offs);
-    ZX_ASSERT(iter != doorbells.end());
-    nvme::DoorbellReg& doorbell = iter->second;
-    doorbell.set_reg_value(val);
+    const bool is_completion = offs & 1;
+    const size_t queue_id = offs >> 1;
+    nvme::DoorbellReg* doorbell;
+    {
+      fbl::AutoLock lock(&doorbells_lock_);
+      auto& doorbells = is_completion ? completion_doorbells_ : submission_doorbells_;
+      auto iter = doorbells.find(queue_id);
+      ZX_ASSERT(iter != doorbells.end());
+      doorbell = &iter->second;
+    }
+    doorbell->set_reg_value(val);
     if (callbacks_) {
-      callbacks_->doorbell_ring(!is_completion, offs, doorbell);
+      callbacks_->doorbell_ring(!is_completion, queue_id, *doorbell);
     }
     return;
   }

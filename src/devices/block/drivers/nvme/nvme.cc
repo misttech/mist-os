@@ -105,7 +105,7 @@ zx_status_t Nvme::DoAdminCommandSync(Submission& submission,
     return status;
   }
 
-  status = sync_completion_wait(&admin_signal_, ZX_SEC(1));
+  status = sync_completion_wait(&admin_signal_, ZX_SEC(10));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Timed out waiting for admin command: %s", zx_status_get_string(status));
     return status;

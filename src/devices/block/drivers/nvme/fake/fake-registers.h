@@ -7,9 +7,13 @@
 
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zircon-internal/thread_annotations.h>
 
 #include <functional>
 #include <vector>
+
+#include <fbl/auto_lock.h>
+#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/nvme/registers.h"
 
@@ -43,10 +47,12 @@ class FakeRegisters {
   void SetCallbacks(NvmeRegisterCallbacks* callbacks) { callbacks_ = callbacks; }
 
   void SetUpCompletionDoorbell(size_t index) {
+    fbl::AutoLock lock(&doorbells_lock_);
     completion_doorbells_.emplace(index, nvme::DoorbellReg{});
   }
 
   void SetUpSubmissionDoorbell(size_t index) {
+    fbl::AutoLock lock(&doorbells_lock_);
     submission_doorbells_.emplace(index, nvme::DoorbellReg{});
   }
 
@@ -62,8 +68,10 @@ class FakeRegisters {
   nvme::AdminQueueAttributesReg admin_queue_attrs_;
   nvme::AdminQueueAddressReg admin_submission_queue_;
   nvme::AdminQueueAddressReg admin_completion_queue_;
-  std::unordered_map<size_t, nvme::DoorbellReg> completion_doorbells_;
-  std::unordered_map<size_t, nvme::DoorbellReg> submission_doorbells_;
+
+  fbl::Mutex doorbells_lock_;
+  std::unordered_map<size_t, nvme::DoorbellReg> completion_doorbells_ TA_GUARDED(doorbells_lock_);
+  std::unordered_map<size_t, nvme::DoorbellReg> submission_doorbells_ TA_GUARDED(doorbells_lock_);
 
   // Define read/write for |bits| that just crashes.
 #define STUB_IO_OP(bits)                                                                        \
