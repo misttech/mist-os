@@ -6,6 +6,14 @@ import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//src/sys/core/build/core.gni")
 
+# NOTE:  The guest image should not be varied by any of the global GN args that
+# are set by the //product/<foo>.gni product-definition files.  It should always
+# be the same regardless of the "main product" that is being built for, as it is
+# its own product-like assembly.
+#
+# The guest image is meant to be run in a VM hosted by the virtualization
+# subsystem in Fuchsia (running a Fuchsia VM on top of Fuchsia).
+
 core_realm_definition("core") {
   testonly = true
   restrict_persistent_storage = false
@@ -25,7 +33,9 @@ product_assembly_configuration("product_assembly_config") {
 
 assembled_system("guest") {
   testonly = true
-  generate_fvm = !bootfs_only
+
+  # The guest image always needs to have an fvm, because it has base packages.
+  generate_fvm = true
 
   product_assembly_config_file =
       get_label_info(":product_assembly_config", "target_out_dir") +
