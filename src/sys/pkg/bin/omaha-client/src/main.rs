@@ -8,10 +8,10 @@
 use anyhow::{anyhow, Context as _, Error};
 use fuchsia_component::server::ServiceFs;
 use futures::{lock::Mutex, prelude::*, stream::FuturesUnordered};
+use http_request::FuchsiaHyperHttpRequest;
 use omaha_client::{
     cup_ecdsa::StandardCupv2Handler, state_machine::StateMachineBuilder, time::StandardTimeSource,
 };
-use omaha_client_fuchsia::http_request;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{error, info};
@@ -23,6 +23,7 @@ mod cobalt;
 mod configuration;
 mod feedback_annotation;
 mod fidl;
+mod http_request;
 mod inspect;
 mod install_plan;
 mod installer;
@@ -87,7 +88,7 @@ async fn main_inner() -> Result<(), Error> {
     root.record_string("channel_source", format!("{:?}", channel_data.source));
 
     // HTTP
-    let http = http_request::FuchsiaHyperHttpRequest::new();
+    let http = FuchsiaHyperHttpRequest::new();
 
     let cup_handler: Option<StandardCupv2Handler> =
         platform_config.omaha_public_keys.as_ref().map(StandardCupv2Handler::new);
