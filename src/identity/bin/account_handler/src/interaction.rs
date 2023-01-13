@@ -52,6 +52,27 @@ fn create_interaction_watch_state(
     }
 }
 
+/// Get the proxy to the appropriate authenticator based on the Mechanism.
+fn get_storage_unlock_proxy(
+    mechanism: &Mechanism,
+) -> Result<StorageUnlockMechanismProxy, ApiError> {
+    if !AVAILABLE_MECHANISMS.contains(mechanism) {
+        warn!("Unsupported auth mechanism: {:?}", mechanism);
+        return Err(ApiError::InvalidRequest);
+    }
+
+    let path = format!("/svc/fuchsia.identity.authentication.{mechanism:?}StorageUnlockMechanism");
+    let auth_mechanism_proxy = client::connect_to_protocol_at_path::<StorageUnlockMechanismMarker>(
+        &path,
+    )
+    .map_err(|err| {
+        warn!("Failed to connect to authentication protocol {}: {:?}", path, err);
+        ApiError::Resource
+    })?;
+
+    Ok(auth_mechanism_proxy)
+}
+
 /// Implements the fuchsia.identity.authentication.Interaction protocol. It
 /// handles all InteractionRequests from the client and connects it to the
 /// appropriate authenticator for enrollment and authentication.
@@ -175,7 +196,7 @@ impl Interaction {
                             self.state_publisher.set(self.create_state());
                         }
                         Ok(()) => {
-                            let storage_unlock_proxy = self.get_storage_unlock_proxy()?;
+                            let storage_unlock_proxy = get_storage_unlock_proxy(&self.mechanism)?;
                             match authenticator_fn(
                                 storage_unlock_proxy,
                                 InteractionProtocolServerEnd::Password(ui),
@@ -203,7 +224,7 @@ impl Interaction {
                             self.state_publisher.set(self.create_state());
                         }
                         Ok(()) => {
-                            let storage_unlock_proxy = self.get_storage_unlock_proxy()?;
+                            let storage_unlock_proxy = get_storage_unlock_proxy(&self.mechanism)?;
                             match authenticator_fn(
                                 storage_unlock_proxy,
                                 InteractionProtocolServerEnd::Test(ui),
@@ -260,28 +281,6 @@ impl Interaction {
         }
 
         Ok(())
-    }
-
-    /// Get the proxy to the appropriate authenticator based on the Mechanism.
-    fn get_storage_unlock_proxy(&self) -> Result<StorageUnlockMechanismProxy, ApiError> {
-        if !AVAILABLE_MECHANISMS.contains(&self.mechanism) {
-            warn!("Unsupported auth mechanism: {:?}", self.mechanism);
-            return Err(ApiError::InvalidRequest);
-        }
-
-        let path = format!(
-            "/svc/fuchsia.identity.authentication.{:?}StorageUnlockMechanism",
-            self.mechanism
-        );
-        let auth_mechanism_proxy = client::connect_to_protocol_at_path::<
-            StorageUnlockMechanismMarker,
-        >(&path)
-        .map_err(|err| {
-            warn!("Failed to connect to authentication protocol {}: {:?}", path, err);
-            ApiError::Resource
-        })?;
-
-        Ok(auth_mechanism_proxy)
     }
 
     async fn start_authentication(
