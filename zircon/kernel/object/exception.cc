@@ -276,21 +276,20 @@ zx_status_t dispatch_user_exception(uint exception_type,
   // process, or no handler processed it at all.
   ProcessDispatcher* process = thread->process();
   if (status == ZX_ERR_INTERNAL_INTR_KILLED) {
+    // An exception handler has decided the process should be terminated.
     if (process->CriticalToRootJob()) {
+      // Terminating a critical process will likely reboot the system so dump some extra diagnostics
+      // to assist in debugging.
       printf("KERN: fatal exception in process critical to root job!\n");
       dump_context(get_name(process));
     }
   } else {
+    // The exception was not handled. Normally, at least crashsvc would handle the exception and
+    // make a smarter decision about what to do with it, but in case it didn't, dump some info to
+    // the kernel logs.
     auto pname = get_name(process);
-
-    if (!processed) {
-      // If no handlers even saw the exception, dump some info. Normally at
-      // least crashsvc will handle the exception and make a smarter decision
-      // about what to do with it, but in case it doesn't, dump some info to
-      // the kernel logs.
-      printf("KERN: exception_handler_worker returned %d\n", status);
-      dump_context(pname);
-    }
+    printf("KERN: exception_handler_worker returned %d\n", status);
+    dump_context(pname);
 
     printf("KERN: terminating process '%s' (%lu)\n", pname.data(), process->get_koid());
     process->Kill(ZX_TASK_RETCODE_EXCEPTION_KILL);
@@ -301,4 +300,14 @@ zx_status_t dispatch_user_exception(uint exception_type,
   ThreadDispatcher::ExitCurrent();
   panic("fell out of thread exit somehow!\n");
   __UNREACHABLE;
+}
+
+void dump_common_exception_context(const arch_exception_context_t* context) {
+  // Print the common fields in arch_exception_context.
+  //
+  // In case of a page fault exception, the error code is typecast from zx_status_t to uint32_t when
+  // populating user_synth_code. So also log the value typecast to zx_status_t to make debugging
+  // easier.
+  printf("synth_code %u (%d), synth_data %u\n", context->user_synth_code,
+         static_cast<zx_status_t>(context->user_synth_code), context->user_synth_data);
 }

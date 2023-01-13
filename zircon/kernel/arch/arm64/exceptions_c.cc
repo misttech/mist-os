@@ -562,6 +562,9 @@ extern "C" void arch_iframe_process_pending_signals(iframe_t* iframe) {
 }
 
 void arch_dump_exception_context(const arch_exception_context_t* context) {
+  // Print the common fields first.
+  dump_common_exception_context(context);
+
   // If we don't have a frame, there's nothing more we can print.
   if (context->frame == nullptr) {
     printf("no frame to dump\n");

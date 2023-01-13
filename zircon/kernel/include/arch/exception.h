@@ -32,6 +32,10 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
 // from a call to dispatch_user_exception(). Implemented by arch code.
 void arch_dump_exception_context(const arch_exception_context_t* context);
 
+// Helper to dump fields in |context| that are not architecture-specific. Called from
+// arch_dump_exception_context().
+void dump_common_exception_context(const arch_exception_context_t* context);
+
 // Sets |report| using architecture-specific information from |context|.
 // Implemented by arch code.
 void arch_fill_in_exception_context(const arch_exception_context_t* context,

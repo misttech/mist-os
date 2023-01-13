@@ -98,10 +98,6 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
     status = ZX_OK;
   }
 
-  if (status != ZX_OK) {
-    printf("PageFault: error %d for virtual address 0x%lx\n", status, addr);
-  }
-
   if (unlikely(ktrace_category_enabled("kernel:vm"_category))) {
     fxt_duration_complete(
         "kernel:vm"_category, start_time, ThreadRefFromContext(TraceContext::Thread),
