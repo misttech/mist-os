@@ -72,6 +72,9 @@ PresentId DefaultFrameScheduler::RegisterPresent(SessionId session_id,
   present_id = present_id == kInvalidPresentId ? scheduling::GetNextPresentId() : present_id;
 
   SchedulingIdPair id_pair{session_id, present_id};
+  FX_DCHECK((presents_.lower_bound(id_pair) == presents_.end()) ||
+            (presents_.lower_bound(id_pair)->first.session_id != session_id))
+      << "PresentIds for a Session must be submitted in order";
   presents_[id_pair] = std::nullopt;  // Initialize an empty entry in |presents_|.
 
   FX_DCHECK(release_fences_.find(id_pair) == release_fences_.end());
