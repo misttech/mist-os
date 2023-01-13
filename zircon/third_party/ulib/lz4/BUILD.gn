@@ -34,9 +34,6 @@ zx_library("lz4") {
   ]
 
   configs += [ "//build/config:Wno-implicit-fallthrough" ]
-
-  # TODO(https://fxbug.dev/41766): Update past https://github.com/lz4/lz4/pull/989 and remove this.
-  configs += [ ":undefined_behavior_null_pointer_arithmetic" ]
 }
 
 config("undefined_behavior_null_pointer_arithmetic") {
