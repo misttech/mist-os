@@ -23,8 +23,8 @@ use thiserror::Error;
 
 use crate::{
     ip::{
-        socket::{BufferIpSocketHandler as _, DefaultSendOptions, IpSocketHandler as _},
-        BufferIpTransportContext, IpExt, TransportReceiveError,
+        socket::DefaultSendOptions, BufferIpTransportContext, BufferTransportIpContext, IpExt,
+        TransportReceiveError,
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
@@ -35,9 +35,9 @@ use crate::{
         segment::Segment,
         seqnum::WindowSize,
         socket::{
-            do_send_inner, Acceptor, Connection, ConnectionId, Listener, ListenerId,
-            MaybeClosedConnectionId, MaybeListener, NonSyncContext, SocketAddr, SyncContext,
-            TcpIpTransportContext, TimerId,
+            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
+            ListenerId, MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext,
+            SocketAddr, Sockets, SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, UserError,
@@ -109,269 +109,355 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        let mut addrs_to_search = AddrVecIter::<IpPortSpec<I, SC::DeviceId>>::with_device(
+        let addrs_to_search = AddrVecIter::<IpPortSpec<I, SC::DeviceId>>::with_device(
             conn_addr.into(),
             device.clone(),
         );
 
-        sync_ctx.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(|ip_transport_ctx, isn, sockets| {
-            let any_usable_conn = addrs_to_search.any(|addr| {
-                match addr {
-                    // Connections are always searched before listeners because they
-                    // are more specific.
-                    AddrVec::Conn(conn_addr) => {
-                        let conn_id = if let Some(conn_id) = sockets.socketmap.conns().get_by_addr(&conn_addr).cloned() {
-                            conn_id
-                        } else {
-                            return false;
-                        };
-
-                        let (conn, _, addr) = sockets
-                            .socketmap
-                            .conns_mut()
-                            .get_by_id_mut(&conn_id)
-                            .expect("inconsistent state: invalid connection id");
-
-                        let Connection { acceptor: _, state, ip_sock, defunct, keep_alive } = conn;
-
-                        // Send the reply to the segment immediately.
-                        let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, keep_alive);
-
-                        // If the incoming segment caused the state machine to
-                        // enter Closed state, and the user has already promised
-                        // not to use the connection again, we can remove the
-                        // connection from the socketmap.
-                        if *defunct && matches!(state, State::Closed(_)) {
-                            assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
-                            let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
-                            return true;
-                        }
-
-                        if let Some(seg) = reply {
-                            let body = tcp_serialize_segment(seg, conn_addr.ip);
-                            match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
-                                Ok(()) => {}
-                                Err((body, err)) => {
-                                    // TODO(https://fxbug.dev/101993): Increment the counter.
-                                    trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-                                }
-                            }
-                        }
-
-                        // Send any enqueued data, if there is any.
-                        do_send_inner(conn_id, conn, addr, ip_transport_ctx, ctx);
-
-                        // Enqueue the connection to the associated listener
-                        // socket's accept queue.
-                        if let Some(passive_open) = passive_open {
-                            let acceptor_id = assert_matches!(conn, Connection {
-                                acceptor: Some(Acceptor::Pending(listener_id)),
-                                state: _,
-                                ip_sock: _,
-                                defunct: _,
-                                keep_alive: _,
-                            } => {
-                                let listener_id = *listener_id;
-                                conn.acceptor = Some(Acceptor::Ready(listener_id));
-                                listener_id
-                            });
-                            let acceptor =
-                                sockets.get_listener_by_id_mut(acceptor_id).expect("orphaned acceptee");
-                            let pos = acceptor
-                                .pending
-                                .iter()
-                                .position(|x| MaybeClosedConnectionId::from(*x) == conn_id)
-                                .expect("acceptee is not found in acceptor's pending queue");
-                            let conn = acceptor.pending.swap_remove(pos);
-                            acceptor.ready.push_back((conn, passive_open));
-                            ctx.on_new_connection(acceptor_id);
-                        }
-
-                        // We found a valid connection for the segment.
-                        true
-                    }
-                    AddrVec::Listen(listener_addr) => {
-                        let socketmap = &mut sockets.socketmap;
-
-                        // If we have a listener and the incoming segment is a SYN, we
-                        // allocate a new connection entry in the demuxer.
-                        // TODO(https://fxbug.dev/101992): Support SYN cookies.
-                        let listener_id = if let Some(id) = socketmap.listeners().get_by_addr(&listener_addr).cloned() {
-                            id
-                        } else {
-                            return false;
-                        };
-
-                        let (maybe_listener, (), listener_addr) = socketmap
-                            .listeners()
-                            .get_by_id(&listener_id)
-                            .expect("invalid listener_id");
-
-                        let Listener {pending, backlog, buffer_sizes, ready, keep_alive } = match maybe_listener {
-                            MaybeListener::Bound(_bound) => {
-                                // If the socket is only bound, but not listening.
-                                return false;
-                            }
-                            MaybeListener::Listener(listener) => listener,
-                        };
-
-                        if pending.len() + ready.len() == backlog.get() {
-                            // TODO(https://fxbug.dev/101993): Increment the counter.
-                            trace!(
-                                "incoming SYN dropped because of the full backlog of the listener"
-                            );
-                            return true;
-                        }
-
-                        let ListenerAddr {ip: _, device: bound_device} = listener_addr;
-                        let ip_sock = match ip_transport_ctx.new_ip_socket(
-                            ctx,
-                            bound_device.as_ref(),
-                            Some(local_ip),
-                            remote_ip,
-                            IpProto::Tcp.into(),
-                            DefaultSendOptions,
-                        ) {
-                            Ok(ip_sock) => ip_sock,
-                            Err(err) => {
-                                // TODO(https://fxbug.dev/101993): Increment the counter.
-                                trace!(
-                                    "cannot construct an ip socket to the SYN originator: {:?}, ignoring",
-                                    err
-                                );
-                                return false;
-                            }
-                        };
-
-                        let now = ctx.now();
-                        let isn = isn.generate(
-                            now,
-                            SocketAddr { ip: ip_sock.local_ip().clone(), port: local_port },
-                            SocketAddr { ip: ip_sock.remote_ip().clone(), port: remote_port },
-                        );
-
-                        let mut state = State::Listen(Closed::<Initial>::listen(isn, buffer_sizes.clone()));
-                        let reply = assert_matches!(
-                            state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),
-                            (reply, None) => reply
-                        );
-                        if let Some(seg) = reply {
-                            let body = tcp_serialize_segment(seg, conn_addr);
-                            match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
-                                Ok(()) => {}
-                                Err((body, err)) => {
-                                    // TODO(https://fxbug.dev/101993): Increment the counter.
-                                    trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-                                }
-                            }
-                        }
-
-                        if matches!(state, State::SynRcvd(_)) {
-                            let poll_send_at =
-                                state.poll_send_at().expect("no retrans timer");
-                            let bound_device = bound_device.clone();
-                            let keep_alive = keep_alive.clone();
-                            let conn_id = socketmap
-                                .conns_mut()
-                                .try_insert(
-                                    ConnAddr {
-                                        ip: ConnIpAddr {
-                                            local: (local_ip, local_port),
-                                            remote: (remote_ip, remote_port),
-                                        },
-                                        device: bound_device,
-                                    },
-                                    Connection {
-                                        acceptor: Some(Acceptor::Pending(ListenerId(
-                                            listener_id.into(),
-                                            IpVersionMarker::default(),
-                                        ))),
-                                        state,
-                                        ip_sock,
-                                        defunct: false,
-                                        keep_alive,
-                                    },
-                                    // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
-                                    (),
-                                )
-                                .expect("failed to create a new connection")
-                                .id();
-                            assert_eq!(
-                                ctx.schedule_timer_instant(
-                                    poll_send_at,
-                                    TimerId::new::<I>(conn_id),
-                                ),
-                                None
-                            );
-                            let (maybe_listener, _, _): (_, &(), &ListenerAddr<_, _, _>) =
-                                sockets.socketmap
-                                .listeners_mut()
-                                .get_by_id_mut(&listener_id)
-                                .expect("the listener must still be active");
-
-                            match maybe_listener {
-                                MaybeListener::Bound(_bound) => {
-                                    unreachable!(
-                                        "the listener must be active because we got here"
-                                    );
-                                }
-                                MaybeListener::Listener(listener) => {
-                                    // This conversion is fine because
-                                    // `conn_id` is newly created; No one
-                                    // should have called close on it.
-                                    let MaybeClosedConnectionId(id, marker) = conn_id;
-                                    listener.pending.push(ConnectionId(id, marker));
-                                }
-                            }
-                        }
-
-                        // We found a valid listener for the segment.
-                        true
-                    }
-                }
-            });
-
-            if !any_usable_conn {
-                // There is no existing TCP state, pretend it is closed
-                // and generate a RST if needed.
-                // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
-                // CLOSED is fictional because it represents the state when
-                // there is no TCB, and therefore, no connection.
-                if let Some(seg) =
-                    (Closed { reason: UserError::ConnectionClosed }.on_segment(incoming))
-                {
-                    match ip_transport_ctx.new_ip_socket(
-                        ctx,
-                        None,
-                        Some(local_ip),
-                        remote_ip,
-                        IpProto::Tcp.into(),
-                        DefaultSendOptions,
-                    ) {
-                        Ok(ip_sock) => {
-                            let body = tcp_serialize_segment(seg, conn_addr);
-                            match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
-                                Ok(()) => {}
-                                Err((body, err)) => {
-                                    // TODO(https://fxbug.dev/101993): Increment the counter.
-                                    trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            // TODO(https://fxbug.dev/101993): Increment the counter.
-                            trace!(
-                                "cannot construct an ip socket to respond RST: {:?}, ignoring",
-                                err
-                            );
-                        }
-                    }
-                }
-            }
-        });
+        sync_ctx.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
+            |ip_transport_ctx, isn, sockets| {
+                handle_incoming_packet::<I, B, C, SC::IpTransportCtx>(
+                    ctx,
+                    ip_transport_ctx,
+                    isn,
+                    sockets,
+                    conn_addr,
+                    addrs_to_search,
+                    incoming,
+                    now,
+                )
+            },
+        );
 
         Ok(())
     }
+}
+
+fn handle_incoming_packet<I, B, C, SC>(
+    ctx: &mut C,
+    ip_transport_ctx: &mut SC,
+    isn: &IsnGenerator<C::Instant>,
+    sockets: &mut Sockets<I, SC::DeviceId, C>,
+    conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+    mut addrs_to_search: AddrVecIter<IpPortSpec<I, SC::DeviceId>>,
+    incoming: Segment<&[u8]>,
+    now: C::Instant,
+) where
+    I: IpExt,
+    B: BufferMut,
+    C: NonSyncContext
+        + BufferProvider<
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+        >,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+{
+    let any_usable_conn = addrs_to_search.any(|addr| {
+        match addr {
+            // Connections are always searched before listeners because they
+            // are more specific.
+            AddrVec::Conn(conn_addr) => {
+                if let Some(conn_id) = sockets.socketmap.conns().get_by_addr(&conn_addr).cloned() {
+                    try_handle_incoming_for_connection::<I, SC, C, B>(
+                        ip_transport_ctx,
+                        ctx,
+                        sockets,
+                        conn_addr,
+                        conn_id,
+                        incoming,
+                        now,
+                    )
+                } else {
+                    return false;
+                }
+            }
+            AddrVec::Listen(listener_addr) => {
+                // If we have a listener and the incoming segment is a SYN, we
+                // allocate a new connection entry in the demuxer.
+                // TODO(https://fxbug.dev/101992): Support SYN cookies.
+
+                if let Some(id) = sockets.socketmap.listeners().get_by_addr(&listener_addr).cloned()
+                {
+                    try_handle_incoming_for_listener::<I, SC, C, B>(
+                        ip_transport_ctx,
+                        ctx,
+                        sockets,
+                        isn,
+                        id,
+                        incoming,
+                        conn_addr,
+                        now,
+                    )
+                } else {
+                    return false;
+                }
+            }
+        }
+    });
+
+    let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
+    if !any_usable_conn {
+        // There is no existing TCP state, pretend it is closed
+        // and generate a RST if needed.
+        // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
+        // CLOSED is fictional because it represents the state when
+        // there is no TCB, and therefore, no connection.
+        if let Some(seg) = (Closed { reason: UserError::ConnectionClosed }.on_segment(incoming)) {
+            match ip_transport_ctx.new_ip_socket(
+                ctx,
+                None,
+                Some(local_ip),
+                remote_ip,
+                IpProto::Tcp.into(),
+                DefaultSendOptions,
+            ) {
+                Ok(ip_sock) => {
+                    let body = tcp_serialize_segment(seg, conn_addr);
+                    match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
+                        Ok(()) => {}
+                        Err((body, err)) => {
+                            // TODO(https://fxbug.dev/101993): Increment the counter.
+                            trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+                        }
+                    }
+                }
+                Err(err) => {
+                    // TODO(https://fxbug.dev/101993): Increment the counter.
+                    trace!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
+                }
+            }
+        }
+    }
+}
+
+/// Tries to handle the incoming segment by providing it to a connected socket.
+///
+/// Returns `true` if the segment was handled, `false` if a different socket
+/// should be tried.
+fn try_handle_incoming_for_connection<I, SC, C, B>(
+    ip_transport_ctx: &mut SC,
+    ctx: &mut C,
+    sockets: &mut Sockets<I, SC::DeviceId, C>,
+    conn_addr: ConnAddr<I::Addr, SC::DeviceId, NonZeroU16, NonZeroU16>,
+    conn_id: MaybeClosedConnectionId<I>,
+    incoming: Segment<&[u8]>,
+    now: C::Instant,
+) -> bool
+where
+    I: IpExt,
+    B: BufferMut,
+    C: NonSyncContext
+        + BufferProvider<
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+        >,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+{
+    let (conn, _, addr) = sockets
+        .socketmap
+        .conns_mut()
+        .get_by_id_mut(&conn_id)
+        .expect("inconsistent state: invalid connection id");
+
+    let Connection { acceptor: _, state, ip_sock, defunct, keep_alive } = conn;
+
+    // Send the reply to the segment immediately.
+    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, keep_alive);
+
+    // If the incoming segment caused the state machine to
+    // enter Closed state, and the user has already promised
+    // not to use the connection again, we can remove the
+    // connection from the socketmap.
+    if *defunct && matches!(state, State::Closed(_)) {
+        assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
+        let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
+        return true;
+    }
+
+    if let Some(seg) = reply {
+        let body = tcp_serialize_segment(seg, conn_addr.ip);
+        match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
+            Ok(()) => {}
+            Err((body, err)) => {
+                // TODO(https://fxbug.dev/101993): Increment the counter.
+                trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+            }
+        }
+    }
+
+    // Send any enqueued data, if there is any.
+    do_send_inner(conn_id, conn, addr, ip_transport_ctx, ctx);
+
+    // Enqueue the connection to the associated listener
+    // socket's accept queue.
+    if let Some(passive_open) = passive_open {
+        let acceptor_id = assert_matches!(conn, Connection {
+            acceptor: Some(Acceptor::Pending(listener_id)),
+            state: _,
+            ip_sock: _,
+            defunct: _,
+            keep_alive: _,
+        } => {
+            let listener_id = *listener_id;
+            conn.acceptor = Some(Acceptor::Ready(listener_id));
+            listener_id
+        });
+        let acceptor = sockets.get_listener_by_id_mut(acceptor_id).expect("orphaned acceptee");
+        let pos = acceptor
+            .pending
+            .iter()
+            .position(|x| MaybeClosedConnectionId::from(*x) == conn_id)
+            .expect("acceptee is not found in acceptor's pending queue");
+        let conn = acceptor.pending.swap_remove(pos);
+        acceptor.ready.push_back((conn, passive_open));
+        ctx.on_new_connection(acceptor_id);
+    }
+
+    // We found a valid connection for the segment.
+    true
+}
+
+/// Tries to handle an incoming segment by passing it to a listening socket.
+///
+/// Returns `true` if the segment was handled, otherwise `false`.
+fn try_handle_incoming_for_listener<I, SC, C, B>(
+    ip_transport_ctx: &mut SC,
+    ctx: &mut C,
+    sockets: &mut Sockets<I, SC::DeviceId, C>,
+    isn: &IsnGenerator<C::Instant>,
+    listener_id: MaybeListenerId<I>,
+    incoming: Segment<&[u8]>,
+    incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+    now: C::Instant,
+) -> bool
+where
+    I: IpExt,
+    B: BufferMut,
+    C: NonSyncContext
+        + BufferProvider<
+            C::ReceiveBuffer,
+            C::SendBuffer,
+            ActiveOpen = <C as NonSyncContext>::ProvidedBuffers,
+            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+        >,
+    SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
+{
+    let socketmap = &mut sockets.socketmap;
+    let (maybe_listener, (), listener_addr) =
+        socketmap.listeners().get_by_id(&listener_id).expect("invalid listener_id");
+
+    let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
+        incoming_addrs;
+
+    let Listener { pending, backlog, buffer_sizes, ready, keep_alive } = match maybe_listener {
+        MaybeListener::Bound(_bound) => {
+            // If the socket is only bound, but not listening.
+            return false;
+        }
+        MaybeListener::Listener(listener) => listener,
+    };
+
+    if pending.len() + ready.len() == backlog.get() {
+        // TODO(https://fxbug.dev/101993): Increment the counter.
+        trace!("incoming SYN dropped because of the full backlog of the listener");
+        return true;
+    }
+
+    let ListenerAddr { ip: _, device: bound_device } = listener_addr;
+    let ip_sock = match ip_transport_ctx.new_ip_socket(
+        ctx,
+        bound_device.as_ref(),
+        Some(local_ip),
+        remote_ip,
+        IpProto::Tcp.into(),
+        DefaultSendOptions,
+    ) {
+        Ok(ip_sock) => ip_sock,
+        Err(err) => {
+            // TODO(https://fxbug.dev/101993): Increment the counter.
+            trace!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
+            return false;
+        }
+    };
+
+    let isn = isn.generate(
+        now,
+        SocketAddr { ip: ip_sock.local_ip().clone(), port: local_port },
+        SocketAddr { ip: ip_sock.remote_ip().clone(), port: remote_port },
+    );
+
+    let mut state = State::Listen(Closed::<Initial>::listen(isn, buffer_sizes.clone()));
+    let reply = assert_matches!(
+        state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),
+        (reply, None) => reply
+    );
+    if let Some(seg) = reply {
+        let body = tcp_serialize_segment(seg, incoming_addrs);
+        match ip_transport_ctx.send_ip_packet(ctx, &ip_sock, body, None) {
+            Ok(()) => {}
+            Err((body, err)) => {
+                // TODO(https://fxbug.dev/101993): Increment the counter.
+                trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
+            }
+        }
+    }
+
+    if matches!(state, State::SynRcvd(_)) {
+        let poll_send_at = state.poll_send_at().expect("no retrans timer");
+        let bound_device = bound_device.clone();
+        let keep_alive = keep_alive.clone();
+        let conn_id = socketmap
+            .conns_mut()
+            .try_insert(
+                ConnAddr {
+                    ip: ConnIpAddr {
+                        local: (local_ip, local_port),
+                        remote: (remote_ip, remote_port),
+                    },
+                    device: bound_device,
+                },
+                Connection {
+                    acceptor: Some(Acceptor::Pending(ListenerId(
+                        listener_id.into(),
+                        IpVersionMarker::default(),
+                    ))),
+                    state,
+                    ip_sock,
+                    defunct: false,
+                    keep_alive,
+                },
+                // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
+                (),
+            )
+            .expect("failed to create a new connection")
+            .id();
+        assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
+        let (maybe_listener, _, _): (_, &(), &ListenerAddr<_, _, _>) = sockets
+            .socketmap
+            .listeners_mut()
+            .get_by_id_mut(&listener_id)
+            .expect("the listener must still be active");
+
+        match maybe_listener {
+            MaybeListener::Bound(_bound) => {
+                unreachable!("the listener must be active because we got here");
+            }
+            MaybeListener::Listener(listener) => {
+                // This conversion is fine because
+                // `conn_id` is newly created; No one
+                // should have called close on it.
+                let MaybeClosedConnectionId(id, marker) = conn_id;
+                listener.pending.push(ConnectionId(id, marker));
+            }
+        }
+    }
+
+    // We found a valid listener for the segment.
+    true
 }
 
 #[derive(Error, Debug)]
