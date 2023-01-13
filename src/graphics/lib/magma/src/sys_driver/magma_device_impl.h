@@ -179,9 +179,9 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     magma_system_device_->GetIcdList(&msd_icd_infos);
     std::vector<fuchsia_gpu_magma::wire::IcdInfo> icd_infos;
     for (auto& item : msd_icd_infos) {
-      fuchsia_gpu_magma::wire::IcdInfo icd_info(allocator);
-      icd_info.set_component_url(allocator, fidl::StringView::FromExternal(
-                                                item.component_url, strlen(item.component_url)));
+      auto icd_info = fuchsia_gpu_magma::wire::IcdInfo::Builder(allocator);
+      icd_info.component_url(
+          fidl::StringView::FromExternal(item.component_url, strlen(item.component_url)));
       fuchsia_gpu_magma::wire::IcdFlags flags;
       if (item.support_flags & ICD_SUPPORT_FLAG_VULKAN)
         flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan;
@@ -189,8 +189,8 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
         flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsOpencl;
       if (item.support_flags & ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY)
         flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsMediaCodecFactory;
-      icd_info.set_flags(flags);
-      icd_infos.push_back(icd_info);
+      icd_info.flags(flags);
+      icd_infos.push_back(icd_info.Build());
     }
 
     completer.Reply(fidl::VectorView<fuchsia_gpu_magma::wire::IcdInfo>::FromExternal(icd_infos));
