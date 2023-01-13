@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "physboot.h"
+
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/code-patches.h>
@@ -13,15 +15,12 @@
 #include <stdio.h>
 #include <zircon/assert.h>
 
-#include <ktl/array.h>
 #include <ktl/move.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
-#include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 #include <phys/uart.h>
 
 #include "handoff-prep.h"
@@ -43,8 +42,6 @@ using ChainBoot = BootZbi;
 #include <ktl/enforce.h>
 
 namespace {
-
-PhysBootTimes gBootTimes;
 
 // A guess about the upper bound on reserve_memory_size so we can do a single
 // allocation before decoding the header and probably not need to relocate.
@@ -91,6 +88,8 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 
   return boot;
 }
+
+}  // namespace
 
 [[noreturn]] void BootZircon(KernelStorage kernel_storage) {
   KernelStorage::Bootfs kernelfs;
@@ -191,50 +190,4 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   // for booting, the PhysHandoff pointer (physical address) is now the
   // argument to the kernel, not the data ZBI address.
   boot.Boot(prep.handoff());
-}
-
-}  // namespace
-
-void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
-  gBootTimes.Set(PhysBootTimes::kZbiEntry, ticks);
-
-  MainSymbolize symbolize("physboot");
-
-  InitMemory(zbi_ptr);
-
-  // This marks the interval between handoff from the boot loader (kZbiEntry)
-  // and phys environment setup with identity-mapped memory management et al.
-  gBootTimes.SampleNow(PhysBootTimes::kPhysSetup);
-
-  // Start collecting the log in memory as well as logging to the console.
-  Log log;
-
-  {
-    // Prime the log with what would already have been written to the console
-    // under kernel.phys.verbose=true (even if it wasn't), but don't send that
-    // to the console.
-    FILE log_file{&log};
-    symbolize.ContextAlways(&log_file);
-    Allocation::GetPool().PrintMemoryRanges(symbolize.name(), &log_file);
-  }
-
-  // Now mirror all stdout to the log, and write debugf there even if verbose
-  // logging to stdout is disabled.
-  gLog = &log;
-  log.SetStdout();
-
-  auto zbi_header = static_cast<zbi_header_t*>(zbi_ptr);
-  auto zbi = zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(zbi_header);
-
-  // Unpack the compressed KERNEL_STORAGE payload.
-  KernelStorage kernel_storage;
-  kernel_storage.Init(zbitl::View{zbi});
-  kernel_storage.GetTimes(gBootTimes);
-
-  // TODO(mcgrathr): Bloat the binary so the total kernel.zbi size doesn't
-  // get too comfortably small while physboot functionality is still growing.
-  static const ktl::array<char, 512 * 1024> kPad{1};
-  __asm__ volatile("" ::"m"(kPad), "r"(kPad.data()));
-
-  BootZircon(ktl::move(kernel_storage));
 }

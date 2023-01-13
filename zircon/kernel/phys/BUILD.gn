@@ -563,30 +563,49 @@ group("boot_tests") {
 }
 
 zbi_executable("physboot") {
-  sources = [ "physboot.cc" ]
+  sources = [ "physboot-zbi-main.cc" ]
   deps = [
     ":allocation",
     ":boot-zbi",
     ":handoff",
-    ":handoff-prep",
     ":kernel-package",
     ":log",
     ":main",
-    ":stdio",
+    ":physboot-main",
     ":symbolize",
-    ":trampoline-boot",
-    ":uart",
-    "//src/lib/zbitl",
-    "//zircon/kernel/arch/$zircon_cpu/code-patches",
-    "//zircon/kernel/lib/arch",
-    "//zircon/kernel/lib/boot-options",
-    "//zircon/kernel/lib/code-patching",
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/libc",
   ]
+}
 
-  # Used as a bias when patching kernel code.
-  defines = [ "KERNEL_LINK_ADDRESS=${kernel_base}" ]
+if (toolchain_environment == "kernel.phys") {
+  source_set("physboot-main") {
+    public = [ "physboot.h" ]
+    sources = [ "physboot.cc" ]
+    deps = [
+      ":allocation",
+      ":boot-zbi",
+      ":handoff",
+      ":handoff-prep",
+      ":kernel-package",
+      ":log",
+      ":main",
+      ":stdio",
+      ":symbolize",
+      ":trampoline-boot",
+      ":uart",
+      "//src/lib/zbitl",
+      "//zircon/kernel/arch/$zircon_cpu/code-patches",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/code-patching",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+
+    # Used as a bias when patching kernel code.
+    defines = [ "KERNEL_LINK_ADDRESS=${kernel_base}" ]
+  }
 }
 
 if (is_kernel) {
