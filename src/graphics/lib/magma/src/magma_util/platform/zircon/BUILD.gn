@@ -81,8 +81,6 @@ source_set("dependency_injection_device") {
 }
 
 entry_deps = [
-  ":dependency_injection_device",
-  ":performance_counter_device",
   ":status",
   ":thread_profile",
   "..:logger",

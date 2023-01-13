@@ -19,8 +19,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 
-#include "magma_dependency_injection_device.h"
-#include "magma_performance_counter_device.h"
 #include "magma_util/macros.h"
 #include "platform_handle.h"
 #include "platform_logger.h"
@@ -40,19 +38,9 @@ class GpuDevice;
 using DdkDeviceType =
     ddk::Device<GpuDevice, magma::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
 
-class GpuDevice : public magma::MagmaDependencyInjectionDevice::Owner,
-                  public DdkDeviceType,
-                  public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
+class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
  public:
   explicit GpuDevice(zx_device_t* parent_device) : DdkDeviceType(parent_device) {}
-
-  // magma::MagmaDependencyInjection::Owner implementation.
-  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override {
-    std::lock_guard lock(magma_mutex());
-    last_memory_pressure_level_ = level;
-    if (magma_system_device())
-      magma_system_device()->SetMemoryPressureLevel(level);
-  }
 
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
@@ -62,41 +50,19 @@ class GpuDevice : public magma::MagmaDependencyInjectionDevice::Owner,
 
  private:
   zx_status_t MagmaStart() MAGMA_REQUIRES(magma_mutex());
-
-  zx_koid_t perf_counter_koid_ = 0;
-  std::optional<MagmaMemoryPressureLevel> last_memory_pressure_level_ MAGMA_GUARDED(magma_mutex());
 };
 
 zx_status_t GpuDevice::MagmaStart() {
   set_magma_system_device(magma_driver()->CreateDevice(parent()));
   if (!magma_system_device())
     return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
-  magma_system_device()->set_perf_count_access_token_id(perf_counter_koid_);
-  if (last_memory_pressure_level_) {
-    magma_system_device()->SetMemoryPressureLevel(*last_memory_pressure_level_);
-  }
+  InitSystemDevice();
   return ZX_OK;
 }
 
 void GpuDevice::DdkInit(ddk::InitTxn txn) {
   set_zx_device(zxdev());
-  std::lock_guard<std::mutex> lock(magma_mutex());
-  if (!magma::MagmaPerformanceCounterDevice::AddDevice(zxdev(), &perf_counter_koid_)) {
-    txn.Reply(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  magma_system_device()->set_perf_count_access_token_id(perf_counter_koid_);
-
-  auto dependency_injection_device =
-      std::make_unique<magma::MagmaDependencyInjectionDevice>(zxdev(), this);
-  if (magma::MagmaDependencyInjectionDevice::Bind(std::move(dependency_injection_device)) !=
-      ZX_OK) {
-    txn.Reply(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  txn.Reply(ZX_OK);
+  txn.Reply(InitChildDevices());
 }
 
 void GpuDevice::DdkUnbind(ddk::UnbindTxn txn) {

@@ -59,6 +59,7 @@ class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_
       return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
 
     DLOG("Created device %p", magma_system_device());
+    InitSystemDevice();
 
     return ZX_OK;
   }
@@ -71,21 +72,11 @@ class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_
 
  private:
   intel_gpu_core_protocol_t gpu_core_protocol_;
-
-  zx_koid_t perf_count_access_token_id_ = 0;
 };
 
 void IntelDevice::DdkInit(ddk::InitTxn txn) {
   set_zx_device(zxdev());
-  std::lock_guard<std::mutex> lock(magma_mutex());
-  if (!magma::MagmaPerformanceCounterDevice::AddDevice(zxdev(), &perf_count_access_token_id_)) {
-    txn.Reply(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  magma_system_device()->set_perf_count_access_token_id(perf_count_access_token_id_);
-
-  txn.Reply(ZX_OK);
+  txn.Reply(InitChildDevices());
 }
 
 void IntelDevice::DdkUnbind(ddk::UnbindTxn txn) {

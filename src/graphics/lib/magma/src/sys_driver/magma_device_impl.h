@@ -10,6 +10,8 @@
 
 #include <ddktl/device.h>
 
+#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_dependency_injection_device.h"
+#include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "sys_driver/magma_driver.h"
 
@@ -24,7 +26,8 @@ using DeviceType = fuchsia_gpu_magma::CombinedDevice;
 // mixin. `D` is the type of the subclass (CRTP), which will be supplied by ddk::Device. The class
 // is thread-safe.
 template <typename D>
-class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D> {
+class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
+                        public magma::MagmaDependencyInjectionDevice::Owner {
  public:
   using fws = fidl::WireServer<DeviceType>;
 
@@ -57,6 +60,42 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D> {
     magma_system_device_->Shutdown();
     magma_system_device_.reset();
     return ZX_OK;
+  }
+
+  // Initialize child devices that are used for various purposes. Must be called exactly once,
+  // within DdkInit().
+  zx_status_t InitChildDevices() {
+    std::lock_guard<std::mutex> lock(magma_mutex_);
+    ZX_DEBUG_ASSERT(zx_device_);
+    if (!magma::MagmaPerformanceCounterDevice::AddDevice(zx_device_, &perf_counter_koid_)) {
+      return ZX_ERR_INTERNAL;
+    }
+
+    magma_system_device_->set_perf_count_access_token_id(perf_counter_koid_);
+
+    auto dependency_injection_device =
+        std::make_unique<magma::MagmaDependencyInjectionDevice>(zx_device_, this);
+    if (magma::MagmaDependencyInjectionDevice::Bind(std::move(dependency_injection_device)) !=
+        ZX_OK) {
+      return ZX_ERR_INTERNAL;
+    }
+    return ZX_OK;
+  }
+
+  // magma::MagmaDependencyInjection::Owner implementation.
+  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override {
+    std::lock_guard lock(magma_mutex_);
+    last_memory_pressure_level_ = level;
+    if (magma_system_device_)
+      magma_system_device_->SetMemoryPressureLevel(level);
+  }
+
+  // Initialize magma_system_device_ on creation.
+  void InitSystemDevice() MAGMA_REQUIRES(magma_mutex_) {
+    magma_system_device_->set_perf_count_access_token_id(perf_counter_koid_);
+    if (last_memory_pressure_level_) {
+      magma_system_device_->SetMemoryPressureLevel(*last_memory_pressure_level_);
+    }
   }
 
   template <typename T>
@@ -172,6 +211,8 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D> {
   std::unique_ptr<MagmaDriver> magma_driver_ MAGMA_GUARDED(magma_mutex_);
   std::shared_ptr<MagmaSystemDevice> magma_system_device_ MAGMA_GUARDED(magma_mutex_);
   zx_device_t* zx_device_ = nullptr;
+  zx_koid_t perf_counter_koid_ = 0;
+  std::optional<MagmaMemoryPressureLevel> last_memory_pressure_level_ MAGMA_GUARDED(magma_mutex_);
 #if MAGMA_TEST_DRIVER
   zx_status_t unit_test_status_ = ZX_ERR_NOT_SUPPORTED;
 #endif
