@@ -101,29 +101,7 @@ mod tests {
     use anyhow::anyhow;
     use async_trait::async_trait;
     use ffx_emulator_config::{EmulatorEngine, EngineType};
-    use lazy_static::lazy_static;
-    use std::{
-        str,
-        sync::{Mutex, MutexGuard},
-    };
-
-    // Since we are mocking global methods, we need to synchronize
-    // the setting of the expectations on the mock. This is done using a Mutex.
-    lazy_static! {
-        static ref MTX: Mutex<()> = Mutex::new(());
-    }
-
-    // When a test panics, it will poison the Mutex. Since we don't actually
-    // care about the state of the data we ignore that it is poisoned and grab
-    // the lock regardless.  If you just do `let _m = &MTX.lock().unwrap()`, one
-    // test panicking will cause all other tests that try and acquire a lock on
-    // that Mutex to also panic.
-    fn get_lock(m: &'static Mutex<()>) -> MutexGuard<'static, ()> {
-        match m.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
+    use std::str;
 
     /// TestEngine is a test struct for implementing the EmulatorEngine trait
     /// Currently this one only exposes the running flag which is returned from
@@ -147,11 +125,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_empty_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         // no existing instances
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec![]));
@@ -170,11 +145,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_new_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["notrunning_emu".to_string()]));
         let cmd = ListCommand { only_running: false };
@@ -198,11 +170,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_configured_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["notrunning_emu".to_string()]));
         let cmd = ListCommand { only_running: false };
@@ -226,11 +195,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_staged_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["notrunning_emu".to_string()]));
         let cmd = ListCommand { only_running: false };
@@ -254,11 +220,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_running_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["running_emu".to_string()]));
         let cmd = ListCommand { only_running: false };
@@ -283,11 +246,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_running_flag() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect()
             .returning(|| {
@@ -422,11 +382,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_error_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["running_emu".to_string()]));
         let cmd = ListCommand { only_running: false };
@@ -451,11 +408,8 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_broken_list() -> Result<()> {
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
-
         let ctx = mock_modules::get_all_instances_context();
         ctx.expect().returning(|| Ok(vec!["error_emu".to_string()]));
         let cmd = ListCommand { only_running: false };

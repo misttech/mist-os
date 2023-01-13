@@ -685,29 +685,9 @@ mod tests {
     use async_trait::async_trait;
     use ffx_config::{query, ConfigLevel};
     use ffx_emulator_config::EngineType;
-    use lazy_static::lazy_static;
     use serde::Serialize;
     use serde_json::json;
-    use std::sync::{Mutex, MutexGuard};
     use tempfile::{tempdir, TempDir};
-
-    // Since we are mocking global methods, we need to synchronize
-    // the setting of the expectations on the mock. This is done using a Mutex.
-    lazy_static! {
-        static ref MTX: Mutex<()> = Mutex::new(());
-    }
-
-    // When a test panics, it will poison the Mutex. Since we don't actually
-    // care about the state of the data we ignore that it is poisoned and grab
-    // the lock regardless.  If you just do `let _m = &MTX.lock().unwrap()`, one
-    // test panicking will cause all other tests that try and acquire a lock on
-    // that Mutex to also panic.
-    fn get_lock(m: &'static Mutex<()>) -> MutexGuard<'static, ()> {
-        match m.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
 
     #[derive(Default, Serialize)]
     struct TestEngine {}
@@ -801,16 +781,13 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_staging_no_reuse() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         let root = setup(&mut emu_config.guest, &temp).await?;
-
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -884,6 +861,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_staging_with_reuse() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
@@ -891,10 +869,6 @@ mod tests {
         let mut emu_config = EmulatorConfiguration::default();
 
         let root = setup(&mut emu_config.guest, &temp).await?;
-
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -969,16 +943,13 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_embed_boot_data() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let mut emu_config = EmulatorConfiguration::default();
 
         let root = setup(&mut emu_config.guest, &temp).await?;
-
-        // get the lock for the mock, it is released when
-        // the test exits.
-        let _m = get_lock(&MTX);
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));

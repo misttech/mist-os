@@ -20,8 +20,8 @@ if (is_host) {
     test_deps = [
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:mockall",
+      "//third_party/rust_crates:serial_test",
     ]
     args_sources = [ "src/args.rs" ]
     sources = [ "src/lib.rs" ]
