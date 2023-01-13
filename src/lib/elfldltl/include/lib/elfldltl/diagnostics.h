@@ -92,6 +92,11 @@ namespace elfldltl {
 //   the limit of the resource are unknown at compile time like
 //   PreallocatedVector with a dynamic extent.
 //
+// * `bool UndefinedSymbol(std::string_view sym_name)`
+//
+//    UndefinedSymbol is an error used when the current linking task cannot
+//    be completed because of an undefined symbol.
+//
 // * `bool SystemError(std::string_view error, ...)`
 //
 //    SystemError is used when the system cannot fulfill an otherwise valid
@@ -255,6 +260,10 @@ class Diagnostics {
   template <typename... Args>
   constexpr bool SystemError(std::string_view error, Args&&... args) {
     return FormatError(error, args...);
+  }
+
+  constexpr bool UndefinedSymbol(std::string_view sym_name) {
+    return FormatError("undefined symbol: ", sym_name);
   }
 
  private:

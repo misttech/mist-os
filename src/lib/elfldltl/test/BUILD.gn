@@ -28,6 +28,7 @@ test("elfldltl-unittests") {
     "note-tests.cc",
     "phdr-tests.cc",
     "relocation-tests.cc",
+    "resolve-tests.cc",
     "soname-tests.cc",
     "symbol-tests.cc",
     "symbol-tests.h",
@@ -51,6 +52,8 @@ test("elfldltl-unittests") {
   if (is_elf) {
     deps += [ ":loader-tests" ]
   }
+
+  data_deps = [ ":resolve_test_dsos" ]
 }
 
 source_set("test-utils") {
@@ -73,6 +76,29 @@ source_set("test-utils") {
       "//sdk/lib/fdio",
       "//zircon/system/ulib/zx",
     ]
+  }
+}
+
+resolve_dsos = [
+  "data/first-32be.so",
+  "data/first-32le.so",
+  "data/first-64be.so",
+  "data/first-64le.so",
+  "data/second-32be.so",
+  "data/second-32le.so",
+  "data/second-64be.so",
+  "data/second-64le.so",
+]
+
+if (is_host) {
+  host_test_data("resolve_test_dsos") {
+    sources = resolve_dsos
+    outputs = [ "$root_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+  }
+} else {
+  resource("resolve_test_dsos") {
+    sources = resolve_dsos
+    outputs = [ "data/test_data/elfldltl/{{source_file_part}}" ]
   }
 }
 
