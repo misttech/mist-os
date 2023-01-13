@@ -86,6 +86,7 @@ pub(super) struct TouchpadEvent {
     // `touch_data: super::touch_binding::TouchpadEvent`.
     pub(super) pressed_buttons: Vec<u8>,
     pub(super) contacts: Vec<touch_binding::TouchContact>,
+    pub(super) filtered_palm_contacts: Vec<touch_binding::TouchContact>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -407,6 +408,19 @@ impl TouchpadEvent {
                     })
                 })
             });
+            touchpad_event_node.record_child(&*PALM_CONTACT_STATE_PROP, |contact_set_node| {
+                self.filtered_palm_contacts.iter().for_each(|contact| {
+                    contact_set_node.record_child(contact.id.to_string(), |contact_node| {
+                        contact_node.record_double(&*X_POS_PROP, f64::from(contact.position.x));
+                        contact_node.record_double(&*Y_POS_PROP, f64::from(contact.position.y));
+                        if let Some(contact_size) = contact.contact_size {
+                            contact_node.record_double(&*WIDTH_PROP, f64::from(contact_size.width));
+                            contact_node
+                                .record_double(&*HEIGHT_PROP, f64::from(contact_size.height));
+                        }
+                    })
+                })
+            });
 
             // Pass ownership of the touchpad event node to the log.
             log_entry_node.record(touchpad_event_node);
@@ -475,24 +489,37 @@ fn parse_touchpad_event(
                 ..*contact
             })
             .collect(),
+        filtered_palm_contacts: vec![],
     })
 }
 
 fn filter_palm_contact(touchpad_event: TouchpadEvent) -> TouchpadEvent {
-    let contacts: Vec<_> = touchpad_event
-        .contacts
-        .into_iter()
-        .filter(|contact| match contact.contact_size {
-            Some(size) => {
-                size.width < args::MIN_PALM_SIZE_MM && size.height < args::MIN_PALM_SIZE_MM
+    let (contacts, filtered_palm_contacts) = touchpad_event.contacts.into_iter().fold(
+        (
+            Vec::<touch_binding::TouchContact>::default(),
+            Vec::<touch_binding::TouchContact>::default(),
+        ),
+        |mut out, contact| {
+            match contact.contact_size {
+                Some(size) => {
+                    if size.width < args::MIN_PALM_SIZE_MM && size.height < args::MIN_PALM_SIZE_MM {
+                        out.0.push(contact);
+                    } else {
+                        out.1.push(contact);
+                    }
+                }
+                None => {
+                    out.0.push(contact);
+                }
             }
-            None => true,
-        })
-        .collect();
+            out
+        },
+    );
     let size_of_contacts = contacts.len();
 
     TouchpadEvent {
         contacts,
+        filtered_palm_contacts,
         pressed_buttons: match size_of_contacts {
             // Gesture arena remove button because:
             // 1. Palm is resting heavily enough on the pad to trigger a click.
@@ -563,8 +590,8 @@ impl GestureArena {
     ) -> Result<Vec<input_device::InputEvent>, Error> {
         let touchpad_event = parse_touchpad_event(event_time, touchpad_event, device_descriptor)
             .context("dropping touchpad event")?;
-        touchpad_event.log_inspect(self.inspect_log.borrow_mut().create_entry());
         let touchpad_event = filter_palm_contact(touchpad_event);
+        touchpad_event.log_inspect(self.inspect_log.borrow_mut().create_entry());
 
         let old_state_name = self.mutable_state.borrow().get_state_name();
         let (new_state, generated_events) = match self.mutable_state.replace(MutableState::Invalid)
@@ -1970,6 +1997,7 @@ mod tests {
                                 ..TOUCH_CONTACT_INDEX_FINGER
                             },
                         ],
+                        filtered_palm_contacts: vec![],
                     }]
                 )
             );
@@ -2527,6 +2555,7 @@ mod tests {
                     timestamp: zx::Time::from_nanos(123),
                     contacts: vec![],
                     pressed_buttons: vec![],
+                    filtered_palm_contacts: vec![],
                 }],
                 None,
             );
@@ -2876,6 +2905,7 @@ mod tests {
                     contacts: vec![],
                     pressed_buttons: vec![],
                     timestamp: zx::Time::ZERO,
+                    filtered_palm_contacts: vec![],
                 }),
                 Reason::Basic("some reason"),
             ));
@@ -2912,6 +2942,7 @@ mod tests {
                     }],
                     pressed_buttons: vec![],
                     timestamp: zx::Time::from_nanos(123456),
+                    filtered_palm_contacts: vec![],
                 }),
                 Reason::Basic("some reason"),
             ));
@@ -3110,6 +3141,7 @@ mod tests {
                     timestamp: zx::Time::ZERO,
                     contacts: vec![],
                     pressed_buttons: vec![],
+                    filtered_palm_contacts: vec![],
                 }),
                 Reason::Basic("reason"),
             ));
@@ -3687,7 +3719,8 @@ mod tests {
                                     pos_x_mm: 40.0,
                                     pos_y_mm: 50.0,
                                 },
-                            }
+                            },
+                            filtered_palm_contacts: {},
                         }
                     },
                     "1": {
@@ -3747,7 +3780,8 @@ mod tests {
                                     width_mm: 3.0,
                                     height_mm: 4.0,
                                 },
-                            }
+                            },
+                            filtered_palm_contacts: {},
                         }
                     },
                     "8": {
@@ -3841,6 +3875,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
+            filtered_palm_contacts: vec![],
         }); "end_gesture_unconsumed_event")]
         #[test_case(EndGestureEvent::GeneratedEvent(MouseEvent {
             timestamp: zx::Time::ZERO,
@@ -4024,7 +4059,8 @@ mod tests {
                             driver_monotonic_nanos: 0i64,
                             entry_latency_micros: 1_000i64,
                             pressed_buttons: Vec::<u64>::new(),
-                            contacts: {
+                            contacts: {},
+                            filtered_palm_contacts: {
                                 "1": {
                                     pos_x_mm: 2.0,
                                     pos_y_mm: 1.0,

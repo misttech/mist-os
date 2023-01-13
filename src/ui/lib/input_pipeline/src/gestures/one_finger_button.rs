@@ -513,6 +513,7 @@ mod tests {
         timestamp: zx::Time::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
+        filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -521,6 +522,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             make_touch_contact(2, Position{x: 5.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"2 fingers")]
     #[fuchsia::test]
     fn initial_contender_examine_event_mismatch(event: TouchpadEvent) {
@@ -549,6 +551,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = contender.examine_event(&event);
@@ -568,6 +571,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = contender.examine_event(&event);
@@ -578,6 +582,7 @@ mod tests {
       timestamp: zx::Time::ZERO,
       pressed_buttons: vec![],
       contacts: vec![],
+      filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
       timestamp: zx::Time::ZERO,
@@ -586,6 +591,7 @@ mod tests {
           make_touch_contact(1, Position{x: 1.0, y: 1.0}),
           make_touch_contact(2, Position{x: 5.0, y: 5.0}),
       ],
+      filtered_palm_contacts: vec![],
     };"2 fingers")]
     #[test_case(TouchpadEvent{
       timestamp: zx::Time::ZERO,
@@ -593,6 +599,7 @@ mod tests {
       contacts: vec![
           make_touch_contact(1, Position{x: 10.0, y: 1.0}),
       ],
+      filtered_palm_contacts: vec![],
     };"1 fingers move more than threshold")]
     #[fuchsia::test]
     fn finger_contact_contender_examine_event_mismatch(event: TouchpadEvent) {
@@ -615,6 +622,7 @@ mod tests {
       contacts: vec![
           make_touch_contact(1, Position{x: 9.0, y: 1.0}),
       ],
+      filtered_palm_contacts: vec![],
     };"1 fingers move less than threshold")]
     #[test_case(TouchpadEvent{
       timestamp: zx::Time::ZERO,
@@ -622,6 +630,7 @@ mod tests {
       contacts: vec![
           make_touch_contact(1, Position{x: 0.0, y: 0.0}),
       ],
+      filtered_palm_contacts: vec![],
     };"1 fingers stay")]
     #[fuchsia::test]
     fn finger_contact_contender_examine_event_finger_contact_contender(event: TouchpadEvent) {
@@ -652,6 +661,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = contender.examine_event(&event);
@@ -670,6 +680,7 @@ mod tests {
                 timestamp: zx::Time::from_nanos(41),
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
         let events = vec![
@@ -677,11 +688,13 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+                filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
                 timestamp: zx::Time::from_nanos(41),
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+                filtered_palm_contacts: vec![],
             },
         ];
 
@@ -718,13 +731,15 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             ],
-        };"button release")]
+        filtered_palm_contacts: vec![],
+    };"button release")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move less than threshold in edge state")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
@@ -732,6 +747,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 9.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move less than threshold out of edge state")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -739,6 +755,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 20.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move more than threshold in edge state and release button")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
@@ -746,6 +763,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move more than threshold out of edge state and release button")]
     #[fuchsia::test]
     fn button_down_winner_button_up(event: TouchpadEvent) {
@@ -759,6 +777,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -785,6 +804,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move less than threshold in edge state")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
@@ -792,6 +812,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 9.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move less than threshold out of edge state")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -800,6 +821,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             make_touch_contact(2, Position{x: 1.0, y: 2.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"add more finger")]
     #[fuchsia::test]
     fn button_down_winner_continue(event: TouchpadEvent) {
@@ -813,6 +835,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -828,6 +851,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 20.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move more than threshold in edge state")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
@@ -835,6 +859,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move more than threshold out of edge state")]
     #[fuchsia::test]
     fn button_down_winner_drag_winner_continue(event: TouchpadEvent) {
@@ -848,6 +873,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -863,7 +889,8 @@ mod tests {
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
-            ],
+        ],
+        filtered_palm_contacts: vec![],
     };"button release")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -871,6 +898,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move and button release")]
     #[fuchsia::test]
     fn drag_winner_button_up(event: TouchpadEvent) {
@@ -882,6 +910,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -912,6 +941,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -919,6 +949,7 @@ mod tests {
             timestamp: zx::Time::from_nanos(41),
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 19.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = winner.process_new_event(event);
@@ -948,6 +979,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -958,6 +990,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 0.0, y: 0.0 }),
                 make_touch_contact(2, Position { x: 0.0, y: 5.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
 
         let got = winner.process_new_event(event);
@@ -984,6 +1017,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 0.0, y: 0.0 }),
                 make_touch_contact(2, Position { x: 19.0, y: 5.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
 
         let got = winner.process_new_event(event);
@@ -1013,6 +1047,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 
@@ -1020,6 +1055,7 @@ mod tests {
             timestamp: zx::Time::from_nanos(41),
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 10.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = winner.process_new_event(event);
@@ -1034,6 +1070,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"timeout")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -1041,6 +1078,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -1048,6 +1086,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 21.0, y: 0.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"move more than threshold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
@@ -1056,11 +1095,13 @@ mod tests {
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
             make_touch_contact(2, Position{x: 10.0, y: 10.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"more contacts")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![],
+        filtered_palm_contacts: vec![],
     };"no contact")]
     #[fuchsia::test]
     fn button_up_winner_end(event: TouchpadEvent) {
@@ -1072,6 +1113,7 @@ mod tests {
                 timestamp: zx::Time::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
+                filtered_palm_contacts: vec![],
             },
         });
 

@@ -65,6 +65,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "previous contact stay, place new finger")]
     #[test_case(
         TouchpadEvent {
@@ -73,12 +74,14 @@ mod tests {
             contacts: vec![
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "previous contact lift, place new finger")]
     #[test_case(
         TouchpadEvent {
             timestamp: fx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
+            filtered_palm_contacts: vec![],
         }; "previous contact lift")]
     #[fuchsia::test]
     fn movement_from_events_no_movement(new_event: TouchpadEvent) {
@@ -86,6 +89,7 @@ mod tests {
             timestamp: fx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
 
         let got = movement_from_events(&previous_event, &new_event);
@@ -101,6 +105,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "contact 1 move, contact 2 stay")]
     #[test_case(
         TouchpadEvent {
@@ -110,6 +115,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 10.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "contact 2 move, contact 1 stay")]
     #[test_case(
         TouchpadEvent {
@@ -119,6 +125,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
                 make_touch_contact(2, Position{x: 3.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "contact 1 movement larger")]
     #[test_case(
         TouchpadEvent {
@@ -127,6 +134,7 @@ mod tests {
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
             ],
+            filtered_palm_contacts: vec![],
         }; "1 contact lift")]
     #[fuchsia::test]
     fn movement_from_events_furthest_movement(new_event: TouchpadEvent) {
@@ -137,6 +145,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
                 make_touch_contact(2, Position { x: 5.0, y: 5.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
 
         let got = movement_from_events(&previous_event, &new_event);

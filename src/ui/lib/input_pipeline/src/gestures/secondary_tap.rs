@@ -541,6 +541,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
         })
     }
@@ -556,6 +557,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
         })
     }
@@ -571,6 +573,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
         })
     }
@@ -584,11 +587,13 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
             no_contacts_event: TouchpadEvent {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(123),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
             max_time_elapsed: MAX_TIME_ELAPSED,
         })
@@ -630,6 +635,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0],
+                filtered_palm_contacts: vec![],
             },),
             ExamineEventResult::Mismatch(_)
         );
@@ -644,6 +650,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0, 1],
+                filtered_palm_contacts: vec![],
             },),
             ExamineEventResult::Mismatch(_)
         );
@@ -658,6 +665,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -672,6 +680,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerContactContender>(),
         );
@@ -689,6 +698,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -707,6 +717,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -721,6 +732,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero()),],
                 timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -735,6 +747,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -749,6 +762,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0, 1],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -763,6 +777,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -781,6 +796,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -795,6 +811,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerContactContender>(),
         );
@@ -812,6 +829,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -829,6 +847,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -852,6 +871,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -869,6 +889,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerContactContender>(),
         );
@@ -886,6 +907,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -900,6 +922,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -914,6 +937,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -928,6 +952,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0, 1],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -942,6 +967,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
         ));
     }
@@ -955,6 +981,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerRaisedContender>(),
         );
@@ -972,6 +999,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -990,6 +1018,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1007,6 +1036,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -1030,6 +1060,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1048,6 +1079,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1065,6 +1097,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -1077,6 +1110,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -1089,6 +1123,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<TwoFingerContactsContender>(),
         );
@@ -1103,6 +1138,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1117,6 +1153,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1131,6 +1168,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0, 1],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1145,6 +1183,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             },
         ));
     }
@@ -1159,6 +1198,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerRaisedContender>(),
         );
@@ -1171,6 +1211,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerRaisedContender>(),
         );
@@ -1186,6 +1227,7 @@ mod tests {
                 contacts: vec![create_touch_contact(1, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerRaisedContender>(),
         );
@@ -1198,6 +1240,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             TypeId::of::<OneFingerRaisedContender>(),
         );
@@ -1213,6 +1256,7 @@ mod tests {
                 contacts: vec![create_touch_contact(2, Position::zero(),)],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1230,6 +1274,7 @@ mod tests {
                 )],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1247,6 +1292,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             ExamineEventResult::Mismatch(_)
         );
@@ -1261,6 +1307,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             VerifyEventResult::Mismatch(_)
         );
@@ -1274,6 +1321,7 @@ mod tests {
                 contacts: vec![create_touch_contact(0, Position::zero())],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             VerifyEventResult::Mismatch(_)
         );
@@ -1291,6 +1339,7 @@ mod tests {
                 ],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![],
+                filtered_palm_contacts: vec![],
             }),
             VerifyEventResult::Mismatch(_)
         );
@@ -1304,6 +1353,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0],
+                filtered_palm_contacts: vec![],
             }),
             VerifyEventResult::Mismatch(_)
         );
@@ -1318,6 +1368,7 @@ mod tests {
                 contacts: vec![],
                 timestamp: zx::Time::from_nanos(0),
                 pressed_buttons: vec![0, 1],
+                filtered_palm_contacts: vec![],
             }),
             VerifyEventResult::Mismatch(_)
         );
@@ -1331,6 +1382,7 @@ mod tests {
             contacts: vec![],
             timestamp: zx::Time::from_nanos(0),
             pressed_buttons: vec![],
+            filtered_palm_contacts: vec![],
         }));
     }
 

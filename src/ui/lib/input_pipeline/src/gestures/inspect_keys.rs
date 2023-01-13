@@ -24,6 +24,7 @@ lazy_static::lazy_static! {
     // Touchpad-specific properties.
     pub(super) static ref PRESSED_BUTTONS_PROP: StringReference<'static> = "pressed_buttons".into();
     pub(super) static ref CONTACT_STATE_PROP: StringReference<'static> = "contacts".into();
+    pub(super) static ref PALM_CONTACT_STATE_PROP: StringReference<'static> = "filtered_palm_contacts".into();
     pub(super) static ref X_POS_PROP: StringReference<'static> = "pos_x_mm".into();
     pub(super) static ref Y_POS_PROP: StringReference<'static> = "pos_y_mm".into();
     pub(super) static ref WIDTH_PROP: StringReference<'static> = "width_mm".into();

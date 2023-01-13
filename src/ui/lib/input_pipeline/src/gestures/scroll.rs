@@ -803,11 +803,13 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             make_touch_contact(2, Position{x: 5.0, y: 5.0})
         ],
+        filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
+        filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[fuchsia::test]
     fn initial_contender_examine_event_mismatch(event: TouchpadEvent) {
@@ -835,6 +837,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
+            filtered_palm_contacts: vec![],
         };
         let got = contender.examine_event(&event);
         assert_matches!(got, ExamineEventResult::Contender(contender) => {
@@ -858,6 +861,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
                 make_touch_contact(2, Position { x: 5.0, y: 5.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
         let got = contender.examine_event(&event);
         assert_matches!(got, ExamineEventResult::Contender(contender) => {
@@ -871,11 +875,13 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
+        filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -883,6 +889,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 7.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"> motion threshold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -891,6 +898,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 7.0}),
             make_touch_contact(2, Position{x: 1.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"2 finger and > motion threshold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -898,6 +906,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(2, Position{x: 1.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"inital finger lift")]
     #[fuchsia::test]
     fn one_finger_contact_contender_examine_event_mismatch(event: TouchpadEvent) {
@@ -919,6 +928,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"hold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -926,6 +936,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 2.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"< motion threshold")]
     #[fuchsia::test]
     fn one_finger_contact_contender_examine_event_contender(event: TouchpadEvent) {
@@ -960,6 +971,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
                 make_touch_contact(2, Position { x: 1.0, y: 5.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
         let got = contender.examine_event(&event);
         assert_matches!(got, ExamineEventResult::Contender(contender) => {
@@ -974,11 +986,13 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             make_touch_contact(2, Position{x: 5.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
+        filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -986,6 +1000,7 @@ mod tests {
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"1 fingers")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -994,6 +1009,7 @@ mod tests {
             make_touch_contact(1, Position{x: 20.0, y: 20.0}),
             make_touch_contact(2, Position{x: 25.0, y: 25.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"> max movement no direction")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -1002,6 +1018,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 21.0}),
             make_touch_contact(2, Position{x: 5.0, y: -16.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"> max movement different direction")]
     #[fuchsia::test]
     fn two_finger_contact_contender_examine_event_mismatch(event: TouchpadEvent) {
@@ -1026,6 +1043,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             make_touch_contact(2, Position{x: 5.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"finger hold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -1034,6 +1052,7 @@ mod tests {
             make_touch_contact(1, Position{x: 2.0, y: 1.0}),
             make_touch_contact(2, Position{x: 6.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"2 finger move less than threshold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -1042,6 +1061,7 @@ mod tests {
             make_touch_contact(1, Position{x: 12.0, y: 1.0}),
             make_touch_contact(2, Position{x: 6.0, y: 5.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"both finger move, 1 finger move less than threshold")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -1050,6 +1070,7 @@ mod tests {
             make_touch_contact(1, Position{x: 10.0, y: 10.0}),
             make_touch_contact(2, Position{x: 15.0, y: 15.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"no direction")]
     #[test_case(TouchpadEvent{
         timestamp: zx::Time::ZERO,
@@ -1058,6 +1079,7 @@ mod tests {
             make_touch_contact(1, Position{x: 1.0, y: 11.0}),
             make_touch_contact(2, Position{x: 5.0, y: -6.0}),
         ],
+        filtered_palm_contacts: vec![],
     };"different direction")]
     #[fuchsia::test]
     fn two_finger_contact_contender_examine_event_finger_contact_contender(event: TouchpadEvent) {
@@ -1097,6 +1119,7 @@ mod tests {
                 make_touch_contact(1, Position { x: 1.0, y: 11.0 }),
                 make_touch_contact(2, Position { x: 5.0, y: 15.0 }),
             ],
+            filtered_palm_contacts: vec![],
         };
         let got = contender.examine_event(&event);
         assert_matches!(got, ExamineEventResult::MatchedContender(_));
@@ -1107,12 +1130,14 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position{x: 1.0, y: 1.0})],
+            filtered_palm_contacts: vec![],
         };"button down")]
     #[test_case(
         TouchpadEvent{
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
+            filtered_palm_contacts: vec![],
         };"0 fingers")]
     #[test_case(
         TouchpadEvent{
@@ -1121,6 +1146,7 @@ mod tests {
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"1 fingers")]
     #[test_case(
         TouchpadEvent{
@@ -1130,6 +1156,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"finger hold")]
     #[test_case(
         TouchpadEvent{
@@ -1139,6 +1166,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 10.0, y: 10.0}),
                 make_touch_contact(2, Position{x: 15.0, y: 15.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"no direction")]
     #[test_case(
         TouchpadEvent{
@@ -1148,6 +1176,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: -6.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"different direction")]
     #[test_case(
         TouchpadEvent{
@@ -1157,6 +1186,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 16.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"wrong direction")]
     #[fuchsia::test]
     fn matched_contender_verify_event_mismatch(event: TouchpadEvent) {
@@ -1180,6 +1210,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: -11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: -5.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"on direction")]
     #[fuchsia::test]
     fn matched_contender_verify_event_matched_contender(event: TouchpadEvent) {
@@ -1215,6 +1246,7 @@ mod tests {
                     make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
                     make_touch_contact(2, Position { x: 5.0, y: 5.0 }),
                 ],
+                filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
                 timestamp: zx::Time::from_nanos(2),
@@ -1223,6 +1255,7 @@ mod tests {
                     make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
                     make_touch_contact(2, Position { x: 5.0, y: 5.0 }),
                 ],
+                filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
                 timestamp: zx::Time::from_nanos(3),
@@ -1231,6 +1264,7 @@ mod tests {
                     make_touch_contact(1, Position { x: 1.0, y: 2.0 }),
                     make_touch_contact(2, Position { x: 5.0, y: 6.0 }),
                 ],
+                filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
                 timestamp: zx::Time::from_nanos(4),
@@ -1239,6 +1273,7 @@ mod tests {
                     make_touch_contact(1, Position { x: 1.0, y: -11.0 }),
                     make_touch_contact(2, Position { x: 5.0, y: -5.0 }),
                 ],
+                filtered_palm_contacts: vec![],
             },
         ]);
 
@@ -1304,8 +1339,12 @@ mod tests {
                 second_contact: ContactPosition { id: 2, position: Position { x: 5.0, y: 5.0 } },
             },
         });
-        let event =
-            TouchpadEvent { timestamp: zx::Time::ZERO, pressed_buttons: vec![], contacts: vec![] };
+        let event = TouchpadEvent {
+            timestamp: zx::Time::ZERO,
+            pressed_buttons: vec![],
+            contacts: vec![],
+            filtered_palm_contacts: vec![],
+        };
         let got = winner.process_new_event(event);
 
         assert_matches!(got, ProcessNewEventResult::EndGesture(EndGestureEvent::NoEvent, _reason));
@@ -1316,6 +1355,7 @@ mod tests {
             timestamp: zx::Time::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position{x: 1.0, y: 1.0})],
+            filtered_palm_contacts: vec![],
         };"button down")]
     #[test_case(
         TouchpadEvent{
@@ -1324,6 +1364,7 @@ mod tests {
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"1 fingers")]
     #[test_case(
         TouchpadEvent{
@@ -1333,6 +1374,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: -6.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"1 finger reverse direction")]
     #[test_case(
         TouchpadEvent{
@@ -1342,6 +1384,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 16.0}),
             ],
+            filtered_palm_contacts: vec![],
         };"2 fingers reverse direction")]
     #[fuchsia::test]
     fn winner_process_new_event_end_gesture_some(event: TouchpadEvent) {
@@ -1369,6 +1412,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
             ],
+            filtered_palm_contacts: vec![],
         } => MouseEvent {
             timestamp: zx::Time::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
@@ -1393,6 +1437,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 10.0, y: -10.0}),
                 make_touch_contact(2, Position{x: 15.0, y: -15.0}),
             ],
+            filtered_palm_contacts: vec![],
         } => MouseEvent {
             timestamp: zx::Time::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
@@ -1417,6 +1462,7 @@ mod tests {
                 make_touch_contact(1, Position{x: 1.0, y: -11.0}),
                 make_touch_contact(2, Position{x: 5.0, y: -5.0}),
             ],
+            filtered_palm_contacts: vec![],
         } => MouseEvent {
             timestamp: zx::Time::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
