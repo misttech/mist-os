@@ -236,7 +236,7 @@ pub struct Capability;
 impl Capability {
     /// Creates a new protocol capability, whose name is derived from a protocol marker.
     pub fn protocol<P: DiscoverableProtocolMarker>() -> ProtocolCapability {
-        Self::protocol_by_name(P::PROTOCOL_NAME.to_string())
+        Self::protocol_by_name(P::PROTOCOL_NAME)
     }
 
     /// Creates a new protocol capability.
@@ -270,7 +270,7 @@ impl Capability {
 
     /// Creates a new service capability, whose name is derived from a protocol marker.
     pub fn service<S: ServiceMarker>() -> ServiceCapability {
-        Self::service_by_name(S::SERVICE_NAME.to_string())
+        Self::service_by_name(S::SERVICE_NAME)
     }
 
     /// Creates a new service capability.
