@@ -34,7 +34,7 @@ typedef struct magma_image_plane {
 
 // A basic set of constraints on an image format. Corresponds to
 // `fuchsia.sysmem.ImageFormatConstraints`.
-typedef struct {
+typedef struct magma_image_format_constraints {
   uint32_t image_format;
   magma_bool_t has_format_modifier;
   uint64_t format_modifier;
@@ -47,7 +47,7 @@ typedef struct {
 
 // A set of constraints on a buffer collection; corresponds to some properties of
 // `fuchsia.sysmem.BufferCollectionConstraints`.
-typedef struct {
+typedef struct magma_buffer_format_constraints {
   // min_buffer_count
   uint32_t count;
   uint32_t usage;
@@ -58,7 +58,7 @@ typedef struct {
   uint32_t min_size_bytes;
 } magma_buffer_format_constraints_t;
 
-typedef struct {
+typedef struct magma_buffer_format_additional_constraints {
   uint32_t max_buffer_count;
   uint32_t min_buffer_count_for_camping;
   uint32_t min_buffer_count_for_dedicated_slack;

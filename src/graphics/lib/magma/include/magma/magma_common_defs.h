@@ -224,20 +224,20 @@ typedef struct magma_poll_item {
 } magma_poll_item_t;
 
 // A buffer referenced by a command buffer descriptor
-struct magma_exec_resource {
+typedef struct magma_exec_resource {
   uint64_t buffer_id;
   uint64_t offset;
   uint64_t length;
-};
+} magma_exec_resource_t;
 
 // A resource to be executed by a command buffer descriptor
-struct magma_exec_command_buffer {
+typedef struct magma_exec_command_buffer {
   uint32_t resource_index;
   uint32_t unused;
   uint64_t start_offset;
-} __attribute__((__aligned__(8)));
+} __attribute__((__aligned__(8))) magma_exec_command_buffer_t;
 
-struct magma_command_descriptor {
+typedef struct magma_command_descriptor {
   // The count of `resources` that may be referenced by the hardware. These must have been
   // mapped to the hardware previously.
   uint32_t resource_count;
@@ -256,25 +256,25 @@ struct magma_command_descriptor {
 
   uint64_t flags;
 
-} __attribute__((__aligned__(8)));
+} __attribute__((__aligned__(8))) magma_command_descriptor_t;
 
-struct magma_inline_command_buffer {
+typedef struct magma_inline_command_buffer {
   void* data;
   uint64_t size;
   uint64_t* semaphore_ids;
   uint32_t semaphore_count;
-};
+} magma_inline_command_buffer_t;
 
-struct magma_total_time_query_result {
+typedef struct magma_total_time_query_result {
   uint64_t gpu_time_ns;        // GPU time in ns since driver start.
   uint64_t monotonic_time_ns;  // monotonic clock time measured at same time CPU time was.
-};
+} magma_total_time_query_result_t;
 
-struct magma_buffer_offset {
+typedef struct magma_buffer_offset {
   uint64_t buffer_id;
   uint64_t offset;
   uint64_t length;
-};
+} magma_buffer_offset_t;
 
 // The top 16 bits are reserved for vendor-specific flags.
 #define MAGMA_MAP_FLAG_VENDOR_SHIFT ((uint64_t)16)
@@ -285,7 +285,7 @@ struct magma_buffer_offset {
 #define MAGMA_MAP_FLAG_GROWABLE ((uint64_t)(1 << 3))
 #define MAGMA_MAP_FLAG_VENDOR_0 ((uint64_t)(1 << MAGMA_MAP_FLAG_VENDOR_SHIFT))
 
-typedef struct {
+typedef struct magma_buffer_info {
   uint64_t committed_byte_count;
   uint64_t size;
 } magma_buffer_info_t;
@@ -293,7 +293,7 @@ typedef struct {
 #define MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE ((uint32_t)1)
 #define MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE ((uint32_t)(1 << 1))
 
-typedef struct {
+typedef struct magma_image_create_info {
   // A format specified by DRM (Linux Direct Rendering Manager)
   uint64_t drm_format;
   // The last modifier must be DRM_FORMAT_MOD_INVALID
@@ -305,7 +305,7 @@ typedef struct {
   uint64_t flags;
 } magma_image_create_info_t;
 
-typedef struct {
+typedef struct magma_image_info {
   uint64_t plane_strides[MAGMA_MAX_IMAGE_PLANES];
   uint32_t plane_offsets[MAGMA_MAX_IMAGE_PLANES];
   uint64_t drm_format_modifier;
