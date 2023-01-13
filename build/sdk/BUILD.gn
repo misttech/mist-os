@@ -61,3 +61,26 @@ group("sdk_versioned_source_sets_allowlist") {
   visibility =
       _sdk_versioned_source_sets_list + [ ":sdk_versioned_source_sets" ]
 }
+
+# Contains all the shared libraries redistributed with the partner or public
+# SDK that should be compatible with all the currently supported API levels.
+_sdk_versioned_shared_libraries_list = [
+  "//sdk/lib/fdio:fdio",
+  "//sdk/lib/svc:svc",
+  "//src/devices/bin/driver_runtime:driver_runtime",
+  "//src/storage/memfs:memfs",
+  "//third_party/Vulkan-Loader:libvulkan",
+  "//zircon/system/ulib/async-default:async-default",
+  "//zircon/system/ulib/syslog:syslog",
+  "//zircon/system/ulib/trace-engine:trace-engine",
+  "//zircon/system/ulib/trace-provider:trace-provider-so",
+]
+
+group("sdk_versioned_shared_libraries") {
+  deps = _sdk_versioned_shared_libraries_list
+}
+
+group("sdk_versioned_shared_libraries_allowlist") {
+  visibility = _sdk_versioned_shared_libraries_list +
+               [ ":sdk_versioned_shared_libraries" ]
+}

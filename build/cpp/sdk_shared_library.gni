@@ -255,6 +255,14 @@ template("sdk_shared_library") {
         ]
       }
     }
+
+    # 'sdk_shared_library()' targets in the 'partner' or 'public' category that
+    # are not testonly must be tracked by
+    # //build/sdk:sdk_versioned_shared_libraries_allowlist for SDK consistency
+    # checks (see https://fxbug.dev/105940).
+    if (invoker.category == "partner" || invoker.category == "public") {
+      deps += [ "//build/sdk:sdk_versioned_shared_libraries_allowlist" ]
+    }
   }
 
   # Base path for binaries of this library in SDKs.
