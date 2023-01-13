@@ -25,7 +25,7 @@ use {
         errors::FxfsError,
         fsck,
         log::*,
-        metrics::OBJECT_STORES_NODE,
+        metrics,
         object_store::{
             allocator::Allocator,
             directory::ObjectDescriptor,
@@ -182,7 +182,7 @@ impl VolumesDirectory {
         store: Arc<ObjectStore>,
         flush_task_config: FlushTaskConfig,
     ) -> Result<FxVolumeAndRoot, Error> {
-        store.track_statistics(&*OBJECT_STORES_NODE.lock().unwrap(), name);
+        store.track_statistics(&metrics::object_stores(), name);
         let store_id = store.store_object_id();
         let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new(

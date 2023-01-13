@@ -65,7 +65,6 @@ fxfs_sources = [
   "src/lsm_tree/skip_list_layer.rs",
   "src/lsm_tree/types.rs",
   "src/metrics.rs",
-  "src/metrics/traits.rs",
   "src/object_handle.rs",
   "src/object_store.rs",
   "src/object_store/allocator.rs",

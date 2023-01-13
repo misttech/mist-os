@@ -6,12 +6,13 @@ use {
     crate::{
         checksum::{fletcher64, Checksum},
         log::*,
-        metrics::{traits::Metric as _, UintMetric},
+        metrics,
         object_handle::ObjectHandle,
         object_store::journal::JournalCheckpoint,
         serialized_types::{Versioned, LATEST_VERSION},
     },
     byteorder::{LittleEndian, WriteBytesExt},
+    fuchsia_inspect::{Property as _, UintProperty},
     std::{cmp::min, io::Write},
     storage_device::buffer::Buffer,
 };
@@ -33,7 +34,7 @@ pub struct JournalWriter {
     buf: Vec<u8>,
 
     // Current journal offset based on the checkpoint of the last write
-    journal_checkpoint_offset: UintMetric,
+    journal_checkpoint_offset: UintProperty,
 }
 
 impl JournalWriter {
@@ -47,7 +48,8 @@ impl JournalWriter {
             checkpoint,
             last_checksum,
             buf: Vec::new(),
-            journal_checkpoint_offset: UintMetric::new("journal_checkpoint_offset", 0),
+            journal_checkpoint_offset: metrics::detail()
+                .create_uint("journal_checkpoint_offset", 0),
         }
     }
 

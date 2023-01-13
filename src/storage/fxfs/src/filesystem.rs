@@ -8,7 +8,7 @@ use {
         errors::FxfsError,
         fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
         log::*,
-        metrics::{traits::Metric as _, traits::NumericMetric as _, UintMetric},
+        metrics,
         object_store::{
             allocator::{Allocator, Hold, Reservation, SimpleAllocator},
             directory::Directory,
@@ -32,6 +32,7 @@ use {
     async_trait::async_trait,
     event_listener::Event,
     fuchsia_async as fasync,
+    fuchsia_inspect::{NumericProperty as _, UintProperty},
     futures::{
         channel::oneshot::{channel, Sender},
         FutureExt,
@@ -257,7 +258,7 @@ pub struct FxFilesystem {
     closed: AtomicBool,
     trace: bool,
     graveyard: Arc<Graveyard>,
-    completed_transactions: UintMetric,
+    completed_transactions: UintProperty,
     options: Options,
 
     // The number of in-flight transactions which we will limit to MAX_IN_FLIGHT_TRANSACTIONS.
@@ -314,7 +315,7 @@ impl FxFilesystem {
             closed: AtomicBool::new(true),
             trace: false,
             graveyard: Graveyard::new(objects.clone()),
-            completed_transactions: UintMetric::new("completed_transactions", 0),
+            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
             options: Default::default(),
             in_flight_transactions: AtomicU64::new(0),
             event: Event::new(),
@@ -379,7 +380,7 @@ impl FxFilesystem {
             closed: AtomicBool::new(true),
             trace: options.trace,
             graveyard: Graveyard::new(objects.clone()),
-            completed_transactions: UintMetric::new("completed_transactions", 0),
+            completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
             options: filesystem_options,
             in_flight_transactions: AtomicU64::new(0),
             event: Event::new(),

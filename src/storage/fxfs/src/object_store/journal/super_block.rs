@@ -29,7 +29,7 @@ use {
         filesystem::{ApplyContext, ApplyMode, Filesystem, JournalingObject},
         log::*,
         lsm_tree::{types::MutableLayer, LSMTree, LayerSet},
-        metrics::{traits::Metric as _, UintMetric},
+        metrics,
         object_store::{
             allocator::Reservation,
             journal::{
@@ -49,6 +49,7 @@ use {
         },
     },
     anyhow::{bail, ensure, Context, Error},
+    fuchsia_inspect::{Property as _, UintProperty},
     serde::{Deserialize, Serialize},
     std::{
         collections::HashMap,
@@ -221,17 +222,18 @@ pub enum SuperBlockRecordV5 {
 struct SuperBlockMetrics {
     /// Time we wrote the most recent superblock in milliseconds since [`std::time::UNIX_EPOCH`].
     /// Uses [`std::time::SystemTime`] as the clock source.
-    last_super_block_update_time_ms: UintMetric,
+    last_super_block_update_time_ms: UintProperty,
 
     /// Offset of the most recent superblock we wrote in the journal.
-    last_super_block_offset: UintMetric,
+    last_super_block_offset: UintProperty,
 }
 
 impl Default for SuperBlockMetrics {
     fn default() -> Self {
         SuperBlockMetrics {
-            last_super_block_update_time_ms: UintMetric::new("last_super_block_update_time_ms", 0),
-            last_super_block_offset: UintMetric::new("last_super_block_offset", 0),
+            last_super_block_update_time_ms: metrics::detail()
+                .create_uint("last_super_block_update_time_ms", 0),
+            last_super_block_offset: metrics::detail().create_uint("last_super_block_offset", 0),
         }
     }
 }

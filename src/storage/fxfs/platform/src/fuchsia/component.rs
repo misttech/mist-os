@@ -31,7 +31,7 @@ use {
         },
         fsck,
         log::*,
-        metrics::{DETAIL_NODE, OBJECT_STORES_NODE},
+        metrics,
         object_store::volume::root_volume,
         serialized_types::LATEST_VERSION,
     },
@@ -294,7 +294,7 @@ impl Component {
         let fs: Arc<InspectedFxFilesystem> = Arc::new(fs.into());
         let weak_fs = Arc::downgrade(&fs) as Weak<dyn FsInspect + Send + Sync>;
         let inspect_tree =
-            Arc::new(FsInspectTree::new(weak_fs, &fxfs::metrics::FXFS_ROOT_NODE.lock().unwrap()));
+            Arc::new(FsInspectTree::new(weak_fs, fuchsia_inspect::component::inspector().root()));
         let mem_monitor = match MemoryPressureMonitor::start().await {
             Ok(v) => Some(v),
             Err(e) => {
@@ -316,10 +316,10 @@ impl Component {
             /* overwrite: */ true,
         )?;
 
-        fs.allocator().track_statistics(&*DETAIL_NODE.lock().unwrap(), "allocator");
-        fs.journal().track_statistics(&*DETAIL_NODE.lock().unwrap(), "journal");
-        fs.object_manager().track_statistics(&*DETAIL_NODE.lock().unwrap(), "object_manager");
-        fs.root_store().track_statistics(&*OBJECT_STORES_NODE.lock().unwrap(), "__root");
+        fs.allocator().track_statistics(&metrics::detail(), "allocator");
+        fs.journal().track_statistics(&metrics::detail(), "journal");
+        fs.object_manager().track_statistics(&metrics::detail(), "object_manager");
+        fs.root_store().track_statistics(&metrics::object_stores(), "__root");
 
         *state = State::Running(RunningState { fs, volumes, _inspect_tree: inspect_tree });
         info!("Mounted");
