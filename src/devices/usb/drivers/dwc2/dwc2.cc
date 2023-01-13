@@ -202,6 +202,8 @@ void Dwc2::HandleInEpInterrupt() {
             // we can expect either an IN or OUT EP0 transfer-complete interrupt to follow. See the
             // special case logic in either diepint/doepint.xfercompl() branches.
             timeout_recovering_ = true;
+            DEPCTL::Get(DWC_EP0_IN).ReadFrom(mmio).set_cnak(1).set_epena(1).WriteTo(mmio);
+            DEPCTL::Get(DWC_EP0_OUT).ReadFrom(mmio).set_cnak(1).set_epena(1).WriteTo(mmio);
             DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
             break;
           }
@@ -214,6 +216,7 @@ void Dwc2::HandleInEpInterrupt() {
             // The other cases should either theoretically never happen, or handled by the core
             // internally in dedicate-FIFO mode, but we'll log anyway.
             zxlogf(ERROR, "Unhandled IN EP0 diepint.timeout at txn phase %d", ep0_state_);
+
             DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
             break;
         }
