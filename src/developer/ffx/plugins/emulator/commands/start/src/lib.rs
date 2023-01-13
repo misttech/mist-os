@@ -5,9 +5,10 @@
 use crate::editor::edit_configuration;
 use crate::pbm::{list_virtual_devices, make_configs};
 use anyhow::{Context, Result};
+use cfg_if::cfg_if;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::{get_engine_by_name, EngineOption};
+use ffx_emulator_commands::EngineOption;
 use ffx_emulator_config::{EmulatorEngine, EngineType};
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
@@ -17,14 +18,57 @@ use std::str::FromStr;
 mod editor;
 mod pbm;
 
+#[cfg(test)]
+use mockall::{automock, predicate::*};
+
+// Redeclare some methods we use from other crates so that we can mock them for tests.
+#[cfg_attr(test, automock)]
+#[allow(dead_code)]
+mod modules {
+    use super::*;
+
+    pub(super) async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOption> {
+        ffx_emulator_commands::get_engine_by_name(name).await
+    }
+}
+
+#[cfg_attr(test, automock)]
+#[allow(dead_code)]
+mod start {
+    use super::*;
+
+    pub(super) async fn new_engine(cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>> {
+        let emulator_configuration = make_configs(&cmd).await?;
+
+        // Initialize an engine of the requested type with the configuration defined in the manifest.
+        let engine_type = EngineType::from_str(&cmd.engine().await.unwrap_or("femu".to_string()))
+            .context("Couldn't retrieve engine type from ffx config.")?;
+
+        EngineBuilder::new().config(emulator_configuration).engine_type(engine_type).build().await
+    }
+}
+
+// if we're testing, use the mocked methods, otherwise use the
+// ones from the other crates.
+cfg_if! {
+    if #[cfg(test)] {
+        use self::mock_modules::get_engine_by_name;
+        use self::mock_start::new_engine;
+    } else {
+        use self::modules::get_engine_by_name;
+        use self::start::new_engine;
+    }
+}
+
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
 pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Result<()> {
-    let sdk = ffx_config::global_env_context()
-        .context("loading global environment context")?
-        .get_sdk()
-        .await?;
-
+    // List the devices available in this product bundle
     if cmd.device_list {
+        let sdk = ffx_config::global_env_context()
+            .context("loading global environment context")?
+            .get_sdk()
+            .await?;
+
         match list_virtual_devices(&cmd, &sdk).await {
             Ok(devices) => {
                 println!("Valid virtual device specifications are: {:?}", devices);
@@ -114,12 +158,142 @@ async fn get_engine(cmd: &mut StartCommand) -> Result<Box<dyn EmulatorEngine>> {
     })
 }
 
-async fn new_engine(cmd: &StartCommand) -> Result<Box<dyn EmulatorEngine>> {
-    let emulator_configuration = make_configs(&cmd).await?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use ffx_emulator_config::EmulatorEngine;
 
-    // Initialize an engine of the requested type with the configuration defined in the manifest.
-    let engine_type = EngineType::from_str(&cmd.engine().await.unwrap_or("femu".to_string()))
-        .context("Couldn't retrieve engine type from ffx config.")?;
+    /// TestEngine is a test struct for implementing the EmulatorEngine trait
+    /// Currently this one only exposes the running flag which is returned from
+    /// EmulatorEngine::is_running().
+    #[derive(Default)]
+    pub struct TestEngine {}
+    cfg_if! {
+        if #[cfg(test)] {
+            #[async_trait]
+            impl EmulatorEngine for TestEngine {}
+        }
+    }
 
-    EngineBuilder::new().config(emulator_configuration).engine_type(engine_type).build().await
+    // Check that new_engine gets called by default and get_engine_by_name doesn't
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_no_reuse_makes_new() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        new_engine_ctx
+            .expect()
+            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>));
+        get_engine_by_name_ctx.expect().times(0);
+
+        let result = get_engine(&mut cmd).await;
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Check that reuse and config together is still new_engine (i.e. config overrides reuse)
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_with_config_doesnt_reuse() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        cmd.reuse = true;
+        cmd.config = Some("config.file".into());
+        new_engine_ctx
+            .expect()
+            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .times(1);
+        get_engine_by_name_ctx.expect().times(0);
+
+        let result = get_engine(&mut cmd).await;
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Check that reuse and config.is_none calls get_engine_by_name
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_without_config_does_reuse() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        cmd.reuse = true;
+        cmd.config = None;
+        new_engine_ctx.expect().times(0);
+        get_engine_by_name_ctx
+            .expect()
+            .returning(|_| {
+                Ok(EngineOption::DoesExist(
+                    Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>
+                ))
+            })
+            .times(1);
+
+        let result = get_engine(&mut cmd).await;
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Check that if get_engine_by_name returns DoesNotExist, new_engine still gets called and reuse is reset
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_doesnotexist_creates_new() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        cmd.reuse = true;
+        cmd.config = None;
+        new_engine_ctx
+            .expect()
+            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .times(1);
+        get_engine_by_name_ctx
+            .expect()
+            .returning(|_| Ok(EngineOption::DoesNotExist("Warning message".to_string())))
+            .times(1);
+
+        let result = get_engine(&mut cmd).await;
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Check that if DoesExist, then cmd.name is updated too
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_get_engine_updates_cmd_name() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+
+        let mut cmd = StartCommand::default();
+        cmd.name = "".to_string();
+        cmd.reuse = true;
+        cmd.config = None;
+        new_engine_ctx.expect().times(0);
+        get_engine_by_name_ctx
+            .expect()
+            .returning(|name| {
+                *name = Some("NewName".to_string());
+                Ok(EngineOption::DoesExist(
+                    Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>
+                ))
+            })
+            .times(1);
+
+        let result = get_engine(&mut cmd).await;
+        assert!(result.is_ok(), "{:?}", result.err());
+        assert_eq!(cmd.name, "NewName".to_string());
+        Ok(())
+    }
 }
