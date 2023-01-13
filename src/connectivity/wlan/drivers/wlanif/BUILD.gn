@@ -7,16 +7,16 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 all_hdrs = [
+  "convert.h",
   "device.h",
   "driver.h",
   "debug.h",
-  "fullmac_mlme.h",
 ]
 
 all_src = [
+  "convert.cc",
   "device.cc",
   "driver.cc",
-  "fullmac_mlme.cc",
 ]
 
 all_deps = [
@@ -31,14 +31,11 @@ all_deps = [
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
   "//src/connectivity/wlan/drivers/lib/log/cpp",
   "//src/connectivity/wlan/lib/common/cpp:common",
-  "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c",
   "//src/devices/lib/driver",
   "//src/lib/ddk",
-
-  # TODO(fxbug.dev/38599): The fdio dependency here is purely due to
-  # a problem with transitive Rust static library dependencies when linking
-  # C++ programs
-  "//sdk/lib/fdio",
+  "//zircon/system/ulib/async:async-cpp",
+  "//zircon/system/ulib/async-loop:async-loop-cpp",
+  "//zircon/system/ulib/async-loop:async-loop-default",
 ]
 
 source_set("lib_source") {

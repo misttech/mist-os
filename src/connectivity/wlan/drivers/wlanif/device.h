@@ -7,14 +7,13 @@
 
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/binding.h>
 
 #include <memory>
 #include <mutex>
-
-#include "fuchsia/wlan/common/c/banjo.h"
-#include "fullmac_mlme.h"
 
 namespace wlanif {
 
@@ -46,7 +45,7 @@ class EthDevice {
   ethernet_ifc_protocol_t ethernet_ifc_ __TA_GUARDED(lock_) = {};
 };
 
-class Device {
+class Device : public ::fuchsia::wlan::mlme::MLME {
  public:
   Device(zx_device_t* device, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto);
   ~Device();
@@ -57,32 +56,68 @@ class Device {
   void Unbind();
   void Release();
 
-  zx_status_t Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc, zx::channel* out_sme_channel);
+  // MLME implementation (::fuchsia::wlan::mlme -> wlan_fullmac_impl)
+  void StartScan(::fuchsia::wlan::mlme::ScanRequest req) override;
+  void ConnectReq(::fuchsia::wlan::mlme::ConnectRequest req) override;
+  void ReconnectReq(::fuchsia::wlan::mlme::ReconnectRequest req) override;
+  void AuthenticateResp(::fuchsia::wlan::mlme::AuthenticateResponse resp) override;
+  void DeauthenticateReq(::fuchsia::wlan::mlme::DeauthenticateRequest req) override;
+  void AssociateResp(::fuchsia::wlan::mlme::AssociateResponse resp) override;
+  void DisassociateReq(::fuchsia::wlan::mlme::DisassociateRequest req) override;
+  void ResetReq(::fuchsia::wlan::mlme::ResetRequest req) override;
+  void StartReq(::fuchsia::wlan::mlme::StartRequest req) override;
+  void StopReq(::fuchsia::wlan::mlme::StopRequest req) override;
+  void SetKeysReq(::fuchsia::wlan::mlme::SetKeysRequest req) override;
+  void DeleteKeysReq(::fuchsia::wlan::mlme::DeleteKeysRequest req) override;
+  void EapolReq(::fuchsia::wlan::mlme::EapolRequest req) override;
+  void QueryDeviceInfo(QueryDeviceInfoCallback cb) override;
+  void QueryDiscoverySupport(QueryDiscoverySupportCallback cb) override;
+  void QueryMacSublayerSupport(QueryMacSublayerSupportCallback cb) override;
+  void QuerySecuritySupport(QuerySecuritySupportCallback cb) override;
+  void QuerySpectrumManagementSupport(QuerySpectrumManagementSupportCallback cb) override;
+  void GetIfaceCounterStats(GetIfaceCounterStatsCallback cb) override;
+  void GetIfaceHistogramStats(GetIfaceHistogramStatsCallback cb) override;
+  void ListMinstrelPeers(ListMinstrelPeersCallback cb) override;
+  void GetMinstrelStats(::fuchsia::wlan::mlme::MinstrelStatsRequest req,
+                        GetMinstrelStatsCallback cb) override;
+  void SendMpOpenAction(::fuchsia::wlan::mlme::MeshPeeringOpenAction req) override;
+  void SendMpConfirmAction(::fuchsia::wlan::mlme::MeshPeeringConfirmAction req) override;
+  void MeshPeeringEstablished(::fuchsia::wlan::mlme::MeshPeeringParams params) override;
+  void GetMeshPathTableReq(::fuchsia::wlan::mlme::GetMeshPathTableRequest req,
+                           GetMeshPathTableReqCallback cb) override;
+  void StartCaptureFrames(::fuchsia::wlan::mlme::StartCaptureFramesRequest req,
+                          StartCaptureFramesCallback cb) override;
+  void StopCaptureFrames() override;
+  void SaeHandshakeResp(::fuchsia::wlan::mlme::SaeHandshakeResponse resp) override;
+  void SaeFrameTx(::fuchsia::wlan::mlme::SaeFrame frame) override;
+  void WmmStatusReq() override;
+  // This fn calls into ethernet_ifc_t rather than wlan_fullmac_impl
+  void SetControlledPort(::fuchsia::wlan::mlme::SetControlledPortRequest req) override;
 
-  void StartScan(const wlan_fullmac_scan_req_t* req);
-  void ConnectReq(const wlan_fullmac_connect_req_t* req);
-  void ReconnectReq(const wlan_fullmac_reconnect_req_t* req);
-  void AuthenticateResp(const wlan_fullmac_auth_resp_t* resp);
-  void DeauthenticateReq(const wlan_fullmac_deauth_req_t* req);
-  void AssociateResp(const wlan_fullmac_assoc_resp_t* resp);
-  void DisassociateReq(const wlan_fullmac_disassoc_req_t* req);
-  void ResetReq(const wlan_fullmac_reset_req_t* req);
-  void StartReq(const wlan_fullmac_start_req_t* req);
-  void StopReq(const wlan_fullmac_stop_req_t* req);
-  void SetKeysReq(const wlan_fullmac_set_keys_req_t* req, wlan_fullmac_set_keys_resp_t* out_resp);
-  void DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req);
-  void EapolReq(const wlan_fullmac_eapol_req_t* req);
-  void QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp);
-  void QueryMacSublayerSupport(mac_sublayer_support_t* out_resp);
-  void QuerySecuritySupport(security_support_t* out_resp);
-  void QuerySpectrumManagementSupport(spectrum_management_support_t* out_resp);
-  int32_t GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats);
-  int32_t GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out_stats);
-  void SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp);
-  void SaeFrameTx(const wlan_fullmac_sae_frame_t* frame);
-  void WmmStatusReq();
+  // FinalizeAssociationReq is ignored because it is for SoftMAC drivers ONLY.
+  void FinalizeAssociationReq(::fuchsia::wlan::mlme::NegotiatedCapabilities cap) override {}
 
-  void OnLinkStateChanged(bool online);
+  // wlan_fullmac_impl_ifc (wlan_fullmac_impl -> ::fuchsia::wlan::mlme)
+  void OnScanResult(const wlan_fullmac_scan_result_t* result);
+  void OnScanEnd(const wlan_fullmac_scan_end_t* result);
+  void ConnectConf(const wlan_fullmac_connect_confirm_t* resp);
+  void AuthenticateInd(const wlan_fullmac_auth_ind_t* ind);
+  void DeauthenticateConf(const wlan_fullmac_deauth_confirm_t* resp);
+  void DeauthenticateInd(const wlan_fullmac_deauth_indication_t* ind);
+  void AssociateInd(const wlan_fullmac_assoc_ind_t* ind);
+  void DisassociateConf(const wlan_fullmac_disassoc_confirm_t* resp);
+  void DisassociateInd(const wlan_fullmac_disassoc_indication_t* ind);
+  void StartConf(const wlan_fullmac_start_confirm_t* resp);
+  void StopConf(const wlan_fullmac_stop_confirm_t* resp);
+  void EapolConf(const wlan_fullmac_eapol_confirm_t* resp);
+  void SignalReport(const wlan_fullmac_signal_report_indication_t* ind);
+  void EapolInd(const wlan_fullmac_eapol_indication_t* ind);
+  void RelayCapturedFrame(const wlan_fullmac_captured_frame_result* result);
+  void OnChannelSwitched(const wlan_fullmac_channel_switch_info_t* ind);
+  void OnPmkAvailable(const wlan_fullmac_pmk_info_t* info);
+  void SaeHandshakeInd(const wlan_fullmac_sae_handshake_ind_t* ind);
+  void SaeFrameRx(const wlan_fullmac_sae_frame_t* ind);
+  void OnWmmStatusResp(zx_status_t status, const wlan_wmm_params_t* params);
 
   // ethernet_impl_protocol_t (ethernet_impl_protocol -> wlan_fullmac_impl_protocol)
   zx_status_t EthStart(const ethernet_ifc_protocol_t* ifc);
@@ -95,8 +130,18 @@ class Device {
   // wlan_fullmac_impl_ifc (wlanif-impl -> ethernet_ifc_t)
   void EthRecv(const uint8_t* data, size_t length, uint32_t flags);
 
+  zx_status_t Connect(zx::channel request);
+
  private:
   zx_status_t AddDevice();
+  // Suffixes in these function names have the following meanings:
+  //   Locked: Assumes lock_ already acquired prior to this function being called.
+  //   Unlocked: Acquires lock_ at the beginning at the beginning of the function.
+  //   BindingChecked: Assumes binding_ is not equal to nullptr.
+  void SendScanEndLockedBindingChecked(::fuchsia::wlan::mlme::ScanEnd scan_end)
+      __TA_REQUIRES(lock_);
+  void SendScanEndUnlocked(::fuchsia::wlan::mlme::ScanEnd scan_end) __TA_EXCLUDES(lock_);
+  void SendStartConfLocked(wlan_start_result_t result_code) __TA_REQUIRES(lock_);
 
   std::mutex lock_;
   std::mutex get_iface_histogram_stats_lock_;
@@ -107,10 +152,12 @@ class Device {
   wlan_fullmac_impl_protocol_t wlan_fullmac_impl_;
   EthDevice eth_device_;
 
-  // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
-  // calls to this protocol should only be performed by the vendor driver.
-  std::unique_ptr<wlan_fullmac_impl_ifc_protocol_ops_t> wlan_fullmac_impl_ifc_ops_;
-  std::unique_ptr<FullmacMlme> mlme_;
+  bool protected_bss_ __TA_GUARDED(lock_) = false;
+
+  wlan_fullmac_query_info query_info_;
+
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::unique_ptr<fidl::Binding<::fuchsia::wlan::mlme::MLME>> binding_ __TA_GUARDED(lock_);
 };
 
 }  // namespace wlanif

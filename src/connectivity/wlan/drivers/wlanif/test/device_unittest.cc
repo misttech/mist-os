@@ -7,8 +7,6 @@
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl_test_base.h>
-#include <fuchsia/wlan/sme/cpp/fidl.h>
-#include <fuchsia/wlan/sme/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/decoder.h>
 #include <lib/fidl/cpp/message.h>
@@ -52,6 +50,21 @@ std::pair<zx::channel, zx::channel> make_channel() {
   zx::channel remote;
   zx::channel::create(0, &local, &remote);
   return {std::move(local), std::move(remote)};
+}
+
+bool timeout_after(zx_duration_t duration, const std::function<bool()>& predicate) {
+  while (!predicate()) {
+    zx_duration_t sleep = ZX_MSEC(100);
+    zx_nanosleep(zx_deadline_after(sleep));
+    if (duration <= 0) {
+      return false;
+    }
+    duration -= sleep;
+    if (!timeout_after(duration, predicate)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // Verify that receiving an ethernet SetParam for multicast promiscuous mode results in a call to
@@ -121,6 +134,32 @@ struct SmeChannelTestContext {
     }
   }
 
+  void CaptureIncomingScanRequest(const wlan_fullmac_scan_req_t* req) {
+    std::unique_ptr<uint8_t[]> channels_list_begin;
+    std::unique_ptr<cssid_t[]> cssids_list_begin;
+
+    this->scan_req = *req;
+
+    // Copy the dynamically allocated contents of wlan_fullmac_scan_req_t.
+    if (req->channels_count > 0) {
+      channels_list_begin = std::make_unique<uint8_t[]>(req->channels_count);
+      if (channels_list_begin == nullptr) {
+        FAIL();
+      }
+      memcpy(channels_list_begin.get(), req->channels_list, req->channels_count * sizeof(uint8_t));
+    }
+    this->scan_req->channels_list = channels_list_begin.release();  // deleted in destructor
+
+    if (req->ssids_count > 0) {
+      cssids_list_begin = std::make_unique<cssid_t[]>(req->ssids_count);
+      if (cssids_list_begin == nullptr) {
+        FAIL();
+      }
+      memcpy(cssids_list_begin.get(), req->ssids_list, req->ssids_count * sizeof(cssid_t));
+    }
+    this->scan_req->ssids_list = cssids_list_begin.release();  // deleted in destructor
+  }
+
   zx::channel mlme = {};
   zx::channel sme = {};
   std::optional<wlan_fullmac_scan_req_t> scan_req = {};
@@ -154,6 +193,209 @@ wlan_fullmac_impl_protocol_ops_t EmptyProtoOps() {
   };
 }
 
+#define SME_DEV(c) static_cast<SmeChannelTestContext*>(c)
+
+wlan_mlme::ScanRequest fake_mlme_scan_request(std::vector<uint8_t>&& channel_list,
+                                              std::vector<std::vector<uint8_t>>&& ssid_list) {
+  return {
+      .txn_id = 754,
+      .scan_type = wlan_mlme::ScanTypes::PASSIVE,
+      .channel_list = std::move(channel_list),
+      .ssid_list = std::move(ssid_list),
+      .probe_delay = 0,
+      .min_channel_time = 0,
+      .max_channel_time = 100,
+  };
+}
+
+TEST(SmeChannel, ScanRequest) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = SME_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  // Capture incoming scan request.
+  proto_ops.start_scan = [](void* ctx, const wlan_fullmac_scan_req_t* req) {
+    SME_DEV(ctx)->CaptureIncomingScanRequest(req);
+  };
+
+  SmeChannelTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  auto status = device->Bind();
+  ASSERT_EQ(status, ZX_OK);
+
+  // Send scan request to device.
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  wlan_mlme::ScanRequest mlme_scan_request =
+      fake_mlme_scan_request({1, 36}, {{1, 2, 3}, {4, 5, 6, 7}});
+  mlme_proxy.StartScan(mlme_scan_request);
+
+  // Wait for scan message to propagate through the system.
+  ASSERT_TRUE(timeout_after(ZX_SEC(120), [&]() { return ctx.scan_req.has_value(); }));
+
+  // Verify scan request.
+  ASSERT_TRUE(ctx.scan_req.has_value());
+  ASSERT_EQ(ctx.scan_req->txn_id, 754u);
+  ASSERT_EQ(ctx.scan_req->scan_type, WLAN_SCAN_TYPE_PASSIVE);
+
+  ASSERT_EQ(ctx.scan_req->channels_count, 2u);
+  uint8_t expected_channels_list[] = {1, 36};
+  ASSERT_EQ(0,
+            std::memcmp(ctx.scan_req->channels_list, expected_channels_list, 2 * sizeof(uint8_t)));
+  ASSERT_EQ(ctx.scan_req->ssids_count, 2u);
+  ASSERT_EQ(ctx.scan_req->ssids_list[0].len, 3);
+  ASSERT_THAT(ctx.scan_req->ssids_list[0].data,
+              ElementsAre(1, 2, 3, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+                          _, _, _, _, _, _, _));
+  ASSERT_EQ(ctx.scan_req->ssids_list[1].len, 4);
+  ASSERT_THAT(ctx.scan_req->ssids_list[1].data,
+              ElementsAre(4, 5, 6, 7, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+                          _, _, _, _, _, _, _));
+  ASSERT_EQ(ctx.scan_req->min_channel_time, 0u);
+  ASSERT_EQ(ctx.scan_req->max_channel_time, 100u);
+
+  device->Unbind();
+}
+
+TEST(SmeChannel, ScanRequestEmptyChannelListFails) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = SME_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  // Capture incoming scan request.
+  proto_ops.start_scan = [](void* ctx, const wlan_fullmac_scan_req_t* req) {
+    SME_DEV(ctx)->CaptureIncomingScanRequest(req);
+  };
+
+  SmeChannelTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
+  auto mlme_ptr = wlan_mlme::MLMEPtr();
+  std::optional<wlan_mlme::ScanEnd> scan_end = {};
+  mlme_ptr.Bind(std::move(ctx.mlme), dispatcher);
+  mlme_ptr.events().OnScanEnd = [&scan_end, &loop](wlan_mlme::ScanEnd returned_scan_end) {
+    scan_end.emplace(std::move(returned_scan_end));
+    loop.Quit();
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  auto status = device->Bind();
+  ASSERT_EQ(status, ZX_OK);
+
+  // Send scan request to device.
+  wlan_mlme::ScanRequest mlme_scan_request = fake_mlme_scan_request({}, {{1, 2, 3}, {4, 5, 6, 7}});
+  mlme_ptr->StartScan(mlme_scan_request);
+  loop.Run();
+
+  // Verify no scan request sent and ScanEnd value.
+  ASSERT_FALSE(ctx.scan_req.has_value());
+  ASSERT_TRUE(scan_end.has_value());
+  ASSERT_EQ(scan_end.value().txn_id, 754u);
+  ASSERT_EQ(scan_end.value().code, wlan_mlme::ScanResultCode::INVALID_ARGS);
+
+  device->Unbind();
+}
+
+TEST(SmeChannel, ScanRequestEmptySsidList) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = SME_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  //  Capture incoming scan request.
+  proto_ops.start_scan = [](void* ctx, const wlan_fullmac_scan_req_t* req) {
+    SME_DEV(ctx)->CaptureIncomingScanRequest(req);
+  };
+
+  SmeChannelTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  auto status = device->Bind();
+  ASSERT_EQ(status, ZX_OK);
+
+  // Send scan request to device.
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  wlan_mlme::ScanRequest mlme_scan_request = fake_mlme_scan_request({1, 2, 3, 4, 5}, {});
+  mlme_proxy.StartScan(mlme_scan_request);
+
+  // Wait for scan message to propagate through the system.
+  ASSERT_TRUE(timeout_after(ZX_SEC(120), [&]() { return ctx.scan_req.has_value(); }));
+
+  // Verify scan request.
+  ASSERT_TRUE(ctx.scan_req.has_value());
+  ASSERT_EQ(ctx.scan_req->txn_id, 754u);
+  ASSERT_EQ(ctx.scan_req->scan_type, WLAN_SCAN_TYPE_PASSIVE);
+  ASSERT_EQ(ctx.scan_req->channels_count, 5u);
+  uint8_t expected_channels_list[] = {1, 2, 3, 4, 5};
+  ASSERT_EQ(0,
+            std::memcmp(ctx.scan_req->channels_list, expected_channels_list, 5 * sizeof(uint8_t)));
+  ASSERT_EQ(ctx.scan_req->ssids_count, 0u);
+  ASSERT_EQ(ctx.scan_req->min_channel_time, 0u);
+  ASSERT_EQ(ctx.scan_req->max_channel_time, 100u);
+
+  device->Unbind();
+}
+
+#undef SME_DEV
+
+// Tests that the device will be unbound following a failed device bind.
+TEST(SmeChannel, FailedBind) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = static_cast<SmeChannelTestContext*>(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  SmeChannelTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+
+  // Connect a mock channel so that the next device bind will fail.
+  zx::channel local, remote;
+  ASSERT_EQ(zx::channel::create(0, &local, &remote), ZX_OK);
+  ASSERT_EQ(device->Connect(std::move(remote)), ZX_OK);
+
+  // This should fail and request the device be unbound.
+  auto status = device->Bind();
+  ASSERT_NE(status, ZX_OK);
+  mock_ddk::ReleaseFlaggedDevices(parent.get());
+  ASSERT_EQ(0u, parent->descendant_count());
+}
+
 struct ConnectReqTestContext {
   ConnectReqTestContext() {
     auto [new_sme, new_mlme] = make_channel();
@@ -170,6 +412,75 @@ struct ConnectReqTestContext {
   volatile std::atomic<bool> ignore_connect = false;
 };
 
+TEST(AssocReqHandling, MultipleAssocReq) {
+#define ASSOC_DEV(c) static_cast<ConnectReqTestContext*>(c)
+  static wlan_fullmac_impl_ifc_protocol_ops_t wlan_fullmac_impl_ifc_ops = {
+      // MLME operations
+      .connect_conf =
+          [](void* cookie, const wlan_fullmac_connect_confirm_t* resp) {
+            ASSOC_DEV(cookie)->connect_confirmed = true;
+          },
+  };
+
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = ASSOC_DEV(ctx)->sme.release();
+    // Substitute with our own ops to capture connect conf
+    ASSOC_DEV(ctx)->ifc.ops = &wlan_fullmac_impl_ifc_ops;
+    ASSOC_DEV(ctx)->ifc.ctx = ctx;
+    return ZX_OK;
+  };
+
+  proto_ops.connect_req = [](void* ctx, const wlan_fullmac_connect_req_t* req) {
+    if (!ASSOC_DEV(ctx)->ignore_connect) {
+      ASSOC_DEV(ctx)->connect_req = {{
+          .security_ie_count = req->security_ie_count,
+      }};
+      wlan_fullmac_connect_confirm_t conf;
+
+      conf.result_code = 0;
+      conf.association_id = 1;
+      wlan_fullmac_impl_ifc_connect_conf(&ASSOC_DEV(ctx)->ifc, &conf);
+    }
+    ASSOC_DEV(ctx)->connect_received = true;
+  };
+  ConnectReqTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  auto status = device->Bind();
+  ASSERT_EQ(status, ZX_OK);
+
+  // Send connect request to device, ignore this one.
+  ctx.ignore_connect = true;
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  mlme_proxy.ConnectReq(wlan_fullmac_test::CreateConnectReq());
+
+  // Wait for connect req message to propagate through the system. Since there is
+  // no response expected, wait for a minimal amount of time.
+  ASSERT_TRUE(timeout_after(ZX_SEC(120), [&]() { return ctx.connect_received; }));
+  ASSERT_TRUE(!ctx.connect_req.has_value());
+  ASSERT_EQ(ctx.connect_confirmed, false);
+
+  // Send connect request to device and send the conf
+  ctx.ignore_connect = false;
+  ctx.connect_req = {};
+  ctx.connect_received = false;
+  ctx.connect_confirmed = false;
+  mlme_proxy.ConnectReq(wlan_fullmac_test::CreateConnectReq());
+  ASSERT_TRUE(timeout_after(ZX_SEC(120), [&]() { return ctx.connect_received; }));
+  ASSERT_TRUE(ctx.connect_req.has_value());
+  ASSERT_EQ(ctx.connect_confirmed, true);
+
+  device->Unbind();
+}
+
 struct DeviceTestFixture : public ::gtest::TestLoopFixture {
   void InitDevice();
   void TearDown() override {
@@ -177,29 +488,16 @@ struct DeviceTestFixture : public ::gtest::TestLoopFixture {
     TestLoopFixture::TearDown();
   }
   zx_status_t HookStart(const wlan_fullmac_impl_ifc_protocol_t* ifc,
-                        zx_handle_t* out_usme_bootstrap_channel) {
-    auto [usme_bootstrap_client, usme_bootstrap_server] = make_channel();
-    zx_status_t status = usme_bootstrap_.Bind(std::move(usme_bootstrap_client), dispatcher());
+                        zx_handle_t* out_mlme_channel) {
+    auto [new_sme, new_mlme] = make_channel();
+
+    zx_status_t status = mlme_.Bind(std::move(new_sme), dispatcher());
     if (status != ZX_OK) {
       return status;
     }
-
-    auto [generic_sme_client, generic_sme_server_chan] = make_channel();
-    status = generic_sme_.Bind(std::move(usme_bootstrap_client), dispatcher());
-    if (status != ZX_OK) {
-      return status;
-    }
-    auto generic_sme_server =
-        fidl::InterfaceRequest<fuchsia::wlan::sme::GenericSme>(std::move(generic_sme_server_chan));
-
-    fuchsia::wlan::sme::LegacyPrivacySupport legacy_privacy_support{
-        .wep_supported = false,
-        .wpa1_supported = false,
-    };
-    usme_bootstrap_->Start(std::move(generic_sme_server), legacy_privacy_support);
 
     wlan_fullmac_impl_ifc_ = *ifc;
-    *out_usme_bootstrap_channel = usme_bootstrap_server.release();
+    *out_mlme_channel = new_mlme.release();
     return ZX_OK;
   }
   std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
@@ -209,14 +507,13 @@ struct DeviceTestFixture : public ::gtest::TestLoopFixture {
   wlanif::Device* device_{new wlanif::Device(parent_.get(), proto_)};
   wlan_fullmac_impl_ifc_protocol_t wlan_fullmac_impl_ifc_{};
 
-  fuchsia::wlan::sme::UsmeBootstrapPtr usme_bootstrap_;
-  fuchsia::wlan::sme::GenericSmePtr generic_sme_;
+  fuchsia::wlan::mlme::MLMEPtr mlme_;
 };
 
 #define DEV(c) static_cast<DeviceTestFixture*>(c)
 static zx_status_t hook_start(void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
-                              zx_handle_t* usme_bootstrap_channel) {
-  return DEV(ctx)->HookStart(ifc, usme_bootstrap_channel);
+                              zx_handle_t* out_mlme_channel) {
+  return DEV(ctx)->HookStart(ifc, out_mlme_channel);
 }
 #undef DEV
 
@@ -225,21 +522,263 @@ void DeviceTestFixture::InitDevice() {
   ASSERT_EQ(device_->Bind(), ZX_OK);
 }
 
+TEST_F(DeviceTestFixture, SetKeysSuccess) {
+  InitDevice();
+  proto_ops_.set_keys_req = [](void* ctx, const wlan_fullmac_set_keys_req_t* req,
+                               wlan_fullmac_set_keys_resp_t* out_resp) {
+    for (size_t key_num = 0; key_num < req->num_keys; key_num++) {
+      out_resp->statuslist[key_num] = ZX_OK;
+    }
+    out_resp->num_keys = req->num_keys;
+  };
+  fuchsia::wlan::mlme::SetKeysConfirm conf;
+  mlme_.events().SetKeysConf = [&](fuchsia::wlan::mlme::SetKeysConfirm set_keys_conf) {
+    conf = std::move(set_keys_conf);
+  };
+  fuchsia::wlan::mlme::SetKeysRequest req{
+      .keylist = {fuchsia::wlan::mlme::SetKeyDescriptor{
+                      .key_id = 1,
+                      .key_type = fuchsia::wlan::mlme::KeyType::GROUP,
+                  },
+                  fuchsia::wlan::mlme::SetKeyDescriptor{
+                      .key_id = 2,
+                      .key_type = fuchsia::wlan::mlme::KeyType::GROUP,
+                  }},
+  };
+  device_->SetKeysReq(req);
+  RunLoopUntilIdle();
+  ASSERT_EQ(conf.results.size(), 2ul);
+  ASSERT_EQ(conf.results[0].key_id, 1);
+  ASSERT_EQ(conf.results[0].status, ZX_OK);
+  ASSERT_EQ(conf.results[1].key_id, 2);
+  ASSERT_EQ(conf.results[1].status, ZX_OK);
+}
+
+TEST_F(DeviceTestFixture, SetKeysPartialFailure) {
+  InitDevice();
+  proto_ops_.set_keys_req = [](void* ctx, const wlan_fullmac_set_keys_req_t* req,
+                               wlan_fullmac_set_keys_resp_t* out_resp) {
+    for (size_t key_num = 0; key_num < req->num_keys; key_num++) {
+      if (req->keylist[key_num].key_id == 1) {
+        out_resp->statuslist[key_num] = ZX_ERR_INTERNAL;
+      } else {
+        out_resp->statuslist[key_num] = ZX_OK;
+      }
+    }
+    out_resp->num_keys = req->num_keys;
+  };
+  fuchsia::wlan::mlme::SetKeysConfirm conf;
+  mlme_.events().SetKeysConf = [&](fuchsia::wlan::mlme::SetKeysConfirm set_keys_conf) {
+    conf = std::move(set_keys_conf);
+  };
+  fuchsia::wlan::mlme::SetKeysRequest req{
+      .keylist = {fuchsia::wlan::mlme::SetKeyDescriptor{
+                      .key_id = 0,
+                      .key_type = fuchsia::wlan::mlme::KeyType::PEER_KEY,
+                  },
+                  fuchsia::wlan::mlme::SetKeyDescriptor{
+                      .key_id = 1,
+                      .key_type = fuchsia::wlan::mlme::KeyType::GROUP,
+                  },
+                  fuchsia::wlan::mlme::SetKeyDescriptor{
+                      .key_id = 2,
+                      .key_type = fuchsia::wlan::mlme::KeyType::GROUP,
+                  }},
+  };
+  device_->SetKeysReq(req);
+  RunLoopUntilIdle();
+  ASSERT_EQ(conf.results.size(), 3ul);
+  ASSERT_EQ(conf.results[0].key_id, 0);
+  ASSERT_EQ(conf.results[0].status, ZX_OK);
+  ASSERT_EQ(conf.results[1].key_id, 1);
+  ASSERT_EQ(conf.results[1].status, ZX_ERR_INTERNAL);
+  ASSERT_EQ(conf.results[2].key_id, 2);
+  ASSERT_EQ(conf.results[2].status, ZX_OK);
+}
+
+TEST_F(DeviceTestFixture, SetKeysTooLarge) {
+  InitDevice();
+  fuchsia::wlan::mlme::SetKeysConfirm conf;
+  mlme_.events().SetKeysConf = [&](fuchsia::wlan::mlme::SetKeysConfirm set_keys_conf) {
+    conf = std::move(set_keys_conf);
+  };
+  fuchsia::wlan::mlme::SetKeysRequest req;
+  for (uint16_t i = 0; i < static_cast<uint16_t>(WLAN_MAX_KEYLIST_SIZE) + 1; i++) {
+    req.keylist.push_back(fuchsia::wlan::mlme::SetKeyDescriptor{
+        .key_id = i,
+        .key_type = fuchsia::wlan::mlme::KeyType::GROUP,
+    });
+  }
+  device_->SetKeysReq(req);
+  RunLoopUntilIdle();
+  ASSERT_EQ(conf.results.size(), WLAN_MAX_KEYLIST_SIZE + 1);
+  for (size_t i = 0; i < WLAN_MAX_KEYLIST_SIZE + 1; i++) {
+    EXPECT_EQ(conf.results[i].status, ZX_ERR_INVALID_ARGS);
+  }
+}
+
+#define QUERY_TEST_DEV(c) (static_cast<QueryTestContext*>(c))
+
+struct QueryTestContext {
+  QueryTestContext() {
+    auto [new_sme, new_mlme] = make_channel();
+    mlme = std::move(new_mlme);
+    sme = std::move(new_sme);
+  }
+
+  zx::channel mlme = {};
+  zx::channel sme = {};
+};
+
+TEST(QueryTest, QueryDiscoverySupport) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = QUERY_TEST_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+  QueryTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  ASSERT_EQ(device->Bind(), ZX_OK);
+
+  fuchsia::wlan::common::DiscoverySupport support;
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  ASSERT_EQ(mlme_proxy.QueryDiscoverySupport(&support), ZX_OK);
+  EXPECT_FALSE(support.scan_offload.supported);
+  EXPECT_FALSE(support.probe_response_offload.supported);
+
+  device->Unbind();
+}
+
+TEST(QueryTest, QueryMacSublayerSupport) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = QUERY_TEST_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  proto_ops.query_mac_sublayer_support = [](void* ctx, mac_sublayer_support_t* out_support) {
+    *out_support = {};
+    out_support->rate_selection_offload.supported = true;
+    out_support->data_plane.data_plane_type = DATA_PLANE_TYPE_ETHERNET_DEVICE;
+    out_support->device.is_synthetic = false;
+    out_support->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
+    out_support->device.tx_status_report_supported = false;
+  };
+  QueryTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  ASSERT_EQ(device->Bind(), ZX_OK);
+
+  fuchsia::wlan::common::MacSublayerSupport support;
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  ASSERT_EQ(mlme_proxy.QueryMacSublayerSupport(&support), ZX_OK);
+  EXPECT_TRUE(support.rate_selection_offload.supported);
+  EXPECT_EQ(support.data_plane.data_plane_type, wlan_common::DataPlaneType::ETHERNET_DEVICE);
+  EXPECT_FALSE(support.device.is_synthetic);
+  EXPECT_EQ(support.device.mac_implementation_type, wlan_common::MacImplementationType::FULLMAC);
+  EXPECT_FALSE(support.device.tx_status_report_supported);
+
+  device->Unbind();
+}
+
+TEST(QueryTest, QuerySecuritySupport) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = QUERY_TEST_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  proto_ops.query_security_support = [](void* ctx, security_support_t* out_support) {
+    *out_support = {};
+    out_support->sae.driver_handler_supported = true;
+    out_support->sae.sme_handler_supported = true;
+    out_support->mfp.supported = true;
+  };
+  QueryTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  ASSERT_EQ(device->Bind(), ZX_OK);
+
+  fuchsia::wlan::common::SecuritySupport support;
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  ASSERT_EQ(mlme_proxy.QuerySecuritySupport(&support), ZX_OK);
+  EXPECT_TRUE(support.sae.driver_handler_supported);
+  EXPECT_TRUE(support.sae.sme_handler_supported);
+  EXPECT_TRUE(support.mfp.supported);
+
+  device->Unbind();
+}
+
+TEST(QueryTest, QuerySpectrumManagementSupport) {
+  wlan_fullmac_impl_protocol_ops_t proto_ops = EmptyProtoOps();
+  proto_ops.start = [](void* ctx, const wlan_fullmac_impl_ifc_protocol_t* ifc,
+                       zx_handle_t* out_mlme_channel) -> zx_status_t {
+    *out_mlme_channel = QUERY_TEST_DEV(ctx)->sme.release();
+    return ZX_OK;
+  };
+
+  proto_ops.query_spectrum_management_support = [](void* ctx,
+                                                   spectrum_management_support_t* out_support) {
+    *out_support = {};
+    out_support->dfs.supported = true;
+  };
+  QueryTestContext ctx;
+  wlan_fullmac_impl_protocol_t proto = {
+      .ops = &proto_ops,
+      .ctx = &ctx,
+  };
+  auto parent = MockDevice::FakeRootParent();
+  // The parent calls release on this pointer which will delete it so don't delete it or manage it.
+  auto device = new wlanif::Device{parent.get(), proto};
+  ASSERT_EQ(device->Bind(), ZX_OK);
+
+  fuchsia::wlan::common::SpectrumManagementSupport support;
+  auto mlme_proxy = wlan_mlme::MLME_SyncProxy(std::move(ctx.mlme));
+  ASSERT_EQ(mlme_proxy.QuerySpectrumManagementSupport(&support), ZX_OK);
+  EXPECT_TRUE(support.dfs.supported);
+
+  device->Unbind();
+}
+
+#undef QUERY_TEST_DEV
+
 struct EthernetTestFixture : public DeviceTestFixture {
+  void TestEthernetAgainstRole(wlan_mac_role_t role);
   void InitDeviceWithRole(wlan_mac_role_t role);
   void SetEthernetOnline(uint32_t expected_status = ETHERNET_STATUS_ONLINE) {
-    const bool online = true;
-    device_->OnLinkStateChanged(online);
+    device_->SetControlledPort(::fuchsia::wlan::mlme::SetControlledPortRequest{
+        .state = ::fuchsia::wlan::mlme::ControlledPortState::OPEN});
     ASSERT_EQ(ethernet_status_, expected_status);
   }
   void SetEthernetOffline(uint32_t expected_status = 0) {
-    const bool online = false;
-    device_->OnLinkStateChanged(online);
+    device_->SetControlledPort(::fuchsia::wlan::mlme::SetControlledPortRequest{
+        .state = ::fuchsia::wlan::mlme::ControlledPortState::CLOSED});
     ASSERT_EQ(ethernet_status_, expected_status);
   }
   void CallDataRecv() {
-    // Doesn't matter what we put in as argument here since we just want to test for deadlock.
-    device_->EthRecv(nullptr, 0, 0);
+    // Doesn't matter what we put in as argument here (except for device_).
+    // The main thing we want to do is make this call `Device::EthRecv` so we can test this
+    // doesn't deadlock.
+    wlan_fullmac_impl_ifc_.ops->data_recv(device_, nullptr, 0, 0);
   }
 
   ethernet_ifc_protocol_ops_t eth_ops_{};
@@ -256,7 +795,6 @@ struct EthernetTestFixture : public DeviceTestFixture {
 #define ETH_DEV(c) static_cast<EthernetTestFixture*>(c)
 static void hook_query(void* ctx, wlan_fullmac_query_info_t* info) {
   info->role = ETH_DEV(ctx)->role_;
-  info->band_cap_count = 0;
 }
 
 static void hook_query_mac_sublayer_support(void* ctx, mac_sublayer_support_t* out_resp) {
@@ -284,6 +822,39 @@ void EthernetTestFixture::InitDeviceWithRole(wlan_mac_role_t role) {
   eth_ops_.status = hook_eth_status;
   eth_ops_.recv = hook_eth_recv;
   ASSERT_EQ(device_->Bind(), ZX_OK);
+}
+
+void EthernetTestFixture::TestEthernetAgainstRole(wlan_mac_role_t role) {
+  InitDeviceWithRole(role);
+  device_->EthStart(&eth_proto_);
+
+  SetEthernetOnline();
+  wlan_fullmac_deauth_indication_t deauth_ind{.reason_code = REASON_CODE_AP_INITIATED};
+  device_->DeauthenticateInd(&deauth_ind);
+  ASSERT_EQ(ethernet_status_, role_ == WLAN_MAC_ROLE_CLIENT ? 0u : ETHERNET_STATUS_ONLINE);
+
+  SetEthernetOnline();
+  wlan_fullmac_deauth_confirm_t deauth_conf{};
+  device_->DeauthenticateConf(&deauth_conf);
+  ASSERT_EQ(ethernet_status_, role_ == WLAN_MAC_ROLE_CLIENT ? 0u : ETHERNET_STATUS_ONLINE);
+
+  SetEthernetOnline();
+  wlan_fullmac_disassoc_indication_t disassoc_ind{.reason_code = REASON_CODE_AP_INITIATED};
+  device_->DisassociateInd(&disassoc_ind);
+  ASSERT_EQ(ethernet_status_, role_ == WLAN_MAC_ROLE_CLIENT ? 0u : ETHERNET_STATUS_ONLINE);
+
+  SetEthernetOnline();
+  wlan_fullmac_disassoc_confirm_t disassoc_conf{};
+  device_->DisassociateConf(&disassoc_conf);
+  ASSERT_EQ(ethernet_status_, role_ == WLAN_MAC_ROLE_CLIENT ? 0u : ETHERNET_STATUS_ONLINE);
+}
+
+TEST_F(EthernetTestFixture, ClientIfaceDisablesEthernetOnDisconnect) {
+  TestEthernetAgainstRole(WLAN_MAC_ROLE_CLIENT);
+}
+
+TEST_F(EthernetTestFixture, ApIfaceDoesNotAffectEthernetOnClientDisconnect) {
+  TestEthernetAgainstRole(WLAN_MAC_ROLE_AP);
 }
 
 TEST_F(EthernetTestFixture, ApIfaceHasApEthernetFeature) {
@@ -333,6 +904,96 @@ TEST_F(EthernetTestFixture, GndDataPlane) {
             ZX_OK);
 }
 
+TEST_F(EthernetTestFixture, ApOfflineUntilStartConf) {
+  start_req_cb_ = [this](const wlan_fullmac_start_req_t* req) {
+    // Interface should not be online until start has been confirmed.
+    ASSERT_EQ(ethernet_status_, 0u);
+    wlan_fullmac_start_confirm_t response{.result_code = WLAN_START_RESULT_SUCCESS};
+    wlan_fullmac_impl_ifc_start_conf(&wlan_fullmac_impl_ifc_, &response);
+  };
+  InitDeviceWithRole(WLAN_MAC_ROLE_AP);
+  device_->EthStart(&eth_proto_);
+
+  // Provide our own callback for StartConf to verify the result.
+  std::optional<wlan_mlme::StartResultCode> start_result;
+  mlme_.events().StartConf = [&](::fuchsia::wlan::mlme::StartConfirm start_conf) {
+    start_result = start_conf.result_code;
+  };
+
+  ::fuchsia::wlan::mlme::StartRequest req;
+  device_->StartReq(req);
+  // Now that the StartConf is received the interface should be online.
+  ASSERT_EQ(ethernet_status_, ETHERNET_STATUS_ONLINE);
+
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(start_result.has_value());
+  ASSERT_EQ(start_result.value(), wlan_mlme::StartResultCode::SUCCESS);
+}
+
+TEST_F(EthernetTestFixture, ApOfflineOnFailedStartConf) {
+  start_req_cb_ = [this](const wlan_fullmac_start_req_t* req) {
+    // Send a failed start confirm.
+    wlan_fullmac_start_confirm_t response{.result_code = WLAN_START_RESULT_NOT_SUPPORTED};
+    wlan_fullmac_impl_ifc_start_conf(&wlan_fullmac_impl_ifc_, &response);
+  };
+  InitDeviceWithRole(WLAN_MAC_ROLE_AP);
+  device_->EthStart(&eth_proto_);
+
+  // Provide our own callback for StartConf to verify  theresult.
+  std::optional<wlan_mlme::StartResultCode> start_result;
+  mlme_.events().StartConf = [&](::fuchsia::wlan::mlme::StartConfirm start_conf) {
+    start_result = start_conf.result_code;
+  };
+
+  ::fuchsia::wlan::mlme::StartRequest req;
+  device_->StartReq(req);
+  ASSERT_EQ(ethernet_status_, 0u);
+
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(start_result.has_value());
+  ASSERT_EQ(start_result.value(), wlan_mlme::StartResultCode::NOT_SUPPORTED);
+}
+
+TEST_F(EthernetTestFixture, ApSecondStartDoesNotCallImpl) {
+  int ap_start_reqs = 0;
+  // Verify that if a request is made to start an AP while an AP is already running then the
+  // wlanif driver will not forward that request to the wlan_fullmac_impl.
+  start_req_cb_ = [&](const wlan_fullmac_start_req_t* req) {
+    ++ap_start_reqs;
+    wlan_fullmac_start_confirm_t response{.result_code = WLAN_START_RESULT_SUCCESS};
+    wlan_fullmac_impl_ifc_start_conf(&wlan_fullmac_impl_ifc_, &response);
+  };
+  InitDeviceWithRole(WLAN_MAC_ROLE_AP);
+  device_->EthStart(&eth_proto_);
+
+  // Provide our own callback for StartConf to verify results.
+  std::vector<wlan_mlme::StartResultCode> start_results;
+  mlme_.events().StartConf = [&](::fuchsia::wlan::mlme::StartConfirm start_conf) {
+    start_results.push_back(start_conf.result_code);
+  };
+
+  ::fuchsia::wlan::mlme::StartRequest req;
+  device_->StartReq(req);
+  ASSERT_EQ(ap_start_reqs, 1);
+  ASSERT_EQ(ethernet_status_, ETHERNET_STATUS_ONLINE);
+
+  // Make a second request, the start request should not propagate to our protocol implementation.
+  device_->StartReq(req);
+  // The number of requests should stay at one and the interface should remain online.
+  ASSERT_EQ(ap_start_reqs, 1);
+  ASSERT_EQ(ethernet_status_, ETHERNET_STATUS_ONLINE);
+
+  RunLoopUntilIdle();
+
+  // Verify that StartConf was called twice and that the first time succeeded and the second time
+  // indicated that the AP was already started.
+  ASSERT_EQ(start_results.size(), 2u);
+  ASSERT_EQ(start_results[0], wlan_mlme::StartResultCode::SUCCESS);
+  ASSERT_EQ(start_results[1], wlan_mlme::StartResultCode::BSS_ALREADY_STARTED_OR_JOINED);
+}
+
 TEST_F(EthernetTestFixture, NotifyOnline) {
   proto_ops_.on_link_state_changed = [](void* ctx, bool online) {
     reinterpret_cast<EthernetTestFixture*>(ctx)->link_state_ = online;
@@ -346,8 +1007,8 @@ TEST_F(EthernetTestFixture, NotifyOnline) {
   ASSERT_TRUE(link_state_.has_value());
   EXPECT_TRUE(link_state_.value());
 
-  // Clear the optional and then set the status to online again, another link state event should
-  // not be sent.
+  // Clear the optional and then set the status to online again, another link state event should NOT
+  // be sent.
   link_state_.reset();
   SetEthernetOnline();
   EXPECT_FALSE(link_state_.has_value());
@@ -374,8 +1035,7 @@ TEST_F(EthernetTestFixture, GetIfaceCounterStatsReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_iface_counter_stats_t out_stats;
-  device_->GetIfaceCounterStats(&out_stats);
+  device_->GetIfaceCounterStats([](auto resp) {});
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -388,8 +1048,7 @@ TEST_F(EthernetTestFixture, GetIfaceHistogramStatsReqDoesNotDeadlockWithEthRecv)
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_iface_histogram_stats_t out_stats;
-  device_->GetIfaceHistogramStats(&out_stats);
+  device_->GetIfaceHistogramStats([](auto resp) {});
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -400,8 +1059,7 @@ TEST_F(EthernetTestFixture, ConnectReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_connect_req_t req;
-  device_->ConnectReq(&req);
+  device_->ConnectReq(wlan_fullmac_test::CreateConnectReq());
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -412,8 +1070,7 @@ TEST_F(EthernetTestFixture, DeauthReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_deauth_req_t req;
-  device_->DeauthenticateReq(&req);
+  device_->DeauthenticateReq(wlan_fullmac_test::CreateDeauthenticateReq());
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -424,8 +1081,8 @@ TEST_F(EthernetTestFixture, DisassociateReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_disassoc_req_t disassoc_req;
-  device_->DisassociateReq(&disassoc_req);
+  wlan_mlme::DisassociateRequest disassoc_req;
+  device_->DisassociateReq(disassoc_req);
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -434,8 +1091,7 @@ TEST_F(EthernetTestFixture, StartReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_start_req_t start_req;
-  device_->StartReq(&start_req);
+  device_->StartReq(wlan_fullmac_test::CreateStartReq());
   ASSERT_TRUE(eth_recv_called_);
 }
 
@@ -446,8 +1102,7 @@ TEST_F(EthernetTestFixture, StopReqDoesNotDeadlockWithEthRecv) {
   InitDeviceWithRole(WLAN_MAC_ROLE_CLIENT);
   device_->EthStart(&eth_proto_);
 
-  wlan_fullmac_stop_req_t stop_req;
-  device_->StopReq(&stop_req);
+  device_->StopReq(wlan_fullmac_test::CreateStopReq());
   ASSERT_TRUE(eth_recv_called_);
 }
 

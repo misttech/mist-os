@@ -88,7 +88,6 @@ exclude = [
 "WlanTxPacket" = "wlan_tx_packet_t"
 "WlanTxInfo" = "wlan_tx_info_t"
 "WlanTxStatus" = "wlan_tx_status_t"
-"WlanWmmParams" = "wlan_wmm_params_t"
 
 
 # This struct is used for void* context fields in protocol ops.

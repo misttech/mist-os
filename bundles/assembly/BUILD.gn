@@ -365,24 +365,20 @@ assembly_input_bundle("wlan_base") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",
     "//src/connectivity/wlan/wlancfg",
+    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
   ]
 }
 
 assembly_input_bundle("wlan_legacy_privacy_support") {
-  base_packages = []
+  base_packages =
+      [ "//src/connectivity/wlan/wlanstack:wlanstack-legacy-privacy" ]
 }
 
 assembly_input_bundle("wlan_contemporary_privacy_only_support") {
-  base_packages = []
+  base_packages = [ "//src/connectivity/wlan/wlanstack" ]
 }
 
 assembly_input_bundle("wlan_fullmac_support") {
-  base_packages = [
-    # This is temporarily placed here while USME migration is ongoing.
-    # TODO(fxbug.dev/66772): Move this to "wlan_legacy_privacy_support" AIB once USME
-    #                        migration is done.
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy",
-  ]
   base_driver_packages = [
     {
       package_target = "//src/connectivity/wlan/drivers/wlanif"
@@ -392,13 +388,6 @@ assembly_input_bundle("wlan_fullmac_support") {
 }
 
 assembly_input_bundle("wlan_softmac_support") {
-  base_packages = [
-    # This is temporarily placed here while USME migration is ongoing.
-    # TODO(fxbug.dev/66772): Move the below package(s) to "wlan_contemporary_privacy_only_support"
-    #                        AIB once USME migration is done.
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
-    "//src/connectivity/wlan/wlanstack",
-  ]
   base_driver_packages = [
     {
       package_target = "//src/connectivity/wlan/drivers/wlansoftmac"
