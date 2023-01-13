@@ -2784,16 +2784,16 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
         metadata = {
           binaries = []
 
+          # Used by link_output_rspfile(), see its documentation for details
+          link_output_path = [ _link_output_path ]
+          link_output_barrier = []
+
           # Allow metadata to be specified to shared_library instances
           # that come from a PIC-friendly toolchain too. This is required
           # for the Zircon VDSO and C library.
           if (defined(invoker.metadata)) {
             forward_variables_from(invoker.metadata, "*")
           }
-
-          # Used by link_output_rspfile(), see its documentation for details
-          link_output_path = [ _link_output_path ]
-          link_output_barrier = []
 
           # Used by the distribution_manifest template.
           if (!defined(distribution_entries)) {
@@ -3007,6 +3007,10 @@ template("executable") {
     metadata = {
       binaries = []
 
+      # Used by link_output_rspfile(), see its documentation for details.
+      link_output_path = [ rebased_link_output_file ]
+      link_output_barrier = []
+
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
@@ -3079,10 +3083,6 @@ template("executable") {
           },
         ]
       }
-
-      # Used by link_output_rspfile(), see its documentation for details.
-      link_output_path = [ rebased_link_output_file ]
-      link_output_barrier = []
 
       # Don't collect rlibs from transitive deps
       rust_barrier = []
@@ -3172,6 +3172,10 @@ template("loadable_module") {
     metadata = {
       binaries = []
 
+      # Used by link_output_rspfile()
+      link_output_path = [ rebased_link_output_file ]
+      link_output_barrier = []
+
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
@@ -3209,10 +3213,6 @@ template("loadable_module") {
           ]
         }
       }
-
-      # Used by link_output_rspfile()
-      link_output_path = [ rebased_link_output_file ]
-      link_output_barrier = []
     }
   }
 }

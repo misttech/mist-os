@@ -5,7 +5,9 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <lib/fit/defer.h>
+#include <lib/stdcompat/functional.h>
 #include <lib/zxdump/dump.h>
+#include <lib/zxdump/elf-search.h>
 #include <lib/zxdump/fd-writer.h>
 #include <lib/zxdump/task.h>
 #include <lib/zxdump/zstd-writer.h>
@@ -186,27 +188,6 @@ size_t MemberHeaderSize() { return zxdump::JobDump::MemberHeaderSize(); }
 // and of the dump and where it goes.
 class DumperBase {
  public:
-  static fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneAll(
-      zxdump::SegmentDisposition segment, const zx_info_maps_t& mapping, const zx_info_vmo_t& vmo) {
-    segment.filesz = 0;
-    return fit::ok(segment);
-  }
-
-  static fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneDefault(
-      zxdump::SegmentDisposition segment, const zx_info_maps_t& mapping, const zx_info_vmo_t& vmo) {
-    if (mapping.u.mapping.committed_pages == 0 &&   // No private RAM here,
-        vmo.parent_koid == ZX_KOID_INVALID &&       // and none shared,
-        !(vmo.flags & ZX_INFO_VMO_PAGER_BACKED)) {  // and no backing store.
-      // Since it's not pager-backed, there isn't data hidden in backing
-      // store.  If we read this, it would just be zero-fill anyway.
-      segment.filesz = 0;
-    }
-
-    // TODO(mcgrathr): for now, dump everything else.
-
-    return fit::ok(segment);
-  }
-
   // Read errors from syscalls use the PID (or job KOID).
   void Error(const zxdump::Error& error) const {
     std::cerr << koid_ << ": "sv << error << std::endl;
@@ -272,12 +253,6 @@ class ProcessDumper : public DumperBase {
 
   // Phase 1: Collect underpants!
   std::optional<size_t> Collect(const Flags& flags, bool top, const zxdump::TaskHolder& holder) {
-    zxdump::SegmentCallback prune = PruneAll;
-    if (flags.dump_memory) {
-      // TODO(mcgrathr): more filtering switches
-      prune = PruneDefault;
-    }
-
     if (flags.collect_threads) {
       auto result = dumper_.SuspendAndCollectThreads();
       if (result.is_error()) {
@@ -291,7 +266,7 @@ class ProcessDumper : public DumperBase {
       return std::nullopt;
     }
 
-    auto result = dumper_.CollectProcess(std::move(prune), flags.limit);
+    auto result = dumper_.CollectProcess(ChooseSegmentCallback(flags), flags.limit);
     if (result.is_error()) {
       Error(result.error_value());
       return std::nullopt;
@@ -338,6 +313,53 @@ class ProcessDumper : public DumperBase {
   }
 
  private:
+  zxdump::SegmentCallback ChooseSegmentCallback(const Flags& flags) {
+    if (!flags.dump_memory) {
+      return PruneAll;
+    }
+
+    // TODO(mcgrathr): more filtering switches
+
+    return cpp20::bind_front(&ProcessDumper::PruneDefault, this);
+  }
+
+  static fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneAll(
+      zxdump::SegmentDisposition segment, const zx_info_maps_t& mapping, const zx_info_vmo_t& vmo) {
+    segment.filesz = 0;
+    return fit::ok(segment);
+  }
+
+  fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneDefault(
+      zxdump::SegmentDisposition segment, const zx_info_maps_t& mapping, const zx_info_vmo_t& vmo) {
+    if (mapping.u.mapping.committed_pages == 0 &&   // No private RAM here,
+        vmo.parent_koid == ZX_KOID_INVALID &&       // and none shared,
+        !(vmo.flags & ZX_INFO_VMO_PAGER_BACKED)) {  // and no backing store.
+      // Since it's not pager-backed, there isn't data hidden in backing
+      // store.  If we read this, it would just be zero-fill anyway.
+      segment.filesz = 0;
+    }
+
+    // TODO(mcgrathr): for now, dump everything else.
+
+    // Check for build ID.
+    if (segment.filesz > 0 && zxdump::IsLikelyElfMapping(mapping)) {
+      auto result = dumper_.FindBuildIdNote(mapping);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      segment.note = result.value();
+      if (segment.note) {
+        // TODO(mcgrathr): This could e.g. decide under some switch to truncate
+        // the segment to just enough pages to include the build ID (usually
+        // one).
+        //
+        // segment.filesz = PageAlign(note->vaddr + note->size) - mapping.base;
+      }
+    }
+
+    return fit::ok(segment);
+  }
+
   zxdump::ProcessDump dumper_;
 };
 

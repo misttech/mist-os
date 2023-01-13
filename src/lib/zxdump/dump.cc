@@ -5,8 +5,8 @@
 #include "lib/zxdump/dump.h"
 
 #include <lib/stdcompat/span.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zxdump/dump.h>
+#include <lib/zxdump/elf-search.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
@@ -885,6 +885,25 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
 
   void set_date(time_t date) { std::get<DateNote>(notes_).Set(date); }
 
+  // This can be used from a Collect `prune_segment` callback function.
+  fit::result<Error, std::optional<SegmentDisposition::Note>> FindBuildIdNote(
+      const zx_info_maps_t& segment) {
+    auto elf = DetectElf(process_, segment);
+    if (elf.is_error()) {
+      return elf.take_error();
+    }
+    if (!elf->empty()) {
+      auto id = DetectElfIdentity(process_, segment, **elf);
+      if (id.is_error()) {
+        return id.take_error();
+      }
+      if (id->build_id.size > 0) {
+        return fit::ok(id->build_id);
+      }
+    }
+    return fit::ok(std::nullopt);
+  }
+
  private:
   struct ProcessInfoClass {
     using Handle = Process;
@@ -1235,6 +1254,28 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
 
         ZX_ASSERT(dump.filesz <= info.size);
         segment.filesz = dump.filesz;
+
+        // The callback can choose to emit an ELF note whose contents are
+        // embedded within this PT_LOAD segment.  This becomes a PT_NOTE
+        // segment directly in the ET_CORE file, pointing at the dumped memory
+        // expected to be in ELF note format.
+        if (dump.note) {
+          // The note's vaddr and size are a subset of the segment's.  Add an
+          // extra PT_NOTE segment pointing to the chosen memory area.  The
+          // callback sets p_vaddr and p_filesz but we sanitize the rest.
+          ZX_ASSERT(dump.note->vaddr >= segment.vaddr);
+          ZX_ASSERT(dump.note->vaddr - segment.vaddr <= segment.filesz);
+          ZX_ASSERT(dump.note->size <= segment.filesz - (dump.note->vaddr - segment.vaddr));
+          const Elf::Phdr note_phdr = {
+              .type = elfldltl::ElfPhdrType::kNote,
+              .flags = Elf::Phdr::kRead,
+              .vaddr = dump.note->vaddr,
+              .filesz = dump.note->size,
+              .memsz = dump.note->size,
+              .align = NoteAlign(),
+          };
+          phdrs_.push_back(note_phdr);
+        }
       }
     }
 
@@ -1289,6 +1330,16 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
         case elfldltl::ElfPhdrType::kLoad:
           place(phdr);
           break;
+
+        case elfldltl::ElfPhdrType::kNote: {
+          // This is an ELF note segment.
+          // It lies within the preceding PT_LOAD segment.
+          const auto& load = (&phdr)[-1];
+          ZX_DEBUG_ASSERT(load.type == elfldltl::ElfPhdrType::kLoad);
+          ZX_DEBUG_ASSERT(phdr.vaddr >= load.vaddr);
+          phdr.offset = phdr.vaddr - load.vaddr + load.offset;
+          break;
+        }
 
         default:
           ZX_ASSERT_MSG(false, "generated p_type %#x ???", phdr.type());
@@ -1351,6 +1402,11 @@ fit::result<Error> ProcessDump::CollectKernel() { return collector_->CollectKern
 
 fit::result<Error> ProcessDump::CollectSystem(const TaskHolder& holder) {
   return collector_->CollectSystem(holder);
+}
+
+fit::result<Error, std::optional<SegmentDisposition::Note>> ProcessDump::FindBuildIdNote(
+    const zx_info_maps_t& segment) {
+  return collector_->FindBuildIdNote(segment);
 }
 
 fit::result<Error, size_t> ProcessDump::DumpHeadersImpl(DumpCallback dump, size_t limit) {

@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/host.gni")
 import("//build/test.gni")
+import("//build/zircon/c_utils.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("zxdump") {
@@ -12,6 +13,7 @@ zx_library("zxdump") {
   sdk_headers = [
     "lib/zxdump/buffer.h",
     "lib/zxdump/dump.h",
+    "lib/zxdump/elf-search.h",
     "lib/zxdump/fd-writer.h",
     "lib/zxdump/task.h",
     "lib/zxdump/types.h",
@@ -33,6 +35,9 @@ zx_library("zxdump") {
 
     # <lib/zxdump/types.h> has #include <lib/stdcompat/span.h>.
     "//sdk/lib/stdcompat",
+
+    # <lib/zxdump/elf-search.h> has #include <lib/elfldltl/layout.h>.
+    "//src/lib/elfldltl",
   ]
 
   if (is_fuchsia) {
@@ -55,6 +60,7 @@ zx_library("zxdump") {
     "dump-file.cc",
     "dump-file.h",
     "dump.cc",
+    "elf-search.cc",
     "error.cc",
     "fd-writer.cc",
     "job-archive.h",
@@ -245,10 +251,13 @@ test("zxdump-unittests") {
     sources += [
       "dump-tests.cc",
       "dump-tests.h",
+      "elf-search-tests.cc",
       "read-tests.cc",
       "task-tests.cc",
     ]
+    include_dirs = [ target_gen_dir ]  # For test-child-elf-search.h
     deps += [
+      ":test-child-elf-search",
       "//sdk/lib/fdio",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zx",
@@ -278,21 +287,55 @@ executable("zxdump-test-child") {
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
   ]
+
+  metadata = {
+  }
+
   if (is_fuchsia) {
     deps += [
+      ":zxdump-test-child-dso",
       "//sdk/lib/fdio",
       "//src/zircon/lib/zircon",
       "//zircon/system/ulib/zx",
     ]
+
+    # Let the rspfile target also collect the DSO name.
+    metadata.link_output_barrier = [ ":zxdump-test-child-dso" ]
   }
 
   if (is_host) {
     base_out_dir = get_label_info(":$target_name(${toolchain_variant.base})",
                                   "root_out_dir")
-    metadata = {
-      test_runtime_deps = [ "$base_out_dir/$target_name" ]
-    }
+    metadata.test_runtime_deps = [ "$base_out_dir/$target_name" ]
   }
+}
+
+shared_library("zxdump-test-child-dso") {
+  visibility = [ ":*" ]
+  testonly = true
+  public = [ "test-child-dso.h" ]
+  sources = [ "test-child-dso.cc" ]
+}
+
+# This will list the output paths for zxdump-test-child-dso as well.
+link_output_rspfile("test-child-elf-search.rsp") {
+  visibility = [ ":*" ]
+  testonly = true
+  outputs = [ "$target_gen_dir/$target_name" ]
+  deps = [ ":zxdump-test-child($default_toolchain)" ]
+}
+
+# Now use the rspfile to extract the build IDs from the test binaries.
+# elf-search-tests.cc uses the generated header to match them at runtime.
+action("test-child-elf-search") {
+  visibility = [ ":*" ]
+  testonly = true
+  script = "test-child-elf-search.sh"
+  deps = [ ":test-child-elf-search.rsp" ]
+  sources = get_target_outputs(deps[0])
+  outputs = [ "$target_gen_dir/test-child-elf-search.inc" ]
+  depfile = "$target_gen_dir/test-child-elf-search.d"
+  args = rebase_path(outputs + sources + [ depfile ], root_build_dir)
 }
 
 fuchsia_unittest_package("zxdump-tests") {

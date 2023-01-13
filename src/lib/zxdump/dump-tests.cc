@@ -52,7 +52,12 @@ void TestProcessForPropertiesAndInfo::StartChild() {
 
 template <typename Writer>
 void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction precollect,
-                                           bool dump_memory) {
+                                           SegmentCallback prune) {
+  const bool dump_memory = prune != nullptr;
+  if (!prune) {
+    prune = PruneAllMemory;
+  }
+
   zxdump::TaskHolder holder;
   auto insert_result = holder.Insert(handle());
   ASSERT_TRUE(insert_result.is_ok()) << insert_result.error_value();
@@ -61,8 +66,7 @@ void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction pr
 
   ASSERT_NO_FATAL_FAILURE(precollect(holder, dump));
 
-  auto collect_result =
-      dump.CollectProcess(dump_memory ? TestProcess::DumpAllMemory : TestProcess::PruneAllMemory);
+  auto collect_result = dump.CollectProcess(std::move(prune));
   ASSERT_TRUE(collect_result.is_ok()) << collect_result.error_value();
 
   auto dump_result = dump.DumpHeaders(writer.AccumulateFragmentsCallback());
@@ -85,8 +89,9 @@ void TestProcessForPropertiesAndInfo::Dump(Writer& writer, PrecollectFunction pr
   }
 }
 
-template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction, bool);
-template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction, bool);
+template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction, SegmentCallback);
+template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction,
+                                                    SegmentCallback);
 
 void TestProcessForPropertiesAndInfo::CheckDump(zxdump::TaskHolder& holder, bool threads_dumped) {
   auto find_result = holder.root_job().find(koid());

@@ -8,6 +8,7 @@
 #include <lib/fdio/spawn.h>
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
+#include <lib/stdcompat/functional.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zxdump/dump.h>
@@ -33,6 +34,8 @@ constexpr time_t kTestDate = 74697240;  // Long, long ago.
 // A simple test program starts up and waits.
 class TestProcess {
  public:
+  static constexpr std::string_view kDsoSoname = "libzxdump-test-child-dso.so";
+
   zx::unowned_process borrow() const { return zx::unowned_process{process_}; }
 
   LiveHandle handle() const {
@@ -147,7 +150,8 @@ class TestProcessForPropertiesAndInfo : public TestProcess {
 
   // Do the basic dump using the dumper API.
   template <typename Writer>
-  void Dump(Writer& writer, PrecollectFunction precollect = NoPrecollect, bool dump_memory = false);
+  void Dump(Writer& writer, PrecollectFunction precollect = NoPrecollect,
+            SegmentCallback prune = nullptr);
 
   // Verify a dump file for that child was inserted and looks right.
   void CheckDump(zxdump::TaskHolder& holder, bool threads_dumped = true);
@@ -157,8 +161,10 @@ class TestProcessForPropertiesAndInfo : public TestProcess {
 };
 
 // The template and its instantiations are defined in dump-tests.cc.
-extern template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction, bool);
-extern template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction, bool);
+extern template void TestProcessForPropertiesAndInfo::Dump(FdWriter&, PrecollectFunction,
+                                                           SegmentCallback);
+extern template void TestProcessForPropertiesAndInfo::Dump(ZstdWriter&, PrecollectFunction,
+                                                           SegmentCallback);
 
 class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
  public:
@@ -168,8 +174,8 @@ class TestProcessForSystemInfo : public TestProcessForPropertiesAndInfo {
   // Do the basic dump using the dumper API.
   template <typename Writer>
   void Dump(Writer& writer) {
-    auto precollect = [this](auto& holder, auto& dump) { Precollect(holder, dump); };
-    TestProcessForPropertiesAndInfo::Dump(writer, precollect);
+    TestProcessForPropertiesAndInfo::Dump(
+        writer, cpp20::bind_front(&TestProcessForSystemInfo::Precollect, this));
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -191,8 +197,8 @@ class TestProcessForKernelInfo : public TestProcessForPropertiesAndInfo {
   // Do the basic dump using the dumper API.
   template <typename Writer>
   void Dump(Writer& writer) {
-    auto precollect = [this](auto& holder, auto& dump) { Precollect(holder, dump); };
-    TestProcessForPropertiesAndInfo::Dump(writer, precollect);
+    TestProcessForPropertiesAndInfo::Dump(
+        writer, cpp20::bind_front(&TestProcessForKernelInfo::Precollect, this));
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -263,8 +269,8 @@ class TestProcessForMemory : public TestProcessForPropertiesAndInfo {
 
   // Do the full-memory dump using the dumper API.
   template <typename Writer>
-  void Dump(Writer& writer, bool dump_memory = true) {
-    TestProcessForPropertiesAndInfo::Dump(writer, NoPrecollect, dump_memory);
+  void Dump(Writer& writer, SegmentCallback prune = DumpAllMemory) {
+    TestProcessForPropertiesAndInfo::Dump(writer, NoPrecollect, std::move(prune));
   }
 
   // Verify a dump file for that child was inserted and looks right.
@@ -312,6 +318,44 @@ class TestProcessForThreads : public TestProcessForPropertiesAndInfo {
   std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
 
   static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
+};
+
+class TestProcessForElfSearch : public zxdump::testing::TestProcessForPropertiesAndInfo {
+ public:
+  // Start a child for ELF search testing.
+  void StartChild();
+
+  // Do the full-memory dump using the dumper API.
+  template <typename Writer>
+  void Dump(Writer& writer) {
+    zxdump::testing::TestProcessForPropertiesAndInfo::Dump(
+        writer, cpp20::bind_front(&TestProcessForElfSearch::Precollect, this),
+        cpp20::bind_front(&TestProcessForElfSearch::DumpAllMemoryWithBuildIds, this));
+  }
+
+  // Verify a dump file for that child was inserted and looks right.
+  void CheckDump(zxdump::TaskHolder& holder);
+
+  // Verify the build ID PT_NOTEs in the ET_CORE file directly.
+  void CheckNotes(int fd);
+
+  // These give the addresses where the modules were reported in the child.
+
+  uint64_t main_ptr() const { return main_ptr_; }
+
+  uint64_t dso_ptr() const { return dso_ptr_; }
+
+ private:
+  static constexpr const char* kChildName = "zxdump-elf-search-test-child";
+
+  void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
+
+  fit::result<zxdump::Error, zxdump::SegmentDisposition> DumpAllMemoryWithBuildIds(
+      zxdump::SegmentDisposition segment, const zx_info_maps_t& maps, const zx_info_vmo_t& vmo);
+
+  zxdump::ProcessDump* dump_ = nullptr;
+  uint64_t dso_ptr_ = 0;
+  uint64_t main_ptr_ = 0;
 };
 
 }  // namespace zxdump::testing

@@ -161,6 +161,19 @@ The note's "description" (payload) has the size and layout that corresponds to
 that topic's `zx_thread_state_*_t` type.  The types and layouts that will
 appear vary by machine.
 
+#### Build ID Notes
+
+Zircon `ET_CORE` files usually contain additional `PT_NOTE` program headers.
+These come after a `PT_LOAD` header and have a `p_vaddr` and `p_memsz` that
+locates their data inside that load segment.  These additional notes locate
+places in the image where the dump-writer identified ELF build ID notes inside
+ELF images mapped into the process memory.  The notes don't convey any _new_
+data, it's just a small region of the process memory already in the dump.  But
+they save a reader of the dump the trouble of scanning the memory image for
+ELF images and extracting build ID notes.  Instead, each build ID note that
+the dump-writer came across appears directly as a note in the `ET_CORE` file
+when examined by normal ELF tools.
+
 ## Job archives
 
 As well as an individual process, a Zircon job can be dumped into a file

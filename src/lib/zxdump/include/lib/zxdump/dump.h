@@ -31,10 +31,15 @@ inline constexpr size_t DefaultLimit() { return std::numeric_limits<size_t>::max
 // mapping and the memory to consider; and an zxdump::SegmentDisposition
 // describing the default policy, which is usually to dump the whole thing,
 // i.e. `filesz = maps.size`.  It can set `filesz = 0` to elide the segment;
-// or set it to a smaller size to include only part of the segment.
-//
-// TODO(mcgrathr): Add PT_NOTE feature later.
+// or set it to a smaller size to include only part of the segment.  It can
+// optionally also request that a PT_NOTE segment be generated.
 struct SegmentDisposition {
+  // The bounds of the PT_NOTE given here must be within the segment.
+  struct Note {
+    uintptr_t vaddr = 0;
+    size_t size = 0;
+  };
+
   // The leading subset of the segment that should be included in the dump.
   // This can be zero to elide the whole segment, and must not be greater
   // than the original p_filesz value.  This doesn't have to be page-aligned,
@@ -42,6 +47,14 @@ struct SegmentDisposition {
   // gap filled with zero bytes (or a sparse region of the file) so there's
   // not much point in eliding a partial page.
   size_t filesz = 0;
+
+  // The location within the segment where a PT_NOTE should be generated.
+  // This is used to communicate where a NT_GNU_BUILD_ID note was found by
+  // zxdump::ProcessDump::FindBuildIdNote, but it can also for other notes
+  // if a callback sets it to a memory location that's in ELF note format.
+  // (The contents won't be checked by the dumper, and need not even be
+  // actually included in the dump via the filesz chosen by the callback.)
+  std::optional<Note> note;
 };
 
 using SegmentCallback = fit::function<fit::result<Error, SegmentDisposition>(
@@ -183,6 +196,13 @@ class ProcessDump : protected DumpBase {
   // of its memory.
   fit::result<Error, size_t> CollectProcess(SegmentCallback prune_segment,
                                             size_t limit = DefaultLimit());
+
+  // This examines the memory to find an ELF image with a build ID note.  If
+  // there are no errors reading the memory but no ELF image or no build ID
+  // note is found, then the result is fit::ok(std::nullopt).  This is meant
+  // to be used from a `prune_segment` callback in CollectProcess (see above).
+  fit::result<Error, std::optional<SegmentDisposition::Note>> FindBuildIdNote(
+      const zx_info_maps_t& segment);
 
   // This must be called after CollectProcess.
   //

@@ -62,7 +62,7 @@ TEST(ZxdumpTests, ReadMemoryElided) {
   zxdump::testing::TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, false));
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, nullptr));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());
@@ -121,7 +121,7 @@ TEST(ZxdumpTests, ReadMemoryStringElided) {
   zxdump::testing::TestProcessForMemory process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
 
-  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, false));
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer, nullptr));
 
   zxdump::TaskHolder holder;
   auto read_result = holder.Insert(file.RewoundFd());

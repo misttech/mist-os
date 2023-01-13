@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <lib/stdcompat/span.h>
@@ -27,11 +28,13 @@
 #include <zircon/threads.h>
 #endif
 
+#include "test-child-dso.h"
+
 namespace {
 
 constexpr std::string_view kStdinoutFilename = "-";
 
-constexpr char kOptString[] = "c:e:m:M:o:p:t:w:x:";
+constexpr char kOptString[] = "c:e:m:M:o:p:t:w:x:dD";
 constexpr option kLongOpts[] = {
     {"cat-from", required_argument, nullptr, 'c'},      //
     {"cat-to", required_argument, nullptr, 'o'},        //
@@ -41,6 +44,8 @@ constexpr option kLongOpts[] = {
     {"memory-pages", required_argument, nullptr, 'p'},  //
     {"threads", required_argument, nullptr, 't'},       //
     {"memory-wchar", required_argument, nullptr, 'w'},  //
+    {"dladdr-main", no_argument, nullptr, 'd'},         //
+    {"dladdr-dso", no_argument, nullptr, 'D'},          //
     {"exit", required_argument, nullptr, 'x'},          //
 };
 
@@ -114,12 +119,26 @@ void CatTo(const char* filename) {
       CatOpen(filename, STDOUT_FILENO, O_WRONLY | O_CREAT | O_EXCL).get());
 }
 
+template <typename T>
+void PrintDladdr(T ptr) {
+  void* address = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr));
+  Dl_info info;
+  ZX_ASSERT_MSG(dladdr(address, &info) != 0, "dladdr failed on %p", address);
+  printf("%p\n", info.dli_fbase);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   size_t thread_count = 0;
   std::vector<int> ints;
   std::wstring wstr;
+
+#ifdef __Fuchsia__
+  // This doesn't do anything, but calling it ensures that the test-child-dso
+  // shared library is linked in.
+  TestDsoFunction();
+#endif
 
   while (true) {
     switch (getopt_long(argc, argv, kOptString, kLongOpts, nullptr)) {
@@ -179,6 +198,16 @@ int main(int argc, char** argv) {
         printf("%p\n", wstr.data());
         continue;
       }
+
+      case 'd':
+        PrintDladdr(&main);
+        continue;
+
+#ifdef __Fuchsia__
+      case 'D':
+        PrintDladdr(&TestDsoFunction);
+        continue;
+#endif
 
       case 'x':
         return atoi(optarg);
