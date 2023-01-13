@@ -21,7 +21,19 @@ py_runtime(
     #
     # See details about this shebang line in https://fxbug.dev/115164#c29, and
     # general information about the underlying issue in that bug.
-    stub_shebang = '#!/usr/bin/env -S /bin/bash -c \'"$0".runfiles/main/%s "$0" "$@"\'' % _python3_interpreter_path,
+    stub_shebang = """\
+#!/bin/bash
+#
+# This bash oneliner will be interpreted and ignored by Python because they are
+# all string literals. We use it to locate the vendored interpreter to use in
+# the Python launcher script.
+#
+# NOTE: `exec` is necessary here because when used as a launcher script, we want
+# the script to stop at this line, instead of continuing the rest of the
+# launcher script, which are in Python, not bash.
+
+"exec" "$0.runfiles/main/%s" "$0" "$@"
+""" % _python3_interpreter_path,
 )
 
 py_runtime_pair(
