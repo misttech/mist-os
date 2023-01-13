@@ -11,7 +11,7 @@ use argh::FromArgs;
     description = "Runs a driver tool executable in the driver_playground.",
     example = "To run a tool:
 
-    $ driver runtool fuchsia-pkg://fuchsiasamples.com/eductl#bin/eductl -- fact 5",
+    $ driver run-tool fuchsia-pkg://fuchsiasamples.com/eductl#bin/eductl -- fact 5",
     error_code(1, "Failed to connect to the driver playground service")
 )]
 pub struct RunToolCommand {
