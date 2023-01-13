@@ -1129,7 +1129,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1156,7 +1156,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_auth_resp_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1193,7 +1193,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     fn handle_mlme_deauth_req(init_state: State) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
@@ -1219,7 +1219,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, mut time_stream) = make_context(fake_device.as_device());
@@ -1282,7 +1282,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_then_handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1311,7 +1311,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_then_handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1337,7 +1337,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_no_rsn() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1360,7 +1360,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_failure_reason_unspecified() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1395,7 +1395,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_failure_emergency_services_not_supported() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1430,7 +1430,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1537,7 +1537,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1562,7 +1562,7 @@ mod tests {
 
     #[test]
     fn handle_disassoc_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1596,7 +1596,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     fn handle_assoc_req_frame(init_state: State) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
@@ -1637,7 +1637,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     fn handle_auth_frame(init_state: State) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
@@ -1658,7 +1658,7 @@ mod tests {
 
     #[test]
     fn handle_auth_frame_unknown_algorithm() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1685,7 +1685,7 @@ mod tests {
     #[test_case(false; "from idle state")]
     #[test_case(true; "while already authenticated")]
     fn handle_deauth_frame(already_authenticated: bool) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         if already_authenticated {
@@ -1720,7 +1720,7 @@ mod tests {
 
     #[test]
     fn handle_ps_poll() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -1791,7 +1791,7 @@ mod tests {
 
     #[test]
     fn handle_ps_poll_not_buffered() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -1810,7 +1810,7 @@ mod tests {
 
     #[test]
     fn handle_ps_poll_wrong_aid() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -1832,7 +1832,7 @@ mod tests {
 
     #[test]
     fn handle_ps_poll_not_dozing() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -1852,7 +1852,7 @@ mod tests {
 
     #[test]
     fn handle_eapol_llc_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1881,7 +1881,7 @@ mod tests {
 
     #[test]
     fn handle_llc_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1908,7 +1908,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_no_eapol_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1942,7 +1942,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1958,7 +1958,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_eapol_controlled_port_closed() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -1979,7 +1979,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_eapol_controlled_port_open() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device.as_device());
@@ -2013,7 +2013,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_not_permitted() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
@@ -2076,7 +2076,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_not_permitted_disassoc() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
@@ -2139,7 +2139,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_single_llc() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2185,7 +2185,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_amsdu() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2244,7 +2244,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
@@ -2276,7 +2276,7 @@ mod tests {
     #[test_case(Ssid::try_from("").unwrap(), true; "with empty ssid")]
     #[test_case(Ssid::try_from("coolnet").unwrap(), false; "without rsne")]
     fn handle_mgmt_frame_assoc_req(ssid: Ssid, has_rsne: bool) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
@@ -2348,7 +2348,7 @@ mod tests {
         extended_supported_rates_ie: Vec<u8>,
         expected_rates: Vec<u8>,
     ) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
@@ -2395,7 +2395,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_not_permitted() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
@@ -2455,7 +2455,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_not_handled() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2493,7 +2493,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_resets_active_timer() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
@@ -2534,7 +2534,7 @@ mod tests {
 
     #[test]
     fn handle_bss_idle_timeout() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -2577,7 +2577,7 @@ mod tests {
 
     #[test]
     fn doze_then_wake() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -2646,7 +2646,7 @@ mod tests {
 
     #[test]
     fn doze_then_doze() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -2664,7 +2664,7 @@ mod tests {
 
     #[test]
     fn wake_then_wake() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -2682,7 +2682,7 @@ mod tests {
 
     #[test]
     fn doze_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 
@@ -2699,7 +2699,7 @@ mod tests {
 
     #[test]
     fn wake_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
 

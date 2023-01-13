@@ -636,7 +636,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_allowed_event_changes_state_with_reset() {
-        let mut executor = TestExecutor::new().unwrap();
+        let mut executor = TestExecutor::new();
 
         let reset_event = create_reset_consumer_controls_event();
         let reset_handler = FactoryResetHandler::new();

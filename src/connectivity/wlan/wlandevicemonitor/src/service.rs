@@ -671,7 +671,7 @@ mod tests {
 
     #[test]
     fn test_list_phys() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -735,7 +735,7 @@ mod tests {
 
     #[test]
     fn test_list_ifaces() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -788,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_get_dev_path_success() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _) = fake_phy();
 
@@ -825,7 +825,7 @@ mod tests {
 
     #[test]
     fn test_get_dev_path_phy_not_found() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -854,7 +854,7 @@ mod tests {
 
     #[test]
     fn test_get_mac_roles_success() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         test_values.phys.insert(10u16, phy);
@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_get_mac_roles_phy_not_found() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -933,7 +933,7 @@ mod tests {
 
     #[test]
     fn test_watch_devices_add_remove_phy() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
         pin_mut!(watcher_fut);
@@ -988,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_watch_devices_remove_existing_phy() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
         pin_mut!(watcher_fut);
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn test_watch_devices_add_remove_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
         pin_mut!(watcher_fut);
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn test_watch_devices_remove_existing_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let watcher_fut = test_values.watcher_fut;
         pin_mut!(watcher_fut);
@@ -1172,7 +1172,7 @@ mod tests {
     #[test]
     fn test_set_country_succeeds() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1203,7 +1203,7 @@ mod tests {
     #[test]
     fn test_set_country_fails() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1236,7 +1236,7 @@ mod tests {
     #[test]
     fn test_get_country_succeeds() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let (phy, mut phy_stream) = fake_phy();
@@ -1269,7 +1269,7 @@ mod tests {
     #[test]
     fn test_get_country_fails() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1297,7 +1297,7 @@ mod tests {
     #[test]
     fn test_clear_country_succeeds() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1326,7 +1326,7 @@ mod tests {
     #[test]
     fn test_clear_country_fails() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1357,7 +1357,7 @@ mod tests {
     #[test]
     fn test_set_power_save_mode_succeeds() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1390,7 +1390,7 @@ mod tests {
     #[test]
     fn test_set_power_save_mode_fails() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1425,7 +1425,7 @@ mod tests {
     #[test]
     fn test_get_power_save_mode_succeeds() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let (phy, mut phy_stream) = fake_phy();
@@ -1459,7 +1459,7 @@ mod tests {
     #[test]
     fn test_get_power_save_mode_fails() {
         // Setup environment
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, mut phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -1497,7 +1497,7 @@ mod tests {
     #[test_case(true, false; "CreateIface with MAC succeeds")]
     #[test_case(false, true; "CreateIface fails on interface creation")]
     fn test_create_iface(with_mac: bool, create_iface_fails: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (phy, mut phy_stream) = fake_phy();
@@ -1581,7 +1581,7 @@ mod tests {
         create_iface_fails: bool,
         add_iface_fails: bool,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (phy, mut phy_stream) = fake_phy();
@@ -1687,7 +1687,7 @@ mod tests {
 
     #[test]
     fn test_create_multiple_ifaces() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -1769,7 +1769,7 @@ mod tests {
 
     #[test]
     fn test_create_multiple_ifaces_with_wlanstack() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let service_fut = serve_monitor_requests(
             test_values.monitor_req_stream,
@@ -1867,7 +1867,7 @@ mod tests {
 
     #[test]
     fn create_iface_on_invalid_phy_id() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let iface_counter = Arc::new(IfaceCounter::new());
 
@@ -1916,7 +1916,7 @@ mod tests {
 
     #[test]
     fn destroy_iface_success() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
@@ -1940,7 +1940,7 @@ mod tests {
 
     #[test]
     fn destroy_iface_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
@@ -1969,7 +1969,7 @@ mod tests {
 
     #[test]
     fn destroy_iface_recovery() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
@@ -2002,7 +2002,7 @@ mod tests {
 
     #[test]
     fn destroy_iface_not_found() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let _phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
 
@@ -2013,7 +2013,7 @@ mod tests {
 
     #[test]
     fn get_client_sme() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -2058,7 +2058,7 @@ mod tests {
 
     #[test]
     fn get_client_sme_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -2094,7 +2094,7 @@ mod tests {
 
     #[test]
     fn get_client_sme_invalid_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -2120,7 +2120,7 @@ mod tests {
 
     #[test]
     fn get_feature_support() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -2155,7 +2155,7 @@ mod tests {
 
     #[test]
     fn query_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let (phy, _phy_stream) = fake_phy();
         let phy_id = 10u16;
@@ -2203,7 +2203,7 @@ mod tests {
     #[test_case(zx::Status::OK, false; "Generic SME with OK epitaph shuts down cleanly")]
     #[test_case(zx::Status::INTERNAL, true; "Generic SME with error epitaph initiates iface removal")]
     fn new_iface_stream_epitaph(epitaph: zx::Status, expect_destroy_iface: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let new_iface_fut = handle_new_iface_stream(
             test_values.phys.clone(),

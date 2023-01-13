@@ -545,7 +545,7 @@ mod tests {
 
         let connector = FlakeyServiceConnector::new();
         let future = build_current_channel_manager_and_notifier(connector.clone());
-        let mut real_executor = fasync::TestExecutor::new().expect("new executor ok");
+        let mut real_executor = fasync::TestExecutor::new();
         let (_, c) =
             real_executor.run_singlethreaded(future).expect("failed to construct channel_manager");
         std::mem::drop(real_executor);
@@ -588,7 +588,7 @@ mod tests {
         assert_eq!(connector.channel(), Some("stable".to_owned()));
 
         std::mem::drop(executor);
-        let mut real_executor = fasync::TestExecutor::new().expect("new executor ok");
+        let mut real_executor = fasync::TestExecutor::new();
         // Bails out if Cobalt responds with an unexpected status code
         let connector = FlakeyServiceConnector::new();
         let future = build_current_channel_manager_and_notifier(connector.clone());

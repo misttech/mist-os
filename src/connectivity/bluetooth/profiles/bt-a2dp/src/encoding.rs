@@ -410,7 +410,7 @@ mod encoder_tests {
 
     #[test]
     fn test_sbc_encodes_correctly() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let sbc_capability = &avdtp::ServiceCapability::MediaCodec {
             media_type: avdtp::MediaType::Audio,
             codec_type: avdtp::MediaCodecType::AUDIO_SBC,
@@ -424,7 +424,7 @@ mod encoder_tests {
 
     #[test]
     fn test_aac_encodes_correctly() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let aac_capability = &avdtp::ServiceCapability::MediaCodec {
             media_type: avdtp::MediaType::Audio,
             codec_type: avdtp::MediaCodecType::AUDIO_AAC,

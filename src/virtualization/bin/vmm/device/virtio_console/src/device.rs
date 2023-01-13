@@ -153,7 +153,7 @@ mod tests {
 
     #[fuchsia::test]
     fn tx_blocked_on_full_socket() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (remote, local) =
             zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket");
 

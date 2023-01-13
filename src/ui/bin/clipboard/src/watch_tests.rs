@@ -74,7 +74,7 @@ impl TestHandles {
 
 #[fuchsia::test]
 fn test_single_unfocused_client() -> Result<()> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -106,7 +106,7 @@ fn test_single_unfocused_client() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_single_client_first_watches_while_focused() -> Result<()> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -129,7 +129,7 @@ fn test_single_client_first_watches_while_focused() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_single_client_first_watches_then_gains_focus() -> Result<()> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -166,7 +166,7 @@ fn test_single_client_first_watches_then_gains_focus() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_unchanged_metadata_updates_are_ignored() -> Result<()> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -203,7 +203,7 @@ fn test_unchanged_metadata_updates_are_ignored() -> Result<()> {
 fn test_all_clients_are_marked_dirty_when_metadata_changes() -> Result<()> {
     const NUM_CLIENTS: usize = 5;
 
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
     let readers_and_koids =
@@ -274,7 +274,7 @@ fn test_all_clients_are_marked_dirty_when_metadata_changes() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_last_clipboard_state_wins() -> Result<()> {
-    let mut executor = fasync::TestExecutor::new()?;
+    let mut executor = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -317,7 +317,7 @@ fn test_last_clipboard_state_wins() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_last_focus_wins() -> Result<()> {
-    let mut executor = fasync::TestExecutor::new()?;
+    let mut executor = fasync::TestExecutor::new();
 
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
@@ -369,7 +369,7 @@ fn test_last_focus_wins() -> Result<()> {
 fn test_new_watcher_is_notified_despite_flood_of_focus_changes() -> Result<()> {
     const HERD_SIZE: usize = 10;
 
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
     let mut handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 
     let herd_readers_and_koids =
@@ -414,7 +414,7 @@ fn test_new_watcher_is_notified_despite_flood_of_focus_changes() -> Result<()> {
 
 #[fuchsia::test(logging_minimum_severity = "debug")]
 fn test_illegal_concurrent_watch() -> Result<()> {
-    let mut executor = fasync::TestExecutor::new()?;
+    let mut executor = fasync::TestExecutor::new();
 
     let handles = TestHandles::new(ClipboardMetadata::with_last_modified_ns(1));
 

@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn list_ifaces_returns_iface_id_vector() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (wlan_monitor, server) = create_wlan_monitor_util();
         let mut next_device_monitor_req = server.into_future();
 
@@ -627,7 +627,7 @@ mod tests {
 
     #[test]
     fn list_ifaces_properly_handles_zero_ifaces() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (wlan_monitor, server) = create_wlan_monitor_util();
         let mut next_device_monitor_req = server.into_future();
 
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn list_phys_returns_iface_id_vector() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (monitor_service, server) = create_wlan_monitor_util();
         let mut next_device_service_req = server.into_future();
 
@@ -694,7 +694,7 @@ mod tests {
 
     #[test]
     fn list_phys_properly_handles_zero_phys() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (monitor_service, server) = create_wlan_monitor_util();
         let mut next_device_service_req = server.into_future();
 
@@ -767,7 +767,7 @@ mod tests {
 
     #[test]
     fn get_client_sme_valid_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (wlan_monitor, server) = create_wlan_monitor_util();
         let mut next_device_monitor_req = server.into_future();
 
@@ -801,7 +801,7 @@ mod tests {
 
     #[test]
     fn get_client_sme_invalid_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (wlan_monitor, server) = create_wlan_monitor_util();
         let mut next_device_monitor_req = server.into_future();
 
@@ -862,7 +862,7 @@ mod tests {
         let target_ssid = Ssid::try_from(target_ssid).unwrap();
         let connected_to_ssid = Ssid::try_from(connected_to_ssid).unwrap();
 
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut next_client_sme_req = server.into_future();
 
@@ -919,7 +919,7 @@ mod tests {
 
     #[test]
     fn connect_properly_passes_network_info_with_password() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut next_client_sme_req = server.into_future();
 
@@ -952,7 +952,7 @@ mod tests {
 
     #[test]
     fn connect_properly_passes_network_info_open() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut next_client_sme_req = server.into_future();
 
@@ -1085,7 +1085,7 @@ mod tests {
     }
 
     fn test_disconnect(status: StatusResponse) -> Poll<Result<(), Error>> {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut client_sme_req = server.into_future();
 
@@ -1222,7 +1222,7 @@ mod tests {
     }
 
     fn test_scan(scan_results: Vec<fidl_sme::ScanResult>) -> Vec<fidl_sme::ScanResult> {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut client_sme_req = server.into_future();
 
@@ -1257,7 +1257,7 @@ mod tests {
     }
 
     fn test_scan_error() -> Result<(), Error> {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (client_sme, server) = create_client_sme_proxy();
         let mut client_sme_req = server.into_future();
 
@@ -1323,7 +1323,7 @@ mod tests {
 
     #[test]
     fn test_destroy_single_iface_ok() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let (monitor_service, server) = create_wlan_monitor_util();
         let mut next_device_service_req = server.into_future();
 

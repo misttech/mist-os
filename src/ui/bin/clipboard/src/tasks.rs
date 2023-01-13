@@ -66,7 +66,7 @@ mod tests {
 
     #[fuchsia::test]
     fn smoke_test() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new()?;
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut sender_1, task_1, completed_1) = make_signalable_task::<bool>();
         let (sender_2, task_2, completed_2) = make_signalable_task::<bool>();

@@ -74,7 +74,7 @@ mod test {
 
         #[fuchsia::test]
         fn get_or_insert_with_preemption() {
-            let mut exec = fasync::TestExecutor::new().unwrap();
+            let mut exec = fasync::TestExecutor::new();
             let s = SharedState::default();
             let (sender, receiver) = oneshot::channel::<()>();
             let inserter1 = || {

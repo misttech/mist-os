@@ -1175,7 +1175,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_disconnected() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, _stream) =
             create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
         let (remote, signaling) = Channel::create();
@@ -1199,7 +1199,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_collect_capabilities_success() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
 
@@ -1328,7 +1328,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_collect_all_capabilities_success() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
         let p: ProfileDescriptor = ProfileDescriptor {
@@ -1466,7 +1466,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_collect_capabilities_discovery_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(false);
 
@@ -1506,7 +1506,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_collect_capabilities_get_capability_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(true);
 
@@ -1598,7 +1598,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_stream_start_success() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
 
@@ -1661,7 +1661,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_stream_start_picks_correct_direction() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, _, _, peer) = setup_peer_test(false);
         let remote = avdtp::Peer::new(remote);
@@ -1750,7 +1750,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_stream_start_fails_wrong_direction() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup peers with only one Source Stream.
         let (avdtp, remote) = setup_avdtp_peer();
@@ -1835,7 +1835,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_stream_start_fails_to_connect() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
 
@@ -1930,7 +1930,7 @@ mod tests {
     /// Test that the remote end can configure and start a stream.
     #[fuchsia::test]
     fn test_peer_as_acceptor() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
         let (profile_proxy, _requests) =
@@ -2039,7 +2039,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_set_config_reject_first() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
         let (profile_proxy, _requests) =
@@ -2177,7 +2177,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_needs_permit_to_start_stream() {
-        let mut exec = fasync::TestExecutor::new().expect("an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
         let (profile_proxy, _requests) =
@@ -2323,7 +2323,7 @@ mod tests {
 
     #[fuchsia::test]
     fn permits_can_be_revoked_and_reinstated_all() {
-        let mut exec = fasync::TestExecutor::new().expect("an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
         let (profile_proxy, _requests) =
@@ -2422,7 +2422,7 @@ mod tests {
 
     #[fuchsia::test]
     fn permits_can_be_revoked_one_at_a_time() {
-        let mut exec = fasync::TestExecutor::new().expect("an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
         let (profile_proxy, _requests) =

@@ -771,7 +771,7 @@ mod tests {
     #[fuchsia::test]
     fn call_is_active() {
         // executor must be created before fidl endpoints can be created
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
         let (proxy, _) = fidl::endpoints::create_proxy::<CallMarker>().unwrap();
 
         let mut call = CallEntry::new(
@@ -828,7 +828,7 @@ mod tests {
 
     #[fuchsia::test]
     fn calls_should_ring_succeeds() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut calls, mut peer_handler, mut call_stream, _idx, _num) = setup_ongoing_call();
         assert!(calls.should_ring());
@@ -1079,7 +1079,7 @@ mod tests {
 
     #[fuchsia::test]
     fn calls_is_call_active() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
@@ -1117,7 +1117,7 @@ mod tests {
 
     #[fuchsia::test]
     fn calls_transfers_produce_indicators() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
@@ -1159,7 +1159,7 @@ mod tests {
 
     #[fuchsia::test]
     fn calls_swap_produce_indicators() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut peer_stream) =
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
@@ -1241,7 +1241,7 @@ mod tests {
         // when the states of those calls are modified, and finally, when both calls have been
         // removed from the stream.
 
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut calls, mut handler_stream, mut call_1, _idx_1, _num_1) = setup_ongoing_call();
 
@@ -1328,7 +1328,7 @@ mod tests {
         // when the states of those calls are modified, and finally, when both calls have been
         // removed from the stream.
 
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut calls, mut handler_stream, mut call_1, idx_1, _num_1) = setup_ongoing_call();
 
@@ -1413,7 +1413,7 @@ mod tests {
 
     #[fuchsia::test]
     fn send_dtmf_code_to_call() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut calls, _handler_stream, mut call_1, _idx_1, _num_1) = setup_ongoing_call();
         poll_calls_until_pending(&mut exec, &mut calls);

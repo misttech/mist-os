@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn can_read_write() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn can_read_datagram() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
 
         let (one, two) = (&[0, 1], &[2, 3, 4, 5]);
 
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn stream_datagram() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
 
         let (tx, rx) = zx::Socket::create(zx::SocketOpts::DATAGRAM).unwrap();
         let mut rx = Socket::from_socket(rx).unwrap().into_datagram_stream();
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn peer_closed_signal_raised() {
-        let mut executor = TestExecutor::new().expect("failed to create exexcutor");
+        let mut executor = TestExecutor::new();
 
         let (s1, s2) =
             zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn reacquiring_read_signal_ensures_freshness() {
-        let mut executor = TestExecutor::new().expect("failed to create exexcutor");
+        let mut executor = TestExecutor::new();
 
         let (s1, s2) =
             zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn reacquiring_write_signal_ensures_freshness() {
-        let mut executor = TestExecutor::new().expect("failed to create exexcutor");
+        let mut executor = TestExecutor::new();
 
         let (s1, s2) =
             zx::Socket::create(zx::SocketOpts::STREAM).expect("failed to create socket stream");

@@ -299,7 +299,7 @@ mod tests {
     }
 
     fn test_setup() -> TestValues {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let (sender, receiver) = mpsc::channel(1);
         TestValues { exec, iface_manager: IfaceManager { sender }, receiver }
     }
@@ -1354,7 +1354,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_for_scan() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Build an SME specifically for scanning.
         let (proxy, server_end) =
@@ -1387,7 +1387,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sme_for_scan_defects() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         // Build an SME specifically for scanning.
         let (proxy, _) =

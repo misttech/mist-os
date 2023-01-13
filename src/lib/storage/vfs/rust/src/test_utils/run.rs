@@ -230,8 +230,7 @@ where
     /// Runs the test based on the parameters specified in the [`test_server_client`] and other
     /// method calls.
     pub fn run(self) {
-        let exec =
-            self.exec.unwrap_or_else(|| TestExecutor::new().expect("TestExecutor creation failed"));
+        let exec = self.exec.unwrap_or_else(|| TestExecutor::new());
 
         let (client_proxy, server_end) =
             create_proxy::<Marker>().expect("Failed to create connection endpoints");
@@ -273,8 +272,7 @@ impl<'test_refs> AsyncClientTestParams<'test_refs> {
     /// Runs the test based on the parameters specified in the [`test_server_client`] and other
     /// method calls.
     pub fn run(self) {
-        let exec =
-            self.exec.unwrap_or_else(|| TestExecutor::new().expect("TestExecutor creation failed"));
+        let exec = self.exec.unwrap_or_else(|| TestExecutor::new());
 
         let client = (self.get_client)();
 

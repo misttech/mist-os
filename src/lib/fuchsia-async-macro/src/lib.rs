@@ -189,14 +189,12 @@ pub fn run_until_stalled(attr: TokenStream, item: TokenStream) -> TokenStream {
     let executor = executor_ident();
     let run_executor = if test {
         quote! {
-            let mut #executor = ::fuchsia_async::TestExecutor::new()
-                .expect("Failed to create executor");
+            let mut #executor = ::fuchsia_async::TestExecutor::new();
             ::fuchsia_async::test_support::run_until_stalled_test(&mut #executor, func)
         }
     } else {
         quote! {
-            let mut #executor = ::fuchsia_async::TestExecutor::new()
-                .expect("Failed to create executor");
+            let mut #executor = ::fuchsia_async::TestExecutor::new();
             let mut fut = func();
             ::fuchsia_async::pin_mut!(fut);
             match #executor.run_until_stalled(&mut fut) {

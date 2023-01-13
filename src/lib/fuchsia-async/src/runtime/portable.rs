@@ -216,8 +216,8 @@ pub mod executor {
     impl TestExecutor {
         /// Create a new executor for testing.
         #[allow(deprecated)]
-        pub fn new() -> Result<Self, zx_status::Status> {
-            Self::try_new()
+        pub fn new() -> Self {
+            Self::try_new().unwrap()
         }
 
         /// Deprecated, will be deleted.

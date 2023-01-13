@@ -1006,8 +1006,7 @@ mod tests {
         for information_config in VALID_INFORMATION_CONFIGS.iter() {
             for non_temporary_address_config in get_valid_non_temporary_address_configs().iter() {
                 for prefix_delegation_config in VALID_DELEGATED_PREFIX_CONFIGS.iter() {
-                    let mut exec =
-                        fasync::TestExecutor::new().expect("failed to create test executor");
+                    let mut exec = fasync::TestExecutor::new();
 
                     let (client_proxy, server_end) =
                         create_proxy::<ClientMarker>().expect("failed to create test client proxy");
@@ -1201,7 +1200,7 @@ mod tests {
 
     #[test]
     fn test_client_should_respond_to_dns_watch_requests() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create test executor");
+        let mut exec = fasync::TestExecutor::new();
         let transaction_id = [1, 2, 3];
 
         let (client_proxy, client_stream) = create_proxy_and_stream::<ClientMarker>()

@@ -936,7 +936,7 @@ mod tests {
     // and notifies injectors about said updates.
     #[fuchsia::test]
     fn receives_viewport_updates() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         // Set up fidl streams.
         let (aggregator_proxy, _) =

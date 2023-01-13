@@ -922,7 +922,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn slc_handles_multipart_commands() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut slc, remote) = create_and_connect_slc();
         // Bypass the SLCI procedure by setting the channel to initialized.
         slc.set_initialized();
@@ -943,7 +943,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn slc_handles_multiple_commands() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut slc, remote) = create_and_connect_slc();
         // Bypass the SLCI procedure by setting the channel to initialized.
         slc.set_initialized();
@@ -967,7 +967,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     #[ignore]
     fn unexpected_command_before_initialization_closes_channel() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut slc, remote) = create_and_connect_slc();
 
         // Peer sends an unexpected AT command.
@@ -1012,7 +1012,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn completing_slc_init_procedure_initializes_channel() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut slc, mut remote) = create_and_connect_slc();
         let slci_marker = ProcedureMarker::SlcInitialization;
@@ -1094,7 +1094,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn slci_command_after_initialization_returns_error() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
         let (mut slc, _remote) = create_and_connect_slc();
         // Bypass the SLCI procedure by setting the channel to initialized.
         slc.set_initialized();
@@ -1136,7 +1136,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn ag_updates_are_queued_until_slc_initialization() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut slc, mut remote) = create_and_connect_slc();
         assert!(!slc.initialized());
@@ -1250,7 +1250,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn queued_packets_get_sent_to_connection() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (local, mut remote) = Channel::create();
         let mut connection = DataController::new(local);

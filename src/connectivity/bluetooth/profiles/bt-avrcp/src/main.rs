@@ -188,7 +188,7 @@ mod tests {
 
     #[fuchsia::test]
     fn record_target_peer_capabilities() {
-        let mut exec = fuchsia_async::TestExecutor::new().unwrap();
+        let mut exec = fuchsia_async::TestExecutor::new();
         let (proxy, mut receiver) =
             fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");
@@ -227,7 +227,7 @@ mod tests {
 
     #[fuchsia::test]
     fn record_controller_peer_capabilities() {
-        let mut exec = fuchsia_async::TestExecutor::new().unwrap();
+        let mut exec = fuchsia_async::TestExecutor::new();
         let (proxy, mut receiver) =
             fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");

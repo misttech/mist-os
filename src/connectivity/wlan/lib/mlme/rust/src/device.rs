@@ -1206,7 +1206,7 @@ mod tests {
 
     #[test]
     fn send_mlme_message() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.mlme_control_handle()
@@ -1222,7 +1222,7 @@ mod tests {
 
     #[test]
     fn send_mlme_message_peer_already_closed() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1235,7 +1235,7 @@ mod tests {
 
     #[test]
     fn fake_device_deliver_eth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         assert_eq!(fake_device.eth_queue.len(), 0);
@@ -1250,7 +1250,7 @@ mod tests {
 
     #[test]
     fn get_set_channel() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.set_channel(banjo_common::WlanChannel {
@@ -1281,7 +1281,7 @@ mod tests {
 
     #[test]
     fn set_key() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.set_key(key::KeyConfig {
@@ -1302,7 +1302,7 @@ mod tests {
 
     #[test]
     fn start_passive_scan() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1325,7 +1325,7 @@ mod tests {
 
     #[test]
     fn start_active_scan() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1391,7 +1391,7 @@ mod tests {
 
     #[test]
     fn get_wlan_softmac_info() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         let info = dev.wlan_softmac_info();
@@ -1403,7 +1403,7 @@ mod tests {
 
     #[test]
     fn configure_bss() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.configure_bss(BssConfig {
@@ -1417,7 +1417,7 @@ mod tests {
 
     #[test]
     fn enable_disable_beaconing() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1439,7 +1439,7 @@ mod tests {
 
     #[test]
     fn configure_beacon() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1467,7 +1467,7 @@ mod tests {
 
     #[test]
     fn set_link_status() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
@@ -1480,7 +1480,7 @@ mod tests {
 
     #[test]
     fn configure_assoc() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.configure_assoc(WlanAssocCtx {
@@ -1518,7 +1518,7 @@ mod tests {
     }
     #[test]
     fn clear_assoc() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
         dev.configure_bss(BssConfig {

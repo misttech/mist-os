@@ -694,7 +694,7 @@ mod tests {
 
     #[fuchsia::test]
     fn batch_iterator_terminates_on_client_disconnect() {
-        let mut executor = fasync::TestExecutor::new().expect("create executor");
+        let mut executor = fasync::TestExecutor::new();
         let (batch_iterator_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
         // Create a batch iterator that uses a hung stream to serve logs.

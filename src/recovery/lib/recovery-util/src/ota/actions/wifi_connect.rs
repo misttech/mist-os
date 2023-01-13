@@ -129,7 +129,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connect_ok() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender.expect_send().with(eq(Event::WiFiConnected)).times(1).return_const(());
         event_sender

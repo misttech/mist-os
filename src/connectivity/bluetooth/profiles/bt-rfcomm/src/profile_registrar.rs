@@ -668,7 +668,7 @@ mod tests {
 
     /// Creates the ProfileRegistrar with the upstream Profile service.
     fn setup_server() -> (fasync::TestExecutor, ProfileRegistrar, bredr::ProfileRequestStream) {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (client, server) = create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let profile_server = ProfileRegistrar::new(client);
         (exec, profile_server, server)
@@ -1136,7 +1136,7 @@ mod tests {
     /// 2) When the call resolves, the Future resolves.
     #[fuchsia::test]
     fn test_advertise_relay() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (upstream, mut upstream_server) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let (connect_client, _connect_requests) =
@@ -1167,7 +1167,7 @@ mod tests {
     /// to the Sender of the connection task.
     #[fuchsia::test]
     fn test_connection_request_relay() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (connect_client, connect_requests) =
             create_proxy_and_stream::<bredr::ConnectionReceiverMarker>().unwrap();

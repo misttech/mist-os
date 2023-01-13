@@ -181,7 +181,7 @@ mod tests {
 
     #[fuchsia::test]
     fn responder_notified_with_error_on_token_drop() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =
@@ -204,7 +204,7 @@ mod tests {
 
     #[fuchsia::test]
     fn token_terminates_when_upstream_advertisement_terminates() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =
@@ -234,7 +234,7 @@ mod tests {
 
     #[fuchsia::test]
     fn token_terminates_when_fidl_client_closes_channel() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (request, _request_client, client_fut) = make_set_device_id_request(&mut exec);
         let (_record, request_server, responder) =

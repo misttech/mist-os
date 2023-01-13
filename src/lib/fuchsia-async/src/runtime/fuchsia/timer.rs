@@ -268,7 +268,7 @@ mod test {
 
     #[test]
     fn fires_after_timeout() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let deadline = Time::after(5.seconds());
         let mut future = Timer::new(deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
@@ -278,7 +278,7 @@ mod test {
 
     #[test]
     fn timer_before_now_fires_immediately() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let deadline = Time::from(Time::now() - Duration::from_nanos(1));
         let mut future = Timer::new(deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
@@ -288,7 +288,7 @@ mod test {
 
     #[test]
     fn interval() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let start = Time::now();
 
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));

@@ -109,7 +109,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_atomic_stream() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (sender, receiver) = mpsc::unbounded();
         let mut atomic_stream = AtomicOneshotStream::new(receiver);
 
@@ -170,7 +170,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_poll_complete_behavior() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (sender, receiver) = mpsc::unbounded();
         let mut atomic_stream = AtomicOneshotStream::new(receiver);
 
@@ -206,7 +206,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_token_sets_state() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let status = Arc::new(RwLock::new(StreamStatus::Ready));
 
@@ -221,7 +221,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_operating_state() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (sender, receiver) = mpsc::unbounded();
         let mut atomic_stream = AtomicOneshotStream::new(receiver);

@@ -66,7 +66,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_reboot() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()
@@ -80,7 +80,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_reboot_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()

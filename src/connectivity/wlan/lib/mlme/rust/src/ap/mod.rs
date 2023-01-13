@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn ap_handle_eth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn ap_handle_eth_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mac_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mac_frame_ps_poll() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mac_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -769,7 +769,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mac_frame_bogus() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -806,7 +806,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mac_frame_wrong_channel_drop() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -868,7 +868,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_start_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.handle_mlme_start_req(fidl_mlme::StartRequest {
@@ -908,7 +908,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_start_req_already_started() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_stop_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -983,7 +983,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_stop_req_already_stopped() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1003,7 +1003,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_setkeys_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_setkeys_req_no_bss() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         assert_variant!(
@@ -1073,7 +1073,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_setkeys_req_bss_no_rsne() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1109,7 +1109,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1157,7 +1157,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_auth_resp_no_bss() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1181,7 +1181,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_auth_resp_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1218,7 +1218,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1264,7 +1264,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1319,7 +1319,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1365,7 +1365,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_set_controlled_port_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1409,7 +1409,7 @@ mod tests {
 
     #[test]
     fn ap_handle_mlme_msg_handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
         ap.bss.replace(
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn ap_mlme_respond_to_query_device_info() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1481,7 +1481,7 @@ mod tests {
 
     #[test]
     fn ap_mlme_respond_to_query_discovery_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1502,7 +1502,7 @@ mod tests {
 
     #[test]
     fn ap_mlme_respond_to_query_mac_sublayer_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1529,7 +1529,7 @@ mod tests {
 
     #[test]
     fn ap_mlme_respond_to_query_security_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 
@@ -1551,7 +1551,7 @@ mod tests {
 
     #[test]
     fn ap_mlme_respond_to_query_spectrum_management_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ap, _) = make_ap(fake_device.as_device());
 

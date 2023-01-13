@@ -1190,7 +1190,7 @@ mod tests {
 
     #[test]
     fn status_connecting() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1258,7 +1258,7 @@ mod tests {
 
     #[test]
     fn connecting_to_wep_network_unsupported() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut _mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1272,7 +1272,7 @@ mod tests {
 
     #[test]
     fn connecting_password_supplied_for_protected_network() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1292,7 +1292,7 @@ mod tests {
 
     #[test]
     fn connecting_psk_supplied_for_protected_network() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1312,7 +1312,7 @@ mod tests {
 
     #[test]
     fn connecting_password_supplied_for_unprotected_network() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut _mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1337,7 +1337,7 @@ mod tests {
 
     #[test]
     fn connecting_psk_supplied_for_unprotected_network() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut _mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1362,7 +1362,7 @@ mod tests {
 
     #[test]
     fn connecting_no_password_supplied_for_protected_network() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1387,7 +1387,7 @@ mod tests {
 
     #[test]
     fn connecting_bypass_join_scan_open() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1405,7 +1405,7 @@ mod tests {
 
     #[test]
     fn connecting_bypass_join_scan_protected() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1426,7 +1426,7 @@ mod tests {
 
     #[test]
     fn connecting_bypass_join_scan_mismatched_credential() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1450,7 +1450,7 @@ mod tests {
 
     #[test]
     fn connecting_bypass_join_scan_unsupported_bss() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         assert_eq!(ClientSmeStatus::Idle, sme.status());
 
@@ -1477,7 +1477,7 @@ mod tests {
 
     #[test]
     fn connecting_right_credential_type_no_privacy() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_stream, _time_stream) = create_sme(&exec);
 
         let bss_description = fake_fidl_bss_description!(
@@ -1508,7 +1508,7 @@ mod tests {
 
     #[test]
     fn connecting_mismatched_security_protocol() {
-        let executor = fuchsia_async::TestExecutor::new().unwrap();
+        let executor = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_stream, _time_stream) = create_sme(&executor);
 
         let bss_description =
@@ -1556,7 +1556,7 @@ mod tests {
 
     #[test]
     fn connecting_right_credential_type_but_short_password() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_stream, _time_stream) = create_sme(&exec);
 
         let bss_description =
@@ -1585,7 +1585,7 @@ mod tests {
 
     #[test]
     fn new_connect_attempt_cancels_pending_connect() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_stream, _time_stream) = create_sme(&exec);
 
         let bss_description =
@@ -1637,7 +1637,7 @@ mod tests {
 
     #[test]
     fn test_simple_scan_error() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_strem, _time_stream) = create_sme(&exec);
         let mut recv =
             sme.on_scan_command(fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}));
@@ -1657,7 +1657,7 @@ mod tests {
 
     #[test]
     fn test_scan_error_after_some_results_returned() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_strem, _time_stream) = create_sme(&exec);
         let mut recv =
             sme.on_scan_command(fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}));
@@ -1697,7 +1697,7 @@ mod tests {
 
     #[test]
     fn test_scan_is_rejected_while_connecting() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, _mlme_strem, _time_stream) = create_sme(&exec);
 
         // Send a connect command to move SME into Connecting state
@@ -1718,7 +1718,7 @@ mod tests {
 
     #[test]
     fn test_wmm_status_success() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         let mut receiver = sme.wmm_status();
 
@@ -1735,7 +1735,7 @@ mod tests {
 
     #[test]
     fn test_wmm_status_failed() {
-        let exec = fuchsia_async::TestExecutor::new().unwrap();
+        let exec = fuchsia_async::TestExecutor::new();
         let (mut sme, mut mlme_stream, _time_stream) = create_sme(&exec);
         let mut receiver = sme.wmm_status();
 

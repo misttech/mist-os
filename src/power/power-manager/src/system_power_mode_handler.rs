@@ -835,7 +835,7 @@ mod tests {
     /// correctly published into Inspect.
     #[test]
     fn test_inspect() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with a `Wlan` client whose default power level is 1
@@ -920,7 +920,7 @@ mod tests {
     /// pattern.
     #[test]
     fn test_hanging_get() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with a `Wlan` client whose default power level is 0
@@ -961,7 +961,7 @@ mod tests {
     /// Tests that a connect request for an unconfigured `client_type` returns an error.
     #[test]
     fn test_unsupported_client() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         let _node = SystemPowerModeHandlerBuilder::new()
@@ -981,7 +981,7 @@ mod tests {
     /// updates separately.
     #[test]
     fn test_multiple_client_types() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with a `Wlan` client whose default power level is 0
@@ -1021,7 +1021,7 @@ mod tests {
     /// `ClientType` returns a missing config.
     #[test]
     fn test_get_missing_client_config() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Configuration with no configured clients
@@ -1045,7 +1045,7 @@ mod tests {
     /// `ClientType` returns the correct config.
     #[test]
     fn test_get_present_client_config() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with a `Wlan` client whose default power level is 0
@@ -1070,7 +1070,7 @@ mod tests {
     /// client.
     #[test]
     fn test_set_client_config() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Start with an empty config
@@ -1101,7 +1101,7 @@ mod tests {
     /// default power level.
     #[test]
     fn test_debug_set_default_power_level() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with a `Wlan` client whose default power level is 0

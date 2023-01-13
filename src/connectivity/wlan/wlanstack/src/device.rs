@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn query_serve_with_sme_channel() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mlme_proxy, _mlme_server) =
             create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
         let iface_map = IfaceMap::new();
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn sme_shutdown_by_generic_sme() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mlme_proxy, _mlme_server) =
             create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
         let iface_map = IfaceMap::new();
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn sme_shutdown_by_mlme_proxy() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mlme_proxy, mlme_server) =
             create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
         let iface_map = IfaceMap::new();
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_new_iface_map() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let iface_map = IfaceMap::new();
         let hashmap = iface_map.inner.lock();
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_iface_map_insert_remove() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let iface_map = IfaceMap::new();
         let (mlme_proxy, _) = create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
@@ -476,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_iface_map_remove_nonexistent_iface() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let iface_map = IfaceMap::new();
         let (mlme_proxy, _) = create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_iface_map_insert_get() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let iface_map = IfaceMap::new();
         let (mlme_proxy, _) = create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");
@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_iface_map_insert_get_nonexistent_iface() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
 
         let iface_map = IfaceMap::new();
         let (mlme_proxy, _) = create_proxy::<MlmeMarker>().expect("failed to create MlmeProxy");

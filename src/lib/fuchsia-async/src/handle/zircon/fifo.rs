@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn can_read_write() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let element = entry { a: 10, b: 20 };
 
         let (tx, rx) =
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn read_wrong_size() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements = &[entry { a: 10, b: 20 }][..];
 
         let (tx, rx) =
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn write_wrong_size() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements = &[wrong_entry { a: 10 }][..];
 
         let (tx, rx) =
@@ -600,7 +600,7 @@ mod tests {
     fn write_into_full() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements =
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
 
@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn write_more_than_full() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements =
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
 
@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn read_multiple() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements =
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn read_one() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements =
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
@@ -736,7 +736,7 @@ mod tests {
 
     #[test]
     fn maybe_uninit_single() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let element = entry { a: 10, b: 20 };
         let (tx, rx) =
             zx::Fifo::create(1, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
@@ -761,7 +761,7 @@ mod tests {
 
     #[test]
     fn maybe_uninit_slice() {
-        let mut exec = TestExecutor::new().expect("failed to create executor");
+        let mut exec = TestExecutor::new();
         let elements =
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())

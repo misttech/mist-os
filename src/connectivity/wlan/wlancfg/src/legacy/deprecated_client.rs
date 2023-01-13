@@ -117,7 +117,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_no_client() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let iface = IfaceRef::new();
         let status_fut = status(&iface);
         pin_mut!(status_fut);
@@ -134,7 +134,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_broken_sme() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Drop the SME request stream so that the client request will fail.
@@ -155,7 +155,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_disconnected_client() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let status_fut = status(&test_values.iface);
         pin_mut!(status_fut);
@@ -182,7 +182,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connecting_client() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let status_fut = status(&test_values.iface);
         pin_mut!(status_fut);
@@ -210,7 +210,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connected_client() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let ssid = "test_ssid";
         let rssi_dbm = -70;

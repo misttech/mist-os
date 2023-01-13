@@ -146,7 +146,7 @@ mod test {
 
     #[test]
     fn send_states() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut state_machine = MockEventProcessor::new();
         state_machine
             .expect_process_event()

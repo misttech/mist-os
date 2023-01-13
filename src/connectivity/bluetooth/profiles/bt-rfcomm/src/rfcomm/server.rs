@@ -302,7 +302,7 @@ mod tests {
     use crate::rfcomm::test_util::{expect_frame_received_by_peer, send_peer_frame};
 
     fn setup_rfcomm_manager() -> (fasync::TestExecutor, RfcommServer) {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let rfcomm = RfcommServer::new();
         (exec, rfcomm)
     }

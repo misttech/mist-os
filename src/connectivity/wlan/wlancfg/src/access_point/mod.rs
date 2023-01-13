@@ -509,7 +509,7 @@ mod tests {
     /// the request and the request succeeds.
     #[fuchsia::test]
     fn test_start_access_point_with_iface_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -549,7 +549,7 @@ mod tests {
     /// the request, but the request fails.
     #[fuchsia::test]
     fn test_start_access_point_with_iface_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -600,7 +600,7 @@ mod tests {
     /// request.
     #[fuchsia::test]
     fn test_start_access_point_no_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Set the IfaceManager to fail when asked to start an AP.
@@ -648,7 +648,7 @@ mod tests {
     /// request and the request succeeds.
     #[fuchsia::test]
     fn test_stop_access_point_with_iface_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -686,7 +686,7 @@ mod tests {
     /// the request, but the request fails.
     #[fuchsia::test]
     fn test_stop_access_point_with_iface_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -735,7 +735,7 @@ mod tests {
     /// request, and the request succeeds.
     #[fuchsia::test]
     fn test_stop_all_access_points_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -759,7 +759,7 @@ mod tests {
     /// the request, but the request fails.
     #[fuchsia::test]
     fn test_stop_all_access_points_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -792,7 +792,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_multiple_controllers() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);
@@ -827,7 +827,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_multiple_api_clients() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = test_values.ap.clone().serve_provider_requests(test_values.requests);
         pin_mut!(serve_fut);

@@ -97,7 +97,7 @@ mod tests {
 
     pub(crate) fn setup_fake_service<M: fidl::endpoints::ProtocolMarker>(
     ) -> (fuchsia_async::TestExecutor, M::Proxy, M::RequestStream) {
-        let exec = fuchsia_async::TestExecutor::new().expect("creating executor");
+        let exec = fuchsia_async::TestExecutor::new();
         let (proxy, server) = fidl::endpoints::create_proxy::<M>().expect("creating proxy");
         (exec, proxy, server.into_stream().expect("creating stream"))
     }

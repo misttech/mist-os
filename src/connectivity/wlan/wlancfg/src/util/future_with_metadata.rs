@@ -49,7 +49,7 @@ mod tests {
 
     #[fuchsia::test]
     fn assign_and_read_metadata_in_future_output() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         #[derive(Debug, Clone)]
         struct TestMetadata {

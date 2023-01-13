@@ -576,7 +576,7 @@ mod tests {
     // injectors about said updates.
     #[fuchsia::test]
     fn receives_viewport_updates() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         // Create touch handler.
         let (aggregator_proxy, _) =
@@ -685,7 +685,7 @@ mod tests {
     // Tests that an add contact event is dropped without a viewport.
     #[fuchsia::test]
     fn add_contact_drops_without_viewport() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         // Set up fidl streams.
         let (aggregator_proxy, _) =
@@ -742,7 +742,7 @@ mod tests {
     // Tests that an add contact event is handled correctly with a viewport.
     #[fuchsia::test]
     fn add_contact_succeeds_with_viewport() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         // Create touch handler.
         let (aggregator_proxy, aggregator_request_stream) =
@@ -850,7 +850,7 @@ mod tests {
     // Tests that an add touchpad contact event with viewport is unhandled and not send to scenic.
     #[fuchsia::test]
     fn add_touchpad_contact_with_viewport() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         // Create touch handler.
         let (aggregator_proxy, _) =

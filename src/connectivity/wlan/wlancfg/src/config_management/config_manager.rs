@@ -986,7 +986,7 @@ mod tests {
     fn lookup_compatible_does_not_return_wpa3_psk(
         wpa3_detailed_security: types::SecurityTypeDetailed,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut exec = fasync::TestExecutor::new();
         let saved_networks = exec
             .run_singlethreaded(SavedNetworksManager::new_for_test())
             .expect("Failed to create SavedNetworksManager");
@@ -1724,7 +1724,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_store_waits_for_stash() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut exec = fasync::TestExecutor::new();
         let (saved_networks, mut stash_server) =
             exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
 

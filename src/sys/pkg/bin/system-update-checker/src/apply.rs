@@ -452,7 +452,7 @@ mod test_apply_system_update_impl {
             let mut update_installer = ArgumentCapturingUpdateInstaller::default();
 
             let mut executor =
-                fasync::TestExecutor::new().expect("create executor in test");
+                fasync::TestExecutor::new();
             executor.run_singlethreaded(async move{
                 let result = apply_system_update_impl(
                     TEST_DEFAULT_UPDATE_URL,

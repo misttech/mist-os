@@ -207,7 +207,7 @@ mod tests {
             &mut super::InputDeviceRegistry,
         ) -> Result<Box<dyn synthesizer::InputDevice>, Error>,
     ) -> Result<(), Error> {
-        let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
                 .context("failed to create proxy and stream for InputDeviceRegistry")?;
@@ -252,7 +252,7 @@ mod tests {
             &mut super::InputDeviceRegistry,
         ) -> Result<Box<dyn synthesizer::InputDevice>, Error>,
     ) -> Result<DeviceDescriptor, Error> {
-        let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+        let mut executor = fasync::TestExecutor::new();
         // Create an `InputDeviceRegistry`, and add a keyboard to it.
         let (registry_proxy, mut registry_request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()

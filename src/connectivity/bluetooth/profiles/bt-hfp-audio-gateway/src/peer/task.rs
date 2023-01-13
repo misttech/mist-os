@@ -972,7 +972,7 @@ mod tests {
         })]
         #[test]
         fn updates(a in arb_network(), b in arb_network()) {
-            let mut exec = fasync::TestExecutor::new().unwrap();
+            let mut exec = fasync::TestExecutor::new();
             let mut task = setup_peer_task(None).0;
 
             task.network = a.clone();
@@ -1011,7 +1011,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_peer_request_stores_peer_handler_proxy() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let mut peer = setup_peer_task(None).0;
         assert!(peer.handler.is_none());
         let (proxy, mut stream) =
@@ -1074,7 +1074,7 @@ mod tests {
 
     #[fuchsia::test]
     fn peer_task_drives_procedure() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut peer, _sender, receiver, _profile) = setup_peer_task(None);
 
         // Set up the RFCOMM connection.
@@ -1123,7 +1123,7 @@ mod tests {
         };
 
         // Set up the executor, peer, and background call manager task
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let state = SlcState {
             ag_indicator_events_reporting: AgIndicatorsReporting::new_enabled(),
             ..SlcState::default()
@@ -1187,7 +1187,7 @@ mod tests {
 
     #[fuchsia::test]
     fn terminated_slc_ends_peer_task() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (connection, remote) = create_and_initialize_slc(SlcState::default());
         let (peer, _sender, receiver, _profile) = setup_peer_task(Some(connection));
 
@@ -1208,7 +1208,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_in_slc_ends_peer_task() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (connection, remote) = create_and_initialize_slc(SlcState::default());
         let (peer, _sender, receiver, _profile) = setup_peer_task(Some(connection));
 
@@ -1291,7 +1291,7 @@ mod tests {
     #[fuchsia::test]
     fn call_updates_update_ringer_state() {
         // Set up the executor, peer, and background call manager task
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task with the specified SlcState to enable indicator events.
         let state = SlcState {
@@ -1340,7 +1340,7 @@ mod tests {
     fn transfers_change_sco_state() {
         // Set up the executor, peer, and background call manager task
         info!("transfers_change_sco_state: Creating executer.");
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task.
         info!("transfers_change_sco_state: Creating SLC.");
@@ -1468,7 +1468,7 @@ mod tests {
     #[fuchsia::test]
     fn incoming_hf_indicator_battery_level_is_propagated_to_peer_handler_stream() {
         // Set up the executor, peer, and background call manager task
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task with the specified SlcState to enable the battery level HF indicator.
         let mut hf_indicators = HfIndicators::default();
@@ -1516,7 +1516,7 @@ mod tests {
 
     #[fuchsia::test]
     fn local_battery_level_change_initiates_phone_status_procedure() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task with the specified SlcState to enable the battery level indicator on
         // both the HF and the AG.
@@ -1547,7 +1547,7 @@ mod tests {
     #[fuchsia::test]
     fn call_updates_produce_call_waiting() {
         // Set up the executor, peer, and background call manager task
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let raw_number = "1234567";
         let number = Number::from(raw_number);
@@ -1601,7 +1601,7 @@ mod tests {
     #[fuchsia::test]
     fn outgoing_call_holds_active() {
         // Set up the executor.
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task with the specified SlcState to enable three way calling.
         let mut ag_features = AgFeatures::default();
@@ -1668,7 +1668,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connection_behavior_request_updates_state() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(None);
 
         let _peer_task = fasync::Task::local(peer.run(receiver));
@@ -1724,7 +1724,7 @@ mod tests {
 
     #[fuchsia::test]
     fn non_rfcomm_search_result_is_ignored() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(None);
 
         let _peer_task = fasync::Task::local(peer.run(receiver));
@@ -1748,7 +1748,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connect_request_triggers_connection() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let connection = ServiceLevelConnection::new();
         let (local, mut remote) = Channel::create();
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
@@ -1780,7 +1780,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connect_request_replaces_connection() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, mut old_remote) = create_and_connect_slc();
         let (peer, mut sender, receiver, _profile) = setup_peer_task(Some(connection));
@@ -1922,7 +1922,7 @@ mod tests {
 
     #[fuchsia::test]
     fn setup_audio_connection_connects_and_starts_audio() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
         let (mut peer, _sender, _receiver, mut profile_requests) =
@@ -1946,7 +1946,7 @@ mod tests {
 
     #[fuchsia::test]
     fn audio_is_stopped_when_sco_connection_closes() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
         let (mut peer, _sender, receiver, mut profile_requests) = setup_peer_task(Some(connection));
@@ -1983,7 +1983,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sco_connection_closed_when_call_ends() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
         let (mut peer, _sender, _receiver, mut profile_requests) =

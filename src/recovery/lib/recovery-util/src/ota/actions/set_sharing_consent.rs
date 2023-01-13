@@ -103,7 +103,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_privacy_set_true() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()
@@ -126,7 +126,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_privacy_set_false() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()
@@ -149,7 +149,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_privacy_set_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()
@@ -166,7 +166,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_privacy_fidl_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut event_sender = MockSendEvent::new();
         event_sender
             .expect_send()

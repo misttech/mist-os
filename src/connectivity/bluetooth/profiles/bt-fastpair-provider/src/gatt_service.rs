@@ -448,7 +448,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn gatt_service_is_received_by_upstream_server() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (gatt_client, mut gatt_server) =
             fidl::endpoints::create_proxy_and_stream::<Server_Marker>().unwrap();
@@ -505,7 +505,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn gatt_service_stream_impl_terminates() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (gatt_service, _upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
         pin_mut!(gatt_service);
@@ -526,7 +526,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn read_model_id_characteristic_success() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
 
@@ -559,7 +559,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn read_firmware_revision_characteristic_success() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
 
@@ -592,7 +592,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn read_invalid_characteristic_returns_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
 
@@ -623,7 +623,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn write_requests_with_invalid_handle_is_handled_gracefully() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
         let gatt_service_fut = gatt_service.next();
@@ -666,7 +666,7 @@ pub(crate) mod tests {
         characteristic_handle: Handle,
         matcher: GattRequestMatcher,
     ) {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
 
@@ -735,7 +735,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn gatt_write_with_nonzero_offset_returns_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut gatt_service, upstream_service_client) =
             exec.run_singlethreaded(setup_gatt_service());
 
@@ -765,7 +765,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn key_based_pairing_notification() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (gatt_service, upstream_service_client) = exec.run_singlethreaded(setup_gatt_service());
 
         let mut local_service_event_stream = upstream_service_client.take_event_stream();
@@ -789,7 +789,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn passkey_notification() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (gatt_service, upstream_service_client) = exec.run_singlethreaded(setup_gatt_service());
 
         let mut local_service_event_stream = upstream_service_client.take_event_stream();

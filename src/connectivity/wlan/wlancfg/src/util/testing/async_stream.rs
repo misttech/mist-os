@@ -57,7 +57,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_run_while() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let neverending_background_fut: future::Pending<bool> = future::pending();
         pin_mut!(neverending_background_fut);
 

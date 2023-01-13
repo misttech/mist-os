@@ -30,7 +30,7 @@ fn setup() -> (
 ) {
     let inspect = Inspector::new();
     (
-        TestExecutor::new().unwrap(),
+        TestExecutor::new(),
         ConcurrentSnooperPacketFutures::new(),
         PacketLogs::new(
             10,

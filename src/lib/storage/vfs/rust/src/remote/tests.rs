@@ -56,7 +56,7 @@ async fn test_set_up_remote() {
 
 #[test]
 fn remote_dir_construction_open_node_ref() {
-    let exec = fasync::TestExecutor::new().expect("Executor creation failed");
+    let exec = fasync::TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let remote_proxy = set_up_remote(scope.clone());
@@ -72,7 +72,7 @@ fn remote_dir_construction_open_node_ref() {
 
 #[test]
 fn remote_dir_node_ref_with_path() {
-    let exec = fasync::TestExecutor::new().expect("Executor creation failed");
+    let exec = fasync::TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let remote_proxy = set_up_remote(scope.clone());
@@ -96,7 +96,7 @@ fn remote_dir_node_ref_with_path() {
 
 #[test]
 fn remote_dir_direct_connection() {
-    let exec = fasync::TestExecutor::new().expect("Executor creation failed");
+    let exec = fasync::TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let remote_proxy = set_up_remote(scope.clone());
@@ -127,7 +127,7 @@ fn remote_dir_direct_connection() {
 
 #[test]
 fn remote_dir_direct_connection_dir_contents() {
-    let exec = fasync::TestExecutor::new().expect("Executor creation failed");
+    let exec = fasync::TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let remote_proxy = set_up_remote(scope.clone());

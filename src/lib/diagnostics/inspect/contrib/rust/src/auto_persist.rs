@@ -185,7 +185,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_persistence_req_sender() {
-        let mut exec = fasync::TestExecutor::new().expect("creating executor should succeed");
+        let mut exec = fasync::TestExecutor::new();
         let (persistence_proxy, mut persistence_stream) =
             create_proxy_and_stream::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>()
                 .expect("creating persistence proxy and stream should succeed");

@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn start_and_stop_main_loop() {
-        let mut exec = TestExecutor::new().expect("Failed to create test executor");
+        let mut exec = TestExecutor::new();
         let mut device = FakeDevice::new(&exec);
         let buf_provider = FakeBufferProvider::new();
         let (sink, stream) = mpsc::unbounded();

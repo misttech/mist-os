@@ -319,7 +319,7 @@ mod tests {
     /// Tests for the presence and correctness of inspect data
     #[test]
     fn test_inspect_data() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let inspector = inspect::Inspector::new();
         let node =
             ShutdownWatcherBuilder::new().with_inspect_root(inspector.root()).build().unwrap();
@@ -496,7 +496,7 @@ mod tests {
     /// Tests that a reboot watcher is able to delay the shutdown.
     #[test]
     fn test_watcher_response_delay() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let node = ShutdownWatcherBuilder::new().build().unwrap();
 
         // Register the reboot watcher

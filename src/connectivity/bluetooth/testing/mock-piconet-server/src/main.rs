@@ -536,7 +536,7 @@ mod tests {
 
     #[fuchsia::test]
     fn register_peer_is_handled_by_server() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let mps = MockPiconetServer::new();
         let (mut sender, receiver) = mpsc::channel(MAX_CONCURRENT_PICONET_MEMBER_REQUESTS);
 
@@ -565,7 +565,7 @@ mod tests {
 
     #[fuchsia::test]
     fn concurrent_registered_peers_can_connect_profile_proxy() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let mps = MockPiconetServer::new();
         let (mut sender, receiver) = mpsc::channel(MAX_CONCURRENT_PICONET_MEMBER_REQUESTS);
         let mut sender_clone = sender.clone();
@@ -608,7 +608,7 @@ mod tests {
 
     #[fuchsia::test]
     fn advertisement_request_resolves_when_terminated() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let mps = MockPiconetServer::new();
         let (mut sender, receiver) = mpsc::channel(MAX_CONCURRENT_PICONET_MEMBER_REQUESTS);
 

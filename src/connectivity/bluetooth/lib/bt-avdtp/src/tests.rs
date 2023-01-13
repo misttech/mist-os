@@ -23,7 +23,7 @@ pub(crate) fn setup_peer() -> (Peer, Channel) {
 }
 
 fn setup_stream_test() -> (fasync::TestExecutor, RequestStream, Peer, Channel) {
-    let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let stream = peer.take_request_stream();
     (exec, stream, peer, remote)
@@ -78,7 +78,7 @@ fn stream_request_response(
 
 #[test]
 fn closes_socket_when_dropped() {
-    let mut _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut _exec = fasync::TestExecutor::new();
     let (peer_chan, signaling) = Channel::create();
 
     {
@@ -95,7 +95,7 @@ fn closes_socket_when_dropped() {
 #[test]
 #[should_panic]
 fn can_only_take_stream_once() {
-    let mut _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut _exec = fasync::TestExecutor::new();
     let (_, signaling) = Channel::create();
 
     let peer = Peer::new(signaling);
@@ -203,7 +203,7 @@ fn invalid_signal_id_responds_error() {
 
 #[test]
 fn exhaust_request_ids() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let mut response_futures = Vec::new();
     // There are only 16 labels, so fill up the "outgoing requests pending" buffer
@@ -249,7 +249,7 @@ fn exhaust_request_ids() {
 
 #[test]
 fn command_timeout() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let mut response_fut = Box::pin(peer.discover());
     assert!(exec.run_until_stalled(&mut response_fut).is_pending());
@@ -286,7 +286,7 @@ fn command_timeout() {
 
 #[test]
 fn command_response_can_be_discarded() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let response_fut = peer.discover();
 
@@ -413,7 +413,7 @@ fn discover_event_responder_reject_works() {
 
 #[test]
 fn discover_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let mut response_fut = Box::pin(peer.discover());
     assert!(exec.run_until_stalled(&mut response_fut).is_pending());
@@ -466,7 +466,7 @@ fn discover_command_works() {
 
 #[test]
 fn discover_command_rejected() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let mut response_fut = Box::pin(peer.discover());
     assert!(exec.run_until_stalled(&mut response_fut).is_pending());
@@ -590,7 +590,7 @@ fn get_capabilities_responder_reject_works() {
 
 #[test]
 fn get_capabilities_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_capabilities(&seid));
@@ -650,7 +650,7 @@ fn get_capabilities_command_works() {
 
 #[test]
 fn get_capabilities_reject_command() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_capabilities(&seid));
@@ -776,7 +776,7 @@ fn get_all_capabilities_responder_reject_works() {
 
 #[test]
 fn get_all_capabilities_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_all_capabilities(&seid));
@@ -836,7 +836,7 @@ fn get_all_capabilities_command_works() {
 
 #[test]
 fn get_all_capabilities_reject_command() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_all_capabilities(&seid));
@@ -873,7 +873,7 @@ fn get_all_capabilities_reject_command() {
 
 #[test]
 fn get_all_capabilites_general_reject() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_all_capabilities(&seid));
@@ -1000,7 +1000,7 @@ fn get_configuration_responder_reject_works() {
 
 #[test]
 fn get_configuration_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_configuration(&seid));
@@ -1060,7 +1060,7 @@ fn get_configuration_command_works() {
 
 #[test]
 fn get_configuration_reject_command() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_configuration(&seid));
@@ -1099,7 +1099,7 @@ macro_rules! seid_command_test {
     ($test_name:ident, $signal_value:expr, $peer_function:ident) => {
         #[test]
         fn $test_name() {
-            let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+            let mut exec = fasync::TestExecutor::new();
             let (peer, remote) = setup_peer();
             let seid = StreamEndpointId::try_from(1).unwrap();
             let mut response_fut = Box::pin(peer.$peer_function(&seid));
@@ -1131,7 +1131,7 @@ macro_rules! seids_command_test {
     ($test_name:ident, $signal_value:expr, $peer_function:ident) => {
         #[test]
         fn $test_name() {
-            let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+            let mut exec = fasync::TestExecutor::new();
             let (peer, remote) = setup_peer();
             let seid1 = StreamEndpointId::try_from(1).unwrap();
             let seid2 = StreamEndpointId::try_from(16).unwrap();
@@ -1166,7 +1166,7 @@ macro_rules! seid_command_reject_test {
     ($test_name:ident, $signal_value: expr, $peer_function:ident) => {
         #[test]
         fn $test_name() {
-            let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+            let mut exec = fasync::TestExecutor::new();
             let (peer, remote) = setup_peer();
             let seid = StreamEndpointId::try_from(1).unwrap();
             let mut response_fut = Box::pin(peer.$peer_function(&seid));
@@ -1208,7 +1208,7 @@ macro_rules! seids_command_reject_test {
     ($test_name:ident, $signal_value: expr, $peer_function:ident) => {
         #[test]
         fn $test_name() {
-            let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+            let mut exec = fasync::TestExecutor::new();
             let (peer, remote) = setup_peer();
             let seid1 = StreamEndpointId::try_from(1).unwrap();
             let seid2 = StreamEndpointId::try_from(16).unwrap();
@@ -1458,7 +1458,7 @@ seid_event_responder_reject_test!(abort_responder_reject, Abort, *CMD_ABORT_VALU
 /// We timeout after some amount of time.
 #[test]
 fn abort_sent_no_response() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.abort(&seid));
@@ -1581,7 +1581,7 @@ fn set_config_event_responder_reject_works() {
 
 #[test]
 fn set_config_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     // This should cover all the implemented capabilities to confirm they are
     // encoded correctly.
@@ -1650,7 +1650,7 @@ fn set_config_command_works() {
 
 #[test]
 fn set_config_error_response() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let caps = vec![
         ServiceCapability::MediaTransport,
@@ -1993,7 +1993,7 @@ fn reconfig_event_responder_reject_works() {
 
 #[test]
 fn reconfigure_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     // This should cover all the implemented capabilities to confirm they are
     // encoded correctly.
@@ -2044,7 +2044,7 @@ fn reconfigure_command_works() {
 
 #[test]
 fn reconfigure_error_response() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let caps = vec![
         ServiceCapability::MediaTransport,
@@ -2107,7 +2107,7 @@ fn reconfigure_error_response() {
 /// This test covers the valid decoding of all valid ServiceCapabilities.
 #[test]
 fn get_capabilities_command_with_all_service_capabilities_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_capabilities(&seid));
@@ -2178,7 +2178,7 @@ fn get_capabilities_command_with_all_service_capabilities_works() {
 /// Decoding these invalid capabilities should be handled gracefully, and they should be ignored.
 #[test]
 fn get_capabilities_command_with_invalid_service_capabilities_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_capabilities(&seid));
@@ -2238,7 +2238,7 @@ fn get_capabilities_command_with_invalid_service_capabilities_works() {
 /// This test covers ServiceCapabilities that are only invalid.
 #[test]
 fn get_capabilities_command_with_only_invalid_service_capabilities_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.get_capabilities(&seid));
@@ -2342,7 +2342,7 @@ fn delay_report_responder_reject_works() {
 
 #[test]
 fn delay_report_command_works() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.delay_report(&seid, 0xc0de));
@@ -2375,7 +2375,7 @@ fn delay_report_command_works() {
 
 #[test]
 fn delay_report_reject_command() {
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let seid = &StreamEndpointId::try_from(1).unwrap();
     let mut response_fut = Box::pin(peer.delay_report(&seid, 0xc0de));

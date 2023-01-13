@@ -102,7 +102,7 @@ fn empty_directory_describe() {
 
 #[test]
 fn open_empty_directory_with_describe() {
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let server = simple();
@@ -1168,7 +1168,7 @@ fn in_tree_open() {
         },
     };
 
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
@@ -1196,7 +1196,7 @@ fn in_tree_open_path_one_component() {
         },
     };
 
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
@@ -1225,7 +1225,7 @@ fn in_tree_open_path_two_components() {
         },
     };
 
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     run_client(exec, || async move {
@@ -1563,7 +1563,7 @@ fn watch_addition_with_two_scopes() {
         },
     };
 
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
     let scope1 = ExecutionScope::new();
     let scope2 = ExecutionScope::new();
 

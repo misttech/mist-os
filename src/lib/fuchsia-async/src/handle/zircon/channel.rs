@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn can_receive() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Channel::create();
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn can_receive_etc() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Channel::create();
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn key_reuse() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let (tx0, rx0) = zx::Channel::create();
         let (_tx1, rx1) = zx::Channel::create();
         let f_rx0 = Channel::from_channel(rx0).unwrap();
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn key_reuse_etc() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
         let (tx0, rx0) = zx::Channel::create();
         let (_tx1, rx1) = zx::Channel::create();
         let f_rx0 = Channel::from_channel(rx0).unwrap();

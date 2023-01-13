@@ -51,7 +51,7 @@ impl Expected {
 #[fuchsia::test(add_test_attr = false)]
 fn launch_component_and_check_messages(url: &str, moniker: &str, expected_messages: Expected) {
     // TODO(https://fxbug.dev/94784) inline `test_inner` once the fuchsia test macro supports it
-    TestExecutor::new().unwrap().run_singlethreaded(test_inner(url, moniker, expected_messages));
+    TestExecutor::new().run_singlethreaded(test_inner(url, moniker, expected_messages));
 }
 
 async fn test_inner(url: &str, moniker: &str, expected: Expected) {

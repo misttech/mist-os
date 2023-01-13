@@ -107,7 +107,7 @@ mod tests {
 
     #[fuchsia::test]
     fn duplicate_watch_requests_is_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (watcher_task, watcher_proxy, _state) = make_watcher_task();
 
         let watch_request1 = watcher_proxy.watch(&mut [].into_iter());
@@ -127,7 +127,7 @@ mod tests {
 
     #[fuchsia::test]
     fn duplicate_power_update_is_noop() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut watcher_task, watcher_proxy, state) = make_watcher_task();
 
         // Initial state.

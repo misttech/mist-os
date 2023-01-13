@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn wait_without_request_present_never_completes() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let sched = ThroughputScheduler::new();
         let mut fut = sched.wait_to_update();
         assert!(exec.run_until_stalled(&mut fut).is_pending());
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn following_waits_never_completes_without_on_next_frame_begin() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let sched = ThroughputScheduler::new();
         // Initial wait always completes immediately.
         sched.request_present();

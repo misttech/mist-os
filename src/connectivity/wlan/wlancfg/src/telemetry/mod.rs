@@ -5952,7 +5952,7 @@ mod tests {
         experiment_id: Option<Vec<u32>>,
         failure_mode: CreateMetricsLoggerFailureMode,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (factory_proxy, mut factory_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
         >()

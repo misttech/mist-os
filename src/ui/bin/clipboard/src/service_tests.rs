@@ -514,7 +514,7 @@ async fn test_copy_and_paste_default_mime_type() -> Result<(), Error> {
 
 #[fuchsia::test]
 fn test_writer_and_watcher() -> Result<(), Error> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let handles = TestHandles::new()?;
 
@@ -593,7 +593,7 @@ fn test_writer_and_watcher() -> Result<(), Error> {
 /// `async_utils::hanging_get::HangingGetStream`.
 #[fuchsia::test]
 fn test_writer_and_watcher_hanging_get_stream() -> Result<(), Error> {
-    let mut exec = fasync::TestExecutor::new()?;
+    let mut exec = fasync::TestExecutor::new();
 
     let handles = TestHandles::new()?;
 

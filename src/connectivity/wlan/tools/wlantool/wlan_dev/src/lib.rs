@@ -902,7 +902,7 @@ mod tests {
 
     #[test]
     fn destroy_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -936,7 +936,7 @@ mod tests {
 
     #[test]
     fn test_get_country() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -963,7 +963,7 @@ mod tests {
 
     #[test]
     fn test_set_country() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -987,7 +987,7 @@ mod tests {
 
     #[test]
     fn test_clear_country() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[test]
     fn test_get_power_save_mode() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -1036,7 +1036,7 @@ mod tests {
 
     #[test]
     fn test_set_power_save_mode() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_svc_stream =
@@ -1109,7 +1109,7 @@ mod tests {
 
     #[test]
     fn reject_connect_ssid_too_long() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_stream = monitor_remote.into_stream().expect("failed to create stream");
@@ -1134,7 +1134,7 @@ mod tests {
 
     #[test]
     fn test_wmm_status() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =
             create_proxy::<DeviceMonitorMarker>().expect("failed to create DeviceMonitor service");
         let mut monitor_stream = monitor_remote.into_stream().expect("failed to create stream");

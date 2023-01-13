@@ -447,7 +447,7 @@ mod tests {
     /// Tests that profile changes are communicated via the server.
     #[test]
     fn test_profile_server() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut hanging_get_broker = create_hanging_get_broker(Profile::Idle);
 

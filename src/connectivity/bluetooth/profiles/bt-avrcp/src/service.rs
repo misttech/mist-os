@@ -279,7 +279,7 @@ mod tests {
     /// Tests that a request to register a target handler responds correctly.
     #[fuchsia::test]
     fn spawn_avrcp_target() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
             create_proxy_and_stream::<PeerManagerMarker>().unwrap();
 
@@ -341,7 +341,7 @@ mod tests {
     /// successfully sets up a controller.
     #[fuchsia::test]
     fn spawn_avrcp_controllers() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
         let (peer_manager_proxy, peer_manager_requests) =
             create_proxy_and_stream::<PeerManagerMarker>().unwrap();
 
@@ -426,7 +426,7 @@ mod tests {
     #[fuchsia::test]
     /// Test that getting a controller from the test server (PeerManagerExt) works.
     fn spawn_avrcp_extension_controllers() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
         let (peer_manager_ext_proxy, peer_manager_ext_requests) =
             create_proxy_and_stream::<PeerManagerExtMarker>().unwrap();
 
@@ -535,7 +535,7 @@ mod tests {
 
     #[fuchsia::test]
     fn target_delegate_target_handler_already_bound_test() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should create");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut peer_manager, _profile_requests, peer_manager_proxy, mut service_request_receiver) =
             spawn_peer_manager();
@@ -603,7 +603,7 @@ mod tests {
 
     #[fuchsia::test]
     fn target_delegate_volume_handler_already_bound_test() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should create");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut peer_manager, _profile_requests, peer_manager_proxy, mut service_request_receiver) =
             spawn_peer_manager();

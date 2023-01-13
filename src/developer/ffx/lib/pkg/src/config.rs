@@ -341,7 +341,7 @@ mod tests {
     // * clear out the config keys before we run each test to make sure state isn't leaked across
     //   tests.
     fn run_async_test<F: Future>(fut: F) -> F::Output {
-        fuchsia_async::TestExecutor::new().unwrap().run_singlethreaded(async move {
+        fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
             let _env = ffx_config::test_init().await.unwrap();
             fut.await
         })

@@ -197,7 +197,7 @@ mod tests {
 
     #[fuchsia::test]
     fn peer_channel_properly_extracted() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
         let (channel_1, _channel_2) = Channel::create();
         let (profile_proxy, _profile_server) =
             fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
@@ -214,7 +214,7 @@ mod tests {
 
     #[fuchsia::test]
     fn at_responses_are_accepted() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (local, remote) = Channel::create();
         let config = HandsFreeFeatureSupport::default();
         let state = Arc::new(Mutex::new(SlcState::new(config)));
@@ -235,7 +235,7 @@ mod tests {
 
     #[fuchsia::test]
     fn at_commands_are_handled_gracefully() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (local, remote) = Channel::create();
         let config = HandsFreeFeatureSupport::default();
         let state = Arc::new(Mutex::new(SlcState::new(config)));
@@ -258,7 +258,7 @@ mod tests {
     /// Checks that active procedure is added to map of active procedures and
     /// that the initial command is properly sent through the RFCOMM channel.
     fn peer_updates_map_of_active_procedures_and_sends_commands() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (local, remote) = Channel::create();
         let config = HandsFreeFeatureSupport::default();
         let state = Arc::new(Mutex::new(SlcState::new(config)));
@@ -294,7 +294,7 @@ mod tests {
     /// procedure, proper command is written based on procedure, and shared state is
     /// is properly updated.
     fn properly_matches_procedure_and_updates_state() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (mut local, remote) = Channel::create();
         let config = HandsFreeFeatureSupport::default();
         let state = Arc::new(Mutex::new(SlcState::new(config)));

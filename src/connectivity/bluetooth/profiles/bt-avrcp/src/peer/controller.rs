@@ -621,7 +621,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn test_get_folder_items() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
 
         let (controller, _remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
@@ -696,7 +696,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn test_change_directory() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
 
         let (controller, _remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();
@@ -727,7 +727,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn test_play_item() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
 
         let (controller, remote_avc_peer, remote_avctp_peer) = set_up();
         let mut avctp_cmd_stream = remote_avctp_peer.take_command_stream();

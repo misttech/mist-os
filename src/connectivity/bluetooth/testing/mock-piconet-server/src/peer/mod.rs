@@ -348,7 +348,7 @@ mod tests {
     /// client drops the ConnectionReceiver.
     #[test]
     fn registered_service_is_unregistered_when_receiver_disconnects() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(234);
         let (mut mock_peer, _observer_stream) = create_mock_peer(id)?;
@@ -377,7 +377,7 @@ mod tests {
     /// over potentially registered PSMs.
     #[test]
     fn register_l2cap_service_with_connection_success() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(2392);
         let (mut mock_peer, mut observer_stream) = create_mock_peer(id)?;
@@ -429,7 +429,7 @@ mod tests {
     /// Tests notifying the outstanding searches with an advertised service.
     #[test]
     fn register_multiple_searches_success() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(2824);
         let (mut mock_peer, mut observer_stream) = create_mock_peer(id)?;
@@ -493,7 +493,7 @@ mod tests {
     /// the ServerEnd of the SearchResults channel.
     #[test]
     fn service_search_terminates_when_client_disconnects() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(5604);
         let (mut mock_peer, _observer_stream) = create_mock_peer(id)?;
@@ -522,7 +522,7 @@ mod tests {
     /// reconnects, and re-advertises an identical service.
     #[test]
     fn service_search_gets_notified_when_service_re_registers() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(9999);
         let (mut mock_peer, _observer_stream) = create_mock_peer(id)?;
@@ -560,7 +560,7 @@ mod tests {
 
     #[test]
     fn rfcomm_connection_with_no_advertisement_returns_error() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
 
         // New mock peer with no RFCOMM advertisement.
         let id = PeerId(71);
@@ -572,7 +572,7 @@ mod tests {
 
     #[test]
     fn rfcomm_connection_relayed_to_peer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(80);
         let (mut mock_peer, mut observer_stream) = create_mock_peer(id).expect("valid mock peer");
@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn rfcomm_advertisement_relayed_to_peer_search() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(81);
         let (mut mock_peer, mut observer_stream) = create_mock_peer(id).expect("valid mock peer");

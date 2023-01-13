@@ -251,13 +251,13 @@ mod tests {
 
     #[fuchsia::test]
     fn new_gain_control_succeeds() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
         let _ = GainControl::new().expect("a success value");
     }
 
     #[fuchsia::test]
     fn get_client_end_leaves_field_empty() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
 
         let mut control = GainControl::new().expect("a success value");
         assert!(control.client_end.is_some());
@@ -272,7 +272,7 @@ mod tests {
 
     #[fuchsia::test]
     fn stream_returns_pending_without_client_interaction() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut ctrl = GainControl::new().unwrap();
         let result = exec.run_until_stalled(&mut ctrl.next());
@@ -344,7 +344,7 @@ mod tests {
 
     #[fuchsia::test]
     fn speaker_hanging_get_produces_values() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut ctrl = GainControl::new().unwrap();
         let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();
@@ -382,7 +382,7 @@ mod tests {
 
     #[fuchsia::test]
     fn microphone_hanging_get_produces_values() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut ctrl = GainControl::new().unwrap();
         let proxy = ctrl.get_client_end().unwrap().into_proxy().unwrap();

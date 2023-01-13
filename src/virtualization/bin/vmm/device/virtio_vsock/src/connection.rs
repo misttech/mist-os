@@ -535,7 +535,7 @@ mod tests {
     #[fuchsia::test]
     fn guest_initiated_and_client_closed_connection() {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
             .expect("failed to create HostVsockAcceptor request stream");
 
@@ -608,7 +608,7 @@ mod tests {
     #[fuchsia::test]
     fn client_initiated_connection_write_data_to_port() {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
             .expect("failed to create HostVsockEndpoint proxy/stream");
 

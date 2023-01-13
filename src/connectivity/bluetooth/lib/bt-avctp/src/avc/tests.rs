@@ -16,7 +16,7 @@ use crate::avctp::MessageType as AvctpMessageType;
 
 #[test]
 fn closes_channel_when_dropped() {
-    let mut _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut _exec = fasync::TestExecutor::new();
     let (peer_chan, control) = Channel::create();
 
     {
@@ -33,7 +33,7 @@ fn closes_channel_when_dropped() {
 #[test]
 #[should_panic(expected = "Command stream has already been taken")]
 fn can_only_take_stream_once() {
-    let mut _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut _exec = fasync::TestExecutor::new();
     let (_, control) = Channel::create();
 
     let peer = Peer::new(control);
@@ -49,7 +49,7 @@ pub(crate) fn setup_peer() -> (Peer, Channel) {
 }
 
 fn setup_stream_test() -> (fasync::TestExecutor, CommandStream, Peer, Channel) {
-    let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let exec = fasync::TestExecutor::new();
     let (peer, remote) = setup_peer();
     let stream = peer.take_command_stream();
     (exec, stream, peer, remote)

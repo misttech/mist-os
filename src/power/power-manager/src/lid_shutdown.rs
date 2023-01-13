@@ -518,7 +518,7 @@ mod tests {
     /// report and, on reception of a lid open report, it does NOT trigger a system shutdown.
     #[test]
     fn test_event_handling() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let fake_lid_driver = FakeLidDriver::new();
         let shutdown_node = FakeShutdownNode::new();
         let _node = executor.run_singlethreaded(
@@ -549,7 +549,7 @@ mod tests {
 
     #[test]
     fn test_loop_is_not_blocked() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let fake_lid_driver = FakeLidDriver::new();
         let _node = executor.run_singlethreaded(
             LidShutdownBuilder::new().driver_proxy(fake_lid_driver.proxy()).build_and_init(),
@@ -565,7 +565,7 @@ mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[test]
     fn test_inspect_data() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let inspector = inspect::Inspector::new();
         let fake_lid_driver = FakeLidDriver::new();
 

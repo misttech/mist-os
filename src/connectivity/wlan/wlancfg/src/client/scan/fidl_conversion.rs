@@ -415,7 +415,7 @@ mod tests {
     // consumed.
     #[fuchsia::test]
     fn partial_scan_result_consumption_has_no_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let scan_results = generate_test_fidl_data();
 
         // Create an iterator and send scan results
@@ -450,7 +450,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_scan_result_consumption_has_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let scan_results = generate_test_fidl_data();
 
         // Create an iterator and send scan results
@@ -468,7 +468,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_result_sends_max_message_size() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create and executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
 
@@ -494,7 +494,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_result_exceeding_max_size_throws_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create and executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
 
@@ -518,7 +518,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_result_sends_single_batch() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create and executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
 
@@ -545,7 +545,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_result_sends_multiple_batches() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create and executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iter, iter_server) =
             fidl::endpoints::create_proxy().expect("failed to create iterator");
 

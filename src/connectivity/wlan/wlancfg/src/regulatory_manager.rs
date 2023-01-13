@@ -124,7 +124,7 @@ mod tests {
         fn new(
             iface_manager: StubIfaceManager<S>,
         ) -> TestContext<impl Stream<Item = Result<(), Error>> + Send + Unpin> {
-            let executor = fasync::TestExecutor::new().expect("failed to create an executor");
+            let executor = fasync::TestExecutor::new();
             let (regulatory_region_proxy, regulatory_region_server_channel) =
                 create_proxy::<RegulatoryRegionWatcherMarker>()
                     .expect("failed to create RegulatoryRegionWatcher proxy");

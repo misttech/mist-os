@@ -1958,7 +1958,7 @@ mod tests {
     /// configured.
     #[fuchsia::test]
     fn test_connect_with_configured_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let other_test_ssid = ap_types::Ssid::try_from("other_ssid_connecting").unwrap();
 
         // Create a configured ClientIfaceContainer.
@@ -2002,7 +2002,7 @@ mod tests {
     /// unconfigured.
     #[fuchsia::test]
     fn test_connect_with_unconfigured_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         let mut test_values = test_setup(&mut exec);
         let (mut iface_manager, mut _sme_stream) =
@@ -2090,7 +2090,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connect_cancels_auto_reconnect_future() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         let mut test_values = test_setup(&mut exec);
         let (mut iface_manager, mut _sme_stream) =
@@ -2195,7 +2195,7 @@ mod tests {
         sae_driver_handler_supported: bool,
         sae_sme_handler_supported: bool,
     ) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         let mut test_values = test_setup(&mut exec);
         // The default FakePhyManager will not have a WPA3 iface which is intentional because if
@@ -2307,7 +2307,7 @@ mod tests {
     /// does not support WPA3. The connect should fail without trying to connect.
     #[fuchsia::test]
     fn test_connect_wpa3_no_wpa3_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         let test_values = test_setup(&mut exec);
         // By default IfaceManager has an iface but not one with WPA3.
@@ -2346,7 +2346,7 @@ mod tests {
     /// PhyManager should be asked for an iface that supports WPA3.
     #[fuchsia::test]
     fn test_connect_wpa3_with_configured_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         // Build the connect request for connecting to the WPA3 network.
         let ssid = ap_types::Ssid::try_from("some_wpa3_network").unwrap();
         let network = ap_types::NetworkIdentifier {
@@ -2414,7 +2414,7 @@ mod tests {
     /// Tests the case where connect is called, but no client ifaces exist.
     #[fuchsia::test]
     fn test_connect_with_no_ifaces() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a PhyManager with no knowledge of any client ifaces.
         let test_values = test_setup(&mut exec);
@@ -2447,7 +2447,7 @@ mod tests {
     /// Tests the case where connect is called, but client connections are disabled.
     #[fuchsia::test]
     fn test_connect_while_connections_disabled() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a PhyManager with no knowledge of any client ifaces.
         let test_values = test_setup(&mut exec);
@@ -2506,7 +2506,7 @@ mod tests {
     /// able to create an SME proxy for it.
     #[fuchsia::test]
     fn test_connect_sme_creation_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager and drop its client
         let test_values = test_setup(&mut exec);
@@ -2536,7 +2536,7 @@ mod tests {
     /// Tests the case where disconnect is called on a configured client.
     #[fuchsia::test]
     fn test_disconnect_configured_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -2572,7 +2572,7 @@ mod tests {
     /// configured.  Verifies that the configured client is unaffected.
     #[fuchsia::test]
     fn test_disconnect_nonexistent_config() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a ClientIfaceContainer with a valid client.
         let test_values = test_setup(&mut exec);
@@ -2608,7 +2608,7 @@ mod tests {
     /// Tests the case where disconnect is called and no client ifaces are present.
     #[fuchsia::test]
     fn test_disconnect_no_clients() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -2644,7 +2644,7 @@ mod tests {
     /// Tests the case where the call to disconnect the client fails.
     #[fuchsia::test]
     fn test_disconnect_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -2672,7 +2672,7 @@ mod tests {
     /// Tests stop_client_connections when there is a client that is connected.
     #[fuchsia::test]
     fn test_stop_connected_client() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let mut test_values = test_setup(&mut exec);
@@ -2713,7 +2713,7 @@ mod tests {
     /// Call stop_client_connections when the only available client is unconfigured.
     #[fuchsia::test]
     fn test_stop_unconfigured_client() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -2743,7 +2743,7 @@ mod tests {
     /// Tests the case where stop_client_connections is called, but there are no client ifaces.
     #[fuchsia::test]
     fn test_stop_no_clients() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create and empty PhyManager and IfaceManager.
@@ -2779,7 +2779,7 @@ mod tests {
     /// machines fails.
     #[fuchsia::test]
     fn test_stop_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -2814,7 +2814,7 @@ mod tests {
     /// Tests the case where the IfaceManager fails to tear down all of the client ifaces.
     #[fuchsia::test]
     fn test_stop_iface_destruction_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -2855,7 +2855,7 @@ mod tests {
     /// stopped.
     #[fuchsia::test]
     fn test_stop_client_when_already_stopped() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -2894,7 +2894,7 @@ mod tests {
     /// Tests the case where an existing iface is marked as idle.
     #[fuchsia::test]
     fn test_mark_iface_idle() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
@@ -2913,7 +2913,7 @@ mod tests {
     /// Tests the case where a running and configured iface is marked as idle.
     #[fuchsia::test]
     fn test_mark_active_iface_idle() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
@@ -2928,7 +2928,7 @@ mod tests {
     /// Tests the case where a non-existent iface is marked as idle.
     #[fuchsia::test]
     fn test_mark_nonexistent_iface_idle() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
@@ -2940,7 +2940,7 @@ mod tests {
     /// Tests the case where an iface is not configured and has_idle_client is called.
     #[fuchsia::test]
     fn test_unconfigured_iface_idle_check() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (iface_manager, _) = create_iface_manager_with_client(&test_values, false);
         assert!(!iface_manager.idle_clients().is_empty());
@@ -2949,7 +2949,7 @@ mod tests {
     /// Tests the case where an iface is configured and alive and has_idle_client is called.
     #[fuchsia::test]
     fn test_configured_alive_iface_idle_check() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (iface_manager, _) = create_iface_manager_with_client(&test_values, true);
         assert!(iface_manager.idle_clients().is_empty());
@@ -2958,7 +2958,7 @@ mod tests {
     /// Tests the case where an iface is configured and dead and has_idle_client is called.
     #[fuchsia::test]
     fn test_configured_dead_iface_idle_check() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
 
@@ -2975,7 +2975,7 @@ mod tests {
     /// Tests the case where not ifaces are present and has_idle_client is called.
     #[fuchsia::test]
     fn test_no_ifaces_idle_check() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (mut iface_manager, _) = create_iface_manager_with_client(&test_values, true);
         let _ = iface_manager.clients.pop();
@@ -2985,7 +2985,7 @@ mod tests {
     /// Tests the case where starting client connections succeeds.
     #[fuchsia::test]
     fn test_start_clients_succeeds() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3020,7 +3020,7 @@ mod tests {
     /// Tests the case where starting client connections fails.
     #[fuchsia::test]
     fn test_start_clients_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -3047,7 +3047,7 @@ mod tests {
     /// a working state.
     #[fuchsia::test]
     fn test_start_clients_with_lingering_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager with no clients and client connections initially disabled.  Seed
         // it with a PhyManager that knows of a lingering client interface.
@@ -3154,7 +3154,7 @@ mod tests {
     /// the access point.
     #[fuchsia::test]
     fn test_start_ap_succeeds() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3174,7 +3174,7 @@ mod tests {
     /// the access point.
     #[fuchsia::test]
     fn test_start_ap_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: false, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3191,7 +3191,7 @@ mod tests {
     /// Tests the case where start is called on the IfaceManager, but there are no AP ifaces.
     #[fuchsia::test]
     fn test_start_ap_no_ifaces() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3223,7 +3223,7 @@ mod tests {
     /// IfaceManager.
     #[fuchsia::test]
     fn test_stop_ap_succeeds() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3248,7 +3248,7 @@ mod tests {
     /// Tests the case where IfaceManager is requested to stop a config that is not accounted for.
     #[fuchsia::test]
     fn test_stop_ap_invalid_config() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3272,7 +3272,7 @@ mod tests {
     /// fails.
     #[fuchsia::test]
     fn test_stop_ap_stop_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: false, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3299,7 +3299,7 @@ mod tests {
     /// fails.
     #[fuchsia::test]
     fn test_stop_ap_exit_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: false };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3325,7 +3325,7 @@ mod tests {
     /// Tests the case where stop is called on the IfaceManager, but there are no AP ifaces.
     #[fuchsia::test]
     fn test_stop_ap_no_ifaces() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3352,7 +3352,7 @@ mod tests {
     /// Tests the case where stop_all_aps is called and it succeeds.
     #[fuchsia::test]
     fn test_stop_all_aps_succeeds() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3392,7 +3392,7 @@ mod tests {
     /// Tests the case where stop_all_aps is called and the request to stop fails for an iface.
     #[fuchsia::test]
     fn test_stop_all_aps_stop_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: false, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3432,7 +3432,7 @@ mod tests {
     /// Tests the case where stop_all_aps is called and the request to stop fails for an iface.
     #[fuchsia::test]
     fn test_stop_all_aps_exit_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: false };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3473,7 +3473,7 @@ mod tests {
     /// ifaces.
     #[fuchsia::test]
     fn test_stop_all_aps_no_ifaces() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3505,7 +3505,7 @@ mod tests {
     /// asked to stop.
     #[fuchsia::test]
     fn test_start_ap_twice_then_stop() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
@@ -3556,7 +3556,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_recover_removed_client_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager with a client and an AP.
         let mut test_values = test_setup(&mut exec);
@@ -3632,7 +3632,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_client_iface_recovery_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager with a client and an AP.
         let mut test_values = test_setup(&mut exec);
@@ -3695,7 +3695,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_do_not_recover_removed_ap_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager with a client and an AP.
         let test_values = test_setup(&mut exec);
@@ -3732,7 +3732,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_remove_nonexistent_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager with a client and an AP.
         let test_values = test_setup(&mut exec);
@@ -3782,7 +3782,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_client_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3888,7 +3888,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_ap_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -3958,7 +3958,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_nonexistent_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -4008,7 +4008,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_existing_client_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4052,7 +4052,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_existing_ap_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4239,7 +4239,7 @@ mod tests {
         TestType::ClientError; "client drops receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_disconnect_test(fake_client: FakeClient, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4275,7 +4275,7 @@ mod tests {
         TestType::ClientError; "client drops receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_connect_test(fake_client: FakeClient, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4319,7 +4319,7 @@ mod tests {
     // as well as the mechanism for querying idle interfaces.
     #[fuchsia::test]
     fn test_service_record_idle_client() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4385,7 +4385,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_record_idle_client_response_failure() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4433,7 +4433,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_query_idle_client_response_failure() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4565,7 +4565,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_service_add_iface_succeeds() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -4699,7 +4699,7 @@ mod tests {
     #[test_case(TestType::ClientError; "client dropped receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_add_iface_negative_tests(test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an empty PhyManager and IfaceManager.
@@ -4741,7 +4741,7 @@ mod tests {
     #[test_case(TestType::ClientError; "client dropped receiving end")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_remove_iface_test(test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4806,7 +4806,7 @@ mod tests {
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn service_start_client_connections_test(phy_manager: FakePhyManager, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4883,7 +4883,7 @@ mod tests {
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn service_stop_client_connections_test(phy_manager: FakePhyManager, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -4924,7 +4924,7 @@ mod tests {
     #[test_case(FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true }, TestType::ClientError; "client drops receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_start_ap_test(fake_ap: FakeAp, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an IfaceManager with a fake AP interface.
@@ -4954,7 +4954,7 @@ mod tests {
     #[test_case(FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true }, TestType::ClientError; "client drops receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_stop_ap_test(fake_ap: FakeAp, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an IfaceManager with a configured fake AP interface.
@@ -4987,7 +4987,7 @@ mod tests {
     #[test_case(FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true }, TestType::ClientError; "client drops receiver")]
     #[fuchsia::test(add_test_attr = false)]
     fn service_stop_all_aps_test(fake_ap: FakeAp, test_type: TestType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an IfaceManager with a fake AP interface.
@@ -5013,7 +5013,7 @@ mod tests {
     /// disconnected.
     #[fuchsia::test]
     fn test_reconnect_disconnected_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let mut test_values = test_setup(&mut exec);
@@ -5109,7 +5109,7 @@ mod tests {
     /// connections have been stopped.
     #[fuchsia::test]
     fn test_reconnect_nonexistent_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an empty IfaceManager
         let test_values = test_setup(&mut exec);
@@ -5155,7 +5155,7 @@ mod tests {
     /// machine exits because a new connect request has come in.
     #[fuchsia::test]
     fn test_reconnect_connected_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let mut test_values = test_setup(&mut exec);
@@ -5208,7 +5208,7 @@ mod tests {
     #[fuchsia::test(add_test_attr = false)]
     fn test_initiate_network_selection(test_type: NetworkSelectionMissingAttribute) {
         // Start out by setting the test up such that we would expect a scan to be requested.
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let mut test_values = test_setup(&mut exec);
@@ -5327,7 +5327,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_scan_result_backoff() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManagerService
         let test_values = test_setup(&mut exec);
@@ -5360,7 +5360,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_reconnect_on_network_selection_results() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an interface manager with an unconfigured client interface.
@@ -5431,7 +5431,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_idle_client_remains_after_failed_reconnection() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an interface manager with an unconfigured client interface.
@@ -5486,7 +5486,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_bss_selection_for_connect_request_results() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Create an interface manager with an unconfigured client interface.
@@ -5542,7 +5542,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_terminated_client() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_values = test_setup(&mut exec);
 
         // Create a fake network entry so that a reconnect will be attempted.
@@ -5605,7 +5605,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_terminated_ap() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -5643,7 +5643,7 @@ mod tests {
     /// will return true.
     #[fuchsia::test]
     fn test_has_wpa3_capable_client() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -5667,7 +5667,7 @@ mod tests {
     /// return false.
     #[fuchsia::test]
     fn test_has_no_wpa3_capable_iface() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
         let test_values = test_setup(&mut exec);
@@ -5734,7 +5734,7 @@ mod tests {
         create_iface_ok: bool,
         test_type: TestType,
     ) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
 
         // Seed a FakePhyManager with the test configuration information and provide the PhyManager
@@ -5823,7 +5823,7 @@ mod tests {
     /// Ensure that defect reports are passed through to the PhyManager.
     #[fuchsia::test]
     fn test_record_defect() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
@@ -5862,7 +5862,7 @@ mod tests {
     /// Ensure that state machine defects are passed through to the PhyManager.
     #[fuchsia::test]
     fn test_record_state_machine_defect() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_values = test_setup(&mut exec);
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
@@ -5920,7 +5920,7 @@ mod tests {
     // future completes.
     #[fuchsia::test]
     fn test_attempt_atomic_operation() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // The mpsc channel pair represents a requestor/worker pair to be managed by an
         // AtomicOneshotReceiver.
@@ -5973,7 +5973,7 @@ mod tests {
         req: IfaceManagerRequest,
         mut receiver: oneshot::Receiver<T>,
     ) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create an IfaceManager that has both a fake client and a fake AP state machine.  Hold on
         // to the receiving ends of the state machine command channels.  The receiving ends will

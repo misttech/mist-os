@@ -213,7 +213,7 @@ mod test {
                 update_state: Option<State>,
                 version_available in random_version_available(),
         ) {
-            fasync::TestExecutor::new().unwrap().run_singlethreaded(async {
+            fasync::TestExecutor::new().run_singlethreaded(async {
                 let mut update_monitor = random_update_monitor::<FakeStateNotifier, FakeAttemptNotifier>(update_state.clone(), version_available).await;
                 let expected_states: Vec<_> = update_state.into_iter().collect();
                 let temporary_callback = FakeStateNotifier::new();
@@ -235,7 +235,7 @@ mod test {
                 version_available in random_version_available(),
                 next_states in prop::collection::vec(any::<State>(), 0..4),
         ) {
-            fasync::TestExecutor::new().unwrap().run_singlethreaded(async {
+            fasync::TestExecutor::new().run_singlethreaded(async {
                 let mut update_monitor = random_update_monitor::<FakeStateNotifier, FakeAttemptNotifier>(initial_state.clone(), version_available).await;
                 let temporary_callback = FakeStateNotifier::new();
                 let expected_states: Vec<_> = initial_state.clone().into_iter().chain(next_states.clone().into_iter()).collect();
@@ -260,7 +260,7 @@ mod test {
             update_state: Option<State>,
             version_available in random_version_available(),
         ) {
-            fasync::TestExecutor::new().unwrap().run_singlethreaded(async {
+            fasync::TestExecutor::new().run_singlethreaded(async {
                 let mut update_monitor = random_update_monitor::<FakeStateNotifier, FakeAttemptNotifier>(update_state, version_available).await;
                 update_monitor.set_version_available(VERSION_AVAILABLE.to_string());
 
@@ -279,7 +279,7 @@ mod test {
             update_state: Option<State>,
             version_available in random_version_available(),
         ) {
-            fasync::TestExecutor::new().unwrap().run_singlethreaded(async {
+            fasync::TestExecutor::new().run_singlethreaded(async {
                 let mut update_monitor = random_update_monitor::<FakeStateNotifier, FakeAttemptNotifier>(update_state, version_available).await;
                 let temporary_callback = FakeStateNotifier::new();
 
@@ -298,7 +298,7 @@ mod test {
             update_state: State,
             version_available in random_version_available(),
         ) {
-            let mut executor = fasync::TestExecutor::new().unwrap();
+            let mut executor = fasync::TestExecutor::new();
             let mut update_monitor = executor.run_singlethreaded(random_update_monitor::<_, FakeAttemptNotifier>(Some(update_state.clone()), version_available));
 
             let (sender, mut receiver) = mpsc::channel(0);

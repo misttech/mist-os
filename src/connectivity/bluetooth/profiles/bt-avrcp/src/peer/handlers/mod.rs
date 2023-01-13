@@ -1380,7 +1380,7 @@ mod test {
     /// Validate our interim timers fire
     #[test]
     fn send_status_interim_fired() {
-        let mut exec = fasync::TestExecutor::new().expect("executor::new failed");
+        let mut exec = fasync::TestExecutor::new();
 
         // stall the responses from the target handler by 10 seconds
         let target_proxy = create_dummy_target_handler(true);
@@ -1713,7 +1713,7 @@ mod test {
 
     #[test]
     fn validate_passthrough_reject_timer_fired() {
-        let mut exec = fasync::TestExecutor::new().expect("executor::new failed");
+        let mut exec = fasync::TestExecutor::new();
 
         let target_proxy = create_dummy_target_handler(true);
         let cmd_handler = create_command_handler(Some(target_proxy), None);

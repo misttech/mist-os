@@ -23,7 +23,7 @@ mod udp_tests {
     const MESSAGE: &[u8; 11] = b"hello world";
 
     fn send_recv_same_socket(addr: std::net::IpAddr) {
-        let mut exec = TestExecutor::new().expect("could not create executor");
+        let mut exec = TestExecutor::new();
 
         let addr = std::net::SocketAddr::new(addr, 0);
         let socket = UdpSocket::bind(&addr).expect("could not create socket");
@@ -52,7 +52,7 @@ mod udp_tests {
     }
 
     fn send_recv(addr: std::net::IpAddr) {
-        let mut exec = TestExecutor::new().expect("could not create executor");
+        let mut exec = TestExecutor::new();
 
         let socket_addr = std::net::SocketAddr::new(addr.into(), 0);
         let client_socket = UdpSocket::bind(&socket_addr).expect("could not create client socket");
@@ -89,7 +89,7 @@ mod udp_tests {
 
     #[test]
     fn broadcast() {
-        let mut _exec = TestExecutor::new().expect("could not create executor");
+        let mut _exec = TestExecutor::new();
 
         let addr = "127.0.0.1:0".parse().expect("could not parse test address");
         let socket = UdpSocket::bind(&addr).expect("could not create socket");
@@ -102,7 +102,7 @@ mod udp_tests {
 
     #[test]
     fn test_local_addr() {
-        let mut _exec = TestExecutor::new().expect("could not create executor");
+        let mut _exec = TestExecutor::new();
         let addr = "127.0.0.1:5432".parse().expect("could not parse test address");
         let socket = UdpSocket::bind(&addr).expect("could not create socket");
         assert_eq!(socket.local_addr().expect("could not get local address"), addr);

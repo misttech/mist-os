@@ -144,7 +144,7 @@ mod tests {
 
         #[test]
         fn splits_overflowed_reports_to_next_read() -> Result<(), Error> {
-            let mut executor = fasync::TestExecutor::new().expect("creating executor");
+            let mut executor = fasync::TestExecutor::new();
             let max_reports = usize::try_from(MAX_DEVICE_REPORT_COUNT)
                 .context("internal error converting MAX_DEVICE_REPORT_COUNT to usize")?;
             let (proxy, request_stream) =
@@ -288,7 +288,7 @@ mod tests {
 
         #[test]
         fn closes_channel_after_reports_are_consumed() -> Result<(), Error> {
-            let mut executor = fasync::TestExecutor::new().expect("creating executor");
+            let mut executor = fasync::TestExecutor::new();
             let (proxy, request_stream) =
                 endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
                     .context("creating InputReportsReader proxy and stream")?;

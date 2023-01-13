@@ -188,7 +188,7 @@ mod tests {
     /// Tests that the client stream handler will spawn a controller when a controller request
     /// successfully sets up a controller.
     fn run_client() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
 
         // Set up for testing.
         let controller = setup();
@@ -216,7 +216,7 @@ mod tests {
     /// successfully sets up a controller.
     #[fuchsia::test]
     fn run_ext_client() {
-        let mut exec = fasync::TestExecutor::new().expect("TestExecutor should be created");
+        let mut exec = fasync::TestExecutor::new();
 
         // Set up testing.
         let controller = setup();

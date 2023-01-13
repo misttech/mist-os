@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_wlansoftmac_delete_no_crash() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&mut exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
         let handle_fut = start_wlansoftmac_async(fake_device.as_raw_device(), fake_buf_provider);
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_wlansoftmac_delete_without_stop_no_crash() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&mut exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
         let handle_fut = start_wlansoftmac_async(fake_device.as_raw_device(), fake_buf_provider);
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_wlansoftmac_handle_use_after_stop() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&mut exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
         let handle_fut = start_wlansoftmac_async(fake_device.as_raw_device(), fake_buf_provider);

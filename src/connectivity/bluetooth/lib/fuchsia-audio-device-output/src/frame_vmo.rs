@@ -387,7 +387,7 @@ mod tests {
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn test_frames_before(mut vmo: FrameVmo) {
-        let _exec = fasync::TestExecutor::new().expect("executor");
+        let _exec = fasync::TestExecutor::new();
 
         let start_time = fasync::Time::now();
         vmo.start(start_time).unwrap();

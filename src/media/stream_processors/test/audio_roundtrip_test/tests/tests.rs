@@ -63,6 +63,6 @@ fn cvsd_test_suite() -> Result<()> {
             rmse_diff_tolerance,
         )?;
 
-        fasync::TestExecutor::new().unwrap().run_singlethreaded(cvsd_tests.run())
+        fasync::TestExecutor::new().run_singlethreaded(cvsd_tests.run())
     })
 }

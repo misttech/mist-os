@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_handle_scan_req_reject_if_busy() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -644,7 +644,7 @@ mod tests {
 
     #[test]
     fn test_handle_scan_req_reject_if_disabled() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn test_handle_scan_req_empty_channel_list() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_handle_scan_req_invalid_channel_time() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn test_start_offload_passive_scan_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device.discovery_support.scan_offload.supported = true;
@@ -800,7 +800,7 @@ mod tests {
         expected_two_ghz_dynamic_args: Option<ExpectedDynamicActiveScanArgs>,
         expected_five_ghz_dynamic_args: Option<ExpectedDynamicActiveScanArgs>,
     ) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device.discovery_support.scan_offload.supported = true;
@@ -883,7 +883,7 @@ mod tests {
 
     #[test]
     fn test_start_passive_scan_fails() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let device = m.fake_device.as_device_fail_start_passive_scan();
         let mut ctx = m.make_ctx_with_device(device);
@@ -902,7 +902,7 @@ mod tests {
 
     #[test]
     fn test_start_active_scan_fails() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let device = m.fake_device.as_device_fail_start_active_scan();
         let mut ctx = m.make_ctx_with_device(device);
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_start_passive_scan_canceled() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device.discovery_support.scan_offload.supported = true;
@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn test_start_active_scan_canceled() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device.discovery_support.scan_offload.supported = true;
@@ -1006,7 +1006,7 @@ mod tests {
 
     #[test]
     fn test_handle_ap_advertisement() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -1037,7 +1037,7 @@ mod tests {
 
     #[test]
     fn test_handle_ap_advertisement_multiple() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);
@@ -1079,7 +1079,7 @@ mod tests {
 
     #[test]
     fn not_scanning_vs_scanning() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(IFACE_MAC);

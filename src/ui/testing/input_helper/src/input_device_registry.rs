@@ -215,7 +215,7 @@ mod tests {
     fn add_device_invokes_fidl_register_method_exactly_once(
         add_device_method: &dyn Fn(&mut super::InputDeviceRegistry) -> Result<InputDevice, Error>,
     ) -> Result<(), Error> {
-        let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
                 .context("failed to create proxy and stream for InputDeviceRegistry")?;
@@ -264,7 +264,7 @@ mod tests {
     fn add_device_registers_correct_device_type(
         add_device_method: &dyn Fn(&mut super::InputDeviceRegistry) -> Result<InputDevice, Error>,
     ) -> Result<DeviceDescriptor, Error> {
-        let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+        let mut executor = fasync::TestExecutor::new();
         // Create an `InputDeviceRegistry`, and add a device to it.
         let (registry_proxy, mut registry_request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()

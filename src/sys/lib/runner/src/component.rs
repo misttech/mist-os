@@ -648,7 +648,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_then_kill() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (sender, mut recv) = futures::channel::oneshot::channel::<()>();
         let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
         const CHANNEL_EPITAPH: zx::Status = zx::Status::OK;

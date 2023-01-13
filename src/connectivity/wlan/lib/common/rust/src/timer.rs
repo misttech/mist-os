@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_timer_schedule_at() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<Event>();
         let timeout1 = zx::Time::after(5.seconds());
         let timeout2 = zx::Time::after(10.seconds());
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_timer_schedule_after() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<Event>();
         let timeout1 = 1000.seconds();
         let timeout2 = 5.seconds();
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_timer_schedule() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<Event>();
         let start = zx::Time::after(0.millis());
 
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_timer_stream() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let fut = async {
             let (timer, time_stream) = mpsc::unbounded::<TimeEntry<Event>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);

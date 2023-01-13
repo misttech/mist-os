@@ -132,7 +132,7 @@ fn read_only_read_no_status() {
 
 #[test]
 fn read_only_read_with_describe() {
-    let exec = TestExecutor::new().expect("Executor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let server = simple_read_only(b"Read only test");
@@ -195,7 +195,7 @@ fn read_twice() {
 fn read_error() {
     let read_attempt = Arc::new(AtomicUsize::new(0));
 
-    let exec = TestExecutor::new().expect("Executor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
@@ -883,7 +883,7 @@ fn node_reference_can_not_seek() {
 /// content once again.
 #[test]
 fn mock_directory_with_one_file_and_two_connections() {
-    let exec = TestExecutor::new().expect("Executor creation failed");
+    let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
     let server = simple_read_write(b"Initial");

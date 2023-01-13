@@ -299,7 +299,7 @@ mod tests {
 
     #[fuchsia::test]
     fn allocate_future() {
-        let mut exec = fasync::TestExecutor::new().expect("executor creation");
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut allocator_requests) =
             fidl::endpoints::create_proxy_and_stream::<AllocatorMarker>().unwrap();
@@ -439,7 +439,7 @@ mod tests {
 
     #[fuchsia::test]
     fn with_system_allocator() {
-        let mut exec = fasync::TestExecutor::new().expect("executor creation");
+        let mut exec = fasync::TestExecutor::new();
         let sysmem_client = fuchsia_component::client::connect_to_protocol::<AllocatorMarker>()
             .expect("connect to allocator");
 

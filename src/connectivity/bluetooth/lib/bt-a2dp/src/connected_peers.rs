@@ -515,7 +515,7 @@ mod tests {
 
     fn setup_connected_peer_test(
     ) -> (fasync::TestExecutor, PeerId, ConnectedPeers, ProfileRequestStream) {
-        let exec = fasync::TestExecutor::new().expect("executor should build");
+        let exec = fasync::TestExecutor::new();
         let (proxy, stream) =
             create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
         let id = PeerId(1);

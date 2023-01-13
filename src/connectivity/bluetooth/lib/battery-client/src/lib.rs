@@ -236,7 +236,7 @@ mod tests {
 
     fn setup_battery_client(
     ) -> (fasync::TestExecutor, BatteryClient, fpower::BatteryInfoWatcherProxy) {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (c, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fpower::BatteryManagerMarker>().unwrap();

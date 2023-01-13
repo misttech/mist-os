@@ -383,7 +383,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sink_task_works_without_session() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, mut session_requests) =
             fidl::endpoints::create_proxy_and_stream::<PublisherMarker>().unwrap();
         let (audio_consumer_factory_proxy, mut audio_factory_requests) =
@@ -434,7 +434,7 @@ mod tests {
 
     #[fuchsia::test]
     fn dropped_task_reports_metrics() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (send, mut recv) = fake_cobalt_sender();
         let (proxy, mut session_requests) =
             fidl::endpoints::create_proxy_and_stream::<PublisherMarker>().unwrap();
@@ -478,7 +478,7 @@ mod tests {
     }
 
     fn setup_media_stream_test() -> (fasync::TestExecutor, MediaCodecConfig, DataStreamInspect) {
-        let exec = fasync::TestExecutor::new().expect("executor should build");
+        let exec = fasync::TestExecutor::new();
         let sbc_config = MediaCodecConfig::min_sbc();
         let inspect = DataStreamInspect::default();
         (exec, sbc_config, inspect)
@@ -487,7 +487,7 @@ mod tests {
     #[fuchsia::test]
     /// Test that cobalt metrics are sent after stream ends
     fn test_cobalt_metrics() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (send, mut recv) = fake_cobalt_sender();
         const TEST_DURATION: i64 = 1;
 

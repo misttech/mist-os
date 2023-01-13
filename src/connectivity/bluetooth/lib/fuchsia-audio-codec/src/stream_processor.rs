@@ -827,7 +827,7 @@ mod tests {
 
     #[fuchsia::test]
     fn encode_sbc() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
@@ -959,7 +959,7 @@ mod tests {
     #[fixture(fix_sbc_test_file)]
     #[fuchsia::test]
     fn decode_sbc(sbc_data: Vec<u8>) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         const SBC_FRAME_SIZE: usize = 72;
         const INPUT_FRAMES: usize = 23;
@@ -1033,7 +1033,7 @@ mod tests {
     #[fixture(fix_sbc_test_file)]
     #[fuchsia::test]
     fn decode_sbc_wakes_output_to_process_events(sbc_data: Vec<u8>) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         const SBC_FRAME_SIZE: usize = 72;
 
         // SBC codec info corresponding to Mono reference stream.
@@ -1099,7 +1099,7 @@ mod tests {
     #[fixture(fix_sbc_test_file)]
     #[fuchsia::test]
     fn decode_sbc_wakes_input_to_process_events(sbc_data: Vec<u8>) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         const SBC_FRAME_SIZE: usize = 72;
 
         // SBC codec info corresponding to Mono reference stream.

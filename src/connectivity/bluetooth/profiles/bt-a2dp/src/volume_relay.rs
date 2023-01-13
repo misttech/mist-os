@@ -365,7 +365,7 @@ mod tests {
     /// signal.
     #[test]
     fn test_relay_setup() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, stop_sender, relay_fut) = setup_volume_relay()?;
 
         pin_mut!(relay_fut);
@@ -497,7 +497,7 @@ mod tests {
     /// on_volume_changed request when the volume changes locally.
     #[test]
     fn test_volume_changes() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) =
             setup_volume_relay()?;
 
@@ -581,7 +581,7 @@ mod tests {
     // when OnVolumeChanged is called twice without a response.
     #[test]
     fn test_volume_changes_multiple_requests() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) =
             setup_volume_relay()?;
 

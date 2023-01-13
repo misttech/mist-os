@@ -1634,7 +1634,7 @@ mod tests {
             simplelog::Config::default(),
         );
 
-        fuchsia_async::TestExecutor::new().unwrap().run_singlethreaded(async move {
+        fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
             let _env = ffx_config::test_init().await.unwrap();
 
             // Since ffx_config is global, it's possible to leave behind entries

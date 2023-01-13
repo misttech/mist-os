@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn instrumentation_stepwise_smoke_test() {
-        let mut executor = TestExecutor::new().unwrap();
+        let mut executor = TestExecutor::new();
         let fut = simple_task_for_snapshot();
         pin_mut!(fut);
         assert!(executor.run_until_stalled(&mut fut).is_pending());

@@ -260,7 +260,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_services_collection() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
         let mut services = Services::new();
 
         let mut expected_defs = vec![];
@@ -316,7 +316,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_service_group() {
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
 
         let (mut service_group, _server) = build_service_group();
 
@@ -345,7 +345,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_service_group_relay_connected() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut service_group, mut server) = build_service_group();
 

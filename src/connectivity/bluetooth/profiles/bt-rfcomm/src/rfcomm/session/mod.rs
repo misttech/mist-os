@@ -1295,7 +1295,7 @@ mod tests {
 
     #[test]
     fn test_session_inner_inspect() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let inspect = inspect::Inspector::new();
 
         // Setup SessionInner with inspect.
@@ -1331,7 +1331,7 @@ mod tests {
 
     #[test]
     fn test_register_l2cap_channel() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (processing_fut, remote) = setup_session_task();
         pin_mut!(processing_fut);
@@ -1344,7 +1344,7 @@ mod tests {
 
     #[test]
     fn test_receiving_data_is_ok() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (processing_fut, remote) = setup_session_task();
         pin_mut!(processing_fut);
@@ -1362,7 +1362,7 @@ mod tests {
 
     #[test]
     fn test_peer_disconnection_notifies_termination_future() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(992);
         let (local, remote) = Channel::create();
@@ -1390,7 +1390,7 @@ mod tests {
 
     #[test]
     fn test_receiving_user_sabm_before_mux_startup_is_rejected() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert_eq!(session.role(), Role::Unassigned);
@@ -1408,7 +1408,7 @@ mod tests {
 
     #[test]
     fn test_receiving_mux_sabm_starts_multiplexer_with_ua_response() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
 
@@ -1429,7 +1429,7 @@ mod tests {
 
     #[test]
     fn test_receiving_mux_sabm_after_mux_startup_is_rejected() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert!(session.multiplexer().start(Role::Responder).is_ok());
@@ -1448,7 +1448,7 @@ mod tests {
 
     #[test]
     fn test_receiving_multiple_pn_commands_results_in_set_parameters() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert!(!session.session_parameters_negotiated());
@@ -1490,7 +1490,7 @@ mod tests {
 
     #[test]
     fn test_dlcpn_renegotiation_does_not_update_parameters() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, mut channel_receiver) = setup_session();
@@ -1561,7 +1561,7 @@ mod tests {
 
     #[test]
     fn test_establish_dlci_request_relays_channel_to_channel_open_fn() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, mut channel_receiver) = setup_session();
@@ -1596,7 +1596,7 @@ mod tests {
 
     #[test]
     fn test_no_registered_clients_rejects_establish_dlci_request() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create the session - set the channel_send_fn to unanimously reject
         // channels, to simulate failure.
@@ -1620,7 +1620,7 @@ mod tests {
 
     #[test]
     fn test_received_user_data_is_relayed_to_and_from_profile_client() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, mut channel_receiver) = setup_session();
@@ -1678,7 +1678,7 @@ mod tests {
 
     #[test]
     fn test_receiving_invalid_mux_command_results_in_non_supported_command() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert!(session.multiplexer().start(Role::Responder).is_ok());
@@ -1703,7 +1703,7 @@ mod tests {
 
     #[test]
     fn test_disconnect_over_user_dlci_closes_session_channel() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channel.
         let (mut session, mut outgoing_frames, mut channel_receiver) = setup_session();
@@ -1744,7 +1744,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_disconnect_over_mux_control_closes_session() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (session_fut, mut remote) = setup_session_task();
         pin_mut!(session_fut);
@@ -1786,7 +1786,7 @@ mod tests {
 
     #[test]
     fn test_start_multiplexer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert!(!session.multiplexer().started());
@@ -1828,7 +1828,7 @@ mod tests {
 
     #[test]
     fn test_peer_rejects_multiplexer_startup() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         assert!(!session.multiplexer().started());
@@ -1861,7 +1861,7 @@ mod tests {
 
     #[test]
     fn test_initiating_parameter_negotiation_expects_response() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
 
@@ -1904,7 +1904,7 @@ mod tests {
 
     #[test]
     fn test_peer_rejects_parameter_negotiation_with_dm() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _rfcomm_channels) = setup_session();
         let (outbound_fn, mut outbound_channels) = create_outbound_relay();
@@ -1940,7 +1940,7 @@ mod tests {
 
     #[test]
     fn test_peer_rejects_parameter_negotiation_with_disc() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, mut outgoing_frames, _inbound_channels) = setup_session();
         let (outbound_fn, mut outbound_channels) = create_outbound_relay();
@@ -1979,7 +1979,7 @@ mod tests {
 
     #[test]
     fn test_open_channel_request_establishes_channel_after_mux_startup_and_pn() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, _inbound_channels) = setup_session();
@@ -2058,7 +2058,7 @@ mod tests {
 
     #[test]
     fn test_open_channel_request_rejected_by_peer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Start SessionInner - don't expect any relayed channels.
         let (mut session, mut outgoing_frames, _inbound_channels) = setup_session();
@@ -2100,7 +2100,7 @@ mod tests {
 
     #[test]
     fn test_cancellation_during_open_channel_notifies_client() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (local, mut remote) = Channel::create();
         let (channel_open_fn, _inbound_channels) = create_inbound_relay();
@@ -2131,7 +2131,7 @@ mod tests {
 
     #[fuchsia::test]
     fn session_close_request_before_mux_startup_is_no_op() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (local, remote) = Channel::create();
         let (channel_open_fn, _inbound_channels) = create_inbound_relay();
@@ -2152,7 +2152,7 @@ mod tests {
 
     #[fuchsia::test]
     fn session_close_request_results_in_disconnect_frame_to_peer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (local, mut remote) = Channel::create();
         let (channel_open_fn, _inbound_channels) = create_inbound_relay();
@@ -2196,7 +2196,7 @@ mod tests {
 
     #[test]
     fn test_open_multiple_channels_establishes_channels_after_acknowledgement() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, _inbound_channels) = setup_session();
@@ -2272,7 +2272,7 @@ mod tests {
 
     #[test]
     fn test_open_rfcomm_channel_relays_channel_to_callback() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (local, mut remote) = Channel::create();
         let (channel_open_fn, _inbound_channels) = create_inbound_relay();
@@ -2318,7 +2318,7 @@ mod tests {
 
     #[test]
     fn test_open_same_rfcomm_channel_fails() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Create and start a SessionInner that relays any opened RFCOMM channels.
         let (mut session, mut outgoing_frames, _inbound_channels) = setup_session();
@@ -2350,7 +2350,7 @@ mod tests {
 
     #[fuchsia::test]
     fn send_rls_before_mux_startup_returns_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut session, _outgoing_frames, _inbound_channels) = setup_session();
 
@@ -2365,7 +2365,7 @@ mod tests {
 
     #[fuchsia::test]
     fn send_rls_before_channel_establishment_returns_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let our_role = Role::Responder;
         let (mut session, _outgoing_frames, _inbound_channels) = setup_session();
@@ -2386,7 +2386,7 @@ mod tests {
 
     #[fuchsia::test]
     fn rls_command_received_by_peer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let our_role = Role::Responder;
         let remote_peer_role = our_role.opposite_role();

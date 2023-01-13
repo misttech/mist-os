@@ -1095,8 +1095,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_fn() {
-        let _executor =
-            fasync::TestExecutor::new().expect("log_listener: unable to create executor");
+        let _executor = fasync::TestExecutor::new();
         let tmp_dir = TempDir::new().expect("log_listener: should have created tempdir");
         let file_path = tmp_dir.path().join("tmp_file");
         let tmp_file = File::create(&file_path).expect("log_listener: should have created file");
@@ -1180,7 +1179,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_only_and_suppress() {
-        let _executor = fasync::TestExecutor::new().expect("unable to create executor");
+        let _executor = fasync::TestExecutor::new();
         let tmp_dir = TempDir::new().expect("should have created tempdir");
         let file_path = tmp_dir.path().join("tmp_file");
         let tmp_file = File::create(&file_path).expect("should have created file");
@@ -1225,7 +1224,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_begin_end() {
-        let _executor = fasync::TestExecutor::new().expect("unable to create executor");
+        let _executor = fasync::TestExecutor::new();
         let tmp_dir = TempDir::new().expect("should have created tempdir");
         let file_path = tmp_dir.path().join("tmp_file");
         let tmp_file = File::create(&file_path).expect("should have created file");
@@ -1279,7 +1278,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_since_now() {
-        let _executor = fasync::TestExecutor::new().expect("unable to create executor");
+        let _executor = fasync::TestExecutor::new();
         let tmp_dir = TempDir::new().expect("should have created tempdir");
         let file_path = tmp_dir.path().join("tmp_file");
         let tmp_file = File::create(&file_path).expect("should have created file");

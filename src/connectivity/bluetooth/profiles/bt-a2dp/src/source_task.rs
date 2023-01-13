@@ -257,7 +257,7 @@ mod tests {
 
     #[fuchsia::test]
     fn configures_source_from_codec_config() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let builder = SourceTaskBuilder::new(sources::AudioSourceType::BigBen);
 
         // Minimum SBC requirements are mono, 48kHz
@@ -288,7 +288,7 @@ mod tests {
 
     #[fuchsia::test]
     fn source_media_stream_stats() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let builder = SourceTaskBuilder::new(sources::AudioSourceType::BigBen);
 
         let inspector = inspect::component::inspector();

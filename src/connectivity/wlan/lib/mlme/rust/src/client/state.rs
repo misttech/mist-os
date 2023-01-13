@@ -1538,7 +1538,7 @@ mod tests {
 
     #[test]
     fn connect_authenticate_tx_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let device = m.fake_device.as_device_fail_wlan_tx();
         let mut ctx = m.make_ctx_with_device(device);
@@ -1566,7 +1566,7 @@ mod tests {
 
     #[test]
     fn joined_no_authentication_algorithm() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let connect_req = ParsedConnectRequest {
@@ -1602,7 +1602,7 @@ mod tests {
 
     #[test]
     fn authenticating_state_auth_rejected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1640,7 +1640,7 @@ mod tests {
 
     #[test]
     fn authenticating_state_deauth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1669,7 +1669,7 @@ mod tests {
 
     #[test]
     fn associating_success_unprotected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1713,7 +1713,7 @@ mod tests {
 
     #[test]
     fn associating_success_protected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_protected_client_station();
@@ -1776,7 +1776,7 @@ mod tests {
 
     #[test]
     fn associating_failure_due_to_failed_status_code() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1806,7 +1806,7 @@ mod tests {
 
     #[test]
     fn associating_failure_due_to_incompatibility() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1838,7 +1838,7 @@ mod tests {
 
     #[test]
     fn associating_deauth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1860,7 +1860,7 @@ mod tests {
 
     #[test]
     fn associating_disassociation() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1887,7 +1887,7 @@ mod tests {
 
     #[test]
     fn associated_block_ack_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut mock = MockObjects::new(&exec);
         let mut ctx = mock.make_ctx();
         let mut station = make_client_station();
@@ -1941,7 +1941,7 @@ mod tests {
 
     #[test]
     fn associated_deauth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -1984,7 +1984,7 @@ mod tests {
 
     #[test]
     fn associated_disassociation() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2027,7 +2027,7 @@ mod tests {
 
     #[test]
     fn associated_move_data_closed_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2044,7 +2044,7 @@ mod tests {
 
     #[test]
     fn associated_move_data_opened_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2069,7 +2069,7 @@ mod tests {
 
     #[test]
     fn associated_skip_empty_data() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2093,7 +2093,7 @@ mod tests {
         controlled_port_open: bool,
         protected: bool,
     ) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta =
@@ -2117,7 +2117,7 @@ mod tests {
 
     #[test]
     fn associated_handle_eapol_closed_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -2144,7 +2144,7 @@ mod tests {
 
     #[test]
     fn associated_handle_eapol_open_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -2171,7 +2171,7 @@ mod tests {
 
     #[test]
     fn associated_handle_amsdus_open_controlled_port() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -2205,7 +2205,7 @@ mod tests {
 
     #[test]
     fn associated_request_bu_data_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2235,7 +2235,7 @@ mod tests {
 
     #[test]
     fn associated_request_bu_mgmt_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2275,7 +2275,7 @@ mod tests {
 
     #[test]
     fn associated_no_bu_request() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2312,7 +2312,7 @@ mod tests {
 
     #[test]
     fn associated_drop_foreign_data_frames() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2352,7 +2352,7 @@ mod tests {
 
     #[test]
     fn state_transitions_joined_state_reconnect_denied() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2384,7 +2384,7 @@ mod tests {
 
     #[test]
     fn state_transitions_authing_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2414,7 +2414,7 @@ mod tests {
 
     #[test]
     fn state_transitions_authing_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2446,7 +2446,7 @@ mod tests {
 
     #[test]
     fn state_transitions_authing_deauth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2476,7 +2476,7 @@ mod tests {
 
     #[test]
     fn state_transitions_foreign_auth_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2526,7 +2526,7 @@ mod tests {
 
     #[test]
     fn state_transitions_authing_state_reconnect_denied() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2559,7 +2559,7 @@ mod tests {
 
     #[test]
     fn state_transitions_authing_state_wrong_algorithm() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2589,7 +2589,7 @@ mod tests {
 
     #[test]
     fn state_transitions_associng_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -2628,7 +2628,7 @@ mod tests {
 
     #[test]
     fn state_transitions_associng_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2659,7 +2659,7 @@ mod tests {
 
     #[test]
     fn state_transitions_associng_deauthing() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2688,7 +2688,7 @@ mod tests {
 
     #[test]
     fn state_transitions_associng_reconnect_no_op() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2714,7 +2714,7 @@ mod tests {
 
     #[test]
     fn state_transitions_associng_reconnect_denied() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2751,7 +2751,7 @@ mod tests {
 
     #[test]
     fn state_transitions_assoced_disassoc_connect_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2856,7 +2856,7 @@ mod tests {
 
     #[test]
     fn state_transitions_assoced_disassoc_reconnect_timeout() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2927,7 +2927,7 @@ mod tests {
 
     #[test]
     fn state_transitions_assoced_disassoc_reconnect_denied() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -2988,7 +2988,7 @@ mod tests {
 
     #[test]
     fn state_transitions_assoced_reconnect_no_op() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3027,7 +3027,7 @@ mod tests {
 
     #[test]
     fn state_transitions_assoced_deauthing() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3072,7 +3072,7 @@ mod tests {
     #[test_case(false, true; "unprotected bss, scanning")]
     #[test_case(true, true; "protected bss, scanning")]
     fn assoc_send_eth_frame_becomes_data_frame(protected: bool, scanning: bool) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta =
@@ -3137,7 +3137,7 @@ mod tests {
 
     #[test]
     fn eth_frame_dropped_when_off_channel() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3166,7 +3166,7 @@ mod tests {
 
     #[test]
     fn assoc_eth_frame_too_short_dropped() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3186,7 +3186,7 @@ mod tests {
 
     #[test]
     fn assoc_controlled_port_closed_eth_frame_dropped() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3207,7 +3207,7 @@ mod tests {
 
     #[test]
     fn not_assoc_eth_frame_dropped() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3228,7 +3228,7 @@ mod tests {
     #[test]
     #[allow(deprecated)] // Raw MLME messages are deprecated.
     fn joined_sme_deauth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3247,7 +3247,7 @@ mod tests {
 
     #[test]
     fn authenticating_sme_deauth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3268,7 +3268,7 @@ mod tests {
 
     #[test]
     fn associating_sme_deauth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3289,7 +3289,7 @@ mod tests {
 
     #[test]
     fn associated_sme_deauth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
@@ -3342,7 +3342,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_eapol_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3365,7 +3365,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_eapol_associated_not_protected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3380,7 +3380,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_eapol_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3412,7 +3412,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_set_keys_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3434,7 +3434,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_set_keys_associated_not_protected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3449,7 +3449,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_set_keys_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3485,7 +3485,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn mlme_set_keys_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3536,7 +3536,7 @@ mod tests {
 
     #[test]
     fn mlme_set_controlled_port_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3557,7 +3557,7 @@ mod tests {
 
     #[test]
     fn mlme_set_controlled_port_associated_not_protected() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3571,7 +3571,7 @@ mod tests {
 
     #[test]
     fn mlme_set_controlled_port_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
@@ -3589,7 +3589,7 @@ mod tests {
     #[test_case(true; "while scanning")]
     #[test_case(false; "while not scanning")]
     fn associated_rx_succeeds(scanning: bool) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3644,7 +3644,7 @@ mod tests {
 
     #[test]
     fn associated_rx_with_wrong_cbw_succeeds() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3686,7 +3686,7 @@ mod tests {
 
     #[test]
     fn associated_request_bu_if_tim_indicates_buffered_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3728,7 +3728,7 @@ mod tests {
 
     #[test]
     fn associated_does_not_request_bu_if_tim_indicates_no_buffered_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -3769,7 +3769,7 @@ mod tests {
 
     #[test]
     fn signal_report() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();

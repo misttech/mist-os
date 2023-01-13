@@ -211,7 +211,7 @@ pub(crate) mod tests {
         bredr::ProfileRequestStream,
         mpsc::Sender<di::DeviceIdentificationRequestStream>,
     ) {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
 
         let (sender, receiver) = mpsc::channel(0);
         let (profile, profile_server) =

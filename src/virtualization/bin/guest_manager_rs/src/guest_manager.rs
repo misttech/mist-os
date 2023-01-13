@@ -558,7 +558,7 @@ mod tests {
 
     #[fuchsia::test]
     fn vmm_component_crash() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create test executor");
+        let mut executor = fasync::TestExecutor::new();
         let mut manager = GuestManager::new("foo".to_string());
         let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
 
@@ -590,7 +590,7 @@ mod tests {
 
     #[fuchsia::test]
     fn launch_fails_due_to_invalid_config_path() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let manager = ManagerFixture::new_with_config_file(String::from("foo"));
         let run_fut = manager.run();
         futures::pin_mut!(run_fut);
@@ -611,7 +611,7 @@ mod tests {
 
     #[fuchsia::test]
     fn launch_fails_due_to_bad_config_schema() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let config = r#"{"invalid": "field"}"#;
         let manager = ManagerFixture::new(config);
         let run_fut = manager.run();
@@ -634,7 +634,7 @@ mod tests {
 
     #[fuchsia::test]
     fn double_launch_fails() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let manager = ManagerFixture::new_with_defaults();
         let run_fut = manager.run();
         futures::pin_mut!(run_fut);
@@ -672,7 +672,7 @@ mod tests {
     fn failed_to_create_and_initialize_vmm_with_restart() {
         // Fail to create the VMM when launch is called, then call launch again and succeed
         // the second time.
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let manager = ManagerFixture::new_with_defaults();
         let run_fut = manager.run();
         futures::pin_mut!(run_fut);

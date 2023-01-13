@@ -775,7 +775,7 @@ mod tests {
     /// Tests that each thermal client's state is correctly published into Inspect.
     #[test]
     fn test_inspect() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         // Create a test config with two clients to verify each has their respective Inspect nodes
@@ -871,7 +871,7 @@ mod tests {
     /// Tests that the server correctly implements the hanging-get pattern.
     #[test]
     fn test_hanging_get() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         let thermal_config = ThermalConfig::new().add_client_config(
@@ -919,7 +919,7 @@ mod tests {
     /// Tests that a connect request from an unsupported `client_type` returns an error.
     #[test]
     fn test_unsupported_client() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         let _node = ThermalStateHandlerBuilder {
@@ -944,7 +944,7 @@ mod tests {
     /// Tests that `enable_client_state_connector` = false disables the client state connector.
     #[test]
     fn test_disable_client_state_connector() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
         let thermal_config = ThermalConfig::new().add_client_config(
             "client1",
@@ -1002,7 +1002,7 @@ mod tests {
     /// before the client has connected.
     #[test]
     fn test_initial_thermal_state() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         let thermal_config = ThermalConfig::new().add_client_config(
@@ -1037,7 +1037,7 @@ mod tests {
     /// updates.
     #[test]
     fn test_multiple_client_types() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let mut service_fs = ServiceFs::new_local();
 
         let thermal_config = ThermalConfig::new()

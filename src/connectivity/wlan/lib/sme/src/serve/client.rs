@@ -382,7 +382,7 @@ mod tests {
     #[test_case(50000, false; "with 50000 results")]
     #[test_case(100000, false; "with 100000 results")]
     fn scan_results_are_effectively_unbounded(number_of_scan_results: usize, randomize: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client_sme_proxy, mut client_sme_stream) =
             create_proxy_and_stream::<fidl_sme::ClientSmeMarker>().expect("error creating proxy");
 
@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn test_serve_connect_txn_stream() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let (sme_proxy, sme_connect_txn_stream) = mpsc::unbounded();
         let (fidl_client_proxy, fidl_connect_txn_stream) =

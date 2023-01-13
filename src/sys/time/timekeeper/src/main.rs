@@ -373,7 +373,7 @@ mod tests {
 
     #[fuchsia::test]
     fn successful_update_with_monitor() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (primary_clock, primary_ticks) = create_clock();
         let (monitor_clock, monitor_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -457,7 +457,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -496,7 +496,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_valid_rtc() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(VALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -537,7 +537,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_clock_already_running() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
 
         // Create a clock and set it slightly after backstop
         let (clock, _) = create_clock();

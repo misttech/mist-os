@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn sme_shutdown_on_generic_sme_closed() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let inspector = Inspector::new();
         let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
@@ -399,7 +399,7 @@ mod tests {
     fn start_generic_sme_test(
         role: fidl_common::WlanMacRole,
     ) -> (GenericSmeTestHelper, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let inspector = Inspector::new();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));

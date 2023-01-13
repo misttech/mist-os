@@ -471,7 +471,7 @@ mod tests {
 
         #[test]
         fn serve_fidl_iterator_from_slice_yields_expected_entries(items: Vec<crate::BlobInfo>) {
-            let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new();
             executor.run_singlethreaded(async move {
                 let (proxy, stream) =
                     fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
@@ -509,7 +509,7 @@ mod tests {
             repetition in 0..4usize,
             max_chunking in 0..4usize,
         ) {
-            let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new();
             executor.run_singlethreaded(async move {
                 let (proxy, fidl_stream) =
                     fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
@@ -643,7 +643,7 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[test]
     fn serve_fidl_iterator_from_stream_ignores_empty_vec() {
-        let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+        let mut executor = fuchsia_async::TestExecutor::new();
         let (proxy, fidl_stream) =
             fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
         let (item_sender, item_stream) = futures::channel::mpsc::unbounded();
@@ -671,7 +671,7 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[test]
     fn serve_fidl_iterator_from_stream_does_not_block_if_chunker_not_empty() {
-        let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+        let mut executor = fuchsia_async::TestExecutor::new();
         let (proxy, fidl_stream) =
             fidl::endpoints::create_proxy_and_stream::<BlobInfoIteratorMarker>().unwrap();
         let (item_sender, item_stream) = futures::channel::mpsc::unbounded();

@@ -72,7 +72,7 @@ fn sbc_decode() -> Result<()> {
         }],
     };
 
-    fasync::TestExecutor::new().unwrap().run_singlethreaded(sbc_tests.run())
+    fasync::TestExecutor::new().run_singlethreaded(sbc_tests.run())
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
         }],
     };
 
-    fasync::TestExecutor::new().unwrap().run_singlethreaded(sbc_tests.run())
+    fasync::TestExecutor::new().run_singlethreaded(sbc_tests.run())
 }
 
 #[test]
@@ -152,5 +152,5 @@ fn cvsd_simple_decode() -> Result<()> {
         }],
     };
 
-    fasync::TestExecutor::new().unwrap().run_singlethreaded(cvsd_tests.run())
+    fasync::TestExecutor::new().run_singlethreaded(cvsd_tests.run())
 }

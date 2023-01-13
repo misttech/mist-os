@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn pub_sub_empty_completes() {
-        let mut ex = fasync::TestExecutor::new().unwrap();
+        let mut ex = fasync::TestExecutor::new();
         let broker = HangingGetBroker::new(
             0i32,
             |s, o: oneshot::Sender<_>| o.send(s.clone()).map(|()| true).unwrap(),

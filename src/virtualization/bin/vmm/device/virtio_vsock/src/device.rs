@@ -708,7 +708,7 @@ mod tests {
     fn malformed_rx_chain_doesnt_consume_packet() {
         let guest_port = 123;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
-        let mut executor = fasync::TestExecutor::new().expect("failed to create test executor");
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
             .expect("failed to create HostVsockEndpoint proxy/stream");
 
@@ -844,7 +844,7 @@ mod tests {
     fn guest_rx_from_two_client_initiated_connections() {
         let guest_port = 12345;
         let header_size = mem::size_of::<VirtioVsockHeader>() as u32;
-        let mut executor = fasync::TestExecutor::new().expect("failed to create test executor");
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
             .expect("failed to create HostVsockEndpoint proxy/stream");
 

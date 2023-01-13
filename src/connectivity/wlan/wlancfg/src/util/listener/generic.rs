@@ -200,7 +200,7 @@ mod tests {
 
     #[fuchsia::test]
     fn initial_update() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,
@@ -232,7 +232,7 @@ mod tests {
 
     #[fuchsia::test]
     fn multiple_listeners_broadcast() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,
@@ -284,7 +284,7 @@ mod tests {
 
     #[fuchsia::test]
     fn multiple_listeners_unacked() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (mut update_sender, listener_updates) = mpsc::unbounded::<ClientListenerMessage>();
         let serve_listeners = serve::<
             fidl_policy::ClientStateUpdatesProxy,

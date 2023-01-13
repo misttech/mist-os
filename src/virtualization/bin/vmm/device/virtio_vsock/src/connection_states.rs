@@ -1378,7 +1378,7 @@ mod tests {
     #[fuchsia::test]
     fn guest_initiated_client_returned_failure() {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
             .expect("failed to create HostVsockAcceptor request stream");
@@ -1413,7 +1413,7 @@ mod tests {
     #[fuchsia::test]
     fn guest_initiated_client_returned_socket() {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockAcceptorMarker>()
             .expect("failed to create HostVsockAcceptor request stream");
@@ -1450,7 +1450,7 @@ mod tests {
     fn client_initiated_guest_responded_before_request() {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
             .expect("failed to create HostVsockEndpoint proxy/stream");
 
@@ -1488,7 +1488,7 @@ mod tests {
     fn client_initiated_guest_acceptance() {
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<HostVsockEndpointMarker>()
             .expect("failed to create HostVsockEndpoint proxy/stream");
 
@@ -1534,7 +1534,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_basic_tx_data_integrity_validation() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -1613,7 +1613,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_basic_rx_data_integrity_validation() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -1727,7 +1727,7 @@ mod tests {
 
     #[fuchsia::test]
     fn require_fresh_read_signal_in_read_write_state() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -1763,7 +1763,7 @@ mod tests {
 
     #[fuchsia::test]
     fn require_fresh_write_signal_in_read_write_state() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -1856,7 +1856,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_client_close_socket_rx_bytes_outstanding() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -1982,7 +1982,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_rx_obeys_guest_credit() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
@@ -2279,7 +2279,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_unsolicited_credit_update() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 

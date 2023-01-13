@@ -248,7 +248,7 @@ mod test {
 
     #[fuchsia::test]
     fn closing_server_does_not_close_client_if_test() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
 
         let (client_proxy, client_request_stream) =
             create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()

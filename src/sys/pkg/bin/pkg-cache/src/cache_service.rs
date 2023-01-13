@@ -2678,7 +2678,7 @@ mod serve_write_blob_tests {
 
     #[test]
     fn close_closes_inner_blob_first() {
-        let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+        let mut executor = fuchsia_async::TestExecutor::new();
 
         let (blobfs_blob, mut blobfs_blob_stream) = blobfs::blob::Blob::new_test();
 
@@ -2837,7 +2837,7 @@ mod serve_write_blob_tests {
 
         #[test]
         fn allows_close_in_any_state(initial_state: InitialState) {
-            let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
 
                 let res = do_serve_write_blob_with(|proxy, mut stream| async move {
@@ -2858,7 +2858,7 @@ mod serve_write_blob_tests {
             // Skip stub requests that are the expected request for this initial state.
             prop_assume!(initial_state.expected_method_name() != bad_request.method_name());
 
-            let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
 
                 let res = do_serve_write_blob_with(|proxy, mut stream| async move {

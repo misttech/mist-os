@@ -216,7 +216,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn update_with_no_hosts_stream_is_pending() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -235,7 +235,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn update_with_active_host_change_yields_items() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -266,7 +266,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn active_to_no_active_host_update_yields_event() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -291,7 +291,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn update_with_no_active_host_changes_is_pending() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -322,7 +322,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn update_with_active_host_discoverable_change_yields_item() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -343,7 +343,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn update_with_new_active_host_yields_item() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -374,7 +374,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn invalidly_formatted_active_host_terminates_host_watcher() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();
@@ -398,7 +398,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn termination_of_host_watcher_server_terminates_host_watcher() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<sys::HostWatcherMarker>().unwrap();

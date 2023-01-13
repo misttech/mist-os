@@ -648,7 +648,7 @@ fn save_and_connect(
     let saved_credential = test_credentials.policy.clone();
     let expected_credential = test_credentials.sme.clone();
 
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let mut test_values = test_setup(&mut exec);
 
     // No request has been sent yet. Future should be idle.
@@ -880,7 +880,7 @@ fn save_and_fail_to_connect(
 ) {
     let saved_credential = test_credentials.policy.clone();
 
-    let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+    let mut exec = fasync::TestExecutor::new();
     let mut test_values = test_setup(&mut exec);
 
     // No request has been sent yet. Future should be idle.

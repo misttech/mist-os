@@ -63,7 +63,7 @@ fn get_attr() {
 
 #[test]
 fn describe() {
-    let exec = TestExecutor::new().expect("TestExecutor creation failed");
+    let exec = TestExecutor::new();
 
     let server = endpoint(|_scope, _channel| ());
 

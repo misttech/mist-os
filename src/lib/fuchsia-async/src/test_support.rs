@@ -344,7 +344,7 @@ mod tests {
             Arc::new(Mutex::new((0..REPEAT_COUNT).collect()));
         let pending_runs_child = pending_runs.clone();
         match TestResult::run_until_stalled(
-            &mut crate::TestExecutor::new().unwrap(),
+            &mut crate::TestExecutor::new(),
             move |i| {
                 let pending_runs_child = pending_runs_child.clone();
                 async move {

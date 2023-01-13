@@ -335,7 +335,7 @@ mod tests {
     #[fuchsia::test]
     fn peer_id_returns_expected_id() {
         // TestExecutor must exist in order to create fidl endpoints
-        let _exec = fasync::TestExecutor::new().unwrap();
+        let _exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
         let peer = make_peer(id);
@@ -344,7 +344,7 @@ mod tests {
 
     #[fuchsia::test]
     fn profile_event_request_respawns_task_successfully() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
         let mut peer = make_peer(id);
@@ -375,7 +375,7 @@ mod tests {
 
     #[fuchsia::test]
     fn manager_request_returns_error_when_task_is_stopped() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
         let mut peer = make_peer(id);

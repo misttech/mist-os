@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_snoop_stream() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (tx, rx) = Channel::create();
         let mut snooper = Snooper::from_channel(rx, PathBuf::from("/a/b/c")).unwrap();
         let flags = HciFlags::IS_RECEIVED | HciFlags::PACKET_TYPE_EVENT;

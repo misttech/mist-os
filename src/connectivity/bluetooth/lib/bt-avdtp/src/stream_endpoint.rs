@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn stream_configure_reconfigure() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         // Can't configure items that aren't in range.
@@ -738,7 +738,7 @@ mod tests {
 
     #[test]
     fn stream_establishment() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         let (remote, transport) = Channel::create();
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn stream_release_without_abort() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn test_mediastream() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
@@ -869,7 +869,7 @@ mod tests {
 
     #[test]
     fn stream_release_with_abort() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn start_and_suspend() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         // Can't start or suspend until configured and open.
@@ -1013,7 +1013,7 @@ mod tests {
 
     #[test]
     fn sets_flush_timeout_for_source_transports() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Source);
         let (_remote, mut l2cap_params_requests) = receive_l2cap_params_channel(&mut s);
 
@@ -1035,7 +1035,7 @@ mod tests {
 
     #[test]
     fn no_flush_timeout_for_sink_transports() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
         let (_remote, mut l2cap_params_requests) = receive_l2cap_params_channel(&mut s);
 
@@ -1048,7 +1048,7 @@ mod tests {
 
     #[test]
     fn get_configuration() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         // Can't get configuration if we aren't configured.
@@ -1104,7 +1104,7 @@ mod tests {
     /// not validated here. They are validated in other tests.
     #[test]
     fn update_callback() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
         let (cb, call_count) = call_count_callback();
         s.set_update_callback(cb);

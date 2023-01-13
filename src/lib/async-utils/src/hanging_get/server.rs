@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn sync_pub_sub_updates_and_observes() {
-        let mut ex = fasync::TestExecutor::new().unwrap();
+        let mut ex = fasync::TestExecutor::new();
         let mut broker = HangingGet::new(0i32, |s, o: oneshot::Sender<_>| {
             o.send(s.clone()).map(|()| true).unwrap()
         });
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn sync_pub_sub_multiple_subscribers() {
-        let mut ex = fasync::TestExecutor::new().unwrap();
+        let mut ex = fasync::TestExecutor::new();
         let mut broker = HangingGet::new(0i32, |s, o: oneshot::Sender<_>| {
             o.send(s.clone()).map(|()| true).unwrap()
         });

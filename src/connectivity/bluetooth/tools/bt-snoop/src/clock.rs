@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn set_and_get_clock() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // There is no transformation before the clock has been set.
         assert!(utc_clock_transformation().is_none());

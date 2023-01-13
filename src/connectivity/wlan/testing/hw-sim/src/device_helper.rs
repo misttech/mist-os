@@ -121,7 +121,7 @@ mod tests {
         query_responses: Vec<QueryIfaceResponse>,
         expected_id: Option<u16>,
     ) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("creating executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let (proxy, remote) =
             fidl::endpoints::create_proxy::<DeviceMonitorMarker>().expect("creating proxy");
         let mut request_stream = remote.into_stream().expect("getting request stream");

@@ -1016,7 +1016,7 @@ mod tests {
 
     #[test]
     fn authenticate_while_sme_is_idle() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = create_sme(&exec);
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
@@ -1029,14 +1029,14 @@ mod tests {
     // Check status when sme is idle
     #[test]
     fn status_when_sme_is_idle() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (sme, _, _) = create_sme(&exec);
         assert_eq!(None, sme.get_running_ap());
     }
 
     #[test]
     fn ap_starts_success() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = create_sme(&exec);
         let mut receiver = sme.on_start_command(unprotected_config());
 
@@ -1064,7 +1064,7 @@ mod tests {
     // Check status when Ap starting and started
     #[test]
     fn ap_starts_success_get_running_ap() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = create_sme(&exec);
         let mut receiver = sme.on_start_command(unprotected_config());
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_start_req))) => {});
@@ -1086,7 +1086,7 @@ mod tests {
     // Check status after channel change
     #[test]
     fn ap_check_status_after_channel_change() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, _) = start_unprotected_ap(&exec);
         // Check status
         assert_eq!(
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn ap_starts_timeout() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, mut time_stream) = create_sme(&exec);
         let mut receiver = sme.on_start_command(unprotected_config());
 
@@ -1121,7 +1121,7 @@ mod tests {
 
     #[test]
     fn ap_starts_fails() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, _) = create_sme(&exec);
         let mut receiver = sme.on_start_command(unprotected_config());
 
@@ -1133,7 +1133,7 @@ mod tests {
 
     #[test]
     fn start_req_while_ap_is_starting() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, _) = create_sme(&exec);
         let mut receiver_one = sme.on_start_command(unprotected_config());
 
@@ -1148,7 +1148,7 @@ mod tests {
 
     #[test]
     fn start_req_while_ap_is_stopping() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, _) = start_unprotected_ap(&exec);
         let mut stop_receiver = sme.on_stop_command();
         let mut start_receiver = sme.on_start_command(unprotected_config());
@@ -1158,7 +1158,7 @@ mod tests {
 
     #[test]
     fn ap_stops_while_idle() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = create_sme(&exec);
         let mut receiver = sme.on_stop_command();
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
@@ -1172,7 +1172,7 @@ mod tests {
 
     #[test]
     fn stop_req_while_ap_is_starting_then_succeeds() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = create_sme(&exec);
         let mut start_receiver = sme.on_start_command(unprotected_config());
         let mut stop_receiver = sme.on_stop_command();
@@ -1200,7 +1200,7 @@ mod tests {
 
     #[test]
     fn stop_req_while_ap_is_starting_then_times_out() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, mut time_stream) = create_sme(&exec);
         let mut start_receiver = sme.on_start_command(unprotected_config());
         let mut stop_receiver = sme.on_stop_command();
@@ -1229,7 +1229,7 @@ mod tests {
 
     #[test]
     fn ap_stops_after_started() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let mut receiver = sme.on_stop_command();
 
@@ -1243,7 +1243,7 @@ mod tests {
 
     #[test]
     fn ap_stops_after_started_and_deauths_all_clients() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
@@ -1279,7 +1279,7 @@ mod tests {
 
     #[test]
     fn ap_queues_concurrent_stop_requests() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, _, _) = start_unprotected_ap(&exec);
         let mut receiver1 = sme.on_stop_command();
         let mut receiver2 = sme.on_stop_command();
@@ -1294,7 +1294,7 @@ mod tests {
 
     #[test]
     fn uncleaned_stopping_state() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let mut stop_receiver1 = sme.on_stop_command();
         // Clear out the stop request
@@ -1327,7 +1327,7 @@ mod tests {
 
     #[test]
     fn client_authenticates_supported_authentication_type() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
@@ -1336,7 +1336,7 @@ mod tests {
 
     #[test]
     fn client_authenticates_unsupported_authentication_type() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let client = Client::default();
         let auth_ind = client.create_auth_ind(fidl_mlme::AuthenticationTypes::FastBssTransition);
@@ -1346,7 +1346,7 @@ mod tests {
 
     #[test]
     fn client_associates_unprotected_network() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
@@ -1363,7 +1363,7 @@ mod tests {
 
     #[test]
     fn client_associates_valid_rsne() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
@@ -1380,7 +1380,7 @@ mod tests {
 
     #[test]
     fn client_associates_invalid_rsne() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
@@ -1394,7 +1394,7 @@ mod tests {
 
     #[test]
     fn rsn_handshake_timeout() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, mut time_stream) = start_protected_ap(&exec);
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
@@ -1435,7 +1435,7 @@ mod tests {
 
     #[test]
     fn client_restarts_authentication_flow() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
@@ -1455,7 +1455,7 @@ mod tests {
 
     #[test]
     fn multiple_clients_associate() {
-        let exec = fasync::TestExecutor::new().unwrap();
+        let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
         let client1 = Client::default();
         let client2 = Client { addr: CLIENT_ADDR2 };

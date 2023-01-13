@@ -1146,7 +1146,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_bss_sorts_by_score() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         // build networks list
@@ -1248,7 +1248,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_bss_sorts_by_failure_count() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         // build networks list
@@ -1341,7 +1341,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_bss_incompatible() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         // build networks list
@@ -1444,7 +1444,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_bss_logs_to_inspect() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         // build networks list
@@ -1570,7 +1570,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_bss_empty_list_logs_to_inspect() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         assert_eq!(exec.run_singlethreaded(test_values.network_selector.select_bss(vec![])), None);
@@ -1590,7 +1590,7 @@ mod tests {
 
     #[fuchsia::test]
     fn augment_bss_with_active_scan_doesnt_run_on_actively_found_networks() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         let test_id_1 = types::NetworkIdentifier {
@@ -1630,7 +1630,7 @@ mod tests {
 
     #[fuchsia::test]
     fn augment_bss_with_active_scan_runs_on_passively_found_networks() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
         let scan_channel = generate_channel(36);
@@ -1694,7 +1694,7 @@ mod tests {
 
     #[fuchsia::test]
     fn find_available_bss_list_with_network_specified() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(false));
         let network_selector = test_values.network_selector;
 
@@ -1751,7 +1751,7 @@ mod tests {
     #[test_case(false)]
     #[fuchsia::test(add_test_attr = false)]
     fn find_available_bss_list_without_network_specified(hidden: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = exec.run_singlethreaded(test_setup(false));
         let network_selector = test_values.network_selector;
 
@@ -1901,7 +1901,7 @@ mod tests {
 
     #[fuchsia::test]
     fn find_and_select_scanned_candidate_scan_error() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let network_selector = test_values.network_selector;
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -1947,7 +1947,7 @@ mod tests {
 
     #[fuchsia::test]
     fn find_and_select_scanned_candidate_end_to_end() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let network_selector = test_values.network_selector;
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2147,7 +2147,7 @@ mod tests {
 
     #[fuchsia::test]
     fn find_and_select_scanned_candidate_with_network_end_to_end() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let network_selector = test_values.network_selector;
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2229,7 +2229,7 @@ mod tests {
 
     #[fuchsia::test]
     fn select_networks_selects_specified_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let network_selector = test_values.network_selector;
 
@@ -2261,7 +2261,7 @@ mod tests {
 
     #[fuchsia::test]
     fn find_and_select_scanned_candidate_with_network_end_to_end_with_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
         let network_selector = test_values.network_selector;
         let mut telemetry_receiver = test_values.telemetry_receiver;

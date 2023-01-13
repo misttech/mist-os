@@ -416,7 +416,7 @@ impl TestHandles {
 fn inject_key_and_receive_keyboard_protocol_message(
     event: ui_input3::KeyEvent,
 ) -> Result<(Result<ui_input3::KeyEventStatus, fidl::Error>, ui_input3::KeyEvent)> {
-    fasync::TestExecutor::new()?.run_singlethreaded(async {
+    fasync::TestExecutor::new().run_singlethreaded(async {
         let mut handles = TestHandles::new().await?;
 
         let (was_handled, received_event) = future::join(

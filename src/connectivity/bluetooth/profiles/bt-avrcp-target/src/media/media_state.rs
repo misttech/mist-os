@@ -388,7 +388,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn test_is_supported_passthrough_command() {
-        let _exec = fasync::TestExecutor::new().expect("executor should build");
+        let _exec = fasync::TestExecutor::new();
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
         let media_state = MediaState::new(session_proxy);
         assert!(media_state

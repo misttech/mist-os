@@ -272,7 +272,7 @@ mod tests {
 
         #[test]
         fn multiple_requests_before_call_to_get_input_reports_reader() -> Result<(), Error> {
-            let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+            let mut executor = fasync::TestExecutor::new();
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
             let input_device_server_fut =
@@ -298,7 +298,7 @@ mod tests {
 
         #[test]
         fn after_call_to_get_input_reports_reader_with_report_pending() -> Result<(), Error> {
-            let mut executor = fasync::TestExecutor::new().context("creating executor")?;
+            let mut executor = fasync::TestExecutor::new();
             let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
             input_device
                 .send_input_report(InputReport {
@@ -346,7 +346,7 @@ mod tests {
 
             #[test]
             fn if_device_request_channel_was_closed() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -370,7 +370,7 @@ mod tests {
 
             #[test]
             fn even_if_device_request_channel_is_open() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -393,7 +393,7 @@ mod tests {
 
             #[test]
             fn even_if_reports_was_empty_and_device_request_channel_is_open() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -413,7 +413,7 @@ mod tests {
 
             #[test]
             fn if_reports_were_available() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 input_device
                     .send_input_report(InputReport {
@@ -434,7 +434,7 @@ mod tests {
 
             #[test]
             fn even_if_no_reports_were_available() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
@@ -452,7 +452,7 @@ mod tests {
 
             #[test]
             fn if_reports_were_available() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (_input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 input_device
                     .send_input_report(InputReport {
@@ -469,7 +469,7 @@ mod tests {
 
             #[test]
             fn even_if_no_reports_were_available() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (_input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
@@ -478,7 +478,7 @@ mod tests {
 
             #[test]
             fn even_if_get_device_descriptor_has_been_called() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
@@ -493,7 +493,7 @@ mod tests {
 
             #[test]
             fn if_device_request_channel_is_open() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let _input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -512,7 +512,7 @@ mod tests {
 
             #[test]
             fn even_if_device_channel_is_closed() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let _input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -539,7 +539,7 @@ mod tests {
 
             #[test]
             fn if_device_request_channel_is_open() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
@@ -562,7 +562,7 @@ mod tests {
 
             #[test]
             fn even_if_device_request_channel_is_closed() {
-                let mut executor = fasync::TestExecutor::new().expect("creating executor");
+                let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);

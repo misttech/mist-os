@@ -330,7 +330,7 @@ mod tests {
         GetTest: FnOnce(ExecutionScope) -> GetTestRes,
         GetTestRes: Future<Output = ()>,
     {
-        let mut exec = TestExecutor::new().expect("Executor creation failed");
+        let mut exec = TestExecutor::new();
 
         let scope = ExecutionScope::new();
 
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_wait_waits_for_tasks_to_finish() {
-        let mut executor = TestExecutor::new().expect("Executor creation failed");
+        let mut executor = TestExecutor::new();
         let scope = ExecutionScope::new();
         executor.run_singlethreaded(async {
             let (poll_sender, poll_receiver) = oneshot::channel();

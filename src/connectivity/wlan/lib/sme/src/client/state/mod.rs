@@ -2548,7 +2548,7 @@ mod tests {
             let executor = if with_fake_time {
                 fuchsia_async::TestExecutor::new_with_fake_time().unwrap()
             } else {
-                fuchsia_async::TestExecutor::new().unwrap()
+                fuchsia_async::TestExecutor::new()
             };
 
             let (mlme_sink, mlme_stream) = mpsc::unbounded();

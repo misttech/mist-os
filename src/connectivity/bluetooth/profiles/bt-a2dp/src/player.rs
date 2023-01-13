@@ -689,13 +689,13 @@ pub(crate) mod tests {
 
     #[test]
     fn test_player_setup() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let _ = setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
     }
 
     #[test]
     fn test_player_closed() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (mut player, _sink_request_stream, mut audio_consumer_request_stream, _sink_vmo) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
         let player_next_event_fut = player.next_event();
@@ -747,7 +747,7 @@ pub(crate) mod tests {
     /// VMO is readable by the receiver of the VMO.
     /// We do this by mocking the AudioConsumer and StreamSink interfaces that are used.
     fn test_send_frame() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut player, mut sink_request_stream, _player_request_stream, sink_vmos) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
@@ -819,7 +819,7 @@ pub(crate) mod tests {
     /// sending packets through a Player and examining them after they come out
     /// of the mock StreamSink interface.
     fn test_packet_discontinuities() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut player, mut sink_request_stream, mut player_request_stream, _) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
@@ -854,7 +854,7 @@ pub(crate) mod tests {
     #[test]
     /// Test that parsing works when pushing an AAC packet
     fn test_aac_parsing() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut player, mut sink_request_stream, mut player_request_stream, _) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_AAC));
@@ -884,7 +884,7 @@ pub(crate) mod tests {
     #[cfg(features = "test_encoding")]
     /// Test that bytes flow through to decoder when SBC is active
     fn test_sbc_decoder_write() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut player, mut sink_request_stream, mut player_request_stream, _) =
             setup_player(&mut exec, build_config(&MediaCodecType::AUDIO_SBC));
@@ -914,7 +914,7 @@ pub(crate) mod tests {
     /// Test that the buffers behave correctly for AudioConsumerSink
     #[test]
     fn test_sink_buffer_handling() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
 
         let (mut audio_consumer_proxy, mut audio_consumer_request_stream) =
             create_proxy_and_stream::<AudioConsumerMarker>().expect("proxy creation");

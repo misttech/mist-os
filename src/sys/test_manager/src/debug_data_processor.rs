@@ -491,7 +491,7 @@ mod test {
     #[fuchsia::test]
     fn single_publisher_connection_send_vmo_when_ready() {
         const TEST_URL: &str = "test-url";
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
 
         let (vmo_send, vmo_recv) = mpsc::channel(5);
         let mut vmo_chunk_stream = vmo_recv.ready_chunks(5).boxed();

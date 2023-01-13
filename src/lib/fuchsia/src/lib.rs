@@ -125,7 +125,7 @@ fn init_logging_with_threads(
 
     let (send, recv) = std::sync::mpsc::channel();
     let bg_thread = std::thread::spawn(move || {
-        let mut exec = fuchsia_async::LocalExecutor::new().expect("Failed to create executor");
+        let mut exec = fuchsia_async::LocalExecutor::new().unwrap();
         let on_interest_changes =
             diagnostics_log::init_publishing(diagnostics_log::PublishOptions {
                 tags: tags.as_slice(),
@@ -222,10 +222,7 @@ where
     Fut: 'static + Future<Output = R>,
     R: fuchsia_async::test_support::TestResult,
 {
-    fuchsia_async::test_support::run_until_stalled_test(
-        &mut fuchsia_async::TestExecutor::new().expect("Failed to create executor"),
-        f,
-    )
+    fuchsia_async::test_support::run_until_stalled_test(&mut fuchsia_async::TestExecutor::new(), f)
 }
 
 //

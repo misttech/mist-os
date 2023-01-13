@@ -444,7 +444,7 @@ mod tests {
 
     #[fuchsia::test]
     fn target_peer_players_update() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let inspect = inspect::Inspector::new();
 

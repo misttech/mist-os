@@ -264,7 +264,7 @@ mod test {
 
     #[test]
     fn force_stop_guest_calls_stop_endpoint() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>()
             .expect("failed to create GuestManager request stream");
 

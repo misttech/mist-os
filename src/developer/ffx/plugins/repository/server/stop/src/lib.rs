@@ -64,7 +64,7 @@ mod tests {
     fn run_test<F: Future>(fut: F) -> F::Output {
         let _guard = TEST_LOCK.lock().unwrap();
 
-        fuchsia_async::TestExecutor::new().unwrap().run_singlethreaded(async move {
+        fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
             let _env = ffx_config::test_init().await.unwrap();
             fut.await
         })

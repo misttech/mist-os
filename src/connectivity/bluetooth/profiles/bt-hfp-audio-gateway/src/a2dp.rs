@@ -78,7 +78,7 @@ mod tests {
 
     #[fuchsia::test]
     fn when_a2dp_not_accessible() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let control = Control::connect();
 
         let pause_fut = control.pause(None);
@@ -123,7 +123,7 @@ mod tests {
 
     #[fuchsia::test]
     fn suspend_and_release() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
             fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
         let control = Control::from_proxy(proxy);
@@ -161,7 +161,7 @@ mod tests {
 
     #[fuchsia::test]
     fn suspend_fails() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
             fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
         let control = Control::from_proxy(proxy);
@@ -181,7 +181,7 @@ mod tests {
 
     #[fuchsia::test]
     fn proxy_is_closed_before_suspend_event() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, mut control_requests) =
             fidl::endpoints::create_proxy_and_stream::<a2dp::ControllerMarker>().unwrap();
         let control = Control::from_proxy(proxy);

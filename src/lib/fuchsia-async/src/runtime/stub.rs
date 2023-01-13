@@ -97,7 +97,7 @@ pub mod executor {
 
     impl TestExecutor {
         /// Construct a new stub executor, panics if used.
-        pub fn new() -> Result<Self, Status> {
+        pub fn new() -> Self {
             unimplemented!();
         }
 

@@ -684,7 +684,7 @@ mod tests {
     /// build_local_streams should fail because it can't start the SBC decoder, because
     /// MediaPlayer isn't available in the test environment.
     fn test_sbc_unavailable_error() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let config =
             A2dpConfiguration { source: Some(AudioSourceType::BigBen), ..Default::default() };
         let mut streams_fut = Box::pin(StreamsBuilder::system_available(None, &config));
@@ -698,7 +698,7 @@ mod tests {
     #[fuchsia::test]
     /// build local_streams should not include the AAC streams
     fn test_aac_switch() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let mut config = A2dpConfiguration {
             source: Some(AudioSourceType::BigBen),
             enable_sink: false,
@@ -868,7 +868,7 @@ mod tests {
     #[cfg(not(feature = "test_encoding"))]
     #[fuchsia::test]
     fn test_encoding_fails_in_test_environment() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let result = exec.run_singlethreaded(test_encode_sbc());
 
         assert!(result.is_err());
@@ -876,7 +876,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_audio_mode_connection() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new();
         let (peers, _profile_stream) = setup_connected_peers();
 
         let (proxy, stream) = create_proxy_and_stream::<a2dp::AudioModeMarker>()

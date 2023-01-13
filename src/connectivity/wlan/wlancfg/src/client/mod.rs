@@ -733,7 +733,7 @@ mod tests {
     #[fuchsia::test]
     fn connect_request_unknown_network() {
         let ssid = client_types::Ssid::try_from("foobar-unknown").unwrap();
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -777,7 +777,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connect_request_open_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
@@ -814,7 +814,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connect_request_protected_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
@@ -851,7 +851,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connect_request_protected_psk_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
@@ -888,7 +888,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connect_wpa3_not_supported() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Create a Fake IfaceManager without WPA3 support for this test.
@@ -938,7 +938,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connect_wpa3_is_supported() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -980,7 +980,7 @@ mod tests {
 
     #[fuchsia::test]
     fn start_and_stop_client_connections() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -1057,7 +1057,7 @@ mod tests {
     /// make it back to the requester.
     #[fuchsia::test]
     fn scan_end_to_end() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[fuchsia::test]
     fn save_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
 
         let mut test_values = test_setup();
@@ -1150,7 +1150,7 @@ mod tests {
 
     #[fuchsia::test]
     fn save_network_with_disconnected_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
 
         let mut test_values = test_setup();
@@ -1220,7 +1220,7 @@ mod tests {
 
     #[fuchsia::test]
     fn save_network_overwrite_disconnects() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
 
@@ -1276,7 +1276,7 @@ mod tests {
 
     #[fuchsia::test]
     fn save_bad_network_should_fail() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut saved_networks = FakeSavedNetworksManager::new();
         saved_networks.fail_all_stores = true;
         let saved_networks = Arc::new(saved_networks);
@@ -1335,7 +1335,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_remove_a_network() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let serve_fut = serve_provider_requests(
@@ -1431,7 +1431,7 @@ mod tests {
         configs: Vec<fidl_policy::NetworkConfig>,
         expected_num_sends: usize,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let saved_networks =
             Arc::new(FakeSavedNetworksManager::new_with_saved_networks(configs.clone()));
 
@@ -1494,7 +1494,7 @@ mod tests {
 
     #[fuchsia::test]
     fn register_update_listener() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -1521,7 +1521,7 @@ mod tests {
 
     #[fuchsia::test]
     fn get_listener() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (listener, requests) = create_proxy::<fidl_policy::ClientListenerMarker>()
             .expect("failed to create ClientProvider proxy");
         let requests = requests.into_stream().expect("failed to create stream");
@@ -1548,7 +1548,7 @@ mod tests {
 
     #[fuchsia::test]
     fn multiple_controllers_write_attempt() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -1621,7 +1621,7 @@ mod tests {
 
     #[fuchsia::test]
     fn multiple_controllers_epitaph() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager,
@@ -1738,7 +1738,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_client_interface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let iface_manager = Arc::new(Mutex::new(FakeIfaceManagerNoIfaces {}));
@@ -1831,7 +1831,7 @@ mod tests {
 
     #[fuchsia::test]
     fn multiple_api_clients() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let serve_fut = serve_provider_requests(
             test_values.iface_manager.clone(),
@@ -1913,7 +1913,7 @@ mod tests {
     #[test_case(false)]
     #[fuchsia::test(add_test_attr = false)]
     fn test_start_client_connections(start_client_connections_succeeds: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create ClientSmeProxy");
         let (req_sender, _req_recvr) = mpsc::channel(1);
@@ -1939,7 +1939,7 @@ mod tests {
     #[test_case(false)]
     #[fuchsia::test(add_test_attr = false)]
     fn test_stop_client_connections(stop_client_connections_succeeds: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create ClientSmeProxy");
         let (req_sender, _req_recvr) = mpsc::channel(1);

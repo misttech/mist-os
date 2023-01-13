@@ -1163,7 +1163,7 @@ mod tests {
 
     #[test]
     fn test_blocking_alloc_tx() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         let alloc_fut = pool.alloc_tx_checked(1);
@@ -1191,7 +1191,7 @@ mod tests {
 
     #[test]
     fn test_blocking_alloc_tx_cancel_before_free() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         {
@@ -1215,7 +1215,7 @@ mod tests {
 
     #[test]
     fn test_blocking_alloc_tx_cancel_after_free() {
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         {
@@ -1240,7 +1240,7 @@ mod tests {
     #[test]
     fn test_multiple_blocking_alloc_tx_fulfill_order() {
         const TASKS_TOTAL: usize = 3;
-        let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+        let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         let mut alloc_futs = (1..=TASKS_TOTAL)

@@ -694,7 +694,7 @@ mod tests {
 
     #[test]
     fn channel_state_ignores_empty_beacon_frame() {
-        let _exec = fasync::TestExecutor::new().expect("Failed to create test executor");
+        let _exec = fasync::TestExecutor::new();
         let mut channel_state = ChannelState::default();
         let mut actions = MockChannelActions::default();
         let header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_immediate_csa_in_beacon_frame() {
-        let _exec = fasync::TestExecutor::new().expect("Failed to create test executor");
+        let _exec = fasync::TestExecutor::new();
         let mut channel_state = ChannelState::default();
 
         let mut actions = MockChannelActions::default();
@@ -825,7 +825,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_immediate_csa_in_action_frame() {
-        let _exec = fasync::TestExecutor::new().expect("Failed to create test executor");
+        let _exec = fasync::TestExecutor::new();
         let mut channel_state = ChannelState::default();
 
         let mut actions = MockChannelActions::default();

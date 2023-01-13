@@ -182,7 +182,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_phy_add_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(true, false);
 
         let listener = Listener::new(
@@ -211,7 +211,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_phy_add_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -238,7 +238,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_legacy_ap_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -270,7 +270,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_legacy_mesh_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -302,7 +302,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_legacy_client_iface_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -348,7 +348,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_legacy_client_iface_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -394,7 +394,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_legacy_client_iface_query_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -419,7 +419,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_add_phy_event() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(true, false);
 
         let listener = Listener::new(
@@ -448,7 +448,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_remove_phy_event() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         // Preload a fake PHY ID into the PhyManager
@@ -488,7 +488,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_remove_nonexistent_iface_event() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         // Load a fake iface ID into the IfaceManager.
@@ -526,7 +526,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_remove_iface_event() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         // Load a fake iface ID into the IfaceManager.
@@ -578,7 +578,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_iface_added_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup(false, true);
 
         let listener = Listener::new(
@@ -638,7 +638,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_iface_added_fails_due_to_phy_manager() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, false);
 
         let listener = Listener::new(
@@ -674,7 +674,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_iface_added_fails_due_to_monitor_service() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup(false, true);
 
         let listener = Listener::new(

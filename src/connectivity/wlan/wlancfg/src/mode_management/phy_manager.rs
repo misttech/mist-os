@@ -1063,7 +1063,7 @@ mod tests {
     /// PhyManager should have a new PhyContainer.
     #[fuchsia::test]
     fn add_valid_phy() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         let fake_phy_id = 0;
@@ -1100,7 +1100,7 @@ mod tests {
     /// should not create and store a new PhyContainer.
     #[fuchsia::test]
     fn add_invalid_phy() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1129,7 +1129,7 @@ mod tests {
     /// properties have changed.  The PhyManager in this case should update the associated PhyInfo.
     #[fuchsia::test]
     fn add_duplicate_phy() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1189,7 +1189,7 @@ mod tests {
     /// case should remove the PhyContainer associated with the removed PHY ID.
     #[fuchsia::test]
     fn add_phy_after_create_all_client_ifaces() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1258,7 +1258,7 @@ mod tests {
     /// If this behavior changes, defect accounting needs to be updated and tested here.
     #[fuchsia::test]
     fn add_phy_with_iface_creation_failure() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1303,7 +1303,7 @@ mod tests {
     /// Tests the case where a new PHY is discovered after the country code has been set.
     #[fuchsia::test]
     fn test_add_phy_after_setting_country_code() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         let fake_phy_id = 1;
@@ -1404,7 +1404,7 @@ mod tests {
     /// newly discovered iface to the existing PHY's list of client ifaces.
     #[fuchsia::test]
     fn on_iface_added() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1476,7 +1476,7 @@ mod tests {
     /// the PHY's list of client ifaces.
     #[fuchsia::test]
     fn on_iface_added_missing_phy() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1558,7 +1558,7 @@ mod tests {
     /// should simply ignore the duplicate iface ID and not append it to its list of clients.
     #[fuchsia::test]
     fn add_duplicate_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1630,7 +1630,7 @@ mod tests {
     /// and not account for the iface ID.
     #[fuchsia::test]
     fn add_nonexistent_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1863,7 +1863,7 @@ mod tests {
         security_support.mfp.supported = mfp_supported;
         security_support.sae.driver_handler_supported = sae_driver_handler_supported;
         security_support.sae.sme_handler_supported = sae_sme_handler_supported;
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1892,7 +1892,7 @@ mod tests {
     /// enabled.
     #[fuchsia::test]
     fn get_client_while_stopped() {
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
 
         // Create a new PhyManager.  On construction, client connections are disabled.
@@ -1920,7 +1920,7 @@ mod tests {
     /// record of the iface ID in the PhyManager.
     #[fuchsia::test]
     fn destroy_all_client_ifaces() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -1967,7 +1967,7 @@ mod tests {
     /// present but an AP iface is present.  The expectation is that the AP iface is left intact.
     #[fuchsia::test]
     fn destroy_all_client_ifaces_no_clients() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2007,7 +2007,7 @@ mod tests {
     /// This test validates the behavior when stopping client connections fails.
     #[fuchsia::test]
     fn destroy_all_client_ifaces_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2058,7 +2058,7 @@ mod tests {
     /// expectation is that the PhyManager will return None in this case.
     #[fuchsia::test]
     fn get_ap_no_phys() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2077,7 +2077,7 @@ mod tests {
     /// a new AP iface and returns its ID to the caller.
     #[fuchsia::test]
     fn get_unconfigured_ap() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2118,7 +2118,7 @@ mod tests {
     /// Tests the case where an AP interface is requested but interface creation fails.
     #[fuchsia::test]
     fn get_ap_iface_creation_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2161,7 +2161,7 @@ mod tests {
     /// iface ID of the existing AP iface.
     #[fuchsia::test]
     fn get_configured_ap() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2195,7 +2195,7 @@ mod tests {
     /// a client interface.  The PhyManager should return None.
     #[fuchsia::test]
     fn get_ap_no_compatible_phys() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2221,7 +2221,7 @@ mod tests {
     /// should retain the record of the PHY, but the AP iface ID should be removed.
     #[fuchsia::test]
     fn stop_valid_ap_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2264,7 +2264,7 @@ mod tests {
     /// ID is unaffected.
     #[fuchsia::test]
     fn stop_invalid_ap_iface() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2307,7 +2307,7 @@ mod tests {
     /// PhyManager should retain the AP interface and log a defect.
     #[fuchsia::test]
     fn stop_ap_iface_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2360,7 +2360,7 @@ mod tests {
     /// the records of the iface IDs should be removed from the PhyContainer.
     #[fuchsia::test]
     fn stop_all_ap_ifaces() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2408,7 +2408,7 @@ mod tests {
     /// PhyManager
     #[fuchsia::test]
     fn stop_all_ap_ifaces_with_client() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2447,7 +2447,7 @@ mod tests {
     /// This test validates the behavior when destroying all AP interfaces fails.
     #[fuchsia::test]
     fn stop_all_ap_ifaces_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2503,7 +2503,7 @@ mod tests {
     /// interface requests.
     #[fuchsia::test]
     fn test_suggest_ap_mac() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2553,7 +2553,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_suggested_mac_does_not_apply_to_client() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2615,7 +2615,7 @@ mod tests {
     /// Tests the case where creating a client interface fails while starting client connections.
     #[fuchsia::test]
     fn test_iface_creation_fails_during_start_client_connections() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2672,7 +2672,7 @@ mod tests {
     /// return a single element `Vec`, with the appropriate ID.
     #[fuchsia::test]
     fn get_phy_ids_single_phy() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2699,7 +2699,7 @@ mod tests {
     /// return a two-element `Vec`, containing the appropriate IDs. Ordering is not guaranteed.
     #[fuchsia::test]
     fn get_phy_ids_two_phys() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2764,7 +2764,7 @@ mod tests {
     /// country code update.
     #[fuchsia::test]
     fn test_set_country_code() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2855,7 +2855,7 @@ mod tests {
     // Tests the case where setting the country code is unsuccessful.
     #[fuchsia::test]
     fn test_setting_country_code_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -2912,7 +2912,7 @@ mod tests {
     /// Tests the case where multiple client interfaces need to be recovered.
     #[fuchsia::test]
     fn test_recover_client_interfaces_succeeds() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3002,7 +3002,7 @@ mod tests {
     /// Tests the case where a client interface needs to be recovered and recovery fails.
     #[fuchsia::test]
     fn test_recover_client_interfaces_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3105,7 +3105,7 @@ mod tests {
     /// caller requests attempts to recover client interfaces.
     #[fuchsia::test]
     fn test_recover_client_interfaces_while_disabled() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3142,7 +3142,7 @@ mod tests {
     /// client connections request.
     #[fuchsia::test]
     fn test_start_after_unsuccessful_stop() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3194,7 +3194,7 @@ mod tests {
     #[test_case(true, true)]
     #[fuchsia::test(add_test_attr = false)]
     fn has_wpa3_client_iface(driver_handler_supported: bool, sme_handler_supported: bool) {
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
 
         // Create a phy with the security features that indicate WPA3 support.
@@ -3227,7 +3227,7 @@ mod tests {
 
     #[fuchsia::test]
     fn has_no_wpa3_capable_client_iface() {
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
         // Create a phy without security features that indicate WPA3 support.
         let fake_phy_id = 0;
@@ -3247,7 +3247,7 @@ mod tests {
     /// Tests reporting of client connections status when client connections are enabled.
     #[fuchsia::test]
     fn test_client_connections_enabled_when_enabled() {
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3262,7 +3262,7 @@ mod tests {
     /// Tests reporting of client connections status when client connections are disabled.
     #[fuchsia::test]
     fn test_client_connections_enabled_when_disabled() {
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3277,7 +3277,7 @@ mod tests {
     /// Tests the case where setting low power state succeeds.
     #[fuchsia::test]
     fn test_succeed_in_setting_power_state() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3332,7 +3332,7 @@ mod tests {
     /// Tests the case where setting low power state fails.
     #[fuchsia::test]
     fn test_fail_to_set_power_state() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3397,7 +3397,7 @@ mod tests {
     /// Tests the case where the request cannot be made to configure low power mode for a PHY.
     #[fuchsia::test]
     fn test_fail_to_request_low_power_mode() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3429,7 +3429,7 @@ mod tests {
     /// Tests the case where a PHY is added after the low power state has been enabled.
     #[fuchsia::test]
     fn test_add_phy_after_low_power_enabled() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
@@ -3492,7 +3492,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_iface_succeeds() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         // Issue a create iface request
@@ -3520,7 +3520,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_iface_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         // Issue a create iface request
@@ -3554,7 +3554,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_iface_request_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         drop(test_values.monitor_stream);
@@ -3584,7 +3584,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_destroy_iface_succeeds() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
@@ -3606,7 +3606,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_destroy_iface_not_found() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
@@ -3631,7 +3631,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_destroy_iface_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         // Issue a destroy iface request
@@ -3663,7 +3663,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_destroy_iface_request_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
 
         drop(test_values.monitor_stream);
@@ -3688,7 +3688,7 @@ mod tests {
     /// Verify that client iface failures are added properly.
     #[fuchsia::test]
     fn test_record_iface_event() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(
@@ -3802,7 +3802,7 @@ mod tests {
     /// Verify that AP ifaces do not receive client failures..
     #[fuchsia::test]
     fn test_aps_do_not_record_client_defects() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(
@@ -3853,7 +3853,7 @@ mod tests {
     /// Verify that client ifaces do not receive AP defects.
     #[fuchsia::test]
     fn test_clients_do_not_record_ap_defects() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(

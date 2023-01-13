@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_no_wlan_power_config() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let test_vals = test_setup();
 
         // Drop the watcher service end so that watcher update requests fail.
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_power_watcher_drops() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_vals = test_setup();
 
         // Create a PowerModeManager and run it.
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_applying_power_setting_fails() {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_vals = test_setup();
 
         // Configure the FakePhyManager so that setting the power state fails.
@@ -236,7 +236,7 @@ mod tests {
     #[test_case(fidl_common::PowerSaveType::PsModeLowPower)]
     #[test_case(fidl_common::PowerSaveType::PsModeUltraLowPower)]
     fn test_applying_power_setting_succeeds(desired_power_state: fidl_common::PowerSaveType) {
-        let mut exec = fuchsia_async::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_vals = test_setup();
         let phy_manager = Arc::new(Mutex::new(test_vals.phy_manager));
 

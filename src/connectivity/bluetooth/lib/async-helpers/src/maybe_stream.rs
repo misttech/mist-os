@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn maybestream() {
-        let mut exec = TestExecutor::new().unwrap();
+        let mut exec = TestExecutor::new();
 
         let mut s = MaybeStream::default();
 

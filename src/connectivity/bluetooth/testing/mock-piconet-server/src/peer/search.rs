@@ -245,7 +245,7 @@ mod tests {
     /// Duplicate service advertisements should not be relayed.
     #[test]
     fn test_notify_search() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut search_mgr = SearchSet::new();
 

@@ -168,7 +168,7 @@ async fn led_watcher_updates_light_groups_on_watch() {
 #[fuchsia::test]
 fn cancelable_task_triggers_controlled_cancelation() {
     let (cancelation_tx, mut cancelation_rx) = oneshot::channel();
-    let mut executor = fasync::TestExecutor::new().expect("Failed to create executor");
+    let mut executor = fasync::TestExecutor::new();
 
     let done = Rc::new(RefCell::new(false));
     let mut task = fasync::Task::local({

@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn suite_controller_hanging_get_events() {
-        let mut executor = fasync::TestExecutor::new().unwrap();
+        let mut executor = fasync::TestExecutor::new();
         let (mut sender, recv) = mpsc::channel(1024);
         let (stop_sender, _stop_recv) = oneshot::channel::<()>();
         let (task, remote_handle) = async {}.remote_handle();

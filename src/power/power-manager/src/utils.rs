@@ -215,7 +215,7 @@ mod connect_to_driver {
         /// Tests that `connect_to_driver` doesn't return until the required path is added.
         #[test]
         fn test_connect_to_driver_late_add() {
-            let mut executor = fasync::TestExecutor::new().unwrap();
+            let mut executor = fasync::TestExecutor::new();
 
             let thermal_dir = pseudo_directory! {
                 "000" => read_only_static("string cheese (cheddar)")
@@ -243,7 +243,7 @@ mod connect_to_driver {
         /// does not yet exist.
         #[test]
         fn test_connect_to_driver_nonexistent_parent_dir() {
-            let mut executor = fasync::TestExecutor::new().unwrap();
+            let mut executor = fasync::TestExecutor::new();
 
             bind_to_dev(pseudo_directory! {
                 "class" => pseudo_directory!{

@@ -814,7 +814,7 @@ mod tests {
 
     #[fuchsia::test]
     fn subsequent_enabling_when_previous_closed_is_ok() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (provider, mut le_peripheral, _gatt, mut host_watcher, _mock_pairing, _mock_upstream) =
@@ -868,7 +868,7 @@ mod tests {
 
     #[fuchsia::test]
     fn gatt_update_when_disabled_is_rejected() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (provider, _le_peripheral, gatt, _host_watcher, _mock_pairing, _mock_upstream) =
@@ -945,7 +945,7 @@ mod tests {
     /// This test is a large integration-style test that verifies the key-based pairing procedure.
     #[fuchsia::test]
     fn key_based_pairing_procedure() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (
@@ -1274,7 +1274,7 @@ mod tests {
 
     #[fuchsia::test]
     fn passkey_write_with_no_pairing_manager_is_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, mut mock_pairing, _mock_upstream) =
@@ -1326,7 +1326,7 @@ mod tests {
     // ordering of events.
     #[fuchsia::test]
     fn account_key_write_before_pairing_complete_is_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, mut mock_pairing, _mock_upstream) =
@@ -1396,7 +1396,7 @@ mod tests {
 
     #[fuchsia::test]
     fn retroactive_account_key_write_procedure() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);
         let (mut provider, _le_peripheral, gatt, _host_watcher, _mock_pairing, _mock_upstream) =
@@ -1561,7 +1561,7 @@ mod tests {
 
     #[fuchsia::test]
     fn pairing_fidl_request_is_accepted() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let setup_fut = setup_provider();
         pin_mut!(setup_fut);

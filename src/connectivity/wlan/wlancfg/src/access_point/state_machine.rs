@@ -634,7 +634,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
@@ -697,7 +697,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_exit_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
@@ -751,7 +751,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_start_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
@@ -832,7 +832,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_duplicate_status_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
@@ -886,7 +886,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_new_status_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
@@ -941,7 +941,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_failure_during_started() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Drop the serving side of the SME so that a status request will result in an error.
@@ -986,7 +986,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_while_stopped() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Run the stopped state.
@@ -1008,7 +1008,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_exit_while_stopped() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Run the stopped state.
@@ -1028,7 +1028,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_start_while_stopped() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Run the stopped state.
@@ -1103,7 +1103,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_exit_while_stopping() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Run the stopping state.
@@ -1138,7 +1138,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_while_stopping() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Run the stopping state.
@@ -1182,7 +1182,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_start_while_stopping() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
         // Run the stopping state.
@@ -1252,7 +1252,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_failure_while_stopping() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Drop the serving side of the SME so that the stop request will result in an error.
@@ -1278,7 +1278,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_failed_result_code_while_stopping() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Run the stopping state.
@@ -1316,7 +1316,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1397,7 +1397,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_start_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1509,7 +1509,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_exit_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1575,7 +1575,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_breaks_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Drop the serving side of the SME so that client requests fail.
@@ -1605,7 +1605,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_fails_to_stop_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, _start_receiver) = oneshot::channel();
@@ -1656,7 +1656,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_sme_fails_to_start_while_starting() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1761,7 +1761,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_stop_after_start_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1873,7 +1873,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_start_after_start_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, mut start_receiver) = oneshot::channel();
@@ -1992,7 +1992,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_exit_after_start_failure() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         let (start_sender, _) = oneshot::channel();
@@ -2078,7 +2078,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_manual_start_causes_starting_notification() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
         // Create a start request and enter the state machine with a manual start request.
@@ -2131,7 +2131,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_serve_does_not_terminate_right_away() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let sme_event_stream = test_values.deps.proxy.take_event_stream();
         let sme_fut = test_values.sme_req_stream.into_future();
@@ -2157,7 +2157,7 @@ mod tests {
 
     #[test]
     fn test_no_notification_when_sme_fails_while_stopped() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
         let sme_event_stream = test_values.deps.proxy.take_event_stream();
         let update_sender = test_values.deps.state_tracker.inner.lock().sender.clone();
@@ -2188,7 +2188,7 @@ mod tests {
 
     #[test]
     fn test_failure_notification_when_configured() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
         let sme_event_stream = test_values.deps.proxy.take_event_stream();
         let mut sme_fut = Box::pin(test_values.sme_req_stream.into_future());
@@ -2263,7 +2263,7 @@ mod tests {
 
     #[test]
     fn test_state_tracker_reset() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
 
         // A new state tracker should initially have no state.
@@ -2320,7 +2320,7 @@ mod tests {
 
     #[test]
     fn test_state_tracker_consume_sme_update() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
         let state = ApStateTracker::new(sender);
 
@@ -2383,7 +2383,7 @@ mod tests {
 
     #[test]
     fn test_state_tracker_update_operating_state() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
         let state = ApStateTracker::new(sender);
 
@@ -2462,7 +2462,7 @@ mod tests {
 
     #[test]
     fn test_state_tracker_set_stopped_state() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
         let state = ApStateTracker::new(sender);
 
@@ -2495,7 +2495,7 @@ mod tests {
 
     #[test]
     fn test_state_tracker_failure_modes() {
-        let _exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new();
         let (sender, receiver) = mpsc::unbounded();
         let state = ApStateTracker::new(sender);
         {

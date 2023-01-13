@@ -1423,7 +1423,7 @@ mod tests {
 
     #[test]
     fn spawns_new_sta_on_connect_request_from_sme() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
@@ -1441,7 +1441,7 @@ mod tests {
 
     #[test]
     fn rsn_ie_implies_sta_eapol_required() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
@@ -1460,7 +1460,7 @@ mod tests {
 
     #[test]
     fn wpa1_implies_sta_eapol_required() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
@@ -1479,7 +1479,7 @@ mod tests {
 
     #[test]
     fn no_wpa_or_rsn_ie_implies_sta_eapol_not_required() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
@@ -1511,7 +1511,7 @@ mod tests {
 
     #[test]
     fn test_auto_deauth_uninterrupted_interval() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1559,7 +1559,7 @@ mod tests {
 
     #[test]
     fn test_auto_deauth_received_beacon() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1626,7 +1626,7 @@ mod tests {
 
     #[test]
     fn client_send_open_auth_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1651,7 +1651,7 @@ mod tests {
 
     #[test]
     fn client_send_assoc_req_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let connect_req = ParsedConnectRequest {
@@ -1719,7 +1719,7 @@ mod tests {
 
     #[test]
     fn client_send_keep_alive_resp_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1741,7 +1741,7 @@ mod tests {
     #[test]
     fn client_send_data_frame() {
         let payload = vec![5; 8];
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1770,7 +1770,7 @@ mod tests {
 
     #[test]
     fn client_send_data_frame_ipv4_qos() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let mut client = make_client_station();
@@ -1807,7 +1807,7 @@ mod tests {
 
     #[test]
     fn client_send_data_frame_ipv6_qos() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let mut client = make_client_station();
@@ -1845,7 +1845,7 @@ mod tests {
     #[test]
     fn client_send_data_frame_from_ds() {
         let payload = vec![5; 8];
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1875,7 +1875,7 @@ mod tests {
 
     #[test]
     fn client_send_deauthentication_notification() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1915,7 +1915,7 @@ mod tests {
             42, 42, 42, 42, 42, 42, // addr3
             0x10, 0, // Sequence Control
         ];
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1944,7 +1944,7 @@ mod tests {
         data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -1970,7 +1970,7 @@ mod tests {
         data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2006,7 +2006,7 @@ mod tests {
         data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2034,7 +2034,7 @@ mod tests {
         data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station_protected();
@@ -2055,7 +2055,7 @@ mod tests {
         eapol_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         eapol_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station_protected();
@@ -2086,7 +2086,7 @@ mod tests {
         eapol_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
         eapol_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2111,7 +2111,7 @@ mod tests {
 
     #[test]
     fn send_eapol_ind_too_large() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2126,7 +2126,7 @@ mod tests {
 
     #[test]
     fn send_eapol_ind_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2146,7 +2146,7 @@ mod tests {
 
     #[test]
     fn send_eapol_frame_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2187,7 +2187,7 @@ mod tests {
 
     #[test]
     fn send_eapol_frame_failure() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let device = m.fake_device.as_device_fail_wlan_tx();
         let mut me = m.make_mlme_with_device(device);
@@ -2214,7 +2214,7 @@ mod tests {
 
     #[test]
     fn send_keys() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station_protected();
@@ -2236,7 +2236,7 @@ mod tests {
 
     #[test]
     fn send_ps_poll_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2246,7 +2246,7 @@ mod tests {
 
     #[test]
     fn send_power_state_doze_frame_success() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let mut client = make_client_station();
@@ -2260,7 +2260,7 @@ mod tests {
 
     #[test]
     fn send_addba_req_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut mock = MockObjects::new(&exec);
         let mut mlme = mock.make_mlme();
         mlme.make_client_station();
@@ -2294,7 +2294,7 @@ mod tests {
 
     #[test]
     fn send_addba_resp_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut mock = MockObjects::new(&exec);
         let mut mlme = mock.make_mlme();
         mlme.make_client_station();
@@ -2328,7 +2328,7 @@ mod tests {
 
     #[test]
     fn client_send_successful_connect_conf() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2352,7 +2352,7 @@ mod tests {
 
     #[test]
     fn client_send_failed_connect_conf() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2375,7 +2375,7 @@ mod tests {
 
     #[test]
     fn client_send_scan_end_on_mlme_scan_busy() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2396,7 +2396,7 @@ mod tests {
 
     #[test]
     fn client_send_scan_end_on_offload_scan_busy() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
 
         // Configure the fake device to offload scan
@@ -2420,7 +2420,7 @@ mod tests {
 
     #[test]
     fn client_send_scan_end_on_mlme_scan_invalid_args() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2446,7 +2446,7 @@ mod tests {
 
     #[test]
     fn client_send_scan_end_on_offload_scan_invalid_args() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
 
         // Configure the fake device to offload scan
@@ -2475,7 +2475,7 @@ mod tests {
 
     #[test]
     fn client_send_scan_end_on_offload_scan_fails() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
 
         // Configure the fake device to offload scan and fail on passive scans
@@ -2497,7 +2497,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_query_device_info() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2519,7 +2519,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_query_discovery_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2540,7 +2540,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_query_mac_sublayer_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2567,7 +2567,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_query_security_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2589,7 +2589,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_query_spectrum_management_support() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -2609,7 +2609,7 @@ mod tests {
 
     #[test]
     fn mlme_connect_unprotected_happy_path() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let (control_handle, _) = fake_control_handle(&exec);
@@ -2765,7 +2765,7 @@ mod tests {
 
     #[test]
     fn mlme_connect_protected_happy_path() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let (control_handle, _) = fake_control_handle(&exec);
@@ -2956,7 +2956,7 @@ mod tests {
 
     #[test]
     fn mlme_connect_vht() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let (control_handle, _) = fake_control_handle(&exec);
@@ -3040,7 +3040,7 @@ mod tests {
 
     #[test]
     fn mlme_connect_timeout() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let (control_handle, _) = fake_control_handle(&exec);
@@ -3086,7 +3086,7 @@ mod tests {
 
     #[test]
     fn mlme_reconnect_no_sta() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let (control_handle, _) = fake_control_handle(&exec);
@@ -3113,7 +3113,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_get_iface_counter_stats_with_error_status() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
@@ -3136,7 +3136,7 @@ mod tests {
 
     #[test]
     fn mlme_respond_to_get_iface_histogram_stats_with_error_status() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 

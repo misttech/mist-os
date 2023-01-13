@@ -171,7 +171,7 @@ mod tests {
 
     #[fuchsia::test]
     fn get_properties() {
-        let mut exec = fasync::TestExecutor::new().expect("executor");
+        let mut exec = fasync::TestExecutor::new();
         // Unconnected DAI
         let dai = DigitalAudioInterface { path: PathBuf::new(), proxy: None };
 
@@ -205,7 +205,7 @@ mod tests {
 
     #[fuchsia::test]
     fn dai_formats() {
-        let mut exec = fasync::TestExecutor::new().expect("executor");
+        let mut exec = fasync::TestExecutor::new();
         let (dai, mut requests) = connected_dai();
 
         let supported_formats_fut = dai.dai_formats();

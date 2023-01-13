@@ -160,8 +160,8 @@ pub struct TestExecutor {
 impl TestExecutor {
     /// Create a new executor for testing.
     #[allow(deprecated)]
-    pub fn new() -> Result<Self, zx::Status> {
-        Self::try_new()
+    pub fn new() -> Self {
+        Self::try_new().unwrap()
     }
 
     /// Deprecated, will be deleted.
@@ -620,7 +620,7 @@ mod tests {
         }
         let mut dropped = Arc::new(AtomicBool::new(false));
         let drop_spawner = DropSpawner { dropped: dropped.clone() };
-        let mut executor = TestExecutor::new().unwrap();
+        let mut executor = TestExecutor::new();
         let main_fut = async move {
             spawn(async move {
                 // Take ownership of the drop spawner

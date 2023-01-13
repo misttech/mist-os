@@ -200,7 +200,7 @@ mod tests {
     #[fuchsia::test]
     fn test_time_since_last_event() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
 
         // Allow events to be stored basically forever.  The goal here is to ensure that the
         // retention policy does not discard any of our events.
@@ -234,7 +234,7 @@ mod tests {
     #[fuchsia::test]
     fn test_time_since_last_event_retention() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
 
         // Set the retention time to slightly less than the current time.  This number will be
         // positive.  Since it will occupy the positive range of i64, it is safe to cast it as u32.
@@ -250,7 +250,7 @@ mod tests {
     #[fuchsia::test]
     fn test_add_event() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let mut event_history = EventHistory::<()>::new(u32::MAX);
 
         // Add a few events
@@ -275,7 +275,7 @@ mod tests {
     #[fuchsia::test]
     fn test_add_event_retention() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
 
         // Set the retention time to slightly less than the current time.  This number will be
         // positive.  Since it will occupy the positive range of i64, it is safe to cast it as u32.
@@ -310,7 +310,7 @@ mod tests {
     #[fuchsia::test]
     fn test_event_count() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
         let mut event_history = EventHistory::<TestEnum>::new(u32::MAX);
 
         event_history.events = vec![
@@ -328,7 +328,7 @@ mod tests {
     #[fuchsia::test]
     fn test_event_count_retention() {
         // An executor is required to enable querying time.
-        let _exec = TestExecutor::new().expect("failed to create an executor");
+        let _exec = TestExecutor::new();
 
         // Set the retention time to slightly less than the current time.  This number will be
         // positive.  Since it will occupy the positive range of i64, it is safe to cast it as u32.

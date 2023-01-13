@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_add_iface() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Boilerplate for adding a new interface.
         let iface_map = Arc::new(IfaceMap::new());
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_add_iface_query_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Boilerplate for adding a new interface.
         let iface_map = Arc::new(IfaceMap::new());
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_add_iface_create_sme_fails() {
-        let mut exec = fasync::TestExecutor::new().expect("Failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Boilerplate for adding a new interface.
         let iface_map = Arc::new(IfaceMap::new());

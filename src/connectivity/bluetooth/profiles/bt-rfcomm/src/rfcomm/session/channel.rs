@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_establish_channel_and_send_data_with_no_flow_control() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let role = Role::Responder;
         let dlci = DLCI::try_from(8).unwrap();
@@ -639,7 +639,7 @@ mod tests {
     /// credits.
     #[test]
     fn test_session_channel_with_default_credit_flow_control() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let role = Role::Responder;
         let dlci = DLCI::try_from(8).unwrap();
@@ -708,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_session_channel_with_negotiated_credit_flow_control() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let role = Role::Responder;
         let dlci = DLCI::try_from(8).unwrap();
@@ -870,7 +870,7 @@ mod tests {
 
     #[test]
     fn finished_signal_resolves_when_session_channel_dropped() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (_inspect, session_channel, _client, _outgoing_frames) =
             create_and_establish(Role::Initiator, DLCI::try_from(8).unwrap(), None);
@@ -887,7 +887,7 @@ mod tests {
 
     #[test]
     fn finished_signal_resolves_when_client_disconnects() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let dlci = DLCI::try_from(19).unwrap();
         let (_inspect, session_channel, _client, mut outgoing_frames) =
@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn finished_signal_before_establishment_resolves_immediately() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let session_channel = SessionChannel::new(DLCI::try_from(19).unwrap(), Role::Initiator);
         // Checking termination multiple times is OK.
@@ -923,7 +923,7 @@ mod tests {
 
     #[test]
     fn finish_signal_resolves_with_multiple_establishments() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let dlci = DLCI::try_from(19).unwrap();
         let (_inspect, mut session_channel, _client, _outgoing_frames) =

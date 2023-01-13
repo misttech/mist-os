@@ -152,7 +152,7 @@ mod test {
 
     #[test]
     fn wait_for_event() -> Result<(), zx::Status> {
-        let mut exec = crate::TestExecutor::new()?;
+        let mut exec = crate::TestExecutor::new();
         let mut deliver_events =
             || assert!(exec.run_until_stalled(&mut pending::<()>()).is_pending());
 
@@ -179,7 +179,7 @@ mod test {
 
     #[test]
     fn drop_before_event() -> Result<(), zx::Status> {
-        let _exec = crate::TestExecutor::new()?;
+        let _exec = crate::TestExecutor::new();
         let ehandle = EHandle::local();
 
         let event = zx::Event::create();

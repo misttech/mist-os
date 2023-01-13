@@ -679,7 +679,7 @@ pub mod tests {
     #[test]
     fn test_ignore_second_shutdown() {
         let mut mock_maker = MockNodeMaker::new();
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         // Arbitrary shutdown request to be used in the test
         let shutdown_request = ShutdownRequest::PowerOff;

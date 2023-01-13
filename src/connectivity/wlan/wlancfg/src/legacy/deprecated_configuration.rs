@@ -185,7 +185,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_suggest_mac_succeeds() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
 
         // Set up the DeprecatedConfigurator.
         let phy_manager = Arc::new(Mutex::new(StubPhyManager::new()));

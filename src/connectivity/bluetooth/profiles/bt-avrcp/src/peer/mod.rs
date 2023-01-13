@@ -1636,7 +1636,7 @@ mod tests {
 
     #[fuchsia::test]
     fn successful_inbound_connection_updates_inspect_metrics() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(842);
         let (mut peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id)?;

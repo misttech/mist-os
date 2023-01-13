@@ -818,7 +818,7 @@ mod tests {
 
     #[test]
     fn test_reboot() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let mut installer = new_installer();
         let (reboot_controller, mut stream) =

@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_color_adjustment_manager() -> Result<()> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (manager, mut converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
@@ -543,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_color_adjustment_manager_rejects_bad_requests() -> Result<()> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (manager, converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
 
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_color_adjustment_manager_noop_when_a11y_active() -> Result<()> {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (manager, mut converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));

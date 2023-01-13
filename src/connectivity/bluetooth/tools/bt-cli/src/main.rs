@@ -1244,7 +1244,7 @@ mod tests {
 
     #[test]
     fn test_allow_pairing_no_args() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let args = vec![];
         let (proxy, mut mock) = PairingMock::new(1.second()).expect("failed to create mock");
@@ -1261,7 +1261,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_allow_pairing_args() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut mock) = PairingMock::new(1.second()).expect("failed to create mock");
 

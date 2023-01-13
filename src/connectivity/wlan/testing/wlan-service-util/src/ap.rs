@@ -135,7 +135,7 @@ mod tests {
         channel: u8,
         result_code: StartApResultCode,
     ) -> StartApResultCode {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (ap_sme, server) = create_ap_sme_proxy();
         let mut ap_sme_req = server.into_future();
         let target_ssid = Ssid::try_from(ssid).unwrap();

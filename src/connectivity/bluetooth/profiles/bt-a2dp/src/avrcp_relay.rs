@@ -543,7 +543,7 @@ mod tests {
     /// signal.
     #[fuchsia::test]
     fn test_relay_setup() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
         let request_streams;
@@ -577,7 +577,7 @@ mod tests {
     /// Relay will stop when AVRCP closes the notification channel.
     #[fuchsia::test]
     fn test_relay_avrcp_ends() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -606,7 +606,7 @@ mod tests {
     /// Relay will stop when Player stops asking for updates.
     #[fuchsia::test]
     fn test_relay_player_ends() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -907,7 +907,7 @@ mod tests {
     /// When commands come from the Player, they are relayed to the AVRCP commands.
     #[fuchsia::test]
     fn test_relay_sends_commands() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -957,7 +957,7 @@ mod tests {
 
     #[fuchsia::test]
     fn relay_sends_battery_update_to_avrcp() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);
@@ -990,7 +990,7 @@ mod tests {
 
     #[fuchsia::test]
     fn not_available_battery_update_is_not_relayed_to_avrcp() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);
@@ -1017,7 +1017,7 @@ mod tests {
 
     #[fuchsia::test]
     fn relay_still_active_when_battery_client_terminates() {
-        let mut exec = fasync::TestExecutor::new().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new();
 
         let (_player_client, avrcp_requests, relay_fut, test_battery_manager) =
             setup_media_relay_with_battery_manager(&mut exec);

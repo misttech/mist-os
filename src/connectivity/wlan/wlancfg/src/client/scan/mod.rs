@@ -743,7 +743,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sme_scan_with_passive_request() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
@@ -787,7 +787,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sme_scan_with_active_request() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
@@ -837,7 +837,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sme_channel_closed_while_awaiting_scan_results() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
         let (defect_sender, _) = mpsc::unbounded();
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
@@ -876,7 +876,7 @@ mod tests {
 
     #[fuchsia::test]
     fn basic_scan() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -916,7 +916,7 @@ mod tests {
 
     #[fuchsia::test]
     fn empty_scan_results() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, mut telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -969,7 +969,7 @@ mod tests {
     #[test_case(false)]
     #[fuchsia::test(add_test_attr = false)]
     fn scan_updates_hidden_network_probabilities(passive: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1205,7 +1205,7 @@ mod tests {
         policy_failure_mode: types::ScanError,
         expected_defect: Defect,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1247,7 +1247,7 @@ mod tests {
     #[test_case(fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware, true; "Scan error CanceledByDriverOrFirmware with successful retry")]
     #[fuchsia::test]
     fn scan_error_retries_once(error_code: fidl_sme::ScanErrorCode, retry_succeeds: bool) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1339,7 +1339,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scan_returns_error_on_timeout() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (client, _sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1399,7 +1399,7 @@ mod tests {
         scan_result: Result<Vec<wlan_common::scan::ScanResult>, types::ScanError>,
         expected_defect: Option<Defect>,
     ) {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create and executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iface_manager, _) = exec.run_singlethreaded(create_iface_manager());
 
         // Get the SME out of the IfaceManager.
@@ -1432,7 +1432,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_handles_sequential_requests() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1517,7 +1517,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_handles_overlapping_requests() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1608,7 +1608,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_sends_results_to_requester_and_location_sensor() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
@@ -1657,7 +1657,7 @@ mod tests {
 
     #[fuchsia::test]
     fn scanning_loop_location_sensor_timeout_works() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let (iface_mgr, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();

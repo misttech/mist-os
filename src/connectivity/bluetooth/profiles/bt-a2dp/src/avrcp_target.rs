@@ -35,7 +35,7 @@ mod tests {
 
     #[test]
     fn waiting_for_lifecycle_returns_when_ready() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn waiting_for_lifecycle_returns_error_when_client_error() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();

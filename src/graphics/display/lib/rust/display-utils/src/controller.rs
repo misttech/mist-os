@@ -483,7 +483,7 @@ mod tests {
     fn test_vsync_listener_single() -> Result<()> {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
-        let mut executor = TestExecutor::new()?;
+        let mut executor = TestExecutor::new();
         let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
         let mut vsync = controller.add_vsync_listener(None)?;
 
@@ -515,7 +515,7 @@ mod tests {
     fn test_vsync_listener_multiple() -> Result<()> {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
-        let mut executor = TestExecutor::new()?;
+        let mut executor = TestExecutor::new();
         let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
         let mut vsync = controller.add_vsync_listener(None)?;
 
@@ -562,7 +562,7 @@ mod tests {
     fn test_vsync_listener_display_id_filter() -> Result<()> {
         // Drive an executor directly for this test to avoid having to rely on timeouts for cases
         // in which no events are received.
-        let mut executor = TestExecutor::new()?;
+        let mut executor = TestExecutor::new();
         let (controller, mock) = executor.run_singlethreaded(init_with_displays(&[]))?;
 
         const ID1: DisplayId = DisplayId(1);

@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_crash_pending_reports() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, _stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_feedback::CrashReporterMarker,
         >()

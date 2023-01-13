@@ -203,7 +203,7 @@ async fn test_echo_pair() {
 
 #[test]
 fn test_session_task_dropped() {
-    let mut executor = fasync::TestExecutor::new().expect("failed to create executor");
+    let mut executor = fasync::TestExecutor::new();
     let session = executor.run_singlethreaded(async {
         let (tun, _tun_port, port) = create_tun_device_and_port().await;
         let client = create_netdev_client(&tun);

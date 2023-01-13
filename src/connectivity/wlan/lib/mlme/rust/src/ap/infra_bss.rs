@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn new() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         InfraBss::new(
@@ -701,7 +701,7 @@ mod tests {
 
     #[test]
     fn stop() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let bss = make_infra_bss(&mut ctx);
@@ -711,7 +711,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -747,7 +747,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_auth_resp_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -769,7 +769,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -849,7 +849,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_assoc_resp_with_caps() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = InfraBss::new(
@@ -903,7 +903,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -937,7 +937,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_set_controlled_port_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_protected_infra_bss(&mut ctx);
@@ -965,7 +965,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_auth() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_assoc_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1106,7 +1106,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_bad_ds_bits_to_ds() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1141,7 +1141,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_bad_ds_bits_from_ds() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1176,7 +1176,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1208,7 +1208,7 @@ mod tests {
 
     #[test]
     fn handle_mgmt_frame_bogus() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1239,7 +1239,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1302,7 +1302,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_bad_ds_bits() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1339,7 +1339,7 @@ mod tests {
 
     #[test]
     fn handle_client_event() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, mut time_stream) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1404,7 +1404,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1457,7 +1457,7 @@ mod tests {
 
     #[test]
     fn handle_data_frame_client_not_associated() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1521,7 +1521,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_no_rsn() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1577,7 +1577,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_no_client() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1601,7 +1601,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_is_rsn_eapol_controlled_port_closed() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_protected_infra_bss(&mut ctx);
@@ -1641,7 +1641,7 @@ mod tests {
 
     #[test]
     fn handle_eth_frame_is_rsn_eapol_controlled_port_open() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_protected_infra_bss(&mut ctx);
@@ -1702,7 +1702,7 @@ mod tests {
     #[test_case(false; "Controlled port closed")]
     #[test_case(true; "Controlled port open")]
     fn handle_data_frame_is_rsn_eapol(controlled_port_open: bool) {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_protected_infra_bss(&mut ctx);
@@ -1871,7 +1871,7 @@ mod tests {
 
     #[test]
     fn handle_multiple_complete_associations() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1893,7 +1893,7 @@ mod tests {
 
     #[test]
     fn handle_ps_poll() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -1963,7 +1963,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_setkeys_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_protected_infra_bss(&mut ctx);
@@ -1999,7 +1999,7 @@ mod tests {
 
     #[test]
     fn handle_mlme_setkeys_req_no_rsne() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -2024,7 +2024,7 @@ mod tests {
 
     #[test]
     fn handle_probe_req() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = InfraBss::new(
@@ -2067,7 +2067,7 @@ mod tests {
 
     #[test]
     fn handle_probe_req_has_offload() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         fake_device.discovery_support.probe_response_offload.supported = true;
 
@@ -2103,7 +2103,7 @@ mod tests {
 
     #[test]
     fn handle_probe_req_wildcard_ssid() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = InfraBss::new(
@@ -2162,7 +2162,7 @@ mod tests {
 
     #[test]
     fn handle_probe_req_matching_ssid() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = InfraBss::new(
@@ -2219,7 +2219,7 @@ mod tests {
 
     #[test]
     fn handle_probe_req_mismatching_ssid() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = InfraBss::new(
@@ -2256,7 +2256,7 @@ mod tests {
 
     #[test]
     fn make_tim() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -2298,7 +2298,7 @@ mod tests {
 
     #[test]
     fn make_tim_empty() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let bss = make_infra_bss(&mut ctx);
@@ -2311,7 +2311,7 @@ mod tests {
 
     #[test]
     fn handle_pre_tbtt_hw_indication() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);
@@ -2456,7 +2456,7 @@ mod tests {
 
     #[test]
     fn handle_pre_tbtt_hw_indication_has_group_traffic() {
-        let exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device.as_device());
         let mut bss = make_infra_bss(&mut ctx);

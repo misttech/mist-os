@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn permit_reservations() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should start");
+        let mut exec = fasync::TestExecutor::new();
 
         // Two permits allowed.
         let permits = Permits::new(2);
@@ -593,7 +593,7 @@ mod tests {
 
     #[fuchsia::test]
     fn revokable_reservations() {
-        let mut exec = fasync::TestExecutor::new().expect("executor should start");
+        let mut exec = fasync::TestExecutor::new();
         const TOTAL_PERMITS: usize = 2;
         let permits = Permits::new(TOTAL_PERMITS);
 

@@ -88,7 +88,7 @@ mod tests {
     #[fuchsia::test]
     fn search_result_creates_peer_task() {
         // Set up peers.
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (proxy, client, mut server) = test_profile_server::setup_profile_and_test_server();
         let mut peers = Peers::new(client, proxy);
 

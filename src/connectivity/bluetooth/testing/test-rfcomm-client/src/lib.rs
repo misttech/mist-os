@@ -663,7 +663,7 @@ mod tests {
 
     #[fuchsia::test]
     fn closing_sender_closes_rfcomm_channel_task() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let random_channel_number = ServerChannel::try_from(10).unwrap();
         let (local, _remote) = Channel::create();
@@ -680,7 +680,7 @@ mod tests {
 
     #[fuchsia::test]
     fn closing_channel_closes_rfcomm_channel_task() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let random_channel_number = ServerChannel::try_from(10).unwrap();
         let (local, _remote) = Channel::create();

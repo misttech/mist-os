@@ -86,7 +86,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_get_networks_populated() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let infos = create_test_networks();
         let infos_check = create_test_networks();
         let infos_len = infos.len();
@@ -120,7 +120,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_get_networks_fail_to_gather_empty_vec_returned() {
-        let mut exec = fasync::TestExecutor::new().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new();
         let infos = create_test_networks();
         let mut event_sender = MockSendEvent::new();
         event_sender

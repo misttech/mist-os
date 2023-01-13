@@ -203,7 +203,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_file_stream_proptest(len in 0usize..CHUNK_SIZE * 100) {
-            let mut executor = fuchsia_async::TestExecutor::new().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
                 let expected = (0..std::u8::MAX).cycle().take(len).collect::<Vec<_>>();
                 let reader = TestReader {

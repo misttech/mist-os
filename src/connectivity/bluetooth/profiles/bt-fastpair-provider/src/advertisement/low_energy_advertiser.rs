@@ -380,7 +380,7 @@ mod tests {
 
     #[fuchsia::test]
     fn advertisement_terminating_early_results_in_stream_item() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
             fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
@@ -422,7 +422,7 @@ mod tests {
 
     #[fuchsia::test]
     fn subsequent_advertise_request_stops_previous() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
             fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
@@ -466,7 +466,7 @@ mod tests {
 
     #[fuchsia::test]
     fn le_connection_events_propagated_to_stream() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
             fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();
@@ -517,7 +517,7 @@ mod tests {
 
     #[fuchsia::test]
     fn invalidly_formatted_peer_connection_produces_no_event() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
 
         let (c, mut upstream_server) =
             fidl::endpoints::create_proxy_and_stream::<PeripheralMarker>().unwrap();

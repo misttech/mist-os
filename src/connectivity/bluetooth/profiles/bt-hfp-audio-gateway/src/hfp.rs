@@ -409,7 +409,7 @@ mod tests {
     /// a call manager.
     #[fuchsia::test]
     fn peer_connected_only_after_connection_success() {
-        let mut exec = fuchsia_async::TestExecutor::new().unwrap();
+        let mut exec = fuchsia_async::TestExecutor::new();
         let (profile, profile_svc, server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
         pin_mut!(setup_fut);
@@ -558,7 +558,7 @@ mod tests {
     /// a call manager.
     #[fuchsia::test]
     fn new_profile_from_audio_gateway_is_ignored() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (profile, profile_svc, mut server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
         pin_mut!(setup_fut);
@@ -731,7 +731,7 @@ mod tests {
 
     #[fuchsia::test]
     fn battery_client_update_is_propagated_to_peer() {
-        let mut exec = fasync::TestExecutor::new().unwrap();
+        let mut exec = fasync::TestExecutor::new();
         let (profile, profile_svc, _server) = setup_profile_and_test_server();
         let setup_fut = TestBatteryManager::make_battery_client_with_test_manager();
         pin_mut!(setup_fut);

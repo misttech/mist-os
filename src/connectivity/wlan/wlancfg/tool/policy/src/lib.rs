@@ -1030,7 +1030,7 @@ mod tests {
     /// Tests the case where start client connections is called and the operation is successful.
     #[fuchsia::test]
     fn test_start_client_connections_success() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_start_client_connections(test_values.client_proxy);
         pin_mut!(fut);
@@ -1051,7 +1051,7 @@ mod tests {
     /// Tests the case where starting client connections fails.
     #[fuchsia::test]
     fn test_start_client_connections_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_start_client_connections(test_values.client_proxy);
         pin_mut!(fut);
@@ -1072,7 +1072,7 @@ mod tests {
     /// Tests the case where starting client connections is successful.
     #[fuchsia::test]
     fn test_stop_client_connections_success() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_stop_client_connections(test_values.client_proxy);
         pin_mut!(fut);
@@ -1093,7 +1093,7 @@ mod tests {
     /// Tests the case where starting client connections fails.
     #[fuchsia::test]
     fn test_stop_client_connections_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let fut = handle_stop_client_connections(test_values.client_proxy);
         pin_mut!(fut);
@@ -1114,7 +1114,7 @@ mod tests {
     /// Tests the case where a network is successfully saved.
     #[fuchsia::test]
     fn test_save_network_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let config = create_network_config(TEST_SSID);
         let fut = handle_save_network(test_values.client_proxy, config);
@@ -1132,7 +1132,7 @@ mod tests {
     /// Tests the case where a network configuration cannot be saved.
     #[fuchsia::test]
     fn test_save_network_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let config = create_network_config(TEST_SSID);
         let fut = handle_save_network(test_values.client_proxy, config);
@@ -1150,7 +1150,7 @@ mod tests {
     /// Tests the case where a network config can be successfully removed.
     #[fuchsia::test]
     fn test_remove_network_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let security = Some(wlan_policy::SecurityType::Wpa2);
         let credential = Some(create_password(TEST_PASSWORD));
@@ -1184,7 +1184,7 @@ mod tests {
     /// networks.
     #[fuchsia::test]
     fn test_remove_network_ssid_only_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Request to remove a network by only specifying the SSID of the saved network.
@@ -1222,7 +1222,7 @@ mod tests {
     /// saved networks and finding a matching config.
     #[fuchsia::test]
     fn test_remove_network_unspecified_security_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Request to remove a network by only specifying the SSID of the saved network.
@@ -1260,7 +1260,7 @@ mod tests {
     /// saved networks and finding a matching config.
     #[fuchsia::test]
     fn test_remove_network_no_credential_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Request to remove a network by only specifying the SSID of the saved network.
@@ -1297,7 +1297,7 @@ mod tests {
     /// no matching config.
     #[fuchsia::test]
     fn test_remove_network_ssid_only_no_match_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Request to remove a network by only specifying the SSID of the saved network.
@@ -1327,7 +1327,7 @@ mod tests {
     /// Tests the case where network removal fails.
     #[fuchsia::test]
     fn test_remove_network_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let security = Some(wlan_policy::SecurityType::Wpa2);
         let credential = Some(create_password(TEST_PASSWORD));
@@ -1354,7 +1354,7 @@ mod tests {
     /// Tests the case where network removal returns no error but the network is still present.
     #[fuchsia::test]
     fn test_remove_network_not_removed_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
         let security = Some(wlan_policy::SecurityType::Wpa2);
         let credential = Some(create_password(TEST_PASSWORD));
@@ -1435,7 +1435,7 @@ mod tests {
     /// Tests the case where the client successfully connects.
     #[fuchsia::test]
     fn test_connect_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Start the connect routine.
@@ -1477,7 +1477,7 @@ mod tests {
     /// because a matching network is already saved. The connection succeeds.
     #[fuchsia::test]
     fn test_connect_unspecified_security_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Start the connect routine without giving a security type.
@@ -1528,7 +1528,7 @@ mod tests {
     /// In this case there should be no connect request and an error should be returned.
     #[fuchsia::test]
     fn test_connect_no_security_given_nothing_saved_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Start the connect routine.
@@ -1557,7 +1557,7 @@ mod tests {
     /// are saved. In this case there should be no connect request and an error should be returned.
     #[fuchsia::test]
     fn test_connect_no_security_given_multiple_saved_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Start the connect routine.
@@ -1593,7 +1593,7 @@ mod tests {
     /// Tests the case where a client fails to connect.
     #[fuchsia::test]
     fn test_connect_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         // Start the connect routine.
@@ -1627,7 +1627,7 @@ mod tests {
     /// Tests the case where a scan is requested and results are sent back to the requester.
     #[fuchsia::test]
     fn test_scan_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = client_test_setup();
 
         let fut = handle_scan(test_values.client_proxy);
@@ -1659,7 +1659,7 @@ mod tests {
     /// Tests the case where the scan cannot be performed.
     #[fuchsia::test]
     fn test_scan_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = client_test_setup();
 
         let fut = handle_scan(test_values.client_proxy);
@@ -1683,7 +1683,7 @@ mod tests {
     /// Tests the ability to get saved networks from the client policy layer.
     #[fuchsia::test]
     fn test_get_saved_networks() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = client_test_setup();
 
         let fut = handle_get_saved_networks(&test_values.client_proxy);
@@ -1713,7 +1713,7 @@ mod tests {
     /// Tests to ensure that the listening loop continues to be active after receiving client state updates.
     #[fuchsia::test]
     fn test_client_listen() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = client_test_setup();
 
         let fut = handle_listen(test_values.update_stream);
@@ -1741,7 +1741,7 @@ mod tests {
     /// error.
     #[fuchsia::test]
     fn test_stop_ap_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let network_config = create_network_config(&TEST_SSID);
@@ -1765,7 +1765,7 @@ mod tests {
     /// Tests the case where an AP is successfully stopped.
     #[fuchsia::test]
     fn test_stop_ap_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let network_config = create_network_config(&TEST_SSID);
@@ -1789,7 +1789,7 @@ mod tests {
     /// Tests the case where the request to start an AP results in an error.
     #[fuchsia::test]
     fn test_start_ap_request_fail() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let network_config = create_network_config(&TEST_SSID);
@@ -1814,7 +1814,7 @@ mod tests {
     /// wait for an update indicating that the AP is active.
     #[fuchsia::test]
     fn test_start_ap_pass() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let network_config = create_network_config(&TEST_SSID);
@@ -1856,7 +1856,7 @@ mod tests {
     /// the startup process.
     #[fuchsia::test]
     fn test_ap_failed_to_start() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let network_config = create_network_config(&TEST_SSID);
@@ -1887,7 +1887,7 @@ mod tests {
     /// Tests the case where all APs are requested to be stopped.
     #[fuchsia::test]
     fn test_stop_all_aps() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let mut test_values = ap_test_setup();
 
         let fut = handle_stop_all_aps(test_values.ap_proxy);
@@ -1908,7 +1908,7 @@ mod tests {
     /// Tests that the AP listen routine continues listening for new updates.
     #[fuchsia::test]
     fn test_ap_listen() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
         let test_values = ap_test_setup();
 
         let mut state_updates = vec![
@@ -1940,7 +1940,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_suggest_ap_mac_succeeds() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
 
         let (configurator_proxy, mut configurator_stream) =
             endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>()
@@ -1965,7 +1965,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_suggest_ap_mac_fails() {
-        let mut exec = TestExecutor::new().expect("failed to create an executor");
+        let mut exec = TestExecutor::new();
 
         let (configurator_proxy, mut configurator_stream) =
             endpoints::create_proxy_and_stream::<wlan_deprecated::DeprecatedConfiguratorMarker>()
