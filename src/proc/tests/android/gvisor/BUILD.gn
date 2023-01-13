@@ -304,6 +304,7 @@ sequential_gvisor_tests = [
   "raw_socket_icmp_test",
   "raw_socket_test",
   "socket_ipv4_udp_unbound_loopback_test",
+  "socket_unix_unbound_abstract_test",
 ]
 
 starbionic_test_package_with_expectations("starnix_gvisor_tests") {

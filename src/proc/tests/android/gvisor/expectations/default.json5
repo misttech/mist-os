@@ -991,13 +991,6 @@
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
-                // socket_unix_unbound_abstract_test
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/0",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/1",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/2",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/3",
-                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
-
                 // socket_unix_seqpacket_local_test
                 "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.Sendto/*",
 

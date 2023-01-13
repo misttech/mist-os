@@ -48,6 +48,13 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
+
+                // socket_unix_unbound_abstract_test
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/0",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/1",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/2",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/3",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
             ],
         },
         {
