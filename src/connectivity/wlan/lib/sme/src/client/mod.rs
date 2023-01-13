@@ -620,11 +620,12 @@ impl ClientSme {
     pub fn on_disconnect_command(
         &mut self,
         policy_disconnect_reason: fidl_sme::UserDisconnectReason,
+        responder: fidl_sme::ClientSmeDisconnectResponder,
     ) {
         self.state = self
             .state
             .take()
-            .map(|state| state.disconnect(&mut self.context, policy_disconnect_reason));
+            .map(|state| state.disconnect(&mut self.context, policy_disconnect_reason, responder));
         self.context.inspect.update_pulse(self.status());
     }
 
@@ -757,7 +758,8 @@ impl super::Station for ClientSme {
             event @ Event::RsnaCompletionTimeout(..)
             | event @ Event::RsnaResponseTimeout(..)
             | event @ Event::RsnaRetransmissionTimeout(..)
-            | event @ Event::SaeTimeout(..) => {
+            | event @ Event::SaeTimeout(..)
+            | event @ Event::DeauthenticateTimeout(..) => {
                 state.handle_timeout(timed_event.id, event, &mut self.context)
             }
             Event::InspectPulseCheck(..) => {
@@ -1621,8 +1623,11 @@ mod tests {
             fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
         );
 
-        let req3 =
-            connect_req(Ssid::try_from("foo").unwrap(), bss_description, authentication_open());
+        let req3 = connect_req(
+            Ssid::try_from("foo").unwrap(),
+            bss_description.clone(),
+            authentication_open(),
+        );
         let mut _connect_fut3 = sme.on_connect_command(req3);
 
         // Verify that second connection attempt is canceled as new connect request comes in

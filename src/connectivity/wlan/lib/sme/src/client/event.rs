@@ -28,6 +28,10 @@ pub const RSNA_RETRANSMISSION_TIMEOUT_MILLIS: i64 = 200;
 /// a response before restransmitting the last transmitted SAE message.
 pub const SAE_RETRANSMISSION_TIMEOUT_MILLIS: i64 = 1000;
 
+/// Amount of time in milliseconds we should wait for a deauth response from the
+/// driver before aborting a connection.
+pub const DEAUTHENTICATE_TIMEOUT_MILLIS: i64 = 500;
+
 pub const INSPECT_PULSE_CHECK_MINUTES: i64 = 1;
 pub const INSPECT_PULSE_PERSIST_MINUTES: i64 = 5;
 
@@ -40,6 +44,7 @@ pub enum Event {
     /// From startup, periodically schedule an event to persist the Inspect pulse data
     InspectPulsePersist(InspectPulsePersist),
     SaeTimeout(SaeTimeout),
+    DeauthenticateTimeout(DeauthenticateTimeout),
 }
 impl From<RsnaCompletionTimeout> for Event {
     fn from(timeout: RsnaCompletionTimeout) -> Self {
@@ -69,6 +74,11 @@ impl From<InspectPulsePersist> for Event {
 impl From<SaeTimeout> for Event {
     fn from(this: SaeTimeout) -> Self {
         Event::SaeTimeout(this)
+    }
+}
+impl From<DeauthenticateTimeout> for Event {
+    fn from(this: DeauthenticateTimeout) -> Self {
+        Event::DeauthenticateTimeout(this)
     }
 }
 
@@ -120,5 +130,13 @@ pub struct SaeTimeout(pub u64);
 impl TimeoutDuration for SaeTimeout {
     fn timeout_duration(&self) -> zx::Duration {
         SAE_RETRANSMISSION_TIMEOUT_MILLIS.millis()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeauthenticateTimeout;
+impl TimeoutDuration for DeauthenticateTimeout {
+    fn timeout_duration(&self) -> zx::Duration {
+        DEAUTHENTICATE_TIMEOUT_MILLIS.millis()
     }
 }
