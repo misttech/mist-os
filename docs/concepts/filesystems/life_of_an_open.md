@@ -268,9 +268,9 @@ need to route through the ‘CWD’ on future requests.
 ## Life of an Open: Diagrams
 
 ```
-             +----------------+
-             | Client Program |
-+-----------------------------+
++----------------+
+| Client Program |
++----------------+
 |   fd: x    |   fd: y    |
 | Fdio (FIDL)| Fdio (FIDL)|
 +-------------------------+
@@ -287,14 +287,14 @@ Zircon Channels, speaking FIDL                   State BEFORE open(‘foo’)
 |  I/O State |  I/O State |
 +-------------------------+
 |   Vnode A  |   Vnode B  |
-+------------------------------+
-           | Filesystem Server |
-           +-------------------+
++-------------------------+
+| Filesystem Server |
++-------------------+
 
 
-             +----------------+
-             | Client Program |
-+-----------------------------+
++----------------+
+| Client Program |
++-------------------------+
 |   fd: x    |   fd: y    |
 | Fdio (FIDL)| Fdio (FIDL)|
 +-------------------------+
@@ -311,14 +311,14 @@ Zircon Channels, speaking FIDL                   Client Creates Channel
 |  I/O State |  I/O State |
 +-------------------------+
 |   Vnode A  |   Vnode B  |
-+------------------------------+
-           | Filesystem Server |
-           +-------------------+
++-------------------------+
+| Filesystem Server |
++-------------------+
 
 
-             +----------------+
-             | Client Program |
-+-----------------------------+
++----------------+
+| Client Program |
++-------------------------+
 |   fd: x    |   fd: y    |
 | Fdio (FIDL)| Fdio (FIDL)|
 +-------------------------+--------------+
@@ -335,14 +335,14 @@ Zircon Channels, speaking FIDL                  Client Sends FIDL message to Ser
 |  I/O State |  I/O State |
 +-------------------------+
 |   Vnode A  |   Vnode B  |
-+------------------------------+
-           | Filesystem Server |
-           +-------------------+
++-------------------------+
+| Filesystem Server |
++-------------------+
 
 
-             +----------------+
-             | Client Program |
-+-----------------------------+
++----------------+
+| Client Program |
++-------------------------+
 |   fd: x    |   fd: y    |
 | Fdio (FIDL)| Fdio (FIDL)|
 +-------------------------+--------------+
@@ -360,13 +360,13 @@ Zircon Channels, speaking FIDL                  Server dispatches message to I/O
 +-------------------------+-------------+
 |   Vnode A  |   Vnode B  |   Vnode C   |
 +------------------------------+--------+
-           | Filesystem Server |
-           +-------------------+
+| Filesystem Server |
++-------------------+
 
 
-             +----------------+
-             | Client Program |
-+-----------------------------+
++----------------+
+| Client Program |
++-------------------------+
 |   fd: x    |   fd: y    |
 | Fdio (FIDL)| Fdio (FIDL)|
 +-------------------------+--------------+
@@ -384,12 +384,12 @@ Zircon Channels, FIDL         |                   Server allocates I/O state for
 +-------------------------+--------------+
 |   Vnode A  |   Vnode B  |    Vnode C   |
 +------------------------------+---------+
-           | Filesystem Server |
-           +-------------------+
+| Filesystem Server |
++-------------------+
 
 
-             +----------------+
-             | Client Program |
++----------------+
+| Client Program |
 +-----------------------------+----------+
 |   fd: x    |   fd: y    |    fd: z     |
 | Fdio (FIDL)| Fdio (FIDL)|  Fdio (FIDL) |
@@ -408,8 +408,8 @@ Zircon Channels, speaking FIDL |                  Client recognizes that ‘foo�
 +-------------------------+--------------+
 |   Vnode A  |   Vnode B  |    Vnode C   |
 +------------------------------+---------+
-           | Filesystem Server |
-           +-------------------+
+| Filesystem Server |
++-------------------+
 ```
 
 [glossary.component]: /docs/glossary/README.md#component
