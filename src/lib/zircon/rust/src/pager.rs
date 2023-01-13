@@ -27,10 +27,17 @@ bitflags! {
     }
 }
 
+bitflags! {
+    #[repr(transparent)]
+    pub struct PagerWritebackBeginOptions: u64 {
+        const DIRTY_RANGE_IS_ZERO = sys::ZX_VMO_DIRTY_RANGE_IS_ZERO;
+    }
+}
+
 pub enum PagerOp {
     Fail(Status),
     Dirty,
-    WritebackBegin,
+    WritebackBegin(PagerWritebackBeginOptions),
     WritebackEnd,
 }
 
@@ -103,7 +110,7 @@ impl Pager {
         let (op, data) = match op {
             PagerOp::Fail(status) => (sys::ZX_PAGER_OP_FAIL, status.into_raw() as u64),
             PagerOp::Dirty => (sys::ZX_PAGER_OP_DIRTY, 0),
-            PagerOp::WritebackBegin => (sys::ZX_PAGER_OP_WRITEBACK_BEGIN, 0),
+            PagerOp::WritebackBegin(options) => (sys::ZX_PAGER_OP_WRITEBACK_BEGIN, options.bits()),
             PagerOp::WritebackEnd => (sys::ZX_PAGER_OP_WRITEBACK_END, 0),
         };
         let status = unsafe {
@@ -269,7 +276,42 @@ mod tests {
 
         write_thread.join().unwrap();
 
-        pager.op_range(zx::PagerOp::WritebackBegin, vmo.as_ref(), 0..page_size).unwrap();
+        // TODO(fxbug.dev/63989) Verify that the first page is dirty with `query_dirty_ranges`.
+        pager
+            .op_range(
+                zx::PagerOp::WritebackBegin(zx::PagerWritebackBeginOptions::empty()),
+                vmo.as_ref(),
+                0..page_size,
+            )
+            .unwrap();
         pager.op_range(zx::PagerOp::WritebackEnd, vmo.as_ref(), 0..page_size).unwrap();
+        // TODO(fxbug.dev/63989) Verify that the first page is now clean with `query_dirty_ranges`.
+    }
+
+    #[test]
+    fn pager_writeback_begin_with_dirtied_zero_range() {
+        let page_size: u64 = zx::system_get_page_size().into();
+        let port = zx::Port::create();
+        let pager = zx::Pager::create(zx::PagerOptions::empty()).unwrap();
+        let vmo = pager.create_vmo(zx::VmoOptions::RESIZABLE, &port, KEY, page_size).unwrap();
+        let aux_vmo = zx::Vmo::create(page_size).unwrap();
+        pager.supply_pages(&vmo, 0..page_size, &aux_vmo, 0).unwrap();
+        vmo.set_size(page_size * 3).unwrap();
+
+        // TODO(fxbug.dev/63989) Verify that pages 2, and 3 are dirty and zero with
+        // `query_dirty_ranges`.
+
+        vmo.write(&[0, 1, 2, 3], page_size * 2).unwrap();
+        pager
+            .op_range(
+                zx::PagerOp::WritebackBegin(zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO),
+                &vmo,
+                page_size..(page_size * 2),
+            )
+            .unwrap();
+        pager.op_range(zx::PagerOp::WritebackEnd, &vmo, page_size..(page_size * 2)).unwrap();
+
+        // TODO(fxbug.dev/63989) Verify that page 2 is still dirty and not zero with
+        // `query_dirty_ranges`.
     }
 }

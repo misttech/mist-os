@@ -456,8 +456,13 @@ impl<T: PagerBackedVmo> Pager<T> {
 
     /// Notifies the kernel that the filesystem has started cleaning the `range` of pages. See
     /// `ZX_PAGER_OP_WRITEBACK_BEGIN` for more information.
-    pub fn writeback_begin(&self, vmo: &zx::Vmo, range: Range<u64>) {
-        if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackBegin, vmo, range) {
+    pub fn writeback_begin(
+        &self,
+        vmo: &zx::Vmo,
+        range: Range<u64>,
+        options: zx::PagerWritebackBeginOptions,
+    ) {
+        if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackBegin(options), vmo, range) {
             error!(error = e.as_value(), "writeback_begin failed");
         }
     }
@@ -570,8 +575,7 @@ impl VmoDirtyRange {
 
     /// Returns true if all of the bytes in the range are 0.
     pub fn is_zero_range(&self) -> bool {
-        const DIRTY_RANGE_IS_ZERO: u64 = 1;
-        self.options & DIRTY_RANGE_IS_ZERO != 0
+        self.options & zx::sys::ZX_VMO_DIRTY_RANGE_IS_ZERO != 0
     }
 }
 

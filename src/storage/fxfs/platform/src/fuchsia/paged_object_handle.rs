@@ -785,7 +785,12 @@ impl FlushBatch {
 
     fn writeback_begin(&self, vmo: &zx::Vmo, pager: &Pager<FxFile>) {
         for range in &self.ranges {
-            pager.writeback_begin(vmo, range.range.clone());
+            let options = if range.is_zero_range {
+                zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO
+            } else {
+                zx::PagerWritebackBeginOptions::empty()
+            };
+            pager.writeback_begin(vmo, range.range.clone(), options);
         }
     }
 

@@ -120,6 +120,10 @@ multiconst!(u32, [
     ZX_VMO_TRAP_DIRTY = 1 << 3;
 ]);
 
+multiconst!(u64, [
+    ZX_VMO_DIRTY_RANGE_IS_ZERO = 1;
+]);
+
 multiconst!(u32, [
     ZX_INFO_VMO_RESIZABLE = 1 << 1;
     ZX_INFO_VMO_IS_COW_CLONE = 1 << 2;
