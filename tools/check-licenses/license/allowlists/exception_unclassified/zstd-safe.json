@@ -1,6 +1,6 @@
 {
     "license": {
-        "exceptions": [
+        "allowlists": [
             {
                 "entries": [
                     {

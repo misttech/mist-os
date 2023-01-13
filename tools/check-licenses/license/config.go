@@ -16,8 +16,7 @@ type LicenseConfig struct {
 
 	// Allowlists define projects that have been given approval to use
 	// a given restricted license type.
-	Allowlists               []*Allowlist `json:"allowlists"`
-	AllowlistsSoftTransition []*Allowlist `json:"exceptions"`
+	Allowlists []*Allowlist `json:"allowlists"`
 }
 
 type PatternRoot struct {
@@ -34,7 +33,6 @@ type PatternRoot struct {
 // exist to allow that project access to that license type.
 //
 // This struct describes how the allowlist is formatted.
-// TODO(fxbug.dev/109828): Rename "Exception" to "Allowlist".
 type Allowlist struct {
 	// LicenseType describes the type of license that this pattern matches
 	// with (e.g. bsd-3).
@@ -60,7 +58,7 @@ type Allowlist struct {
 // Each allowlist entry can define a bug which should describe why / when the project
 // was allowlisted.
 //
-// In the future, bug entries will be required for each exception entry.
+// In the future, bug entries will be required for each allowlist entry.
 type AllowlistEntry struct {
 	// Link to a bug granting this exception.
 	// TODO(b/264579404): Make this a required field
@@ -99,16 +97,8 @@ func (c *LicenseConfig) Merge(other *LicenseConfig) {
 	if c.Allowlists == nil {
 		c.Allowlists = make([]*Allowlist, 0)
 	}
-	if c.AllowlistsSoftTransition == nil {
-		c.AllowlistsSoftTransition = make([]*Allowlist, 0)
-	}
 	if other.Allowlists == nil {
 		other.Allowlists = make([]*Allowlist, 0)
 	}
-	if other.AllowlistsSoftTransition == nil {
-		other.AllowlistsSoftTransition = make([]*Allowlist, 0)
-	}
 	c.Allowlists = append(c.Allowlists, other.Allowlists...)
-	c.Allowlists = append(c.Allowlists, c.AllowlistsSoftTransition...)
-	c.Allowlists = append(c.Allowlists, other.AllowlistsSoftTransition...)
 }
