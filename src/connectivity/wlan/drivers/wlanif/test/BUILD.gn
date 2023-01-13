@@ -13,32 +13,6 @@ bind_test("wlanif_bind_test") {
   deps = [ "//src/devices/bind/fuchsia.wlan" ]
 }
 
-test("convert_unittest") {
-  output_name = "wlanif_convert_unittest"
-
-  sources = [ "convert_unittest.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats_hlcpp",
-    "//src/connectivity/wlan/drivers/lib/fuzzing/cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp",
-    "//src/connectivity/wlan/drivers/wlanif:lib_source",
-    "//src/connectivity/wlan/lib/mlme/cpp:mlme",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gmock",
-    "//third_party/googletest:gtest",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
 test("device_unittest") {
   output_name = "wlanif_device_unittest"
 
@@ -52,6 +26,7 @@ test("device_unittest") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_hlcpp",
     "//sdk/lib/sys/cpp/testing:cpp",
     "//src/connectivity/wlan/drivers/wlanif:lib_source",
     "//src/connectivity/wlan/lib/mlme/cpp:mlme",
@@ -70,10 +45,7 @@ test("device_unittest") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-tests = [
-  "convert",
-  "device",
-]
+tests = [ "device" ]
 
 foreach(test, tests) {
   name = "${test}_test"

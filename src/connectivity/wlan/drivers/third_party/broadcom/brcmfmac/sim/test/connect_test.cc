@@ -19,7 +19,6 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
-#include "src/connectivity/wlan/drivers/wlanif/convert.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 
 namespace wlan::brcmfmac {
@@ -484,20 +483,17 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   ap.EnableBeacon(zx::msec(100));
 
   context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  wlan_fullmac_iface_histogram_stats_t banjo_stats = {};
+  wlan_fullmac_iface_histogram_stats_t stats = {};
 
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
-  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &banjo_stats),
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &stats),
                              zx::msec(30));
 
   env_->Run(kTestDuration);
 
-  fuchsia::wlan::stats::IfaceHistogramStats stats;
-  wlanif::ConvertIfaceHistogramStats(&stats, banjo_stats);
-
   // Sim firmware returns these fake values for per-antenna histograms.
-  const auto& expected_hist_scope = fuchsia::wlan::stats::HistScope::PER_ANTENNA;
-  const auto& expected_antenna_freq = fuchsia::wlan::stats::AntennaFreq::ANTENNA_2_G;
+  const auto& expected_hist_scope = WLAN_FULLMAC_HIST_SCOPE_PER_ANTENNA;
+  const auto& expected_antenna_freq = WLAN_FULLMAC_ANTENNA_FREQ_ANTENNA_2_G;
   const uint8_t expected_antenna_index = 0;
   const uint8_t expected_snr_index = 60;
   const uint8_t expected_snr_num_frames = 50;
@@ -506,32 +502,39 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   // get handling between real and sim firmware (e.g. fxr/404141). When wstats_counters is fully
   // supported in sim firmware we can test for the expected noise floor, RSSI, and rate buckets.
 
-  ASSERT_EQ(stats.noise_floor_histograms.size(), 1);
-  EXPECT_EQ(stats.noise_floor_histograms[0].hist_scope, expected_hist_scope);
-  ASSERT_NOT_NULL(stats.noise_floor_histograms[0].antenna_id);
-  EXPECT_EQ(stats.noise_floor_histograms[0].antenna_id->freq, expected_antenna_freq);
-  EXPECT_EQ(stats.noise_floor_histograms[0].antenna_id->index, expected_antenna_index);
+  ASSERT_EQ(stats.noise_floor_histograms_count, 1U);
+  EXPECT_EQ(stats.noise_floor_histograms_list[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.noise_floor_histograms_list[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.noise_floor_histograms_list[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rssi_histograms.size(), 1);
-  EXPECT_EQ(stats.rssi_histograms[0].hist_scope, expected_hist_scope);
-  ASSERT_NOT_NULL(stats.rssi_histograms[0].antenna_id);
-  EXPECT_EQ(stats.rssi_histograms[0].antenna_id->freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rssi_histograms[0].antenna_id->index, expected_antenna_index);
+  ASSERT_EQ(stats.rssi_histograms_count, 1U);
+  EXPECT_EQ(stats.rssi_histograms_list[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.rssi_histograms_list[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rssi_histograms_list[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.rx_rate_index_histograms.size(), 1);
-  EXPECT_EQ(stats.rx_rate_index_histograms[0].hist_scope, expected_hist_scope);
-  ASSERT_NOT_NULL(stats.rx_rate_index_histograms[0].antenna_id);
-  EXPECT_EQ(stats.rx_rate_index_histograms[0].antenna_id->freq, expected_antenna_freq);
-  EXPECT_EQ(stats.rx_rate_index_histograms[0].antenna_id->index, expected_antenna_index);
+  ASSERT_EQ(stats.rx_rate_index_histograms_count, 1U);
+  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.rx_rate_index_histograms_list[0].antenna_id.index, expected_antenna_index);
 
-  ASSERT_EQ(stats.snr_histograms.size(), 1);
-  EXPECT_EQ(stats.snr_histograms[0].hist_scope, expected_hist_scope);
-  ASSERT_NOT_NULL(stats.snr_histograms[0].antenna_id);
-  EXPECT_EQ(stats.snr_histograms[0].antenna_id->freq, expected_antenna_freq);
-  EXPECT_EQ(stats.snr_histograms[0].antenna_id->index, expected_antenna_index);
-  ASSERT_EQ(stats.snr_histograms[0].snr_samples.size(), 1);
-  EXPECT_EQ(stats.snr_histograms[0].snr_samples[0].bucket_index, expected_snr_index);
-  EXPECT_EQ(stats.snr_histograms[0].snr_samples[0].num_samples, expected_snr_num_frames);
+  ASSERT_EQ(stats.snr_histograms_count, 1U);
+  EXPECT_EQ(stats.snr_histograms_list[0].hist_scope, expected_hist_scope);
+  EXPECT_EQ(stats.snr_histograms_list[0].antenna_id.freq, expected_antenna_freq);
+  EXPECT_EQ(stats.snr_histograms_list[0].antenna_id.index, expected_antenna_index);
+  uint64_t snr_samples_count = 0;
+  uint64_t snr_bucket_index = 0;
+  uint64_t snr_bucket_num_samples = 0;
+  for (uint64_t i = 0; i < stats.snr_histograms_list[0].snr_samples_count; i++) {
+    if (stats.snr_histograms_list[0].snr_samples_list[i].num_samples != 0) {
+      snr_samples_count++;
+      snr_bucket_index = stats.snr_histograms_list[0].snr_samples_list[i].bucket_index;
+      snr_bucket_num_samples = stats.snr_histograms_list[0].snr_samples_list[i].num_samples;
+    }
+  }
+
+  EXPECT_EQ(snr_samples_count, 1U);
+  EXPECT_EQ(snr_bucket_index, expected_snr_index);
+  EXPECT_EQ(snr_bucket_num_samples, expected_snr_num_frames);
 }
 
 TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
@@ -543,22 +546,19 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
   ap.EnableBeacon(zx::msec(100));
 
   context_.expected_results.push_front(STATUS_CODE_SUCCESS);
-  wlan_fullmac_iface_histogram_stats_t banjo_stats = {};
+  wlan_fullmac_iface_histogram_stats_t stats = {};
 
   DetailedHistogramErrorInject();
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
-  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &banjo_stats),
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceHistogramStats, this, &stats),
                              zx::msec(30));
 
   env_->Run(kTestDuration);
 
-  fuchsia::wlan::stats::IfaceHistogramStats stats;
-  wlanif::ConvertIfaceHistogramStats(&stats, banjo_stats);
-
-  ASSERT_TRUE(stats.noise_floor_histograms.empty());
-  ASSERT_TRUE(stats.rssi_histograms.empty());
-  ASSERT_TRUE(stats.rx_rate_index_histograms.empty());
-  ASSERT_TRUE(stats.snr_histograms.empty());
+  EXPECT_EQ(stats.noise_floor_histograms_count, 0U);
+  EXPECT_EQ(stats.rssi_histograms_count, 0U);
+  EXPECT_EQ(stats.rx_rate_index_histograms_count, 0U);
+  EXPECT_EQ(stats.snr_histograms_count, 0U);
 }
 
 void ConnectTest::ConnectErrorInject() {

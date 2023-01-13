@@ -220,6 +220,12 @@ async fn forward_mlme_request(
         MlmeRequest::QuerySpectrumManagementSupport(responder) => {
             proxy.query_spectrum_management_support().await.map(|resp| responder.respond(resp))
         }
+        MlmeRequest::Disassociate(..)
+        | wlan_sme::MlmeRequest::DeleteKeys(..)
+        | wlan_sme::MlmeRequest::Reset(..) => {
+            info!("Disassociate, DeleteKeys, and Reset are unimplemented");
+            Ok(())
+        }
     }
 }
 

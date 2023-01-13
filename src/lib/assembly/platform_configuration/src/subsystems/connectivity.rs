@@ -14,19 +14,19 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let FeatureSupportLevel::Minimal = context.feature_set_level {
-            builder.platform_bundle("wlan_base");
-            // Some products require legacy security types to be supported.
-            // Otherwise, they are disabled by default.
-            if connectivity_config.wlan.legacy_privacy_support {
-                builder.platform_bundle("wlan_legacy_privacy_support");
-            } else {
-                builder.platform_bundle("wlan_contemporary_privacy_only_support");
-            }
-
             if let Some(board_info) = context.board_info {
                 let has_fullmac = board_info.provides_feature("fuchsia::wlan_fullmac");
                 let has_softmac = board_info.provides_feature("fuchsia::wlan_softmac");
                 if has_fullmac || has_softmac {
+                    builder.platform_bundle("wlan_base");
+                    // Some products require legacy security types to be supported.
+                    // Otherwise, they are disabled by default.
+                    if connectivity_config.wlan.legacy_privacy_support {
+                        builder.platform_bundle("wlan_legacy_privacy_support");
+                    } else {
+                        builder.platform_bundle("wlan_contemporary_privacy_only_support");
+                    }
+
                     if has_fullmac {
                         builder.platform_bundle("wlan_fullmac_support");
                     }
