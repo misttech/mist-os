@@ -74,4 +74,7 @@ default_args = {
     "//third_party/pigweed/src/pw_assert:impl",
     "//third_party/pigweed/src/pw_log:impl",
   ]
+
+  # Configures Pigweed to use Fuchsia's boringssl target.
+  pw_third_party_boringssl_ALIAS = "//third_party/boringssl"
 }
