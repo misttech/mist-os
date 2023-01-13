@@ -235,7 +235,6 @@ mod tests {
     use crate::agent::Invocation;
     use crate::base::{SettingInfo, SettingType, UnknownInfo};
     use crate::message::base::Status;
-    use crate::message::MessageHubUtil;
     use crate::service::MessageHub;
     use crate::service_context::ServiceContext;
 

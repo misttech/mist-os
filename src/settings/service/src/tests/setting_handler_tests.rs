@@ -13,7 +13,6 @@ use crate::handler::setting_handler::{
     Handler, IntoHandlerResult, Payload, SettingHandlerResult, State,
 };
 use crate::message::base::{Audience, MessengerType};
-use crate::message::MessageHubUtil;
 use crate::service;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::message_utils::verify_payload;

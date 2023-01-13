@@ -319,7 +319,6 @@ impl Handler {
 mod tests {
     use super::*;
     use crate::job::execution;
-    use crate::message::MessageHubUtil;
     use crate::service::{test, MessageHub};
     use crate::tests::scaffold::workload::{Sequential, StubWorkload, Workload};
     use rand::Rng;

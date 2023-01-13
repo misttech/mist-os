@@ -28,29 +28,32 @@ use crate::handler::setting_handler as controller;
 use crate::job;
 #[cfg(test)]
 use crate::message::base::MessengerType;
-use crate::message::MessageHubDefinition;
+use crate::message::message_hub;
 use crate::policy::{self, PolicyType};
 use crate::storage;
 
 pub struct MessageHub;
-impl MessageHubDefinition for MessageHub {
-    type Payload = Payload;
-    type Address = Address;
+
+impl MessageHub {
+    pub(crate) fn create_hub() -> message::Delegate {
+        message_hub::MessageHub::create()
+    }
 }
 
 pub(crate) mod message {
-    use super::MessageHub;
-    use crate::message::MessageHubUtil;
+    use super::Address;
+    use super::Payload;
+    use crate::message::{base, delegate, message_client, messenger, receptor};
 
-    pub(crate) type Audience = <MessageHub as MessageHubUtil>::Audience;
-    pub(crate) type Delegate = <MessageHub as MessageHubUtil>::Delegate;
-    pub(crate) type MessageClient = <MessageHub as MessageHubUtil>::MessageClient;
-    pub(crate) type MessageError = <MessageHub as MessageHubUtil>::MessageError;
-    pub(crate) type MessageEvent = <MessageHub as MessageHubUtil>::MessageEvent;
-    pub(crate) type Messenger = <MessageHub as MessageHubUtil>::Messenger;
-    pub(crate) type MessengerType = <MessageHub as MessageHubUtil>::MessengerType;
-    pub(crate) type Receptor = <MessageHub as MessageHubUtil>::Receptor;
-    pub(crate) type Signature = <MessageHub as MessageHubUtil>::Signature;
+    pub(crate) type Delegate = delegate::Delegate<Payload, Address>;
+    pub(crate) type Audience = base::Audience<Address>;
+    pub(crate) type Messenger = messenger::MessengerClient<Payload, Address>;
+    pub(crate) type MessageError = base::MessageError<Address>;
+    pub(crate) type MessageEvent = base::MessageEvent<Payload, Address>;
+    pub(crate) type MessageClient = message_client::MessageClient<Payload, Address>;
+    pub(crate) type MessengerType = base::MessengerType<Payload, Address>;
+    pub(crate) type Receptor = receptor::Receptor<Payload, Address>;
+    pub(crate) type Signature = base::Signature<Address>;
 }
 
 /// The `Address` enumeration defines a namespace for entities that can be

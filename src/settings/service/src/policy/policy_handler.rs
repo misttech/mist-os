@@ -235,7 +235,6 @@ mod tests {
     use crate::base::SettingType;
     use crate::handler::base::{Payload as HandlerPayload, Request};
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::policy::PolicyType;
     use crate::service;
     use crate::tests::message_utils::verify_payload;

@@ -292,7 +292,6 @@ mod tests {
     use crate::event::source::CompleteError;
     use crate::job::Payload;
     use crate::message::base::Audience;
-    use crate::message::MessageHubUtil;
     use crate::service::{build_event_listener, test, MessageHub};
     use crate::tests::scaffold::workload::Workload;
     use assert_matches::assert_matches;

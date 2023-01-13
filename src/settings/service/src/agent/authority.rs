@@ -171,7 +171,7 @@ mod tests {
             }
         }
 
-        let delegate = MessageHub::create(None);
+        let delegate = MessageHub::create();
         let mut authority = Authority::create(delegate, HashSet::new(), HashSet::new())
             .await
             .expect("Should be able to create authority");

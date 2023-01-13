@@ -9,7 +9,6 @@ use crate::agent::{Context, Payload};
 use crate::event::{self, Event};
 use crate::input::{MediaButtons, VolumeGain};
 use crate::message::base::{Audience, MessengerType};
-use crate::message::MessageHubUtil;
 use crate::service;
 use crate::service_context::ServiceContext;
 use crate::tests::fakes::input_device_registry_service::InputDeviceRegistryService;

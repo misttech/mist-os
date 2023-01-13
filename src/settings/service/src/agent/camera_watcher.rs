@@ -153,7 +153,6 @@ mod tests {
     use crate::event;
     use crate::message::base::{MessageEvent, MessengerType};
     use crate::message::receptor::Receptor;
-    use crate::message::MessageHubUtil;
     use crate::service::{Address, Payload};
     use crate::service_context::ServiceContext;
     use crate::tests::fakes::service_registry::ServiceRegistry;

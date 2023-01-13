@@ -8,7 +8,6 @@ use crate::message::base::MessengerType;
 use crate::message::delegate::Delegate;
 use crate::message::messenger::MessengerClient;
 use crate::message::receptor::Receptor;
-use crate::message::MessageHubUtil;
 use crate::service::{Address as ServiceAddress, MessageHub, Payload as ServicePayload};
 
 use fuchsia_async::TestExecutor;

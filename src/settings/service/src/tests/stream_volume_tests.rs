@@ -8,7 +8,6 @@ use crate::audio::{create_default_audio_stream, StreamVolumeControl};
 use crate::clock;
 use crate::event;
 use crate::message::base::MessengerType;
-use crate::message::MessageHubUtil;
 use crate::service;
 use crate::service_context::{ExternalServiceEvent, ServiceContext};
 use crate::tests::fakes::audio_core_service;

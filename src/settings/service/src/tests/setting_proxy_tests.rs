@@ -30,7 +30,6 @@ use crate::handler::setting_proxy::{SettingProxy, MAX_NODE_ERRORS};
 use crate::inspect::listener_logger::ListenerInspectLogger;
 use crate::message::base::{Audience, MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
-use crate::message::MessageHubUtil;
 use crate::service::{
     self, message, Address as ServiceAddress, Payload as ServicePayload, TryFromWithClient,
 };

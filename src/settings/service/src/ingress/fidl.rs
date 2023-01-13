@@ -304,7 +304,6 @@ mod tests {
     use crate::job::manager::Manager;
     use crate::job::source::Seeder;
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::service;
 
     use super::Interface;

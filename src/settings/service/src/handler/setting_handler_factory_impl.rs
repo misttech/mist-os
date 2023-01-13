@@ -140,7 +140,6 @@ mod tests {
         BoxedController, ClientImpl, ControllerError, ControllerStateResult, SettingHandlerResult,
     };
     use crate::message::base::{filter, Message, MessageType};
-    use crate::message::MessageHubUtil;
     use crate::service;
     use crate::service_context::ServiceContext;
     use fuchsia_async as fasync;

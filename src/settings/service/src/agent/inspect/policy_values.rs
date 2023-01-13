@@ -266,7 +266,6 @@ mod tests {
     use crate::audio::types::AudioStreamType;
     use crate::clock;
     use crate::message::base::{MessageEvent, MessengerType, Status};
-    use crate::message::MessageHubUtil;
     use crate::policy::{self as policy_base, Payload, PolicyInfo, Role, UnknownInfo};
     use crate::service::message::Audience;
     use crate::service::{self, MessageHub};

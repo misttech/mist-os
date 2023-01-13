@@ -492,7 +492,6 @@ mod tests {
     use crate::handler::setting_handler::ClientImpl;
     use crate::light::types::{LightInfo, LightState, LightType, LightValue};
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::storage::{Payload as StoragePayload, StorageRequest, StorageResponse};
     use crate::tests::fakes::hardware_light_service::HardwareLightService;
     use crate::tests::fakes::service_registry::ServiceRegistry;

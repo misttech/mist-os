@@ -106,7 +106,6 @@ mod tests {
     use crate::base::{Dependency, Entity, SettingType};
     use crate::job::source::Seeder;
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::service;
     use assert_matches::assert_matches;
     use fuchsia_component::server::ServiceFs;

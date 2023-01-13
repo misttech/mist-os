@@ -172,7 +172,6 @@ mod tests {
     use super::*;
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
-    use crate::message::MessageHubUtil;
     use crate::service;
 
     use fuchsia_inspect::assert_data_tree;

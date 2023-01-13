@@ -392,7 +392,6 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use crate::message::base::Audience;
-    use crate::message::MessageHubUtil;
     use crate::service;
 
     use fuchsia_inspect::{assert_data_tree, Inspector};

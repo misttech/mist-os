@@ -7,7 +7,6 @@ use crate::agent::{AgentError, Context, Invocation, Lifespan, Payload};
 use crate::event::{self, Event};
 use crate::input::common::CAMERA_WATCHER_TIMEOUT;
 use crate::message::base::{Audience, MessengerType};
-use crate::message::MessageHubUtil;
 use crate::service;
 use crate::service_context::ServiceContext;
 use crate::tests::fakes::camera3_service::Camera3Service;

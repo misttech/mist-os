@@ -6,7 +6,6 @@ use crate::agent::authority::Authority;
 use crate::agent::{
     AgentError, BlueprintHandle, Context, Invocation, InvocationResult, Lifespan, Payload,
 };
-use crate::message::MessageHubUtil;
 use crate::service;
 use crate::service_context::ServiceContext;
 use crate::storage::testing::InMemoryStorageFactory;

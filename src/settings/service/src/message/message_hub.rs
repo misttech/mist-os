@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::message::action_fuse::ActionFuseBuilder;
-use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
     filter::Filter, messenger, ActionSender, Address, Attribution, Audience, Fingerprint, Message,
     MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
@@ -90,7 +89,7 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static> {
 
 impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     /// Returns a new MessageHub for the given types.
-    pub(crate) fn create(fuse: Option<ActionFuseHandle>) -> Delegate<P, A> {
+    pub(crate) fn create() -> Delegate<P, A> {
         let (action_tx, mut action_rx) = futures::channel::mpsc::unbounded::<(
             Fingerprint<A>,
             MessageAction<P, A>,
@@ -115,8 +114,6 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
         };
 
         fasync::Task::spawn(async move {
-            // Released when exiting scope to signal completion.
-            let _scope_fuse = fuse;
             let id = ftrace::Id::new();
 
             trace!(id, "message hub");

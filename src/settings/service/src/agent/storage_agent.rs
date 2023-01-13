@@ -378,7 +378,6 @@ mod tests {
     use crate::async_property_test;
     use crate::display::types::LightData;
     use crate::message::base::Audience;
-    use crate::message::MessageHubUtil;
     use crate::storage::testing::InMemoryStorageFactory;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_io::DirectoryMarker;

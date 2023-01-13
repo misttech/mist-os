@@ -166,7 +166,6 @@ mod tests {
     use crate::input::MediaButtons;
     use crate::message::base::MessageEvent;
     use crate::message::receptor::Receptor;
-    use crate::message::MessageHubUtil;
     use crate::service;
     use crate::service::{Address, Payload};
     use crate::service_context::ServiceContext;

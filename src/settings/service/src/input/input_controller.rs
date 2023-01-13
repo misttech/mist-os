@@ -491,8 +491,6 @@ mod tests {
     use crate::handler::setting_handler::controller::Handle;
     use crate::handler::setting_handler::ClientImpl;
     use crate::input::input_device_configuration::{InputDeviceConfiguration, SourceState};
-    use crate::message::MessageHubUtil;
-    use crate::service::message::MessengerType;
     use crate::service_context::ServiceContext;
     use crate::storage::{Payload as StoragePayload, StorageRequest, StorageResponse};
     use crate::tests::fakes::service_registry::ServiceRegistry;
@@ -598,7 +596,7 @@ mod tests {
 
         // Create the messenger that the client proxy uses to send messages.
         let (controller_messenger, _) = message_hub
-            .create(MessengerType::Unbound)
+            .create(service::message::MessengerType::Unbound)
             .await
             .expect("Unable to create agent messenger");
 
@@ -615,7 +613,7 @@ mod tests {
 
         // Create a fake storage receptor used to receive and respond to storage messages.
         let (_, mut storage_receptor) = message_hub
-            .create(MessengerType::Addressable(Address::Storage))
+            .create(service::message::MessengerType::Addressable(Address::Storage))
             .await
             .expect("Unable to create agent messenger");
 

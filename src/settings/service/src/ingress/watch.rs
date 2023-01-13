@@ -282,7 +282,6 @@ mod tests {
     use super::*;
     use crate::base::{SettingInfo, UnknownInfo};
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::service::{Address, MessageHub};
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;

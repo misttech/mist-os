@@ -479,7 +479,6 @@ pub(super) mod execution {
 mod tests {
     use super::*;
     use crate::message::base::MessengerType;
-    use crate::message::MessageHubUtil;
     use crate::service::test::Payload;
     use crate::service::MessageHub;
     use crate::tests::scaffold::workload::Workload;
