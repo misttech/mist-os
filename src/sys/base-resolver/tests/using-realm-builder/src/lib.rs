@@ -16,6 +16,8 @@ use {
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
+mod true_base_resolver;
+
 static PKG_CACHE_RESOLVER_URL: &str =
     "fuchsia-pkg://fuchsia.com/base-resolver-integration-tests#meta/pkg-cache-resolver.cm";
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";

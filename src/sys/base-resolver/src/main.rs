@@ -4,11 +4,12 @@
 
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fuchsia_pkg::PackageName,
+    fidl_fuchsia_pkg as fpkg, fuchsia_pkg::PackageName,
 };
 
 mod base_resolver;
 mod pkg_cache_resolver;
+mod true_base_resolver;
 
 #[fuchsia::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,6 +18,7 @@ async fn main() -> anyhow::Result<()> {
     match args.as_slice() {
         ["/pkg/bin/base_resolver", "base_resolver"] => base_resolver::main().await,
         ["/pkg/bin/base_resolver", "pkg_cache_resolver"] => pkg_cache_resolver::main().await,
+        ["/pkg/bin/base_resolver", "true_base_resolver"] => true_base_resolver::main().await,
         _ => {
             tracing::error!("invalid args {:?}", args);
             anyhow::bail!("invalid args {:?}", args)
@@ -120,5 +122,34 @@ impl From<&ResolverError> for fresolution::ResolverError {
 impl From<ResolverError> for fresolution::ResolverError {
     fn from(err: ResolverError) -> fresolution::ResolverError {
         (&err).into()
+    }
+}
+
+impl From<&ResolverError> for fpkg::ResolveError {
+    fn from(err: &ResolverError) -> fpkg::ResolveError {
+        use {fpkg::ResolveError as ferror, ResolverError::*};
+        match err {
+            InvalidUrl(_)
+            | PackageHashNotSupported
+            | UnsupportedRepo
+            | AbsoluteUrlWithReservedName => ferror::InvalidUrl,
+            ComponentNotFound(_)
+            | ConfigValuesNotFound(_)
+            | AbiRevision(_)
+            | CreatingContext(_)
+            | ReadingContext(_)
+            | RelativeUrlMissingContext(_)
+            | ParsingManifest(_)
+            | UnsupportedConfigSource(_)
+            | InvalidConfigSource => ferror::Internal,
+            ReadManifest(_)
+            | CreateEndpoints(_)
+            | ServePackageDirectory(_)
+            | ConvertProxyToClient => ferror::Io,
+            PackageNotFound(_)
+            | PackageNotInBase(_)
+            | SubpackageNotFound(_)
+            | SubpackageNotInBase(_) => ferror::PackageNotFound,
+        }
     }
 }

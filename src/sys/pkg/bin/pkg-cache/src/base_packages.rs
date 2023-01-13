@@ -12,9 +12,6 @@ use {
     std::collections::{HashMap, HashSet},
 };
 
-const SYSTEM_IMAGE_NAME: &str = "system_image";
-const SYSTEM_IMAGE_VARIANT: &str = "0";
-
 /// BasePackages represents the set of packages in the static_packages list, plus the system_image
 /// package.
 #[derive(Debug)]
@@ -60,10 +57,7 @@ impl BasePackages {
             .context("failed to load static packages from system image")?
             .into_contents()
             .chain(std::iter::once((
-                PackagePath::from_name_and_variant(
-                    SYSTEM_IMAGE_NAME.parse().unwrap(),
-                    SYSTEM_IMAGE_VARIANT.parse().unwrap(),
-                ),
+                system_image::SystemImage::package_path(),
                 *system_image.hash(),
             )));
 

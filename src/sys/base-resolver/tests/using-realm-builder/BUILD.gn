@@ -9,15 +9,22 @@ rustc_test("driver") {
   name = "base_resolver_integration_test"
   edition = "2021"
   source_root = "src/lib.rs"
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/true_base_resolver.rs",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/sys/pkg/lib/fuchsia-hash",
+    "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/system-image",
     "//src/sys/pkg/testing/blobfs-ramdisk",
@@ -34,22 +41,22 @@ fuchsia_component("component") {
     "//src/storage/bin/blobfs",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/base-resolver:pkg-cache-resolver-component",
+    "//src/sys/base-resolver:true-base-resolver-component",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 
-fuchsia_test_package("package") {
+fuchsia_test_package("base-resolver-integration-tests") {
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  package_name = "base-resolver-integration-tests"
   test_components = [ ":component" ]
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":package" ]
+  public_deps = [ ":base-resolver-integration-tests" ]
 }

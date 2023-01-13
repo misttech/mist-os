@@ -103,6 +103,14 @@ impl SystemImage {
     pub fn into_root_dir(self) -> RootDir<blobfs::Client> {
         self.root_dir
     }
+
+    /// The package path of the system image package.
+    pub fn package_path() -> fuchsia_pkg::PackagePath {
+        fuchsia_pkg::PackagePath::from_name_and_variant(
+            "system_image".parse().expect("valid package name"),
+            fuchsia_pkg::PackageVariant::zero(),
+        )
+    }
 }
 
 #[cfg(test)]
