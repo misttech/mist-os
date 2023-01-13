@@ -18,7 +18,6 @@ if (is_host) {
       "//third_party/rust_crates:cfg-if",
     ]
     test_deps = [
-      "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:lazy_static",

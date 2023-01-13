@@ -19,71 +19,143 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, process::Command, time::Duration};
 
 #[async_trait]
-pub trait EmulatorEngine {
+pub trait EmulatorEngine: Send {
     /// Prepare an emulator to run. This function shouldn't require any additional configuration as
     /// input, since the object should be fully configured by the EngineBuilder. At its most basic,
     /// this should assemble the command-line to invoke the emulator binary. If support processes
     /// are required, or temporary files need to be written to disk, that would be handled here.
-    async fn stage(&mut self) -> Result<()>;
+    async fn stage(&mut self) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Given a staged emulator instance, start it running. When the function returns, either the
     /// emulator will be running independently, or an error will be sent back explaining the failure.
     async fn start(
         &mut self,
-        mut emulator_cmd: Command,
-        proxy: &ffx::TargetCollectionProxy,
-    ) -> Result<i32>;
+        mut _emulator_cmd: Command,
+        _proxy: &ffx::TargetCollectionProxy,
+    ) -> Result<i32> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Shut down a running emulator instance. The engine should have been instantiated from a saved
     /// and serialized instance, so no additional initialization should be needed. This function
     /// will terminate a running emulator instance, which will be specified on the command line. It
     /// may return an error if the instance doesn't exist or the shut down fails, but should succeed
     /// if it's no longer running or gets successfully shut down.
-    async fn stop(&mut self, proxy: &ffx::TargetCollectionProxy) -> Result<()>;
+    async fn stop(&mut self, _proxy: &ffx::TargetCollectionProxy) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Output the details of an existing emulation instance. The engine should have been
     /// instantiated from a saved and serialized instance, so no additional initialization should be
     /// needed. This function will output text to the terminal describing the instance, its status,
     /// and its configuration. This is an engine-specific output with more detail than `ffx list`.
-    fn show(&self, details: Vec<ShowDetail>);
+    fn show(&self, _details: Vec<ShowDetail>) {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Complete and validate the configuration parameters that have been provided to this engine,
     /// according to the requirements for this engine type. If there are fields which are required,
     /// mutually exclusive, only work when applied in certain combinations, or don't apply to this
     /// engine type, this function will return an error indicating which field(s) and why. It also
     /// returns an error if the engine has already been started. Otherwise, this returns Ok(()).
-    fn configure(&mut self) -> Result<()>;
+    fn configure(&mut self) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Returns the EngineType used when building this engine. Each engine implementation should
     /// always return the same EngineType.
-    fn engine_type(&self) -> EngineType;
+    fn engine_type(&self) -> EngineType {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Returns true if this instance of the emulator is currently running.
     /// This is checked by using signal to the process id, no consideration is
     /// made for multi threaded access.
-    fn is_running(&mut self) -> bool;
+    fn is_running(&mut self) -> bool {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Once the engine has been staged, this generates the command line required to start
     /// emulation. There are no side-effects, and the operation can be repeated as necessary.
-    fn build_emulator_cmd(&self) -> Command;
+    fn build_emulator_cmd(&self) -> Command {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Determine the appropriate binary for the target engine, and load its path into the
     /// engine's configuration for future use.
-    async fn load_emulator_binary(&mut self) -> Result<()>;
+    async fn load_emulator_binary(&mut self) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Access to the engine's emulator_configuration field.
-    fn emu_config(&self) -> &EmulatorConfiguration;
+    fn emu_config(&self) -> &EmulatorConfiguration {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Mutable access to the engine's emulator_configuration field.
-    fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration;
+    fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Attach the current process to one of the emulator's consoles.
-    fn attach(&self, console: EngineConsoleType) -> Result<()>;
+    fn attach(&self, _console: EngineConsoleType) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
     /// Access to the engine's engine_state field.
-    fn engine_state(&self) -> EngineState;
+    fn engine_state(&self) -> EngineState {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 
-    fn save_to_disk(&self) -> Result<()>;
+    /// Serialize the contents of the EmulatorEngine to its instance directory on the
+    /// local file system.
+    fn save_to_disk(&self) -> Result<()> {
+        unimplemented!(
+            "These default trait implementations are to allow for easier testing and \
+            should not be used directly"
+        )
+    }
 }
 
 /// Collects the specific configurations into a single struct for ease of passing around.

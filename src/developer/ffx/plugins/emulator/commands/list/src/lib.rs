@@ -100,13 +100,9 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use async_trait::async_trait;
-    use ffx_emulator_config::{
-        EmulatorConfiguration, EmulatorEngine, EngineConsoleType, EngineType, ShowDetail,
-    };
-    use fidl_fuchsia_developer_ffx as ffx;
+    use ffx_emulator_config::{EmulatorEngine, EngineType};
     use lazy_static::lazy_static;
     use std::{
-        process::Command,
         str,
         sync::{Mutex, MutexGuard},
     };
@@ -139,21 +135,6 @@ mod tests {
 
     #[async_trait]
     impl EmulatorEngine for TestEngine {
-        async fn start(&mut self, _: Command, _: &ffx::TargetCollectionProxy) -> Result<i32> {
-            todo!()
-        }
-        async fn stop(&mut self, _: &ffx::TargetCollectionProxy) -> Result<()> {
-            todo!()
-        }
-        fn show(&self, _: Vec<ShowDetail>) {
-            todo!()
-        }
-        async fn stage(&mut self) -> Result<()> {
-            todo!()
-        }
-        fn configure(&mut self) -> Result<()> {
-            todo!()
-        }
         fn engine_state(&self) -> EngineState {
             self.engine_state
         }
@@ -162,24 +143,6 @@ mod tests {
         }
         fn is_running(&mut self) -> bool {
             self.running_flag
-        }
-        fn build_emulator_cmd(&self) -> Command {
-            todo!()
-        }
-        async fn load_emulator_binary(&mut self) -> Result<()> {
-            todo!()
-        }
-        fn emu_config(&self) -> &EmulatorConfiguration {
-            todo!()
-        }
-        fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
-            todo!()
-        }
-        fn attach(&self, _console: EngineConsoleType) -> Result<()> {
-            todo!()
-        }
-        fn save_to_disk(&self) -> Result<()> {
-            todo!()
         }
     }
 

@@ -684,7 +684,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use ffx_config::{query, ConfigLevel};
-    use ffx_emulator_config::{EngineType, ShowDetail};
+    use ffx_emulator_config::EngineType;
     use lazy_static::lazy_static;
     use serde::Serialize;
     use serde_json::json;
@@ -723,21 +723,6 @@ mod tests {
     }
     #[async_trait]
     impl EmulatorEngine for TestEngine {
-        async fn start(&mut self, _: Command, _: &ffx::TargetCollectionProxy) -> Result<i32> {
-            todo!()
-        }
-        async fn stop(&mut self, _: &ffx::TargetCollectionProxy) -> Result<()> {
-            todo!()
-        }
-        fn show(&self, _: Vec<ShowDetail>) {
-            todo!()
-        }
-        async fn stage(&mut self) -> Result<()> {
-            todo!()
-        }
-        fn configure(&mut self) -> Result<()> {
-            todo!()
-        }
         fn engine_state(&self) -> EngineState {
             EngineState::default()
         }
@@ -746,24 +731,6 @@ mod tests {
         }
         fn is_running(&mut self) -> bool {
             false
-        }
-        fn build_emulator_cmd(&self) -> Command {
-            todo!()
-        }
-        async fn load_emulator_binary(&mut self) -> Result<()> {
-            todo!()
-        }
-        fn emu_config(&self) -> &EmulatorConfiguration {
-            todo!()
-        }
-        fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
-            todo!()
-        }
-        fn attach(&self, _console: EngineConsoleType) -> Result<()> {
-            todo!()
-        }
-        fn save_to_disk(&self) -> Result<()> {
-            todo!()
         }
     }
     impl SerializingEngine for TestEngine {}
