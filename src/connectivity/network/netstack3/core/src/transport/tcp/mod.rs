@@ -94,21 +94,43 @@ impl Default for BufferSizes {
     }
 }
 
+/// TCP socket options.
+///
+/// This only stores options that are trivial to get and set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SocketOptions {
+    /// Socket options that control TCP keep-alive mechanism, see [`KeepAlive`].
+    pub keep_alive: KeepAlive,
+    /// Switch to turn nagle algorithm on/off.
+    pub nagle_enabled: bool,
+}
+
+impl Default for SocketOptions {
+    fn default() -> Self {
+        Self {
+            keep_alive: KeepAlive::default(),
+            // RFC 9293 Section 3.7.4:
+            //   A TCP implementation SHOULD implement the Nagle algorithm to
+            //   coalesce short segments
+            nagle_enabled: true,
+        }
+    }
+}
+
 /// Options that are related to TCP keep-alive.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KeepAlive {
-    /// TCP_KEEPIDLE, the amount of time for an idle connection to wait before
-    /// sending out probes.
+    /// The amount of time for an idle connection to wait before sending out
+    /// probes.
     pub idle: NonZeroDuration,
-    /// TCP_KEEPINTVL, interval between consecutive probes.
+    /// Interval between consecutive probes.
     pub interval: NonZeroDuration,
-    /// TCP_KEEPCNT, maximum number of probes we send before considering the
-    /// connection dead.
+    /// Maximum number of probes we send before considering the connection dead.
     ///
     /// `u8` is enough because if a connection doesn't hear back from the peer
     /// after 256 probes, then chances are that the connection is already dead.
     pub count: NonZeroU8,
-    /// SO_KEEPALIVE, we only send probes if keep-alive is enabled.
+    /// Only send probes if keep-alive is enabled.
     pub enabled: bool,
 }
 
@@ -126,24 +148,5 @@ impl Default for KeepAlive {
             //   ... they MUST default to off.
             enabled: false,
         }
-    }
-}
-
-/// If the connection is using nagle algorithm.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum NagleAlgorithm {
-    Enabled,
-    // TODO(https://fxbug.dev/117115): This is unused before we can change the
-    // option value.
-    #[allow(unused)]
-    Disabled,
-}
-
-impl Default for NagleAlgorithm {
-    fn default() -> Self {
-        // RFC 9293 Section 3.7.4:
-        //   A TCP implementation SHOULD implement the Nagle algorithm to
-        //   coalesce short segments
-        NagleAlgorithm::Enabled
     }
 }

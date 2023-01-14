@@ -40,7 +40,7 @@ use crate::{
             SocketAddr, Sockets, SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
-        BufferSizes, Control, KeepAlive, UserError,
+        BufferSizes, Control, KeepAlive, SocketOptions, UserError,
     },
 };
 
@@ -263,7 +263,13 @@ where
         .get_by_id_mut(&conn_id)
         .expect("inconsistent state: invalid connection id");
 
-    let Connection { acceptor: _, state, ip_sock, defunct, keep_alive } = conn;
+    let Connection {
+        acceptor: _,
+        state,
+        ip_sock,
+        defunct,
+        socket_options: SocketOptions { keep_alive, nagle_enabled: _ },
+    } = conn;
 
     // Send the reply to the segment immediately.
     let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, keep_alive);
@@ -300,7 +306,7 @@ where
             state: _,
             ip_sock: _,
             defunct: _,
-            keep_alive: _,
+            socket_options: _,
         } => {
             let listener_id = *listener_id;
             conn.acceptor = Some(Acceptor::Ready(listener_id));
@@ -353,7 +359,7 @@ where
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
         incoming_addrs;
 
-    let Listener { pending, backlog, buffer_sizes, ready, keep_alive } = match maybe_listener {
+    let Listener { pending, backlog, buffer_sizes, ready, socket_options } = match maybe_listener {
         MaybeListener::Bound(_bound) => {
             // If the socket is only bound, but not listening.
             return false;
@@ -409,7 +415,7 @@ where
     if matches!(state, State::SynRcvd(_)) {
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
         let bound_device = bound_device.clone();
-        let keep_alive = keep_alive.clone();
+        let socket_options = socket_options.clone();
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
@@ -428,7 +434,7 @@ where
                     state,
                     ip_sock,
                     defunct: false,
-                    keep_alive,
+                    socket_options,
                 },
                 // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
                 (),

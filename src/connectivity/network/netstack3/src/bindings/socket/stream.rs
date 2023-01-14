@@ -41,12 +41,12 @@ use netstack3_core::{
             get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
             remove_unbound, send_buffer_size, set_bound_device, set_connection_device,
             set_listener_device, set_send_buffer_size, set_unbound_device, shutdown_conn,
-            shutdown_listener, with_keep_alive, with_keep_alive_mut, AcceptError, BoundId,
+            shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError, BoundId,
             BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenerId, NoConnection,
             SocketAddr, UnboundId,
         },
         state::Takeable,
-        BufferSizes, KeepAlive,
+        BufferSizes, SocketOptions,
     },
     Ctx,
 };
@@ -973,11 +973,11 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
-                self.with_keep_alive_mut(|k| k.enabled = enabled).await;
+                self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled).await;
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
-                let enabled = self.with_keep_alive(|k| k.enabled).await;
+                let enabled = self.with_socket_options(|so| so.keep_alive.enabled).await;
                 responder_send!(responder, &mut Ok(enabled));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
@@ -1195,8 +1195,8 @@ where
                     .filter(|value_secs| value_secs.get() <= MAX_TCP_KEEPIDLE_SECS)
                 {
                     Some(secs) => {
-                        self.with_keep_alive_mut(|k| {
-                            k.idle = NonZeroDuration::from_nonzero_secs(secs)
+                        self.with_socket_options_mut(|so| {
+                            so.keep_alive.idle = NonZeroDuration::from_nonzero_secs(secs)
                         })
                         .await;
                         responder_send!(responder, &mut Ok(()));
@@ -1207,7 +1207,9 @@ where
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
-                let secs = self.with_keep_alive(|k| Duration::from(k.idle).as_secs()).await;
+                let secs = self
+                    .with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs())
+                    .await;
                 responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
@@ -1218,8 +1220,8 @@ where
                     .filter(|value_secs| value_secs.get() <= MAX_TCP_KEEPINTVL_SECS)
                 {
                     Some(secs) => {
-                        self.with_keep_alive_mut(|k| {
-                            k.interval = NonZeroDuration::from_nonzero_secs(secs)
+                        self.with_socket_options_mut(|so| {
+                            so.keep_alive.interval = NonZeroDuration::from_nonzero_secs(secs)
                         })
                         .await;
                         responder_send!(responder, &mut Ok(()));
@@ -1230,7 +1232,9 @@ where
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
-                let secs = self.with_keep_alive(|k| Duration::from(k.interval).as_secs()).await;
+                let secs = self
+                    .with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs())
+                    .await;
                 responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
@@ -1240,8 +1244,8 @@ where
                     .filter(|count| count.get() <= MAX_TCP_KEEPCNT)
                 {
                     Some(count) => {
-                        self.with_keep_alive_mut(|k| {
-                            k.count = count;
+                        self.with_socket_options_mut(|so| {
+                            so.keep_alive.count = count;
                         })
                         .await;
                         responder_send!(responder, &mut Ok(()));
@@ -1252,7 +1256,7 @@ where
                 };
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
-                let count = self.with_keep_alive(|k| k.count).await;
+                let count = self.with_socket_options(|so| so.keep_alive.count).await;
                 responder_send!(responder, &mut Ok(u32::from(u8::from(count))));
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value: _, responder } => {
@@ -1307,25 +1311,25 @@ where
         ControlFlow::Continue(None)
     }
 
-    async fn with_keep_alive_mut<R, F: FnOnce(&mut KeepAlive) -> R>(&mut self, f: F) -> R {
+    async fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(&mut self, f: F) -> R {
         let mut guard = self.ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
         match self.id {
-            SocketId::Unbound(id, _) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Bound(id, _) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Connection(id, _) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Listener(id) => with_keep_alive_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Unbound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Bound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Connection(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Listener(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
         }
     }
 
-    async fn with_keep_alive<R, F: FnOnce(&KeepAlive) -> R>(&mut self, f: F) -> R {
+    async fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(&mut self, f: F) -> R {
         let guard = self.ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx: _ } = &*guard;
         match self.id {
-            SocketId::Unbound(id, _) => with_keep_alive(sync_ctx, id, f),
-            SocketId::Bound(id, _) => with_keep_alive(sync_ctx, id, f),
-            SocketId::Connection(id, _) => with_keep_alive(sync_ctx, id, f),
-            SocketId::Listener(id) => with_keep_alive(sync_ctx, id, f),
+            SocketId::Unbound(id, _) => with_socket_options(sync_ctx, id, f),
+            SocketId::Bound(id, _) => with_socket_options(sync_ctx, id, f),
+            SocketId::Connection(id, _) => with_socket_options(sync_ctx, id, f),
+            SocketId::Listener(id) => with_socket_options(sync_ctx, id, f),
         }
     }
 }
