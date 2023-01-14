@@ -80,8 +80,6 @@ pub async fn run_tool(
                 if in_result.is_err() {
                     writeln!(writer, "Failed to copy from stdin stream.")?;
                 }
-
-                break;
             },
             out_result = out_copy => {
                 out_result?;
@@ -107,6 +105,8 @@ pub async fn run_tool(
         if code != 0 {
             return Err(anyhow!("Tool exited with non-zero exit code ({})", code));
         }
+    } else {
+        return Err(anyhow!("No exit code available, the tool did not run fully."));
     }
 
     Ok(())
