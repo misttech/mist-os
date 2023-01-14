@@ -9,21 +9,25 @@
 namespace media_audio {
 namespace {
 
-TEST(AtomicOptionalTest, SwapPop) {
+TEST(AtomicOptionalTest, PushPop) {
   AtomicOptional<int> v;
-
   EXPECT_EQ(v.pop(), std::nullopt);
-  EXPECT_EQ(v.swap(1), std::nullopt);
-  EXPECT_EQ(v.swap(2), 1);
-  EXPECT_EQ(v.pop(), 2);
-  EXPECT_EQ(v.pop(), std::nullopt);
-}
 
-TEST(AtomicOptionalTest, SetMustBeEmpty) {
-  AtomicOptional<int> v;
+  // Operate >2 times to make sure to test beyond the internal buffer size.
+  for (int i = 1; i <= 3; ++i) {
+    SCOPED_TRACE(i);
 
-  v.set_must_be_empty(1);
-  EXPECT_EQ(v.pop(), 1);
+    // Only the first push will be successful.
+    EXPECT_TRUE(v.push(i));
+    EXPECT_FALSE(v.push(10 * i));
+    EXPECT_FALSE(v.push(20 * i));
+    EXPECT_FALSE(v.push(30 * i));
+
+    // Only the first pop should have a value.
+    EXPECT_EQ(v.pop(), i);
+    EXPECT_EQ(v.pop(), std::nullopt);
+    EXPECT_EQ(v.pop(), std::nullopt);
+  }
 }
 
 }  // namespace

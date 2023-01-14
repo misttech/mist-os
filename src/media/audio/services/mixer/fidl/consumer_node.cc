@@ -76,7 +76,7 @@ ConsumerNode::ConsumerNode(std::string_view name, std::shared_ptr<Clock> referen
 }
 
 bool ConsumerNode::Start(ConsumerStage::StartCommand cmd) const {
-  if (pending_start_stop_command_->swap(std::move(cmd))) {
+  if (!pending_start_stop_command_->push(std::move(cmd))) {
     return false;
   }
   mix_thread_->NotifyConsumerStarting(consumer_stage_);
@@ -84,7 +84,7 @@ bool ConsumerNode::Start(ConsumerStage::StartCommand cmd) const {
 }
 
 bool ConsumerNode::Stop(ConsumerStage::StopCommand cmd) const {
-  if (pending_start_stop_command_->swap(std::move(cmd))) {
+  if (!pending_start_stop_command_->push(std::move(cmd))) {
     return false;
   }
   mix_thread_->NotifyConsumerStarting(consumer_stage_);

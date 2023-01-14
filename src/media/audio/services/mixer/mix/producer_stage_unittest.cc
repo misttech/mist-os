@@ -66,16 +66,16 @@ class ProducerStageTestWithPacketQueue : public ::testing::Test {
   }
 
   void SendStartCommand(zx::time start_presentation_time, Fixed start_frame) {
-    pending_start_stop_command_->set_must_be_empty(ProducerStage::StartCommand{
+    FX_CHECK(pending_start_stop_command_->push(ProducerStage::StartCommand{
         .start_time = RealTime{.clock = WhichClock::kReference, .time = start_presentation_time},
         .stream_time = start_frame,
-    });
+    }));
   }
 
   void SendStopCommand(Fixed stop_frame) {
-    pending_start_stop_command_->set_must_be_empty(ProducerStage::StopCommand{
+    FX_CHECK(pending_start_stop_command_->push(ProducerStage::StopCommand{
         .when = stop_frame,
-    });
+    }));
   }
 
   ProducerStage& producer_stage() { return producer_stage_; }
@@ -446,16 +446,16 @@ class ProducerStageTestWithRingBuffer : public ::testing::Test {
   }
 
   void SendStartCommand(zx::time start_presentation_time, Fixed start_frame) {
-    pending_start_stop_command_->set_must_be_empty(ProducerStage::StartCommand{
+    FX_CHECK(pending_start_stop_command_->push(ProducerStage::StartCommand{
         .start_time = RealTime{.clock = WhichClock::kReference, .time = start_presentation_time},
         .stream_time = start_frame,
-    });
+    }));
   }
 
   void SendStopCommand(Fixed stop_frame) {
-    pending_start_stop_command_->set_must_be_empty(ProducerStage::StopCommand{
+    FX_CHECK(pending_start_stop_command_->push(ProducerStage::StopCommand{
         .when = stop_frame,
-    });
+    }));
   }
 
   ProducerStage& producer_stage() { return producer_stage_; }
