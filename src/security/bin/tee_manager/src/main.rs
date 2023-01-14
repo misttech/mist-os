@@ -12,7 +12,7 @@ use {
     crate::config::Config,
     crate::device_server::{serve_application_passthrough, serve_device_info_passthrough},
     anyhow::{format_err, Context as _, Error},
-    fidl::prelude::*,
+    fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd},
     fidl_fuchsia_hardware_tee::{DeviceConnectorMarker, DeviceConnectorProxy},
     fidl_fuchsia_tee::{self as fuchsia_tee, DeviceInfoMarker},
     fuchsia_async as fasync,
@@ -20,7 +20,7 @@ use {
     fuchsia_fs::OpenFlags,
     fuchsia_syslog as syslog,
     fuchsia_syslog::macros::*,
-    fuchsia_vfs_watcher as vfs, fuchsia_zircon as zx,
+    fuchsia_vfs_watcher as vfs,
     futures::{prelude::*, select, stream::FusedStream},
     std::path::{Path, PathBuf},
     uuid::Uuid,
@@ -29,8 +29,8 @@ use {
 const DEV_TEE_PATH: &str = "/dev/class/tee";
 
 enum IncomingRequest {
-    Application(zx::Channel, fuchsia_tee::Uuid),
-    DeviceInfo(zx::Channel),
+    Application(ServerEnd<fuchsia_tee::ApplicationMarker>, fuchsia_tee::Uuid),
+    DeviceInfo(ServerEnd<fuchsia_tee::DeviceInfoMarker>),
 }
 
 #[fasync::run_singlethreaded]
@@ -39,21 +39,26 @@ async fn main() -> Result<(), Error> {
 
     let device_list = enumerate_tee_devices().await?;
 
-    if device_list.len() == 0 {
-        return Err(format_err!("No TEE devices found"));
-    } else if device_list.len() > 1 {
-        // Cannot handle more than one TEE device
-        // If this becomes supported, Manager will need to provide a method for clients to
-        // enumerate and select a device to connect to.
-        return Err(format_err!("Found more than 1 TEE device - this is currently not supported"));
-    }
+    let path = match device_list.as_slice() {
+        [] => return Err(format_err!("No TEE devices found")),
+        [path] => path.to_str().unwrap(),
+        _device_list => {
+            // Cannot handle more than one TEE device
+            // If this becomes supported, Manager will need to provide a method for clients to
+            // enumerate and select a device to connect to.
+            return Err(format_err!(
+                "Found more than 1 TEE device - this is currently not supported"
+            ));
+        }
+    };
 
     let dev_connector_proxy =
-        open_tee_device_connector(device_list.first().unwrap().to_str().unwrap())?;
+        fuchsia_component::client::connect_to_protocol_at_path::<DeviceConnectorMarker>(path)
+            .context("Failed to connect to TEE DeviceConnectorProxy")?;
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_service_at(DeviceInfoMarker::PROTOCOL_NAME, |channel| {
-        Some(IncomingRequest::DeviceInfo(channel))
+        Some(IncomingRequest::DeviceInfo(ServerEnd::new(channel)))
     });
 
     match Config::from_file() {
@@ -63,7 +68,7 @@ async fn main() -> Result<(), Error> {
                 fx_log_debug!("Serving {}", service_name);
                 let fidl_uuid = uuid_to_fuchsia_tee_uuid(&app_uuid);
                 fs.dir("svc").add_service_at(service_name, move |channel| {
-                    Some(IncomingRequest::Application(channel, fidl_uuid))
+                    Some(IncomingRequest::Application(ServerEnd::new(channel), fidl_uuid))
                 });
             }
         }
@@ -130,14 +135,6 @@ async fn create_watcher(path: &str) -> Result<vfs::Watcher, Error> {
     Ok(watcher)
 }
 
-fn open_tee_device_connector(path: &str) -> Result<DeviceConnectorProxy, Error> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<DeviceConnectorMarker>()
-        .context("Failed to create TEE DeviceConnectorProxy")?;
-    fdio::service_connect(path, server.into_channel())
-        .context("Failed to connect to TEE DeviceConnectorProxy")?;
-    Ok(proxy)
-}
-
 /// Converts a `uuid::Uuid` to a `fidl_fuchsia_tee::Uuid`.
 fn uuid_to_fuchsia_tee_uuid(uuid: &Uuid) -> fuchsia_tee::Uuid {
     let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = uuid.as_fields();
@@ -154,12 +151,11 @@ fn uuid_to_fuchsia_tee_uuid(uuid: &Uuid) -> fuchsia_tee::Uuid {
 mod tests {
     use {
         super::*,
-        fidl::{endpoints, Error},
+        fidl::{endpoints, Error, HandleBased as _},
         fidl_fuchsia_hardware_tee::DeviceConnectorRequest,
         fidl_fuchsia_io as fio,
         fidl_fuchsia_tee::ApplicationMarker,
         fidl_fuchsia_tee_manager::ProviderProxy,
-        fuchsia_zircon::HandleBased,
         fuchsia_zircon_status::Status,
         futures::channel::mpsc,
     };
@@ -250,7 +246,7 @@ mod tests {
         let app_proxy =
             app_client.into_proxy().expect("Failed to convert ClientEnd to DeviceProxy");
         sender
-            .try_send(IncomingRequest::Application(app_server.into_channel(), app_uuid))
+            .try_send(IncomingRequest::Application(app_server, app_uuid))
             .expect("Unable to send Application Request");
 
         let (result, _) = app_proxy.take_event_stream().into_future().await;
@@ -293,7 +289,7 @@ mod tests {
             .expect("Failed to convert ClientEnd to DeviceInfoProxy");
 
         sender
-            .try_send(IncomingRequest::DeviceInfo(device_info_server.into_channel()))
+            .try_send(IncomingRequest::DeviceInfo(device_info_server))
             .expect("Unable to send DeviceInfo Request");
 
         let (result, _) = device_info_proxy.take_event_stream().into_future().await;

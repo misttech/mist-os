@@ -3,43 +3,39 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Context as _, Error},
-    fdio,
-    fidl::endpoints::RequestStream,
+    anyhow::{Context as _, Error},
     fidl_fuchsia_tee_manager::{ProviderRequest, ProviderRequestStream},
-    fuchsia_async as fasync,
-    futures::prelude::*,
-    std::{fs, path::PathBuf},
+    futures::stream::TryStreamExt as _,
 };
 
 /// `ProviderServer` implements the fuchsia.tee.manager.Provider FIDL protocol.
 pub struct ProviderServer {
-    storage_dir: PathBuf,
+    storage_dir: &'static str,
 }
 
 impl ProviderServer {
-    pub fn try_new(storage_dir: PathBuf) -> Result<Self, Error> {
-        fs::create_dir_all(&storage_dir)?;
+    pub fn try_new(storage_dir: &'static str) -> Result<Self, Error> {
+        std::fs::create_dir_all(&storage_dir)?;
         Ok(Self { storage_dir })
     }
 
-    pub async fn serve(self, chan: fasync::Channel) -> Result<(), Error> {
-        let mut request_stream = ProviderRequestStream::from_channel(chan);
-
-        while let Some(request) = request_stream
-            .try_next()
+    pub async fn serve(&self, stream: ProviderRequestStream) -> Result<(), Error> {
+        let Self { storage_dir } = self;
+        stream
+            .err_into()
+            .try_for_each(|ProviderRequest::RequestPersistentStorage { dir, control_handle: _ }| {
+                futures::future::ready(
+                    fuchsia_fs::directory::open_channel_in_namespace(
+                        storage_dir,
+                        fuchsia_fs::OpenFlags::RIGHT_READABLE
+                            | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+                        dir,
+                    )
+                    .with_context(|| {
+                        format!("Failed to connect to storage directory ({}) service", storage_dir,)
+                    }),
+                )
+            })
             .await
-            .context("Error receiving ProviderRequestStream message")?
-        {
-            let ProviderRequest::RequestPersistentStorage { dir, .. } = request;
-
-            let storage_dir_str =
-                self.storage_dir.to_str().ok_or_else(|| format_err!("Invalid storage path"))?;
-            fdio::service_connect(storage_dir_str, dir.into_channel()).with_context(|| {
-                format!("Failed to connect to storage directory ({}) service", storage_dir_str)
-            })?;
-        }
-
-        Ok(())
     }
 }
