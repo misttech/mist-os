@@ -69,6 +69,7 @@ pub fn dispatch_syscall(
         clock_gettime[2],
         clock_nanosleep[4],
         clone[5],
+        clone3[2],
         close[1],
         connect[3],
         creat[2],
@@ -163,6 +164,9 @@ pub fn dispatch_syscall(
         newfstatat[4],
         open[3],
         openat[4],
+        // pidfd_getfd[3],  // TODO(fxbug.dev/119476) implement pidfd support.
+        // pidfd_open[2],
+        // pidfd_send_signal[4],
         pipe2[2],
         pipe[1],
         poll[3],

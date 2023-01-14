@@ -4,6 +4,7 @@
 
 use fuchsia_zircon::AsHandleRef;
 
+use static_assertions::const_assert;
 use std::ffi::CString;
 use std::sync::Arc;
 use zerocopy::AsBytes;
@@ -15,6 +16,34 @@ use crate::mm::*;
 use crate::syscalls::*;
 use crate::task::*;
 
+fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
+    let child_exit_signal = if args.exit_signal == 0 {
+        None
+    } else {
+        Some(Signal::try_from(UncheckedSignal::new(args.exit_signal))?)
+    };
+
+    let mut new_task = current_task.clone_task(
+        args.flags,
+        child_exit_signal,
+        UserRef::<pid_t>::new(UserAddress::from(args.parent_tid)),
+        UserRef::<pid_t>::new(UserAddress::from(args.child_tid)),
+    )?;
+    let tid = new_task.id;
+
+    new_task.registers = current_task.registers;
+    new_task.registers.rax = 0;
+    if args.stack != 0 {
+        new_task.registers.rsp = args.stack;
+    }
+    if args.flags & (CLONE_SETTLS as u64) != 0 {
+        new_task.registers.fs_base = args.tls;
+    }
+
+    execute_task(new_task, |_| {});
+    Ok(tid)
+}
+
 pub fn sys_clone(
     current_task: &CurrentTask,
     flags: u64,
@@ -23,26 +52,46 @@ pub fn sys_clone(
     user_child_tid: UserRef<pid_t>,
     user_tls: UserAddress,
 ) -> Result<pid_t, Errno> {
-    let mut new_task = current_task.clone_task(flags, user_parent_tid, user_child_tid)?;
-    let tid = new_task.id;
+    // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
+    // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
+    do_clone(
+        current_task,
+        &clone_args {
+            flags: flags & !(CSIGNAL as u64),
+            child_tid: user_child_tid.addr().ptr() as u64,
+            parent_tid: user_parent_tid.addr().ptr() as u64,
+            exit_signal: flags & (CSIGNAL as u64),
+            stack: user_stack.ptr() as u64,
+            tls: user_tls.ptr() as u64,
+            ..Default::default()
+        },
+    )
+}
 
-    new_task.registers = current_task.registers;
-    new_task.registers.rax = 0;
-    if !user_stack.is_null() {
-        new_task.registers.rsp = user_stack.ptr() as u64;
-    }
-    if flags & (CLONE_SETTLS as u64) != 0 {
-        new_task.registers.fs_base = user_tls.ptr() as u64;
+pub fn sys_clone3(
+    current_task: &CurrentTask,
+    user_clone_args: UserRef<clone_args>,
+    user_clone_args_size: usize,
+) -> Result<pid_t, Errno> {
+    // Only these specific sized versions are supported.
+    if !(user_clone_args_size == CLONE_ARGS_SIZE_VER0 as usize
+        || user_clone_args_size == CLONE_ARGS_SIZE_VER1 as usize
+        || user_clone_args_size == CLONE_ARGS_SIZE_VER2 as usize)
+    {
+        return error!(EINVAL);
     }
 
-    execute_task(new_task, |_| {});
-    Ok(tid)
+    // The most recent version of the struct size should match our definition.
+    const_assert!(std::mem::size_of::<clone_args>() == CLONE_ARGS_SIZE_VER2 as usize);
+
+    let clone_args = current_task.mm.read_object_partial(user_clone_args, user_clone_args_size)?;
+    do_clone(current_task, &clone_args)
 }
 
 pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     not_implemented!(current_task, "vfork is not implemented. A normal fork is executed instead.");
     let mut new_task =
-        current_task.clone_task(SIGCHLD.number() as u64, UserRef::default(), UserRef::default())?;
+        current_task.clone_task(0, Some(SIGCHLD), UserRef::default(), UserRef::default())?;
     let tid = new_task.id;
 
     new_task.registers = current_task.registers;

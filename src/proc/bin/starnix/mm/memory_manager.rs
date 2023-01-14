@@ -943,6 +943,35 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         Ok(object)
     }
 
+    /// Reads the first `partial` bytes of an object, leaving any remainder 0-filled.
+    ///
+    /// This is used for reading size-versioned structures where the user can specify an older
+    /// version of the structure with a smaller size.
+    ///
+    /// Returns EINVAL if the input size is larger than the object (assuming the input size is from
+    /// the user who has specified something we don't support).
+    fn read_object_partial<T: FromBytes>(
+        &self,
+        user: UserRef<T>,
+        partial_size: usize,
+    ) -> Result<T, Errno> {
+        let full_size = std::mem::size_of::<T>();
+        if partial_size > full_size {
+            return error!(EINVAL);
+        }
+
+        // This implementation involves an extra memcpy compared to read_object but avoids unsafe
+        // code. This isn't currently called very often.
+        let mut full_buffer = std::vec::Vec::<u8>::with_capacity(full_size);
+        full_buffer.resize(partial_size, 0u8);
+
+        self.read_memory(user.addr(), &mut full_buffer)?;
+        full_buffer.resize(full_size, 0u8); // Zero pad out to the correct size.
+
+        // This should only fail if we provided a mis-sized buffers so panicking is OK.
+        Ok(T::read_from(&*full_buffer).unwrap())
+    }
+
     fn read_objects<T: FromBytes>(&self, user: UserRef<T>, objects: &mut [T]) -> Result<(), Errno> {
         for (index, object) in objects.iter_mut().enumerate() {
             *object = self.read_object(user.at(index))?;
@@ -2352,6 +2381,51 @@ mod tests {
         mm.read_objects(items_ref, &mut items_read).expect("Failed to read empty object array.");
 
         assert_eq!(items_written, items_read);
+    }
+
+    #[::fuchsia::test]
+    fn test_read_object_partial() {
+        #[derive(Debug, Default, Copy, Clone, FromBytes, PartialEq)]
+        struct Items {
+            val: [i32; 4],
+        }
+
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let items_array_ref = UserRef::<i32>::new(addr);
+
+        // Populate some values.
+        let items_written = vec![75, 23, 51, 98];
+        mm.write_objects(items_array_ref, &items_written).expect("Failed to write object array.");
+
+        // Full read of all 4 values.
+        let items_ref = UserRef::<Items>::new(addr);
+        let items_read = mm
+            .read_object_partial(items_ref, std::mem::size_of::<Items>())
+            .expect("Failed to read object");
+        assert_eq!(items_written, items_read.val);
+
+        // Partial read of the first two.
+        let items_read = mm.read_object_partial(items_ref, 8).expect("Failed to read object");
+        assert_eq!(vec![75, 23, 0, 0], items_read.val);
+
+        // The API currently allows reading 0 bytes (this could be re-evaluated) so test that does
+        // the right thing.
+        let items_read = mm.read_object_partial(items_ref, 0).expect("Failed to read object");
+        assert_eq!(vec![0, 0, 0, 0], items_read.val);
+
+        // Size bigger than the object.
+        assert_eq!(
+            mm.read_object_partial(items_ref, std::mem::size_of::<Items>() + 8),
+            error!(EINVAL)
+        );
+
+        // Bad pointer.
+        assert_eq!(
+            mm.read_object_partial(UserRef::<Items>::new(UserAddress::from(1)), 16),
+            error!(EFAULT)
+        );
     }
 
     #[::fuchsia::test]

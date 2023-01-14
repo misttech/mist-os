@@ -322,9 +322,13 @@ impl Task {
     /// according to the given flags.
     ///
     /// Used by the clone() syscall to create both processes and threads.
+    ///
+    /// The exit signal is broken out from the flags parameter like clone3() rather than being
+    /// bitwise-ORed like clone().
     pub fn clone_task(
         &self,
         flags: u64,
+        child_exit_signal: Option<Signal>,
         user_parent_tid: UserRef<pid_t>,
         user_child_tid: UserRef<pid_t>,
     ) -> Result<CurrentTask, Errno> {
@@ -339,7 +343,7 @@ impl Task {
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
-            | CSIGNAL) as u64;
+            | CLONE_VFORK) as u64;
 
         // CLONE_SETTLS is implemented by sys_clone.
 
@@ -367,13 +371,6 @@ impl Task {
             );
             return error!(ENOSYS);
         }
-
-        let raw_child_exist_signal = flags & (CSIGNAL as u64);
-        let child_exit_signal = if raw_child_exist_signal == 0 {
-            None
-        } else {
-            Some(Signal::try_from(UncheckedSignal::new(raw_child_exist_signal))?)
-        };
 
         let fs = if flags & (CLONE_FS as u64) != 0 { self.fs().clone() } else { self.fs().fork() };
         let files =
@@ -480,10 +477,12 @@ impl Task {
         Ok(child)
     }
 
+    /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
+    /// exit signal as in clone().
     #[cfg(test)]
     pub fn clone_task_for_test(&self, flags: u64) -> CurrentTask {
         let result = self
-            .clone_task(flags, UserRef::default(), UserRef::default())
+            .clone_task(flags, None, UserRef::default(), UserRef::default())
             .expect("failed to create task in test");
 
         // Take the lock on thread group and task in the correct order to ensure any wrong ordering

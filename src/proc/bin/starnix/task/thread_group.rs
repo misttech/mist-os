@@ -865,6 +865,7 @@ mod test {
         let task1 = current_task
             .clone_task(
                 0,
+                None,
                 UserRef::new(UserAddress::default()),
                 UserRef::new(UserAddress::default()),
             )
@@ -872,6 +873,7 @@ mod test {
         let task2 = task1
             .clone_task(
                 0,
+                None,
                 UserRef::new(UserAddress::default()),
                 UserRef::new(UserAddress::default()),
             )
@@ -879,6 +881,7 @@ mod test {
         let task3 = task2
             .clone_task(
                 0,
+                None,
                 UserRef::new(UserAddress::default()),
                 UserRef::new(UserAddress::default()),
             )
