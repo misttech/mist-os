@@ -93,7 +93,7 @@ zx_status_t ChildProcess::AddArg(std::string_view arg) {
   static const char* kPkgPrefix = "/pkg/";
   auto arg_len = (args_.empty() ? strlen(kPkgPrefix) : 0) + arg.size();
   if (auto status = ReserveBytes(arg_len); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to add argument: '" << arg << "'";
+    FX_LOGS(WARNING) << "Failed to add argument: '" << arg << "'";
     return status;
   }
   if (args_.empty()) {
@@ -245,8 +245,8 @@ zx_status_t ChildProcess::AddChannel(uint32_t id, zx::channel channel) {
 
 zx_status_t ChildProcess::ReserveBytes(size_t num_bytes) {
   if (num_bytes_ + num_bytes > ZX_CHANNEL_MAX_MSG_BYTES / 2) {
-    FX_LOGS(ERROR) << "Spawn message bytes limit exceeded; " << num_bytes_
-                   << " bytes previously added";
+    FX_LOGS(WARNING) << "Spawn message bytes limit exceeded; " << num_bytes_
+                     << " bytes previously added";
     return ZX_ERR_OUT_OF_RANGE;
   }
   num_bytes_ += num_bytes;
@@ -255,8 +255,8 @@ zx_status_t ChildProcess::ReserveBytes(size_t num_bytes) {
 
 zx_status_t ChildProcess::ReserveHandles(size_t num_handles) {
   if (num_handles_ + num_handles > ZX_CHANNEL_MAX_MSG_HANDLES / 2) {
-    FX_LOGS(ERROR) << "Spawn message handles limit exceeded; " << num_handles_
-                   << " handles previously added";
+    FX_LOGS(WARNING) << "Spawn message handles limit exceeded; " << num_handles_
+                     << " handles previously added";
     return ZX_ERR_OUT_OF_RANGE;
   }
   num_handles_ += num_handles;
@@ -456,6 +456,8 @@ void ChildProcess::Reset() {
   KillSync();
   spawned_ = false;
   killed_ = false;
+  num_bytes_ = 0;
+  num_handles_ = 0;
   args_.clear();
   envvars_.clear();
   process_.reset();

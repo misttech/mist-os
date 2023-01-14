@@ -228,6 +228,7 @@ ZxPromise<FuzzResult> LibFuzzerRunner::Execute(std::vector<Input> inputs) {
                  return fpromise::ok(FuzzResult::NO_ERRORS);
                }
                if (auto status = AddArgs(); status != ZX_OK) {
+                 FX_LOGS(WARNING) << "Failed to add libFuzzer command line flags.";
                  return fpromise::error(status);
                }
                std::vector<std::string> deferred;
@@ -239,6 +240,10 @@ ZxPromise<FuzzResult> LibFuzzerRunner::Execute(std::vector<Input> inputs) {
                  if (status != ZX_OK) {
                    deferred.emplace_back(std::move(test_input));
                  }
+               }
+               if (!deferred.empty()) {
+                 FX_LOGS(INFO) << "Will try " << deferred.size()
+                               << " remaining input(s) in a subsequent attempt.";
                }
                test_inputs = std::move(deferred);
                fut = RunAsync();
