@@ -2682,3 +2682,16 @@
   reviewers: ['cstout@google.com', 'costan@google.com', 'jhowarth@google.com', 'msandy@google.com', 'rosasco@google.com', 'palmer@google.com', 'wittrock@google.com']
   submitted: '2023-01-12'
   reviewed: '2023-01-12'
+
+- name: 'RFC-0206'
+  title: 'Deprecate stash'
+  short_description: 'Deprecate the stash service and migrate clients to use a storage capability'
+  authors: ['jsankey@google.com']
+  file: '0206_deprecate_stash.md'
+  area: ['Security', 'Storage']
+  issue: ['102879']
+  gerrit_change_id: ['774782']
+  status: 'Accepted'
+  reviewers: ['atait@google.com', 'brunodalbo@google.com', 'ecstone@google.com', 'emircan@google.com', 'jamuraa@google.com', 'nmccracken@google.com', 'palmer@google.com', 'senj@google.com', 'paulfaria@google.com']
+  submitted: '2022-12-08'
+  reviewed: '2022-01-13'
