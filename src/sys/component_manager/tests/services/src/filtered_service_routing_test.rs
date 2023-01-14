@@ -493,6 +493,117 @@ async fn aggregate_instances_renamed_test() {
     );
 }
 
+// Test that aggregating service instances across static children works as expected.
+#[fuchsia::test]
+async fn aggregate_static_instances_test() {
+    let dynamic_child_name = "aggregate_static_instances_test_client";
+    let provider_a_exposed_dir =
+        client::open_childs_exposed_directory(PROVIDER_A_CHILD_NAME.to_string(), None)
+            .await
+            .expect("Failed to get child expose directory.");
+
+    let _ = verify_original_service(&provider_a_exposed_dir).await;
+
+    let provider_b_exposed_dir =
+        client::open_childs_exposed_directory(PROVIDER_B_CHILD_NAME.to_string(), None)
+            .await
+            .expect("Failed to get child expose directory.");
+
+    let _ = verify_original_service(&provider_b_exposed_dir).await;
+
+    let offers = vec![
+        fdecl::Offer::Service(fdecl::OfferService {
+            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                name: PROVIDER_A_CHILD_NAME.to_string(),
+                collection: None,
+            })),
+            source_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+            target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+            renamed_instances: Some(vec![
+                fdecl::NameMapping {
+                    source_name: "default".to_string(),
+                    target_name: "default_from_a".to_string(),
+                },
+                fdecl::NameMapping {
+                    source_name: "hello".to_string(),
+                    target_name: "hello_from_a".to_string(),
+                },
+            ]),
+            source_instance_filter: Some(vec![
+                "default_from_a".to_string(),
+                "hello_from_a".to_string(),
+            ]),
+            ..fdecl::OfferService::EMPTY
+        }),
+        fdecl::Offer::Service(fdecl::OfferService {
+            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                name: PROVIDER_B_CHILD_NAME.to_string(),
+                collection: None,
+            })),
+            source_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+            target_name: Some(fexamples::EchoServiceMarker::SERVICE_NAME.to_string()),
+            renamed_instances: Some(vec![
+                fdecl::NameMapping {
+                    source_name: "default".to_string(),
+                    target_name: "default_from_b".to_string(),
+                },
+                fdecl::NameMapping {
+                    source_name: "hello".to_string(),
+                    target_name: "hello_from_b".to_string(),
+                },
+            ]),
+            source_instance_filter: Some(vec![
+                "default_from_b".to_string(),
+                "hello_from_b".to_string(),
+            ]),
+            ..fdecl::OfferService::EMPTY
+        }),
+    ];
+    create_dynamic_service_client_from_offers(dynamic_child_name, offers)
+        .await
+        .expect("Failed to create dynamic service client");
+    let filtered_exposed_dir = client::open_childs_exposed_directory(
+        dynamic_child_name,
+        Some(TEST_COLLECTION_NAME.to_string()),
+    )
+    .await
+    .expect("Failed to get child expose directory.");
+
+    let renamed_service_dir_proxy =
+        client::open_service_at_dir::<fexamples::EchoServiceMarker>(&filtered_exposed_dir)
+            .expect("failed to open service in expose dir.");
+    let visible_service_instances: Vec<String> =
+        fuchsia_fs::directory::readdir(&renamed_service_dir_proxy)
+            .await
+            .expect("failed to read entries from exposed service dir")
+            .into_iter()
+            .map(|dirent| dirent.name)
+            .collect();
+    info!("Entries in exposed service dir after rename: {:?}", visible_service_instances);
+    let expected_visible_instance_list: Vec<String> =
+        vec!["default_from_a", "default_from_b", "hello_from_a", "hello_from_b"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+    assert_eq!(expected_visible_instance_list, visible_service_instances);
+
+    assert_eq!(
+        regular_echo_at_service_instance(&provider_a_exposed_dir, "default").await.unwrap(),
+        regular_echo_at_service_instance(&filtered_exposed_dir, "default_from_a").await.unwrap(),
+    );
+    assert_eq!(
+        regular_echo_at_service_instance(&provider_b_exposed_dir, "default").await.unwrap(),
+        regular_echo_at_service_instance(&filtered_exposed_dir, "default_from_b").await.unwrap(),
+    );
+    assert_eq!(
+        regular_echo_at_service_instance(&provider_a_exposed_dir, "hello").await.unwrap(),
+        regular_echo_at_service_instance(&filtered_exposed_dir, "hello_from_a").await.unwrap(),
+    );
+    assert_eq!(
+        regular_echo_at_service_instance(&provider_b_exposed_dir, "hello").await.unwrap(),
+        regular_echo_at_service_instance(&filtered_exposed_dir, "hello_from_b").await.unwrap(),
+    );
+}
 // aggregate_instances_multiple_service_instances_renamed_test tests that an aggregate service
 // where the component sources that are aggregated supply multiple service instances are aggregated
 // correctly.
