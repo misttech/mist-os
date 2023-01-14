@@ -63,6 +63,8 @@ source_set("shared") {
     "profile_provider.h",
     "reporter.cc",
     "reporter.h",
+    "select_best_format.cc",
+    "select_best_format.h",
     "stream_usage.cc",
     "stream_usage.h",
     "stream_volume_manager.cc",
@@ -81,6 +83,7 @@ source_set("shared") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
@@ -147,6 +150,7 @@ executable("unittest_bin") {
     "process_config_unittest.cc",
     "profile_provider_unittest.cc",
     "reporter_unittest.cc",
+    "select_best_format_unittest.cc",
     "stream_usage_unittest.cc",
     "stream_volume_manager_unittest.cc",
     "usage_gain_reporter_impl_unittest.cc",

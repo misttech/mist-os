@@ -223,7 +223,6 @@ class AudioDriver {
   std::string manufacturer_name_;
   std::string product_name_;
   HwGainState hw_gain_state_;
-  std::vector<audio_stream_format_range_t> format_ranges_;
 
   // Configuration state.
   zx::time mono_start_time_;

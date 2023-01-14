@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/audio_core/v1/utils.h"
+#include "src/media/audio/audio_core/shared/select_best_format.h"
 
 #include <zircon/errors.h>
 
@@ -22,47 +22,16 @@ void AddChannelSet(fuchsia::hardware::audio::PcmSupportedFormats& formats,
   formats.mutable_channel_sets()->push_back(std::move(channel_set));
 }
 
-TEST(UtilsFormatTest, SelectBestFormatFound) {
-  std::vector<audio_stream_format_range_t> fmts;
-  fmts.push_back(audio_stream_format_range_t{
-      .sample_formats = AUDIO_SAMPLE_FORMAT_32BIT_FLOAT,
-      .min_frames_per_second = 12'000,
-      .max_frames_per_second = 96'000,
-      .min_channels = 1,
-      .max_channels = 8,
-      .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
-  });
-  fuchsia::media::AudioSampleFormat sample_format_inout = fuchsia::media::AudioSampleFormat::FLOAT;
-  uint32_t frames_per_second_inout = 96'000;
-  uint32_t channels_inout = 1;
-
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(96'000));
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(1));
-
-  // Add a second format range.
-  fmts.push_back(audio_stream_format_range_t{
-      .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,
-      .min_frames_per_second = 22'050,
-      .max_frames_per_second = 176'400,
-      .min_channels = 4,
-      .max_channels = 8,
-      .flags = ASF_RANGE_FLAG_FPS_44100_FAMILY,
-  });
-  sample_format_inout = fuchsia::media::AudioSampleFormat::SIGNED_16;
-  frames_per_second_inout = 88'200;
-  channels_inout = 5;
-
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::SIGNED_16);
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(88'200));
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(5));
+void AddChannelSet(fuchsia_audio_device::PcmFormatSet& formats, size_t number_of_channels) {
+  fuchsia_audio_device::ChannelSet channel_set;
+  channel_set.attributes(std::vector<fuchsia_audio_device::ChannelAttributes>(number_of_channels));
+  if (!formats.channel_sets()) {
+    formats.channel_sets({{}});
+  }
+  formats.channel_sets()->push_back(std::move(channel_set));
 }
 
-TEST(UtilsFormatTest, SelectBestFormatFoundFidl) {
+TEST(SelectBestFormatTest, SelectBestFormatFound) {
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> fmts;
 
   fuchsia::hardware::audio::PcmSupportedFormats formats = {};
@@ -116,58 +85,55 @@ TEST(UtilsFormatTest, SelectBestFormatFoundFidl) {
   ASSERT_EQ(channels_inout, static_cast<uint32_t>(5));
 }
 
-TEST(UtilsFormatTest, SelectBestFormatOutsideRanges) {
-  std::vector<audio_stream_format_range_t> fmts;
-  fmts.push_back(audio_stream_format_range_t{
-      .sample_formats = AUDIO_SAMPLE_FORMAT_32BIT_FLOAT,
-      .min_frames_per_second = 16'000,
-      .max_frames_per_second = 96'000,
-      .min_channels = 1,
-      .max_channels = 8,
-      .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+TEST(SelectBestFormatTest, SelectBestFormatFoundNewFidl) {
+  std::vector<fuchsia_audio_device::PcmFormatSet> fmts;
+
+  fuchsia_audio_device::PcmFormatSet formats;
+  AddChannelSet(formats, 1);
+  AddChannelSet(formats, 2);
+  AddChannelSet(formats, 4);
+  AddChannelSet(formats, 8);
+  formats.sample_types({{fuchsia_audio::SampleType::kFloat32}});
+  formats.frame_rates({{12'000, 24'000, 48'000, 96'000}});
+  fmts.push_back(std::move(formats));
+
+  auto pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kFloat32,
+      .channels = 1,
+      .frames_per_second = 96'000,
   });
-  fuchsia::media::AudioSampleFormat sample_format_inout =
-      fuchsia::media::AudioSampleFormat::SIGNED_16;
-  uint32_t frames_per_second_inout = 0;
-  uint32_t channels_inout = 0;
 
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(16'000));  // Prefer closest.
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(2));                // Prefer 2 channels.
-
-  sample_format_inout = fuchsia::media::AudioSampleFormat::UNSIGNED_8;
-  frames_per_second_inout = 192'000;
-  channels_inout = 200;
-
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(96'000));  // Pick closest.
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(2));                // Prefer 2 channels.
+  auto result = SelectBestFormat(fmts, pref);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);
+  EXPECT_EQ(result->frames_per_second(), 96'000);
+  EXPECT_EQ(result->channels(), 1);
 
   // Add a second format range.
-  fmts.push_back(audio_stream_format_range_t{
-      .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,
-      .min_frames_per_second = 16'000,
-      .max_frames_per_second = 24'000,
-      .min_channels = 4,
-      .max_channels = 8,
-      .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
-  });
-  frames_per_second_inout = 0;
-  channels_inout = 0;
-  sample_format_inout = fuchsia::media::AudioSampleFormat::UNSIGNED_8;
+  fuchsia_audio_device::PcmFormatSet formats2;
+  AddChannelSet(formats2, 4);
+  AddChannelSet(formats2, 5);
+  AddChannelSet(formats2, 6);
+  AddChannelSet(formats2, 7);
+  AddChannelSet(formats2, 8);
+  formats2.sample_types({{fuchsia_audio::SampleType::kInt16}});
+  formats2.frame_rates({{22'050, 44'100, 88'200, 176'400}});
+  fmts.push_back(std::move(formats2));
 
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::SIGNED_16);  // Pick 16 bits.
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(16'000));             // Pick closest.
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(8));                           // Pick highest.
+  pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kInt16,
+      .channels = 5,
+      .frames_per_second = 88'200,
+  });
+
+  result = SelectBestFormat(fmts, pref);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kInt16);
+  EXPECT_EQ(result->frames_per_second(), 88'200);
+  EXPECT_EQ(result->channels(), 5);
 }
 
-TEST(UtilsFormatTest, SelectBestFormatOutsideRangesFidl) {
+TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> fmts;
   fuchsia::hardware::audio::PcmSupportedFormats formats = {};
   AddChannelSet(formats, 1);
@@ -229,38 +195,67 @@ TEST(UtilsFormatTest, SelectBestFormatOutsideRangesFidl) {
   ASSERT_EQ(channels_inout, static_cast<uint32_t>(8));                           // Pick highest.
 }
 
-TEST(UtilsFormatTest, SelectBestFormatError) {
-  std::vector<audio_stream_format_range_t> fmts;
-  fmts.push_back(audio_stream_format_range_t{
-      .sample_formats = AUDIO_SAMPLE_FORMAT_32BIT_FLOAT,
-      .min_frames_per_second = 8'000,
-      .max_frames_per_second = 768'000,
-      .min_channels = 1,
-      .max_channels = 8,
-      .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
+  std::vector<fuchsia_audio_device::PcmFormatSet> fmts;
+
+  fuchsia_audio_device::PcmFormatSet formats;
+  AddChannelSet(formats, 1);
+  AddChannelSet(formats, 2);
+  AddChannelSet(formats, 4);
+  AddChannelSet(formats, 8);
+  formats.sample_types({{fuchsia_audio::SampleType::kFloat32}});
+  formats.frame_rates({{16'000, 24'000, 48'000, 96'000}});
+  fmts.push_back(std::move(formats));
+
+  auto pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kInt16,
+      .channels = 3,
+      .frames_per_second = 1,
   });
-  fuchsia::media::AudioSampleFormat sample_format_inout = {};  // Bad format.
-  uint32_t frames_per_second_inout = 0;
-  uint32_t channels_inout = 0;
 
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-            ZX_ERR_INVALID_ARGS);
+  auto result = SelectBestFormat(fmts, pref);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);
+  EXPECT_EQ(result->frames_per_second(), 16'000);  // pick closest available
+  EXPECT_EQ(result->channels(), 2);                // prefer 2 channels
 
-  sample_format_inout = fuchsia::media::AudioSampleFormat::SIGNED_16;  // Fix format.
+  pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kUint8,
+      .channels = 200,
+      .frames_per_second = 192'000,
+  });
 
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, nullptr,  // Bad pointer.
-                             &sample_format_inout),
-            ZX_ERR_INVALID_ARGS);
-  ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, nullptr),
-            ZX_ERR_INVALID_ARGS);  // Bad pointer.
+  result = SelectBestFormat(fmts, pref);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);
+  EXPECT_EQ(result->frames_per_second(), 96'000);  // pick closest available
+  EXPECT_EQ(result->channels(), 2);                // prefer 2 channels
 
-  std::vector<audio_stream_format_range_t> empty_fmts;
-  ASSERT_EQ(
-      SelectBestFormat(empty_fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
-      ZX_ERR_NOT_SUPPORTED);
+  // Add a second format range.
+  fuchsia_audio_device::PcmFormatSet formats2;
+  AddChannelSet(formats2, 4);
+  AddChannelSet(formats2, 5);
+  AddChannelSet(formats2, 6);
+  AddChannelSet(formats2, 7);
+  AddChannelSet(formats2, 8);
+  formats2.sample_types({{fuchsia_audio::SampleType::kInt16}});
+  formats2.frame_rates({{16'000, 24'000}});
+  fmts.push_back(std::move(formats2));
+
+  pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kUint8,
+      .channels = 3,
+      .frames_per_second = 1,
+  });
+
+  result = SelectBestFormat(fmts, pref);
+  ASSERT_TRUE(result.is_ok());
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kInt16);  // pick 16 bits
+  EXPECT_EQ(result->frames_per_second(), 16'000);                       // pick closest
+  EXPECT_EQ(result->channels(), 8);                                     // pick highest
 }
 
-TEST(UtilsFormatTest, SelectBestFormatErrorFidl) {
+TEST(SelectBestFormatTest, SelectBestFormatError) {
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> fmts;
 
   fuchsia::hardware::audio::PcmSupportedFormats formats = {};
@@ -300,6 +295,20 @@ TEST(UtilsFormatTest, SelectBestFormatErrorFidl) {
   ASSERT_EQ(
       SelectBestFormat(empty_fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
       ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST(SelectBestFormatTest, SelectBestFormatErrorNewFidl) {
+  // Most of the SelectBestFormatError test cases are impossible by construction. Only this
+  // `empty_fmts` case is possible.
+  std::vector<fuchsia_audio_device::PcmFormatSet> empty_fmts;
+  auto pref = media_audio::Format::CreateOrDie({
+      .sample_type = fuchsia_audio::SampleType::kInt16,
+      .channels = 3,
+      .frames_per_second = 1,
+  });
+  auto result = SelectBestFormat(empty_fmts, pref);
+  ASSERT_FALSE(result.is_ok());
+  EXPECT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace

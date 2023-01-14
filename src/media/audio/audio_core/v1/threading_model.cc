@@ -11,6 +11,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
+#include <lib/zx/thread.h>
 
 #include <mutex>
 #include <string>

@@ -88,7 +88,6 @@ source_set("audio_core_lib") {
     "ultrasound_factory.h",
     "ultrasound_renderer.cc",
     "ultrasound_renderer.h",
-    "utils.cc",
     "utils.h",
     "verbose_log.cc",
     "verbose_log.h",
@@ -202,7 +201,6 @@ executable("unittest_bin") {
     "thermal_watcher_unittest.cc",
     "threading_model_unittest.cc",
     "throttle_output_unittest.cc",
-    "utils_unittest.cc",
     "versioned_timeline_function_unittest.cc",
     "wakeup_event_unittest.cc",
   ]
