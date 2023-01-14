@@ -114,9 +114,11 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
     channel = std::move(*params.mutable_response_channel());
   }
 
+  FX_LOGS(INFO) << "Generating snapshot";
   GetSnapshotInternal(timeout, [this, callback = std::move(callback), channel = std::move(channel)](
                                    const feedback::Annotations& annotations,
                                    fsl::SizedVmo archive) mutable {
+    FX_LOGS(INFO) << "Generated snapshot";
     Snapshot snapshot;
 
     // Add the annotations to the FIDL object and as file in the snapshot itself.
