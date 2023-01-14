@@ -19,4 +19,8 @@ pub struct PlatformWlanConfig {
     /// Enable the use of legacy security types like WEP and/or WPA1.
     #[serde(default)]
     pub legacy_privacy_support: bool,
+    /// Only include WLAN AIBs if set to true. Temporary flag to help with
+    /// migration to assembly.
+    #[serde(default)]
+    pub include_wlan_aibs: bool,
 }
