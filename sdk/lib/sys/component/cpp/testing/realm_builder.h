@@ -188,15 +188,11 @@ class Realm final {
   //
   // Names must be unique. Duplicate names will result in a panic.
   //
-  // TODO(fxbug.dev/109804): Mark this method [[deprecated]] (if supported in
-  // the Fuchsia SDK), then migrate clients to use |LocalComponentFactory|, and
+  // TODO(fxbug.dev/109804): Migrate clients to use |LocalComponentFactory|, and
   // remove this deprecated method.
-  //
-  // #if __Fuchsia_API_level__ >= 9
-  //   [[deprecated("Use AddLocalChild(..., LocalComponentFactory, ...)")]]
-  // #endif
   Realm& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                       ChildOptions options = kDefaultChildOptions);
+                       ChildOptions options = kDefaultChildOptions)
+      ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
 #if __Fuchsia_API_level__ >= 9
   // Add a component by implementing a factory function that creates and returns
@@ -311,15 +307,11 @@ class RealmBuilder final {
   // Add a component by raw pointer to a LocalComponent-derived instance.
   // See |Realm.AddLocalChild| for more details.
   //
-  // TODO(fxbug.dev/109804): Mark this method [[deprecated]] (if supported in
-  // the Fuchsia SDK), then migrate clients to use LocalComponentFactory, and
+  // TODO(fxbug.dev/109804): Migrate clients to use LocalComponentFactory, and
   // remove this deprecated method.
-  //
-  // #if __Fuchsia_API_level__ >= 9
-  //   [[deprecated("Use AddLocalChild(..., LocalComponentFactory, ...)")]]
-  // #endif
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
-                              ChildOptions options = kDefaultChildOptions);
+                              ChildOptions options = kDefaultChildOptions)
+      ZX_DEPRECATED_SINCE(1, 9, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
 
 #if __Fuchsia_API_level__ >= 9
   // Add a component by LocalComponentFactory.
