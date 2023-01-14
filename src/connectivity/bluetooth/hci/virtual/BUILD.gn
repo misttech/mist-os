@@ -34,6 +34,7 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/fidl/fuchsia.bluetooth.test:fuchsia.bluetooth.test_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_c",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp_wire",
     "//sdk/lib/fit-promise",
     "//src/connectivity/bluetooth/core/bt-host/fidl:helpers",
