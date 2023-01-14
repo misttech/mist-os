@@ -23,18 +23,6 @@ Fuchsia filesystem tests
 * Only run f2fs unit tests
 > $ fx test f2fs-unittest
 
-Linux compatibility tests (EXPERIMENTAL)
--------------
-* Prerequisite
-> Linux kernel built with f2fs
-> $ apt install f2fs-tools (on Debian/Ubuntu)
-
-* Build configuration for fs-tests
-> $ fx set core.x64 --with-base //src/storage/f2fs/test/compatibility:f2fs-compatibility-tests
-
-* Run Linux compatibility tests
-> $ fx test f2fs-compatibility-test
-
 Debian guest based Linux compatibility tests (EXPERIMENTAL)
 -------------
 * Prerequisite

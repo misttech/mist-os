@@ -5,29 +5,6 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-if (is_linux) {
-  group("f2fs-compatibility-tests") {
-    testonly = true
-    deps = [ ":f2fs-compatibility-test($host_toolchain)" ]
-  }
-
-  test("f2fs-compatibility-test") {
-    sources = [
-      "compatibility.cc",
-      "dir.cc",
-      "file.cc",
-      "inline.cc",
-      "mkfs_fsck_test.cc",
-    ]
-    deps = [
-      "//src/lib/fxl/test:gtest_main",
-      "//src/storage/f2fs",
-      "//third_party/googletest:gtest",
-      "//zircon/system/ulib/zx",
-    ]
-  }
-}
-
 guest_packages = [
   "//src/virtualization/bin/vmm",
   "//src/virtualization/bin/guest_manager:debian_guest_manager",
