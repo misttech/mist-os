@@ -11,9 +11,16 @@ use {
 pub struct DFv1Device(pub fdd::DeviceInfo);
 
 impl DFv1Device {
+    /// Gets the full topological path name of the device.
+    pub fn get_topo_path(&self) -> Result<&str> {
+        Ok(self.0.topological_path.as_ref().ok_or(format_err!("Missing topological path"))?)
+    }
+
+    /// Gets the last ordinal of the device's topological path.
+    ///
+    /// For a `topological_path` value of "/some/topo/path/foo/bar", "bar" will be returned.
     pub fn extract_name(&self) -> Result<&str> {
-        let topological_path =
-            self.0.topological_path.as_ref().ok_or(format_err!("Missing topological path"))?;
+        let topological_path = self.get_topo_path()?;
         let (_, name) = topological_path.rsplit_once('/').unwrap_or(("", &topological_path));
         Ok(name)
     }
@@ -23,8 +30,16 @@ impl DFv1Device {
 pub struct DFv2Node(pub fdd::DeviceInfo);
 
 impl DFv2Node {
+    /// Gets the full moniker name of the device.
+    pub fn get_moniker(&self) -> Result<&str> {
+        Ok(self.0.moniker.as_ref().ok_or(format_err!("Missing moniker"))?)
+    }
+
+    /// Gets the last ordinal of the device's moniker.
+    ///
+    /// For a `moniker` value of "this.is.a.moniker.foo.bar", "bar" will be returned.
     pub fn extract_name(&self) -> Result<&str> {
-        let moniker = self.0.moniker.as_ref().ok_or(format_err!("Missing moniker"))?;
+        let moniker = self.get_moniker()?;
         let (_, name) = moniker.rsplit_once('.').unwrap_or(("", &moniker));
         Ok(name)
     }
@@ -44,6 +59,21 @@ impl Device {
         }
     }
 
+    /// Gets the full identifying path name of the device.
+    ///
+    /// For V1 devices, that is the `topological_path`.
+    /// For V2 devices, that is the `moniker`.
+    pub fn get_full_name(&self) -> Result<&str> {
+        match self {
+            Device::V1(device) => device.get_topo_path(),
+            Device::V2(node) => node.get_moniker(),
+        }
+    }
+
+    /// Gets the last ordinal of the identifying path name of the device.
+    ///
+    /// For V1 devices, it would be the part of the string after the last `/`.
+    /// For V2 devices, it would be the part of the string after the last `.`.
     pub fn extract_name(&self) -> Result<&str> {
         match self {
             Device::V1(device) => device.extract_name(),
@@ -188,32 +218,42 @@ pub async fn get_driver_by_device(
     let device_filter: [String; 1] = [device_topo_path.to_string()];
     let mut device_list =
         get_device_info(&driver_development_proxy, &device_filter, /* exact_match= */ true).await?;
-
     if device_list.len() != 1 {
-        return Err(anyhow!(
-            concat!(
-                "Expected 1 result for the given query but got {}. Please ",
-                "adjust your query for an exact match."
-            ),
-            device_list.len()
-        ));
+        let fuzzy_device_list = get_device_info(
+            &driver_development_proxy,
+            &device_filter,
+            /* exact_match= */ false,
+        )
+        .await?;
+        if fuzzy_device_list.len() == 0 {
+            return Err(anyhow!("No devices matched the query: {}", device_topo_path.to_string()));
+        } else if fuzzy_device_list.len() > 1 {
+            let mut builder = "Found multiple matches. Did you mean one of these?\n\n".to_string();
+            for item in fuzzy_device_list {
+                let device: Device = item.into();
+                // We don't appear to have a string builder crate in-tree.
+                builder = format!("{}{}\n", builder, device.get_full_name()?.to_string());
+            }
+            return Err(anyhow!(builder.to_string()));
+        }
+        device_list = fuzzy_device_list;
     }
 
-    let mut found_device: Option<String> = None;
+    let found_device: Device = device_list.remove(0).into();
 
-    let device: Device = device_list.remove(0).into();
-    match device {
-        Device::V1(ref info) => match &info.0.bound_driver_libname {
-            Some(bound_driver_libname) => {
-                found_device = Some(bound_driver_libname.to_string());
+    let mut found_driver: Option<String> = None;
+
+    match found_device {
+        Device::V1(ref info) => {
+            if let Some(libname) = &info.0.bound_driver_libname {
+                found_driver = Some(libname.to_string());
             }
-            _ => {}
-        },
+        }
         Device::V2(ref _info) => {
             // TODO(fxb/112785): Querying V2 is not supported for now.
         }
-    };
-    match found_device {
+    }
+    match found_driver {
         Some(ref driver_libname) => {
             get_driver_by_libname(&driver_libname, &driver_development_proxy).await
         }
