@@ -32,14 +32,14 @@ const std::array<float, 9> kColorInversionMatrix = {
 const std::array<float, 3> kColorInversionPostOffset = {.999f, .999f, .999f};
 
 const std::array<float, 9> kCorrectProtanomaly = {
-    0.622774, 0.264275,  0.216821,
-    0.377226, 0.735725,  -0.216821,
-    0.000000, -0.000000, 1.000000};
+    0.622774, 0.377226,  0.000000,
+    0.264275, 0.735725,  -0.000000,
+    0.216821, -0.216821, 1.000000};
 
 const std::array<float, 9> kProtanomalyAndInversionMatrix = {
-    -0.192508, -0.757502,  0.113709,
-    -0.438056, -0.286052, -0.319932,
-    -0.817036, -1.024249,  0.896322};
+    -0.10933889, -0.66266111, -0.228,
+    -0.46783789, -0.30416211, -0.228,
+    -0.51692431, -1.25907569,  0.771};
 const std::array<float, 3> kProtanomalyAndInversionPostOffset = {.999f, .999f, .999f};
 
 // clang-format on
