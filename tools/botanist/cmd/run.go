@@ -117,6 +117,8 @@ func (v *imageOverridesFlagValue) Set(s string) error {
 // targetInfo is the schema for a JSON object used to communicate target
 // information (device properties, serial paths, SSH properties, etc.) to
 // subprocesses.
+
+// LINT.IfChange
 type targetInfo struct {
 	// Nodename is the Fuchsia nodename of the target.
 	Nodename string `json:"nodename"`
@@ -133,6 +135,8 @@ type targetInfo struct {
 	// SSHKey is a path to a private key that can be used to access the target.
 	SSHKey string `json:"ssh_key"`
 }
+
+// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_mobly.py)
 
 func (*RunCommand) Name() string {
 	return "run"

@@ -19,8 +19,10 @@ import (
 )
 
 const (
+	// LINT.IfChange
 	moblyTestPreamblePatternStr = `^\[=====MOBLY RESULTS=====\]$`
-	moblyTestCaseType           = "Record"
+	// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_infra.py)
+	moblyTestCaseType = "Record"
 )
 
 var moblyTestPreamblePattern = regexp.MustCompile(moblyTestPreamblePatternStr)
