@@ -9,6 +9,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use futures::{FutureExt as _, StreamExt as _};
 use reachability_core::Monitor;
+use reachability_handler::ReachabilityHandler;
 use tracing::info;
 
 mod eventloop;
@@ -24,16 +25,20 @@ fn main() {
         fuchsia_async::LocalExecutor::new().expect("failed to create local executor");
 
     let mut fs = ServiceFs::new_local();
-    let mut fs = fs.take_and_serve_directory_handle().expect("failed to serve ServiceFS directory");
+
+    let mut handler = ReachabilityHandler::new();
+    handler.publish_service(fs.dir("svc"));
 
     let inspector = component::inspector();
     let () = inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspect");
+
+    let fs = fs.take_and_serve_directory_handle().expect("failed to serve ServiceFS directory");
 
     let mut monitor = Monitor::new().expect("failed to create reachability monitor");
     let () = monitor.set_inspector(inspector);
 
     info!("monitoring");
-    let mut eventloop = EventLoop::new(monitor);
+    let mut eventloop = EventLoop::new(monitor, handler);
     let eventloop_fut = eventloop.run().fuse();
     let serve_fut = fs.fuse().collect();
     futures::pin_mut!(eventloop_fut, serve_fut);

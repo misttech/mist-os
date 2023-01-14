@@ -18,6 +18,7 @@ use {
     fuchsia_zircon as zx,
     futures::{pin_mut, prelude::*, select},
     reachability_core::{watchdog, InterfaceView, Monitor, NeighborCache},
+    reachability_handler::{ReachabilityHandler, ReachabilityState},
     std::collections::HashMap,
     tracing::{debug, error},
 };
@@ -109,6 +110,7 @@ type Watchdog = watchdog::Watchdog<SystemDispatcher>;
 /// The event loop.
 pub struct EventLoop {
     monitor: Monitor,
+    handler: ReachabilityHandler,
     watchdog: Watchdog,
     interface_properties: HashMap<u64, fnet_interfaces_ext::Properties>,
     neighbor_cache: NeighborCache,
@@ -116,10 +118,11 @@ pub struct EventLoop {
 
 impl EventLoop {
     /// `new` returns an `EventLoop` instance.
-    pub fn new(monitor: Monitor) -> Self {
+    pub fn new(monitor: Monitor, handler: ReachabilityHandler) -> Self {
         fuchsia_inspect::component::health().set_starting_up();
         EventLoop {
             monitor,
+            handler,
             watchdog: Watchdog::new(),
             interface_properties: Default::default(),
             neighbor_cache: Default::default(),
@@ -214,6 +217,11 @@ impl EventLoop {
                                     &self.neighbor_cache
                                 ).await;
                                 let () = probe_futures.push(stream.into_future());
+                                self.handler.set_state(
+                                    ReachabilityState {
+                                        internet_available: self.monitor.state().system_has_internet()
+                                    }
+                                ).await;
                             }
                         }
                         Some((None, _)) => {
