@@ -123,6 +123,7 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   status = wlan_softmac_device->ServeWlanSoftmacProtocol(std::move(endpoints->server));
   if (status != ZX_OK) {
     IWL_ERR(this, "failed to serve wlan softmac service: %s\n", zx_status_get_string(status));
+    completer.buffer(arena).ReplyError(status);
     return;
   }
   std::array<const char*, 1> offers{
