@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::ensure;
 use std::collections::BTreeSet;
 
 use fidl_fuchsia_logger::MAX_TAGS;
@@ -44,10 +43,13 @@ impl DefineSubsystemConfiguration<Vec<String>> for ConsoleSubsystemConfig {
 
             let num_product_tags = additional_serial_log_tags.len();
             let max_product_tags = MAX_TAGS as usize - BASE_CONSOLE_ALLOWED_TAGS.len();
-            ensure!(
-                num_product_tags <= max_product_tags,
-                "Max {max_product_tags} tags can be forwarded to serial, got {num_product_tags}."
-            );
+            if num_product_tags > max_product_tags {
+                return Err(anyhow::anyhow!(
+                    "Max {} tags can be forwarded to serial, got {:?}",
+                    max_product_tags,
+                    additional_serial_log_tags,
+                ));
+            }
             allowed_log_tags.extend(additional_serial_log_tags.iter().cloned());
             allowed_log_tags.into_iter().collect::<Vec<_>>()
         };
