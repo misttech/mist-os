@@ -16,6 +16,8 @@ toc:
   path: /docs/development/performance/chromeperf_user_guide.md
 - title: "Fuchsiaperf format for performance test results"
   path: /docs/development/performance/fuchsiaperf_format.md
+- title: "Fuchsiaperf producers: libraries"
+  path: /docs/development/performance/fuchsiaperf_producers.md
 - title: "Fuchsiaperf consumers: analysis tools"
   path: /docs/development/performance/fuchsiaperf_consumers.md
 - title: "Naming style for metrics"
