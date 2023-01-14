@@ -79,7 +79,16 @@ pub enum AgentType {
 }
 
 pub fn get_default_agent_types() -> HashSet<AgentType> {
-    [AgentType::Restore].iter().copied().collect()
+    [
+        AgentType::Restore,
+        AgentType::InspectExternalApis,
+        AgentType::InspectPolicyValues,
+        AgentType::InspectSettingProxy,
+        AgentType::InspectSettingValues,
+        AgentType::InspectSettingTypeUsage,
+    ]
+    .into_iter()
+    .collect()
 }
 
 impl From<AgentType> for BlueprintHandle {
