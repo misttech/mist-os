@@ -352,16 +352,12 @@ int RunDfv1(DriverManagerParams driver_manager_params,
         return conn.status_value();
       });
 
+  system_instance.ServiceStarter(&coordinator);
+
   // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
   LOGF(INFO, "driver_manager loader loop started");
 
   fs::SynchronousVfs vfs(loop.dispatcher());
-
-  {
-    zx::result devfs_client = coordinator.devfs().Connect(vfs);
-    ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
-    system_instance.ServiceStarter(&coordinator, std::move(devfs_client.value()));
-  }
 
   // Serve the USB device watcher protocol.
   {

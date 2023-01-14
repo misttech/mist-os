@@ -125,6 +125,8 @@ int RunDfv2(DriverManagerParams driver_manager_params,
   driver_runner.ScheduleBaseDriversBinding();
 
   dfv2::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
+  shutdown_manager.Publish(outgoing);
+
   async::Loop usb_watcher_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   usb_watcher_loop.StartThread();
 
@@ -132,12 +134,6 @@ int RunDfv2(DriverManagerParams driver_manager_params,
   LOGF(INFO, "driver_manager loader loop started");
 
   fs::SynchronousVfs vfs(loop.dispatcher());
-
-  {
-    zx::result devfs_client = devfs.Connect(vfs);
-    ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
-    shutdown_manager.Publish(outgoing, std::move(devfs_client.value()));
-  }
 
   // Serve the USB device watcher protocol.
   {

@@ -56,7 +56,6 @@ power_manager_deps = [
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
-  "//src/lib/fdio/rust:fdio",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fidl/rust/fidl-contrib",
   "//src/lib/fuchsia-async",
@@ -126,6 +125,7 @@ rustc_binary("bin") {
   test_deps = [
     ":fake_syscalls",
     "rkf45:lib",
+    "//src/lib/fdio/rust:fdio",
     "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",

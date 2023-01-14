@@ -141,10 +141,7 @@ mod connect_to_driver {
     /// is opened.
     async fn connect_channel(path: &str) -> Result<fio::NodeProxy, Error> {
         device_watcher::recursive_wait_and_open_node(
-            &fuchsia_fs::directory::open_in_namespace(
-                "/dev",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )?,
+            &fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)?,
             path,
         )
         .await
@@ -189,7 +186,7 @@ mod connect_to_driver {
             let scope = ExecutionScope::new();
             dir.open(
                 scope,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::RIGHT_READABLE,
                 fio::MODE_TYPE_DIRECTORY,
                 vfs::path::Path::dot(),
                 fidl::endpoints::ServerEnd::new(dir_server.into_channel()),

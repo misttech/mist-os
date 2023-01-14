@@ -97,8 +97,7 @@ void ShutdownManager::OnUnbound(const char* connection, fidl::UnbindInfo info) {
   SignalBootShutdown(nullptr);
 }
 
-void ShutdownManager::Publish(component::OutgoingDirectory& outgoing,
-                              fidl::ClientEnd<fuchsia_io::Directory> dev_io) {
+void ShutdownManager::Publish(component::OutgoingDirectory& outgoing) {
   auto result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::Administrator>(
       admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
@@ -148,8 +147,8 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing,
     LOGF(ERROR, "Failed to connect to fuchsia.power.manager: %s", fpm_result.status_string());
     return;
   }
-  auto reg_result = fidl::WireCall(*fpm_result)
-                        ->Register(std::move(system_state_endpoints->client), std::move(dev_io));
+  auto reg_result =
+      fidl::WireCall(*fpm_result)->Register(std::move(system_state_endpoints->client));
   ZX_ASSERT(reg_result.ok());
 }
 

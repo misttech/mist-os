@@ -80,7 +80,7 @@ mod tests {
         let (dir, dir_server) = fidl::endpoints::create_proxy().unwrap();
         pseudo_dir.open(
             vfs::execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             fio::MODE_TYPE_DIRECTORY,
             vfs::path::Path::dot(),
             dir_server,

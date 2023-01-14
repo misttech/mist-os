@@ -368,8 +368,7 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
   root_device_->devfs.publish();
 }
 
-void Coordinator::RegisterWithPowerManager(fidl::ClientEnd<fio::Directory> devfs,
-                                           RegisterWithPowerManagerCompletion completion) {
+void Coordinator::RegisterWithPowerManager(RegisterWithPowerManagerCompletion completion) {
   auto system_state_endpoints = fidl::CreateEndpoints<fdm::SystemStateTransition>();
   if (system_state_endpoints.is_error()) {
     completion(system_state_endpoints.error_value());
@@ -389,15 +388,15 @@ void Coordinator::RegisterWithPowerManager(fidl::ClientEnd<fio::Directory> devfs
   }
 
   RegisterWithPowerManager(std::move(*result), std::move(system_state_endpoints->client),
-                           std::move(devfs), std::move(completion));
+                           std::move(completion));
 }
 
 void Coordinator::RegisterWithPowerManager(
     fidl::ClientEnd<fpm::DriverManagerRegistration> power_manager,
     fidl::ClientEnd<fdm::SystemStateTransition> system_state_transition,
-    fidl::ClientEnd<fio::Directory> devfs, RegisterWithPowerManagerCompletion completion) {
+    RegisterWithPowerManagerCompletion completion) {
   power_manager_client_.Bind(std::move(power_manager), dispatcher_);
-  power_manager_client_->Register(std::move(system_state_transition), std::move(devfs))
+  power_manager_client_->Register(std::move(system_state_transition))
       .ThenExactlyOnce(
           [this, completion = std::move(completion)](
               fidl::WireUnownedResult<fpm::DriverManagerRegistration::Register>& result) mutable {

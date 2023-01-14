@@ -480,16 +480,12 @@ TEST_F(MultipleDeviceTestCase, PowerManagerRegistration) {
   auto power_endpoints = fidl::CreateEndpoints<fuchsia_power_manager::DriverManagerRegistration>();
   ASSERT_OK(power_endpoints.status_value());
 
-  auto dev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(dev_endpoints.status_value());
-
   ASSERT_OK(fidl::BindSingleInFlightOnly(coordinator_loop()->dispatcher(),
                                          std::move(power_endpoints->server), &mock_power_manager));
 
   sync_completion_t register_called;
   coordinator().RegisterWithPowerManager(std::move(power_endpoints->client),
-                                         std::move(endpoints->client),
-                                         std::move(dev_endpoints->client), [&](zx_status_t status) {
+                                         std::move(endpoints->client), [&](zx_status_t status) {
                                            ASSERT_OK(status);
                                            sync_completion_signal(&register_called);
                                          });

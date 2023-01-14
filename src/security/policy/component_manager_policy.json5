@@ -713,6 +713,7 @@
                     "/bootstrap/fshost",
                     "/bootstrap/fshost/blobfs",
                     "/bootstrap/miscsvc",
+                    "/bootstrap/power_manager",
                     "/bootstrap/sysinfo",
                     "/bootstrap/vboot-fwparam",
                     "/core/account/account_manager/account_handlers:**",

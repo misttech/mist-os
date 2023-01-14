@@ -23,6 +23,11 @@
     ],
     use: [
         {
+            directory: "dev-topological",
+            rights: [ "r*" ],
+            path: "/dev",
+        },
+        {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",

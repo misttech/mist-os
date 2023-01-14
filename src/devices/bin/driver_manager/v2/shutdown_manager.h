@@ -66,8 +66,7 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
 
   ShutdownManager(NodeRemover* node_remover, async_dispatcher_t* dispatcher);
 
-  void Publish(component::OutgoingDirectory& outgoing,
-               fidl::ClientEnd<fuchsia_io::Directory> dev_io);
+  void Publish(component::OutgoingDirectory& outgoing);
 
   // Called by the node_remover when it finishes removing drivers in storage.
   // Should only be called when in state: kPackageStopping.

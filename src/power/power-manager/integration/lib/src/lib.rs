@@ -13,7 +13,7 @@ use {
     },
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl::AsHandleRef as _,
-    fidl_fuchsia_testing as ftesting,
+    fidl_fuchsia_io as fio, fidl_fuchsia_testing as ftesting,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     std::collections::HashMap,
     std::sync::atomic::{AtomicU64, Ordering},
@@ -217,6 +217,15 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
+        let driver_manager_to_power_manager = Route::new().capability(
+            Capability::directory("dev-topological").rights(fio::R_STAR_DIR).path("/dev").weak(),
+        );
+        realm_builder
+            .add_route(
+                driver_manager_to_power_manager.from(&driver_manager_child).to(&power_manager),
+            )
+            .await
+            .unwrap();
         let power_manager_to_driver_manager = Route::new().capability(
             Capability::protocol_by_name("fuchsia.power.manager.DriverManagerRegistration"),
         );

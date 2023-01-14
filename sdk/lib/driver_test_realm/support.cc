@@ -179,13 +179,11 @@ class FakePowerRegistration
   void Register(RegisterRequestView request, RegisterCompleter::Sync& completer) override {
     // Store these so the other side doesn't see the channels close.
     transition_ = std::move(request->system_state_transition);
-    dir_ = std::move(request->dir);
     completer.ReplySuccess();
   }
 
  private:
   fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition> transition_;
-  fidl::ClientEnd<fuchsia_io::Directory> dir_;
 };
 
 class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {

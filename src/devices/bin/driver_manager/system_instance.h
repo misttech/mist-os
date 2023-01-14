@@ -39,7 +39,7 @@ class SystemInstance : public FsProvider {
 
   zx_status_t CreateDriverHostJob(const zx::job& root_job, zx::job* driver_host_job_out);
 
-  void ServiceStarter(Coordinator* coordinator, fidl::ClientEnd<fuchsia_io::Directory> devfs);
+  void ServiceStarter(Coordinator* coordinator);
 
  private:
   zx_status_t InitializeDriverHostSvcDir();

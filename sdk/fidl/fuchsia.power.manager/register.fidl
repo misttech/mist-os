@@ -4,7 +4,6 @@
 library fuchsia.power.manager;
 
 using fuchsia.device.manager;
-using fuchsia.io;
 
 /// Error codes for the DriverManagerRegistration protocol.
 type RegistrationError = strict enum {
@@ -19,17 +18,15 @@ type RegistrationError = strict enum {
 /// Power Manager.
 @discoverable
 protocol DriverManagerRegistration {
-    /// Registers a [fuchsia.device.manager/SystemStateTransition] and [fuchsia.io.Directory] with
-    /// the Power Manager. The Power Manager expects to receive this call exactly once and it will
-    /// be inoperable until the call is made successfully. If the call succeeds, the
-    /// DriverManagerRegistration channel will no longer serve any purpose and may be closed. If
-    /// the call fails, the Power Manager will leave the channel open and await a retry.
+    /// Registers a [fuchsia.device.manager/SystemStateTransition] with the Power Manager. The
+    /// Power Manager expects to receive this call exactly once and it will be inoperable until
+    /// the call is made successfully. If the call succeeds, the DriverManagerRegistration channel
+    /// will no longer serve any purpose and may be closed. If the call fails, the Power Manager
+    /// will leave the channel open and await a retry.
     ///
     /// + request `system_state_transition` a [fuchsia.device.manager/SystemStateTransition] that
     ///     allows the Power Manager to set the Driver Manager termination behavior. This is an
     ///     essential piece involved in coordinating orderly system shutdown.
-    /// + request `dir` a [fuchsia.io.Directory] that represents the devfs (/dev) served by the
-    ///     Driver Manager.
     /// * error a [fuchsia.power.manager.Error] value indicating the reason (if any) that Register
     ///     failed.
     //
@@ -44,6 +41,5 @@ protocol DriverManagerRegistration {
     // process.
     Register(resource struct {
         system_state_transition client_end:fuchsia.device.manager.SystemStateTransition;
-        dir client_end:fuchsia.io.Directory;
     }) -> () error RegistrationError;
 };

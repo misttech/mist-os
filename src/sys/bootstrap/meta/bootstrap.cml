@@ -616,6 +616,12 @@
             ],
         },
         {
+            directory: "dev-topological",
+            from: "#devfs",
+            to: "#power_manager",
+            dependency: "weak",
+        },
+        {
             directory: "dev-class",
             from: "#devfs",
             as: "dev-class-network",

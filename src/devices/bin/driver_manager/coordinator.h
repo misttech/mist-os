@@ -180,12 +180,11 @@ class Coordinator : public CompositeManagerBridge,
   void UnregisterDriverHost(DriverHost* dh) { driver_hosts_.erase(*dh); }
 
   using RegisterWithPowerManagerCompletion = fit::callback<void(zx_status_t)>;
-  void RegisterWithPowerManager(fidl::ClientEnd<fuchsia_io::Directory> devfs,
-                                RegisterWithPowerManagerCompletion completion);
+  void RegisterWithPowerManager(RegisterWithPowerManagerCompletion completion);
   void RegisterWithPowerManager(
       fidl::ClientEnd<fuchsia_power_manager::DriverManagerRegistration> power_manager,
       fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition> system_state_transition,
-      fidl::ClientEnd<fuchsia_io::Directory> devfs, RegisterWithPowerManagerCompletion completion);
+      RegisterWithPowerManagerCompletion completion);
 
   zx_status_t SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi);
 
