@@ -11,7 +11,7 @@ System validation sets up the test with following capability routing relationshi
         system_validation_test_realm (facet: system-validation) <-- system validation test root
                 |  parent to
                 V
-    web_system_validation (runs `ui_app_instrumentor.rs`)
+        test component (ex: `web_view_system_validation`)
          /  parent to  |           \
         /              |            \
         V              V             V

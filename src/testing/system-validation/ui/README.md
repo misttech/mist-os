@@ -11,7 +11,7 @@ test_manager <-- root
 system_validation_test_realm (facet: system-validation) <-- system validation test root
     |  parent to
     V
-test component (`ui_app_instrumentor.rs`)
+test component (ex: simplest_sysmem_system_validation)
     |  parent to
     V
 sample-app (ex: `flatland-view-provider.cm`)
@@ -22,7 +22,7 @@ sample-app (ex: `flatland-view-provider.cm`)
 1. Build `workstation_eng_paused` product with system validation test targets.
 
 ```
-fx set workstation_eng_paused.qemu-x64 --release --with-base //sdk/bundles:tools  --with //src/testing/system-validation:tests
+fx set workstation_eng_paused.qemu-x64 --release --with //src/testing/system-validation:tests
 fx build
 ```
 

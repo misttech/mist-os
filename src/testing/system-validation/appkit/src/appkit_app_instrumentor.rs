@@ -1,12 +1,10 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use {
     argh::FromArgs,
-    fidl_fuchsia_session_scene as scene, fidl_fuchsia_ui_app as ui_app, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_scenic as scenic,
+    fuchsia_async as fasync,
     system_validation_lib::{
         app_monitor::AppMonitor, screencapture::take_screenshot,
         single_session_trace::SingleSessionTrace,
@@ -34,24 +32,9 @@ const SAMPLE_APP_MONIKER: &str = "./sample-app";
 #[fuchsia::main]
 async fn main() {
     let args: RunTestCmd = argh::from_env();
-    // Hook up to scene_manager
-    let scene_manager = connect_to_protocol::<scene::ManagerMarker>()
-        .expect("failed to connect to fuchsia.scene.Manager");
-    let view_provider = connect_to_protocol::<ui_app::ViewProviderMarker>()
-        .expect("failed to connect to ViewProvider");
-    let mut link_token_pair = scenic::flatland::ViewCreationTokenPair::new().unwrap();
+
     let app_monitor = AppMonitor::new(SAMPLE_APP_MONIKER.to_string());
 
-    // Use view provider to initiate creation of the view which will be connected to the
-    // viewport that we create below.
-    view_provider
-        .create_view2(ui_app::CreateView2Args {
-            view_creation_token: Some(link_token_pair.view_creation_token),
-            ..ui_app::CreateView2Args::EMPTY
-        })
-        .expect("Cannot invoke create_view2");
-    let _root_view_created =
-        scene_manager.present_root_view(&mut link_token_pair.viewport_creation_token);
     app_monitor.wait_for_start_event().await;
     app_monitor.add_monitor_for_stop_event();
 
