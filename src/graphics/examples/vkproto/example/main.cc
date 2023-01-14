@@ -60,29 +60,37 @@ int main(int argc, char* argv[]) {
   RTN_IF_MSG(1, !vkp_debug_messenger.Init(), "Debug messenger initialization failed");
 
 #if USE_GLFW
-  glfwInit();
-  glfwSetErrorCallback(glfwErrorCallback);
-  RTN_IF_MSG(1, !glfwVulkanSupported(), "glfwVulkanSupported has returned false.\n");
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow* window = glfwCreateWindow(1024, 768, "VkProto", nullptr, nullptr);
-  RTN_IF_MSG(1, !window, "glfwCreateWindow failed.\n");
+  GLFWwindow* window = nullptr;
+  if (!offscreen) {
+    glfwInit();
+    glfwSetErrorCallback(glfwErrorCallback);
+    RTN_IF_MSG(1, !glfwVulkanSupported(), "glfwVulkanSupported has returned false.\n");
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    window = glfwCreateWindow(1024, 768, "VkProto", nullptr, nullptr);
+    RTN_IF_MSG(1, !window, "glfwCreateWindow failed.\n");
+  }
 #endif
 
-// SURFACE
+  // SURFACE
+  std::shared_ptr<vkp::Surface> vkp_surface;
+  if (!offscreen) {
 #if USE_GLFW
-  auto vkp_surface = std::make_shared<vkp::Surface>(instance, window);
+    vkp_surface = std::make_shared<vkp::Surface>(instance, window);
 #else
-  auto vkp_surface = std::make_shared<vkp::Surface>(instance);
+    vkp_surface = std::make_shared<vkp::Surface>(instance);
 #endif
-  RTN_IF_MSG(1, !vkp_surface->Init(), "Surface initialization failed\n");
+    RTN_IF_MSG(1, !vkp_surface->Init(), "Surface initialization failed\n");
+  }
+
+  VkSurfaceKHR surface = vkp_surface ? vkp_surface->get() : nullptr;
 
   // PHYSICAL DEVICE
-  vkp::PhysicalDevice vkp_physical_device(instance, vkp_surface->get());
+  vkp::PhysicalDevice vkp_physical_device(instance, surface);
   RTN_IF_MSG(1, !vkp_physical_device.Init(), "Physical device initialization failed\n");
   const vk::PhysicalDevice& physical_device = vkp_physical_device.get();
 
   // LOGICAL DEVICE
-  auto vkp_device = vkp::Device(physical_device, vkp_surface->get());
+  auto vkp_device = vkp::Device(physical_device, surface);
   RTN_IF_MSG(1, !vkp_device.Init(), "Logical device initialization failed\n");
   std::shared_ptr<vk::Device> device = vkp_device.shared();
 
@@ -104,7 +112,7 @@ int main(int argc, char* argv[]) {
     image_views.emplace_back(vkp_offscreen_image_view->get());
   } else {
     // SWAP CHAIN
-    vkp_swap_chain = std::make_shared<vkp::Swapchain>(physical_device, device, vkp_surface);
+    vkp_swap_chain = std::make_shared<vkp::Swapchain>(physical_device, device, surface);
     RTN_IF_MSG(1, !vkp_swap_chain->Init(), "Swap chain initialization failed\n");
 
     image_format = vkp_swap_chain->image_format();
@@ -155,11 +163,11 @@ int main(int argc, char* argv[]) {
   }
 
 #if USE_GLFW
-  while (!glfwWindowShouldClose(window)) {
-    glfwPollEvents();
-    if (offscreen) {
-      DrawOffscreenFrame(vkp_device, *vkp_command_buffers, offscreen_fence.get());
-    } else {
+  if (offscreen) {
+    DrawOffscreenFrame(vkp_device, *vkp_command_buffers, offscreen_fence.get());
+  } else {
+    while (!glfwWindowShouldClose(window)) {
+      glfwPollEvents();
       DrawFrame(vkp_device, *vkp_swap_chain, *vkp_command_buffers, fences);
     }
   }
@@ -186,8 +194,10 @@ int main(int argc, char* argv[]) {
   }
 
 #if USE_GLFW
-  glfwDestroyWindow(window);
-  glfwTerminate();
+  if (!offscreen) {
+    glfwDestroyWindow(window);
+    glfwTerminate();
+  }
 #endif
 
   return 0;
@@ -252,6 +262,10 @@ bool DrawFrame(const vkp::Device& vkp_device, const vkp::Swapchain& vkp_swap_cha
   present_info.pImageIndices = &swapchain_image_index;
 
   RTN_IF_VKH_ERR(false, vkp_device.queue().presentKHR(&present_info), "presentKHR failed\n");
+  RTN_IF_VKH_ERR(false, vkp_device.queue().waitIdle(), "queue waitIdle failed\n");
+
+  device.destroySemaphore(render_finished_semaphore);
+  device.destroySemaphore(image_available_semaphore);
 
   return true;
 }

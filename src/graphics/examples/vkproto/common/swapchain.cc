@@ -92,8 +92,8 @@ bool CreateImageViews(const vk::Device device, const vk::Format& image_format,
 namespace vkp {
 
 Swapchain::Swapchain(const vk::PhysicalDevice phys_device, std::shared_ptr<vk::Device> device,
-                     std::shared_ptr<Surface> vkp_surface)
-    : initialized_(false), device_(device), vkp_surface_(std::move(vkp_surface)) {
+                     const VkSurfaceKHR& surface)
+    : initialized_(false), device_(device), surface_(std::move(surface)) {
   phys_device_ = std::make_unique<vk::PhysicalDevice>(phys_device);
 }
 
@@ -102,7 +102,7 @@ bool Swapchain::Init() {
   RTN_IF_MSG(false, !device_, "Device must be initialized.\n");
 
   Swapchain::Info info;
-  QuerySwapchainSupport(*phys_device_, vkp_surface_->get(), &info);
+  QuerySwapchainSupport(*phys_device_, surface_, &info);
   vk::SurfaceFormatKHR surface_format = ChooseSwapSurfaceFormat(info.formats);
   vk::PresentModeKHR present_mode = ChooseSwapPresentMode(info.present_modes);
   extent_ = ChooseSwapExtent(info.capabilities);
@@ -124,7 +124,7 @@ bool Swapchain::Init() {
   swapchain_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
   swapchain_info.presentMode = present_mode;
   swapchain_info.preTransform = info.capabilities.currentTransform;
-  swapchain_info.surface = vkp_surface_->get();
+  swapchain_info.surface = surface_;
 
   auto [r_swapchain, swapchain] = device_->createSwapchainKHRUnique(swapchain_info);
   RTN_IF_VKH_ERR(false, r_swapchain, "Failed to create swap chain.\n");

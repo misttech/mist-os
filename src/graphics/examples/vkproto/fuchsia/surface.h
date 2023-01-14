@@ -16,6 +16,7 @@ namespace vkp {
 
 class Surface {
  public:
+  Surface() = default;
   explicit Surface(std::shared_ptr<vk::Instance> instance);
   ~Surface();
 
@@ -25,7 +26,7 @@ class Surface {
  private:
   FXL_DISALLOW_COPY_AND_ASSIGN(Surface);
 
-  bool initialized_;
+  bool initialized_ = false;
   std::shared_ptr<vk::Instance> instance_;
   VkSurfaceKHR surface_;
 };

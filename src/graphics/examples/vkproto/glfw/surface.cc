@@ -18,6 +18,12 @@ Surface::~Surface() {
 }
 
 bool Surface::Init() {
+  if (initialized_) {
+    RTN_MSG(false, "vkp::Surface::Init() failed - already initialized.\n");
+  }
+  if (!instance_.get()) {
+    RTN_MSG(false, "vkp::Surface::Init() failed - must provide instance and window.\n");
+  }
   auto rv = glfwCreateWindowSurface(*instance_, window_, nullptr, &surface_);
 
   if (rv != VK_SUCCESS) {

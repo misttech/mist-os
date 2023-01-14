@@ -19,7 +19,10 @@ Surface::~Surface() {
 
 bool Surface::Init() {
   if (initialized_) {
-    RTN_MSG(false, "Surface is already initialized.\n");
+    RTN_MSG(false, "vkp::Surface::Init() failed - already initialized.\n");
+  }
+  if (!instance_.get()) {
+    RTN_MSG(false, "vkp::Surface::Init() failed - must provide instance.\n");
   }
 
   // TODO(fxbug.dev/13252): Move to scenic (public) surface.

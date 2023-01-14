@@ -28,7 +28,7 @@ class Swapchain {
   };
 
   Swapchain(vk::PhysicalDevice phys_device, std::shared_ptr<vk::Device> device,
-            std::shared_ptr<Surface> vkp_surface);
+            const VkSurfaceKHR &surface);
   Swapchain() = delete;
 
   bool Init();
@@ -51,7 +51,7 @@ class Swapchain {
   vk::Extent2D extent_;
   vk::Format image_format_;
   std::vector<vk::UniqueImageView> image_views_;
-  std::shared_ptr<Surface> vkp_surface_;
+  VkSurfaceKHR surface_;
   std::unique_ptr<vk::PhysicalDevice> phys_device_;
 
   vk::UniqueSwapchainKHR swap_chain_;
