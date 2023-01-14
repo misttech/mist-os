@@ -100,8 +100,8 @@ protocol AnnotationController {
         annotations Annotations;
     }) error GetAnnotationsError;
 
-    /// Returns annotations when they have changed, or when this method is
-    /// called by the client for the first time.
+    /// Returns the full set of `Annotations` when one or more of them have changed, or
+    /// when this method is called by the client for the first time.
     ///
     /// This operation does not block other requests from the client, but only one
     /// `WatchAnnotations` request at a time can be made on a connection. If the
