@@ -11,6 +11,9 @@
 extern "C" {
 #endif
 
+// This header is C, so clang-tidy shouldn't recommend using C++ features.
+// NOLINTBEGIN(modernize-use-using)
+
 #if defined(__Fuchsia__)
 // The entrypoints should be exported from libmagma_client.a. ICDs should use a
 // version script to re-exporting magma entrypoints.
@@ -312,6 +315,8 @@ typedef struct magma_image_info {
   uint32_t coherency_domain;
   uint32_t unused;
 } magma_image_info_t;
+
+// NOLINTEND(modernize-use-using)
 
 #if defined(__cplusplus)
 }

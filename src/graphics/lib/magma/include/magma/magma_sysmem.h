@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+// This header is C, so clang-tidy shouldn't recommend using C++ features.
+// NOLINTBEGIN(modernize-use-using)
+
 // An opaque handle that corresponds to a fuchsia.sysmem.BufferCollection.
 typedef uint64_t magma_buffer_collection_t;
 
@@ -298,6 +301,8 @@ MAGMA_EXPORT magma_status_t magma_get_description_format_index(
     magma_sysmem_connection_t connection, magma_buffer_format_description_t description,
     magma_sysmem_buffer_constraints_t constraints, magma_bool_t* format_valid_out,
     uint32_t format_valid_count);
+
+// NOLINTEND(modernize-use-using)
 
 #if defined(__cplusplus)
 }
