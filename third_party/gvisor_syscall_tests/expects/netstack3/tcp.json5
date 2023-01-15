@@ -18,11 +18,6 @@
                 "AllTCPSockets/*.*/*",
                 "AllUnixDomainSockets/*.*/*",
                 "AllInetTests/SimpleTcpSocketTest.*/*",
-
-                // Skip tests that sometimes crash the Netstack.
-                //
-                // https://fxbug.dev/111364
-                "AllInetTests/TcpSocketTest.NoDelayDefault/*",
             ],
         },
         {
@@ -38,8 +33,6 @@
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
                 "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
-                "AllInetTests/TcpSocketTest.NoDelayDefault/*",
-                "AllInetTests/TcpSocketTest.SetNoDelay/*",
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
                 "AllInetTests/TcpSocketTest.TcpInq/*",
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",

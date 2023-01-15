@@ -1168,15 +1168,19 @@ where
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
+            // Note for the following two options:
+            // Nagle enabled means TCP delays sending segment, thus meaning
+            // TCP_NODELAY is turned off. They have opposite meanings.
             fposix_socket::StreamSocketRequest::SetTcpNoDelay { value, responder } => {
-                // TODO(https://fxbug.dev/117115): Implement Nagle's algorithm
-                // and disable TCP_NODELAY by default.
-                responder_send!(responder, &mut {
-                    value.then_some(()).ok_or(fposix::Errno::Eopnotsupp)
-                });
+                self.with_socket_options_mut(|so| {
+                    so.nagle_enabled = !value;
+                })
+                .await;
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled).await;
+                responder_send!(responder, &mut Ok(!nagle_enabled));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
