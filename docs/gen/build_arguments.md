@@ -7266,7 +7266,7 @@ From //build/security.gni:231
 ### thinlto_cache_dir
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"linux_x64/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7567,7 +7567,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
