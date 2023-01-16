@@ -323,10 +323,7 @@ where
     where
         V: DeserializeSeed<'de>,
     {
-        let node = match self.nodes.next() {
-            Some(x) => x,
-            None => unreachable!(),
-        };
+        let node = self.nodes.next().unwrap();
         let inner = Deserializer::new(self.generator, node);
         seed.deserialize(inner)
     }

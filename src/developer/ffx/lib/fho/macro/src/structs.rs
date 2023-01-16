@@ -189,10 +189,8 @@ fn extract_command_field<'a>(
         .iter()
         .position(|f| matches!(f, NamedFieldTy::Command(_)))
         .ok_or(ParseError::CommandRequired(Span::call_site()))?;
-    match fields.remove(command_field_idx) {
-        NamedFieldTy::Command(f) => Ok(f),
-        _ => unreachable!(),
-    }
+    let NamedFieldTy::Command(f) = fields.remove(command_field_idx) else { unreachable!() };
+    Ok(f)
 }
 
 impl<'a> NamedFieldStruct<'a> {
@@ -279,15 +277,13 @@ mod tests {
             "#,
         );
         let ds = crate::extract_struct_info(&ast).unwrap();
-        let mut fields = match &ds.fields {
-            syn::Fields::Named(fields) => fields
-                .named
-                .iter()
-                .map(NamedFieldTy::parse)
-                .collect::<Result<Vec<_>, ParseError>>()
-                .unwrap(),
-            _ => unreachable!(),
-        };
+        let syn::Fields::Named(fields) = &ds.fields else { unreachable!() };
+        let mut fields = fields
+            .named
+            .iter()
+            .map(NamedFieldTy::parse)
+            .collect::<Result<Vec<_>, ParseError>>()
+            .unwrap();
         let mut vcc = VariableCreationCollection::new();
         vcc.add_field(fields.remove(0));
         // An unfortunate side effect of translating to tokens is that every individual token is
@@ -310,15 +306,13 @@ mod tests {
             "#,
         );
         let ds = crate::extract_struct_info(&ast).unwrap();
-        let mut fields = match &ds.fields {
-            syn::Fields::Named(fields) => fields
-                .named
-                .iter()
-                .map(NamedFieldTy::parse)
-                .collect::<Result<Vec<_>, ParseError>>()
-                .unwrap(),
-            _ => unreachable!(),
-        };
+        let syn::Fields::Named(fields) = &ds.fields else { unreachable!() };
+        let mut fields = fields
+            .named
+            .iter()
+            .map(NamedFieldTy::parse)
+            .collect::<Result<Vec<_>, ParseError>>()
+            .unwrap();
         let mut vcc = VariableCreationCollection::new();
         vcc.add_field(fields.remove(0));
         vcc.add_field(fields.remove(0));

@@ -142,48 +142,7 @@ impl TargetCollection {
         // scopes.
         new_target.drop_unscoped_link_local_addrs();
 
-        if let Some(to_update) = to_update {
-            if let Some(config) = new_target.build_config() {
-                to_update.build_config.borrow_mut().replace(config);
-            }
-            if let Some(serial) = new_target.serial() {
-                to_update.serial.borrow_mut().replace(serial);
-            }
-            if let Some(new_name) = new_target.nodename() {
-                to_update.set_nodename(new_name);
-            }
-            if let Some(ssh_port) = new_target.ssh_port() {
-                // Ony set the updated ssh port if it is None.
-                if to_update.ssh_port().is_none() {
-                    to_update.set_ssh_port(Some(ssh_port));
-                }
-            }
-            to_update.update_last_response(new_target.last_response());
-            let mut addrs = new_target.addrs.borrow().iter().cloned().collect::<Vec<_>>();
-            addrs.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            to_update.addrs_extend(addrs.into_iter());
-            to_update.addrs.borrow_mut().retain(|t| {
-                let is_too_old = Utc::now().signed_duration_since(t.timestamp).num_milliseconds()
-                    as i128
-                    > MDNS_MAX_AGE.as_millis() as i128;
-                !is_too_old || matches!(t.addr_type, TargetAddrType::Manual(_))
-            });
-            to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
-
-            to_update.update_connection_state(|_| new_target.get_connection_state());
-
-            to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
-                tracing::warn!("unable to enqueue rediscovered event: {:#}", err)
-            });
-            if let Some(event_queue) = self.events.borrow().as_ref() {
-                event_queue
-                    .push(DaemonEvent::UpdatedTarget(new_target.target_info()))
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("unalbe to push target update event: {}", e)
-                    });
-            }
-            to_update
-        } else {
+        let Some(to_update) = to_update else {
             tracing::info!("adding new target: {:?}", new_target);
             self.targets.borrow_mut().insert(new_target.id(), new_target.clone());
 
@@ -192,9 +151,47 @@ impl TargetCollection {
                     .push(DaemonEvent::NewTarget(new_target.target_info()))
                     .unwrap_or_else(|e| tracing::warn!("unable to push new target event: {}", e));
             }
+            return new_target;
+        };
 
-            new_target
+        if let Some(config) = new_target.build_config() {
+            to_update.build_config.borrow_mut().replace(config);
         }
+        if let Some(serial) = new_target.serial() {
+            to_update.serial.borrow_mut().replace(serial);
+        }
+        if let Some(new_name) = new_target.nodename() {
+            to_update.set_nodename(new_name);
+        }
+        if let Some(ssh_port) = new_target.ssh_port() {
+            // Ony set the updated ssh port if it is None.
+            if to_update.ssh_port().is_none() {
+                to_update.set_ssh_port(Some(ssh_port));
+            }
+        }
+        to_update.update_last_response(new_target.last_response());
+        let mut addrs = new_target.addrs.borrow().iter().cloned().collect::<Vec<_>>();
+        addrs.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        to_update.addrs_extend(addrs.into_iter());
+        to_update.addrs.borrow_mut().retain(|t| {
+            let is_too_old = Utc::now().signed_duration_since(t.timestamp).num_milliseconds()
+                as i128
+                > MDNS_MAX_AGE.as_millis() as i128;
+            !is_too_old || matches!(t.addr_type, TargetAddrType::Manual(_))
+        });
+        to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
+
+        to_update.update_connection_state(|_| new_target.get_connection_state());
+
+        to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
+            tracing::warn!("unable to enqueue rediscovered event: {:#}", err)
+        });
+        if let Some(event_queue) = self.events.borrow().as_ref() {
+            event_queue
+                .push(DaemonEvent::UpdatedTarget(new_target.target_info()))
+                .unwrap_or_else(|e| tracing::warn!("unalbe to push target update event: {}", e));
+        }
+        to_update
     }
 
     /// wait_for_match attempts to find a target matching "matcher". If no

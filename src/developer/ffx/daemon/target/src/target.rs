@@ -472,23 +472,20 @@ impl Target {
     }
 
     pub fn ssh_address_info(&self) -> Option<ffx::TargetAddrInfo> {
-        if let Some(addr) = self.ssh_address() {
-            let ip = match addr.ip() {
-                IpAddr::V6(i) => IpAddress::Ipv6(Ipv6Address { addr: i.octets().into() }),
-                IpAddr::V4(i) => IpAddress::Ipv4(Ipv4Address { addr: i.octets().into() }),
-            };
+        let addr = self.ssh_address()?;
+        let ip = match addr.ip() {
+            IpAddr::V6(i) => IpAddress::Ipv6(Ipv6Address { addr: i.octets().into() }),
+            IpAddr::V4(i) => IpAddress::Ipv4(Ipv4Address { addr: i.octets().into() }),
+        };
 
-            let scope_id = match addr {
-                SocketAddr::V6(ref v6) => v6.scope_id(),
-                _ => 0,
-            };
+        let scope_id = match addr {
+            SocketAddr::V6(ref v6) => v6.scope_id(),
+            _ => 0,
+        };
 
-            let port = self.ssh_port().unwrap_or(DEFAULT_SSH_PORT);
+        let port = self.ssh_port().unwrap_or(DEFAULT_SSH_PORT);
 
-            Some(TargetAddrInfo::IpPort(TargetIpPort { ip, port, scope_id }))
-        } else {
-            None
-        }
+        Some(TargetAddrInfo::IpPort(TargetIpPort { ip, port, scope_id }))
     }
 
     pub fn ssh_host_address_info(&self) -> Option<ffx::SshHostAddrInfo> {
@@ -710,9 +707,10 @@ impl Target {
 
     pub fn overnet_node_id(&self) -> Option<u64> {
         if let TargetConnectionState::Rcs(conn) = self.get_connection_state() {
-            return Some(conn.overnet_id.id);
+            Some(conn.overnet_id.id)
+        } else {
+            None
         }
-        None
     }
 
     pub fn ssh_port(&self) -> Option<u16> {
@@ -1006,23 +1004,15 @@ impl Target {
             let new_state = match &current_state {
                 TargetConnectionState::Mdns(ref last_seen)
                 | TargetConnectionState::Fastboot(ref last_seen)
-                | TargetConnectionState::Zedboot(ref last_seen) => {
-                    if last_seen.elapsed() > expire_duration {
-                        Some(TargetConnectionState::Disconnected)
-                    } else {
-                        None
-                    }
+                | TargetConnectionState::Zedboot(ref last_seen)
+                    if last_seen.elapsed() > expire_duration =>
+                {
+                    Some(TargetConnectionState::Disconnected)
                 }
-                TargetConnectionState::Manual(ref last_seen) => {
-                    if let Some(time) = last_seen {
-                        if time.elapsed() > expire_duration {
-                            Some(TargetConnectionState::Disconnected)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
+                TargetConnectionState::Manual(ref last_seen)
+                    if last_seen.map(|time| time.elapsed() > expire_duration).unwrap_or(false) =>
+                {
+                    Some(TargetConnectionState::Disconnected)
                 }
                 _ => None,
             };
@@ -1056,14 +1046,10 @@ impl Target {
         let addrs = self.addrs.borrow();
         let entry = addrs
             .iter()
-            .find(|addr_entry| matches!(addr_entry.addr_type, TargetAddrType::Manual(_)));
-        if let Some(entry) = entry {
-            match entry.addr_type {
-                TargetAddrType::Manual(timeout) => timeout,
-                _ => None,
-            }
-        } else {
-            None
+            .find(|addr_entry| matches!(addr_entry.addr_type, TargetAddrType::Manual(_)))?;
+        match entry.addr_type {
+            TargetAddrType::Manual(timeout) => timeout,
+            _ => None,
         }
     }
 

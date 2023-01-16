@@ -65,22 +65,19 @@ impl AsyncRead for TcpNetworkInterface {
             }));
         }
 
-        if let Some(ref mut task) = self.read_task {
-            match task.as_mut().poll(cx) {
-                Poll::Ready(Ok((avail_bytes, bytes_read, data))) => {
-                    self.read_task = None;
-                    self.read_avail_bytes = if avail_bytes == 0 { None } else { Some(avail_bytes) };
-                    buf[0..bytes_read].copy_from_slice(&data[0..bytes_read]);
-                    Poll::Ready(Ok(bytes_read))
-                }
-                Poll::Ready(Err(e)) => {
-                    self.read_task = None;
-                    Poll::Ready(Err(e))
-                }
-                Poll::Pending => Poll::Pending,
+        let task = self.read_task.as_mut().unwrap();
+        match task.as_mut().poll(cx) {
+            Poll::Ready(Ok((avail_bytes, bytes_read, data))) => {
+                self.read_task = None;
+                self.read_avail_bytes = if avail_bytes == 0 { None } else { Some(avail_bytes) };
+                buf[0..bytes_read].copy_from_slice(&data[0..bytes_read]);
+                Poll::Ready(Ok(bytes_read))
             }
-        } else {
-            unreachable!()
+            Poll::Ready(Err(e)) => {
+                self.read_task = None;
+                Poll::Ready(Err(e))
+            }
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -115,20 +112,17 @@ impl AsyncWrite for TcpNetworkInterface {
             }));
         }
 
-        if let Some(ref mut task) = self.write_task {
-            match task.as_mut().poll(cx) {
-                Poll::Ready(Ok(s)) => {
-                    self.write_task = None;
-                    Poll::Ready(Ok(s))
-                }
-                Poll::Ready(Err(e)) => {
-                    self.write_task = None;
-                    Poll::Ready(Err(e))
-                }
-                Poll::Pending => Poll::Pending,
+        let task = self.write_task.as_mut().unwrap();
+        match task.as_mut().poll(cx) {
+            Poll::Ready(Ok(s)) => {
+                self.write_task = None;
+                Poll::Ready(Ok(s))
             }
-        } else {
-            unreachable!();
+            Poll::Ready(Err(e)) => {
+                self.write_task = None;
+                Poll::Ready(Err(e))
+            }
+            Poll::Pending => Poll::Pending,
         }
     }
 

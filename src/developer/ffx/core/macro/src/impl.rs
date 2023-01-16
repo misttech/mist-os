@@ -60,7 +60,7 @@ fn qualified_name(path: &syn::Path) -> String {
     path.segments
         .pairs()
         .map(|pair| {
-            if let Some(_) = pair.punct() {
+            if pair.punct().is_some() {
                 format!("{}::", pair.value().ident.to_string())
             } else {
                 // last ident won't have a punctuation
@@ -201,7 +201,7 @@ fn parse_arguments(
                         assert!(ffx_attr.is_none());
                     } else if let Some(command) = parse_argh_command(&pat) {
                         // This SHOULD be the argh command - and there should only be one.
-                        if let Some(_) = cmd {
+                        if cmd.is_some() {
                             return Err(Error::new(
                                 arg.span(),
                                 format!(
@@ -210,26 +210,21 @@ fn parse_arguments(
                                     UNRECOGNIZED_PARAMETER
                                 ),
                             ));
-                        } else {
-                            if extract_ffx_attribute_tokens(&attrs).is_some() {
-                                return Err(Error::new(arg.span(), ATTRIBUTE_ON_WRONG_PROXY_TYPE));
-                            }
-                            let ident = command.ident.clone();
-                            if command.mutability.is_some() {
-                                if let FnArg::Typed(p) = arg.clone() {
-                                    let new_pat = Box::new(Pat::Ident(PatIdent {
-                                        mutability: None,
-                                        ..command
-                                    }));
-                                    cmd = Some(FnArg::Typed(PatType { ty, pat: new_pat, ..p }));
-                                } else {
-                                    cmd = Some(arg.clone());
-                                }
-                            } else {
-                                cmd = Some(arg.clone());
-                            }
-                            inner_args.push(quote! { #ident });
                         }
+
+                        if extract_ffx_attribute_tokens(&attrs).is_some() {
+                            return Err(Error::new(arg.span(), ATTRIBUTE_ON_WRONG_PROXY_TYPE));
+                        }
+                        let ident = command.ident.clone();
+                        match (command.mutability, arg.clone()) {
+                            (Some(_), FnArg::Typed(p)) => {
+                                let new_pat =
+                                    Box::new(Pat::Ident(PatIdent { mutability: None, ..command }));
+                                cmd = Some(FnArg::Typed(PatType { ty, pat: new_pat, ..p }));
+                            }
+                            (_, a) => cmd = Some(a),
+                        }
+                        inner_args.push(quote! { #ident });
                     } else {
                         if let Pat::Ident(pat_ident) = pat.as_ref() {
                             return Err(Error::new(
@@ -643,7 +638,7 @@ impl ToTokens for WriterArgument {
 
 pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error> {
     let method = input.sig.ident.clone();
-    let asyncness = if let Some(_) = input.sig.asyncness {
+    let asyncness = if input.sig.asyncness.is_some() {
         quote! {.await}
     } else {
         quote! {}
@@ -1051,7 +1046,7 @@ mod test {
         let original: ItemFn = parse_quote! {
             pub async fn echo() -> Result<(), Error> { Ok(()) }
         };
-        if let Ok(_) = ffx_plugin(original.clone(), proxies) {
+        if ffx_plugin(original.clone(), proxies).is_ok() {
             assert!(false, "A method with no parameters should throw an error");
         }
         Ok(())
@@ -1063,7 +1058,7 @@ mod test {
         let original: ItemFn = parse_quote! {
             pub async fn echo(self, cmd: EchoCommand) -> Result<(), Error> { Ok(()) }
         };
-        if let Ok(_) = ffx_plugin(original.clone(), proxies) {
+        if ffx_plugin(original.clone(), proxies).is_ok() {
             assert!(false, "A method with a receiver should throw an error");
         }
         Ok(())
@@ -1075,7 +1070,7 @@ mod test {
         let original: ItemFn = parse_quote! {
             pub async fn echo(proxy: &TestProxy, cmd: EchoCommand) -> Result<(), Error> { Ok(()) }
         };
-        if let Ok(_) = ffx_plugin(original.clone(), proxies) {
+        if ffx_plugin(original.clone(), proxies).is_ok() {
             assert!(false, "A method with references should throw an error");
         }
         Ok(())
