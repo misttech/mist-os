@@ -22,7 +22,9 @@ def copy_file_if_changed(src_path, dst_path):
     if os.path.exists(dst_path) and filecmp.cmp(src_path, dst_path,
                                                 shallow=False):
         return
-    if os.path.exists(dst_path):
+
+    # Use lexists to make sure broken symlinks are removed as well.
+    if os.path.lexists(dst_path):
         os.remove(dst_path)
     try:
         os.link(src_path, dst_path)
