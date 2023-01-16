@@ -7,6 +7,12 @@
         accessor: "ALL",
         timeout_seconds: "60",
         cases: [
+            // Verify the filesystem type (which is hard-coded and stable)
+            "bootstrap/fshost/blobfs:root/fs.info:type WHERE [a] a == 2657701153",
+
+            // Verify total bytes of filesystem is nonzero
+            "bootstrap/fshost/blobfs:root/fs.usage:total_bytes WHERE [a] a > 0",
+
             // Paged and unpaged reads have a non-zero number of total bytes.
             "bootstrap/fshost/blobfs:root/*paged_read_stats/*:read_bytes WHERE [a] Fold(Fn([cur, prev], cur + prev), a, 0) > 0",
 
@@ -16,21 +22,6 @@
             // Allocation stats are reported and non-negative.
             "bootstrap/fshost/blobfs:root/allocation_stats:blobs_created WHERE [a] a >= 0",
             "bootstrap/fshost/blobfs:root/allocation_stats:total_allocation_time_ticks WHERE [a] a >= 0",
-
-            // Cache size is reported and non-negative.
-            "bootstrap/fshost:root/data_stats/data/cache:size WHERE [a] a >= 0",
-
-            // Data directory size is reported and non-negative.
-            "bootstrap/fshost:root/data_stats/data:size WHERE [a] a >= 0",
-
-            // Volume size is non-zero, and amount used is non-negative.
-            "bootstrap/fshost:root/data_stats/stats:total_bytes WHERE [a] a > 0",
-            "bootstrap/fshost:root/data_stats/stats:allocated_bytes WHERE [a] a > 0",
-            "bootstrap/fshost:root/data_stats/stats:used_bytes WHERE [a] a >= 0",
-
-            // Inode allocation is non-zero and usage is non-negative.
-            "bootstrap/fshost:root/data_stats/stats:allocated_inodes WHERE [a] a > 0",
-            "bootstrap/fshost:root/data_stats/stats:used_inodes WHERE [a] a >= 0",
 
             // Lookup stats for blob opening are reported and non-negative.
             "bootstrap/fshost/blobfs:root/lookup_stats:blobs_opened WHERE [a] a >= 0",

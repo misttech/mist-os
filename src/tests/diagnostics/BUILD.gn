@@ -8,28 +8,13 @@ import("//build/testing/environments.gni")
 # For data_filesystem_format
 import("//src/storage/fshost/generated_fshost_config.gni")
 
-# This is copied from "//zircon/kernel/lib/instrumentation/asan" to
-# detect if we are running an ASAN build.
-#
-# Note that the `is_asan` check below comes first so that we do not get
-# an error that this variable is unused.
-#_asan_config = [ "//build/config/sanitizers:asan" ]
-#_toolchain_configs = toolchain_variant.configs
-#is_asan = _toolchain_configs + _asan_config - _asan_config != _toolchain_configs
-
 # This directory contains tests for diagnostic data presence in "core".
 #
 # Diagnostics data presence tests touch multiple components on the system
 # and are non-hermetic.
-#
-# We disable these tests in debug, coverage, and ASAN
-# builds. Coverage/ASAN will not provide meaningful results for these
-# tests, since the tests themselves are only configuration, and the reduced
-# performance of such builds makes these tests flaky.
 group("tests") {
   testonly = true
 
-  #  if (!is_asan && !is_debug && !is_coverage) {
   deps = [
     ":appmgr-cpu-stats-tests",
     ":appmgr-log-tests",
@@ -40,15 +25,18 @@ group("tests") {
     ":component-manager-status-tests",
     ":diagnostics-kcounter-inspect-tests",
     ":diagnostics-persistence-inspect-tests",
-    ":fshost-stats-tests",
+    ":fshost-blobfs-metrics-tests",
+    ":fshost-metrics-tests",
     ":legacy-metrics-tests",
     ":log-stats-inspect-tests",
   ]
 
-  #  }
-
   if (data_filesystem_format == "fxfs") {
-    deps += [ ":fshost-fxfs-stats-tests" ]
+    deps += [ ":fshost-fxfs-metrics-tests" ]
+  }
+
+  if (data_filesystem_format == "minfs") {
+    deps += [ ":fshost-minfs-metrics-tests" ]
   }
 }
 
@@ -82,8 +70,8 @@ fuchsia_unittest_package("appmgr-cpu-stats-tests") {
   }
 }
 
-fuchsia_unittest_package("fshost-stats-tests") {
-  manifest = "meta/fshost_stats_tests.cml"
+fuchsia_unittest_package("fshost-metrics-tests") {
+  manifest = "meta/fshost_metrics_tests.cml"
 
   test_specs = {
     environments = [
@@ -97,8 +85,38 @@ fuchsia_unittest_package("fshost-stats-tests") {
   }
 }
 
-fuchsia_unittest_package("fshost-fxfs-stats-tests") {
-  manifest = "meta/fshost_fxfs_stats_tests.cml"
+fuchsia_unittest_package("fshost-blobfs-metrics-tests") {
+  manifest = "meta/fshost_blobfs_metrics_tests.cml"
+
+  test_specs = {
+    environments = [
+      emu_env,
+      {
+        dimensions = {
+          device_type = "Astro"
+        }
+      },
+    ]
+  }
+}
+
+fuchsia_unittest_package("fshost-fxfs-metrics-tests") {
+  manifest = "meta/fshost_fxfs_metrics_tests.cml"
+
+  test_specs = {
+    environments = [
+      emu_env,
+      {
+        dimensions = {
+          device_type = "Astro"
+        }
+      },
+    ]
+  }
+}
+
+fuchsia_unittest_package("fshost-minfs-metrics-tests") {
+  manifest = "meta/fshost_minfs_metrics_tests.cml"
 
   test_specs = {
     environments = [
