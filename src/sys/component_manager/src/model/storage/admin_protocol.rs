@@ -333,10 +333,8 @@ impl StorageAdmin {
                     let abs_moniker = component
                         .abs_moniker()
                         .descendant(&instanced_relative_moniker.without_instance_ids());
-                    let instance_id = component
-                        .try_get_component_id_index()?
-                        .look_up_moniker(&abs_moniker)
-                        .cloned();
+                    let instance_id =
+                        component.component_id_index().look_up_moniker(&abs_moniker).cloned();
 
                     let dir_proxy = storage::open_isolated_storage(
                         &storage_capability_source_info,
@@ -384,7 +382,7 @@ impl StorageAdmin {
                     }
                 }
                 fsys::StorageAdminRequest::OpenComponentStorageById { id, object, responder } => {
-                    let instance_id_index = component.try_get_component_id_index()?;
+                    let instance_id_index = component.component_id_index();
                     if !instance_id_index.look_up_instance_id(&id) {
                         responder.send(&mut Err(fcomponent::Error::ResourceNotFound))?;
                         continue;
@@ -416,7 +414,7 @@ impl StorageAdmin {
                                 .abs_moniker()
                                 .descendant(&instanced_relative_moniker.without_instance_ids());
                             let instance_id = component
-                                .try_get_component_id_index()?
+                                .component_id_index()
                                 .look_up_moniker(&abs_moniker)
                                 .cloned();
                             let res = storage::delete_isolated_storage(

@@ -1248,12 +1248,12 @@ impl ComponentInstanceInterface for ComponentInstance {
         self.environment.as_ref()
     }
 
-    fn try_get_policy_checker(&self) -> Result<GlobalPolicyChecker, ComponentInstanceError> {
-        Ok(self.context.policy().clone())
+    fn policy_checker(&self) -> GlobalPolicyChecker {
+        self.context.policy().clone()
     }
 
-    fn try_get_component_id_index(&self) -> Result<Arc<ComponentIdIndex>, ComponentInstanceError> {
-        Ok(self.context.component_id_index())
+    fn component_id_index(&self) -> Arc<ComponentIdIndex> {
+        self.context.component_id_index()
     }
 
     fn try_get_parent(&self) -> Result<ExtendedInstance, ComponentInstanceError> {

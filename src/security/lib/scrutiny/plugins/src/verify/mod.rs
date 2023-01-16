@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(
             Some(&iid),
             root_instance
-                .try_get_component_id_index()?
+                .component_id_index()
                 .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
         );
         Ok(())

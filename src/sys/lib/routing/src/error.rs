@@ -22,10 +22,6 @@ pub enum ComponentInstanceError {
     InstanceNotFound { moniker: AbsoluteMoniker },
     #[error("component manager instance unavailable")]
     ComponentManagerInstanceUnavailable {},
-    #[error("policy checker not found for component instance {}", moniker)]
-    PolicyCheckerNotFound { moniker: AbsoluteMoniker },
-    #[error("component ID index not found for component instance {}", moniker)]
-    ComponentIdIndexNotFound { moniker: AbsoluteMoniker },
     #[error("malformed url {} for component instance {}", url, moniker)]
     MalformedUrl { url: String, moniker: AbsoluteMoniker },
     #[error("url {} for component {} does not resolve to an absolute url", url, moniker)]
@@ -89,14 +85,6 @@ impl PartialEq for ComponentInstanceError {
                 Self::ComponentManagerInstanceUnavailable {},
                 Self::ComponentManagerInstanceUnavailable {},
             ) => true,
-            (
-                Self::PolicyCheckerNotFound { moniker: self_moniker },
-                Self::PolicyCheckerNotFound { moniker: other_moniker },
-            ) => self_moniker.eq(other_moniker),
-            (
-                Self::ComponentIdIndexNotFound { moniker: self_moniker },
-                Self::ComponentIdIndexNotFound { moniker: other_moniker },
-            ) => self_moniker.eq(other_moniker),
             (Self::ResolveFailed { .. }, Self::ResolveFailed { .. }) => false,
             _ => false,
         }

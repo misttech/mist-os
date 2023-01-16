@@ -50,11 +50,11 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     /// Returns a representation of this `ComponentInstanceInterface`'s environment.
     fn environment(&self) -> &dyn EnvironmentInterface<Self>;
 
-    /// Returns the `GlobalPolicyChecker` for this component instance, if it is still available.
-    fn try_get_policy_checker(&self) -> Result<GlobalPolicyChecker, ComponentInstanceError>;
+    /// Returns the `GlobalPolicyChecker` for this component instance.
+    fn policy_checker(&self) -> GlobalPolicyChecker;
 
     /// Returns the `ComponentIdIndex` available to this component instance, if it is still available.
-    fn try_get_component_id_index(&self) -> Result<Arc<ComponentIdIndex>, ComponentInstanceError>;
+    fn component_id_index(&self) -> Arc<ComponentIdIndex>;
 
     /// Gets the parent, if it still exists, or returns an `InstanceNotFound` error.
     fn try_get_parent(&self) -> Result<ExtendedInstanceInterface<Self>, ComponentInstanceError>;

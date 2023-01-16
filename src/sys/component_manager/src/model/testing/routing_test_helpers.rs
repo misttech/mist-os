@@ -686,13 +686,8 @@ impl RoutingTestModel for RoutingTest {
                 capability_util::write_file_to_storage(&namespace, path, expected_res.clone())
                     .await;
 
-                let instance_id = self
-                    .model
-                    .root()
-                    .try_get_component_id_index()
-                    .unwrap()
-                    .look_up_moniker(&moniker)
-                    .cloned();
+                let instance_id =
+                    self.model.root().component_id_index().look_up_moniker(&moniker).cloned();
 
                 if let Some(relative_moniker) = storage_relation {
                     if from_cm_namespace {
@@ -749,8 +744,7 @@ impl RoutingTestModel for RoutingTest {
                 let component_instance_id = self
                     .model
                     .root()
-                    .try_get_component_id_index()
-                    .unwrap()
+                    .component_id_index()
                     .look_up_moniker(&component_abs_moniker)
                     .cloned();
                 storage_admin_proxy

@@ -1420,12 +1420,6 @@ mod tests {
             _ => panic!("child environment's parent should be root component"),
         }
 
-        root_instance.try_get_policy_checker()?;
-        root_instance.try_get_component_id_index()?;
-
-        child_instance.try_get_policy_checker()?;
-        child_instance.try_get_component_id_index()?;
-
         assert!(root_instance.resolve().is_ok());
         assert!(child_instance.resolve().is_ok());
 

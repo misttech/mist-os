@@ -84,7 +84,7 @@ async fn do_start(
         })?;
 
         // Generate the Runtime which will be set in the Execution.
-        let checker = component.try_get_policy_checker()?;
+        let checker = component.policy_checker();
         let (pending_runtime, start_info, controller_server_end, break_on_start) =
             make_execution_runtime(
                 &component,

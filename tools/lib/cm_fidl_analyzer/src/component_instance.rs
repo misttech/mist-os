@@ -188,12 +188,12 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         Ok(self.parent.upgrade()?)
     }
 
-    fn try_get_policy_checker(&self) -> Result<GlobalPolicyChecker, ComponentInstanceError> {
-        Ok(self.policy_checker.clone())
+    fn policy_checker(&self) -> GlobalPolicyChecker {
+        self.policy_checker.clone()
     }
 
-    fn try_get_component_id_index(&self) -> Result<Arc<ComponentIdIndex>, ComponentInstanceError> {
-        Ok(Arc::clone(&self.component_id_index))
+    fn component_id_index(&self) -> Arc<ComponentIdIndex> {
+        Arc::clone(&self.component_id_index)
     }
 
     // The trait definition requires this function to be async, but `ComponentInstanceForAnalyzer`'s
