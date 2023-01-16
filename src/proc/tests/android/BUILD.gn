@@ -4,8 +4,6 @@
 
 import("//build/components.gni")
 import("//build/python/python_host_test.gni")
-import(
-    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 import("//src/proc/tests/starnix_test_package.gni")
 
 group("tests") {
@@ -53,19 +51,17 @@ fuchsia_test_component("binder_test") {
   ]
 }
 
-fuchsia_test_component_with_expectations("adbd_test") {
+fuchsia_test_component("adbd_test") {
   manifest = "meta/adbd_test.cml"
-  expectations = "expectations/adbd_test.json5"
   deps = [
     "//src/connectivity/network/netstack:component",
-    "//src/proc/tests:starnix_test_with_expectations",
+    "//src/proc/tests:starnix_test",
   ]
 }
 
-fuchsia_test_component_with_expectations("libutils_test") {
+fuchsia_test_component("libutils_test") {
   manifest = "meta/libutils_test.cml"
-  expectations = "expectations/libutils_test.json5"
-  deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
+  deps = [ "//src/proc/tests:starnix_test" ]
 }
 
 resource("starnix_testcases_image") {
@@ -99,7 +95,6 @@ starbionic_test_package("android") {
     ":binder_smoke_test",
     ":libutils_test",
   ]
-  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
 starnix_test_package("android_with_init") {
