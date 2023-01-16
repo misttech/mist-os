@@ -194,8 +194,8 @@ static std::string RetrieveLogs(std::string guid, zx::channel remote) {
     if (exit) {
       return;
     }
-    auto chunk_result = diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(
-        std::move(content), true);
+    auto chunk_result =
+        diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content));
     auto messages = chunk_result.take_value();  // throws exception if conversion fails.
     for (auto& msg : messages) {
       std::string formatted = Format(msg.value());

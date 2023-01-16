@@ -154,7 +154,7 @@ TEST(LogMessage, LegacyHostEncoding) {
   buffer.size = sizeof(kSampleLogPayload);
   content.set_json(std::move(buffer));
   auto messages =
-      diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content), true)
+      diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content))
           .take_value();
   auto message = messages[0].value();
   auto encoded_message =
@@ -620,7 +620,7 @@ TEST(LogMessage, MessageFormatting) {
   }
 ]
 )JSON",
-      .expected_message = "Hello, world kv=ok",
+      .expected_message = "Hello, world kv=\"ok\"",
   });
   cases.emplace_back(ValidationTestCase{
       .input = R"JSON(

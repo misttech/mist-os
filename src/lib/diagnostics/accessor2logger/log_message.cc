@@ -64,8 +64,7 @@ std::string GetComponentName(const std::string& moniker) {
   return moniker.substr(pos + 1);
 }
 
-inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Value& value,
-                                                                  bool use_host_encoding) {
+inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Value& value) {
   LogMessage ret = {};
   std::stringstream kv_mapping;
 
@@ -199,26 +198,22 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
       } else if (it->value.IsDouble()) {
         kv_mapping << it->value.GetDouble();
       } else if (it->value.IsString()) {
-        if (use_host_encoding) {
-          kv_mapping << "\"";
-          auto str_value = it->value.GetString();
-          if (strchr(str_value, '"') != nullptr) {
-            // Escape quotes in strings per host encoding.
-            size_t len = strlen(str_value);
-            for (size_t i = 0; i < len; ++i) {
-              char c = str_value[i];
-              if (c == '"') {
-                kv_mapping << '\\';
-              }
-              kv_mapping << c;
+        kv_mapping << "\"";
+        auto str_value = it->value.GetString();
+        if (strchr(str_value, '"') != nullptr) {
+          // Escape quotes in strings per host encoding.
+          size_t len = strlen(str_value);
+          for (size_t i = 0; i < len; ++i) {
+            char c = str_value[i];
+            if (c == '"') {
+              kv_mapping << '\\';
             }
-          } else {
-            kv_mapping << std::move(it->value.GetString());
+            kv_mapping << c;
           }
-          kv_mapping << "\"";
         } else {
           kv_mapping << std::move(it->value.GetString());
         }
+        kv_mapping << "\"";
       } else {
         kv_mapping << "<unknown>";
       }
@@ -263,12 +258,6 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
 fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
                  std::string>
 ConvertFormattedContentToLogMessages(FormattedContent content) {
-  return ConvertFormattedContentToLogMessages(std::move(content), false);
-}
-
-fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
-                 std::string>
-ConvertFormattedContentToLogMessages(FormattedContent content, bool use_host_encoding) {
   std::vector<fpromise::result<LogMessage, std::string>> output;
 
   if (!content.is_json()) {
@@ -296,7 +285,7 @@ ConvertFormattedContentToLogMessages(FormattedContent content, bool use_host_enc
   }
 
   for (rapidjson::SizeType i = 0; i < d.Size(); ++i) {
-    output.emplace_back(JsonToLogMessage(d[i], use_host_encoding));
+    output.emplace_back(JsonToLogMessage(d[i]));
   }
 
   return fpromise::ok(std::move(output));
