@@ -430,7 +430,7 @@ impl PackageBuilder {
         .with_context(|| format!("building package manifest {}", metafar_path.display()))?;
 
         Ok(if let Some(manifest_path) = manifest_path {
-            let package_manifest = if let RelativeTo::File = blob_sources_relative {
+            if let RelativeTo::File = blob_sources_relative {
                 package_manifest.write_with_relative_paths(&manifest_path).with_context(|| {
                     format!(
                         "Failed to create package manifest with relative paths at: {manifest_path}"
@@ -448,9 +448,7 @@ impl PackageBuilder {
                 .with_context(|| format!("writing package manifest to {manifest_path}"))?;
 
                 package_manifest
-            };
-
-            package_manifest
+            }
         } else {
             package_manifest
         })

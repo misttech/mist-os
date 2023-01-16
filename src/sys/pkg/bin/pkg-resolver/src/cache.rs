@@ -532,7 +532,7 @@ impl BlobFetcher {
                 let local_mirror_proxy = local_mirror_proxy.clone();
 
                 async move {
-                    let res = fetch_blob(
+                    fetch_blob(
                         inspect,
                         &http_client,
                         stats,
@@ -543,8 +543,7 @@ impl BlobFetcher {
                         blob_fetch_params,
                     )
                     .map_err(Arc::new)
-                    .await;
-                    res
+                    .await
                 }
             },
         );

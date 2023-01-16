@@ -124,7 +124,7 @@ impl InputState {
         device_name: String,
         source: DeviceStateSource,
     ) -> Result<DeviceState, Error> {
-        return Ok(*self
+        Ok(*self
             .input_categories
             .get(&device_type)
             .ok_or_else(|| {
@@ -141,7 +141,7 @@ impl InputState {
             .get(&source)
             .ok_or_else(|| {
                 ControllerError::UnexpectedError("Failed to get state from source states".into())
-            })?);
+            })?)
     }
 
     /// Retrieve the overall state of a given device.

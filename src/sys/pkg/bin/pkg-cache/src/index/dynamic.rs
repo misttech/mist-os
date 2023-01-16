@@ -78,7 +78,8 @@ impl DynamicIndex {
 
     fn make_package_node(&mut self, package: &Package, hash: &Hash) -> PackageNode {
         let child_node = self.node.create_child(hash.to_string());
-        let package_node = match package {
+
+        match package {
             Package::Pending => PackageNode::Pending {
                 state: child_node.create_string("state", "pending"),
                 time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
@@ -100,9 +101,7 @@ impl DynamicIndex {
                     .create_int("required_blobs", required_blobs.len().try_into().unwrap_or(-1)),
                 node: child_node,
             },
-        };
-
-        package_node
+        }
     }
 
     // Add the given package to the dynamic index.

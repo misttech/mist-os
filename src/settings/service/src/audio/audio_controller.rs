@@ -142,11 +142,11 @@ impl VolumeController {
                         .iter()
                         .find(|stream| stream.stream_type == set_stream.stream_type)
                         .ok_or_else(|| {
-                            return ControllerError::InvalidArgument(
+                            ControllerError::InvalidArgument(
                                 SettingType::Audio,
                                 "stream".into(),
                                 format!("{set_stream:?}").into(),
-                            );
+                            )
                         })?;
                     new_vec.push(AudioStream {
                         stream_type: stored_stream.stream_type,
