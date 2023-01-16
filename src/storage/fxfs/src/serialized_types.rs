@@ -70,4 +70,4 @@ mod tests;
 
 // Re-export all Fxfs types.
 mod types;
-pub use types::{EARLIEST_SUPPORTED_VERSION, LATEST_VERSION};
+pub use types::{EARLIEST_SUPPORTED_VERSION, JOURNAL_BLOCK_SIZE_CHANGE_VERSION, LATEST_VERSION};

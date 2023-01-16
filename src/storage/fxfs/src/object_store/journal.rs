@@ -82,7 +82,8 @@ use {
 pub use super_block::{SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5};
 
 // The journal file is written to in blocks of this size.
-pub const BLOCK_SIZE: u64 = 8192;
+pub const BLOCK_SIZE: u64 = 4096;
+const OLD_BLOCK_SIZE: u64 = 8192;
 
 // The journal file is extended by this amount when necessary.
 const CHUNK_SIZE: u64 = 131_072;
@@ -555,8 +556,7 @@ impl Journal {
             }
         }
 
-        let mut reader =
-            JournalReader::new(handle, self.block_size(), &super_block.journal_checkpoint);
+        let mut reader = JournalReader::new(handle, &super_block.journal_checkpoint);
         let JournaledTransactions { transactions, marked_for_deletion, device_flushed_offset } =
             self.read_transactions(&mut reader, None).await?;
 
@@ -980,7 +980,7 @@ impl Journal {
             Some(checkpoint) => checkpoint,
             None => return Ok(vec![]),
         };
-        let mut reader = JournalReader::new(handle, self.block_size(), &checkpoint);
+        let mut reader = JournalReader::new(handle, &checkpoint);
         // Record the current end offset and only read to there, so we don't accidentally read any
         // partially flushed blocks.
         let end_offset = self.inner.lock().unwrap().flushed_offset;
@@ -1266,10 +1266,6 @@ impl Journal {
                 self.reclaim_event.listen()
             });
         }
-    }
-
-    fn block_size(&self) -> u64 {
-        BLOCK_SIZE
     }
 
     fn chunk_size(&self) -> u64 {

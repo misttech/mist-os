@@ -140,6 +140,22 @@ async fn check_image(path: &Path) -> Result<(), Error> {
         if ops::get(&vol, &Path::new("some/deleted.txt")).await.is_ok() {
             bail!("Found deleted file.");
         }
+
+        // Make sure after writing a new file (using the latest format), the filesystem remains
+        // valid.
+        let new_file = Path::new("some/test_file.txt");
+        let content = vec![0, 1, 2, 3, 4, 5];
+        ops::put(&fs, &vol, &new_file, content.clone()).await?;
+        fs.close().await?;
+
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await?;
+        ops::fsck(&fs, true).await.context("fsck failed")?;
+        let vol = ops::open_volume(&fs, crypt.clone()).await?;
+        if &ops::get(&vol, &new_file).await? != &content {
+            bail!("Unexpected file content in new file");
+        }
         fs.close().await
     }
 }

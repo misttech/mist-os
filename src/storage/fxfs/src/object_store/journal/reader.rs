@@ -5,8 +5,12 @@
 use {
     crate::{
         checksum::{fletcher64, Checksum},
-        object_store::journal::{JournalCheckpoint, JournalHandle, RESET_XOR},
-        serialized_types::{Version, Versioned, VersionedLatest},
+        object_store::journal::{
+            JournalCheckpoint, JournalHandle, BLOCK_SIZE, OLD_BLOCK_SIZE, RESET_XOR,
+        },
+        serialized_types::{
+            Version, Versioned, VersionedLatest, JOURNAL_BLOCK_SIZE_CHANGE_VERSION,
+        },
     },
     anyhow::{bail, Context, Error},
     byteorder::{ByteOrder, LittleEndian},
@@ -20,9 +24,6 @@ use {
 pub struct JournalReader {
     // The handle of the journal file that we are reading.
     handle: Box<dyn JournalHandle>,
-
-    // The block size for the journal file.
-    block_size: u64,
 
     // The currently buffered data.
     buf: Vec<u8>,
@@ -54,17 +55,12 @@ pub struct JournalReader {
 }
 
 impl JournalReader {
-    pub(super) fn new(
-        handle: impl JournalHandle,
-        block_size: u64,
-        checkpoint: &JournalCheckpoint,
-    ) -> Self {
+    pub(super) fn new(handle: impl JournalHandle, checkpoint: &JournalCheckpoint) -> Self {
         JournalReader {
             handle: Box::new(handle),
-            block_size,
             buf: Vec::new(),
             buf_range: 0..0,
-            read_offset: checkpoint.file_offset - checkpoint.file_offset % block_size,
+            read_offset: checkpoint.file_offset - checkpoint.file_offset % BLOCK_SIZE,
             buf_file_offset: checkpoint.file_offset,
             checksums: vec![checkpoint.checksum],
             version: checkpoint.version,
@@ -90,17 +86,19 @@ impl JournalReader {
     /// This can change across Journal RESET boundaries when the tail of the journal is written to
     /// by newer versions of the code.
     pub fn set_version(&mut self, version: Version) {
-        self.version = version
+        self.version = version;
+
+        // Reset bad_checksum in case this version change triggers a change in the block size.
+        self.bad_checksum = false;
     }
 
     /// To allow users to flush a block, they can store a record that indicates the rest of the
     /// block should be skipped.  When that record is read, users should call this function.
     pub fn skip_to_end_of_block(&mut self) {
-        let block_offset = self.buf_file_offset % self.block_size;
+        let bs = self.block_size();
+        let block_offset = self.buf_file_offset % bs;
         if block_offset > 0 {
-            self.consume(
-                (self.block_size - block_offset) as usize - std::mem::size_of::<Checksum>(),
-            );
+            self.consume((bs - block_offset) as usize - std::mem::size_of::<Checksum>());
         }
     }
 
@@ -130,8 +128,8 @@ impl JournalReader {
 
                     // Fix up buf_range now...
                     self.consume(self.buf_range.end - self.buf_range.start);
-                    self.buf_range = self.buf.len() - self.block_size as usize
-                        ..self.buf.len() - std::mem::size_of::<Checksum>();
+                    self.buf_range =
+                        self.buf_range.end..self.buf.len() - std::mem::size_of::<Checksum>();
                     let (version, to_consume) = {
                         let mut cursor = std::io::Cursor::new(self.buffer());
                         let version = Version::deserialize_from(&mut cursor)
@@ -155,7 +153,7 @@ impl JournalReader {
     // After reading a block, it verifies the checksum.  Once done, it should be possible to
     // deserialize records.
     pub async fn fill_buf(&mut self) -> Result<(), Error> {
-        let bs = self.block_size as usize;
+        let bs = self.block_size() as usize;
         let min_required = bs - std::mem::size_of::<Checksum>();
 
         if self.found_reset
@@ -186,31 +184,59 @@ impl JournalReader {
             let (contents_slice, checksum_slice) =
                 buffer.as_slice().split_at(bs - std::mem::size_of::<Checksum>());
             let stored_checksum = LittleEndian::read_u64(checksum_slice);
-            let computed_checksum = fletcher64(contents_slice, last_read_checksum);
-            if stored_checksum != computed_checksum {
-                // If this is the first read, the checksum should be correct.
-                if !self.first_read {
-                    let computed_checksum =
-                        fletcher64(contents_slice, last_read_checksum ^ RESET_XOR);
-                    if stored_checksum == computed_checksum {
-                        // Record that we've encountered a reset in the stream (a point where the
-                        // journal wasn't cleanly closed in the past) and it starts afresh in this
-                        // block.  We don't adjust buf_range until the reset has been processed, but
-                        // we do push the checksum.
-                        self.found_reset = true;
-                        // We need to adjust the last pushed checksum since it could possibly be
-                        // for checkpoints later (see Self::journal_file_checkpoint), and
-                        // checkpoints should always use the correct seed.
-                        if let Some(checksum) = self.checksums.last_mut() {
-                            *checksum ^= RESET_XOR;
-                        }
-                        self.checksums.push(stored_checksum);
-                        self.read_offset += bs as u64;
-                        return Ok(());
+
+            match verify_checksum(
+                contents_slice,
+                stored_checksum,
+                last_read_checksum,
+                !self.first_read,
+            ) {
+                ChecksumResult::Ok => {}
+                ChecksumResult::Reset => {
+                    // Record that we've encountered a reset in the stream (a point where the
+                    // journal wasn't cleanly closed in the past) and it starts afresh in this
+                    // block.  We don't adjust buf_range until the reset has been processed, but
+                    // we do push the checksum.
+                    self.found_reset = true;
+                    // We need to adjust the last pushed checksum since it could possibly be
+                    // for checkpoints later (see Self::journal_file_checkpoint), and
+                    // checkpoints should always use the correct seed.
+                    if let Some(checksum) = self.checksums.last_mut() {
+                        *checksum ^= RESET_XOR;
                     }
+                    self.checksums.push(stored_checksum);
+                    self.read_offset += bs as u64;
+                    return Ok(());
                 }
-                self.bad_checksum = true;
-                return Ok(());
+                ChecksumResult::Bad => {
+                    if self.version < JOURNAL_BLOCK_SIZE_CHANGE_VERSION && !self.first_read {
+                        // Try reading with the newer block size.  If block size has changed, the
+                        // only possible result should be ChecksumResult::Reset.
+                        let (contents_slice, checksum_slice) = buffer
+                            .as_slice()
+                            .split_at(BLOCK_SIZE as usize - std::mem::size_of::<Checksum>());
+                        let stored_checksum = LittleEndian::read_u64(checksum_slice);
+                        if let ChecksumResult::Reset = verify_checksum(
+                            contents_slice,
+                            stored_checksum,
+                            last_read_checksum,
+                            true,
+                        ) {
+                            self.found_reset = true;
+                            if let Some(checksum) = self.checksums.last_mut() {
+                                *checksum ^= RESET_XOR;
+                            }
+                            self.checksums.push(stored_checksum);
+                            self.read_offset += BLOCK_SIZE;
+                            self.buf
+                                .resize(self.buf.len() - (OLD_BLOCK_SIZE - BLOCK_SIZE) as usize, 0);
+                            return Ok(());
+                        }
+                    }
+
+                    self.bad_checksum = true;
+                    return Ok(());
+                }
             }
 
             self.first_read = false;
@@ -226,7 +252,7 @@ impl JournalReader {
                 self.buf_range =
                     self.buf_range.start..self.buf.len() - std::mem::size_of::<Checksum>();
             }
-            self.read_offset += self.block_size;
+            self.read_offset += bs as u64;
         }
         Ok(())
     }
@@ -234,22 +260,53 @@ impl JournalReader {
     // Used after deserializing to indicate how many bytes were deserialized and adjusts the buffer
     // pointers accordingly.
     pub fn consume(&mut self, amount: usize) {
-        assert!(amount < self.block_size as usize);
-        let block_offset_before = self.buf_file_offset % self.block_size;
+        let bs = self.block_size();
+        assert!(amount < bs as usize);
+        let block_offset_before = self.buf_file_offset % bs;
         self.buf_file_offset += amount as u64;
         // If we crossed a block boundary, then the file offset needs be incremented by the size of
         // the checksum.
-        if block_offset_before + amount as u64
-            >= self.block_size - std::mem::size_of::<Checksum>() as u64
-        {
+        if block_offset_before + amount as u64 >= bs - std::mem::size_of::<Checksum>() as u64 {
             self.buf_file_offset += std::mem::size_of::<Checksum>() as u64;
             self.checksums.drain(0..1);
         }
-        self.buf_range = self.buf_range.start + amount..self.buf_range.end;
+        self.buf_range.start += amount
     }
 
     pub fn buffer(&self) -> &[u8] {
         &self.buf[self.buf_range.clone()]
+    }
+
+    fn block_size(&self) -> u64 {
+        if self.version != Version::default() && self.version < JOURNAL_BLOCK_SIZE_CHANGE_VERSION {
+            OLD_BLOCK_SIZE as u64
+        } else {
+            BLOCK_SIZE
+        }
+    }
+}
+
+enum ChecksumResult {
+    Ok,
+    Reset,
+    Bad,
+}
+
+fn verify_checksum(
+    contents: &[u8],
+    stored_checksum: u64,
+    last_read_checksum: u64,
+    allow_reset: bool,
+) -> ChecksumResult {
+    if stored_checksum == fletcher64(contents, last_read_checksum) {
+        ChecksumResult::Ok
+    } else {
+        if allow_reset {
+            if stored_checksum == fletcher64(contents, last_read_checksum ^ RESET_XOR) {
+                return ChecksumResult::Reset;
+            }
+        }
+        ChecksumResult::Bad
     }
 }
 
@@ -265,7 +322,7 @@ mod tests {
     // The following tests use JournalWriter to test our reader implementation. This works so long
     // as JournalWriter doesn't use JournalReader to test its implementation.
     use {
-        super::{JournalReader, ReadResult},
+        super::{JournalReader, ReadResult, BLOCK_SIZE},
         crate::{
             object_handle::{ObjectHandle, WriteObjectHandle},
             object_store::journal::{
@@ -277,13 +334,11 @@ mod tests {
         std::{io::Write, sync::Arc},
     };
 
-    const TEST_BLOCK_SIZE: u64 = 512;
-
     async fn write_items<T: VersionedLatest + std::fmt::Debug>(
         handle: FakeObjectHandle,
         items: &[T],
     ) {
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         for item in items {
             writer.write_record(item);
         }
@@ -297,7 +352,7 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         let handle = FakeObjectHandle::new(object.clone());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
-        let len = TEST_BLOCK_SIZE as usize * 2;
+        let len = BLOCK_SIZE as usize * 2;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
@@ -305,7 +360,6 @@ mod tests {
 
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
         );
         let value = reader.deserialize().await.expect("deserialize failed");
@@ -317,12 +371,11 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         let checkpoint =
             JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() };
-        let mut reader =
-            JournalReader::new(FakeObjectHandle::new(object.clone()), TEST_BLOCK_SIZE, &checkpoint);
+        let mut reader = JournalReader::new(FakeObjectHandle::new(object.clone()), &checkpoint);
         assert_eq!(reader.journal_file_checkpoint(), checkpoint);
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 2;
+        let len = BLOCK_SIZE as usize * 2;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
@@ -333,8 +386,7 @@ mod tests {
         // If we take the checkpoint here and then create another reader, we should see the second
         // item.
         let checkpoint = reader.journal_file_checkpoint();
-        let mut reader =
-            JournalReader::new(FakeObjectHandle::new(object.clone()), TEST_BLOCK_SIZE, &checkpoint);
+        let mut reader = JournalReader::new(FakeObjectHandle::new(object.clone()), &checkpoint);
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(7u32));
     }
 
@@ -343,11 +395,11 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         writer.write_record(&4u32);
         writer.pad_to_block().expect("pad_to_block failed");
         writer.write_record(&7u32);
@@ -356,7 +408,6 @@ mod tests {
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
         );
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(4u32));
@@ -369,16 +420,15 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
         );
-        assert_eq!(reader.handle().get_size(), TEST_BLOCK_SIZE * 3);
+        assert_eq!(reader.handle().get_size(), BLOCK_SIZE * 3);
     }
 
     #[fuchsia::test]
@@ -386,27 +436,26 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         // Write one byte so that everything else is misaligned.
         writer.write_record(&4u8);
         let mut count: i32 = 0;
-        while writer.journal_file_checkpoint().file_offset < TEST_BLOCK_SIZE {
+        while writer.journal_file_checkpoint().file_offset < BLOCK_SIZE {
             writer.write_record(&12345678u32);
             count += 1;
         }
         // Check that writing didn't end up being aligned on a block.
-        assert_ne!(writer.journal_file_checkpoint().file_offset, TEST_BLOCK_SIZE);
+        assert_ne!(writer.journal_file_checkpoint().file_offset, BLOCK_SIZE);
         writer.pad_to_block().expect("pad_to_block failed");
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
         );
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(4u8));
@@ -423,7 +472,7 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
@@ -431,7 +480,6 @@ mod tests {
 
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: LATEST_VERSION, ..JournalCheckpoint::default() },
         );
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(4u32));
@@ -442,10 +490,10 @@ mod tests {
             ReadResult::ChecksumMismatch
         );
 
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         let new_version = Version { minor: LATEST_VERSION.minor + 1, ..LATEST_VERSION };
         writer.seek(JournalCheckpoint {
-            file_offset: TEST_BLOCK_SIZE,
+            file_offset: BLOCK_SIZE,
             checksum: reader.last_read_checksum() ^ RESET_XOR,
             version: new_version,
         });
@@ -461,7 +509,6 @@ mod tests {
 
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint { version: new_version, ..JournalCheckpoint::default() },
         );
         assert_eq!(reader.deserialize().await.expect("deserialize failed"), ReadResult::Some(4u32));
@@ -487,8 +534,7 @@ mod tests {
         );
 
         // Make sure a reader can start from the middle of a reset block.
-        let mut reader =
-            JournalReader::new(FakeObjectHandle::new(object.clone()), TEST_BLOCK_SIZE, &checkpoint);
+        let mut reader = JournalReader::new(FakeObjectHandle::new(object.clone()), &checkpoint);
         assert_eq!(
             reader.deserialize().await.expect("deserialize failed"),
             ReadResult::Some(78u32)
@@ -505,23 +551,22 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
-        let len = 2 * (TEST_BLOCK_SIZE as usize - std::mem::size_of::<Checksum>());
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
+        let len = 2 * (BLOCK_SIZE as usize - std::mem::size_of::<Checksum>());
         assert_eq!(writer.write(&vec![78u8; len]).expect("write failed"), len);
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let checkpoint = JournalCheckpoint {
-            file_offset: TEST_BLOCK_SIZE - std::mem::size_of::<Checksum>() as u64 - 1,
+            file_offset: BLOCK_SIZE - std::mem::size_of::<Checksum>() as u64 - 1,
             checksum: 0,
             version: LATEST_VERSION,
         };
-        let mut reader =
-            JournalReader::new(FakeObjectHandle::new(object.clone()), TEST_BLOCK_SIZE, &checkpoint);
+        let mut reader = JournalReader::new(FakeObjectHandle::new(object.clone()), &checkpoint);
         let mut offset = checkpoint.file_offset as usize;
         while offset < len {
             reader.fill_buf().await.expect("fill_buf failed");
@@ -539,12 +584,12 @@ mod tests {
         let object = Arc::new(FakeObject::new());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
-        let len = TEST_BLOCK_SIZE as usize * 3;
+        let len = BLOCK_SIZE as usize * 3;
         let mut buf = handle.allocate_buffer(len);
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
-        let mut writer = JournalWriter::new(TEST_BLOCK_SIZE as usize, 0);
-        let len = TEST_BLOCK_SIZE as usize - std::mem::size_of::<Checksum>();
+        let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
+        let len = BLOCK_SIZE as usize - std::mem::size_of::<Checksum>();
         assert_eq!(writer.write(&vec![78u8; len]).expect("write failed"), len);
         let (offset, buf) = writer.take_buffer(&handle).unwrap();
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
@@ -552,11 +597,10 @@ mod tests {
 
         // The checkpoint should be at the start of the next block.
         let writer_checkpoint = writer.journal_file_checkpoint();
-        assert_eq!(writer_checkpoint.file_offset, TEST_BLOCK_SIZE);
+        assert_eq!(writer_checkpoint.file_offset, BLOCK_SIZE);
 
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
-            TEST_BLOCK_SIZE,
             &JournalCheckpoint::default(),
         );
         reader.set_version(LATEST_VERSION);

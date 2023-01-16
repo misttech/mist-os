@@ -36,7 +36,7 @@ use {
                 bootstrap_handle::BootstrapObjectHandle,
                 reader::{JournalReader, ReadResult},
                 writer::JournalWriter,
-                JournalCheckpoint, JournalHandle as _,
+                JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
             },
             object_record::{ObjectItem, ObjectItemV5},
             transaction::{AssocObj, Options},
@@ -68,9 +68,6 @@ use {
 // These only exist in the root store.
 const SUPER_BLOCK_A_OBJECT_ID: u64 = 1;
 const SUPER_BLOCK_B_OBJECT_ID: u64 = 2;
-
-/// The block size used when reading and writing journal entries.
-const SUPER_BLOCK_BLOCK_SIZE: usize = 8192;
 
 /// The superblock is extended in units of `SUPER_BLOCK_CHUNK_SIZE` as required.
 const SUPER_BLOCK_CHUNK_SIZE: u64 = 65536;
@@ -247,7 +244,7 @@ async fn read(
 ) -> Result<(SuperBlockHeader, SuperBlockInstance, ObjectStore), Error> {
     let (super_block_header, mut reader) = SuperBlockHeader::read_header(device.clone(), instance)
         .await
-        .context("Failed to read superblocks")?;
+        .context("failed to read superblock")?;
     let root_parent = ObjectStore::new_root_parent(
         device,
         block_size,
@@ -475,13 +472,16 @@ impl SuperBlockHeader {
     ) -> Result<(SuperBlockHeader, RecordReader), Error> {
         let mut handle = BootstrapObjectHandle::new(target_super_block.object_id(), device);
         handle.push_extent(target_super_block.first_extent());
-        let mut reader = JournalReader::new(
-            handle,
-            SUPER_BLOCK_BLOCK_SIZE as u64,
-            &JournalCheckpoint::default(),
-        );
+        let mut reader = JournalReader::new(handle, &JournalCheckpoint::default());
 
         reader.fill_buf().await?;
+
+        if reader.buffer().len() == 0 {
+            // Try with the old block size.
+            reader.set_version(EARLIEST_SUPPORTED_VERSION);
+            reader.fill_buf().await?;
+        }
+
         let mut super_block_header;
         let super_block_version;
         reader.consume({
@@ -538,7 +538,7 @@ impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> SuperBlockWriter<'a, S> 
     fn new(handle: StoreObjectHandle<S>, reservation: &'a Reservation) -> Self {
         Self {
             handle,
-            writer: JournalWriter::new(SUPER_BLOCK_BLOCK_SIZE, 0),
+            writer: JournalWriter::new(BLOCK_SIZE as usize, 0),
             next_extent_offset: MIN_SUPER_BLOCK_SIZE,
             reservation,
         }

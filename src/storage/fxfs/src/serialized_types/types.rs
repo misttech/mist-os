@@ -23,7 +23,10 @@ use crate::{
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 25, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 26, minor: 0 };
+
+/// The version where the journal block size changed.
+pub const JOURNAL_BLOCK_SIZE_CHANGE_VERSION: Version = Version { major: 26, minor: 0 };
 
 /// The earliest supported version of the on-disk filesystem format.
 ///
@@ -72,7 +75,7 @@ versioned_type! {
     21.. => SuperBlockHeader,
 }
 versioned_type! {
-    25.. =>SuperBlockRecord,
+    25.. => SuperBlockRecord,
     5.. => SuperBlockRecordV5,
 }
 
