@@ -72,7 +72,9 @@ function main() {
   # platform-neutral implementation instead.
   readonly _REL_BUILD_DIR="$(realpath -s --relative-to="${FUCHSIA_BUILD_DIR}" "${FUCHSIA_DIR}")"
 
-  fx-command-run host-tool ffx coverage \
+  fx-command-run host-tool ffx \
+    --config 'coverage=true' \
+    coverage \
     --clang-dir "${PREBUILT_CLANG_DIR}" \
     --test-output-dir "${_TEST_OUT_DIR}" ${ffx_cov_args[@]} \
     --path-remappings "${_REL_BUILD_DIR},${FUCHSIA_DIR}" \
