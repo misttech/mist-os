@@ -125,7 +125,7 @@ impl<'a> MultiFvmBuilder<'a> {
         let name = match &filesystem {
             FvmFilesystem::BlobFS(fs) => &fs.name,
             FvmFilesystem::MinFS(fs) => &fs.name,
-            FvmFilesystem::EmptyMinFS(fs) => &fs.name,
+            FvmFilesystem::EmptyData(fs) => &fs.name,
             FvmFilesystem::Reserved(fs) => &fs.name,
         };
         self.filesystems.insert(name.clone(), FilesystemEntry::Params(filesystem));
@@ -211,12 +211,12 @@ impl<'a> MultiFvmBuilder<'a> {
                     fvm_type,
                 );
 
-                let mut has_minfs = false;
+                let mut has_data = false;
                 for filesystem_name in &config.filesystems {
                     let fs = self.get_filesystem(tools, filesystem_name)?;
                     #[allow(clippy::single_match)]
                     match fs {
-                        Filesystem::MinFS { path: _, attributes: _ } => has_minfs = true,
+                        Filesystem::MinFS { path: _, attributes: _ } => has_data = true,
                         _ => {}
                     }
                     builder.filesystem(fs);
@@ -225,7 +225,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 builder.build()?;
                 if add_to_manifest {
                     let path_relative = path_relative_from_current_dir(path)?;
-                    if has_minfs {
+                    if has_data {
                         self.assembly_manifest.images.push(Image::FVMSparse(path_relative));
                     } else {
                         self.assembly_manifest.images.push(Image::FVMSparseBlob(path_relative));
@@ -350,7 +350,7 @@ impl<'a> MultiFvmBuilder<'a> {
                     },
                 )
             }
-            FvmFilesystem::EmptyMinFS(_config) => (None, Filesystem::EmptyMinFS {}),
+            FvmFilesystem::EmptyData(_config) => (None, Filesystem::EmptyData {}),
             FvmFilesystem::Reserved(config) => {
                 (None, Filesystem::Reserved { slices: config.slices })
             }
@@ -366,7 +366,7 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
     use assembly_images_config::{
-        BlobFS, BlobFSLayout, EmptyMinFS, FvmFilesystem, FvmOutput, MinFS, NandFvm, Reserved,
+        BlobFS, BlobFSLayout, EmptyData, FvmFilesystem, FvmOutput, MinFS, NandFvm, Reserved,
         SparseFvm, StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
@@ -689,7 +689,7 @@ mod tests {
             minimum_data_bytes: None,
             minimum_inodes: None,
         }));
-        builder.filesystem(FvmFilesystem::EmptyMinFS(EmptyMinFS { name: "empty-data".into() }));
+        builder.filesystem(FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }));
         builder
             .filesystem(FvmFilesystem::Reserved(Reserved { name: "reserved".into(), slices: 10 }));
         builder.output(FvmOutput::Standard(StandardFvm {

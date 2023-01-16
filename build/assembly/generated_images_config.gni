@@ -183,14 +183,14 @@ template("generated_images_config") {
         forward_variables_from(invoker_fvm.minfs, "*")
       }
     }
-    empty_minfs = {
-      type = "empty-minfs"
+    empty_data = {
+      type = "empty-data"
       name = "empty-data"
     }
     fvm_filesystems = [
       blobfs,
       minfs,
-      empty_minfs,
+      empty_data,
     ]
 
     # Optionally, reserve some slices in the FVM.

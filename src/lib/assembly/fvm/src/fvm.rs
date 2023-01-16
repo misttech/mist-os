@@ -88,8 +88,8 @@ pub enum Filesystem {
         /// The attributes of the filesystem to create.
         attributes: FilesystemAttributes,
     },
-    /// An empty minfs filesystem that will be formatted when Fuchsia boots.
-    EmptyMinFS,
+    /// An empty data filesystem that will be formatted with fxfs/minfs when Fuchsia boots.
+    EmptyData,
     /// Reserved slices for future use.
     Reserved {
         /// The number of slices to reserve.
@@ -206,7 +206,8 @@ impl FvmBuilder {
                 Filesystem::MinFS { path, attributes } => {
                     append_filesystem(&mut args, path.to_string(), attributes);
                 }
-                Filesystem::EmptyMinFS => {
+                // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
+                Filesystem::EmptyData => {
                     args.push("--with-empty-minfs".to_string());
                 }
                 Filesystem::Reserved { slices } => {
@@ -384,8 +385,9 @@ mod tests {
             false,
             FvmType::Sparse { max_disk_size: None },
         );
-        builder.filesystem(Filesystem::EmptyMinFS);
+        builder.filesystem(Filesystem::EmptyData);
         let args = builder.build_args().unwrap();
+        // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove --with-empty-minfs.
         assert_eq!(vec!["mypath", "sparse", "--slice", "1", "--with-empty-minfs",], args);
     }
 }

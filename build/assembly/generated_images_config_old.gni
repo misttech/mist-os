@@ -221,12 +221,12 @@ template("generated_images_config_old") {
   }
   fvm_filesystems += [ minfs ]
 
-  # Define an optional empty minfs partition
-  empty_minfs = {
-    type = "empty-minfs"
+  # Define an optional empty data partition
+  empty_data = {
+    type = "empty-data"
     name = "empty-data"
   }
-  fvm_filesystems += [ empty_minfs ]
+  fvm_filesystems += [ empty_data ]
 
   if (defined(invoker.empty_account_partition) &&
       invoker.empty_account_partition) {

@@ -338,7 +338,7 @@ The images config specifies **which images** to generate and how.
 
 ```json5
 {
-  type: "empty-minfs",
+  type: "empty-data",
 
   // The name of the volume in the FVM.
   name: "data_empty",

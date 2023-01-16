@@ -191,11 +191,11 @@ pub enum FvmFilesystem {
     #[serde(rename = "minfs")]
     MinFS(MinFS),
 
-    /// An empty minfs volume.
-    /// This is often used to reserve the minfs volume, but wait until boot-time to format the
-    /// partition.
-    #[serde(rename = "empty-minfs")]
-    EmptyMinFS(EmptyMinFS),
+    /// An empty data partition.
+    /// This reserves the data volume, which will be formatted as fxfs/minfs on boot.
+    // TODO(fxbug.dev/85134): Remove empty-minfs alias after updating sdk-integration.
+    #[serde(rename = "empty-data", alias = "empty-minfs")]
+    EmptyData(EmptyData),
 
     /// Reserved slices in the FVM.
     #[serde(rename = "reserved")]
@@ -243,7 +243,7 @@ fn default_blobfs_layout() -> BlobFSLayout {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MinFS {
     /// The name of the volume in the FVM.
-    #[serde(default = "default_minfs_name")]
+    #[serde(default = "default_data_name")]
     pub name: String,
 
     /// Reserve |minimum_data_bytes| and |minimum_inodes| in the FVM, and ensure
@@ -260,15 +260,15 @@ pub struct MinFS {
     pub minimum_inodes: Option<u64>,
 }
 
-fn default_minfs_name() -> String {
+fn default_data_name() -> String {
     "data".into()
 }
 
-/// Configuration for building a EmptyMinFS volume.
+/// Configuration for building an EmptyData volume.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct EmptyMinFS {
+pub struct EmptyData {
     /// The name of the volume in the FVM.
-    #[serde(default = "default_minfs_name")]
+    #[serde(default = "default_data_name")]
     pub name: String,
 }
 

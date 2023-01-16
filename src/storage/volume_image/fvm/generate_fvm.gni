@@ -50,7 +50,8 @@ template("generate_fvm") {
     if (!defined(deps)) {
       deps = []
     }
-    if (defined(invoker.with_empty_minfs) && invoker.with_empty_minfs) {
+    if (defined(invoker.with_empty_data) && invoker.with_empty_data) {
+      # TODO(fxbug.dev/85165): Remove this flag and pass in an empty file instead.
       args += [ "--with-empty-minfs" ]
     }
     if (fvm_reserved_slices > 0) {
