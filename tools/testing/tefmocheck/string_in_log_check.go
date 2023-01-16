@@ -278,6 +278,9 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		{startString: "RUN   TestKernelLockupDetectorFatalHeartbeat", endString: ": TestKernelLockupDetectorFatalHeartbeat"},
 		// Kernel out-of-memory test "OOMHard" may report valid OOPS that should not reflect a test failure.
 		{startString: "RUN   TestOOMHard", endString: ": TestOOMHard"},
+		// Suspend e2e test may report a valid OOPS while resuming however the test does not expect resume to succeed.
+		// These logs correspond to the beginning and end of the resume logs and do not occur elsewhere in the serial logs.
+		{startString: "Restore GNVS pointer", endString: "platform_halt suggested_action 1 reason 6"},
 	}
 	// These are rather generic. New checks should probably go above here so that they run before these.
 	allLogTypes := []logType{serialLogType, swarmingOutputType, syslogType}
