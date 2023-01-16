@@ -26,15 +26,11 @@ pub struct Config {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum Mode {
+    #[default]
     Ignore,
     RebootOnFailure,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Ignore
-    }
 }
 
 impl Config {

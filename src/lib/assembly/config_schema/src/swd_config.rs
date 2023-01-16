@@ -43,15 +43,11 @@ pub enum UpdateChecker {
 /// verification fails
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum VerificationFailureAction {
+    #[default]
     Reboot,
     Disabled,
-}
-
-impl Default for VerificationFailureAction {
-    fn default() -> Self {
-        VerificationFailureAction::Reboot
-    }
 }
 
 /// Configuration for the Omaha Client

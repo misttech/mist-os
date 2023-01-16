@@ -77,7 +77,7 @@ pub struct PlatformConfig {
 ///   +--> minimal.gni
 ///         +--> core.gni
 ///               +--> (everything else)
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Default)]
 pub enum FeatureSupportLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
@@ -99,14 +99,9 @@ pub enum FeatureSupportLevel {
     ///
     /// This is the default level unless otherwise specified.
     #[serde(rename = "minimal")]
+    #[default]
     Minimal,
     // Core  (in the future)
-}
-
-impl Default for FeatureSupportLevel {
-    fn default() -> Self {
-        FeatureSupportLevel::Minimal
-    }
 }
 
 /// The platform BuildTypes.

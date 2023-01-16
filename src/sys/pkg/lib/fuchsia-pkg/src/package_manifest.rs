@@ -392,18 +392,13 @@ struct PackageManifestV1 {
 /// If 'RelativeTo::File', then the path is relative to the file that contained
 /// the path.  To use the path, it must be resolved against the path to the
 /// file.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum RelativeTo {
     #[serde(rename = "working_dir")]
+    #[default]
     WorkingDir,
     #[serde(rename = "file")]
     File,
-}
-
-impl Default for RelativeTo {
-    fn default() -> Self {
-        RelativeTo::WorkingDir
-    }
 }
 
 impl RelativeTo {

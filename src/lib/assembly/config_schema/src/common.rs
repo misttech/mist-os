@@ -34,8 +34,10 @@ pub(crate) type PackageName = String;
 /// to be either on or off. Features default to disabled.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[derive(Default)]
 pub enum FeatureControl {
     #[serde(rename = "disabled")]
+    #[default]
     Disabled,
 
     #[serde(rename = "allowed")]
@@ -43,12 +45,6 @@ pub enum FeatureControl {
 
     #[serde(rename = "required")]
     Required,
-}
-
-impl Default for FeatureControl {
-    fn default() -> Self {
-        FeatureControl::Disabled
-    }
 }
 
 impl PartialEq<FeatureControl> for &FeatureControl {
