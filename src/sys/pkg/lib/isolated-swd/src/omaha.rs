@@ -4,15 +4,12 @@
 
 // TODO(fxbug.dev/51770): move everything except installer and policy into a shared crate,
 // because these modules all come from //src/sys/pkg/bin/omaha-client.
-mod http_request;
 mod install_plan;
 mod installer;
 mod policy;
 mod timer;
 use {
-    crate::omaha::{
-        http_request::FuchsiaHyperHttpRequest, installer::IsolatedInstaller, timer::FuchsiaTimer,
-    },
+    crate::omaha::{installer::IsolatedInstaller, timer::FuchsiaTimer},
     anyhow::{Context, Error},
     futures::lock::Mutex,
     futures::prelude::*,
@@ -28,6 +25,7 @@ use {
         storage::MemStorage,
         time::StandardTimeSource,
     },
+    omaha_client_fuchsia::http_request,
     std::rc::Rc,
     tracing::error,
     version::Version,
@@ -71,7 +69,7 @@ pub async fn install_update(
         VecAppSet::new(vec![App::builder().id(appid).version(version).cohort(cohort).build()]);
 
     let config = get_omaha_config(&current_version, &service_url).await;
-    install_update_with_http(updater, app_set, config, FuchsiaHyperHttpRequest::new())
+    install_update_with_http(updater, app_set, config, http_request::FuchsiaHyperHttpRequest::new())
         .await
         .context("installing update via http(s)")
 }
