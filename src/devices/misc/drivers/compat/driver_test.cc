@@ -85,6 +85,8 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
     return zx::ok(std::move(endpoints->client));
   }
 
+  bool HasNode() { return node_binding_.has_value(); }
+
  private:
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
     std::string name{request->args.name().get()};
@@ -635,8 +637,10 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
   zx_protocol_device_t ops{};
   auto driver = StartDriver("/pkg/driver/v1_missing_test.so", &ops);
 
-  // Verify that v1_test.so has not added a child device.
-  RunUntilDispatchersIdle();
+  // We will know the driver has finished starting when it closes its node in error.
+  while (node().HasNode()) {
+    RunUntilDispatchersIdle();
+  }
   EXPECT_TRUE(node().children().empty());
 
   // Verify that v1_test.so has not set a context.

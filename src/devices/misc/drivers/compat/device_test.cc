@@ -237,12 +237,13 @@ TEST_F(DeviceTest, RemoveChildren) {
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
   parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.InitReply(ZX_OK);
+  ASSERT_TRUE(RunLoopUntilIdle());
 
   // Add a child device.
   device_add_args_t args{.name = "child"};
   zx_device_t* child = nullptr;
   ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
-  ASSERT_EQ(ZX_OK, child->CreateNode());
   EXPECT_NE(nullptr, child);
   EXPECT_STREQ("child", child->Name());
   EXPECT_TRUE(parent.HasChildren());
@@ -254,7 +255,6 @@ TEST_F(DeviceTest, RemoveChildren) {
   device_add_args_t args2{.name = "child2"};
   zx_device_t* child2 = nullptr;
   ASSERT_EQ(ZX_OK, parent.Add(&args2, &child2));
-  ASSERT_EQ(ZX_OK, child2->CreateNode());
   EXPECT_NE(nullptr, child2);
   EXPECT_STREQ("child2", child2->Name());
   EXPECT_TRUE(parent.HasChildren());
@@ -409,16 +409,11 @@ TEST_F(DeviceTest, AddChildDeviceWithInit) {
   };
   zx_device_t* child = nullptr;
   ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
-  ASSERT_EQ(ZX_OK, child->CreateNode());
-  EXPECT_NE(nullptr, child);
   EXPECT_STREQ("child", child->Name());
   EXPECT_TRUE(parent.HasChildren());
 
-  // Manually call the init op.
-  EXPECT_FALSE(child_ctx);
-  child_ops.init(&child_ctx);
-  EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(child_ctx);
+  // Run the loop which should call the init op.
+  ASSERT_TRUE(RunLoopUntilIdle());
 
   // Check that init promise hasn't finished yet.
   bool init_is_finished = false;
@@ -427,10 +422,68 @@ TEST_F(DeviceTest, AddChildDeviceWithInit) {
   ASSERT_TRUE(RunLoopUntilIdle());
   EXPECT_FALSE(init_is_finished);
 
-  // Reply to init and check that the promise finishes.
+  // Reply to init. This shouldn't be marked as finished because the parent hasn't finished
+  // initializing.
   device_init_reply(child, ZX_OK, nullptr);
   EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(init_is_finished);
+  ASSERT_FALSE(init_is_finished);
+
+  // Parent finishes initializing.
+  parent.InitReply(ZX_OK);
+  EXPECT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(init_is_finished);
+}
+
+TEST_F(DeviceTest, ParentInitFails) {
+  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
+
+  // Create a node.
+  TestNode node(dispatcher());
+  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+
+  // Create a device.
+  zx_protocol_device_t parent_ops{};
+  compat::Device parent(compat::kDefaultDevice, &parent_ops, nullptr, std::nullopt, logger(),
+                        dispatcher());
+  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.InitReply(ZX_OK);
+
+  // Add child one.
+  zx_protocol_device_t ops = {
+      .init = [](void*) {},
+  };
+  device_add_args_t args_one{
+      .name = "child-one",
+      .ops = &ops,
+  };
+  zx_device_t* child_one = nullptr;
+  ASSERT_EQ(ZX_OK, parent.Add(&args_one, &child_one));
+  EXPECT_NE(nullptr, child_one);
+  EXPECT_TRUE(parent.HasChildren());
+
+  // Add child two.
+  device_add_args_t args{
+      .name = "child-two",
+      .ops = &ops,
+  };
+  zx_device_t* child_two = nullptr;
+  ASSERT_EQ(ZX_OK, child_one->Add(&args, &child_two));
+  EXPECT_NE(nullptr, child_two);
+  EXPECT_TRUE(child_one->HasChildren());
+
+  // Run the loop which should call the init op.
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  // Finish the initialization with an error. Child_two should now be freed once it's finished
+  // initializing.
+  device_init_reply(child_one, ZX_ERR_INTERNAL, nullptr);
+
+  EXPECT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(child_one->HasChildren());
+
+  device_init_reply(child_two, ZX_OK, nullptr);
+  EXPECT_TRUE(RunLoopUntilIdle());
+  ASSERT_FALSE(parent.HasChildren());
 }
 
 TEST_F(DeviceTest, AddAndRemoveChildDevice) {
@@ -445,12 +498,12 @@ TEST_F(DeviceTest, AddAndRemoveChildDevice) {
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
   parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.InitReply(ZX_OK);
 
   // Add a child device.
   device_add_args_t args{.name = "child"};
   zx_device_t* child = nullptr;
   ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
-  ASSERT_EQ(ZX_OK, child->CreateNode());
   EXPECT_NE(nullptr, child);
   EXPECT_STREQ("child", child->Name());
   EXPECT_TRUE(parent.HasChildren());
@@ -464,21 +517,17 @@ TEST_F(DeviceTest, AddAndRemoveChildDevice) {
 }
 
 TEST_F(DeviceTest, AddChildToBindableDevice) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
-
-  // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
+  parent.InitReply(ZX_OK);
 
   // Try to a child device.
   device_add_args_t args{.name = "child"};
   zx_device_t* child = nullptr;
   ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
+
+  // The parent does not have a Node, so child won't be able to create its own Node.
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, child->CreateNode());
 }
 

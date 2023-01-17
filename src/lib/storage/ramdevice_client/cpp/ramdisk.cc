@@ -69,27 +69,26 @@ struct ramdisk_client {
     }
     fdio_cpp::UnownedFdioCaller caller(dirfd);
 
-    zx::result ramdisk_interface =
-        component::ConnectAt<fuchsia_hardware_ramdisk::Ramdisk>(caller.directory(), ramdisk_path);
-    if (ramdisk_interface.is_error()) {
-      return ramdisk_interface.status_value();
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(dirfd.get(), ramdisk_path.c_str(), duration);
+    if (channel.is_error()) {
+      return channel.status_value();
     }
+    fidl::ClientEnd ramdisk_interface =
+        fidl::ClientEnd<fuchsia_hardware_ramdisk::Ramdisk>(std::move(channel.value()));
 
     // If binding to the block interface fails, ensure we still try to tear down the
     // ramdisk driver.
-    auto cleanup = fit::defer([&ramdisk_interface]() {
-      ramdisk_client::DestroyByHandle(std::move(ramdisk_interface.value()));
-    });
+    auto cleanup = fit::defer(
+        [&ramdisk_interface]() { ramdisk_client::DestroyByHandle(std::move(ramdisk_interface)); });
 
-    zx::result channel =
-        device_watcher::RecursiveWaitForFile(dirfd.get(), block_path.c_str(), duration);
+    channel = device_watcher::RecursiveWaitForFile(dirfd.get(), block_path.c_str(), duration);
     if (channel.is_error()) {
       return channel.error_value();
     }
     cleanup.cancel();
     *out = std::unique_ptr<ramdisk_client>(new ramdisk_client(
-        std::move(dirfd), std::move(path), std::move(block_path),
-        std::move(ramdisk_interface.value()),
+        std::move(dirfd), std::move(path), std::move(block_path), std::move(ramdisk_interface),
         fidl::ClientEnd<fuchsia_hardware_block::Block>{std::move(channel.value())}));
     return ZX_OK;
   }

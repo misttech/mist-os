@@ -339,121 +339,76 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   device->properties_ = CreateProperties(arena_, *logger_, zx_args);
   device->device_flags_ = zx_args->flags;
 
-  bool has_init = HasOp(device->ops_, &zx_protocol_device_t::init);
-  if (!has_init) {
-    device->InitReply(ZX_OK);
-  }
-
   if (out) {
     *out = device->ZxDevice();
   }
+
+  if (HasOp(device->ops_, &zx_protocol_device_t::init)) {
+    // We have to schedule the init task so that it is run in the dispatcher context,
+    // as we are currently in the device context from device_add_from_driver().
+    // (We are not allowed to re-enter the device context).
+    device->executor_.schedule_task(fpromise::make_ok_promise().and_then(
+        [device]() mutable { device->ops_->init(device->compat_symbol_.context); }));
+  } else {
+    device->InitReply(ZX_OK);
+  }
+
   children_.push_back(std::move(device));
   return ZX_OK;
 }
 
-fpromise::promise<void, zx_status_t> Device::Export() {
-  auto dev_vnode_name = OutgoingName();
-
-  zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
-  if (status != ZX_OK) {
+zx_status_t Device::ExportAfterInit() {
+  if (zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
+      status != ZX_OK) {
     FDF_LOG(INFO, "Device %s failed to add to outgoing directory: %s", topological_path_.c_str(),
             zx_status_get_string(status));
-    return fpromise::make_error_promise(status);
-  }
-
-  bool has_init = HasOp(ops_, &zx_protocol_device_t::init);
-  auto options = fuchsia_device_fs::wire::ExportOptions();
-  if (has_init) {
-    options |= fuchsia_device_fs::wire::ExportOptions::kInvisible;
+    return status;
   }
 
   // Export to devfs.
+  // This must happen before creating the node, because otherwise the children that bind to our node
+  // will steal our devfs entry.
   {
     if (!devfs_connector_.has_value()) {
       FDF_LOG(ERROR, "Device %s failed to add to devfs: no devfs_connector",
               topological_path_.c_str());
-      return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+      return ZX_ERR_INTERNAL;
     }
 
     zx::result connector = devfs_connector_.value().Bind(dispatcher());
     if (connector.is_error()) {
       FDF_LOG(ERROR, "Device %s failed to create devfs connector: %s", topological_path_.c_str(),
               connector.status_string());
-      return fpromise::make_error_promise(connector.error_value());
+      return connector.error_value();
     }
 
     fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
     fidl::WireResult result = driver()->devfs_exporter().sync()->ExportV2(
         std::move(connector.value()), fidl::StringView::FromExternal(topological_path_), class_name,
-        options);
+        {});
     if (!result.ok()) {
       FDF_LOG(ERROR, "Device %s: devfs failed: calling export2 returned: %s",
               topological_path_.c_str(), result.status_string());
-      return fpromise::make_error_promise(result.status());
+      return result.status();
     }
     if (result.value().is_error()) {
       FDF_LOG(ERROR, "Device %s: devfs failed: export2 returned: %s", topological_path_.c_str(),
               zx_status_get_string(result.value().error_value()));
-      return fpromise::make_error_promise(result.value().error_value());
+      return result.value().error_value();
     }
+
+    // TODO(fxdebug.dev/90735): When DriverDevelopment works in DFv2, don't print
+    // this.
+    FDF_LOG(DEBUG, "Created /dev/%s", topological_path().data());
   }
 
-  // TODO(fxdebug.dev/90735): When DriverDevelopment works in DFv2, don't print
-  // this.
-  FDF_LOG(DEBUG, "Created /dev/%s", topological_path().data());
-
-  // If the device is non-bindable we want to create the node now. This lets the driver
-  // immediately create more children once we return.
-  if (device_flags_ & DEVICE_ADD_NON_BINDABLE) {
-    status = CreateNode();
-    if (status != ZX_OK) {
-      FDF_LOG(INFO, "Device %s failed to create NON_BINDABLE node: %s", topological_path_.c_str(),
-              zx_status_get_string(status));
-      return fpromise::make_error_promise(status);
-    }
+  if (zx_status_t status = CreateNode(); status != ZX_OK) {
+    FDF_LOG(ERROR, "Device %s: failed to create node: %s", topological_path_.c_str(),
+            zx_status_get_string(status));
+    return status;
   }
 
-  // Wait for the device to initialize, then export to dev, then
-  // create the device's Node.
-  return fpromise::make_promise([has_init, this]() {
-           // Emulate fuchsia.device.manager.DeviceController behaviour, and run the
-           // init task after adding the device.
-           if (has_init) {
-             ops_->init(compat_symbol_.context);
-           }
-           return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
-         })
-      .and_then(WaitForInitToComplete())
-      .and_then([has_init, this]() {
-        // Make the device visible if it has an init function.
-        if (has_init) {
-          fidl::WireResult status = driver()->devfs_exporter().sync()->MakeVisible(
-              fidl::StringView::FromExternal(topological_path()));
-          if (status->is_error()) {
-            return fpromise::make_error_promise(status->error_value());
-          }
-        }
-
-        // Create the node now that we are initialized.
-        // If we were non bindable, we would've made the node earlier.
-        if (!(device_flags_ & DEVICE_ADD_NON_BINDABLE)) {
-          zx_status_t status = CreateNode();
-          if (status != ZX_OK) {
-            FDF_LOG(ERROR, "Failed to CreateNode for device: %s: %s", Name(),
-                    zx_status_get_string(status));
-            return fpromise::make_error_promise(status);
-          }
-        }
-
-        return fpromise::make_result_promise(fpromise::result<void, zx_status_t>());
-      })
-      .or_else([this](const zx_status_t& status) {
-        FDF_LOG(ERROR, "Failed to export /dev/%s to devfs: %s", topological_path().data(),
-                zx_status_get_string(status));
-        Remove();
-        return fpromise::make_error_promise(status);
-      })
-      .wrap_with(scope());
+  return ZX_OK;
 }
 
 zx_status_t Device::CreateNode() {
@@ -537,13 +492,18 @@ zx_status_t Device::CreateNode() {
     node_server = std::move(node_ends->server);
   }
 
-  // Add the device node.
-  if (!(*parent_)->node_.is_valid()) {
-    FDF_LOG(ERROR, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
-            (*parent_)->topological_path_.data());
+  if (!parent_.value()->node_.is_valid()) {
+    if (parent_.value()->device_flags_ & DEVICE_ADD_NON_BINDABLE) {
+      FDF_LOG(ERROR, "Cannot add device, as parent '%s' does not have a valid node",
+              (*parent_)->topological_path_.data());
+    } else {
+      FDF_LOG(ERROR, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
+              (*parent_)->topological_path_.data());
+    }
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  // Add the device node.
   fpromise::bridge<void, std::variant<zx_status_t, fdf::NodeError>> bridge;
   auto callback = [completer = std::move(bridge.completer)](
                       fidl::WireUnownedResult<fdf::Node::AddChild>& result) mutable {
@@ -557,7 +517,7 @@ zx_status_t Device::CreateNode() {
     }
     completer.complete_ok();
   };
-  (*parent_)
+  parent_.value()
       ->node_->AddChild(args, std::move(controller_ends->server), std::move(node_server))
       .ThenExactlyOnce(std::move(callback));
 
@@ -745,17 +705,45 @@ zx::result<uint32_t> Device::SetPerformanceStateOp(uint32_t state) {
 }
 
 void Device::InitReply(zx_status_t status) {
-  std::scoped_lock lock(init_lock_);
-  init_is_finished_ = true;
-  init_status_ = status;
-  for (auto& waiter : init_waiters_) {
-    if (status == ZX_OK) {
-      waiter.complete_ok();
-    } else {
-      waiter.complete_error(init_status_);
-    }
+  fpromise::promise<void, zx_status_t> promise =
+      fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
+  // If we have a parent, we want to only finish our init after they finish their init.
+  if (parent_.has_value()) {
+    promise = parent_.value()->WaitForInitToComplete();
   }
-  init_waiters_.clear();
+
+  executor().schedule_task(promise.then(
+      [this, init_status = status](fpromise::result<void, zx_status_t>& result) mutable {
+        // We want to export ourselves now that we're initialized.
+        // We can only do this if we have a parent, if we don't have a parent we've already been
+        // exported.
+        if (init_status == ZX_OK && parent_.has_value() && driver()) {
+          if (zx_status_t status = ExportAfterInit(); status != ZX_OK) {
+            FDF_LOG(ERROR, "Device %s failed to create node: %s", topological_path_.c_str(),
+                    zx_status_get_string(status));
+            Remove();
+          }
+        }
+
+        // Finish the init by alerting any waiters.
+        {
+          std::scoped_lock lock(init_lock_);
+          init_is_finished_ = true;
+          init_status_ = init_status;
+          for (auto& waiter : init_waiters_) {
+            if (init_status_ == ZX_OK) {
+              waiter.complete_ok();
+            } else {
+              waiter.complete_error(init_status_);
+            }
+          }
+          init_waiters_.clear();
+        }
+
+        if (init_status != ZX_OK) {
+          Remove();
+        }
+      }));
 }
 
 fpromise::promise<void, zx_status_t> Device::WaitForInitToComplete() {

@@ -501,7 +501,7 @@ fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {
         device_.set_fragments(std::move(parents_names));
         completer.complete_ok();
       });
-  return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL));
+  return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL)).wrap_with(scope_);
 }
 
 promise<void, zx_status_t> Driver::GetDeviceInfo() {
@@ -625,7 +625,6 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
     if (out) {
       *out = child;
     }
-    executor_.schedule_task(child->Export());
     return ZX_OK;
   });
 }
