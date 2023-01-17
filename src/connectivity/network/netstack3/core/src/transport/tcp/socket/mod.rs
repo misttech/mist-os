@@ -2986,6 +2986,83 @@ mod tests {
         );
     }
 
+    #[test_case(true; "any")]
+    #[test_case(false; "link local")]
+    fn accepted_connection_info_zone(listen_any: bool) {
+        set_logger_for_test();
+        let client_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
+        let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap();
+        let mut net = FakeNetwork::new(
+            [
+                (
+                    LOCAL,
+                    TcpCtx::with_sync_ctx(TcpSyncCtx::new(
+                        server_ip,
+                        client_ip,
+                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
+                    )),
+                ),
+                (
+                    REMOTE,
+                    TcpCtx::with_sync_ctx(TcpSyncCtx::new(
+                        client_ip,
+                        server_ip,
+                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
+                    )),
+                ),
+            ],
+            move |net, meta: SendIpPacketMeta<_, _, _>| {
+                if net == LOCAL {
+                    alloc::vec![(REMOTE, meta, None)]
+                } else {
+                    alloc::vec![(LOCAL, meta, None)]
+                }
+            },
+        );
+
+        let local_server = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::<Ipv6, _>::create_socket(sync_ctx, non_sync_ctx);
+            let bind_addr = match listen_any {
+                true => Ipv6::UNSPECIFIED_ADDRESS,
+                false => *server_ip,
+            };
+            let bind =
+                SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, bind_addr, Some(PORT_1))
+                    .expect("failed to bind the client socket");
+            SocketHandler::listen(sync_ctx, non_sync_ctx, bind, nonzero!(1usize))
+        });
+
+        let _remote_client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                SocketAddr { ip: server_ip, port: PORT_1 },
+                Default::default(),
+            )
+            .expect("failed to connect")
+        });
+
+        net.run_until_idle(handle_frame, handle_timer);
+
+        let ConnectionInfo { remote_addr, local_addr, device } =
+            net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+                let (server_conn, _addr, _buffers) =
+                    SocketHandler::accept(sync_ctx, non_sync_ctx, local_server)
+                        .expect("connection is available");
+                SocketHandler::get_connection_info(sync_ctx, server_conn)
+            });
+
+        let device = assert_matches!(device, Some(device) => device);
+        assert_eq!(
+            local_addr,
+            (ZonedAddr::Zoned(AddrAndZone::new(*server_ip, device).unwrap()), PORT_1)
+        );
+        let (remote_ip, _remote_port) = remote_addr;
+        assert_eq!(remote_ip, ZonedAddr::Zoned(AddrAndZone::new(*client_ip, device).unwrap()));
+    }
+
     #[test]
     fn bound_connection_info_zoned_addrs() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();

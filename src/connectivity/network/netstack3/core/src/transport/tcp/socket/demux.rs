@@ -122,6 +122,7 @@ where
                     isn,
                     sockets,
                     conn_addr,
+                    device,
                     addrs_to_search,
                     incoming,
                     now,
@@ -139,6 +140,7 @@ fn handle_incoming_packet<I, B, C, SC>(
     isn: &IsnGenerator<C::Instant>,
     sockets: &mut Sockets<I, SC::DeviceId, C>,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+    incoming_device: &SC::DeviceId,
     mut addrs_to_search: AddrVecIter<IpPortSpec<I, SC::DeviceId>>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
@@ -188,6 +190,7 @@ fn handle_incoming_packet<I, B, C, SC>(
                         id,
                         incoming,
                         conn_addr,
+                        incoming_device,
                         now,
                     )
                 } else {
@@ -338,6 +341,7 @@ fn try_handle_incoming_for_listener<I, SC, C, B>(
     listener_id: MaybeListenerId<I>,
     incoming: Segment<&[u8]>,
     incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+    incoming_device: &SC::DeviceId,
     now: C::Instant,
 ) -> bool
 where
@@ -374,9 +378,18 @@ where
     }
 
     let ListenerAddr { ip: _, device: bound_device } = listener_addr;
+    // Ensure that if the remote address requires a zone, we propagate that to
+    // the address for the connected socket.
+    let bound_device = bound_device.as_ref();
+    let bound_device = if crate::socket::must_have_zone(&remote_ip) {
+        Some(bound_device.unwrap_or(incoming_device))
+    } else {
+        bound_device
+    };
+
     let ip_sock = match ip_transport_ctx.new_ip_socket(
         ctx,
-        bound_device.as_ref(),
+        bound_device,
         Some(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
@@ -414,8 +427,8 @@ where
 
     if matches!(state, State::SynRcvd(_)) {
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
-        let bound_device = bound_device.clone();
         let socket_options = socket_options.clone();
+        let bound_device = bound_device.cloned();
         let conn_id = socketmap
             .conns_mut()
             .try_insert(
