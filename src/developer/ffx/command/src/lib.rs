@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use analytics::{get_notice, opt_out_for_this_invocation};
-use anyhow::Context;
 use errors::{ffx_error, IntoExitCode};
 use ffx_metrics::{add_ffx_launch_and_timing_events, init_metrics_svc};
 use fuchsia_async::TimeoutExt;
@@ -95,8 +94,9 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
 
     // Since this is invoking the config, this must be run _after_ ffx_config::init.
     let log_level = app.log_level().await?;
-    let _:  simplelog::LevelFilter = simplelog::LevelFilter::from_str(log_level.as_str()).with_context(||
-        ffx_error!("'{}' is not a valid log level. Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'", log_level))?;
+    simplelog::LevelFilter::from_str(log_level.as_str()).with_user_message(|| {
+        ffx_error!("'{log_level}' is not a valid log level. Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'")
+    })?;
 
     let analytics_disabled = ffx_config::get("ffx.analytics.disabled").await.unwrap_or(false);
     let ffx_invoker = ffx_config::get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
@@ -156,7 +156,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     // Write to our stamp file if it was requested
     if let Some(mut stamp) = stamp {
         write_exit_code(&res, &mut stamp);
-        stamp.sync_all().context("Syncing exit code stamp write")?;
+        stamp.sync_all().bug_context("Syncing exit code stamp write")?;
     }
 
     res

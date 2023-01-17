@@ -128,7 +128,6 @@ impl ToolRunner for FfxSubCommand {
                     run_legacy_subcommand(self.app, self.context, subcommand)
                         .await
                         .map(|_| ExitStatus::from_raw(0))
-                        .map_err(Error::from)
                 }
             }
         }

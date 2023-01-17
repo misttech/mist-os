@@ -50,10 +50,9 @@ impl From<anyhow::Error> for Error {
     fn from(error: anyhow::Error) -> Self {
         // this is just a compatibility shim to extract information out of the way
         // we've traditionally divided user and unexpected errors.
-        if error.is::<FfxError>() {
-            Self::User(error)
-        } else {
-            Self::Unexpected(error)
+        match error.downcast::<FfxError>() {
+            Ok(err) => Self::User(err.into()),
+            Err(err) => Self::Unexpected(err),
         }
     }
 }
@@ -199,6 +198,16 @@ mod tests {
             Error::from(err),
             Error::User(_),
             "an arbitrary anyhow error should convert to a 'user' error"
+        );
+    }
+
+    #[test]
+    fn into_error_from_contextualized_ffx_error_prints_original_error() {
+        let err = Error::from(anyhow::anyhow!(errors::ffx_error!(FFX_STR)).context("boom"));
+        assert_eq!(
+            &format!("{err}"),
+            FFX_STR,
+            "an anyhow error with context should print the original error, not the context, when stringified."
         );
     }
 
