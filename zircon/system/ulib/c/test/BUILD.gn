@@ -208,7 +208,7 @@ test("gwp-asan-test") {
   # TODO(fxbug.dev/119315): Remove this after gwp-asan has rolled.
   gwp_asan_git_revision =
       read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
-  if (gwp_asan_git_revision != [ "5cd0466acd74fc10f074c2076abdf122022c9c3f" ]) {
+  if (gwp_asan_git_revision != [ "130625efe629f3aa66b700a2b16e92baea0df6ad" ]) {
     defines += [ "NEW_CRASH_ADDR_API=0" ]
   } else {
     defines += [ "NEW_CRASH_ADDR_API=1" ]
