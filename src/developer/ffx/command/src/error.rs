@@ -21,6 +21,13 @@ pub enum Error {
         /// The exit status
         code: i32,
     },
+    /// Something failed before ffx's configuration could be loaded (like an
+    /// invalid argument, a failure to read an env config file, etc).
+    ///
+    /// Errors of this type should include any information the user might need
+    /// to recover from the issue, because it will not advise the user to look
+    /// in the log files or anything like that.
+    Config(#[source] anyhow::Error),
 }
 
 /// Writes a detailed description of an anyhow error to the formatter
@@ -40,7 +47,7 @@ impl std::fmt::Display for Error {
                 writeln!(f, "{BUG_LINE}")?;
                 write_detailed(f, error)
             }
-            Self::User(error) => write!(f, "{error}"),
+            Self::User(error) | Self::Config(error) => write!(f, "{error}"),
             Self::Help { output, .. } => write!(f, "{output}"),
         }
     }
@@ -153,9 +160,12 @@ impl ResultExt for Error {
 }
 impl IntoExitCode for Error {
     fn exit_code(&self) -> i32 {
-        match self.ffx_error() {
-            Some(err) => err.exit_code(),
-            None => 1,
+        use Error::*;
+        match self {
+            Help { code, .. } => *code,
+            Unexpected(err) | User(err) | Config(err) => {
+                err.ffx_error().map(FfxError::exit_code).unwrap_or(1)
+            }
         }
     }
 }

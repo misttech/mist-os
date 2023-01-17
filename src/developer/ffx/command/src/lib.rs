@@ -169,6 +169,14 @@ pub async fn exit(res: Result<ExitStatus>) -> ! {
         Err(Error::Help { output, .. }) => {
             writeln!(&mut std::io::stdout(), "{output}").unwrap();
         }
+        Err(Error::Config(err)) => {
+            let mut out = std::io::stderr();
+            // abort hard on a failure to print the user error somehow
+            writeln!(&mut out, "{err}").unwrap();
+            // note: we don't try to report this error or print a log hint
+            // because we don't expect to have enough information to do either
+            // of those things here.
+        }
         Err(err) => {
             let mut out = std::io::stderr();
             // abort hard on a failure to print the user error somehow
