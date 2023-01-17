@@ -8,7 +8,7 @@ import("//tools/cmc/build/cmc.gni")
 
 declare_args() {
   # If true, use the Rust version of fshost.
-  rust_fshost = false
+  rust_fshost = true
 }
 
 # Generates an fshost cml file.
