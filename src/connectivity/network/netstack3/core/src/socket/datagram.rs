@@ -401,38 +401,6 @@ where
     })
 }
 
-/// Returns the address and device that should be used for a socket.
-///
-/// Given an address for a socket and an optional device that the socket is
-/// already bound on, returns the address and device that should be used
-/// for the socket. If `addr` and `device` require inconsistent devices,
-/// or if `addr` requires a zone but there is none specified (by `addr` or
-/// `device`), an error is returned.
-pub(crate) fn resolve_addr_with_device<A: IpAddress, D: PartialEq + Clone>(
-    addr: ZonedAddr<A, D>,
-    device: Option<&D>,
-) -> Result<(SpecifiedAddr<A>, Option<D>), ZonedAddressError> {
-    let (addr, zone) = addr.into_addr_zone();
-    let device = match (zone, device) {
-        (Some(zone), Some(device)) => {
-            if &zone != device {
-                return Err(ZonedAddressError::DeviceZoneMismatch);
-            }
-            Some(device.clone())
-        }
-        (Some(zone), None) => Some(zone),
-        (None, Some(device)) => Some(device.clone()),
-        (None, None) => {
-            if socket::must_have_zone(&addr) {
-                return Err(ZonedAddressError::RequiredZoneNotProvided);
-            } else {
-                None
-            }
-        }
-    };
-    Ok((addr, device))
-}
-
 /// Wrapper for an occupied entry that implements Into::into by
 /// removing from the entry.
 struct TakeMemberships<'a, A: IpAddress, D, S>(
@@ -496,7 +464,8 @@ where
                 // Extract the specified address and the device. The device
                 // is either the one from the address or the one to which
                 // the socket was previously bound.
-                let (addr, device) = resolve_addr_with_device(addr, device.as_ref())?;
+                let (addr, device) =
+                    crate::transport::resolve_addr_with_device(addr, device.as_ref())?;
 
                 // Binding to multicast addresses is allowed regardless.
                 // Other addresses can only be bound to if they are assigned
@@ -591,8 +560,9 @@ where
         };
         let UnboundSocketState { device, sharing, ip_options: _ } = occupied.get();
 
-        let (remote_ip, socket_device) = resolve_addr_with_device(remote_ip, device.as_ref())
-            .map_err(SockCreationError::Zone)?;
+        let (remote_ip, socket_device) =
+            crate::transport::resolve_addr_with_device(remote_ip, device.as_ref())
+                .map_err(SockCreationError::Zone)?;
 
         let device = socket_device.as_ref();
 
@@ -680,11 +650,11 @@ where
             _,
         ) = entry.get();
 
-        let (remote_ip, socket_device) = match resolve_addr_with_device(remote_ip, device.as_ref())
-        {
-            Ok(x) => x,
-            Err(e) => return Err((ConnectListenerError::Zone(e), id)),
-        };
+        let (remote_ip, socket_device) =
+            match crate::transport::resolve_addr_with_device(remote_ip, device.as_ref()) {
+                Ok(x) => x,
+                Err(e) => return Err((ConnectListenerError::Zone(e), id)),
+            };
 
         let ListenerIpAddr { addr: local_ip, identifier: local_port } = ip.clone();
 
@@ -759,11 +729,11 @@ where
         ): &(ConnState<_, _>, S::ConnSharingState, _) = entry.get();
         let proto = socket.proto();
 
-        let (remote_ip, socket_device) = match resolve_addr_with_device(remote_ip, device.as_ref())
-        {
-            Ok(x) => x,
-            Err(e) => return Err((ConnectListenerError::Zone(e), id)),
-        };
+        let (remote_ip, socket_device) =
+            match crate::transport::resolve_addr_with_device(remote_ip, device.as_ref()) {
+                Ok(x) => x,
+                Err(e) => return Err((ConnectListenerError::Zone(e), id)),
+            };
 
         let (local_ip, _) = local;
         let ip_sock = match sync_ctx.new_ip_socket(
@@ -1012,10 +982,11 @@ fn send_oneshot<
     proto: <A::IpVersion as IpProtoExt>::Proto,
     body: B,
 ) -> Result<(), SendToError<B, S::Serializer<B>>> {
-    let (remote_ip, device) = match resolve_addr_with_device(remote_ip, device.as_ref()) {
-        Ok(addr) => addr,
-        Err(e) => return Err(SendToError::Zone(body, e)),
-    };
+    let (remote_ip, device) =
+        match crate::transport::resolve_addr_with_device(remote_ip, device.as_ref()) {
+            Ok(addr) => addr,
+            Err(e) => return Err(SendToError::Zone(body, e)),
+        };
 
     sync_ctx
         .send_oneshot_ip_packet(
