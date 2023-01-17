@@ -48,17 +48,34 @@ typedef struct magma_image_format_constraints {
   uint32_t min_bytes_per_row;
 } magma_image_format_constraints_t;
 
+// Signals what struct members are valid on `magma_buffer_format_constraints_t`.
+typedef uint32_t magma_buffer_format_constraint_options_t;
+
+#define MAGMA_BUFFER_FORMAT_CONSTRAINT_OPTIONS_EXTRA_COUNTS \
+  ((magma_buffer_format_constraint_options_t)(1 << 0))
+
 // A set of constraints on a buffer collection; corresponds to some properties of
 // `fuchsia.sysmem.BufferCollectionConstraints`.
 typedef struct magma_buffer_format_constraints {
   // min_buffer_count
-  uint32_t count;
-  uint32_t usage;
-  magma_bool_t secure_permitted;
-  magma_bool_t secure_required;
-  magma_bool_t ram_domain_supported;
-  magma_bool_t cpu_domain_supported;
-  uint32_t min_size_bytes;
+  // Always enabled.
+  struct {
+    uint32_t count;
+    uint32_t usage;
+    magma_bool_t secure_permitted;
+    magma_bool_t secure_required;
+    magma_bool_t ram_domain_supported;
+    magma_bool_t cpu_domain_supported;
+    uint32_t min_size_bytes;
+  };
+  magma_buffer_format_constraint_options_t options;
+  // Enabled with MAGMA_BUFFER_FORMAT_CONSTRAINT_OPTIONS_EXTRA_COUNTS set.
+  struct {
+    uint32_t max_buffer_count;
+    uint32_t min_buffer_count_for_camping;
+    uint32_t min_buffer_count_for_dedicated_slack;
+    uint32_t min_buffer_count_for_shared_slack;
+  };
 } magma_buffer_format_constraints_t;
 
 typedef struct magma_buffer_format_additional_constraints {

@@ -175,6 +175,15 @@ class ZirconPlatformBufferConstraints : public PlatformBufferConstraints {
     constraints_.buffer_memory_constraints.ram_domain_supported = constraints->ram_domain_supported;
     constraints_.buffer_memory_constraints.cpu_domain_supported = constraints->cpu_domain_supported;
     constraints_.buffer_memory_constraints.min_size_bytes = constraints->min_size_bytes;
+    ZX_ASSERT(!(constraints->options & ~(MAGMA_BUFFER_FORMAT_CONSTRAINT_OPTIONS_EXTRA_COUNTS)));
+    if (constraints->options & MAGMA_BUFFER_FORMAT_CONSTRAINT_OPTIONS_EXTRA_COUNTS) {
+      constraints_.max_buffer_count = constraints->max_buffer_count;
+      constraints_.min_buffer_count_for_camping = constraints->min_buffer_count_for_camping;
+      constraints_.min_buffer_count_for_dedicated_slack =
+          constraints->min_buffer_count_for_dedicated_slack;
+      constraints_.min_buffer_count_for_shared_slack =
+          constraints->min_buffer_count_for_shared_slack;
+    }
   }
 
   Status SetImageFormatConstraints(
