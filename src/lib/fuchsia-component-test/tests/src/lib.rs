@@ -28,18 +28,18 @@ const V1_ECHO_CLIENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_client.cmx";
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_client.cm";
-const V2_ECHO_CLIENT_RELATIVE_URL: &'static str = "#meta/echo_client.cm";
-const V2_ECHO_CLIENT_STRUCTURED_CONFIG_RELATIVE_URL: &'static str = "#meta/echo_client_sc.cm";
+const V2_ECHO_CLIENT_FRAGMENT_URL: &'static str = "#meta/echo_client.cm";
+const V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/echo_client_sc.cm";
 
-const COLLECTION_STRUCTURED_CONFIG_RELATIVE_URL: &'static str = "#meta/collection_sc.cm";
+const COLLECTION_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/collection_sc.cm";
 
 const V1_ECHO_SERVER_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_server.cmx";
 const V2_ECHO_SERVER_ABSOLUTE_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_server.cm";
-const V2_ECHO_SERVER_RELATIVE_URL: &'static str = "#meta/echo_server.cm";
+const V2_ECHO_SERVER_FRAGMENT_URL: &'static str = "#meta/echo_server.cm";
 
-const ECHO_REALM_RELATIVE_URL: &'static str = "#meta/echo_realm.cm";
+const ECHO_REALM_FRAGMENT_URL: &'static str = "#meta/echo_realm.cm";
 
 const DEFAULT_ECHO_STR: &'static str = "Hello Fuchsia!";
 
@@ -106,7 +106,7 @@ async fn absolute_component_route_to_parent() -> Result<(), Error> {
 async fn relative_component_route_to_parent() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
     let child =
-        builder.add_child("child", V2_ECHO_SERVER_RELATIVE_URL, ChildOptions::new()).await?;
+        builder.add_child("child", V2_ECHO_SERVER_FRAGMENT_URL, ChildOptions::new()).await?;
     builder
         .add_route(
             Route::new()
@@ -271,7 +271,7 @@ async fn relative_component_route_to_parent_in_sub_realm() -> Result<(), Error> 
     let builder = RealmBuilder::new().await?;
     let child_realm = builder.add_child_realm("child-realm", ChildOptions::new()).await?;
     let child =
-        child_realm.add_child("child", V2_ECHO_SERVER_RELATIVE_URL, ChildOptions::new()).await?;
+        child_realm.add_child("child", V2_ECHO_SERVER_FRAGMENT_URL, ChildOptions::new()).await?;
     builder
         .add_route(
             Route::new()
@@ -682,7 +682,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
                             &mut fcdecl::CollectionRef { name: collection_name_for_mock.clone() },
                             fcdecl::Child {
                                 name: Some("echo-server".to_string()),
-                                url: Some(V2_ECHO_SERVER_RELATIVE_URL.to_string()),
+                                url: Some(V2_ECHO_SERVER_FRAGMENT_URL.to_string()),
                                 startup: Some(fcdecl::StartupMode::Lazy),
                                 environment: None,
                                 on_terminate: None,
@@ -761,7 +761,7 @@ async fn altered_echo_client_args() -> Result<(), Error> {
 
     let builder = RealmBuilder::new().await?;
     let echo_client = builder
-        .add_child("echo_client", V2_ECHO_CLIENT_RELATIVE_URL, ChildOptions::new().eager())
+        .add_child("echo_client", V2_ECHO_CLIENT_FRAGMENT_URL, ChildOptions::new().eager())
         .await?;
     let echo_server = builder
         .add_local_child(
@@ -813,7 +813,7 @@ async fn config_packaged_values_only() -> Result<(), Error> {
     let echo_client = builder
         .add_child(
             "echo_client",
-            V2_ECHO_CLIENT_STRUCTURED_CONFIG_RELATIVE_URL,
+            V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL,
             ChildOptions::new().eager(),
         )
         .await?;
@@ -863,7 +863,7 @@ async fn config_set_values_only() -> Result<(), Error> {
     let echo_client = builder
         .add_child(
             "echo_client",
-            V2_ECHO_CLIENT_STRUCTURED_CONFIG_RELATIVE_URL,
+            V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL,
             ChildOptions::new().eager(),
         )
         .await?;
@@ -978,7 +978,7 @@ async fn config_mix_packaged_and_set_values() {
     let echo_client = builder
         .add_child(
             "echo_client",
-            V2_ECHO_CLIENT_STRUCTURED_CONFIG_RELATIVE_URL,
+            V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL,
             ChildOptions::new().eager(),
         )
         .await
@@ -1053,7 +1053,7 @@ async fn config_override_for_root_with_config_in_collection_without_override() {
     let collection_launcher = builder
         .add_child(
             "collection_launcher",
-            COLLECTION_STRUCTURED_CONFIG_RELATIVE_URL,
+            COLLECTION_STRUCTURED_CONFIG_FRAGMENT_URL,
             ChildOptions::new().eager(),
         )
         .await
@@ -1172,7 +1172,7 @@ async fn echo_clients() -> Result<(), Error> {
 
     {
         let builder = RealmBuilder::new().await?;
-        builder.add_child(client_name, V2_ECHO_CLIENT_RELATIVE_URL, child_opts.clone()).await?;
+        builder.add_child(client_name, V2_ECHO_CLIENT_FRAGMENT_URL, child_opts.clone()).await?;
         let mut receive_echo_server_called = setup_echo_client_realm(&builder).await?;
         let realm_instance = builder.build().await?;
 
@@ -1236,7 +1236,7 @@ async fn echo_clients_in_nested_component_manager() -> Result<(), Error> {
     {
         let builder = RealmBuilder::new().await?;
         builder
-            .add_child("echo-client", V2_ECHO_CLIENT_RELATIVE_URL, ChildOptions::new().eager())
+            .add_child("echo-client", V2_ECHO_CLIENT_FRAGMENT_URL, ChildOptions::new().eager())
             .await?;
         let mut receive_echo_server_called = setup_echo_client_realm(&builder).await?;
         let realm_instance =
@@ -1345,7 +1345,7 @@ async fn echo_servers() -> Result<(), Error> {
 
     {
         let builder = RealmBuilder::new().await?;
-        builder.add_child(server_name, V2_ECHO_SERVER_RELATIVE_URL, child_opts.clone()).await?;
+        builder.add_child(server_name, V2_ECHO_SERVER_FRAGMENT_URL, child_opts.clone()).await?;
         let mut receive_echo_client_results = setup_echo_server_realm(&builder).await?;
         let realm_instance = builder.build().await?;
 
@@ -1831,8 +1831,8 @@ async fn read_only_directory() -> Result<(), Error> {
 }
 
 #[fuchsia::test]
-async fn from_relative_url() -> Result<(), Error> {
-    let builder = RealmBuilder::from_relative_url(ECHO_REALM_RELATIVE_URL).await?;
+async fn from_fragment() -> Result<(), Error> {
+    let builder = RealmBuilder::from_relative_url(ECHO_REALM_FRAGMENT_URL).await?;
 
     let echo_client_decl_file = fuchsia_fs::file::open_in_namespace(
         "/pkg/meta/echo_client.cm",
@@ -1874,7 +1874,7 @@ async fn from_relative_url() -> Result<(), Error> {
 }
 
 #[fuchsia::test]
-async fn from_relative_url_invalid_manifest() -> Result<(), Error> {
+async fn from_fragment_invalid_manifest() -> Result<(), Error> {
     // The file referenced here is intentionally not a component manifest
     assert_matches!(
         RealmBuilder::from_relative_url("#data/component_manager_realm_builder_config").await,

@@ -1312,7 +1312,10 @@ class RealmBuilder {
   final String collectionName;
 
   /// Creates a new RealmBuilder.
-  /// [relativeUrl]: The path to a manifest to load into the realm.
+  /// [relativeUrl]: A fragment-only component URL indicating the path to a
+  /// manifest in the test package (for example, `#meta/other-component.cm`;
+  /// see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+  /// The realm will be initialized with the contents of this package.
   /// [collectionName]: The collection to add the realm to, when launched.
   static Future<RealmBuilder> create({
     String? relativeUrl,
@@ -1426,12 +1429,32 @@ class RealmBuilder {
     );
   }
 
-  /// Returns a copy the decl for a child in this realm
+  /// Returns a copy of the decl for a child in this realm. This operation is
+  /// only supported for:
+  ///
+  /// * A component with a local implementation
+  /// * A legacy component
+  /// * A component added with a fragment-only component URL (typically,
+  ///   components bundled in the same package as the realm builder client,
+  ///   sharing the same `/pkg` directory, for example
+  ///   `#meta/other-component.cm`; see
+  ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+  /// * An automatically generated realm (such as the root)
   Future<fdecl.Component> getComponentDecl(ChildRef childRef) {
     return rootRealm.getComponentDecl(childRef);
   }
 
-  /// Replaces the decl for a child of this realm
+  /// Replaces the decl for a child of this realm. This operation is only
+  /// supported for:
+  ///
+  /// * A component with a local implementation
+  /// * A legacy component
+  /// * A component added with a fragment-only component URL (typically,
+  ///   components bundled in the same package as the realm builder client,
+  ///   sharing the same `/pkg` directory, for example
+  ///   `#meta/other-component.cm`; see
+  ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+  /// * An automatically generated realm (such as the root)
   Future<void> replaceComponentDecl(
     ChildRef childRef,
     fdecl.Component decl,

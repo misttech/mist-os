@@ -49,7 +49,7 @@ namespace fdecl = fuchsia::component::decl;
 constexpr char kEchoServerUrl[] =
     "fuchsia-pkg://fuchsia.com/component_cpp_testing_realm_builder_tests#meta/echo_server.cm";
 constexpr char kEchoServerScUrl[] = "#meta/echo_server_sc.cm";
-constexpr char kEchoServerRelativeUrl[] = "#meta/echo_server.cm";
+constexpr char kEchoServerFragmentOnlyUrl[] = "#meta/echo_server.cm";
 constexpr char kEchoServiceServerUrl[] = "#meta/echo_service_server.cm";
 
 class RealmBuilderTest : public gtest::RealLoopFixture {};
@@ -169,7 +169,7 @@ TEST_F(RealmBuilderTest, SetConfigValueFails) {
       {
         static constexpr char kEchoServer[] = "echo_server";
         auto realm_builder = RealmBuilder::Create();
-        realm_builder.AddChild(kEchoServer, kEchoServerRelativeUrl);
+        realm_builder.AddChild(kEchoServer, kEchoServerFragmentOnlyUrl);
         realm_builder.SetConfigValue(kEchoServer, "my_flag", ConfigValue::Bool(true));
       },
       "");
@@ -212,7 +212,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromRelativeChild) {
   static constexpr char kEchoServer[] = "echo_server";
 
   auto realm_builder = RealmBuilder::Create();
-  realm_builder.AddChild(kEchoServer, kEchoServerRelativeUrl);
+  realm_builder.AddChild(kEchoServer, kEchoServerFragmentOnlyUrl);
   realm_builder.AddRoute(Route{.capabilities = {Protocol{test::placeholders::Echo::Name_}},
                                .source = ChildRef{kEchoServer},
                                .targets = {ParentRef()}});
@@ -773,7 +773,7 @@ TEST_F(RealmBuilderTest, RealmDeclCanBeReplaced) {
 // This test is similar to RealmBuilderTest.RoutesProtocolFromChild except
 // that its setup is done statically via a manifest. This is to assert that
 // invoking |CreateFromRelativeUrl| works as expected.
-TEST_F(RealmBuilderTest, BuildsRealmFromRelativeUrl) {
+TEST_F(RealmBuilderTest, BuildsRealmFromFragmentOnlyUrl) {
   static constexpr char kPrePopulatedRealmUrl[] = "#meta/pre_populated_realm.cm";
 
   auto realm_builder = RealmBuilder::CreateFromRelativeUrl(kPrePopulatedRealmUrl);

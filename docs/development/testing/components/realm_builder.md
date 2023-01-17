@@ -206,8 +206,9 @@ The example below adds two static child components to the created realm:
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/realm_builder/dart/test/sample.dart" region_tag="add_component_dart" adjust_indentation="auto" %}
     ```
 
-Note: Realm Builder interprets component sources defined using a relative URL
-to be contained in the same package as the test component.
+Note: Realm Builder interprets component sources defined using a
+[fragment-only URL][fragment-only-url] to be contained in the same package as
+the test component (for example, `#meta/other-component.cm`).
 
 ### Adding Mock Components {#mock-components}
 
@@ -634,6 +635,7 @@ controller, see [offering test capabilities](#routing-from-test).
 [component-urls]: /docs/reference/components/url.md
 [environment]: https://fuchsia.dev/reference/cml#environments
 [expose]: https://fuchsia.dev/reference/cml#expose
+[fragment-only-url]: /docs/reference/components/url.md#relative-fragment-only
 [namespaces]: /docs/concepts/process/namespaces.md
 [offer]: https://fuchsia.dev/reference/cml#offer
 [realm-builder-shard]: /sdk/lib/sys/component/realm_builder_base.shard.cml

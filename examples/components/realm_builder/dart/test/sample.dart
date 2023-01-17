@@ -38,7 +38,7 @@ void main() {
         'fuchsia-pkg://fuchsia.com/realm-builder-examples#meta/echo_server.cm',
       );
 
-      // Add a child component to the realm using a relative URL. The child is
+      // Add a child component to the realm using a fragment-only URL. The child is
       // not exposing a service, so the `eager` option ensures the child starts
       // when the realm is built.
       final echoClient = await builder.addChild(

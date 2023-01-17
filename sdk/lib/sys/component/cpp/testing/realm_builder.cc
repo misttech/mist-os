@@ -224,12 +224,12 @@ RealmBuilder RealmBuilder::Create(std::shared_ptr<sys::ServiceDirectory> svc) {
   return CreateImpl(cpp17::nullopt, std::move(svc));
 }
 
-RealmBuilder RealmBuilder::CreateFromRelativeUrl(std::string_view relative_url,
+RealmBuilder RealmBuilder::CreateFromRelativeUrl(std::string_view fragment_only_url,
                                                  std::shared_ptr<sys::ServiceDirectory> svc) {
-  return CreateImpl(relative_url, std::move(svc));
+  return CreateImpl(fragment_only_url, std::move(svc));
 }
 
-RealmBuilder RealmBuilder::CreateImpl(cpp17::optional<std::string_view> relative_url,
+RealmBuilder RealmBuilder::CreateImpl(cpp17::optional<std::string_view> fragment_only_url,
                                       std::shared_ptr<sys::ServiceDirectory> svc) {
   if (svc == nullptr) {
     svc = sys::ServiceDirectory::CreateFromNamespace();
@@ -245,13 +245,13 @@ RealmBuilder RealmBuilder::CreateImpl(cpp17::optional<std::string_view> relative
   ZX_COMPONENT_ASSERT_STATUS_OK("RealmBuilderFactory/Create", status);
   fuchsia::component::test::BuilderSyncPtr builder_proxy;
   fuchsia::component::test::RealmSyncPtr test_realm_proxy;
-  if (relative_url.has_value()) {
-    ZX_ASSERT_MSG(!relative_url.value().empty(), "relative_url can't be empty");
+  if (fragment_only_url.has_value()) {
+    ZX_ASSERT_MSG(!fragment_only_url.value().empty(), "fragment_only_url can't be empty");
 
     fuchsia::component::test::RealmBuilderFactory_CreateFromRelativeUrl_Result result;
     ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
         "RealmBuilderFactory/CreateFromRelativeUrl",
-        factory_proxy->CreateFromRelativeUrl(CreatePkgDirHandle(), relative_url.value().data(),
+        factory_proxy->CreateFromRelativeUrl(CreatePkgDirHandle(), fragment_only_url.value().data(),
                                              test_realm_proxy.NewRequest(),
                                              builder_proxy.NewRequest(), &result),
         result);

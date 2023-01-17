@@ -213,7 +213,7 @@ impl Registry {
                 .await
                 .map_err(|_| fresolution::ResolverError::Internal)
         } else {
-            Self::load_relative_url(parsed_url, component_decls_guard).await
+            Self::load_fragment_only_url(parsed_url, component_decls_guard).await
         }
     }
 
@@ -271,14 +271,14 @@ impl Registry {
     }
 
     // Realm builder never generates URLs with fragments. If we're asked to resolve a URL with
-    // one, then this must be from component manager attempting to make sense of a relative URL
+    // one, then this must be from component manager attempting to make sense of a fragment-only URL
     // where the parent of the component is an absolute realm builder URL. We rewrite relative
     // URLs to be absolute realm builder URLs at build time, but if a component is added at
     // runtime (as in, to a collection) then realm builder doesn't have a chance to do this
     // rewrite.
     //
     // To handle this: let's use the fragment to look for a component in the test package.
-    async fn load_relative_url<'a>(
+    async fn load_fragment_only_url<'a>(
         mut parsed_url: Url,
         component_decls_guard: MutexGuard<'a, HashMap<Url, ResolveableComponent>>,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
@@ -324,8 +324,9 @@ impl Registry {
         let config_values = Self::resolve_structured_config(
             &component_decl,
             package_dir_for_config,
-            // Since realm builder never generates relative URLs, the component we are resolving
-            // here will never be one with config value replacements set, so don't provide any.
+            // Since realm builder never generates fragment-only URLs, the component we are
+            // resolving here will never be one with config value replacements set, so don't provide
+            // any.
             &HashMap::new(),
         )
         .await

@@ -28,6 +28,10 @@ protocol RealmBuilderFactory {
     /// as adding new children to the realm or adding capability routes between
     /// them. The client end of `builder_server_end` is used to finalize the
     /// realm, after which point it can be launched in a collection.
+    ///
+    /// `pkg_dir_handle` is a handle to the test package. The realm builder
+    /// client typically passes a handle to its own `/pkg` directory, and
+    /// bundles the `other-component` into the same package.
     Create(resource struct {
         pkg_dir_handle client_end:fuchsia.io.Directory;
         realm_server_end server_end:Realm;
@@ -35,8 +39,10 @@ protocol RealmBuilderFactory {
     }) -> () error RealmBuilderError;
 
     /// Identical to `Create`, but instead of the realm being empty by default
-    /// it contains the contents of the manifest located at `relative_url`
-    /// within `pkg_dir_handle`.
+    /// it contains the contents of the manifest located in the test package at
+    /// the path indicated by `relative_url`, which must be a fragment-only URL
+    /// (for example, `#meta/other-component.cm`; see
+    /// https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
     CreateFromRelativeUrl(resource struct {
         pkg_dir_handle client_end:fuchsia.io.Directory;
         relative_url fuchsia.url.Url;
@@ -66,7 +72,7 @@ type RealmBuilderError = strict enum : uint32 {
 
     /// The component declaration for the referenced child cannot be viewed nor
     /// manipulated by RealmBuilder, because the child was added to the realm
-    /// using an URL that was neither a relative nor a legacy URL.
+    /// using an URL that was neither a fragment-only nor a legacy URL.
     CHILD_DECL_NOT_VISIBLE = 4;
 
     /// The source does not exist.
@@ -85,11 +91,11 @@ type RealmBuilderError = strict enum : uint32 {
     SOURCE_AND_TARGET_MATCH = 9;
 
     /// The test package does not contain the component declaration referenced
-    /// by a relative URL.
+    /// by a fragment-only component URL.
     DECL_NOT_FOUND = 10;
 
     /// Encountered an I/O error when attempting to read a component declaration
-    /// referenced by a relative URL from the test package.
+    /// referenced by a fragment-only component URL from the test package.
     DECL_READ_ERROR = 11;
 
     /// The `Build` function has been called multiple times on this channel.
@@ -109,7 +115,7 @@ type RealmBuilderError = strict enum : uint32 {
     IMMUTABLE_PROGRAM = 15;
 
     /// The URL provided to `RealmBuilderFactory.CreateFromRelativeURL` is not a
-    /// relative URL.
+    /// fragment-only component URL.
     URL_IS_NOT_RELATIVE = 16;
 
     /// The handle the client provided for the test's pkg directory is not
@@ -356,16 +362,38 @@ type DirectoryEntry = resource struct {
 protocol Realm {
     /// Adds a component to the realm.
     ///
+    /// The `url` can be in one of the following formats:
+    ///
+    /// - an absolute component URL (such as,
+    ///   "fuchsia-pkg://fuchsia.com/some-package#meta/some-component.cm")
+    /// - a relative path component URL to a subpackaged component (like,
+    ///   "some-subpackage#meta/subpackaged-component.cm"); or
+    /// - a relative fragment-only URL (like, `#meta/other-component.cm`;
+    ///   see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only)
+    ///   indicating the path to a component manifest in the `pkg_dir` supplied
+    ///   to `RealmBuilderFactory::Create*()`.
+    ///
+    /// The realm builder client typically passes a handle to its own `/pkg`
+    /// directory, and bundles the `other-component` into the same package.
+    ///
+    /// Of the three URL types, _only_ component declarations added via the
+    /// fragment-only URL can be modified, via
+    /// `GetComponentDecl`/`ReplaceComponentDecl` because realm builder actually
+    /// performs its own component resolution from the component's manifest and
+    /// files bundled in the provided `pkg_dir` (typically from the package
+    /// shared by the realm builder client component and the components added
+    /// via fragment-only URL).
+    ///
     /// Errors:
     /// - `CHILD_ALREADY_EXISTS`: this realm already contains a child with the
     ///   given name.
     /// - `INVALID_MANIFEST_EXTENSION`: `url` ends with `.cmx`, and thus should
     ///   be used with `AddLegacyChild` instead of `AddChild`.
     /// - `DECL_NOT_FOUND`: The test package does not contain the component
-    ///   declaration referenced by a relative URL.
+    ///   declaration referenced by a fragment-only component URL.
     /// - `DECL_READ_ERROR`: Encountered an I/O error when attempting to read a
-    ///   component declaration referenced by a relative URL from the test
-    ///   package.
+    ///   component declaration referenced by a fragment-only component URL from
+    ///   the test package.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
     AddChild(struct {
@@ -474,7 +502,10 @@ protocol Realm {
     ///
     /// - A component with a local implementation
     /// - A legacy component
-    /// - A component added with a relative URL
+    /// - A component added with a fragment-only URL (typically, components
+    ///   bundled in the same package as the realm builder client, sharing the
+    ///   same `/pkg` directory, for example, `#meta/other-component.cm`; see
+    ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only)
     /// - An automatically generated realm (ex: the root)
     ///
     /// Errors:
@@ -482,7 +513,8 @@ protocol Realm {
     ///   name.
     /// - `CHILD_DECL_NOT_VISIBLE`: The component decl cannot be fetched for
     ///   the referenced child, because the child was added to the realm using
-    ///   an absolute (not-relative) and modern (not legacy) URL.
+    ///   a modern (not legacy) absolute URL or subpackaged component's relative
+    ///   path URL.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
     GetComponentDecl(struct {
@@ -497,7 +529,10 @@ protocol Realm {
     ///
     /// - A component with a local implementation
     /// - A legacy component
-    /// - A component added with a relative URL
+    /// - A component added with a fragment-only URL (typically, components
+    ///   bundled in the same package as the realm builder client, sharing the
+    ///   same `/pkg` directory, for example, `#meta/other-component.cm`; see
+    ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only)
     /// - An automatically generated realm (ex: the root)
     ///
     /// Errors:

@@ -223,37 +223,57 @@ class Realm final {
   // Route a capability from one child to another.
   Realm& AddRoute(Route route);
 
-  /// Offers a directory capability to a component in this realm. The
-  /// directory will be read-only (i.e. have `r*` rights), and will have the
-  /// contents described in `directory`.
+  // Offers a directory capability to a component in this realm. The
+  // directory will be read-only (i.e. have `r*` rights), and will have the
+  // contents described in `directory`.
   Realm& RouteReadOnlyDirectory(const std::string& name, std::vector<Ref> to,
                                 DirectoryContents directory);
 
 #if __Fuchsia_API_level__ >= 9
-  /// Load the packaged configuration of the component if available.
+  // Load the packaged configuration of the component if available.
   Realm& InitMutableConfigFromPackage(const std::string& name);
 #endif
 
 #if __Fuchsia_API_level__ >= 9
-  /// Allow setting configuration values without loading packaged configuration.
+  // Allow setting configuration values without loading packaged configuration.
   Realm& InitMutableConfigToEmpty(const std::string& name);
 #endif
 
-  /// Replaces the value of a given configuration field
+  // Replaces the value of a given configuration field
   Realm& SetConfigValue(const std::string& name, const std::string& key, ConfigValue value);
 
-  /// Updates the Component decl of the given child.
+  // Fetches the Component decl of the given child. This operation is only
+  // supported for:
+  //
+  // * A component with a local implementation
+  // * A legacy component
+  // * A component added with a fragment-only component URL (typically,
+  //   components bundled in the same package as the realm builder client,
+  //   sharing the same `/pkg` directory, for example,
+  //   `#meta/other-component.cm`; see
+  //   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only)
+  // * An automatically generated realm (such as the root)
+  fuchsia::component::decl::Component GetComponentDecl(const std::string& child_name);
+
+  // Fetches the Component decl of this Realm.
+  fuchsia::component::decl::Component GetRealmDecl();
+
+  // Updates the Component decl of the given child. This operation is only
+  // supported for:
+  //
+  // * A component with a local implementation
+  // * A legacy component
+  // * A component added with a fragment-only component URL (typically,
+  //   components bundled in the same package as the realm builder client,
+  //   sharing the same `/pkg` directory, for example,
+  //   `#meta/other-component.cm`; see
+  //   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only)
+  // * An automatically generated realm (such as the root)
   void ReplaceComponentDecl(const std::string& child_name,
                             fuchsia::component::decl::Component decl);
 
-  /// Updates the Component decl of this Realm.
+  // Updates the Component decl of this Realm.
   void ReplaceRealmDecl(fuchsia::component::decl::Component decl);
-
-  /// Fetches the Component decl of the given child.
-  fuchsia::component::decl::Component GetComponentDecl(const std::string& child_name);
-
-  /// Fetches the Component decl of this Realm.
-  fuchsia::component::decl::Component GetRealmDecl();
 
   friend class RealmBuilder;
 
@@ -280,9 +300,11 @@ class RealmBuilder final {
   // If it's nullptr, then the current process' "/svc" namespace entry is used.
   static RealmBuilder Create(std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
 
-  // Same as above but the Realm will contain the contents in the manifest of
-  // the component referenced by the |relative_url|.
-  static RealmBuilder CreateFromRelativeUrl(std::string_view relative_url,
+  // Same as above but the Realm will contain the contents of the manifest
+  // located in the test package at the path indicated by the fragment-only URL
+  // (for example, `#meta/other-component.cm`; see
+  // https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+  static RealmBuilder CreateFromRelativeUrl(std::string_view fragment_only_url,
                                             std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
 
   RealmBuilder(RealmBuilder&&) = default;
@@ -331,36 +353,38 @@ class RealmBuilder final {
   // See |Realm.AddRoute| for more details.
   RealmBuilder& AddRoute(Route route);
 
-  /// Offers a directory capability to a component for the root realm.
+  // Offers a directory capability to a component for the root realm.
   // See |Realm.RouteReadOnlyDirectory| for more details.
   RealmBuilder& RouteReadOnlyDirectory(const std::string& name, std::vector<Ref> to,
                                        DirectoryContents directory);
 
 #if __Fuchsia_API_level__ >= 9
-  /// Load the packaged configuration of the component if available.
+  // Load the packaged configuration of the component if available.
   RealmBuilder& InitMutableConfigFromPackage(const std::string& name);
 #endif
 
 #if __Fuchsia_API_level__ >= 9
-  /// Allow setting configuration values without loading packaged configuration.
+  // Allow setting configuration values without loading packaged configuration.
   RealmBuilder& InitMutableConfigToEmpty(const std::string& name);
 #endif
 
-  /// Replaces the value of a given configuration field for the root realm.
+  // Replaces the value of a given configuration field for the root realm.
   RealmBuilder& SetConfigValue(const std::string& name, const std::string& key, ConfigValue value);
 
-  /// Updates the Component decl of the given child of the root realm.
+  // Fetches the Component decl of the given child of the root realm.
+  // See |Realm.GetComponentDecl| for more details.
+  fuchsia::component::decl::Component GetComponentDecl(const std::string& child_name);
+
+  // Fetches the Component decl of this root realm.
+  fuchsia::component::decl::Component GetRealmDecl();
+
+  // Updates the Component decl of the given child of the root realm.
+  // See |Realm.GetRealmDecl| for more details.
   void ReplaceComponentDecl(const std::string& child_name,
                             fuchsia::component::decl::Component decl);
 
-  /// Updates the Component decl of this root realm.
+  // Updates the Component decl of this root realm.
   void ReplaceRealmDecl(fuchsia::component::decl::Component decl);
-
-  /// Fetches the Component decl of the given child of the root realm.
-  fuchsia::component::decl::Component GetComponentDecl(const std::string& child_name);
-
-  /// Fetches the Component decl of this root realm.
-  fuchsia::component::decl::Component GetRealmDecl();
 
 #if __Fuchsia_API_level__ >= 10
   // Set the name of the collection that the realm will be added to.
@@ -394,8 +418,9 @@ class RealmBuilder final {
                fuchsia::component::test::BuilderSyncPtr builder_proxy,
                fuchsia::component::test::RealmSyncPtr test_realm_proxy);
 
-  static RealmBuilder CreateImpl(cpp17::optional<std::string_view> relative_url = cpp17::nullopt,
-                                 std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
+  static RealmBuilder CreateImpl(
+      cpp17::optional<std::string_view> fragment_only_url = cpp17::nullopt,
+      std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
 
   bool realm_commited_ = false;
   std::string realm_collection_ = kDefaultCollection;

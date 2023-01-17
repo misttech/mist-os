@@ -116,7 +116,7 @@ impl RealmBuilderFactory {
                     builder_server_end,
                     responder,
                 } => {
-                    if !is_relative_url(&relative_url) {
+                    if !is_fragment_only_url(&relative_url) {
                         responder.send(&mut Err(ftest::RealmBuilderError::UrlIsNotRelative))?;
                         continue;
                     }
@@ -508,7 +508,7 @@ impl Realm {
             });
         }
 
-        if is_relative_url(&url) {
+        if is_fragment_only_url(&url) {
             let child_realm_node =
                 RealmNode2::load_from_pkg(url, Clone::clone(&self.pkg_dir)).await?;
             self.realm_node.add_child(name.clone(), options, child_realm_node).await
@@ -1014,11 +1014,11 @@ impl RealmNode2 {
     }
 
     fn load_from_pkg(
-        relative_url: String,
+        fragment_only_url: String,
         test_pkg_dir: fio::DirectoryProxy,
     ) -> BoxFuture<'static, Result<RealmNode2, RealmBuilderError>> {
         async move {
-            let path = relative_url.trim_start_matches('#');
+            let path = fragment_only_url.trim_start_matches('#');
 
             let file_proxy_res = fuchsia_fs::directory::open_file(
                 &test_pkg_dir,
@@ -1029,19 +1029,22 @@ impl RealmNode2 {
             let file_proxy = match file_proxy_res {
                 Ok(file_proxy) => file_proxy,
                 Err(fuchsia_fs::node::OpenError::OpenError(zx_status::Status::NOT_FOUND)) => {
-                    return Err(RealmBuilderError::DeclNotFound(relative_url.clone()))
+                    return Err(RealmBuilderError::DeclNotFound(fragment_only_url.clone()))
                 }
                 Err(e) => {
-                    return Err(RealmBuilderError::DeclReadError(relative_url.clone(), e.into()))
+                    return Err(RealmBuilderError::DeclReadError(
+                        fragment_only_url.clone(),
+                        e.into(),
+                    ))
                 }
             };
 
             let fidl_decl = fuchsia_fs::file::read_fidl::<fcdecl::Component>(&file_proxy)
                 .await
-                .map_err(|e| RealmBuilderError::DeclReadError(relative_url.clone(), e))?;
+                .map_err(|e| RealmBuilderError::DeclReadError(fragment_only_url.clone(), e))?;
             cm_fidl_validator::validate(&fidl_decl).map_err(|e| {
                 RealmBuilderError::InvalidComponentDeclWithName(
-                    relative_url,
+                    fragment_only_url,
                     to_tabulated_string(e),
                 )
             })?;
@@ -1052,7 +1055,7 @@ impl RealmNode2 {
 
             let children = state_guard.decl.children.drain(..).collect::<Vec<_>>();
             for child in children {
-                if !is_relative_url(&child.url) {
+                if !is_fragment_only_url(&child.url) {
                     state_guard.decl.children.push(child);
                 } else {
                     let child_node =
@@ -1821,7 +1824,7 @@ enum RealmBuilderError {
     /// The component declaration for the referenced child cannot be viewed nor manipulated by
     /// RealmBuilder because the child was added to the realm using an URL that was neither a
     /// relative nor a legacy URL.
-    #[error("The component declaration for child {0} cannot be replaced. This occurs for components referenced via absolute URL. If you'd like to mutate a component's decl, add it your test package and reference it via a relative URL: https://fuchsia.dev/go/components/url#relative.")]
+    #[error("The component declaration for child {0} cannot be replaced. This occurs for components referenced via absolute URL. If you'd like to mutate a component's decl, add it your test package and reference it via a fragment-only URL: https://fuchsia.dev/go/components/url#relative-fragment-only.")]
     ChildDeclNotVisible(String),
 
     /// The source does not exist.
@@ -1844,12 +1847,12 @@ enum RealmBuilderError {
     #[error("One of the targets of this route is equal to the source {0:?}. Routing a capability to itself is not supported.")]
     SourceAndTargetMatch(String),
 
-    /// The test package does not contain the component declaration referenced by a relative URL.
-    #[error("Component \"{0}\" not found in package. Only components added to the test's package can be referenced by relative URLs. Ensure that this component is included in the test's package.")]
+    /// The test package does not contain the component declaration referenced by a fragment-only URL.
+    #[error("Component \"{0}\" not found in package. Only components added to the test's package can be referenced by fragment-only URLs. Ensure that this component is included in the test's package.")]
     DeclNotFound(String),
 
     /// Encountered an I/O error when attempting to read a component declaration referenced by a
-    /// relative URL from the test package.
+    /// fragment-only URL from the test package.
     #[error("Could not read the manifest for component \"{0}\". {1:?}")]
     DeclReadError(String, anyhow::Error),
 
@@ -1921,7 +1924,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
     }
 }
 
-fn is_relative_url(url: &str) -> bool {
+fn is_fragment_only_url(url: &str) -> bool {
     if url.len() == 0 || url.chars().nth(0) != Some('#') {
         return false;
     }
@@ -4626,7 +4629,7 @@ mod tests {
             .contains_key(&"0".to_string()));
     }
 
-    // Test the code paths `load_relative_url` and `load_absolute_url` correctly read the abi revision
+    // Test the code paths `load_fragment_only_url` and `load_absolute_url` correctly read the abi revision
     // from the test package. This uses `launch_builder_task` to pass in the test's package directory.
     #[fuchsia::test]
     async fn test_rb_pkg_abi_revision() {
@@ -4647,10 +4650,10 @@ mod tests {
         realm_and_builder_task.call_build().await.expect("failed to build realm");
         let registry = realm_and_builder_task.registry;
 
-        // Exercise the code path for `resolver::load_relative_url()`
-        // Note: resolve expects a fully qualified URL to pass to `load_relative_url` which will
+        // Exercise the code path for `resolver::load_fragment_only_url()`
+        // Note: resolve expects a fully qualified URL to pass to `load_fragment_only_url` which will
         // load component 'a' using its url fragment (#meta/a.cm) at the relative path meta/a.cml.
-        // Please see comment in `resolver::load_relative_url()` for more information.
+        // Please see comment in `resolver::load_fragment_only_url()` for more information.
         let res = registry.resolve("realm-builder://0/a#meta/a.cm").await.unwrap();
         let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
         assert!(version_history::is_valid_abi_revision(abi_revision.into()));

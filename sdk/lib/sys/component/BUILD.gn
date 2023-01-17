@@ -36,6 +36,13 @@ sdk_component_manifests("realm_builder_shard_sdk") {
 
 sdk_component_manifests("realm_builder_shard") {
   name = "sys/component"
-  manifests = [ "realm_builder.shard.cml" ]
+
+  # TODO(fxbug.dev/119428): Move `realm_builder_subpackage.shard.cml` to
+  # "partner" (`realm_builder_shard_sdk` target) when `realm_builder_server`
+  # is exported with the SDK for subpackaging in OOT components.
+  manifests = [
+    "realm_builder.shard.cml",
+    "realm_builder_subpackage.shard.cml",
+  ]
   category = "internal"
 }

@@ -654,20 +654,25 @@ impl RealmBuilder {
         Self::create(DEFAULT_COLLECTION_NAME.to_string(), None).await
     }
 
-    /// Creates a new Realm Builder, and loads the contents of the manifest located at
-    /// `relative_url` into the realm.
-    pub async fn from_relative_url(relative_url: impl Into<String>) -> Result<Self, Error> {
-        Self::create(DEFAULT_COLLECTION_NAME.to_string(), Some(relative_url.into())).await
+    /// Creates a new Realm Builder initialized with the contents of the
+    /// manifest located in the test package at the path indicated by the
+    /// fragment-only component URL (for example, `#meta/other-component.cm`;
+    /// see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+    pub async fn from_relative_url(fragment_only_url: impl Into<String>) -> Result<Self, Error> {
+        Self::create(DEFAULT_COLLECTION_NAME.to_string(), Some(fragment_only_url.into())).await
     }
 
-    /// Creates a new Realm Builder, and loads the contents of the manifest located at
-    /// `relative_url` into the realm. When `RealmBuilder::build` is called, the realm will be
-    /// launched in the collection named `collection_name`.
+    /// Creates a new Realm Builder initialized with the contents of the
+    /// manifest located in the test package at the path indicated by the
+    /// fragment-only component URL (for example, `#meta/other-component.cm`;
+    /// see https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+    /// When `RealmBuilder::build` is called, the realm will be launched in the
+    /// collection named `collection_name`.
     pub async fn from_relative_url_with_collection(
-        relative_url: impl Into<String>,
+        fragment_only_url: impl Into<String>,
         collection_name: impl Into<String>,
     ) -> Result<Self, Error> {
-        Self::create(collection_name.into(), Some(relative_url.into())).await
+        Self::create(collection_name.into(), Some(fragment_only_url.into())).await
     }
 
     /// Creates a new, empty Realm Builder. When `RealmBuilder::build` is called, the realm will be
@@ -676,7 +681,10 @@ impl RealmBuilder {
         Self::create(collection_name.into(), None).await
     }
 
-    async fn create(collection_name: String, relative_url: Option<String>) -> Result<Self, Error> {
+    async fn create(
+        collection_name: String,
+        fragment_only_url: Option<String>,
+    ) -> Result<Self, Error> {
         let realm_proxy = fclient::connect_to_protocol::<fcomponent::RealmMarker>()
             .map_err(Error::ConnectToServer)?;
         let (exposed_dir_proxy, exposed_dir_server_end) =
@@ -709,12 +717,12 @@ impl RealmBuilder {
             create_proxy::<ftest::RealmMarker>().expect("failed to create channel pair");
         let (builder_proxy, builder_server_end) =
             create_proxy::<ftest::BuilderMarker>().expect("failed to create channel pair");
-        match relative_url {
-            Some(relative_url) => {
+        match fragment_only_url {
+            Some(fragment_only_url) => {
                 realm_builder_factory_proxy
                     .create_from_relative_url(
                         ClientEnd::from(pkg_dir_proxy.into_channel().unwrap().into_zx_channel()),
-                        &relative_url,
+                        &fragment_only_url,
                         realm_server_end,
                         builder_server_end,
                     )
@@ -800,7 +808,7 @@ impl RealmBuilder {
     }
 
     /// Initializes the created realm under an instance of component manager, specified by the
-    /// given relative URL. Returns the realm containing component manager.
+    /// given fragment-only URL. Returns the realm containing component manager.
     ///
     /// This function should be used to modify the component manager realm. Otherwise, to directly
     /// build the created realm under an instance of component manager, use
@@ -814,7 +822,7 @@ impl RealmBuilder {
     /// does expose the hub though, which could be traversed to find an exposed capability.
     pub async fn with_nested_component_manager(
         self,
-        component_manager_relative_url: &str,
+        component_manager_fragment_only_url: &str,
     ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
         if *self.root_realm.has_legacy_children.lock().await {
             return Err(Error::LegacyChildrenUnsupportedInNestedComponentManager);
@@ -838,7 +846,7 @@ impl RealmBuilder {
         component_manager_realm
             .add_child(
                 "component_manager",
-                component_manager_relative_url,
+                component_manager_fragment_only_url,
                 ChildOptions::new().eager(),
             )
             .await?;
@@ -895,7 +903,8 @@ impl RealmBuilder {
     }
 
     /// Launches a nested component manager which will run the created realm (along with any local
-    /// components in the realm). This component manager _must_ be referenced by a relative URL.
+    /// components in the realm). This component manager _must_ be referenced by a fragment-only
+    /// URL.
     ///
     /// Note that any routes with a source of `parent` in the root realm will need to also be used
     /// in component manager's manifest and listed as a namespace capability in its config.
@@ -905,10 +914,10 @@ impl RealmBuilder {
     /// does expose the hub though, which could be traversed to find an exposed capability.
     pub async fn build_in_nested_component_manager(
         self,
-        component_manager_relative_url: &str,
+        component_manager_fragment_only_url: &str,
     ) -> Result<RealmInstance, Error> {
         let (component_manager_realm, nested_local_component_runner_task) =
-            self.with_nested_component_manager(component_manager_relative_url).await?;
+            self.with_nested_component_manager(component_manager_fragment_only_url).await?;
         let mut cm_instance = component_manager_realm.build().await?;
 
         // There are no local components alongside the nested component manager.
@@ -975,7 +984,17 @@ impl RealmBuilder {
         self.root_realm.add_child_from_decl(name, decl, options).await
     }
 
-    /// Returns a copy the decl for a child in this realm
+    /// Returns a copy of the decl for a child in this realm. This operation is
+    /// only supported for:
+    ///
+    /// * A component with a local implementation
+    /// * A legacy component
+    /// * A component added with a fragment-only component URL (typically,
+    ///   components bundled in the same package as the realm builder client,
+    ///   sharing the same `/pkg` directory, for example,
+    ///   `#meta/other-component.cm`; see
+    ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+    /// * An automatically generated realm (such as the root)
     pub async fn get_component_decl(
         &self,
         name: impl Into<ChildRef>,
@@ -983,7 +1002,17 @@ impl RealmBuilder {
         self.root_realm.get_component_decl(name).await
     }
 
-    /// Replaces the decl for a child of this realm
+    /// Replaces the decl for a child of this realm. This operation is only
+    /// supported for:
+    ///
+    /// * A component with a local implementation
+    /// * A legacy component
+    /// * A component added with a fragment-only component URL (typically,
+    ///   components bundled in the same package as the realm builder client,
+    ///   sharing the same `/pkg` directory, for example,
+    ///   `#meta/other-component.cm`; see
+    ///   https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
+    /// * An automatically generated realm (such as the root)
     pub async fn replace_component_decl(
         &self,
         name: impl Into<ChildRef>,
