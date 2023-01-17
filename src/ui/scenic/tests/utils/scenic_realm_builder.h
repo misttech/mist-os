@@ -21,14 +21,6 @@ struct ViewProviderConfig {
   std::string component_url;
 };
 
-struct MockComponent {
-  // Name of the mock component.
-  std::string name;
-
-  // The implementation class for the mock component. Must not be a nullptr.
-  component_testing::LocalComponent* impl;
-};
-
 struct RealmBuilderArgs {
   bool use_flatland = true;
   std::optional<ViewProviderConfig> view_provider_config;
@@ -61,9 +53,6 @@ class ScenicRealmBuilder {
   // component. Should be used only for the protocols which are required by the test component.
   // |protocol| must be exposed by one of the components inside the scenic realm.
   ScenicRealmBuilder& AddRealmProtocol(const ProtocolName& protocol);
-
-  // Adds the |mock_component| to the realm topology.
-  ScenicRealmBuilder& AddMockComponent(const MockComponent& mock_component);
 
   // Builds the realm with the provided components and routes and returns the realm root.
   component_testing::RealmRoot Build();

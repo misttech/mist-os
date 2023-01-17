@@ -81,14 +81,6 @@ ScenicRealmBuilder& ScenicRealmBuilder::AddRealmProtocol(const ProtocolName& pro
   return *this;
 }
 
-ScenicRealmBuilder& ScenicRealmBuilder::AddMockComponent(const MockComponent& mock_component) {
-  FX_DCHECK(mock_component.impl != nullptr) << "precondition.";
-
-  realm_builder_.AddLocalChild(mock_component.name, mock_component.impl);
-
-  return *this;
-}
-
 RealmRoot ScenicRealmBuilder::Build() { return realm_builder_.Build(); }
 
 std::string ScenicRealmBuilder::BuildScenicConfig(bool use_flatland) {
