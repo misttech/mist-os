@@ -488,7 +488,7 @@ zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun, scsi_read_capacity_1
   command.opcode = UMS_READ_CAPACITY16;
   // service action = 10, not sure what that means
   command.misc = 0x10;
-  command.length = sizeof(*out_data);
+  command.length = htobe32(sizeof(*out_data));
   SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
 
   // read capacity16 response
