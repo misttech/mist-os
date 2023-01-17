@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <getopt.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

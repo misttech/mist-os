@@ -12,7 +12,8 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/inspect/service/cpp/service.h>

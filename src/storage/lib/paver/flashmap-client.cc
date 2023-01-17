@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.acpi.chromeos/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.vboot/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>

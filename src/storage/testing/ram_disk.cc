@@ -4,7 +4,7 @@
 
 #include "src/storage/testing/ram_disk.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>

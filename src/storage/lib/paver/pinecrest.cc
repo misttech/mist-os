@@ -5,6 +5,7 @@
 #include "src/storage/lib/paver/pinecrest.h"
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 

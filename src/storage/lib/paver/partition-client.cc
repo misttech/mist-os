@@ -4,7 +4,7 @@
 
 #include "src/storage/lib/paver/partition-client.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fzl/vmo-mapper.h>

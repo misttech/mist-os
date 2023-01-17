@@ -12,7 +12,7 @@
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <fuchsia/fs/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>

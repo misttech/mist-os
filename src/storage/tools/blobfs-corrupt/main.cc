@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <getopt.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fd.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>

@@ -5,7 +5,7 @@
 #include "src/storage/lib/paver/astro.h"
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 
 #include <algorithm>

@@ -8,7 +8,8 @@
 #include <fidl/fuchsia.component/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/wire_types.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>

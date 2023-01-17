@@ -4,7 +4,7 @@
 
 #include "src/storage/fs_test/json_filesystem.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <zircon/errors.h>
 
 #include "src/lib/storage/fs_management/cpp/launch.h"

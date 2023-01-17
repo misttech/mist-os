@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <getopt.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>

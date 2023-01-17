@@ -10,7 +10,7 @@
 #include <fidl/fuchsia.hardware.block/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/default.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
 #include <lib/fidl-async/cpp/bind.h>

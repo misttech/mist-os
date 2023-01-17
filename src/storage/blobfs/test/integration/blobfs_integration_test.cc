@@ -14,7 +14,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/default.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>

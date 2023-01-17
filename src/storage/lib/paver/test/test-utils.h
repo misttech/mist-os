@@ -4,7 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_
 #define SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl-utils/bind.h>
 #include <lib/fzl/vmo-mapper.h>
 

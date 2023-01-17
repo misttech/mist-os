@@ -13,7 +13,7 @@
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/abr/abr.h>
 #include <lib/cksum.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>

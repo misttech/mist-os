@@ -4,7 +4,7 @@
 #ifndef SRC_STORAGE_LIB_PAVER_GPT_H_
 #define SRC_STORAGE_LIB_PAVER_GPT_H_
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/function.h>
