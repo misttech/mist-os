@@ -45,7 +45,7 @@ pub fn from_logger(source: MonikerWithUrl, msg: LoggerMessage) -> LogsData {
     let mut builder = LogsDataBuilder::new(BuilderArgs {
         timestamp_nanos: msg.timestamp.into(),
         component_url: Some(source.url),
-        moniker: source.moniker.clone(),
+        moniker: source.moniker,
         severity: msg.severity,
     })
     .set_pid(msg.pid)
@@ -71,7 +71,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
 
     let mut builder = LogsDataBuilder::new(BuilderArgs {
         timestamp_nanos: record.timestamp.into(),
-        component_url: Some(source.url.clone()),
+        component_url: Some(source.url),
         moniker: source.moniker,
         // NOTE: this severity is not final. Severity will be set after parsing the
         // record.arguments
