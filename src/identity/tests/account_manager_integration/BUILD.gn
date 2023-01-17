@@ -42,9 +42,6 @@ rustc_test("test") {
     "tests/account.rs",
     "tests/lib.rs",
   ]
-
-  # For fvm_init()
-  non_rust_deps = [ "//src/lib/storage/fs_management/c" ]
 }
 
 fuchsia_test_component("account_manager_integration_test_component") {
