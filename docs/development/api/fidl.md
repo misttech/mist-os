@@ -1591,6 +1591,30 @@ This section describes several antipatterns: design patterns that often provide
 negative value.  Learning to recognize these patterns is the first step towards
 avoiding using them in the wrong ways.
 
+### Pushed settings: avoid when possible
+
+The Fuchsia platform generally prefers pull semantics.  The [semantics of
+components][fuchsia-components] provide an important example; capabilities are
+assumed to be pulled from components, allowing component startup to be lazy and
+component shutdown ordering to be inferred from the directed graph of capability
+routes.
+
+Designs in which a FIDL protocol is used to push configuration from one
+component to another are tempting because of their apparent simplicity.  This
+arises in cases where component A pushes policy to component B for B's business
+logic.  This causes the platform to misunderstand the dependency relationship: A
+is not automatically started in support of B's function, A may be shut down
+before B has completed the execution of its business logic.  This in turn leads
+to workarounds involving weak dependencies along with phantom reverse
+dependencies to produce the desired behavior; all this is simpler when policy is
+pulled rather than pushed.
+
+When possible, prefer a design in which policy is pulled rather than pushed.
+
+Note: if you find yourself writing a FIDL function of the form `SetXXX`,
+consider if you have ended up in this situation, and whether a pull-oriented
+design would better serve your needs.
+
 ### Client libraries: use with care
 
 Ideally, clients interface with protocols defined in FIDL using
@@ -1749,3 +1773,4 @@ a more idiomatic interface:
 [flexible-lang]: /docs/reference/fidl/language/language.md#strict-vs-flexible
 [flexible-transition]: /docs/development/languages/fidl/guides/compatibility/README.md#strict-flexible
 [unknown-interactions-lang]: /docs/reference/fidl/language/language.md#unknown-interactions
+[fuchsia-components]: /docs/concepts/components/v2/introduction.md
