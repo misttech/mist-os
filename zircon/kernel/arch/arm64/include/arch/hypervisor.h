@@ -114,12 +114,12 @@ class Vcpu {
   Vcpu(const Vcpu&) = delete;
   Vcpu& operator=(const Vcpu&) = delete;
 
-  zx_status_t Enter(zx_port_packet_t& packet);
+  zx::result<> Enter(zx_port_packet_t& packet);
   void Kick();
   void Interrupt(uint32_t vector);
-  zx_status_t ReadState(zx_vcpu_state_t& state) const;
-  zx_status_t WriteState(const zx_vcpu_state_t& state);
-  zx_status_t WriteState(const zx_vcpu_io_t& io_state) { return ZX_ERR_INVALID_ARGS; }
+  zx::result<> ReadState(zx_vcpu_state_t& state) const;
+  zx::result<> WriteState(const zx_vcpu_state_t& state);
+  zx::result<> WriteState(const zx_vcpu_io_t& io_state) { return zx::error(ZX_ERR_INVALID_ARGS); }
 
   void GetInfo(zx_info_vcpu_t* info);
 

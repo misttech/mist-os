@@ -251,10 +251,10 @@ void Vcpu::MigrateCpu(Thread* thread, Thread::MigrateStage stage) {
   }
 }
 
-zx_status_t Vcpu::Enter(zx_port_packet_t& packet) {
+zx::result<> Vcpu::Enter(zx_port_packet_t& packet) {
   Thread* current_thread = Thread::Current::Get();
   if (current_thread != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   const ArchVmAspace& arch_aspace = guest_.AddressSpace().arch_aspace();
@@ -266,7 +266,7 @@ zx_status_t Vcpu::Enter(zx_port_packet_t& packet) {
     // If the thread was killed or suspended, then we should exit with an error.
     status = current_thread->CheckKillOrSuspendSignal();
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     timer_maybe_interrupt(guest_state, &gich_state_);
     gich_maybe_interrupt(&gich_state_, ich_state);
@@ -286,7 +286,7 @@ zx_status_t Vcpu::Enter(zx_port_packet_t& packet) {
       // is fired after we have disabled interrupts, when we enter the guest we
       // will exit due to the interrupt, and run this check again.
       if (kicked_.exchange(false)) {
-        return ZX_ERR_CANCELED;
+        return zx::error(ZX_ERR_CANCELED);
       }
 
       if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
@@ -313,7 +313,7 @@ zx_status_t Vcpu::Enter(zx_port_packet_t& packet) {
       dprintf(INFO, "hypervisor: VCPU enter failed: %d\n", status);
     }
   } while (status == ZX_OK);
-  return status == ZX_ERR_NEXT ? ZX_OK : status;
+  return zx::make_result(status == ZX_ERR_NEXT ? ZX_OK : status);
 }
 
 void Vcpu::Kick() {
@@ -346,28 +346,28 @@ void Vcpu::Interrupt(uint32_t vector) {
   }
 }
 
-zx_status_t Vcpu::ReadState(zx_vcpu_state_t& state) const {
+zx::result<> Vcpu::ReadState(zx_vcpu_state_t& state) const {
   if (Thread::Current::Get() != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   ASSERT(sizeof(state.x) >= sizeof(el2_state_->guest_state.x));
   memcpy(state.x, el2_state_->guest_state.x, sizeof(el2_state_->guest_state.x));
   state.sp = el2_state_->guest_state.system_state.sp_el1;
   state.cpsr = el2_state_->guest_state.system_state.spsr_el2 & kSpsrNzcv;
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Vcpu::WriteState(const zx_vcpu_state_t& state) {
+zx::result<> Vcpu::WriteState(const zx_vcpu_state_t& state) {
   if (Thread::Current::Get() != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   ASSERT(sizeof(el2_state_->guest_state.x) >= sizeof(state.x));
   memcpy(el2_state_->guest_state.x, state.x, sizeof(state.x));
   el2_state_->guest_state.system_state.sp_el1 = state.sp;
   el2_state_->guest_state.system_state.spsr_el2 |= state.cpsr & kSpsrNzcv;
-  return ZX_OK;
+  return zx::ok();
 }
 
 void Vcpu::GetInfo(zx_info_vcpu_t* info) {

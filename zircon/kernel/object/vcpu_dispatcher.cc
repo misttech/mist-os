@@ -67,7 +67,7 @@ VcpuDispatcher::~VcpuDispatcher() { kcounter_add(dispatcher_vcpu_destroy_count, 
 
 zx_status_t VcpuDispatcher::Enter(zx_port_packet_t& packet) {
   canary_.Assert();
-  return vcpu_->Enter(packet);
+  return vcpu_->Enter(packet).status_value();
 }
 
 void VcpuDispatcher::Kick() {
@@ -86,18 +86,18 @@ zx_status_t VcpuDispatcher::Interrupt(uint32_t vector) {
 
 zx_status_t VcpuDispatcher::ReadState(zx_vcpu_state_t& vcpu_state) const {
   canary_.Assert();
-  return vcpu_->ReadState(vcpu_state);
+  return vcpu_->ReadState(vcpu_state).status_value();
 }
 
 zx_status_t VcpuDispatcher::WriteState(const zx_vcpu_state_t& vcpu_state) {
   canary_.Assert();
-  return vcpu_->WriteState(vcpu_state);
+  return vcpu_->WriteState(vcpu_state).status_value();
 }
 
 zx_status_t VcpuDispatcher::WriteState(const zx_vcpu_io_t& io_state) {
   canary_.Assert();
   if (guest_dispatcher_->options() == ZX_GUEST_OPT_NORMAL) {
-    return static_cast<NormalVcpu*>(vcpu_.get())->WriteState(io_state);
+    return static_cast<NormalVcpu*>(vcpu_.get())->WriteState(io_state).status_value();
   }
   return ZX_ERR_INVALID_ARGS;
 }

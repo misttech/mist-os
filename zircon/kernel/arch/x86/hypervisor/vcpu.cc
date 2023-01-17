@@ -888,11 +888,11 @@ zx_status_t vmx_enter(VmxState* vmx_state) {
 }
 
 template <typename PreEnterFn, typename PostExitFn>
-zx_status_t Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
-                                zx_port_packet_t& packet) {
+zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
+                                 zx_port_packet_t& packet) {
   Thread* current_thread = Thread::Current::Get();
   if (current_thread != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   bool extended_registers_loaded = false;
@@ -920,7 +920,7 @@ zx_status_t Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     // If the thread was killed or suspended, then we should exit with an error.
     status = current_thread->CheckKillOrSuspendSignal();
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     AutoVmcs vmcs(vmcs_page_.PhysicalAddress());
 
@@ -937,12 +937,12 @@ zx_status_t Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     // is fired after we have disabled interrupts, when we enter the guest we
     // will exit due to the interrupt, and run this check again.
     if (kicked_.exchange(false)) {
-      return ZX_ERR_CANCELED;
+      return zx::error(ZX_ERR_CANCELED);
     }
 
-    status = pre_enter(vmcs);
-    if (status != ZX_OK) {
-      return status;
+    auto result = pre_enter(vmcs);
+    if (result.is_error()) {
+      return result;
     }
 
     if (!extended_registers_loaded) {
@@ -983,26 +983,26 @@ zx_status_t Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
       dprintf(INFO, "VCPU enter failed: Instruction error %lu\n", error);
     } else {
       vmx_state_.resume = true;
-      status = post_exit(vmcs, packet);
+      status = post_exit(vmcs, packet).status_value();
     }
   } while (status == ZX_OK);
-  return status == ZX_ERR_NEXT ? ZX_OK : status;
+  return zx::make_result(status == ZX_ERR_NEXT ? ZX_OK : status);
 }
 
-zx_status_t Vcpu::ReadState(zx_vcpu_state_t& vcpu_state) {
+zx::result<> Vcpu::ReadState(zx_vcpu_state_t& vcpu_state) {
   if (Thread::Current::Get() != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   register_copy(vcpu_state, vmx_state_.guest_state);
   AutoVmcs vmcs(vmcs_page_.PhysicalAddress());
   vcpu_state.rsp = vmcs.Read(VmcsFieldXX::GUEST_RSP);
   vcpu_state.rflags = vmcs.Read(VmcsFieldXX::GUEST_RFLAGS) & X86_FLAGS_USER;
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Vcpu::WriteState(const zx_vcpu_state_t& vcpu_state) {
+zx::result<> Vcpu::WriteState(const zx_vcpu_state_t& vcpu_state) {
   if (Thread::Current::Get() != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   register_copy(vmx_state_.guest_state, vcpu_state);
   AutoVmcs vmcs(vmcs_page_.PhysicalAddress());
@@ -1012,7 +1012,7 @@ zx_status_t Vcpu::WriteState(const zx_vcpu_state_t& vcpu_state) {
     const uint64_t user_flags = (rflags & ~X86_FLAGS_USER) | (vcpu_state.rflags & X86_FLAGS_USER);
     vmcs.Write(VmcsFieldXX::GUEST_RFLAGS, user_flags);
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 void Vcpu::GetInfo(zx_info_vcpu_t* info) {
@@ -1104,21 +1104,23 @@ NormalVcpu::~NormalVcpu() {
   DEBUG_ASSERT(result.is_ok());
 }
 
-zx_status_t NormalVcpu::Enter(zx_port_packet_t& packet) {
-  auto pre_enter = [this](AutoVmcs& vmcs) {
+zx::result<> NormalVcpu::Enter(zx_port_packet_t& packet) {
+  auto pre_enter = [this](AutoVmcs& vmcs) -> zx::result<> {
     zx_status_t status = local_apic_maybe_interrupt(&vmcs, &local_apic_state_);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     // Updates guest system time if the guest subscribed to updates.
     auto& guest = static_cast<NormalGuest&>(guest_);
     pv_clock_update_system_time(&pv_clock_state_, &guest.PhysicalAspace());
-    return ZX_OK;
+    return zx::ok();
   };
-  auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) {
+  auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) -> zx::result<> {
     auto& guest = static_cast<NormalGuest&>(guest_);
-    return vmexit_handler_normal(vmcs, vmx_state_.guest_state, local_apic_state_, pv_clock_state_,
-                                 guest.PhysicalAspace(), guest.Traps(), packet);
+    zx_status_t status =
+        vmexit_handler_normal(vmcs, vmx_state_.guest_state, local_apic_state_, pv_clock_state_,
+                              guest.PhysicalAspace(), guest.Traps(), packet);
+    return zx::make_result(status);
   };
   return EnterInternal(ktl::move(pre_enter), ktl::move(post_exit), packet);
 }
@@ -1139,16 +1141,16 @@ void NormalVcpu::Interrupt(uint32_t vector) {
   interrupt_cpu(thread_.load(), last_cpu_);
 }
 
-zx_status_t NormalVcpu::WriteState(const zx_vcpu_io_t& io_state) {
+zx::result<> NormalVcpu::WriteState(const zx_vcpu_io_t& io_state) {
   if (Thread::Current::Get() != thread_) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   if ((io_state.access_size != 1) && (io_state.access_size != 2) && (io_state.access_size != 4)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   static_assert(sizeof(vmx_state_.guest_state.rax) >= 4);
   memcpy(&vmx_state_.guest_state.rax, io_state.data, io_state.access_size);
-  return ZX_OK;
+  return zx::ok();
 }
 
 // static
@@ -1181,22 +1183,23 @@ zx::result<ktl::unique_ptr<Vcpu>> DirectVcpu::Create(DirectGuest& guest, zx_vadd
 DirectVcpu::DirectVcpu(DirectGuest& guest, uint16_t vpid, Thread* thread)
     : Vcpu(guest, vpid, thread) {}
 
-zx_status_t DirectVcpu::Enter(zx_port_packet_t& packet) {
-  auto pre_enter = [this](AutoVmcs& vmcs) mutable {
+zx::result<> DirectVcpu::Enter(zx_port_packet_t& packet) {
+  auto pre_enter = [this](AutoVmcs& vmcs) mutable -> zx::result<> {
     if (fs_base_ != 0) {
       vmcs.Write(VmcsFieldXX::GUEST_FS_BASE, fs_base_);
       fs_base_ = 0;
     }
-    return ZX_OK;
+    return zx::ok();
   };
-  auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) {
-    return vmexit_handler_direct(vmcs, vmx_state_.guest_state, fs_base_, packet);
+  auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) -> zx::result<> {
+    zx_status_t status = vmexit_handler_direct(vmcs, vmx_state_.guest_state, fs_base_, packet);
+    return zx::make_result(status);
   };
   auto& shared_aspace = static_cast<DirectGuest&>(guest_).SharedAspace();
   VmAspace& host_aspace = hypervisor::switch_aspace(shared_aspace);
-  zx_status_t status = EnterInternal(ktl::move(pre_enter), ktl::move(post_exit), packet);
+  auto result = EnterInternal(ktl::move(pre_enter), ktl::move(post_exit), packet);
   hypervisor::switch_aspace(host_aspace);
-  return status;
+  return result;
 }
 
 void DirectVcpu::Kick() {

@@ -117,10 +117,10 @@ class Vcpu {
 
   virtual ~Vcpu();
 
-  virtual zx_status_t Enter(zx_port_packet_t& packet) = 0;
+  virtual zx::result<> Enter(zx_port_packet_t& packet) = 0;
   virtual void Kick() = 0;
-  zx_status_t ReadState(zx_vcpu_state_t& vcpu_state);
-  zx_status_t WriteState(const zx_vcpu_state_t& vcpu_state);
+  zx::result<> ReadState(zx_vcpu_state_t& vcpu_state);
+  zx::result<> WriteState(const zx_vcpu_state_t& vcpu_state);
 
   void GetInfo(zx_info_vcpu_t* info);
 
@@ -135,10 +135,10 @@ class Vcpu {
   void LoadExtendedRegisters(AutoVmcs& vmcs);
   void SaveExtendedRegisters(AutoVmcs& vmcs);
 
-  // `PreEnterFn` must have type `(AutoVmcs&) -> zx_status_t`
-  // `PostExitFn` must have type `(AutoVmcs&, zx_port_packet_t&) -> zx_status_t`
+  // `PreEnterFn` must have type `(AutoVmcs&) -> zx::result<>`
+  // `PostExitFn` must have type `(AutoVmcs&, zx_port_packet_t&) -> zx::result<>`
   template <typename PreEnterFn, typename PostExitFn>
-  zx_status_t EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit, zx_port_packet_t& packet);
+  zx::result<> EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit, zx_port_packet_t& packet);
 
   Guest& guest_;
   const uint16_t vpid_;
@@ -206,10 +206,10 @@ class NormalVcpu : public Vcpu {
   NormalVcpu(NormalGuest& guest, uint16_t vpid, Thread* thread);
   ~NormalVcpu() override;
 
-  zx_status_t Enter(zx_port_packet_t& packet) override;
+  zx::result<> Enter(zx_port_packet_t& packet) override;
   void Kick() override;
   void Interrupt(uint32_t vector);
-  zx_status_t WriteState(const zx_vcpu_io_t& io_state);
+  zx::result<> WriteState(const zx_vcpu_io_t& io_state);
 
  private:
   LocalApicState local_apic_state_;
@@ -228,7 +228,7 @@ class DirectVcpu : public Vcpu {
 
   DirectVcpu(DirectGuest& guest, uint16_t vpid, Thread* thread);
 
-  zx_status_t Enter(zx_port_packet_t& packet) override;
+  zx::result<> Enter(zx_port_packet_t& packet) override;
   void Kick() override;
 
  private:
