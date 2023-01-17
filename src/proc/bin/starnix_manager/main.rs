@@ -220,7 +220,7 @@ fn generate_kernel_name(name: &str) -> String {
 /// the init task completes).
 async fn create_new_kernel(
     kernels_dir: &vfs::directory::immutable::Simple,
-    component_start_info: frunner::ComponentStartInfo,
+    mut component_start_info: frunner::ComponentStartInfo,
     controller: ServerEnd<frunner::ComponentControllerMarker>,
 ) -> Result<(), Error> {
     // The name of the collection that the starnix_kernel is run in.
@@ -232,15 +232,31 @@ async fn create_new_kernel(
     // The name of the directory as seen by the starnix_kernel.
     const CONFIG_DIRECTORY: &str = "galaxy_config";
 
-    // Create a new configuration directory for the starnix_kernel instance.
-    let kernel_name = generate_kernel_config_directory(kernels_dir, component_start_info)?;
-
     // Pass the component_controller for the galaxy to the starnix_kernel as handle `User0`.
     let controller_handle_info = fprocess::HandleInfo {
         handle: controller.into_channel().into_handle(),
-        id: HandleInfo::new(HandleType::User0, 0).as_raw(),
+        id: kernel_config::COMPONENT_CONTROLLER_HANDLE_INFO.as_raw(),
     };
-    let numbered_handles = vec![controller_handle_info];
+
+    // Grab the /pkg directory of the galaxy component, and pass it to the starnix_kernel as handle
+    // `User1`.
+    let mut ns = component_start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
+    let pkg = ns
+        .iter_mut()
+        .find(|entry| entry.path == Some("/pkg".to_string()))
+        .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?
+        .directory
+        .take()
+        .ok_or_else(|| anyhow!("Missing directory handle in pkg namespace entry"))?;
+
+    let pkg_handle_info = fprocess::HandleInfo {
+        handle: pkg.into_channel().into_handle(),
+        id: HandleInfo::new(HandleType::User1, 0).as_raw(),
+    };
+    let numbered_handles = vec![controller_handle_info, pkg_handle_info];
+
+    // Create a new configuration directory for the starnix_kernel instance.
+    let kernel_name = generate_kernel_config_directory(kernels_dir, component_start_info)?;
 
     // Create a new instance of starnix_kernel in the kernel collection. Offer the directory that
     // contains all the configuration information for the galaxy that it is running.
@@ -284,28 +300,15 @@ async fn create_new_kernel(
 
 /// Creates a new subdirectory in `kernels_dir`, named after the galaxy being created.
 ///
-/// This directory is populated with the galaxy's `/pkg` directory and `program` block.
+/// This directory is populated with a file containing the galaxy's `program` block.
 ///
 /// Returns the name of the newly created directory.
 fn generate_kernel_config_directory(
     kernels_dir: &vfs::directory::immutable::Simple,
-    mut component_start_info: ComponentStartInfo,
+    component_start_info: ComponentStartInfo,
 ) -> Result<String, Error> {
-    // The name of the directory that contains the galaxy's /pkg.
-    const PKG_DIRECTORY: &str = "pkg";
     // The name of the file that the starnix_kernel's configuration is written to.
     const CONFIG_FILE: &str = "config";
-
-    // Grab the /pkg directory of the galaxy component. This will be provided to the starnix_kernel.
-    let mut ns = component_start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
-    let pkg = ns
-        .iter_mut()
-        .find(|entry| entry.path == Some("/pkg".to_string()))
-        .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?
-        .directory
-        .take()
-        .ok_or_else(|| anyhow!("Missing directory handle in pkg namespace entry"))?
-        .into_proxy()?;
 
     let mut program_block =
         component_start_info.program.ok_or(anyhow!("Missing program block in galaxy."))?;
@@ -316,7 +319,6 @@ fn generate_kernel_config_directory(
 
     let kernel_config_dir = vfs::directory::immutable::simple();
     kernel_config_dir.add_entry(CONFIG_FILE, kernel_config_file)?;
-    kernel_config_dir.add_entry(PKG_DIRECTORY, vfs::remote::remote_dir(pkg))?;
 
     // This particular starnix_kernel's configuration directory is stored in the `kernels_dir`. We
     // then offer a subdirectory of said directory to the starnix_kernel.

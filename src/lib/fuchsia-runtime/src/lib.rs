@@ -223,7 +223,7 @@ impl HandleInfo {
     /// the respective handle as file descriptor 32.
     ///
     /// Corresponds to PA_HND in processargs.h.
-    pub fn new(htype: HandleType, arg: u16) -> Self {
+    pub const fn new(htype: HandleType, arg: u16) -> Self {
         HandleInfo { htype, arg }
     }
 
