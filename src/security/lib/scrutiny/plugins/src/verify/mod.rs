@@ -396,11 +396,11 @@ mod tests {
         let child_name = "child".to_string();
         let missing_child_name = "missing_child".to_string();
 
-        let good_dir_name = CapabilityName("good_dir".to_string());
-        let bad_dir_name = CapabilityName("bad_dir".to_string());
+        let good_dir_name = CapabilityName::from("good_dir");
+        let bad_dir_name = CapabilityName::from("bad_dir");
         let offer_rights = fio::Operations::CONNECT;
 
-        let protocol_name = CapabilityName("protocol".to_string());
+        let protocol_name = CapabilityName::from("protocol");
 
         let root_offer_good_dir = new_offer_directory_decl(
             OfferSource::Self_,

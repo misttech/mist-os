@@ -1012,9 +1012,9 @@ mod tests {
             .expect("piconet member had no decl");
         let expose_profile_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
-            source_name: CapabilityName(profile_capability_name.clone()),
+            source_name: profile_capability_name.clone().into(),
             target: ExposeTarget::Parent,
-            target_name: CapabilityName(profile_capability_name.clone()),
+            target_name: profile_capability_name.clone().into(),
         };
         let expose_decl = ExposeDecl::Protocol(expose_profile_decl.clone());
         assert!(pico_member_decl.exposes.contains(&expose_decl));
@@ -1022,14 +1022,14 @@ mod tests {
         // Root should have an expose declaration for `Profile` at the custom path.
         {
             let bt_rfcomm_name = super::bt_rfcomm_moniker_for_member(&member_spec.name);
-            let custom_profile_capability_name = CapabilityName(super::capability_path_for_mock::<
-                bredr::ProfileMarker,
-            >(&member_spec));
+            let custom_profile_capability_name = CapabilityName::from(
+                super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec),
+            );
             let custom_expose_profile_decl = ExposeProtocolDecl {
                 source: ExposeSource::Child(bt_rfcomm_name),
-                source_name: CapabilityName(profile_capability_name.to_string()),
+                source_name: profile_capability_name.into(),
                 target: ExposeTarget::Parent,
-                target_name: CapabilityName(custom_profile_capability_name.to_string()),
+                target_name: custom_profile_capability_name.into(),
             };
             let root_expose_decl = ExposeDecl::Protocol(custom_expose_profile_decl);
             let root = builder.get_realm_decl().await.expect("failed to get root");
@@ -1046,8 +1046,9 @@ mod tests {
             .get_component_decl(member_spec.name.clone())
             .await
             .expect("piconet member had no decl");
-        let profile_capability_name =
-            CapabilityName(super::capability_path_for_mock::<bredr::ProfileMarker>(&member_spec));
+        let profile_capability_name = CapabilityName::from(super::capability_path_for_mock::<
+            bredr::ProfileMarker,
+        >(&member_spec));
         let mut expose_proto_decl = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
@@ -1088,7 +1089,7 @@ mod tests {
             .expect("piconet member had no decl");
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: CapabilityName(bredr::ProfileTestMarker::PROTOCOL_NAME.to_string()),
+            source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
             target_path: CapabilityPath {
                 dirname: "/svc".to_string(),
                 basename: bredr::ProfileTestMarker::PROTOCOL_NAME.to_string(),
@@ -1100,7 +1101,7 @@ mod tests {
 
         // Check that the root offers ProfileTest to the piconet member from
         // the Mock Piconet Server
-        let profile_test_name = CapabilityName(bredr::ProfileTestMarker::PROTOCOL_NAME.to_string());
+        let profile_test_name = CapabilityName::from(bredr::ProfileTestMarker::PROTOCOL_NAME);
         let root = builder.get_realm_decl().await.expect("failed to get root");
         let offer_profile_test = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child(super::mock_piconet_server_moniker().to_string()),
@@ -1140,8 +1141,7 @@ mod tests {
         // validate routes
 
         // Profile is exposed by interposer
-        let profile_capability_name =
-            CapabilityName(bredr::ProfileMarker::PROTOCOL_NAME.to_string());
+        let profile_capability_name = CapabilityName::from(bredr::ProfileMarker::PROTOCOL_NAME);
         let profile_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: profile_capability_name.clone(),
@@ -1156,7 +1156,7 @@ mod tests {
         assert!(interposer.exposes.contains(&profile_expose));
 
         // ProfileTest is used by interposer
-        let profile_test_name = CapabilityName(bredr::ProfileTestMarker::PROTOCOL_NAME.to_string());
+        let profile_test_name = CapabilityName::from(bredr::ProfileTestMarker::PROTOCOL_NAME);
         let profile_test_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
@@ -1193,7 +1193,7 @@ mod tests {
         assert!(root.offers.contains(&profile_test_offer));
 
         // LogSink is offered by test root to interposer and profile.
-        let log_capability_name = CapabilityName(LogSinkMarker::PROTOCOL_NAME.to_string());
+        let log_capability_name = CapabilityName::from(LogSinkMarker::PROTOCOL_NAME);
         let log_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: log_capability_name.clone(),
@@ -1233,8 +1233,7 @@ mod tests {
         assert_realm_contains(&test_harness.builder, &bt_rfcomm_name).await;
 
         // validate routes
-        let profile_capability_name =
-            CapabilityName(bredr::ProfileMarker::PROTOCOL_NAME.to_string());
+        let profile_capability_name = CapabilityName::from(bredr::ProfileMarker::PROTOCOL_NAME);
 
         // `Profile` is offered by root to bt-rfcomm from interposer.
         let profile_offer1 = OfferDecl::Protocol(OfferProtocolDecl {

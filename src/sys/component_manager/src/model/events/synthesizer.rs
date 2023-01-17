@@ -69,7 +69,7 @@ impl EventSynthesizer {
         event: EventType,
         provider: Arc<dyn EventSynthesisProvider>,
     ) {
-        self.providers.insert(CapabilityName(event.to_string()), provider);
+        self.providers.insert(event.to_string().into(), provider);
     }
 
     /// Spawns a synthesis task for the requested `events`. Resulting events will be sent on the

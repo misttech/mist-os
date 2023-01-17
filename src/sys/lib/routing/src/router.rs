@@ -647,7 +647,7 @@ where
         }
     }
     let (source_name, offer_service_decls) = offer_decls.iter().fold(
-        (CapabilityName("".to_string()), Vec::<OfferServiceDecl>::new()),
+        ("".into(), Vec::<OfferServiceDecl>::new()),
         |(_, mut decls), o| {
             if let OfferDecl::Service(offer_service_decl) = o.clone().into() {
                 decls.push(offer_service_decl);

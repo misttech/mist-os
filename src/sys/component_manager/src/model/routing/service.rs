@@ -764,7 +764,7 @@ impl CollectionServiceDirectory {
         })
         .await?;
         let dirents = fuchsia_fs::directory::readdir(&proxy).await.map_err(|e| {
-            error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&CapabilityName("".to_string())), e);
+            error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);
             ModelError::open_directory_error(target.abs_moniker.clone(), component_name)
         })?;
         for dirent in dirents {

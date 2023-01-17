@@ -142,10 +142,10 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
     }
 
     fn register_mock_builtin_runner(&mut self, runner: &str) {
-        let runner_name = CapabilityName(runner.into());
+        let runner_name = CapabilityName::from(runner);
         self.builtin_runner_registrations.push(RunnerRegistration {
             source_name: runner_name.clone(),
-            target_name: runner_name.clone(),
+            target_name: runner_name,
             source: RegistrationSource::Self_,
         });
     }
@@ -1214,7 +1214,7 @@ mod tests {
             })))
                 if moniker == *b_component.abs_moniker() &&
                 capability_type == "runner" &&
-                capability_name == CapabilityName("hobbit".to_string())
+                capability_name == CapabilityName::from("hobbit")
         );
     }
 

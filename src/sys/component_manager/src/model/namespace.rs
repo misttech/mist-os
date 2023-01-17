@@ -115,7 +115,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     &s.target_path,
                     component.clone(),
                 );
-                if s.source_name.0 == LogSinkMarker::PROTOCOL_NAME {
+                if s.source_name == LogSinkMarker::PROTOCOL_NAME {
                     log_sink_decl = Some(s.clone());
                 }
             }

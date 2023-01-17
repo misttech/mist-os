@@ -653,9 +653,9 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .add_lazy_child("a")
                     .storage(StorageDecl {
-                        name: CapabilityName("data".to_string()),
+                        name: "data".into(),
                         source: StorageDirectorySource::Child("a".to_string()),
-                        backing_dir: CapabilityName("fs".to_string()),
+                        backing_dir: "fs".into(),
                         subdir: Some("persistent".into()),
                         storage_id:
                             fidl_fuchsia_component_decl::StorageId::StaticInstanceIdOrMoniker,
@@ -666,7 +666,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
-                        name: CapabilityName("fs".to_string()),
+                        name: "fs".into(),
                         source_path: Some(CapabilityPath {
                             basename: "data".to_string(),
                             dirname: "/fs".to_string(),
@@ -674,8 +674,8 @@ mod tests {
                         rights: Operations::all(),
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: CapabilityName("fs".to_string()),
-                        target_name: CapabilityName("fs".to_string()),
+                        source_name: "fs".into(),
+                        target_name: "fs".into(),
                         subdir: None,
                         source: ExposeSource::Self_,
                         target: ExposeTarget::Parent,

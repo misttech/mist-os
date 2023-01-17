@@ -611,12 +611,12 @@ async fn get_realm(
     let mut debug_data_decl = wrapper_realm.get_component_decl(&debug_data).await?;
     debug_data_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
         source: cm_rust::ExposeSource::Self_,
-        source_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+        source_name: "fuchsia.debugdata.Publisher".into(),
         target: cm_rust::ExposeTarget::Parent,
-        target_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+        target_name: "fuchsia.debugdata.Publisher".into(),
     }));
     debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
-        name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+        name: "fuchsia.debugdata.Publisher".into(),
         source_path: Some(cm_rust::CapabilityPath {
             dirname: String::from("/svc"),
             basename: String::from("fuchsia.debugdata.Publisher"),
@@ -630,14 +630,14 @@ async fn get_realm(
     hermetic_resolver_decl.exposes.push(cm_rust::ExposeDecl::Resolver(
         cm_rust::ExposeResolverDecl {
             source: cm_rust::ExposeSource::Self_,
-            source_name: cm_rust::CapabilityName(String::from(HERMETIC_RESOLVER_CAPABILITY_NAME)),
+            source_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             target: cm_rust::ExposeTarget::Parent,
-            target_name: cm_rust::CapabilityName(String::from(HERMETIC_RESOLVER_CAPABILITY_NAME)),
+            target_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
         },
     ));
     hermetic_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(
         cm_rust::ResolverDecl {
-            name: cm_rust::CapabilityName(String::from(HERMETIC_RESOLVER_CAPABILITY_NAME)),
+            name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             source_path: Some(cm_rust::CapabilityPath {
                 dirname: String::from("/svc"),
                 basename: String::from("fuchsia.component.resolution.Resolver"),
@@ -655,7 +655,7 @@ async fn get_realm(
         name: String::from(TEST_ENVIRONMENT_NAME),
         extends: fdecl::EnvironmentExtends::Realm,
         resolvers: vec![cm_rust::ResolverRegistration {
-            resolver: cm_rust::CapabilityName(String::from(HERMETIC_RESOLVER_CAPABILITY_NAME)),
+            resolver: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             source: cm_rust::RegistrationSource::Child(String::from(
                 HERMETIC_RESOLVER_CAPABILITY_NAME,
             )),
@@ -664,9 +664,9 @@ async fn get_realm(
         runners: vec![],
         debug_capabilities: vec![cm_rust::DebugRegistration::Protocol(
             cm_rust::DebugProtocolRegistration {
-                source_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+                source_name: "fuchsia.debugdata.Publisher".into(),
                 source: cm_rust::RegistrationSource::Child(DEBUG_DATA_REALM_NAME.to_string()),
-                target_name: cm_rust::CapabilityName(String::from("fuchsia.debugdata.Publisher")),
+                target_name: "fuchsia.debugdata.Publisher".into(),
             },
         )],
         stop_timeout_ms: None,

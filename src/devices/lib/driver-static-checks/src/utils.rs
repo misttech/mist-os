@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use cm_rust::{CapabilityName, ComponentDecl, FidlIntoNative, ProgramDecl};
+use cm_rust::{ComponentDecl, FidlIntoNative, ProgramDecl};
 use fidl::encoding::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_data as fdata;
@@ -30,7 +30,7 @@ pub fn find_driver_components(far_reader: &mut FarReader) -> Result<Vec<(Compone
 }
 
 pub fn is_driver_component(component: &ComponentDecl) -> bool {
-    if let Some(ProgramDecl { runner: Some(CapabilityName(runner)), .. }) = &component.program {
+    if let Some(ProgramDecl { runner: Some(runner), .. }) = &component.program {
         runner == "driver"
     } else {
         false

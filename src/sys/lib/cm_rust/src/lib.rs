@@ -28,9 +28,9 @@ use serde::{Deserialize, Serialize};
 mod serde_ext;
 
 lazy_static! {
-    static ref DATA_TYPENAME: CapabilityName = CapabilityName("Data".to_string());
-    static ref CACHE_TYPENAME: CapabilityName = CapabilityName("Cache".to_string());
-    static ref META_TYPENAME: CapabilityName = CapabilityName("Meta".to_string());
+    static ref DATA_TYPENAME: CapabilityName = CapabilityName::from("Data");
+    static ref CACHE_TYPENAME: CapabilityName = CapabilityName::from("Cache");
+    static ref META_TYPENAME: CapabilityName = CapabilityName::from("Meta");
 }
 
 /// Converts a fidl object into its corresponding native representation.
@@ -1607,7 +1607,7 @@ impl SourceName for UseDecl {
 /// of hierarchy.
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct CapabilityName(pub String);
+pub struct CapabilityName(String);
 
 impl CapabilityName {
     pub fn str(&self) -> &str {
@@ -1633,15 +1633,33 @@ impl From<String> for CapabilityName {
     }
 }
 
+impl From<&String> for CapabilityName {
+    fn from(name: &String) -> CapabilityName {
+        CapabilityName(name.clone())
+    }
+}
+
 impl From<cm_types::Name> for CapabilityName {
     fn from(name: cm_types::Name) -> CapabilityName {
         name.as_str().into()
     }
 }
 
+impl PartialEq<str> for CapabilityName {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
 impl<'a> PartialEq<&'a str> for CapabilityName {
     fn eq(&self, other: &&'a str) -> bool {
         self.0 == *other
+    }
+}
+
+impl PartialEq<String> for CapabilityName {
+    fn eq(&self, other: &String) -> bool {
+        self.0 == other.as_str()
     }
 }
 
@@ -2899,10 +2917,10 @@ mod tests {
                         ExposeDecl::EventStream (
                             ExposeEventStreamDecl {
                                 source: ExposeSource::Self_,
-                                source_name: CapabilityName::from("diagnostics_ready".to_string()),
+                                source_name: CapabilityName::from("diagnostics_ready"),
                                 target: ExposeTarget::Parent,
                                 scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".to_string(), collection: None})]),
-                                target_name: CapabilityName::from("diagnostics_ready".to_string()),
+                                target_name: CapabilityName::from("diagnostics_ready"),
                             }
                         )
                     ],
@@ -2982,10 +3000,10 @@ mod tests {
                         OfferDecl::EventStream (
                             OfferEventStreamDecl {
                                 source: OfferSource::Parent,
-                                source_name: CapabilityName::from("diagnostics_ready".to_string()),
+                                source_name: CapabilityName::from("diagnostics_ready"),
                                 target: OfferTarget::Child(ChildRef{name: "netstack".to_string(), collection: None}),
                                 scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".to_string(), collection: None})]),
-                                target_name: CapabilityName::from("diagnostics_ready".to_string()),
+                                target_name: CapabilityName::from("diagnostics_ready"),
                                 filter: None,
                                 availability: Availability::Optional,
                             }
@@ -3173,7 +3191,7 @@ mod tests {
                 UseSource::Parent,
                 UseSource::Framework,
                 UseSource::Debug,
-                UseSource::Capability(CapabilityName("capability".to_string())),
+                UseSource::Capability(CapabilityName::from("capability")),
                 UseSource::Child("foo".to_string()),
             ],
             result_type = UseSource,
@@ -3215,7 +3233,7 @@ mod tests {
                 OfferSource::Self_,
                 OfferSource::static_child("foo".to_string()),
                 OfferSource::Framework,
-                OfferSource::Capability(CapabilityName("foo".to_string())),
+                OfferSource::Capability(CapabilityName::from("foo")),
                 OfferSource::Parent,
                 OfferSource::Collection("foo".to_string()),
                 OfferSource::Void,

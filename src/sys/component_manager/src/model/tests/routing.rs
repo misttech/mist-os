@@ -1534,9 +1534,9 @@ async fn use_runner_from_grandparent_environment() {
                 .add_lazy_child("b")
                 .offer(OfferDecl::Runner(OfferRunnerDecl {
                     source: OfferSource::Self_,
-                    source_name: CapabilityName("elf".to_string()),
+                    source_name: "elf".into(),
                     target: OfferTarget::static_child("b".to_string()),
-                    target_name: CapabilityName("dwarf".to_string()),
+                    target_name: "dwarf".into(),
                 }))
                 .runner(RunnerDecl {
                     name: "elf".into(),
@@ -1621,9 +1621,9 @@ async fn use_runner_from_sibling_environment() {
             ComponentDeclBuilder::new()
                 .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                     source: ExposeSource::Self_,
-                    source_name: CapabilityName("elf".to_string()),
+                    source_name: "elf".into(),
                     target: ExposeTarget::Parent,
-                    target_name: CapabilityName("dwarf".to_string()),
+                    target_name: "dwarf".into(),
                 }))
                 .runner(RunnerDecl {
                     name: "elf".into(),
@@ -1921,7 +1921,7 @@ async fn use_runner_from_environment_not_found() {
         })
         if moniker == AbsoluteMoniker::try_from(vec!["b"]).unwrap() &&
         capability_type == "runner" &&
-        capability_name == CapabilityName("hobbit".to_string()));
+        capability_name == "hobbit");
 }
 
 // TODO: Write a test for environment that extends from None. Currently, this is not
@@ -2568,7 +2568,7 @@ async fn route_service_from_parent_collection() {
         }) => {
             assert_eq!(collection_name, "coll");
             assert_matches!(capability, AggregateCapability::Service(_));
-            assert_eq!(*capability.source_name(), CapabilityName("foo".into()));
+            assert_eq!(*capability.source_name(), "foo");
             assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
         }
         _ => panic!("bad capability source"),
@@ -2699,7 +2699,7 @@ async fn list_service_instances_from_collection() {
             capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
             component,
         } => {
-            assert_eq!(name, CapabilityName("foo".into()));
+            assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),
                 "/svc/foo".parse::<CapabilityPath>().unwrap()

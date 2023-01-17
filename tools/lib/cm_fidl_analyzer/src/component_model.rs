@@ -1578,7 +1578,7 @@ mod tests {
         let mut config = RuntimeConfig::default();
         config.builtin_boot_resolver = component_internal::BuiltinBootResolver::Boot;
 
-        let builtin_runner_name = CapabilityName("builtin_runner".into());
+        let builtin_runner_name = CapabilityName::from("builtin_runner");
         let builtin_runner_registration = RunnerRegistration {
             source_name: builtin_runner_name.clone(),
             source: RegistrationSource::Self_,

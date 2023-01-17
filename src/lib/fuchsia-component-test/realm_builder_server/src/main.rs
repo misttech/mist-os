@@ -3257,7 +3257,7 @@ mod tests {
                 }),
                 cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
                     source: cm_rust::UseSource::Parent,
-                    source_name: cm_rust::CapabilityName("fuchsia.examples.Orca".to_owned()),
+                    source_name: "fuchsia.examples.Orca".into(),
                     target_path: "/svc/fuchsia.examples.Orca".try_into().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
@@ -3560,12 +3560,12 @@ mod tests {
                             name: "a".to_owned(),
                             collection: None,
                         }),
-                        source_name: cm_rust::CapabilityName("fuchsia.examples.Hippo".to_owned()),
+                        source_name: "fuchsia.examples.Hippo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "b".to_owned(),
                             collection: None,
                         }),
-                        target_name: cm_rust::CapabilityName("fuchsia.examples.Hippo".to_owned()),
+                        target_name: "fuchsia.examples.Hippo".into(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3574,12 +3574,12 @@ mod tests {
                             name: "a".to_owned(),
                             collection: None,
                         }),
-                        source_name: cm_rust::CapabilityName("fuchsia.examples.Hippo".to_owned()),
+                        source_name: "fuchsia.examples.Hippo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "c".to_owned(),
                             collection: None,
                         }),
-                        target_name: cm_rust::CapabilityName("fuchsia.examples.Hippo".to_owned()),
+                        target_name: "fuchsia.examples.Hippo".into(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3613,7 +3613,7 @@ mod tests {
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
-                                name: cm_rust::CapabilityName("fuchsia.examples.Hippo".to_owned()),
+                                name: "fuchsia.examples.Hippo".into(),
                                 source_path: Some(cm_rust::CapabilityPath {
                                     dirname: "/svc".to_owned(),
                                     basename: "fuchsia.examples.Hippo".to_owned(),
@@ -3622,13 +3622,9 @@ mod tests {
                         )],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                             source: cm_rust::ExposeSource::Self_,
-                            source_name: cm_rust::CapabilityName(
-                                "fuchsia.examples.Hippo".to_owned(),
-                            ),
+                            source_name: "fuchsia.examples.Hippo".into(),
                             target: cm_rust::ExposeTarget::Parent,
-                            target_name: cm_rust::CapabilityName(
-                                "fuchsia.examples.Hippo".to_owned(),
-                            ),
+                            target_name: "fuchsia.examples.Hippo".into(),
                         })],
                         ..cm_rust::ComponentDecl::default()
                     },
@@ -3708,12 +3704,12 @@ mod tests {
                             name: "a".to_owned(),
                             collection: None,
                         }),
-                        source_name: cm_rust::CapabilityName("fuchsia.examples.Echo".to_owned()),
+                        source_name: "fuchsia.examples.Echo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "b".to_owned(),
                             collection: None,
                         }),
-                        target_name: cm_rust::CapabilityName("fuchsia.examples.Echo".to_owned()),
+                        target_name: "fuchsia.examples.Echo".into(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3722,16 +3718,12 @@ mod tests {
                             name: "c".to_owned(),
                             collection: None,
                         }),
-                        source_name: cm_rust::CapabilityName(
-                            "fuchsia.examples.RandonNumberGenerator".to_owned(),
-                        ),
+                        source_name: "fuchsia.examples.RandonNumberGenerator".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "a".to_owned(),
                             collection: None,
                         }),
-                        target_name: cm_rust::CapabilityName(
-                            "fuchsia.examples.RandonNumberGenerator".to_owned(),
-                        ),
+                        target_name: "fuchsia.examples.RandonNumberGenerator".into(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -3765,7 +3757,7 @@ mod tests {
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
-                                name: cm_rust::CapabilityName("fuchsia.examples.Echo".to_owned()),
+                                name: "fuchsia.examples.Echo".into(),
                                 source_path: Some(cm_rust::CapabilityPath {
                                     dirname: "/svc".to_owned(),
                                     basename: "fuchsia.examples.Echo".to_owned(),
@@ -3774,9 +3766,7 @@ mod tests {
                         )],
                         uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                             source: cm_rust::UseSource::Parent,
-                            source_name: cm_rust::CapabilityName(
-                                "fuchsia.examples.RandonNumberGenerator".to_owned(),
-                            ),
+                            source_name: "fuchsia.examples.RandonNumberGenerator".into(),
                             target_path: cm_rust::CapabilityPath {
                                 dirname: "/svc".to_owned(),
                                 basename: "fuchsia.examples.RandonNumberGenerator".to_owned(),
@@ -3786,13 +3776,9 @@ mod tests {
                         })],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                             source: cm_rust::ExposeSource::Self_,
-                            source_name: cm_rust::CapabilityName(
-                                "fuchsia.examples.Echo".to_owned(),
-                            ),
+                            source_name: "fuchsia.examples.Echo".into(),
                             target: cm_rust::ExposeTarget::Parent,
-                            target_name: cm_rust::CapabilityName(
-                                "fuchsia.examples.Echo".to_owned(),
-                            ),
+                            target_name: "fuchsia.examples.Echo".into(),
                         })],
                         ..cm_rust::ComponentDecl::default()
                     },

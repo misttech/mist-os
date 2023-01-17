@@ -90,9 +90,9 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
         }),
         exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
-            source_name: CapabilityName(fcomponent::BinderMarker::DEBUG_NAME.to_owned()),
+            source_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
             target: ExposeTarget::Parent,
-            target_name: CapabilityName(fcomponent::BinderMarker::DEBUG_NAME.to_owned()),
+            target_name: fcomponent::BinderMarker::DEBUG_NAME.into(),
         })],
         ..Default::default()
     }
@@ -2225,7 +2225,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: AggregateCapability::Service(name),
                 ..
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
             }
             _ => panic!("bad capability source"),
         };
@@ -4466,7 +4466,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<CapabilityPath>().unwrap()
@@ -4530,7 +4530,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<CapabilityPath>().unwrap()
@@ -4607,7 +4607,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<CapabilityPath>().unwrap()
@@ -4688,7 +4688,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source_instance_filter,
                 instance_name_source_to_target,
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<CapabilityPath>().unwrap()
@@ -4781,7 +4781,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source_instance_filter,
                 instance_name_source_to_target,
             }) => {
-                assert_eq!(name, CapabilityName("foo".into()));
+                assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<CapabilityPath>().unwrap()
@@ -4846,7 +4846,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/runner".parse::<CapabilityPath>().unwrap()
@@ -4875,9 +4875,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .add_lazy_child("b")
                     .offer(OfferDecl::Runner(OfferRunnerDecl {
                         source: OfferSource::Self_,
-                        source_name: CapabilityName("elf".to_string()),
+                        source_name: "elf".into(),
                         target: OfferTarget::static_child("b".to_string()),
-                        target_name: CapabilityName("dwarf".to_string()),
+                        target_name: "dwarf".into(),
                     }))
                     .runner(RunnerDecl {
                         name: "elf".into(),
@@ -4923,7 +4923,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/runner".parse::<CapabilityPath>().unwrap()
@@ -4966,9 +4966,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                         source: ExposeSource::Self_,
-                        source_name: CapabilityName("elf".to_string()),
+                        source_name: "elf".into(),
                         target: ExposeTarget::Parent,
-                        target_name: CapabilityName("dwarf".to_string()),
+                        target_name: "dwarf".into(),
                     }))
                     .runner(RunnerDecl {
                         name: "elf".into(),
@@ -4997,7 +4997,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/runner".parse::<CapabilityPath>().unwrap()
@@ -5074,7 +5074,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                 component,
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
                     "/svc/runner".parse::<CapabilityPath>().unwrap()
@@ -5134,7 +5134,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             )
                 if moniker == *b_component.abs_moniker() &&
                 capability_type == "runner" &&
-                capability_name == CapabilityName("hobbit".to_string())
+                capability_name == "hobbit"
         );
     }
 
@@ -5189,7 +5189,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: InternalCapability::Runner(name),
                 ..
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),
         };
@@ -5223,7 +5223,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 capability: InternalCapability::Runner(name),
                 ..
             }) => {
-                assert_eq!(name, CapabilityName("elf".into()));
+                assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),
         };
@@ -5307,7 +5307,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             )
                 if moniker == *a_component.abs_moniker()
                 && capability_type == "runner".to_string()
-                && capability_name == CapabilityName("hobbit".into())
+                && capability_name == "hobbit"
         );
     }
 }

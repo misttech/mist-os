@@ -10,7 +10,7 @@ use {
         component_model::ComponentModelForAnalyzer, BreadthFirstModelWalker,
         ComponentInstanceVisitor, ComponentModelWalker,
     },
-    cm_rust::{CapabilityName, UseDecl},
+    cm_rust::UseDecl,
     moniker::AbsoluteMonikerBase,
     routing::{
         component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
@@ -112,7 +112,7 @@ impl ComponentResolversVisitor {
             if *resolver_source.abs_moniker() == moniker {
                 for use_decl in &resolver_source.decl_for_testing().uses {
                     if let UseDecl::Protocol(name) = use_decl {
-                        if name.source_name == CapabilityName(self.request.protocol.clone()) {
+                        if name.source_name == self.request.protocol {
                             self.monikers.push(instance.abs_moniker().to_string());
                         }
                     }

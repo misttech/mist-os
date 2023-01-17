@@ -609,7 +609,7 @@ fn parse_capability_policy(
                         .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let source_name = if let Some(source_name) = e.source_name {
-                    Ok(CapabilityName(source_name))
+                    Ok(source_name.into())
                 } else {
                     Err(PolicyConfigError::EmptyCapabilitySourceName)
                 }?;
@@ -681,7 +681,7 @@ fn parse_debug_capability_policy(
                         .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
                 let source_name = if let Some(source_name) = e.source_name.as_ref() {
-                    Ok(CapabilityName(source_name.clone()))
+                    Ok(source_name.into())
                 } else {
                     Err(PolicyConfigError::EmptyCapabilitySourceName)
                 }?;
