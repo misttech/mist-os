@@ -58,7 +58,7 @@ type NodeProperty = table {
 };
 
 /// Arguments for adding a node.
-type NodeAddArgs = table {
+type NodeAddArgs = resource table {
     /// Name of the node.
     1: name NodeName;
 

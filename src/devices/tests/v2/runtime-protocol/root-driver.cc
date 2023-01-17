@@ -94,8 +94,8 @@ class RootDriver : public fdf::DriverBase,
       return fit::error(fdf::NodeError::kInternal);
     }
 
-    auto add_result =
-        node_.sync()->AddChild(fidl::ToWire(arena, args), std::move(endpoints->server), {});
+    auto add_result = node_.sync()->AddChild(fidl::ToWire(arena, std::move(args)),
+                                             std::move(endpoints->server), {});
     if (!add_result.ok()) {
       return fit::error(fdf::NodeError::kInternal);
     }
