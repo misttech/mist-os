@@ -29,7 +29,6 @@ group("drivers") {
 group("_packages_common") {
   deps = [
     "wlancfg",
-    "wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
     "//src/connectivity/location/regulatory_region",
   ]
 }
@@ -37,6 +36,7 @@ group("_packages_common") {
 group("packages") {
   deps = [
     ":_packages_common",
+    "wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
     "wlanstack:wlanstack",
   ]
 }
@@ -44,7 +44,7 @@ group("packages") {
 group("packages-legacy-privacy") {
   deps = [
     ":_packages_common",
-    "wlanstack:wlanstack-legacy-privacy",
+    "wlandevicemonitor:wlandevicemonitor-legacy-privacy",
   ]
 }
 
@@ -78,6 +78,8 @@ group("tests") {
     "lib/ieee80211:ieee80211-tests",
     "lib/inspect:wlan-inspect-tests",
     "lib/mlme/cpp/tests",
+    "lib/mlme/fullmac:wlan-fullmac-mlme-tests",
+    "lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c-tests",
     "lib/mlme/rust:wlan-mlme-tests",
     "lib/rsn:wlan-rsn-tests",
     "lib/sae:wlan-sae-tests",

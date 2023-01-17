@@ -59,6 +59,8 @@ third_party_rust_crate_log_visibility = [
   "//src/connectivity/network/testing/netemul/runner:*",
   "//src/connectivity/network/testing/network-test-realm/service:*",
   "//src/connectivity/network/testing/network-test-realm/tests/unreliable-echo:*",
+  "//src/connectivity/wlan/lib/mlme/fullmac:*",
+  "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:*",
   "//src/connectivity/wlan/lib/mlme/rust:*",
   "//src/connectivity/wlan/lib/mlme/rust/c-binding:*",
   "//src/connectivity/wlan/lib/rsn:*",

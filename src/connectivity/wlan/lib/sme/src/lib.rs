@@ -41,9 +41,12 @@ pub enum MlmeRequest {
     Connect(fidl_mlme::ConnectRequest),
     Reconnect(fidl_mlme::ReconnectRequest),
     Deauthenticate(fidl_mlme::DeauthenticateRequest),
+    Disassociate(fidl_mlme::DisassociateRequest),
     Eapol(fidl_mlme::EapolRequest),
     SetKeys(fidl_mlme::SetKeysRequest),
+    DeleteKeys(fidl_mlme::DeleteKeysRequest),
     SetCtrlPort(fidl_mlme::SetControlledPortRequest),
+    Reset(fidl_mlme::ResetRequest),
     Start(fidl_mlme::StartRequest),
     Stop(fidl_mlme::StopRequest),
     SendMpOpenAction(fidl_mlme::MeshPeeringOpenAction),
@@ -72,8 +75,9 @@ pub trait Station {
 pub type MlmeStream = mpsc::UnboundedReceiver<MlmeRequest>;
 pub type MlmeEventStream = mpsc::UnboundedReceiver<MlmeEvent>;
 pub type MlmeSink = UnboundedSink<MlmeRequest>;
+pub type MlmeEventSink = UnboundedSink<MlmeEvent>;
 
-mod responder {
+pub mod responder {
     use futures::channel::oneshot;
 
     #[derive(Debug)]
