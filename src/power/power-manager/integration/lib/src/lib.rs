@@ -217,21 +217,19 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let driver_manager_to_power_manager = Route::new().capability(
-            Capability::directory("dev-topological").rights(fio::R_STAR_DIR).path("/dev").weak(),
-        );
+        let driver_manager_to_power_manager = Route::new()
+            .capability(
+                Capability::directory("dev-topological")
+                    .rights(fio::R_STAR_DIR)
+                    .path("/dev")
+                    .weak(),
+            )
+            .capability(Capability::protocol_by_name(
+                "fuchsia.device.manager.SystemStateTransition",
+            ));
         realm_builder
             .add_route(
                 driver_manager_to_power_manager.from(&driver_manager_child).to(&power_manager),
-            )
-            .await
-            .unwrap();
-        let power_manager_to_driver_manager = Route::new().capability(
-            Capability::protocol_by_name("fuchsia.power.manager.DriverManagerRegistration"),
-        );
-        realm_builder
-            .add_route(
-                power_manager_to_driver_manager.from(&power_manager).to(&driver_manager_child),
             )
             .await
             .unwrap();

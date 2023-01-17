@@ -352,8 +352,6 @@ int RunDfv1(DriverManagerParams driver_manager_params,
         return conn.status_value();
       });
 
-  system_instance.ServiceStarter(&coordinator);
-
   // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
   LOGF(INFO, "driver_manager loader loop started");
 

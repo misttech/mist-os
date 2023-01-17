@@ -72,14 +72,6 @@ zx_status_t SystemInstance::CreateDriverHostJob(const zx::job& root_job,
   return ZX_OK;
 }
 
-void SystemInstance::ServiceStarter(Coordinator* coordinator) {
-  coordinator->RegisterWithPowerManager([](zx_status_t status) {
-    if (status != ZX_OK) {
-      LOGF(WARNING, "Unable to RegisterWithPowerManager: %d", status);
-    }
-  });
-}
-
 fidl::ClientEnd<fuchsia_io::Directory> SystemInstance::CloneFs(const char* path) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {

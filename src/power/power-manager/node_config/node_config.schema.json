@@ -1,892 +1,888 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Power Manager Node Config Schema",
-  "type": "array",
-  "items": {
-    "oneOf": [
-      {
-        "properties": {
-          "type": {
-            "pattern": "ActivityHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "system_profile_handler_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "system_profile_handler_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "CrashReportHandler"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "CpuControlHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "driver_path": {
-                "type": "string"
-              },
-              "capacitance": {
-                "type": "number",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "min_cpu_clock_speed": {
-                "type": "number",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "logical_cpu_numbers": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "driver_path",
-              "capacitance",
-              "logical_cpu_numbers"
-            ]
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "cpu_stats_handler_node": {
-                "type": "string"
-              },
-              "cpu_dev_handler_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "cpu_stats_handler_node",
-              "cpu_dev_handler_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "CpuDeviceHandler"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "driver_path": {
-                "type": "string"
-              }
-            },
-          "additionalProperties": false,
-            "required": [
-              "driver_path"
-            ]
-
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "CpuManager"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "clusters": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "cluster_index": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "handler": {
-                      "type": "string"
-                    },
-                    "logical_cpu_numbers": {
-                      "type": "array",
-                      "minItems": 1,
-                      "items": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "normperfs_per_ghz": {
-                      "type": "number",
-                      "minimum": 0
-                    }
-                  }
-                },
-                "additionalProperties": false,
-                "required": [
-                  "name",
-                  "cluster_index",
-                  "handler",
-                  "logical_cpu_numbers",
-                  "normperfs_per_ghz"
-                ]
-              },
-              "thermal_states": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "cluster_pstates": {
-                      "type": "array",
-                      "minItems": 1,
-                      "items": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "min_performance_normperfs": {
-                      "type": "number",
-                      "minimum": 0
-                    },
-                    "static_power_w": {
-                      "type": "number",
-                      "minimum": 0
-                    },
-                    "dynamic_power_per_normperf_w": {
-                      "type": "number",
-                      "minimum": 0
-                    }
-                  }
-                },
-                "additionalProperties": false,
-                "required": [
-                  "cluster_pstates",
-                  "min_performance_normperfs",
-                  "static_power_w",
-                  "dynamic_power_per_normperf_w"
-                ]
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "clusters",
-              "thermal_states"
-            ]
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "cpu_stats_handler": {
-                "type": "string"
-              },
-              "cpu_device_handlers": {
-                "type": "array",
-                "minItems": 1
-              },
-              "syscall_handler": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "cpu_stats_handler",
-              "cpu_device_handlers",
-              "syscall_handler"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },      {
-        "properties": {
-          "type": {
-            "pattern": "CpuStatsHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "cpu_load_cache_duration_ms": {
-                "type": "number",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              }
-            }
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "DeviceControlHandler"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "driver_path": {
-                "type": "string"
-              }
-            }
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "DriverManagerHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "registration_timeout_s": {
-                "type": "number"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "InputSettingsHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "system_profile_handler_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "system_profile_handler_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "PlatformMetrics"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "cpu_temperature_poll_interval_s": {
-                "type": "number",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              },
-              "throttle_debounce_timeout_s": {
-                "type": "number",
-                "minimum": 0
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "cpu_temperature_poll_interval_s",
-              "throttle_debounce_timeout_s"
-            ]
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "cpu_temperature_handler_node": {
-                "type": "string"
-              },
-              "crash_report_handler_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "cpu_temperature_handler_node",
-              "crash_report_handler_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "ShutdownWatcher"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "SystemProfileHandler"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "SystemShutdownHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "shutdown_timeout_s": {
-                "type": "number",
-                "minimum": 0,
-                "exclusiveMinimum": true
-              }
-            }
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "driver_manager_handler_node": {
-                "type": "string"
-              },
-              "shutdown_watcher_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "driver_manager_handler_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "TemperatureHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "driver_path": {
-                "type": "string"
-              },
-              "cache_duration_ms": {
-                "type": "integer"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "driver_path",
-              "cache_duration_ms"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "ThermalLoadDriver"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "temperature_input_configs": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "temperature_handler_node_name": {
-                      "type": "string"
-                    },
-                    "onset_temperature_c": {
-                      "type": "number"
-                    },
-                    "reboot_temperature_c": {
-                      "type": "number"
-                    },
-                    "poll_interval_s": {
-                      "type": "number",
-                      "minimum": 0,
-                      "exclusiveMinimum": true
-                    },
-                    "filter_time_constant_s": {
-                      "type": "number",
-                      "minimum": 0,
-                      "exclusiveMinimum": true
-                    }
-                  },
-                  "additionalProperties": false,
-                  "required": [
-                    "temperature_handler_node_name",
-                    "onset_temperature_c",
-                    "reboot_temperature_c",
-                    "poll_interval_s",
-                    "filter_time_constant_s"
-                  ]
-                }
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "temperature_input_configs"
-            ]
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "platform_metrics_node": {
-                "type": "string"
-              },
-              "system_shutdown_node": {
-                "type": "string"
-              },
-              "thermal_load_notify_nodes": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "temperature_handler_node_names": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "platform_metrics_node",
-              "system_shutdown_node",
-              "thermal_load_notify_nodes",
-              "temperature_handler_node_names"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "ThermalPolicy"
-          },
-          "name": {
-            "type": "string"
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "cpu_control_nodes": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "string"
-                }
-              },
-              "platform_metrics_node": {
-                "type": "string"
-              },
-              "system_power_handler_node": {
-                "type": "string"
-              },
-              "temperature_handler_node": {
-                "type": "string"
-              },
-              "thermal_load_notify_nodes": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "cpu_control_nodes",
-              "platform_metrics_node",
-              "system_power_handler_node",
-              "temperature_handler_node",
-              "thermal_load_notify_nodes"
-            ]
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "thermal_shutdown_temperature": {
-                "type": "number"
-              },
-              "controller_params": {
-                "type": "object",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Power Manager Node Config Schema",
+    "type": "array",
+    "items": {
+        "oneOf": [
+            {
                 "properties": {
-                  "sample_interval": {
-                    "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
-                  },
-                  "filter_time_constant": {
-                    "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
-                  },
-                  "target_temperature": {
-                    "type": "number",
-                    "minimum": 30.0,
-                    "maximum": 110.0
-                  },
-                  "e_integral_min": {
-                    "type": "number",
-                    "maximum": 0
-                  },
-                  "e_integral_max": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "sustainable_power": {
-                    "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
-                  },
-                  "proportional_gain": {
-                    "type": "number",
-                    "minimum": 0
-                  },
-                  "integral_gain": {
-                    "type": "number",
-                    "minimum": 0
-                  }
+                    "type": {
+                        "pattern": "ActivityHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "system_profile_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "system_profile_handler_node"
+                        ]
+                    }
                 },
                 "additionalProperties": false,
                 "required": [
-                  "sample_interval",
-                  "filter_time_constant",
-                  "target_temperature",
-                  "e_integral_min",
-                  "e_integral_max",
-                  "sustainable_power",
-                  "proportional_gain",
-                  "integral_gain"
+                    "type",
+                    "name",
+                    "dependencies"
                 ]
-              }
             },
-            "additionalProperties": false,
-            "required": [
-              "thermal_shutdown_temperature",
-              "controller_params"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "ThermalShutdown"
-          },
-          "name": {
-            "type": "string"
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "platform_metrics_node": {
-                "type": "string"
-              },
-              "system_shutdown_node": {
-                "type": "string"
-              },
-              "temperature_handler_node": {
-                "type": "string"
-              }
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "CrashReportHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
             },
-            "additionalProperties": false,
-            "required": [
-              "platform_metrics_node",
-              "system_shutdown_node",
-              "temperature_handler_node"
-            ]
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "thermal_shutdown_temperature_c": {
-                "type": "number"
-              },
-              "poll_interval_s": {
-                "type": "number"
-              },
-              "filter_time_constant_s": {
-                "type": "number"
-              }
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "CpuControlHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "driver_path": {
+                                "type": "string"
+                            },
+                            "capacitance": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "min_cpu_clock_speed": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "logical_cpu_numbers": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "number",
+                                    "minimum": 0
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "driver_path",
+                            "capacitance",
+                            "logical_cpu_numbers"
+                        ]
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_stats_handler_node": {
+                                "type": "string"
+                            },
+                            "cpu_dev_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_stats_handler_node",
+                            "cpu_dev_handler_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
             },
-            "additionalProperties": false,
-            "required": [
-              "thermal_shutdown_temperature_c",
-              "poll_interval_s",
-              "filter_time_constant_s"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "LidShutdown"
-          },
-          "name": {
-            "type": "string"
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "system_shutdown_node": {
-                "type": "string"
-              }
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "CpuDeviceHandler"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "driver_path": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "driver_path"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config"
+                ]
             },
-            "additionalProperties": false,
-            "required": [
-              "system_shutdown_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "dependencies"
-        ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "SyscallHandler"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name"
-        ]
-      },
-      {
-        "properties": {
-            "type": {
-                "pattern": "SystemPowerModeHandler"
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "CpuManager"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "clusters": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "cluster_index": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                        },
+                                        "handler": {
+                                            "type": "string"
+                                        },
+                                        "logical_cpu_numbers": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "items": {
+                                                "type": "integer",
+                                                "minimum": 0
+                                            }
+                                        },
+                                        "normperfs_per_ghz": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        }
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                    "name",
+                                    "cluster_index",
+                                    "handler",
+                                    "logical_cpu_numbers",
+                                    "normperfs_per_ghz"
+                                ]
+                            },
+                            "thermal_states": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cluster_pstates": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "items": {
+                                                "type": "integer",
+                                                "minimum": 0
+                                            }
+                                        },
+                                        "min_performance_normperfs": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        },
+                                        "static_power_w": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        },
+                                        "dynamic_power_per_normperf_w": {
+                                            "type": "number",
+                                            "minimum": 0
+                                        }
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                    "cluster_pstates",
+                                    "min_performance_normperfs",
+                                    "static_power_w",
+                                    "dynamic_power_per_normperf_w"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "clusters",
+                            "thermal_states"
+                        ]
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_stats_handler": {
+                                "type": "string"
+                            },
+                            "cpu_device_handlers": {
+                                "type": "array",
+                                "minItems": 1
+                            },
+                            "syscall_handler": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_stats_handler",
+                            "cpu_device_handlers",
+                            "syscall_handler"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
             },
-            "name": {
-                "type": "string"
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "CpuStatsHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_load_cache_duration_ms": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            }
+                        }
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "DeviceControlHandler"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "driver_path": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "DriverManagerHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "InputSettingsHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "system_profile_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "system_profile_handler_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "PlatformMetrics"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_temperature_poll_interval_s": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "throttle_debounce_timeout_s": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_temperature_poll_interval_s",
+                            "throttle_debounce_timeout_s"
+                        ]
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_temperature_handler_node": {
+                                "type": "string"
+                            },
+                            "crash_report_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_temperature_handler_node",
+                            "crash_report_handler_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "ShutdownWatcher"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "SystemProfileHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "SystemShutdownHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "shutdown_timeout_s": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            }
+                        }
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "driver_manager_handler_node": {
+                                "type": "string"
+                            },
+                            "shutdown_watcher_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "driver_manager_handler_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "TemperatureHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "driver_path": {
+                                "type": "string"
+                            },
+                            "cache_duration_ms": {
+                                "type": "integer"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "driver_path",
+                            "cache_duration_ms"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "ThermalLoadDriver"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "temperature_input_configs": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "temperature_handler_node_name": {
+                                            "type": "string"
+                                        },
+                                        "onset_temperature_c": {
+                                            "type": "number"
+                                        },
+                                        "reboot_temperature_c": {
+                                            "type": "number"
+                                        },
+                                        "poll_interval_s": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "exclusiveMinimum": true
+                                        },
+                                        "filter_time_constant_s": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "exclusiveMinimum": true
+                                        }
+                                    },
+                                    "additionalProperties": false,
+                                    "required": [
+                                        "temperature_handler_node_name",
+                                        "onset_temperature_c",
+                                        "reboot_temperature_c",
+                                        "poll_interval_s",
+                                        "filter_time_constant_s"
+                                    ]
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "temperature_input_configs"
+                        ]
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "platform_metrics_node": {
+                                "type": "string"
+                            },
+                            "system_shutdown_node": {
+                                "type": "string"
+                            },
+                            "thermal_load_notify_nodes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "temperature_handler_node_names": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "platform_metrics_node",
+                            "system_shutdown_node",
+                            "thermal_load_notify_nodes",
+                            "temperature_handler_node_names"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "ThermalPolicy"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_control_nodes": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "platform_metrics_node": {
+                                "type": "string"
+                            },
+                            "system_power_handler_node": {
+                                "type": "string"
+                            },
+                            "temperature_handler_node": {
+                                "type": "string"
+                            },
+                            "thermal_load_notify_nodes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_control_nodes",
+                            "platform_metrics_node",
+                            "system_power_handler_node",
+                            "temperature_handler_node",
+                            "thermal_load_notify_nodes"
+                        ]
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "thermal_shutdown_temperature": {
+                                "type": "number"
+                            },
+                            "controller_params": {
+                                "type": "object",
+                                "properties": {
+                                    "sample_interval": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "exclusiveMinimum": true
+                                    },
+                                    "filter_time_constant": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "exclusiveMinimum": true
+                                    },
+                                    "target_temperature": {
+                                        "type": "number",
+                                        "minimum": 30.0,
+                                        "maximum": 110.0
+                                    },
+                                    "e_integral_min": {
+                                        "type": "number",
+                                        "maximum": 0
+                                    },
+                                    "e_integral_max": {
+                                        "type": "number",
+                                        "minimum": 0
+                                    },
+                                    "sustainable_power": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "exclusiveMinimum": true
+                                    },
+                                    "proportional_gain": {
+                                        "type": "number",
+                                        "minimum": 0
+                                    },
+                                    "integral_gain": {
+                                        "type": "number",
+                                        "minimum": 0
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                    "sample_interval",
+                                    "filter_time_constant",
+                                    "target_temperature",
+                                    "e_integral_min",
+                                    "e_integral_max",
+                                    "sustainable_power",
+                                    "proportional_gain",
+                                    "integral_gain"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "thermal_shutdown_temperature",
+                            "controller_params"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "ThermalShutdown"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "platform_metrics_node": {
+                                "type": "string"
+                            },
+                            "system_shutdown_node": {
+                                "type": "string"
+                            },
+                            "temperature_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "platform_metrics_node",
+                            "system_shutdown_node",
+                            "temperature_handler_node"
+                        ]
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "thermal_shutdown_temperature_c": {
+                                "type": "number"
+                            },
+                            "poll_interval_s": {
+                                "type": "number"
+                            },
+                            "filter_time_constant_s": {
+                                "type": "number"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "thermal_shutdown_temperature_c",
+                            "poll_interval_s",
+                            "filter_time_constant_s"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "LidShutdown"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "system_shutdown_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "system_shutdown_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "SyscallHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "SystemPowerModeHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
+                        "pattern": "ThermalStateHandler"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "thermal_config_path": {
+                                "type": "string"
+                            },
+                            "enable_client_state_connector": {
+                                "type": "boolean"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "enable_client_state_connector"
+                        ]
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "platform_metrics_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "platform_metrics_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config"
+                ]
             }
-        },
-        "additionalProperties": false,
-        "required": [
-            "type",
-            "name"
         ]
-      },
-      {
-        "properties": {
-          "type": {
-            "pattern": "ThermalStateHandler"
-          },
-          "name": {
-            "type": "string"
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "thermal_config_path": {
-                "type": "string"
-              },
-              "enable_client_state_connector": {
-                "type": "boolean"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "enable_client_state_connector"
-            ]
-          },
-          "dependencies": {
-            "type": "object",
-            "properties": {
-              "platform_metrics_node": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "platform_metrics_node"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "type",
-          "name",
-          "config"
-        ]
-      }
-    ]
-  }
+    }
 }

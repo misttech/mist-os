@@ -169,14 +169,7 @@ impl PowerManager {
                 )
                 .build()?
             }
-            "DriverManagerHandler" => {
-                driver_manager_handler::DriverManagerHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                    service_fs,
-                )
-                .build()?
-            }
+            "DriverManagerHandler" => Rc::new(driver_manager_handler::DriverManagerHandler::new()?),
             "InputSettingsHandler" => {
                 input_settings_handler::InputSettingsHandlerBuilder::new_from_json(
                     json_data,

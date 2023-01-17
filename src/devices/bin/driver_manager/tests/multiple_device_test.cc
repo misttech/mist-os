@@ -11,7 +11,6 @@
 #include <string>
 
 #include "src/devices/bin/driver_manager/component_lifecycle.h"
-#include "src/devices/bin/driver_manager/tests/coordinator_test_mock_power_manager.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
 TEST_F(MultipleDeviceTestCase, UnbindThenSuspend) {
@@ -464,32 +463,6 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl_wrong_state) {
   // Default shutdown_system_state in test is MEXEC.
   ASSERT_EQ(coordinator().shutdown_system_state(),
             fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kMexec);
-}
-
-TEST_F(MultipleDeviceTestCase, PowerManagerRegistration) {
-  ASSERT_OK(coordinator_loop()->StartThread("DevCoordLoop"));
-  set_coordinator_loop_thread_running(true);
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_device_manager::SystemStateTransition>();
-  ASSERT_OK(endpoints.status_value());
-
-  ASSERT_OK(coordinator().system_state_manager().BindPowerManagerInstance(
-      coordinator_loop()->dispatcher(), std::move(endpoints->server)));
-
-  MockPowerManager mock_power_manager;
-  auto power_endpoints = fidl::CreateEndpoints<fuchsia_power_manager::DriverManagerRegistration>();
-  ASSERT_OK(power_endpoints.status_value());
-
-  ASSERT_OK(fidl::BindSingleInFlightOnly(coordinator_loop()->dispatcher(),
-                                         std::move(power_endpoints->server), &mock_power_manager));
-
-  sync_completion_t register_called;
-  coordinator().RegisterWithPowerManager(std::move(power_endpoints->client),
-                                         std::move(endpoints->client), [&](zx_status_t status) {
-                                           ASSERT_OK(status);
-                                           sync_completion_signal(&register_called);
-                                         });
-  sync_completion_wait(&register_called, ZX_TIME_INFINITE);
 }
 
 // This functor accepts a |fidl::WireUnownedResult<FidlMethod>&| and checks that

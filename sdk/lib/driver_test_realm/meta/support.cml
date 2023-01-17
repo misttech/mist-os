@@ -19,7 +19,6 @@
                 "fuchsia.driver.test.Realm",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.pkg.PackageResolver",
-                "fuchsia.power.manager.DriverManagerRegistration",
             ],
         },
         {
@@ -51,7 +50,6 @@
                 "fuchsia.driver.test.Realm",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.pkg.PackageResolver",
-                "fuchsia.power.manager.DriverManagerRegistration",
             ],
             from: "self",
         },

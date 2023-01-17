@@ -69,7 +69,6 @@ namespace {
 
 namespace fdd = fuchsia_driver_development;
 namespace fdm = fuchsia_device_manager;
-namespace fpm = fuchsia_power_manager;
 
 constexpr char kDriverHostName[] = "driver_host";
 constexpr char kDriverHostPath[] = "/pkg/bin/driver_host";
@@ -365,64 +364,6 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to initialize the root device to devfs: %s",
                 zx_status_get_string(status));
   root_device_->devfs.publish();
-}
-
-void Coordinator::RegisterWithPowerManager(RegisterWithPowerManagerCompletion completion) {
-  auto system_state_endpoints = fidl::CreateEndpoints<fdm::SystemStateTransition>();
-  if (system_state_endpoints.is_error()) {
-    completion(system_state_endpoints.error_value());
-    return;
-  }
-  auto status = system_state_manager_.BindPowerManagerInstance(
-      dispatcher_, std::move(system_state_endpoints->server));
-  if (status != ZX_OK) {
-    completion(status);
-    return;
-  }
-  auto result = component::Connect<fpm::DriverManagerRegistration>();
-  if (result.is_error()) {
-    LOGF(ERROR, "Failed to connect to fuchsia.power.manager: %s", result.status_string());
-    completion(result.error_value());
-    return;
-  }
-
-  RegisterWithPowerManager(std::move(*result), std::move(system_state_endpoints->client),
-                           std::move(completion));
-}
-
-void Coordinator::RegisterWithPowerManager(
-    fidl::ClientEnd<fpm::DriverManagerRegistration> power_manager,
-    fidl::ClientEnd<fdm::SystemStateTransition> system_state_transition,
-    RegisterWithPowerManagerCompletion completion) {
-  power_manager_client_.Bind(std::move(power_manager), dispatcher_);
-  power_manager_client_->Register(std::move(system_state_transition))
-      .ThenExactlyOnce(
-          [this, completion = std::move(completion)](
-              fidl::WireUnownedResult<fpm::DriverManagerRegistration::Register>& result) mutable {
-            if (!result.ok()) {
-              // In this branch, `this` could be invalidated.
-              // We cannot use any member variable or member function.
-              LOGF(INFO, "Failed to register with power_manager: %s\n",
-                   result.error().FormatDescription().c_str());
-              completion(result.status());
-              return;
-            }
-
-            if (result->is_error()) {
-              fpm::wire::RegistrationError err = result->error_value();
-              if (err == fpm::wire::RegistrationError::kInvalidHandle) {
-                LOGF(ERROR, "Failed to register with power_manager. Invalid handle.\n");
-                completion(ZX_ERR_BAD_HANDLE);
-                return;
-              }
-              LOGF(ERROR, "Failed to register with power_manager\n");
-              completion(ZX_ERR_INTERNAL);
-              return;
-            }
-            LOGF(INFO, "Registered with power manager successfully");
-            set_power_manager_registered(true);
-            completion(ZX_OK);
-          });
 }
 
 const Driver* Coordinator::LibnameToDriver(std::string_view libname) const {

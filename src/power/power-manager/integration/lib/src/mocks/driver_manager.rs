@@ -5,15 +5,17 @@
 use {
     crate::mocks::temperature_driver::MockTemperatureDriver,
     fidl_fuchsia_device_manager as fdevmgr, fidl_fuchsia_hardware_power_statecontrol as fpower,
-    fidl_fuchsia_io as fio, fidl_fuchsia_power_manager as fpowermanager, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio,
+    fuchsia_component::server::{ServiceFs, ServiceFsDir},
     fuchsia_component_test::LocalComponentHandles,
-    futures::{FutureExt as _, TryStreamExt as _},
+    futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
     parking_lot::RwLock,
     std::sync::Arc,
     tracing::*,
     vfs::directory::{
-        entry::DirectoryEntry as _, helper::DirectlyMutable as _,
-        immutable::simple::Simple as SimpleMutableDir,
+        entry::DirectoryEntry as _,
+        helper::DirectlyMutable as _,
+        immutable::simple::{simple as simple_mutable_dir, Simple as SimpleMutableDir},
     },
 };
 
@@ -26,7 +28,7 @@ pub struct MockDriverManager {
 impl MockDriverManager {
     pub fn new() -> Arc<MockDriverManager> {
         Arc::new(Self {
-            devfs: vfs::directory::immutable::simple::simple(),
+            devfs: simple_mutable_dir(),
             current_termination_state: Arc::new(RwLock::new(None)),
         })
     }
@@ -79,9 +81,6 @@ impl MockDriverManager {
     ///
     pub async fn run(self: Arc<Self>, handles: LocalComponentHandles) -> Result<(), anyhow::Error> {
         info!("MockDriverManager: run");
-        let registration_proxy = handles
-            .connect_to_protocol::<fpowermanager::DriverManagerRegistrationMarker>()
-            .unwrap();
 
         let scope = vfs::execution_scope::ExecutionScope::new();
         let (client, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
@@ -92,119 +91,39 @@ impl MockDriverManager {
             vfs::path::Path::dot(),
             server,
         );
-
-        let mut fs = fuchsia_component::server::ServiceFs::new();
+        let mut fs = ServiceFs::new();
         let () = fs.add_remote_node("dev", client);
         let fs = fs.serve_connection(handles.outgoing_dir).unwrap();
 
-        futures::future::try_join3(
-            self.run_inner(registration_proxy),
-            scope.wait().map(Ok),
-            fs.try_collect(),
-        )
-        .await
-        .map(|((), (), ())| ())
-    }
+        let _: &mut ServiceFsDir<'_, _> = fs
+            .dir("svc")
+            .add_fidl_service(move |stream: fdevmgr::SystemStateTransitionRequestStream| stream);
 
-    async fn run_inner(
-        self: Arc<Self>,
-        registration_proxy: fpowermanager::DriverManagerRegistrationProxy,
-    ) -> Result<(), anyhow::Error> {
-        self.register_with_power_manager(registration_proxy).await;
-        Ok(())
-    }
+        let fut = fs.map(Ok).try_for_each(|stream: fdevmgr::SystemStateTransitionRequestStream| {
+            let current_termination_state = self.current_termination_state.clone();
+            stream.try_for_each(move |request| match request {
+                fdevmgr::SystemStateTransitionRequest::SetTerminationSystemState {
+                    state,
+                    responder,
+                } => {
+                    info!(
+                        "MockDriverManager: received SetTerminationSystemState request: {:?}",
+                        state,
+                    );
+                    *current_termination_state.write() = Some(state);
+                    futures::future::ready(responder.send(&mut Ok(())))
+                }
+                request => panic!("{request:?}"),
+            })
+        });
 
-    async fn register_with_power_manager(
-        &self,
-        registration_proxy: fpowermanager::DriverManagerRegistrationProxy,
-    ) {
-        info!("MockDriverManager: registering with Power Manager");
-
-        let (transition_client, mut transition_request_stream) =
-            fidl::endpoints::create_request_stream::<fdevmgr::SystemStateTransitionMarker>()
-                .unwrap();
-
-        registration_proxy
-            .register(transition_client)
+        futures::future::try_join(scope.wait().map(Ok), fut)
             .await
-            .expect("FIDL error: Failed to register power manager")
-            .expect("Registration error: Failed to register power manager");
-
-        let current_state = self.current_termination_state.clone();
-        fasync::Task::local(async move {
-            while let Some(fdevmgr::SystemStateTransitionRequest::SetTerminationSystemState {
-                state,
-                responder,
-            }) = transition_request_stream.try_next().await.unwrap()
-            {
-                info!("MockDriverManager: received SetTerminationSystemState request: {:?}", state);
-                *current_state.write() = Some(state);
-                let _ = responder.send(&mut Ok(()));
-            }
-        })
-        .detach();
+            .map(|((), ())| ())
+            .map_err(Into::into)
     }
 
     pub fn get_current_termination_state(&self) -> fpower::SystemPowerState {
         self.current_termination_state.read().expect("Termination state not set")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use {super::*, assert_matches::assert_matches, futures::StreamExt as _};
-
-    /// Tests that the mock tries to register with Power Manager when it first starts up.
-    #[fuchsia::test]
-    async fn test_power_manager_registration() {
-        // Create and serve the mock service
-        let (registration_proxy, mut registration_stream) =
-            fidl::endpoints::create_proxy_and_stream::<
-                fpowermanager::DriverManagerRegistrationMarker,
-            >()
-            .unwrap();
-        let mock = MockDriverManager::new();
-        let _task = fasync::Task::local(mock.clone().run_inner(registration_proxy));
-
-        assert_matches!(
-            registration_stream.next().await.unwrap().unwrap(),
-            fpowermanager::DriverManagerRegistrationRequest::Register { .. }
-        );
-    }
-
-    /// Tests that system state transition requests sent to the mock are reflected in calls to
-    /// `get_current_termination_state`.
-    #[fuchsia::test]
-    async fn test_transition_state() {
-        // Create and serve the mock service
-        let (registration_proxy, mut registration_stream) =
-            fidl::endpoints::create_proxy_and_stream::<
-                fpowermanager::DriverManagerRegistrationMarker,
-            >()
-            .unwrap();
-        let mock = MockDriverManager::new();
-        let _task = fasync::Task::local(mock.clone().run_inner(registration_proxy));
-
-        let fpowermanager::DriverManagerRegistrationRequest::Register {
-            system_state_transition,
-            responder,
-            ..
-        } = registration_stream.next().await.unwrap().unwrap();
-        assert_matches!(responder.send(&mut Ok(())), Ok(()));
-        let system_state_transition = system_state_transition.into_proxy().unwrap();
-
-        system_state_transition
-            .set_termination_system_state(fpower::SystemPowerState::RebootRecovery)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(mock.get_current_termination_state(), fpower::SystemPowerState::RebootRecovery);
-
-        system_state_transition
-            .set_termination_system_state(fpower::SystemPowerState::SuspendRam)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(mock.get_current_termination_state(), fpower::SystemPowerState::SuspendRam);
     }
 }

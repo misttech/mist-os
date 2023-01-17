@@ -13,11 +13,22 @@
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.manager.debug.Debug",
-                "fuchsia.power.manager.DriverManagerRegistration",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.power.systemmode.Requester",
                 "fuchsia.thermal.ClientStateConnector",
+
+                // The dependency relationship between power-manager and
+                // driver-manager is inverted. In other words, driver-manager
+                // depends on power-manager for its policy, but the relationship
+                // is expressed in reverse in the driver framework using weak
+                // dependencies. This "protocol" is a phantom used to ensure
+                // that driver-manager is shut down before power-manager is.
+                //
+                // TODO(https://fxbug.dev/119962): Change the APIs used here so
+                // that driver-manager pulls policy from power-manager, rather
+                // power-manager pushing it to driver-manager.
+                "power-manager-outlives-driver-manager",
             ],
         },
     ],
@@ -29,6 +40,7 @@
         },
         {
             protocol: [
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
@@ -59,11 +71,11 @@
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.power.manager.debug.Debug",
-                "fuchsia.power.manager.DriverManagerRegistration",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.power.systemmode.Requester",
                 "fuchsia.thermal.ClientStateConnector",
+                "power-manager-outlives-driver-manager",
             ],
             from: "self",
         },

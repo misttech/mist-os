@@ -54,7 +54,6 @@ source_set("driver_runner") {
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp_wire",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp_wire",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.power.manager:fuchsia.power.manager_cpp_wire",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
     "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
     "//src/lib/ddk",

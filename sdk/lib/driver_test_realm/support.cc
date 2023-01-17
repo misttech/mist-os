@@ -14,7 +14,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
-#include <fidl/fuchsia.power.manager/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
@@ -172,19 +171,6 @@ zx_status_t GetBootItem(const std::vector<board_test::DeviceEntry>& entries, uin
   *out = std::move(vmo);
   return ZX_OK;
 }
-
-class FakePowerRegistration
-    : public fidl::WireServer<fuchsia_power_manager::DriverManagerRegistration> {
- public:
-  void Register(RegisterRequestView request, RegisterCompleter::Sync& completer) override {
-    // Store these so the other side doesn't see the channels close.
-    transition_ = std::move(request->system_state_transition);
-    completer.ReplySuccess();
-  }
-
- private:
-  fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition> transition_;
-};
 
 class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
  public:
@@ -477,12 +463,6 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
       return ZX_ERR_INTERNAL;
     }
 
-    status = AddProtocolWithWait<fuchsia_power_manager::DriverManagerRegistration>(
-        &fake_power_registration_);
-    if (status != ZX_OK) {
-      return ZX_ERR_INTERNAL;
-    }
-
     status = AddProtocolWithWait<fuchsia_pkg::PackageResolver>(&package_resolver_);
     if (status != ZX_OK) {
       return ZX_ERR_INTERNAL;
@@ -628,7 +608,6 @@ class DriverTestRealm final : public fidl::WireServer<fuchsia_driver_test::Realm
   async::Loop* loop_;
 
   mock_boot_arguments::Server boot_arguments_;
-  FakePowerRegistration fake_power_registration_;
   FakeBootItems boot_items_;
   FakeRootJob root_job_;
   FakeBootResolver boot_resolver_;

@@ -12,7 +12,6 @@
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
-#include <fidl/fuchsia.power.manager/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding.h>
@@ -179,13 +178,6 @@ class Coordinator : public CompositeManagerBridge,
   void RegisterDriverHost(DriverHost* dh) { driver_hosts_.push_back(dh); }
   void UnregisterDriverHost(DriverHost* dh) { driver_hosts_.erase(*dh); }
 
-  using RegisterWithPowerManagerCompletion = fit::callback<void(zx_status_t)>;
-  void RegisterWithPowerManager(RegisterWithPowerManagerCompletion completion);
-  void RegisterWithPowerManager(
-      fidl::ClientEnd<fuchsia_power_manager::DriverManagerRegistration> power_manager,
-      fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition> system_state_transition,
-      RegisterWithPowerManagerCompletion completion);
-
   zx_status_t SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi);
 
   uint32_t GetNextDfv2DeviceId() { return next_dfv2_device_id_++; }
@@ -261,7 +253,6 @@ class Coordinator : public CompositeManagerBridge,
   bool launched_first_driver_host_ = false;
   bool power_manager_registered_ = false;
   LoaderServiceConnector loader_service_connector_;
-  fidl::WireSharedClient<fuchsia_power_manager::DriverManagerRegistration> power_manager_client_;
 
   internal::BasePackageResolver base_resolver_;
 

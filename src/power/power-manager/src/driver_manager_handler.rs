@@ -3,43 +3,24 @@
 // found in the LICENSE file.
 
 use crate::error::PowerManagerError;
-use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::system_shutdown_handler;
-use crate::types::Seconds;
-use crate::utils::{get_current_timestamp, result_debug_panic::ResultDebugPanic};
-use anyhow::{format_err, Context, Error};
+use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
-use async_utils::event::Event as AsyncEvent;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_device_manager as fdevicemgr;
 use fidl_fuchsia_hardware_power_statecontrol as fpowerstatecontrol;
-use fidl_fuchsia_power_manager as fpowermanager;
-use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
-use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
+use fuchsia_async::{self as fasync};
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use fuchsia_zircon as zx;
-use futures::channel::mpsc;
-use futures::prelude::*;
-use futures::TryStreamExt;
 use log::*;
-use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
 
 /// Node: DriverManagerHandler
 ///
-/// Summary: The primary purpose of this node is to host the
-/// fuchsia.power.manager.DriverManagerRegistration service. The Driver Manager will use this
-/// service to register protocol instances that Power Manager requires for normal operation. After
-/// the registration protocol instances are received, the node is responsible for:
-///     1) Monitoring the provided fuchsia.device.manager.SystemStateTransition protocol instance
-///        for closure.
-///     2) Setting the termination system state on the Driver Manager
+/// Summary: The primary purpose of this node is to set the termination state on the Driver Manager.
 ///
 /// Handles Messages:
 ///     - SetTerminationSystemState
@@ -47,167 +28,13 @@ use std::rc::Rc;
 /// Sends Messages: N/A
 ///
 /// FIDL dependencies:
-///     - fuchsia.power.manager.DriverManagerRegistration: the node hosts this protocol to allow the
-///       Driver Manager to register essential protocol instances with the Power Manager
-///     - fuchsia.device.manager.SystemStateTransition: a protocol of this instance is provided to
-///       the Power Manager by the Driver Manager using the
-///       fuchsia.power.manager.DriverManagerRegistration protocol. The SystemStateTransition is
-///       then used to set the Driver Manager's termination system state.
-
-/// A builder for constructing the DriverManagerHandler node.
-pub struct DriverManagerHandlerBuilder<'a, 'b> {
-    registration_timeout: Option<Seconds>,
-    driver_manager_registration: Option<DriverManagerRegistration>,
-    termination_channel_closed_handler: Option<Box<dyn FnOnce()>>,
-    outgoing_svc_dir: Option<ServiceFsDir<'a, ServiceObjLocal<'b, ()>>>,
-    inspect_root: Option<&'a inspect::Node>,
-}
-
-impl<'a, 'b> DriverManagerHandlerBuilder<'a, 'b> {
-    #[cfg(test)]
-    fn new() -> Self {
-        Self {
-            registration_timeout: None,
-            driver_manager_registration: None,
-            termination_channel_closed_handler: None,
-            outgoing_svc_dir: None,
-            inspect_root: None,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn outgoing_svc_dir(mut self, dir: ServiceFsDir<'a, ServiceObjLocal<'b, ()>>) -> Self {
-        self.outgoing_svc_dir = Some(dir);
-        self
-    }
-
-    #[cfg(test)]
-    fn registration_timeout(mut self, timeout: Seconds) -> Self {
-        self.registration_timeout = Some(timeout);
-        self
-    }
-
-    #[cfg(test)]
-    fn termination_channel_closed_handler(mut self, handler: Box<impl FnOnce() + 'static>) -> Self {
-        self.termination_channel_closed_handler = Some(handler);
-        self
-    }
-
-    #[cfg(test)]
-    fn driver_manager_registration(mut self, registration: DriverManagerRegistration) -> Self {
-        self.driver_manager_registration = Some(registration);
-        self
-    }
-
-    #[cfg(test)]
-    fn inspect_root(mut self, inspect_root: &'a inspect::Node) -> Self {
-        self.inspect_root = Some(inspect_root);
-        self
-    }
-
-    pub fn new_from_json(
-        json_data: json::Value,
-        _nodes: &HashMap<String, Rc<dyn Node>>,
-        service_fs: &'a mut ServiceFs<ServiceObjLocal<'b, ()>>,
-    ) -> Self {
-        #[derive(Deserialize)]
-        struct Config {
-            registration_timeout_s: Option<f64>,
-        }
-
-        #[derive(Deserialize)]
-        struct JsonData {
-            config: Config,
-        }
-
-        let data: JsonData = json::from_value(json_data).unwrap();
-
-        Self {
-            registration_timeout: data.config.registration_timeout_s.map(Seconds),
-            driver_manager_registration: None,
-            termination_channel_closed_handler: None,
-            outgoing_svc_dir: Some(service_fs.dir("svc")),
-            inspect_root: None,
-        }
-    }
-
-    pub fn build(self) -> Result<Rc<DriverManagerHandler>, Error> {
-        // Default `termination_channel_closed_handler` calls
-        // `system_shutdown_handler::force_shutdown()` to force a system reboot
-        let termination_channel_closed_handler = self
-            .termination_channel_closed_handler
-            .unwrap_or(Box::new(default_termination_channel_closed_handler));
-
-        // Optionally use the default inspect root node
-        let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
-
-        // Create the channel pair that will be used to send the registration from the sender end in
-        // the FIDL server task to the receiver end in `init()`. If
-        // `self.driver_manager_registration` is populated by a test, then we can go ahead and place
-        // it into the channel to be consumed during `init()`.
-        let (mut registration_sender, registration_receiver) = futures::channel::mpsc::channel(1);
-        if let Some(registration) = self.driver_manager_registration {
-            registration_sender.try_send(registration)?;
-        }
-
-        // Set up Inspect and log the registration timeout configuration
-        let inspect = InspectData::new(inspect_root, "DriverManagerHandler".to_string());
-        inspect
-            .registration_timeout_config
-            .set(self.registration_timeout.unwrap_or(Seconds(0.0)).0 as u64);
-
-        let mutable_inner = MutableInner {
-            registration_receiver,
-            termination_channel_closed_handler: Some(termination_channel_closed_handler),
-            termination_state_proxy: None,
-            monitor_termination_channel_closed_task: None,
-        };
-
-        let node = Rc::new(DriverManagerHandler {
-            init_done: AsyncEvent::new(),
-            registration_timeout: self.registration_timeout,
-            mutable_inner: RefCell::new(mutable_inner),
-            inspect,
-        });
-
-        if let Some(outgoing_svc_dir) = self.outgoing_svc_dir {
-            publish_registration_service(registration_sender, outgoing_svc_dir);
-        }
-
-        Ok(node)
-    }
-
-    #[cfg(test)]
-    pub async fn build_and_init(self) -> Rc<DriverManagerHandler> {
-        let node = self.build().unwrap();
-        node.init().await.unwrap();
-        node
-    }
-}
-
-struct MutableInner {
-    /// Receiver to emit valid DriverManagerRegistration. Will be waited on during `init()`. The
-    /// sender end is owned by the FIDL server task.
-    registration_receiver: mpsc::Receiver<DriverManagerRegistration>,
-
-    /// Function to call if the `termination_state_proxy` channel is closed. Initially populated,
-    /// but later moved into `monitor_termination_channel_closed_task`.
-    termination_channel_closed_handler: Option<Box<dyn FnOnce()>>,
-
-    /// Proxy instance that the Power Manager uses to set the Driver Manager's termination system
-    /// state. Populated during `init()`.
-    termination_state_proxy: Option<fdevicemgr::SystemStateTransitionProxy>,
-
-    /// Task that monitors for closure of `termination_state_proxy` to call
-    /// `termination_channel_closed_handler`. Populated once we have a valid
-    /// `termination_state_proxy` during `init()`.
-    monitor_termination_channel_closed_task: Option<fasync::Task<()>>,
-}
+///     - fuchsia.device.manager.SystemStateTransition: a client end of this protocol is provided to
+///       at construction. It is used to set the Driver Manager's termination system state.
 
 /// Default handler function that will be called if the fuchsia.device.manager.SystemStateTransition
 /// protocol instance that was provided during registration is ever closed.
-fn default_termination_channel_closed_handler() {
-    error!("SystemStateTransition channel closed. Forcing system shutdown");
+fn default_termination_channel_closed_handler(result: Result<zx::Signals, zx::Status>) {
+    error!("SystemStateTransition channel closed: {:?}. Forcing system shutdown", result);
     fuchsia_trace::instant!(
         "power_manager",
         "DriverManagerHandler::termination_channel_closed_handler",
@@ -216,41 +43,61 @@ fn default_termination_channel_closed_handler() {
     system_shutdown_handler::force_shutdown();
 }
 
-/// Contains the required protocol instances that are received from the Driver Manager.
-#[derive(Debug)]
-pub struct DriverManagerRegistration {
-    /// Protocol instance that the Power Manager uses to set the Driver Manager's termination system
-    /// state.
-    termination_state_proxy: fdevicemgr::SystemStateTransitionProxy,
-}
-
-impl DriverManagerRegistration {
-    /// Determine if the contents of this registration are valid.
-    fn validate(&self) -> Result<(), Error> {
-        if self.termination_state_proxy.is_closed() {
-            Err(format_err!("Invalid SystemStateTransitionProxy handle"))
-        } else {
-            Ok(())
-        }
-    }
-}
-
 pub struct DriverManagerHandler {
-    /// Signalled after `init()` has completed.
-    init_done: AsyncEvent,
-
-    /// Timeout value for waiting on a `DriverManagerRegistration` from `registration_receiver`. A
-    /// value of None indicates waiting forever.
-    registration_timeout: Option<Seconds>,
-
-    /// Mutable inner state.
-    mutable_inner: RefCell<MutableInner>,
+    termination_state_proxy: fdevicemgr::SystemStateTransitionProxy,
 
     /// Struct for managing Component Inspection data
     inspect: InspectData,
+
+    /// Task that monitors for closure of `termination_state_proxy` to call
+    /// `termination_channel_closed_handler`.
+    _monitor_termination_channel_closed_task: fasync::Task<()>,
 }
 
 impl DriverManagerHandler {
+    pub fn new() -> Result<Self, Error> {
+        let termination_state_proxy = fuchsia_component::client::connect_to_protocol::<
+            fdevicemgr::SystemStateTransitionMarker,
+        >()?;
+        Ok(Self::new_with_termination_state_proxy(termination_state_proxy, None))
+    }
+
+    fn new_with_termination_state_proxy(
+        termination_state_proxy: fdevicemgr::SystemStateTransitionProxy,
+        inspect_root: Option<&inspect::Node>,
+    ) -> Self {
+        Self::new_with_handler(
+            termination_state_proxy,
+            inspect_root,
+            default_termination_channel_closed_handler,
+        )
+    }
+
+    fn new_with_handler<F: FnOnce(Result<zx::Signals, zx::Status>) + 'static>(
+        termination_state_proxy: fdevicemgr::SystemStateTransitionProxy,
+        inspect_root: Option<&inspect::Node>,
+        termination_channel_closed_handler: F,
+    ) -> Self {
+        // Optionally use the default inspect root node
+        let inspect_root = inspect_root.unwrap_or(inspect::component::inspector().root());
+        let inspect = InspectData::new(inspect_root, "DriverManagerHandler".to_string());
+
+        // Create the channel closed handler task
+        let monitor_termination_channel_closed_task = {
+            let termination_state_proxy = termination_state_proxy.clone();
+            fasync::Task::local(async move {
+                let result = termination_state_proxy.on_closed().await;
+                termination_channel_closed_handler(result)
+            })
+        };
+
+        Self {
+            termination_state_proxy,
+            inspect,
+            _monitor_termination_channel_closed_task: monitor_termination_channel_closed_task,
+        }
+    }
+
     /// Handle the SetTerminationState message. The function uses `termination_state_proxy` to set
     /// the Driver Manager's termination state.
     async fn handle_set_termination_state_message(
@@ -267,20 +114,8 @@ impl DriverManagerHandler {
             "state" => state_str.as_str()
         );
 
-        self.init_done.wait().await;
-
-        // Extract `termination_state_proxy` from `mutable_inner`, returning an error (or asserting
-        // in debug) if the proxy is missing
-        let termination_state_proxy = self
-            .mutable_inner
-            .borrow()
+        let result = self
             .termination_state_proxy
-            .as_ref()
-            .ok_or(format_err!("Missing termination_state_proxy"))
-            .or_debug_panic()?
-            .clone();
-
-        let result = termination_state_proxy
             .set_termination_system_state(state)
             .await
             .context("FIDL failed")?;
@@ -314,152 +149,10 @@ impl DriverManagerHandler {
     }
 }
 
-/// Publishes the fuchsia.power.manager.DriverManagerRegistration service so that the Driver manager
-/// can send the registration that the Power Manager requires. The service is provided with the
-/// sender end of a mpsc channel so that it can send the registration back once it is received.
-fn publish_registration_service<'a, 'b>(
-    registration_sender: mpsc::Sender<DriverManagerRegistration>,
-    mut outgoing_svc_dir: ServiceFsDir<'a, ServiceObjLocal<'b, ()>>,
-) {
-    outgoing_svc_dir.add_fidl_service(move |stream| {
-        handle_registration_request_stream(registration_sender.clone(), stream);
-    });
-}
-
-/// Handles a new connection to the fuchsia.power.manager.DriverManagerRegistration service. The
-/// provided `stream` contains the requests sent to this connection. The provided
-/// `registration_sender` is used to send a valid `DriverManagerRegistration` instance to the
-/// receiver, which is waited on during `init()`. For each connection to the service, we handle one
-/// `Register` request then close the channel regardless of result.
-fn handle_registration_request_stream(
-    registration_sender: mpsc::Sender<DriverManagerRegistration>,
-    mut stream: fpowermanager::DriverManagerRegistrationRequestStream,
-) {
-    fuchsia_trace::instant!(
-        "power_manager",
-        "DriverManagerHandler::handle_registration_request_stream",
-        fuchsia_trace::Scope::Thread
-    );
-
-    fasync::Task::local(
-        async move {
-            match stream.try_next().await? {
-                Some(fpowermanager::DriverManagerRegistrationRequest::Register {
-                    system_state_transition,
-                    responder,
-                }) => {
-                    fuchsia_trace::instant!(
-                        "power_manager",
-                        "DriverManagerHandler::register_request",
-                        fuchsia_trace::Scope::Thread
-                    );
-
-                    let mut result =
-                        handle_registration(registration_sender, system_state_transition);
-                    log_if_err!(
-                        result.map_err(|e| format!("{:?}", e)),
-                        "Received invalid registration"
-                    );
-
-                    fuchsia_trace::instant!(
-                        "power_manager",
-                        "DriverManagerHandler::register_request_result",
-                        fuchsia_trace::Scope::Thread,
-                        "result" => format!("{:?}", result).as_str()
-                    );
-
-                    responder.send(&mut result).map_err(|e| e.into())
-                }
-                e => Err(format_err!("Invalid registration request: {:?}", e)),
-            }
-        }
-        .unwrap_or_else(|e: anyhow::Error| error!("{:?}", e)),
-    )
-    .detach();
-}
-
-/// Handles the registration parameters of a received `Register` request. If valid, the
-/// `DriverManagerRegistration` is sent to `registration_sender`.
-fn handle_registration(
-    mut registration_sender: mpsc::Sender<DriverManagerRegistration>,
-    termination_state_proxy: fidl::endpoints::ClientEnd<fdevicemgr::SystemStateTransitionMarker>,
-) -> Result<(), fpowermanager::RegistrationError> {
-    let registration = DriverManagerRegistration {
-        termination_state_proxy: termination_state_proxy
-            .into_proxy()
-            .map_err(|_| fpowermanager::RegistrationError::InvalidHandle)?,
-    };
-    registration.validate().map_err(|_| fpowermanager::RegistrationError::InvalidHandle)?;
-
-    registration_sender
-        .try_send(registration)
-        .map_err(|_| fpowermanager::RegistrationError::Internal)
-}
-
 #[async_trait(?Send)]
 impl Node for DriverManagerHandler {
     fn name(&self) -> String {
         "DriverManagerHandler".to_string()
-    }
-
-    /// Initializes the DriverManagerHandler.
-    ///
-    /// Waits to receive a `DriverManagerRegistration` over the `registration_receiver` channel
-    /// according to `self.registration_timeout`. If registration is not received after the timeout
-    /// then an error is returned.
-    ///
-    /// Received registration contains:
-    ///     - A `SystemStateTransition` proxy, which will be monitored for closure by creating
-    ///     `monitor_termination_channel_closed_task` to call `termination_channel_closed_handler`
-    ///     on closure.
-    ///
-    async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "DriverManagerHandler::init");
-
-        let timeout_time = match self.registration_timeout {
-            Some(timeout) => zx::Duration::from_seconds(timeout.0 as i64).after_now(),
-            None => fasync::Time::INFINITE,
-        };
-
-        let DriverManagerRegistration { termination_state_proxy } = match self
-            .mutable_inner
-            .borrow_mut()
-            .registration_receiver
-            .next()
-            .on_timeout(timeout_time, || None)
-            .await
-        {
-            Some(registration) => Ok(registration),
-            None => Err(format_err!("registration_receiver channel closed")),
-        }?;
-
-        self.inspect.registration_time.set(get_current_timestamp().0);
-
-        // Clone `termination_state_proxy` and retrieve the closed handler function in preparation
-        // to set up the channel closed handler task
-        let termination_state_proxy_clone = termination_state_proxy.clone();
-        let proxy_close_handler = self
-            .mutable_inner
-            .borrow_mut()
-            .termination_channel_closed_handler
-            .take()
-            .ok_or(format_err!("Missing termination_channel_closed_handler"))
-            .or_debug_panic()?;
-
-        // Create the channel closed handler task
-        let monitor_termination_channel_closed_task = fasync::Task::local(async move {
-            let _ = termination_state_proxy_clone.on_closed().await;
-            proxy_close_handler();
-        });
-
-        let mut inner_mut = self.mutable_inner.borrow_mut();
-        inner_mut.monitor_termination_channel_closed_task =
-            Some(monitor_termination_channel_closed_task);
-        inner_mut.termination_state_proxy = Some(termination_state_proxy);
-
-        self.init_done.signal();
-
-        Ok(())
     }
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
@@ -477,8 +170,6 @@ struct InspectData {
     _root_node: inspect::Node,
 
     // Properties
-    registration_timeout_config: inspect::UintProperty,
-    registration_time: inspect::IntProperty,
     termination_state: inspect::StringProperty,
     set_termination_errors: RefCell<BoundedListNode>,
 }
@@ -490,9 +181,6 @@ impl InspectData {
         let root_node = parent.create_child(name);
 
         Self {
-            registration_timeout_config: root_node
-                .create_uint("registration_timeout_config (s)", 0),
-            registration_time: root_node.create_int("registration_time", 0),
             termination_state: root_node.create_string("termination_state", "None"),
             set_termination_errors: RefCell::new(BoundedListNode::new(
                 root_node.create_child("set_termination_errors"),
@@ -511,8 +199,6 @@ impl InspectData {
 pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use futures::future::FusedFuture;
-    use futures::{join, poll, select};
     use inspect::assert_data_tree;
     use std::cell::Cell;
 
@@ -525,6 +211,8 @@ pub mod tests {
     where
         T: FnMut(fpowerstatecontrol::SystemPowerState) -> Result<(), zx::Status> + 'static,
     {
+        use futures::TryStreamExt as _;
+
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fdevicemgr::SystemStateTransitionMarker>()
                 .unwrap();
@@ -547,35 +235,6 @@ pub mod tests {
         proxy
     }
 
-    /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_new_from_json() {
-        // With a registration_timeout
-        let _ = DriverManagerHandlerBuilder::new_from_json(
-            json::json!({
-                "type": "DriverManagerHandler",
-                "name": "driver_manager_handler",
-                "config": {
-                    "registration_timeout": 60.0
-                }
-            }),
-            &HashMap::new(),
-            &mut ServiceFs::new_local(),
-        );
-
-        // Without a registration_timeout
-        let _ = DriverManagerHandlerBuilder::new_from_json(
-            json::json!({
-                "type": "DriverManagerHandler",
-                "name": "driver_manager_handler",
-                "config": {
-                }
-            }),
-            &HashMap::new(),
-            &mut ServiceFs::new_local(),
-        );
-    }
-
     /// Tests for the presence and correctness of Inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
@@ -588,12 +247,10 @@ pub mod tests {
             _ => Err(zx::Status::INVALID_ARGS),
         });
 
-        let node = DriverManagerHandlerBuilder::new()
-            .inspect_root(inspector.root())
-            .registration_timeout(Seconds(60.0))
-            .driver_manager_registration(DriverManagerRegistration { termination_state_proxy })
-            .build_and_init()
-            .await;
+        let node = DriverManagerHandler::new_with_termination_state_proxy(
+            termination_state_proxy,
+            Some(inspector.root()),
+        );
 
         // Should succeed so `termination_state` will be populated
         let _ = node
@@ -609,8 +266,6 @@ pub mod tests {
             inspector,
             root: {
                 DriverManagerHandler: {
-                    "registration_timeout_config (s)": 60u64,
-                    "registration_time": inspect::testing::AnyProperty,
                     "termination_state": "Reboot",
                     "set_termination_errors": {
                         "0": {
@@ -624,146 +279,47 @@ pub mod tests {
         );
     }
 
-    /// Tests that we can connect to the node's `DriverManagerRegistration` service and successfully
-    /// register with it.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_wait_for_registration_success() {
-        let mut service_fs = ServiceFs::new_local();
-        let connector = service_fs.create_protocol_connector().unwrap();
-        let node = DriverManagerHandlerBuilder::new()
-            .outgoing_svc_dir(service_fs.root_dir())
-            .build()
-            .unwrap();
-
-        fasync::Task::local(service_fs.collect()).detach();
-
-        // Create valid registration parameters
-        let (transition_client, _) =
-            fidl::endpoints::create_endpoints::<fdevicemgr::SystemStateTransitionMarker>().unwrap();
-
-        // Connect to the node's `DriverManagerRegistration` service
-        let registration_client = connector
-            .connect_to_protocol::<fpowermanager::DriverManagerRegistrationMarker>()
-            .unwrap();
-
-        // Run the node's `init()` future and the FIDL client's `register()` request future together
-        let (init_result, register_result) =
-            join!(node.init(), registration_client.register(transition_client));
-
-        assert_matches!(init_result, Ok(()));
-        assert_matches!(register_result.unwrap(), Ok(()));
-    }
-
-    /// Tests that the node expectedly returns an error if the registration timeout expires.
-    #[test]
-    fn test_wait_for_registration_timeout() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
-
-        let mut service_fs = ServiceFs::new_local();
-        let node = DriverManagerHandlerBuilder::new()
-            .registration_timeout(Seconds(1.0))
-            .outgoing_svc_dir(service_fs.root_dir())
-            .build()
-            .unwrap();
-
-        let mut init_future = node.init();
-
-        // Try to run `init_future` so that the timer becomes active
-        assert!(exec.run_until_stalled(&mut init_future).is_pending());
-
-        // Force the timeout to expire and verify it would've fired as the expected time
-        assert_eq!(exec.wake_next_timer(), Some(fasync::Time::from_nanos(1e9 as i64)));
-
-        // Verify the `init()` call returns an error
-        assert_matches!(
-            exec.run_until_stalled(&mut init_future),
-            futures::task::Poll::Ready(Err(_))
-        );
-    }
-
-    /// Tests that sending a register request with invalid handles results in an error returned to
-    /// the client and DriverManagerHandler still waiting in `init()`.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_registration_invalid_handles() {
-        let mut service_fs = ServiceFs::new_local();
-        let connector = service_fs.create_protocol_connector().unwrap();
-        let node = DriverManagerHandlerBuilder::new()
-            .outgoing_svc_dir(service_fs.root_dir())
-            .build()
-            .unwrap();
-
-        fasync::Task::local(service_fs.collect()).detach();
-
-        // Create invalid registration parameters
-        let transition_client = fidl::endpoints::ClientEnd::from(zx::Handle::invalid());
-
-        // Connect to the node's `DriverManagerRegistration` service
-        let registration_client = connector
-            .connect_to_protocol::<fpowermanager::DriverManagerRegistrationMarker>()
-            .unwrap();
-
-        let mut node_init_future = node.init().fuse();
-        let mut register_future = registration_client.register(transition_client).fuse();
-
-        // Run the node's `init()` future and the FIDL client's `register()` request future
-        // together. Only `register()` is expected to complete (with an error).
-        select! {
-            _init_result = node_init_future => panic!("init completed unexpectedly"),
-            register_result = register_future => {
-                assert!(register_result.is_err())
-            }
-        }
-
-        // Verify init() is still pending
-        assert!(!node_init_future.is_terminated());
-    }
-
     /// Tests that the proxy closure monitor fires after the underlying channel is closed
     #[fasync::run_singlethreaded(test)]
     async fn test_termination_channel_closure() {
+        use futures::StreamExt as _;
+
         // Channel to notify the test when the proxy closure handler has fired
-        let (mut channel_closed_sender, mut channel_closed_receiver) = mpsc::channel(1);
+        let (mut channel_closed_sender, mut channel_closed_receiver) =
+            futures::channel::mpsc::channel(1);
 
         // Create the registration parameters
         let (termination_state_proxy, termination_state_server) =
             fidl::endpoints::create_proxy::<fdevicemgr::SystemStateTransitionMarker>().unwrap();
-        let registration = DriverManagerRegistration { termination_state_proxy };
 
-        let _node = DriverManagerHandlerBuilder::new()
-            .driver_manager_registration(registration)
-            .termination_channel_closed_handler(Box::new(move || {
-                channel_closed_sender.try_send(()).unwrap()
-            }))
-            .build_and_init()
-            .await;
+        let _node =
+            DriverManagerHandler::new_with_handler(termination_state_proxy, None, move |result| {
+                channel_closed_sender.try_send(result).unwrap()
+            });
 
         // Drop the server end to close the channel
         drop(termination_state_server);
 
         // An item received on `channel_closed_receiver` indicates the proxy closure handler has
         // fired
-        assert_matches!(channel_closed_receiver.next().await, Some(()));
+        assert_matches!(channel_closed_receiver.next().await, Some(Ok(_)));
     }
 
     /// Tests that the DriverManagerHandler correctly processes the SetTerminationState message by
     /// calling out to the Driver Manager using the termination state proxy.
     #[fasync::run_singlethreaded(test)]
     async fn test_set_termination_state() {
-        let termination_state = Rc::new(Cell::new(fpowerstatecontrol::SystemPowerState::FullyOn));
+        let termination_state =
+            std::rc::Rc::new(Cell::new(fpowerstatecontrol::SystemPowerState::FullyOn));
         let termination_state_clone = termination_state.clone();
 
-        let registration = DriverManagerRegistration {
-            termination_state_proxy: setup_fake_termination_state_service(move |state| {
+        let node = DriverManagerHandler::new_with_termination_state_proxy(
+            setup_fake_termination_state_service(move |state| {
                 termination_state_clone.set(state);
                 Ok(())
             }),
-        };
-
-        let node = DriverManagerHandlerBuilder::new()
-            .driver_manager_registration(registration)
-            .build_and_init()
-            .await;
+            None,
+        );
 
         // Send the message and verify it returns successfully
         assert_matches!(
@@ -802,29 +358,5 @@ pub mod tests {
 
             Ok(())
         })
-    }
-
-    /// Tests that messages sent to the node are asynchronously blocked until the node's `init()`
-    /// has completed.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_require_init() {
-        let registration = DriverManagerRegistration {
-            termination_state_proxy: setup_fake_termination_state_service(|_| Ok(())),
-        };
-
-        // Create the node without `init()`
-        let node = DriverManagerHandlerBuilder::new()
-            .driver_manager_registration(registration)
-            .build()
-            .unwrap();
-
-        // Future to send the node a message
-        let mut message_future = node.handle_message(&Message::SetTerminationSystemState(
-            fpowerstatecontrol::SystemPowerState::Reboot,
-        ));
-
-        assert!(poll!(&mut message_future).is_pending());
-        assert_matches!(node.init().await, Ok(()));
-        assert_matches!(message_future.await, Ok(MessageReturn::SetTerminationSystemState));
     }
 }

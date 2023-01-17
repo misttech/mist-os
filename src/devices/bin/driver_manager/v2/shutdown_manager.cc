@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
-#include <fidl/fuchsia.power.manager/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>  // fidl::WireCall
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
@@ -133,23 +132,6 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing) {
     LOGF(INFO,
          "No valid handle found for lifecycle events, assuming test environment and continuing");
   }
-  // Bind to power manager
-  auto system_state_endpoints =
-      fidl::CreateEndpoints<fuchsia_device_manager::SystemStateTransition>();
-  ZX_ASSERT(system_state_endpoints.is_ok());
-  sys_state_bindings_.AddBinding(dispatcher_, std::move(system_state_endpoints->server), this,
-                                 [](ShutdownManager* server, fidl::UnbindInfo info) {
-                                   server->OnUnbound("Power Manager", info);
-                                 });
-
-  auto fpm_result = component::Connect<fuchsia_power_manager::DriverManagerRegistration>();
-  if (fpm_result.is_error()) {
-    LOGF(ERROR, "Failed to connect to fuchsia.power.manager: %s", fpm_result.status_string());
-    return;
-  }
-  auto reg_result =
-      fidl::WireCall(*fpm_result)->Register(std::move(system_state_endpoints->client));
-  ZX_ASSERT(reg_result.ok());
 }
 
 void ShutdownManager::OnPackageShutdownComplete() {

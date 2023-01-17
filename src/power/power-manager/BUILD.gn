@@ -42,7 +42,6 @@ power_manager_deps = [
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
-  "//sdk/fidl/fuchsia.power.manager:fuchsia.power.manager_rust",
   "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug_rust",
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile_rust",
   "//sdk/fidl/fuchsia.power.systemmode:fuchsia.power.systemmode_rust",

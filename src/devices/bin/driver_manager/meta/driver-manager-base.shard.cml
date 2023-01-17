@@ -50,9 +50,9 @@
                 "fuchsia.driver.development.DriverIndex",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.power.manager.DriverManagerRegistration",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+                "power-manager-outlives-driver-manager",
             ],
         },
         {

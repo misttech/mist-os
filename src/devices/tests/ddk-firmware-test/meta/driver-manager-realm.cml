@@ -47,7 +47,6 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.power.manager.DriverManagerRegistration",
             ],
             from: "#driver-manager-support",
             to: "#driver-manager",
