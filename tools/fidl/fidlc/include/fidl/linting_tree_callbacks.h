@@ -9,6 +9,7 @@
 
 #include <vector>
 
+#include "lib/stdcompat/span.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
@@ -44,7 +45,7 @@ class LintingTreeCallbacks {
   }
 
   // If comments lines are broken by more than one newline, they are treated as separate comments.
-  void OnComment(fit::function<void(const std::vector<const SourceSpan>&)> callback) {
+  void OnComment(fit::function<void(const cpp20::span<const SourceSpan>)> callback) {
     comment_callbacks_.push_back(std::move(callback));
   }
   void OnIgnoredToken(fit::function<void(const Token&)> callback) {
@@ -123,7 +124,7 @@ class LintingTreeCallbacks {
   std::vector<fit::function<void(const raw::File&)>> file_callbacks_;
   std::vector<fit::function<void(const raw::File&)>> exit_file_callbacks_;
   std::vector<fit::function<void(const raw::SourceElement&)>> source_element_callbacks_;
-  std::vector<fit::function<void(const std::vector<const SourceSpan>&)>> comment_callbacks_;
+  std::vector<fit::function<void(const cpp20::span<const SourceSpan>)>> comment_callbacks_;
   std::vector<fit::function<void(const Token&)>> ignored_token_callbacks_;
   std::vector<fit::function<void(const raw::AliasDeclaration&)>> alias_callbacks_;
   std::vector<fit::function<void(const raw::Using&)>> using_callbacks_;

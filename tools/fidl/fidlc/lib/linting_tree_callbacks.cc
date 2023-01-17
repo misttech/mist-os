@@ -10,6 +10,7 @@
 
 #include <re2/re2.h>
 
+#include "lib/stdcompat/span.h"
 #include "tools/fidl/fidlc/include/fidl/token_list.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
@@ -165,14 +166,14 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
     }
 
    private:
-    void OnComment(const std::vector<const SourceSpan>& comment_lines) {
+    void OnComment(const cpp20::span<const SourceSpan> comment_lines) {
       for (auto& callback : callbacks_.comment_callbacks_) {
         callback(comment_lines);
       }
     }
 
     void ProcessGaps(const fidl::Token& next_non_gap_token) {
-      std::vector<const SourceSpan> current_comment_block;
+      std::vector<SourceSpan> current_comment_block;
       while (*token_pointer_list_[next_token_index_] < next_non_gap_token) {
         const fidl::Token current_token = *token_pointer_list_[next_token_index_];
         if (current_token.kind() == Token::kComment) {

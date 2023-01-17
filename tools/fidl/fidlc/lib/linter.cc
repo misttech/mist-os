@@ -412,7 +412,7 @@ Linter::Linter()
   callbacks_.OnComment(
       [&linter = *this]
       //
-      (const std::vector<const SourceSpan>& spans) {
+      (const cpp20::span<const SourceSpan> spans) {
         for (const auto& span : spans) {
           linter.line_comments_checked_++;
           if (linter.CopyrightCheckIsComplete() &&
