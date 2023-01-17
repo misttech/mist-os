@@ -230,6 +230,8 @@ host_test_data("bad_cases") {
     "fidl/bad/fi-0193.test.fidl",
     "fidl/bad/fi-0194-a.test.fidl",
     "fidl/bad/fi-0194-b.test.fidl",
+    "fidl/bad/fi-0196-a.test.fidl",
+    "fidl/bad/fi-0196-b.test.fidl",
   ]
   outputs = [ "$root_out_dir/fidlc-tests/bad/{{source_file_part}}" ]
 }
@@ -485,6 +487,9 @@ host_test_data("good_cases") {
     "fidl/good/fi-0193.test.fidl",
     "fidl/good/fi-0194-a.test.fidl",
     "fidl/good/fi-0194-b.test.fidl",
+    "fidl/good/fi-0195.test.fidl",
+    "fidl/good/fi-0196-a.test.fidl",
+    "fidl/good/fi-0196-b.test.fidl",
   ]
   outputs = [ "$root_out_dir/fidlc-tests/good/{{source_file_part}}" ]
 }

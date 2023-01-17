@@ -454,7 +454,14 @@ constexpr FixableErrorDef<192, Fixable::Kind::kProtocolModifier, std::string_vie
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
 constexpr FixableErrorDef<194, Fixable::Kind::kEmptyStructResponse, std::string_view>
     ErrEmptyPayloadStructsWhenResultUnion(
-        "method '{}' cannot have an empty struct as a payload, prefer omitting the payload altogether");
+        "method '{}' cannot have an empty struct as a payload, prefer omitting the payload"
+        "altogether");
+constexpr ErrorDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag(
+    "the @experimental_overflowing attribute can only be used if the"
+    "`--experiment allow_overflowing` flag has been enabled for fidlc");
+constexpr ErrorDef<196> ErrExperimentalOverflowingIncorrectUsage(
+    "the @experimental_overflowing attribute must have at least one of the `request` or `response`"
+    "arguments set to true");
 }  // namespace fidl
 
 // LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)

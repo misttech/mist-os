@@ -398,6 +398,10 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0194.md>>
 
+<<error-catalog/_fi-0195.md>>
+
+<<error-catalog/_fi-0196.md>>
+
 <!--
 
 // LINT.ThenChange(/tools/fidl/fidlc/include/fidl/diagnostics.h)
