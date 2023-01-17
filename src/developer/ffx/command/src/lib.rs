@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use analytics::{get_notice, opt_out_for_this_invocation};
 use errors::{ffx_error, IntoExitCode};
-use ffx_metrics::{add_ffx_launch_and_timing_events, init_metrics_svc};
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
 use std::fs::File;
 use std::io::Write;
 use std::process::ExitStatus;
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 mod describe;
 mod error;
 mod ffx;
+mod metrics;
 mod tools;
 
 pub use error::*;
 pub use ffx::*;
+pub use metrics::*;
 pub use tools::*;
 
 fn stamp_file(stamp: &Option<String>) -> anyhow::Result<Option<File>> {
@@ -98,21 +98,8 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
         ffx_error!("'{log_level}' is not a valid log level. Supported log levels are 'Off', 'Error', 'Warn', 'Info', 'Debug', and 'Trace'")
     })?;
 
-    let analytics_disabled = ffx_config::get("ffx.analytics.disabled").await.unwrap_or(false);
-    let ffx_invoker = ffx_config::get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
-
-    init_metrics_svc(context.build_info(), ffx_invoker).await; // one time call to initialize app analytics
-    if analytics_disabled {
-        opt_out_for_this_invocation().await?
-    }
-
-    if let Some(note) = get_notice().await {
-        eprintln!("{}", note);
-    }
-
-    let analytics_start = Instant::now();
-
-    let command_start = Instant::now();
+    let metrics = MetricsSession::start(&context).await?;
+    metrics.print_notice(&mut std::io::stderr()).await?;
 
     let stamp = stamp_file(&app.stamp)?;
     let res = if let Some(tool) = tool {
@@ -125,33 +112,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
         .into())
     };
 
-    let command_done = Instant::now();
-    tracing::info!("Command completed. Success: {}", res.is_ok());
-    let command_duration = (command_done - command_start).as_secs_f32();
-    let timing_in_millis = (command_done - command_start).as_millis().to_string();
-
-    let analytics_task = fuchsia_async::Task::local(async move {
-        if let Err(e) = add_ffx_launch_and_timing_events(sanitized_args, timing_in_millis).await {
-            tracing::error!("metrics submission failed: {}", e);
-        }
-        Instant::now()
-    });
-
-    let analytics_done = analytics_task
-        // TODO(66918): make configurable, and evaluate chosen time value.
-        .on_timeout(Duration::from_secs(2), || {
-            tracing::error!("metrics submission timed out");
-            // Metrics timeouts should not impact user flows.
-            Instant::now()
-        })
-        .await;
-
-    tracing::info!(
-        "Run finished. success: {}, command time: {}, analytics time: {}",
-        res.is_ok(),
-        &command_duration,
-        (analytics_done - analytics_start).as_secs_f32()
-    );
+    metrics.command_finished(res.is_ok(), sanitized_args).await?;
 
     // Write to our stamp file if it was requested
     if let Some(mut stamp) = stamp {

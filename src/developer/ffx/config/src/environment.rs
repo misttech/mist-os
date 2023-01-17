@@ -177,6 +177,16 @@ impl EnvironmentContext {
         }
     }
 
+    pub async fn analytics_enabled(&self) -> bool {
+        use EnvironmentKind::*;
+        if let Isolated { .. } = self.kind {
+            false
+        } else {
+            // note: double negative to turn this into an affirmative
+            !crate::get("ffx.analytics.disabled").await.unwrap_or(false)
+        }
+    }
+
     pub fn env_file_path(&self) -> Result<PathBuf> {
         match &self.env_file_path {
             Some(path) => Ok(path.clone()),

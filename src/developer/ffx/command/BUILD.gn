@@ -39,6 +39,7 @@ rustc_library("lib") {
     "src/error.rs",
     "src/ffx.rs",
     "src/lib.rs",
+    "src/metrics.rs",
     "src/tools.rs",
   ]
 }
