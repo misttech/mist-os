@@ -9,9 +9,11 @@ use {
     fuchsia_component::server,
 };
 
+mod address;
 mod fidl_server;
 mod hypervisor;
 mod memory;
+mod vcpu;
 mod virtual_machine;
 
 #[fuchsia::main(logging = true, threads = 1)]

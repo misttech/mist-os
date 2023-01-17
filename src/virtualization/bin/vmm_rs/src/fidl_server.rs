@@ -147,7 +147,7 @@ impl<H: Hypervisor> FidlServer<H> {
                     }
                     return;
                 }
-                if let Err(e) = self.virtual_machine.as_ref().unwrap().start_primary_vcpu() {
+                if let Err(e) = self.virtual_machine.as_mut().unwrap().start_primary_vcpu().await {
                     if let Err(e) = responder.send(&mut Err(e)) {
                         tracing::warn!(%e, "Failed to send GuestLifecycle.Run response");
                     }
@@ -247,7 +247,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lifecycle_create_after_run() {
-        let (mut service_connector, _task) = setup_test();
+        let (mut service_connector, task) = setup_test();
 
         let guest_lifecycle =
             connect_to_outgoing_service::<GuestLifecycleMarker>(&mut service_connector);
@@ -267,6 +267,16 @@ mod tests {
                 .await
                 .expect("FIDL Error creating VM")
         );
+
+        // Drop the channel and await on the async task. Without this we could get crashes
+        // because we need to join all threads (which are created when we run the VM). This
+        // is because [task] owns the [FidlServer] and [VirtualMachine] instance so those
+        // [Drop] impls are not running in scope of the test function body.
+        //
+        // TODO(https://fxbug.dev/102872): If we refactor this so that the [FidlServer] is
+        // not owned by our exeuctor the cleanup will happen safely in the correct order.
+        std::mem::drop(guest_lifecycle);
+        task.await;
     }
 
     #[fuchsia::test]

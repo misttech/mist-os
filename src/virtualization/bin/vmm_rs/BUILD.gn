@@ -15,10 +15,12 @@ rustc_binary("vmm_rs") {
   with_unit_tests = true
 
   sources = [
+    "src/address.rs",
     "src/fidl_server.rs",
     "src/hypervisor.rs",
     "src/main.rs",
     "src/memory.rs",
+    "src/vcpu.rs",
     "src/virtual_machine.rs",
   ]
 
