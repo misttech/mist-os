@@ -858,11 +858,11 @@ protocol Flatland {
         size fuchsia.math.SizeU;
     });
 
-    /// Determines the blend function to use when rendering the image specified by
-    /// |image_id|. The image must be a valid image that was previously created with
-    /// a call to |CreateImage|. For details on the different blend functions that are
-    /// available, please refer to the BlendMode enum. If this function is not called,
-    /// then the default blendmode is BlendMode::SRC.
+    /// Determines the blend function to use when rendering the content specified by
+    /// |image_id|. |image_id| must be a valid ContentId associated to a transform through
+    /// a call to |CreateImage| or |CreateFilledRect|. For details on the different blend functions
+    /// that are available, please refer to the BlendMode enum. If this function is not called, then
+    /// the default blendmode is BlendMode::SRC.
     SetImageBlendingFunction(struct {
         image_id ContentId;
         blend_mode BlendMode;
