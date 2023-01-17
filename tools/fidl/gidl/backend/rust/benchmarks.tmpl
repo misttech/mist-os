@@ -40,22 +40,24 @@ const _V2_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion:
 
 {{ range .Benchmarks }}
 fn benchmark_{{ .Name }}_builder(b: &mut Bencher) {
+    {{- if .HandleDefs }}
     b.iter_batched_ref(
         || {
-            {{- if .HandleDefs }}
             create_handles(&{{ .HandleDefs }})
-            {{- else }}
-            {{- /* Use empty vector with b.iter_batched_ref, rather than b.iter,
-                for consistency between handle and non-handle benchmarks. */}}
-            Vec::<Handle>::new()
-            {{- end }}
         },
-        |{{ if not .HandleDefs }}_{{ end }}handle_defs| {
+        |handle_defs| {
             black_box({{ .Value }}); {{- /* semicolon: include drop time. */}}
         },
         {{- /* Consider using LargeInput or NumIterations if this causes memory issues. */}}
         BatchSize::SmallInput,
     );
+    {{- else }}
+    b.iter(
+        || {
+            black_box({{ .Value }}); {{- /* semicolon: include drop time. */}}
+        },
+    );
+    {{- end }}
 }
 
 fn benchmark_{{ .Name }}_encode(b: &mut Bencher) {
