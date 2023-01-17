@@ -34,7 +34,9 @@ exports_files(
     [
         "third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
         "third_party/android/platform/external/avb/test/data/atx_metadata.bin",
-    ],
+    ] +
+    # Bootloader images used in partition configs for product bundles.
+    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"]),
 )
 
 linux_sysroot(
