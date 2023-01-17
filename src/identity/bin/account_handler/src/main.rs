@@ -22,6 +22,7 @@ mod interaction_lock_state;
 mod lock_request;
 mod persona;
 mod pre_auth;
+mod storage_lock_state;
 mod stored_account;
 mod wrapped_key;
 

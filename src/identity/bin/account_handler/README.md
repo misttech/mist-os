@@ -65,14 +65,19 @@ whose responsibilities and key interactions are summarized below:
   - Defining an sub-state machine for the component once it has been initialized
   - Implementing a `fuchsia.identity.internal.AccountHandlerControl` server
   - Invoking the storage manager library.
-- **`account`** - This module defines the state of an unlocked account, uses the
-  `stored_account` module to load and save post-authentication state for the
-  account, and implements a `fuchsia.identity.account.Account` server to expose
-  information about the account to other components. The `account` module also
-  uses the `persona` module to serve requests for personae. No other modules
-  should understand the details of an unlocked account.
-- **`interaction_lock_state`** - This module manages:
-  - the enum which represents the state of the account with respect to being
+- **`storage_lock_state`** - This module manages:
+  - the state of the account with respect to being storage-locked, i.e. whether
+    or not the underlying storage volume is mounted.
+  - enum variants for managing various storage lock states and state
+    transitions.
+- **`account`** - This module defines the state of a storage-unlocked account,
+  uses the `stored_account` module to load and save post-authentication state for
+  the account, and implements a `fuchsia.identity.account.Account` server to
+  expose information about the account to other components. The `account` module
+  also uses the `persona` module to serve requests for personae. No other modules
+  should understand the details of a storage-unlocked account.
+- **`interaction_lock_state`** - This module manages: 
+  - the enum which represents the state of the account with respect to being 
     interaction-locked, i.e. whether or not the account is currently closed
     to interaction because of either a manual lock action or inactivity.
   - enum variants for managing various interaction lock states and state
@@ -101,8 +106,8 @@ whose responsibilities and key interactions are summarized below:
   pre-authentication state to store volume encryption keys and provides
   cryptographic operations to wrap and unwrap these keys.
 - **`lock_request`** - This module defines a simple wrapper used to communicate
-  account lock events received on any `Account` channel to the `account_handler`
-  module.
+  account lock events (both storage lock and integration lock) received on any
+  `Account` channel to the `account_handler` module.
 - **`inspect`** - This module defines the data that the component publishes to
   the Inspect diagnostics system.
 - **`common`** - This module defines data types that are used widely across

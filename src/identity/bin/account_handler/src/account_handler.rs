@@ -10,6 +10,7 @@ use {
         interaction::Interaction,
         lock_request,
         pre_auth::{self, produce_single_enrollment, EnrollmentState, State as PreAuthState},
+        storage_lock_state::StorageLockState,
         wrapped_key::make_random_256_bit_generic_array,
     },
     account_common::{AccountId, AccountManagerError},
@@ -49,7 +50,7 @@ where
 
     /// The account is initialized, and is either locked or unlocked.
     Initialized {
-        lock_state: LockState<SM>,
+        lock_state: StorageLockState<SM>,
         pre_auth_state: PreAuthState,
         storage_manager: Arc<Mutex<SM>>,
     },
@@ -69,31 +70,6 @@ where
                 return l.fmt(f);
             }
             Lifecycle::Finished => "Finished",
-        };
-        write!(f, "{name}")
-    }
-}
-
-/// The states of an initialized AccountHandler.
-enum LockState<SM>
-where
-    SM: StorageManager,
-{
-    /// The account is locked.
-    Locked,
-
-    /// The account is currently loaded and is available.
-    Unlocked { account: Arc<Account<SM>> },
-}
-
-impl<SM> fmt::Debug for LockState<SM>
-where
-    SM: StorageManager,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            LockState::Locked => "Locked",
-            LockState::Unlocked { .. } => "Unlocked",
         };
         write!(f, "{name}")
     }
@@ -256,7 +232,7 @@ where
 
                 let pre_auth_state_bytes: Vec<u8> = (&pre_auth_state).try_into()?;
                 *state_lock = Lifecycle::Initialized {
-                    lock_state: LockState::Unlocked { account: Arc::new(account) },
+                    lock_state: StorageLockState::Unlocked { account: Arc::new(account) },
                     storage_manager,
                     pre_auth_state,
                 };
@@ -287,7 +263,7 @@ where
                 let storage_manager =
                     Arc::new(Mutex::new((storage_manager_factory)(pre_auth_state.account_id())));
                 *state_lock = Lifecycle::Initialized {
-                    lock_state: LockState::Locked,
+                    lock_state: StorageLockState::Locked,
                     pre_auth_state,
                     storage_manager,
                 };
@@ -314,7 +290,7 @@ where
     ) -> Result<Option<Vec<u8>>, ApiError> {
         let mut state_lock = self.state.lock().await;
         match &*state_lock {
-            Lifecycle::Initialized { lock_state: LockState::Unlocked { .. }, .. } => {
+            Lifecycle::Initialized { lock_state: StorageLockState::Unlocked { .. }, .. } => {
                 info!(
                     "UnlockAccount was called in the Initialized::Unlocked state, quietly \
                     succeeding."
@@ -322,7 +298,7 @@ where
                 Ok(None)
             }
             Lifecycle::Initialized {
-                lock_state: LockState::Locked,
+                lock_state: StorageLockState::Locked,
                 pre_auth_state: pre_auth_state_ref,
                 storage_manager,
             } => {
@@ -370,7 +346,7 @@ where
                     })
                     .transpose()?;
                 *state_lock = Lifecycle::Initialized {
-                    lock_state: LockState::Unlocked { account: Arc::new(account) },
+                    lock_state: StorageLockState::Unlocked { account: Arc::new(account) },
                     pre_auth_state,
                     storage_manager: Arc::clone(storage_manager),
                 };
@@ -414,7 +390,7 @@ where
         self.inspect.lifecycle.set("finished");
         match old_lifecycle {
             Lifecycle::Initialized {
-                lock_state: LockState::Locked { .. },
+                lock_state: StorageLockState::Locked { .. },
                 storage_manager,
                 ..
             } => {
@@ -429,7 +405,7 @@ where
                 Ok(())
             }
             Lifecycle::Initialized {
-                lock_state: LockState::Unlocked { account, .. },
+                lock_state: StorageLockState::Unlocked { account, .. },
                 storage_manager,
                 ..
             } => {
@@ -472,9 +448,10 @@ where
         account_server_end: ServerEnd<AccountMarker>,
     ) -> Result<(), ApiError> {
         let account_arc = match &*self.state.lock().await {
-            Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } => {
-                Arc::clone(account)
-            }
+            Lifecycle::Initialized {
+                lock_state: StorageLockState::Unlocked { account, .. },
+                ..
+            } => Arc::clone(account),
             _ => {
                 warn!("GetAccount: AccountHandler is not unlocked");
                 return Err(ApiError::FailedPrecondition);
@@ -512,8 +489,10 @@ where
             let mut state_lock = self.state.lock().await;
             std::mem::replace(&mut *state_lock, Lifecycle::Finished)
         };
-        if let Lifecycle::Initialized { lock_state: LockState::Unlocked { account, .. }, .. } =
-            old_state
+        if let Lifecycle::Initialized {
+            lock_state: StorageLockState::Unlocked { account, .. },
+            ..
+        } = old_state
         {
             if account.task_group().cancel().await.is_err() {
                 warn!("Task group cancelled but account is still unlocked");
@@ -701,14 +680,14 @@ where
         match &mut *state_lock {
             Lifecycle::Initialized { ref mut lock_state, storage_manager, .. } => {
                 match lock_state {
-                    LockState::Locked {} => {
+                    StorageLockState::Locked {} => {
                         info!(
                             "A lock operation was attempted in the locked state, quietly \
                             succeeding."
                         );
                         Ok(None)
                     }
-                    LockState::Unlocked { account } => {
+                    StorageLockState::Unlocked { account } => {
                         let () =
                             storage_manager.lock().await.lock_storage().await.map_err(|err| {
                                 warn!("LockAccount failed to lock StorageManager: {:?}", err);
@@ -718,7 +697,7 @@ where
                         // Ignore AlreadyCancelled error
                         let _ = account.task_group().cancel().await;
 
-                        *lock_state = LockState::Locked;
+                        *lock_state = StorageLockState::Locked;
                         inspect.lifecycle.set("locked");
                         Ok(None) // Pre-auth state remains the same so don't return it.
                     }

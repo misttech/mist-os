@@ -61,6 +61,7 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/persona.rs",
     "src/pre_auth.rs",
+    "src/storage_lock_state.rs",
     "src/stored_account.rs",
     "src/test_util.rs",
     "src/wrapped_key.rs",
