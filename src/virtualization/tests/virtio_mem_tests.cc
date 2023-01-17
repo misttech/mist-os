@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/virtualization/tests/lib/guest_test.h"

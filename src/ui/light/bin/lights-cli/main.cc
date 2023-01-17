@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.light/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>

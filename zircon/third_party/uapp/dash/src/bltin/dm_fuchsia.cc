@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

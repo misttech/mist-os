@@ -4,7 +4,7 @@
 
 #include "harness.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 namespace server_suite {
 

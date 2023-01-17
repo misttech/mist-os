@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.ui.composition/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/image-format/image_format.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>

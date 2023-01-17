@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>

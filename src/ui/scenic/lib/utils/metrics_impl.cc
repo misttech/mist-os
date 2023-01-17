@@ -4,7 +4,7 @@
 
 #include "src/ui/scenic/lib/utils/metrics_impl.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/channel.h>
 
 namespace metrics {
