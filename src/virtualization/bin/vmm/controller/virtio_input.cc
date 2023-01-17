@@ -24,17 +24,10 @@ static_assert(sizeof(kDeviceSerial) - 1 < sizeof(virtio_input_config_t::u),
 // touchpad, stylus or joystick.
 constexpr uint32_t kATKeyboardFirstCode = 0;
 constexpr uint32_t kATKeyboardLastCode = 255;
-constexpr uint32_t kMediaKeyboardFirstCode = 0x160;
-constexpr uint32_t kMediaKeyboardLastCode = 0x2bf;
 static_assert(kATKeyboardFirstCode % 8 == 0, "First scan code must be byte aligned.");
 static_assert((kATKeyboardLastCode + 1 - kATKeyboardFirstCode) % 8 == 0,
               "Scan code range must be byte aligned.");
-static_assert(kMediaKeyboardFirstCode % 8 == 0, "First scan code must be byte aligned.");
-static_assert((kMediaKeyboardLastCode + 1 - kMediaKeyboardFirstCode) % 8 == 0,
-              "Scan code range must be byte aligned.");
 static_assert((kATKeyboardLastCode + 7) / 8 < sizeof(virtio_input_config_t().u.bitmap),
-              "Last scan code cannot exceed allowed range.");
-static_assert((kMediaKeyboardLastCode + 7) / 8 < sizeof(virtio_input_config_t().u.bitmap),
               "Last scan code cannot exceed allowed range.");
 
 constexpr auto kComponentCollectionName = "virtio_input_devices";
@@ -52,10 +45,7 @@ uint8_t VirtioInput::Keyboard(uint8_t subsel, uint8_t* bitmap) {
   }
   memset(&bitmap[kATKeyboardFirstCode / 8], 0xff,
          (kATKeyboardLastCode + 1 - kATKeyboardFirstCode) / 8);
-  memset(&bitmap[kMediaKeyboardFirstCode / 8], 0xff,
-         (kMediaKeyboardLastCode + 1 - kMediaKeyboardFirstCode) / 8);
-  set_config_bit(bitmap, kButtonTouchCode);
-  return sizeof(virtio_input_config::u);
+  return sizeof(virtio_input_config_t::u);
 }
 
 uint8_t VirtioInput::Pointer(uint8_t subsel, uint8_t* bitmap) {
