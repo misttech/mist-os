@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -18,12 +18,21 @@ group("fuzzers") {
 
 cpp_fuzzer("ftl-workload-fuzzer") {
   deps = [ "//src/storage/lib/ftl/test:ftl-workload-fuzzer" ]
-
   # Suppress logs on stdout from library under test
-  options = [ "close_fd_mask=1" ]
 }
 
-fuzzer_package("ftl-fuzzers") {
-  cpp_fuzzers = [ ":ftl-workload-fuzzer" ]
-  fuzz_host = true
+fuchsia_fuzzer_component("ftl-workload-fuzzer-component") {
+  manifest = "meta/ftl-workload-fuzzer.cml"
+  deps = [ ":ftl-workload-fuzzer" ]
+}
+
+if (is_fuchsia) {
+  fuchsia_fuzzer_package("ftl-fuzzers") {
+    cpp_fuzzer_components = [ ":ftl-workload-fuzzer-component" ]
+  }
+} else {
+  group("ftl-fuzzers") {
+    testonly = true
+    deps = [ ":ftl-workload-fuzzer" ]
+  }
 }

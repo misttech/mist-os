@@ -4,9 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 
@@ -69,6 +67,11 @@ rustc_fuzzer("parse_record_fuzzer") {
   sources = [ "src/fuzzer.rs" ]
 }
 
-fuzzer_package("diagnostics-stream-fuzzers") {
-  rust_fuzzers = [ ":parse_record_fuzzer" ]
+fuchsia_fuzzer_component("parse-record-fuzzer-component") {
+  manifest = "meta/parse_record_fuzzer.cml"
+  deps = [ ":parse_record_fuzzer" ]
+}
+
+fuchsia_fuzzer_package("diagnostics-stream-fuzzers") {
+  rust_fuzzer_components = [ ":parse-record-fuzzer-component" ]
 }

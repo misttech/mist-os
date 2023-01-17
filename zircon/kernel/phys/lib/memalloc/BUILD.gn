@@ -6,7 +6,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//build/zircon/migrated_targets.gni")
 
@@ -87,14 +87,32 @@ if (!is_kernel) {
     ]
   }
 
-  fuzzer_package("memalloc-fuzzers") {
-    fuzz_host = true
-    cpp_fuzzers = [
-      ":find-fuzzer",
-      ":pool-fuzzer",
-    ]
+  fuchsia_fuzzer_component("find-fuzzer-component") {
+    manifest = "meta/find-fuzzer.cml"
+    deps = [ ":find-fuzzer" ]
   }
 
+  fuchsia_fuzzer_component("pool-fuzzer-component") {
+    manifest = "meta/pool-fuzzer.cml"
+    deps = [ ":pool-fuzzer" ]
+  }
+
+  if (is_fuchsia) {
+    fuchsia_fuzzer_package("memalloc-fuzzers") {
+      cpp_fuzzer_components = [
+        ":find-fuzzer-component",
+        ":pool-fuzzer-component",
+      ]
+    }
+  } else {
+    group("memalloc-fuzzers") {
+      testonly = true
+      deps = [
+        ":find-fuzzer",
+        ":pool-fuzzer",
+      ]
+    }
+  }
   cpp_fuzzer("find-fuzzer") {
     sources = [ "find-fuzzer.cc" ]
     deps = [

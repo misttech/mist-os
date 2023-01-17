@@ -59,8 +59,7 @@ zx_library("acpi_lite") {
 
 if (!is_kernel) {
   import("//build/components.gni")
-  import("//build/fuzzing/fuzzer.gni")
-  import("//build/fuzzing/fuzzer_package.gni")
+  import("//build/fuzz.gni")
   import("//build/test.gni")
 
   test("acpi_lite_test") {
@@ -82,32 +81,52 @@ if (!is_kernel) {
     deps = [ ":acpi_lite_test" ]
   }
 
-  fuzzer("acpi_lite_fuzztest") {
+  fuchsia_library_fuzzer("acpi_lite_fuzztest") {
     sources = [ "acpi_lite_fuzztest.cc" ]
     deps = [ ":acpi_lite" ]
   }
 
-  fuzzer("apic_fuzztest") {
+  fuchsia_library_fuzzer("apic_fuzztest") {
     sources = [ "apic_fuzztest.cc" ]
     deps = [ ":acpi_lite" ]
   }
 
-  fuzzer("numa_fuzztest") {
+  fuchsia_library_fuzzer("numa_fuzztest") {
     sources = [ "numa_fuzztest.cc" ]
     deps = [ ":acpi_lite" ]
   }
 
-  fuzzer("debug_port_fuzztest") {
+  fuchsia_library_fuzzer("debug_port_fuzztest") {
     sources = [ "debug_port_fuzztest.cc" ]
     deps = [ ":acpi_lite" ]
   }
 
-  fuzzer_package("acpi-lite-fuzzer") {
-    cpp_fuzzers = [
-      ":acpi_lite_fuzztest",
-      ":apic_fuzztest",
-      ":numa_fuzztest",
-      ":debug_port_fuzztest",
+  fuchsia_fuzzer_component("acpi-lite-fuzztest-component") {
+    manifest = "meta/acpi_lite_fuzztest.cml"
+    deps = [ ":acpi_lite_fuzztest" ]
+  }
+
+  fuchsia_fuzzer_component("apic-fuzztest-component") {
+    manifest = "meta/apic_fuzztest.cml"
+    deps = [ ":apic_fuzztest" ]
+  }
+
+  fuchsia_fuzzer_component("numa-fuzztest-component") {
+    manifest = "meta/numa_fuzztest.cml"
+    deps = [ ":numa_fuzztest" ]
+  }
+
+  fuchsia_fuzzer_component("debug-port-fuzztest-component") {
+    manifest = "meta/debug_port_fuzztest.cml"
+    deps = [ ":debug_port_fuzztest" ]
+  }
+
+  fuchsia_fuzzer_package("acpi-lite-fuzzer") {
+    cpp_fuzzer_components = [
+      ":acpi-lite-fuzztest-component",
+      ":apic-fuzztest-component",
+      ":numa-fuzztest-component",
+      ":debug-port-fuzztest-component",
     ]
   }
 

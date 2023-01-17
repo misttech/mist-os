@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -41,11 +40,16 @@ fuchsia_unittest_package("bitmap-test-pkg") {
   deps = [ ":bitmap" ]
 }
 
-fuzzer("raw-bitmap-fuzzer") {
+fuchsia_library_fuzzer("raw-bitmap-fuzzer") {
   sources = [ "raw-bitmap-fuzzer.cc" ]
   deps = [ "//zircon/system/ulib/bitmap" ]
 }
 
-fuzzer_package("bitmap-fuzzers") {
-  cpp_fuzzers = [ ":raw-bitmap-fuzzer" ]
+fuchsia_fuzzer_component("raw-bitmap-fuzzer-component") {
+  manifest = "meta/raw-bitmap-fuzzer.cml"
+  deps = [ ":raw-bitmap-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("bitmap-fuzzers") {
+  cpp_fuzzer_components = [ ":raw-bitmap-fuzzer-component" ]
 }

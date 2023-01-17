@@ -5,8 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ethernet_usb_cdc_ecm_bind") {
@@ -95,7 +94,7 @@ fuchsia_unittest_package("usb-cdc-ecm-unittest-package") {
   deps = [ ":usb-cdc-ecm-unittest" ]
 }
 
-fuzzer("usb-cdc-ecm-descriptor-fuzzer") {
+fuchsia_library_fuzzer("usb-cdc-ecm-descriptor-fuzzer") {
   sources = [ "usb-cdc-ecm-descriptor-fuzzer.cc" ]
   deps = [
     ":usb-cdc-ecm-lib",
@@ -104,8 +103,13 @@ fuzzer("usb-cdc-ecm-descriptor-fuzzer") {
   ]
 }
 
-fuzzer_package("usb-cdc-ecm-fuzzers") {
-  cpp_fuzzers = [ ":usb-cdc-ecm-descriptor-fuzzer" ]
+fuchsia_fuzzer_component("usb-cdc-ecm-descriptor-fuzzer-component") {
+  manifest = "meta/usb-cdc-ecm-descriptor-fuzzer.cml"
+  deps = [ ":usb-cdc-ecm-descriptor-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("usb-cdc-ecm-fuzzers") {
+  cpp_fuzzer_components = [ ":usb-cdc-ecm-descriptor-fuzzer-component" ]
 }
 
 test("usb-cdc-ecm-integration") {

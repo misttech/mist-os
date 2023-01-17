@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
 import("//build/cpp/sdk_source_set.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/sdk/sdk.gni")
 import("//build/test.gni")
 
@@ -67,9 +67,20 @@ cpp_fuzzer("simple-compare-fuzzer") {
   deps = [ ":utf-utils" ]
 }
 
-fuzzer_package("utf-utils-fuzzers") {
-  cpp_fuzzers = [ ":simple-compare-fuzzer" ]
-  fuzz_host = true
+fuchsia_fuzzer_component("simple-compare-fuzzer-component") {
+  manifest = "meta/simple-compare-fuzzer.cml"
+  deps = [ ":simple-compare-fuzzer" ]
+}
+
+if (is_fuchsia) {
+  fuchsia_fuzzer_package("utf-utils-fuzzers") {
+    cpp_fuzzer_components = [ ":simple-compare-fuzzer-component" ]
+  }
+} else {
+  group("utf-utils-fuzzers") {
+    testonly = true
+    deps = [ ":simple-compare-fuzzer" ]
+  }
 }
 
 # Enable SSSE3 and AVX2 instructions for tests that use dynamic dispatch to test vector extensions.

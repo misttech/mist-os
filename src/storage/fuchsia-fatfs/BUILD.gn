@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
@@ -64,15 +64,6 @@ rustc_fuzzer("fat-fuzzer") {
   edition = "2021"
   rustfunction = "fuzz_fatfs"
 
-  corpus = "corpus"
-  options = [
-    "-rss_limit_mb=3072",
-
-    # Set a reasonably low per-task timeout in case the filesystem has problems that cause infinite
-    # loops in the fuzzing code (e.g. cycles in the directory tree).
-    "-timeout=60",
-  ]
-
   sources = [ "src/fuzzer.rs" ] + fatfs_sources
   deps = fatfs_deps + [
            "//src/lib/fuzzing/rust:fuzz",
@@ -80,8 +71,16 @@ rustc_fuzzer("fat-fuzzer") {
          ]
 }
 
-fuzzer_package("fuchsia-fatfs-fuzzer") {
-  rust_fuzzers = [ ":fat-fuzzer" ]
+fuchsia_fuzzer_component("fat-fuzzer-component") {
+  manifest = "meta/fat-fuzzer.cml"
+  deps = [
+    ":fat-fuzzer",
+    "corpus",
+  ]
+}
+
+fuchsia_fuzzer_package("fuchsia-fatfs-fuzzer") {
+  rust_fuzzer_components = [ ":fat-fuzzer-component" ]
 }
 
 rustc_binary("fatfs") {

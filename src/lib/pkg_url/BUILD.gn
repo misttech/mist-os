@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
 source_set("pkg_url") {
   sources = [
@@ -38,19 +37,29 @@ fuchsia_unittest_package("pkg_url_unittests") {
   deps = [ ":tests" ]
 }
 
-fuzzer_package("pkg_url_fuzzers") {
-  cpp_fuzzers = [
-    ":fuchsia_pkg_url_fuzzer",
-    ":url_resolver_fuzzer",
+fuchsia_fuzzer_component("fuchsia-pkg-url-fuzzer-component") {
+  manifest = "meta/fuchsia_pkg_url_fuzzer.cml"
+  deps = [ ":fuchsia_pkg_url_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("url-resolver-fuzzer-component") {
+  manifest = "meta/url_resolver_fuzzer.cml"
+  deps = [ ":url_resolver_fuzzer" ]
+}
+
+fuchsia_fuzzer_package("pkg_url_fuzzers") {
+  cpp_fuzzer_components = [
+    ":fuchsia-pkg-url-fuzzer-component",
+    ":url-resolver-fuzzer-component",
   ]
 }
 
-fuzzer("fuchsia_pkg_url_fuzzer") {
+fuchsia_library_fuzzer("fuchsia_pkg_url_fuzzer") {
   sources = [ "fuchsia_pkg_url_fuzztest.cc" ]
   deps = [ ":pkg_url" ]
 }
 
-fuzzer("url_resolver_fuzzer") {
+fuchsia_library_fuzzer("url_resolver_fuzzer") {
   sources = [ "url_resolver_fuzztest.cc" ]
   deps = [ ":pkg_url" ]
 }

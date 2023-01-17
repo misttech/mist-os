@@ -5,8 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 driver_bind_rules("goldfish_sensor-bind") {
@@ -104,7 +103,7 @@ test("goldfish-sensor-unittest") {
   configs += [ "//build/config:all_source" ]
 }
 
-fuzzer("goldfish-sensor-parser-fuzzer") {
+fuchsia_library_fuzzer("goldfish-sensor-parser-fuzzer") {
   sources = [
     "parser.cc",
     "parser.h",
@@ -116,10 +115,15 @@ fuzzer("goldfish-sensor-parser-fuzzer") {
   ]
 }
 
-fuzzer_package("goldfish-sensor-parser-fuzzer-package") {
+fuchsia_fuzzer_component("goldfish-sensor-parser-fuzzer-component") {
+  manifest = "meta/goldfish-sensor-parser-fuzzer.cml"
+  deps = [ ":goldfish-sensor-parser-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("goldfish-sensor-parser-fuzzer-package") {
   package_name = "goldfish-sensor-parser-fuzzer"
 
-  cpp_fuzzers = [ ":goldfish-sensor-parser-fuzzer" ]
+  cpp_fuzzer_components = [ ":goldfish-sensor-parser-fuzzer-component" ]
 }
 
 fuchsia_unittest_package("goldfish-sensor-test-package") {

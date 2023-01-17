@@ -5,7 +5,7 @@
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -278,8 +278,13 @@ cpp_fuzzer("manifest-parser-fuzzer") {
   deps = [ ":manifest_parser" ]
 }
 
-fuzzer_package("driver-manager-fuzzers") {
-  cpp_fuzzers = [ ":manifest-parser-fuzzer" ]
+fuchsia_fuzzer_component("manifest-parser-fuzzer-component") {
+  manifest = "meta/manifest-parser-fuzzer.cml"
+  deps = [ ":manifest-parser-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("driver-manager-fuzzers") {
+  cpp_fuzzer_components = [ ":manifest-parser-fuzzer-component" ]
 }
 
 fuchsia_test_package("driver-manager-tests") {

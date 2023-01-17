@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
@@ -224,11 +224,21 @@ rustc_fuzzer("fuzz-single-device") {
   configs += [ ":fuzz" ]
 }
 
-fuzzer_package("netstack3-core-fuzzers") {
-  rust_fuzzers = [ ":fuzz-single-device" ]
-  fuzz_host = true
+fuchsia_fuzzer_component("fuzz-single-device-component") {
+  manifest = "meta/fuzz-single-device.cml"
+  deps = [ ":fuzz-single-device" ]
 }
 
+if (is_fuchsia) {
+  fuchsia_fuzzer_package("netstack3-core-fuzzers") {
+    rust_fuzzer_components = [ ":fuzz-single-device-component" ]
+  }
+} else {
+  group("netstack3-core-fuzzers") {
+    testonly = true
+    deps = [ ":fuzz-single-device" ]
+  }
+}
 group("tests") {
   testonly = true
   public_deps = [

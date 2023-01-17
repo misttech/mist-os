@@ -3,18 +3,28 @@
 # found in the LICENSE file.
 
 import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
 group("test") {
   testonly = true
   deps = [ ":cmdline-fuzzers($default_toolchain)" ]
 }
 
-fuzzer_package("cmdline-fuzzers") {
-  fuzz_host = true
-  cpp_fuzzers = [ ":cmdline-fuzzer" ]
+fuchsia_fuzzer_component("cmdline-fuzzer-component") {
+  manifest = "meta/cmdline-fuzzer.cml"
+  deps = [ ":cmdline-fuzzer" ]
 }
 
+if (is_fuchsia) {
+  fuchsia_fuzzer_package("cmdline-fuzzers") {
+    cpp_fuzzer_components = [ ":cmdline-fuzzer-component" ]
+  }
+} else {
+  group("cmdline-fuzzers") {
+    testonly = true
+    deps = [ ":cmdline-fuzzer" ]
+  }
+}
 cpp_fuzzer("cmdline-fuzzer") {
   sources = [ "cmdline_fuzzer.cc" ]
   deps = [ "//zircon/system/ulib/cmdline" ]

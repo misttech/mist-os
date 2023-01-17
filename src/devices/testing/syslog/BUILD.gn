@@ -4,48 +4,59 @@
 
 import("//build/cpp/sdk_shared_library.gni")
 import("//build/cpp/sdk_source_set.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
-fuzzer("syslog-fuzzer") {
+fuchsia_library_fuzzer("syslog-fuzzer") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/syslog/cpp:backend",
     "//zircon/system/ulib/zircon-internal",
   ]
-  options = [ "max_len=1000000" ]
 }
 
-fuzzer_package("syslog-fuzzers") {
-  cpp_fuzzers = [ ":syslog-fuzzer" ]
+fuchsia_fuzzer_component("syslog-fuzzer-component") {
+  manifest = "meta/syslog-fuzzer.cml"
+  deps = [ ":syslog-fuzzer" ]
 }
 
-fuzzer("syslog-fuzzer-legacy") {
+fuchsia_fuzzer_package("syslog-fuzzers") {
+  cpp_fuzzer_components = [ ":syslog-fuzzer-component" ]
+}
+
+fuchsia_library_fuzzer("syslog-fuzzer-legacy") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
-  options = [ "max_len=1000000" ]
 }
 
-fuzzer_package("syslog-fuzzers-legacy") {
-  cpp_fuzzers = [ ":syslog-fuzzer-legacy" ]
+fuchsia_fuzzer_component("syslog-fuzzer-legacy-component") {
+  manifest = "meta/syslog-fuzzer-legacy.cml"
+  deps = [ ":syslog-fuzzer-legacy" ]
 }
 
-fuzzer("sdk-fuzzer") {
+fuchsia_fuzzer_package("syslog-fuzzers-legacy") {
+  cpp_fuzzer_components = [ ":syslog-fuzzer-legacy-component" ]
+}
+
+fuchsia_library_fuzzer("sdk-fuzzer") {
   sources = [ "fuzz-sdk.cc" ]
   deps = [
     "//sdk/lib/syslog/structured_backend",
     "//zircon/system/ulib/zircon-internal",
   ]
-  options = [ "max_len=1000000" ]
 }
 
-fuzzer_package("sdk-fuzzers") {
-  cpp_fuzzers = [ ":sdk-fuzzer" ]
+fuchsia_fuzzer_component("sdk-fuzzer-component") {
+  manifest = "meta/sdk-fuzzer.cml"
+  deps = [ ":sdk-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("sdk-fuzzers") {
+  cpp_fuzzer_components = [ ":sdk-fuzzer-component" ]
 }
 
 group("tests") {

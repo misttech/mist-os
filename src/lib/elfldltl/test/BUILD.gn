@@ -4,7 +4,7 @@
 
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/testing/zbi_test.gni")
@@ -366,16 +366,46 @@ cpp_fuzzer("symbol-fuzzer") {
   deps = [ ".." ]
 }
 
-fuzzer_package("elfldltl-fuzzers") {
-  fuzz_host = true
-  cpp_fuzzers = [
-    ":dynamic-fuzzer",
-    ":note-fuzzer",
-    ":relocation-fuzzer",
-    ":symbol-fuzzer",
-  ]
+fuchsia_fuzzer_component("dynamic-fuzzer-component") {
+  manifest = "meta/dynamic-fuzzer.cml"
+  deps = [ ":dynamic-fuzzer" ]
 }
 
+fuchsia_fuzzer_component("note-fuzzer-component") {
+  manifest = "meta/note-fuzzer.cml"
+  deps = [ ":note-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("relocation-fuzzer-component") {
+  manifest = "meta/relocation-fuzzer.cml"
+  deps = [ ":relocation-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("symbol-fuzzer-component") {
+  manifest = "meta/symbol-fuzzer.cml"
+  deps = [ ":symbol-fuzzer" ]
+}
+
+if (is_fuchsia) {
+  fuchsia_fuzzer_package("elfldltl-fuzzers") {
+    cpp_fuzzer_components = [
+      ":dynamic-fuzzer-component",
+      ":note-fuzzer-component",
+      ":relocation-fuzzer-component",
+      ":symbol-fuzzer-component",
+    ]
+  }
+} else {
+  group("elfldltl-fuzzers") {
+    testonly = true
+    deps = [
+      ":dynamic-fuzzer",
+      ":note-fuzzer",
+      ":relocation-fuzzer",
+      ":symbol-fuzzer",
+    ]
+  }
+}
 group("tests") {
   testonly = true
 

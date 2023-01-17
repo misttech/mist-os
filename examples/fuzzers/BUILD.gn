@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
 group("fuzzers") {
   testonly = true
@@ -20,29 +19,104 @@ group("tests") {
   ]
 }
 
-fuzzer_package("fuzzing-examples") {
+fuchsia_fuzzer_component("crash-fuzzer-component") {
+  manifest = "cpp/meta/crash_fuzzer.cml"
+  deps = [ "cpp:crash_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("overflow-fuzzer-component") {
+  manifest = "cpp/meta/overflow_fuzzer.cml"
+  deps = [ "cpp:overflow_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("corpus-fuzzer-component") {
+  manifest = "cpp/meta/corpus_fuzzer.cml"
+  deps = [
+    "cpp:corpus_fuzzer",
+    "cpp/example-corpus",
+  ]
+}
+
+fuchsia_fuzzer_component("corpus-fuzzer-without-corpus-component") {
+  manifest = "cpp/meta/corpus_fuzzer_without_corpus.cml"
+  deps = [ "cpp:corpus_fuzzer_without_corpus" ]
+}
+
+fuchsia_fuzzer_component("dictionary-fuzzer-component") {
+  manifest = "cpp/meta/dictionary_fuzzer.cml"
+  deps = [
+    "cpp:dictionary_fuzzer",
+    "cpp:dictionary_fuzzer-dictionary",
+    "cpp/example-corpus",
+  ]
+}
+
+fuchsia_fuzzer_component("dictionary-fuzzer-without-dictionary-component") {
+  manifest = "cpp/meta/dictionary_fuzzer_without_dictionary.cml"
+  deps = [
+    "cpp:dictionary_fuzzer_without_dictionary",
+    "cpp/example-corpus",
+  ]
+}
+
+fuchsia_fuzzer_component("fuzzed-data-provider-fuzzer-component") {
+  manifest = "cpp/meta/fuzzed_data_provider_fuzzer.cml"
+  deps = [ "cpp:fuzzed_data_provider_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("noop-fuzzer-component") {
+  manifest = "cpp/meta/noop_fuzzer.cml"
+  deps = [ "cpp:noop_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("out-of-memory-fuzzer-component") {
+  manifest = "cpp/meta/out_of_memory_fuzzer.cml"
+  deps = [ "cpp:out_of_memory_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("echo-fuzzer-component") {
+  manifest = "fidl/meta/echo-fuzzer.cml"
+  deps = [ "fidl:echo-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("toy-example-arbitrary-component") {
+  manifest = "rust/meta/toy_example_arbitrary.cml"
+  deps = [ "rust:toy_example_arbitrary" ]
+}
+
+fuchsia_fuzzer_component("toy-example-raw-bytes-component") {
+  manifest = "rust/meta/toy_example_raw_bytes.cml"
+  deps = [ "rust:toy_example_raw_bytes" ]
+}
+
+fuchsia_fuzzer_component("toy-example-with-main-component") {
+  manifest = "rust/meta/toy_example_with_main.cml"
+  deps = [ "rust:toy_example_with_main" ]
+}
+
+fuchsia_fuzzer_package("fuzzing-examples") {
   # Packages can have non-default names.
   package_name = "example-fuzzers"
 
   # Fuzzers are defined for each supported language
-  cpp_fuzzers = [
-    "cpp:crash_fuzzer",
-    "cpp:overflow_fuzzer",
-    "cpp:corpus_fuzzer",
-    "cpp:corpus_fuzzer_without_corpus",
-    "cpp:dictionary_fuzzer",
-    "cpp:dictionary_fuzzer_without_dictionary",
-    "cpp:fuzzed_data_provider_fuzzer",
-    "cpp:noop_fuzzer",
-    "cpp:out_of_memory_fuzzer",
-    "fidl:echo-fuzzer",
+  cpp_fuzzer_components = [
+    ":crash-fuzzer-component",
+    ":overflow-fuzzer-component",
+    ":corpus-fuzzer-component",
+    ":corpus-fuzzer-without-corpus-component",
+    ":dictionary-fuzzer-component",
+    ":dictionary-fuzzer-without-dictionary-component",
+    ":fuzzed-data-provider-fuzzer-component",
+    ":noop-fuzzer-component",
+    ":out-of-memory-fuzzer-component",
+    ":echo-fuzzer-component",
   ]
 
   # A fuzzers package can have fuzzers for multiple languages.
-  rust_fuzzers = [
-    "rust:toy_example_arbitrary",
-    "rust:toy_example_raw_bytes",
-    "rust:toy_example_with_main",
+  rust_fuzzer_components = [
+    ":toy-example-arbitrary-component",
+    ":toy-example-raw-bytes-component",
+    ":toy-example-with-main-component",
   ]
 
   deps = [ "zx" ]

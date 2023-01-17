@@ -7,7 +7,7 @@
 # When a migration happens, the test needs to be removed from this list and
 # placed within the proper `tests` target under //src.
 
-import("//build/fuzzing/fuzzer.gni")
+import("//build/fuzz.gni")
 
 # IMPORTANT NOTE
 # Do not add more libraries to this directory.

@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 static_library("journal") {
@@ -153,25 +152,40 @@ fuchsia_test_package("journal-unit-tests") {
   test_components = [ ":journal-unit-tests-component" ]
 }
 
-fuzzer("journal-fuzzer") {
+fuchsia_library_fuzzer("journal-fuzzer") {
   sources = [ "journal_fuzztest.cc" ]
   deps = [ ":fuzz-utils" ]
 }
 
-fuzzer("journal-entry-fuzzer") {
+fuchsia_library_fuzzer("journal-entry-fuzzer") {
   sources = [ "entry_parse_fuzztest.cc" ]
   deps = [ ":fuzz-utils" ]
 }
 
-fuzzer("journal-replay-fuzzer") {
+fuchsia_library_fuzzer("journal-replay-fuzzer") {
   sources = [ "replay_fuzztest.cc" ]
   deps = [ ":fuzz-utils" ]
 }
 
-fuzzer_package("journal-fuzzers") {
-  cpp_fuzzers = [
-    ":journal-fuzzer",
-    ":journal-entry-fuzzer",
-    ":journal-replay-fuzzer",
+fuchsia_fuzzer_component("journal-fuzzer-component") {
+  manifest = "meta/journal-fuzzer.cml"
+  deps = [ ":journal-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("journal-entry-fuzzer-component") {
+  manifest = "meta/journal-entry-fuzzer.cml"
+  deps = [ ":journal-entry-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("journal-replay-fuzzer-component") {
+  manifest = "meta/journal-replay-fuzzer.cml"
+  deps = [ ":journal-replay-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("journal-fuzzers") {
+  cpp_fuzzer_components = [
+    ":journal-fuzzer-component",
+    ":journal-entry-fuzzer-component",
+    ":journal-replay-fuzzer-component",
   ]
 }

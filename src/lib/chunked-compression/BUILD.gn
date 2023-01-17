@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/dist/resource.gni")
+import("//build/fuzz.gni")
 import("//build/host.gni")
 import("//build/test.gni")
 
@@ -106,9 +106,13 @@ fuchsia_unittest_package("chunked-compression-unittests-package") {
   }
 }
 
-fuzzer("header-reader-fuzzer") {
+resource("header-reader-fuzzer-dictionary") {
+  sources = [ "test_data/archive.dict" ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+fuchsia_library_fuzzer("header-reader-fuzzer") {
   sources = [ "header-reader-fuzztest.cc" ]
-  dictionary = "test_data/archive.dict"
   deps = [
     ":chunked-compression",
     ":chunked-compression-testutils",
@@ -116,9 +120,13 @@ fuzzer("header-reader-fuzzer") {
   ]
 }
 
-fuzzer("decompressor-fuzzer") {
+resource("decompressor-fuzzer-dictionary") {
+  sources = [ "test_data/archive.dict" ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+fuchsia_library_fuzzer("decompressor-fuzzer") {
   sources = [ "decompressor-fuzztest.cc" ]
-  dictionary = "test_data/archive.dict"
   deps = [
     ":chunked-compression",
     ":chunked-compression-testutils",
@@ -126,7 +134,7 @@ fuzzer("decompressor-fuzzer") {
   ]
 }
 
-fuzzer("compress-decompress-fuzzer") {
+fuchsia_library_fuzzer("compress-decompress-fuzzer") {
   sources = [ "compress-decompress-fuzztest.cc" ]
   deps = [
     ":chunked-compression",
@@ -134,7 +142,7 @@ fuzzer("compress-decompress-fuzzer") {
   ]
 }
 
-fuzzer("compress-fuzzer") {
+fuchsia_library_fuzzer("compress-fuzzer") {
   sources = [ "compress-fuzztest.cc" ]
   deps = [
     ":chunked-compression",
@@ -142,13 +150,39 @@ fuzzer("compress-fuzzer") {
   ]
 }
 
-fuzzer_package("chunked-compression-fuzzers-package") {
-  package_name = "chunked-compression-fuzzers"
-  cpp_fuzzers = [
-    ":compress-decompress-fuzzer",
-    ":compress-fuzzer",
+fuchsia_fuzzer_component("compress-decompress-fuzzer-component") {
+  manifest = "meta/compress-decompress-fuzzer.cml"
+  deps = [ ":compress-decompress-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("compress-fuzzer-component") {
+  manifest = "meta/compress-fuzzer.cml"
+  deps = [ ":compress-fuzzer" ]
+}
+
+fuchsia_fuzzer_component("decompressor-fuzzer-component") {
+  manifest = "meta/decompressor-fuzzer.cml"
+  deps = [
     ":decompressor-fuzzer",
+    ".:decompressor-fuzzer-dictionary",
+  ]
+}
+
+fuchsia_fuzzer_component("header-reader-fuzzer-component") {
+  manifest = "meta/header-reader-fuzzer.cml"
+  deps = [
     ":header-reader-fuzzer",
+    ".:header-reader-fuzzer-dictionary",
+  ]
+}
+
+fuchsia_fuzzer_package("chunked-compression-fuzzers-package") {
+  package_name = "chunked-compression-fuzzers"
+  cpp_fuzzer_components = [
+    ":compress-decompress-fuzzer-component",
+    ":compress-fuzzer-component",
+    ":decompressor-fuzzer-component",
+    ":header-reader-fuzzer-component",
   ]
 }
 

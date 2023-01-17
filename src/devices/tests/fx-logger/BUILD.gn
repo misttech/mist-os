@@ -2,10 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
-fuzzer("fx-log-fuzzer") {
+fuchsia_library_fuzzer("fx-log-fuzzer") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
@@ -13,14 +12,18 @@ fuzzer("fx-log-fuzzer") {
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zircon-internal",
   ]
-  options = [ "max_len=1000000" ]
 }
 
-fuzzer_package("fx-log-fuzzers") {
-  cpp_fuzzers = [ ":fx-log-fuzzer" ]
+fuchsia_fuzzer_component("fx-log-fuzzer-component") {
+  manifest = "meta/fx-log-fuzzer.cml"
+  deps = [ ":fx-log-fuzzer" ]
 }
 
-fuzzer("fx-log-static-fuzzer") {
+fuchsia_fuzzer_package("fx-log-fuzzers") {
+  cpp_fuzzer_components = [ ":fx-log-fuzzer-component" ]
+}
+
+fuchsia_library_fuzzer("fx-log-static-fuzzer") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
@@ -28,11 +31,15 @@ fuzzer("fx-log-static-fuzzer") {
     "//zircon/system/ulib/syslog:syslog-static",
     "//zircon/system/ulib/zircon-internal",
   ]
-  options = [ "max_len=1000000" ]
 }
 
-fuzzer_package("fx-log-static-fuzzers") {
-  cpp_fuzzers = [ ":fx-log-static-fuzzer" ]
+fuchsia_fuzzer_component("fx-log-static-fuzzer-component") {
+  manifest = "meta/fx-log-static-fuzzer.cml"
+  deps = [ ":fx-log-static-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("fx-log-static-fuzzers") {
+  cpp_fuzzer_components = [ ":fx-log-static-fuzzer-component" ]
 }
 
 group("tests") {

@@ -4,8 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 declare_args() {
@@ -218,7 +217,7 @@ fuchsia_unittest_package("mdns-tests") {
   }
 }
 
-fuzzer("packet_reader_fuzzer") {
+fuchsia_library_fuzzer("packet_reader_fuzzer") {
   sources = [
     "encoding/dns_message.cc",
     "encoding/dns_message.h",
@@ -234,8 +233,13 @@ fuzzer("packet_reader_fuzzer") {
   ]
 }
 
-fuzzer_package("mdns-fuzzers") {
-  cpp_fuzzers = [ ":packet_reader_fuzzer" ]
+fuchsia_fuzzer_component("packet-reader-fuzzer-component") {
+  manifest = "meta/packet_reader_fuzzer.cml"
+  deps = [ ":packet_reader_fuzzer" ]
+}
+
+fuchsia_fuzzer_package("mdns-fuzzers") {
+  cpp_fuzzer_components = [ ":packet-reader-fuzzer-component" ]
 }
 
 executable("mdns_netemul_test_agent") {

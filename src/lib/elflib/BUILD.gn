@@ -4,8 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_static_library.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 # A collection of utilities useful to debuggers and similar programs.
@@ -99,7 +98,7 @@ group("tests") {
   ]
 }
 
-fuzzer("elflib_fuzzer") {
+fuchsia_library_fuzzer("elflib_fuzzer") {
   sources = [ "elflib_fuzztest.cc" ]
   deps = [ ":elflib" ]
 
@@ -107,6 +106,11 @@ fuzzer("elflib_fuzzer") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuzzer_package("elflib-fuzzers") {
-  cpp_fuzzers = [ ":elflib_fuzzer" ]
+fuchsia_fuzzer_component("elflib-fuzzer-component") {
+  manifest = "meta/elflib_fuzzer.cml"
+  deps = [ ":elflib_fuzzer" ]
+}
+
+fuchsia_fuzzer_package("elflib-fuzzers") {
+  cpp_fuzzer_components = [ ":elflib-fuzzer-component" ]
 }

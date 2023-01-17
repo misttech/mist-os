@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
@@ -105,8 +105,13 @@ rustc_fuzzer("fuzz-parse-packet") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuzzer_package("packet-formats-fuzzers") {
-  rust_fuzzers = [ ":fuzz-parse-packet" ]
+fuchsia_fuzzer_component("fuzz-parse-packet-component") {
+  manifest = "meta/fuzz-parse-packet.cml"
+  deps = [ ":fuzz-parse-packet" ]
+}
+
+fuchsia_fuzzer_package("packet-formats-fuzzers") {
+  rust_fuzzer_components = [ ":fuzz-parse-packet-component" ]
 }
 
 group("tests") {

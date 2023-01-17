@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
@@ -128,11 +128,26 @@ rustc_fuzzer("symbol_table_section_fuzzer") {
   ]
 }
 
-fuzzer_package("bind-fuzzers") {
-  rust_fuzzers = [
-    ":bind_rules_bytecode_fuzzer",
-    ":instruction_section_fuzzer",
-    ":symbol_table_section_fuzzer",
+fuchsia_fuzzer_component("bind-rules-bytecode-fuzzer-component") {
+  manifest = "meta/bind_rules_bytecode_fuzzer.cml"
+  deps = [ ":bind_rules_bytecode_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("instruction-section-fuzzer-component") {
+  manifest = "meta/instruction_section_fuzzer.cml"
+  deps = [ ":instruction_section_fuzzer" ]
+}
+
+fuchsia_fuzzer_component("symbol-table-section-fuzzer-component") {
+  manifest = "meta/symbol_table_section_fuzzer.cml"
+  deps = [ ":symbol_table_section_fuzzer" ]
+}
+
+fuchsia_fuzzer_package("bind-fuzzers") {
+  rust_fuzzer_components = [
+    ":bind-rules-bytecode-fuzzer-component",
+    ":instruction-section-fuzzer-component",
+    ":symbol-table-section-fuzzer-component",
   ]
 }
 

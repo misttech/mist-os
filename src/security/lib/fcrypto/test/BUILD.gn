@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -40,7 +39,7 @@ test("fcrypto") {
   ]
 }
 
-fuzzer("hmac-fuzzer") {
+fuchsia_library_fuzzer("hmac-fuzzer") {
   sources = [ "hmac-fuzzer.cc" ]
   deps = [
     "//src/security/lib/fcrypto",
@@ -48,8 +47,13 @@ fuzzer("hmac-fuzzer") {
   ]
 }
 
-fuzzer_package("fcrypto-fuzzers") {
-  cpp_fuzzers = [ ":hmac-fuzzer" ]
+fuchsia_fuzzer_component("hmac-fuzzer-component") {
+  manifest = "meta/hmac-fuzzer.cml"
+  deps = [ ":hmac-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("fcrypto-fuzzers") {
+  cpp_fuzzer_components = [ ":hmac-fuzzer-component" ]
 }
 
 fuchsia_unittest_package("fcrypto-test-pkg") {

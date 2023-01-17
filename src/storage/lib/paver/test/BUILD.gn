@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 test("test") {
@@ -96,7 +95,7 @@ fuchsia_unittest_package("paver-test") {
   }
 }
 
-fuzzer("paver-validation-fuzzer") {
+fuchsia_library_fuzzer("paver-validation-fuzzer") {
   sources = [ "validation-fuzzer.cc" ]
 
   deps = [
@@ -122,6 +121,11 @@ fuzzer("paver-validation-fuzzer") {
   ]
 }
 
-fuzzer_package("paver-fuzzers") {
-  cpp_fuzzers = [ ":paver-validation-fuzzer" ]
+fuchsia_fuzzer_component("paver-validation-fuzzer-component") {
+  manifest = "meta/paver-validation-fuzzer.cml"
+  deps = [ ":paver-validation-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("paver-fuzzers") {
+  cpp_fuzzer_components = [ ":paver-validation-fuzzer-component" ]
 }

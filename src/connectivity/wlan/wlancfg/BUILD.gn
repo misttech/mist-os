@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
@@ -233,8 +233,13 @@ rustc_fuzzer("fuzz_saved_networks_manager_store") {
   ]
 }
 
-fuzzer_package("wlancfg-fuzzers") {
-  rust_fuzzers = [ ":fuzz_saved_networks_manager_store" ]
+fuchsia_fuzzer_component("fuzz-saved-networks-manager-store-component") {
+  manifest = "meta/fuzz_saved_networks_manager_store.cml"
+  deps = [ ":fuzz_saved_networks_manager_store" ]
+}
+
+fuchsia_fuzzer_package("wlancfg-fuzzers") {
+  rust_fuzzer_components = [ ":fuzz-saved-networks-manager-store-component" ]
 }
 
 group("tests") {

@@ -2,19 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
 group("tests") {
   testonly = true
   deps = [ ":ldmsg-fuzzers" ]
 }
 
-fuzzer("ldmsg-fuzzer") {
+fuchsia_library_fuzzer("ldmsg-fuzzer") {
   sources = [ "ldmsg-fuzzer.cc" ]
   deps = [ "//zircon/system/ulib/ldmsg" ]
 }
 
-fuzzer_package("ldmsg-fuzzers") {
-  cpp_fuzzers = [ ":ldmsg-fuzzer" ]
+fuchsia_fuzzer_component("ldmsg-fuzzer-component") {
+  manifest = "meta/ldmsg-fuzzer.cml"
+  deps = [ ":ldmsg-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("ldmsg-fuzzers") {
+  cpp_fuzzer_components = [ ":ldmsg-fuzzer-component" ]
 }

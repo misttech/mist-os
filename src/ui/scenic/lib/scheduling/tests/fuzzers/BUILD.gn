@@ -2,10 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 
-fuzzer("frame-scheduler-fuzzer") {
+fuchsia_library_fuzzer("frame-scheduler-fuzzer") {
   sources = [ "frame_scheduler_fuzztest.cc" ]
   deps = [
     "//src/lib/testing/loop_fixture",
@@ -13,7 +12,12 @@ fuzzer("frame-scheduler-fuzzer") {
   ]
 }
 
-fuzzer_package("fuzzers") {
+fuchsia_fuzzer_component("frame-scheduler-fuzzer-component") {
+  manifest = "meta/frame-scheduler-fuzzer.cml"
+  deps = [ ":frame-scheduler-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("fuzzers") {
   package_name = "frame-scheduling-fuzzers"
-  cpp_fuzzers = [ ":frame-scheduler-fuzzer" ]
+  cpp_fuzzer_components = [ ":frame-scheduler-fuzzer-component" ]
 }

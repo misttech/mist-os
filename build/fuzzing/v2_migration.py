@@ -230,7 +230,7 @@ class FuzzingTemplateConverter(object):
 
             options, found = self.read_string_list('options', line)
             if found:
-                args.extend(options)
+                args.extend([f'-{option}' for option in options])
                 continue
 
             fuzzer_scope.append(line)

@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/fuzzing/fuzzer.gni")
+import("//build/fuzz.gni")
 
 test("fidl-async-test") {
   if (is_fuchsia) {

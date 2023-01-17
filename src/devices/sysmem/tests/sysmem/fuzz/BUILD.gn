@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuzzer.gni")
-import("//build/fuzzing/fuzzer_package.gni")
+import("//build/fuzz.gni")
 import("//build/test.gni")
 
 group("fuzz") {
@@ -16,23 +15,37 @@ group("tests") {
   deps = [ ":sysmem-fuzz" ]
 }
 
-fuzzer_package("sysmem-fuzz") {
-  # Fuzzers are defined for each supported language
-  cpp_fuzzers = [
-    # Each list of fuzzers can contain simple labels...
+fuchsia_fuzzer_component("sysmem-fuzzer-component") {
+  manifest = "meta/sysmem_fuzzer.cml"
+  deps = [
     ":sysmem_fuzzer",
-    ":sysmem_fuzzer_multi",
+    "corpus",
   ]
 }
 
-fuzzer("sysmem_fuzzer") {
+fuchsia_fuzzer_component("sysmem-fuzzer-multi-component") {
+  manifest = "meta/sysmem_fuzzer_multi.cml"
+  deps = [
+    ":sysmem_fuzzer_multi",
+    "corpus_multi",
+  ]
+}
+
+fuchsia_fuzzer_package("sysmem-fuzz") {
+  # Fuzzers are defined for each supported language
+  cpp_fuzzer_components = [
+    ":sysmem-fuzzer-component",
+    ":sysmem-fuzzer-multi-component",
+  ]
+}
+
+fuchsia_library_fuzzer("sysmem_fuzzer") {
   testonly = true
   output_name = "sysmem_fuzzer"
   sources = [
     "sysmem_fuzz.cc",
     "sysmem_fuzz_common.cc",
   ]
-  corpus = "corpus"
   deps = [
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
@@ -70,21 +83,19 @@ fuzzer("sysmem_fuzzer") {
   configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }
 
-fuzzer("sysmem_fuzzer_multi") {
+fuchsia_library_fuzzer("sysmem_fuzzer_multi") {
   testonly = true
   output_name = "sysmem_fuzzer_multi"
   sources = [
     "sysmem_fuzz_common.cc",
     "sysmem_fuzz_multi.cc",
   ]
-  corpus = "corpus_multi"
 
   # The fuzzer requires 2 BufferCollectionConstraints inputs, so the input must
   # be at least that big (at the time of writing, around 14000 bytes). Choose
   # 20000 bytes as a margin in case the size of the struct changes; the fuzzer
   # should by able to determine the exact size needed as long as it's <=
   # max_len.
-  options = [ "max_len=20000" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
