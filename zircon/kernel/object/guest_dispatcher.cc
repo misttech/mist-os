@@ -76,7 +76,9 @@ zx_status_t GuestDispatcher::SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len,
                                      fbl::RefPtr<PortDispatcher> port, uint64_t key) {
   canary_.Assert();
   if (options_ == ZX_GUEST_OPT_NORMAL) {
-    return static_cast<NormalGuest*>(guest_.get())->SetTrap(kind, addr, len, ktl::move(port), key);
+    return static_cast<NormalGuest*>(guest_.get())
+        ->SetTrap(kind, addr, len, ktl::move(port), key)
+        .status_value();
   }
   return ZX_ERR_NOT_SUPPORTED;
 }

@@ -65,8 +65,8 @@ class NormalGuest : public Guest {
 
   static zx::result<ktl::unique_ptr<Guest>> Create();
 
-  zx_status_t SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len, fbl::RefPtr<PortDispatcher> port,
-                      uint64_t key);
+  zx::result<> SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len, fbl::RefPtr<PortDispatcher> port,
+                       uint64_t key);
 
   hypervisor::GuestPhysicalAspace& PhysicalAspace() { return gpa_; }
   fbl::RefPtr<VmAddressRegion> RootVmar() const override { return gpa_.RootVmar(); }

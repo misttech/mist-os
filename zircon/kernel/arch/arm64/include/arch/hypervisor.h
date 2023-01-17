@@ -47,8 +47,8 @@ class Guest {
   Guest(const Guest&) = delete;
   Guest& operator=(const Guest&) = delete;
 
-  zx_status_t SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len, fbl::RefPtr<PortDispatcher> port,
-                      uint64_t key);
+  zx::result<> SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len, fbl::RefPtr<PortDispatcher> port,
+                       uint64_t key);
 
   hypervisor::GuestPhysicalAspace& AddressSpace() { return gpa_; }
   fbl::RefPtr<VmAddressRegion> RootVmar() const { return gpa_.RootVmar(); }

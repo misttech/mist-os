@@ -68,30 +68,30 @@ Guest::~Guest() {
   ZX_ASSERT(result.is_ok());
 }
 
-zx_status_t Guest::SetTrap(uint32_t kind, zx_gpaddr_t addr, size_t len,
-                           fbl::RefPtr<PortDispatcher> port, uint64_t key) {
+zx::result<> Guest::SetTrap(uint32_t kind, zx_gpaddr_t addr, size_t len,
+                            fbl::RefPtr<PortDispatcher> port, uint64_t key) {
   switch (kind) {
     case ZX_GUEST_TRAP_MEM:
       if (port) {
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
       break;
     case ZX_GUEST_TRAP_BELL:
       if (!port) {
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
       break;
     case ZX_GUEST_TRAP_IO:
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     default:
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (!IS_PAGE_ALIGNED(addr) || !IS_PAGE_ALIGNED(len)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (auto result = gpa_.UnmapRange(addr, len); result.is_error()) {
-    return result.status_value();
+    return result;
   }
-  return traps_.InsertTrap(kind, addr, len, ktl::move(port), key).status_value();
+  return traps_.InsertTrap(kind, addr, len, ktl::move(port), key);
 }

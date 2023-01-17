@@ -101,36 +101,36 @@ zx::result<ktl::unique_ptr<Guest>> NormalGuest::Create() {
   return ktl::move(guest);
 }
 
-zx_status_t NormalGuest::SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len,
-                                 fbl::RefPtr<PortDispatcher> port, uint64_t key) {
+zx::result<> NormalGuest::SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len,
+                                  fbl::RefPtr<PortDispatcher> port, uint64_t key) {
   switch (kind) {
     case ZX_GUEST_TRAP_MEM:
       if (port) {
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
       break;
     case ZX_GUEST_TRAP_BELL:
       if (!port) {
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
       break;
     case ZX_GUEST_TRAP_IO:
       if (port) {
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
-      return traps_.InsertTrap(kind, addr, len, nullptr, key).status_value();
+      return traps_.InsertTrap(kind, addr, len, nullptr, key);
     default:
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Common logic for memory-based traps.
   if (!IS_PAGE_ALIGNED(addr) || !IS_PAGE_ALIGNED(len)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (auto result = gpa_.UnmapRange(addr, len); result.is_error()) {
-    return result.status_value();
+    return result;
   }
-  return traps_.InsertTrap(kind, addr, len, ktl::move(port), key).status_value();
+  return traps_.InsertTrap(kind, addr, len, ktl::move(port), key);
 }
 
 // static
