@@ -191,7 +191,6 @@ source_set("connection") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zx",
   ]
 
