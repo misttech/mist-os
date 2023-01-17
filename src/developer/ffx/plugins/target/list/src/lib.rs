@@ -64,7 +64,11 @@ pub async fn list_targets(
             if let Some(n) = cmd.nodename {
                 ffx_bail_with_code!(2, "Device {} not found.", n);
             } else {
-                writer.error("No devices found.")?;
+                if !writer.is_machine() {
+                    writer.error("No devices found.")?;
+                } else {
+                    writer.machine(&Vec::<String>::new())?;
+                }
             }
         }
         _ => {
