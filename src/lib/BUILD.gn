@@ -114,7 +114,6 @@ group("tests") {
     "fuchsia-lockfile:host_tests($host_toolchain)",
     "fuchsia-runtime:tests",
     "fuchsia-url:tests",
-    "fuzzing:tests",
     "fxl:tests",
     "gcs:tests($host_toolchain)",
     "go-benchmarking:tests",

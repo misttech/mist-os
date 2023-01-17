@@ -1,3 +1,0 @@
-include /src/security/fuzzing/OWNERS
-
-# COMPONENT: Security>Fuzzing

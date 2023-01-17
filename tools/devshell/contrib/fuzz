@@ -4,11 +4,15 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Run, inspect and debug
+#### DEPRECATED
 ### run a fuzz test on target a device
 
 ## usage: fx fuzz [subcommand] [...]
 ##
+## Deprecated: This command is deprecated as it only works with v1 fuzzers.
+##
 ## For specific subcommand info, run "fx fuzz help".
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
-"${PREBUILT_PYTHON3_DIR}/bin/python3.8" ${FUCHSIA_DIR}/scripts/fuzzing/main.py "$@"
+fx-warn "fx fuzz is deprecated"
+fx-warn "Please use ffx fuzz instead."
