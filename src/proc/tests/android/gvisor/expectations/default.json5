@@ -1309,6 +1309,7 @@
                 "TeeTest.MultiPage",
                 "TeeTest.Blocking",
                 "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
+                "SeccompTest.RetKillOnlyKillsOneThread",
 
                 // TODO(fxbug.dev/105339): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
