@@ -137,4 +137,4 @@ is a change to any file in the entire repository. Reviewers in
 `/foo/bar/METADATA.textproto` apply to anything in the `/foo/bar` directory, as
 well as the child directory `/foo/bar/baz`. Reviewers in
 `/foo/bar/baz/METADATA.textproto` only apply to files edited in the
-`/boo/bar/baz/` directory.
+`/foo/bar/baz/` directory.
