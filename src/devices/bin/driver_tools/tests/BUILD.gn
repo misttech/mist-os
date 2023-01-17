@@ -55,9 +55,31 @@ if (is_host && current_cpu == "x64") {
     ]
   }
 
+  host_test("driver_lspci_test") {
+    binary_path = "$root_out_dir/ffx"
+    args = [
+      "driver",
+      "lspci",
+    ]
+    deps = [
+      ":test_tools",
+      "//src/developer/ffx:ffx_bin",
+    ]
+    environments = [
+      {
+        dimensions = {
+          device_type = "QEMU"
+        }
+      },
+    ]
+  }
+
   group("host_tests") {
     testonly = true
-    deps = [ ":driver_dump_select_test" ]
+    deps = [
+      ":driver_dump_select_test",
+      ":driver_lspci_test",
+    ]
   }
 }
 
