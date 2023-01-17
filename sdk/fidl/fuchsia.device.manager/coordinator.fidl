@@ -215,7 +215,6 @@ type ProxyDevice = resource struct {
     driver_path string:DEVICE_PATH_MAX;
     driver zx.handle:VMO;
     parent_proxy zx.handle:CHANNEL;
-    proxy_args string:<DEVICE_ARGS_MAX, optional>;
 };
 
 type FidlProxyDevice = resource struct {

@@ -195,11 +195,6 @@ typedef struct device_add_args {
   // The number of elements in the above list.
   size_t runtime_service_offer_count;
 
-  // Arguments used with DEVICE_ADD_MUST_ISOLATE
-  // these will be passed to the create() driver op of
-  // the proxy device in the new devhost
-  const char* proxy_args;
-
   // Zero or more of DEVICE_ADD_*
   uint32_t flags;
 

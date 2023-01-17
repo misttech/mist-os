@@ -110,7 +110,7 @@ zxdb's built-in `ps` command:
 [zxdb] ps
 j: 1030 root
   j: 1079 zircon-drivers
-    p: 1926 driver_host:sys
+    p: 1926 driver_host
 ...
 ```
 

@@ -22,7 +22,7 @@ using ConfigUnitTest = testing::Test;
 const std::string kValidConfiguration = R"([
     {
         "name": "ContiguousPool",
-        "process": "driver_host:.*",
+        "process": "driver_host",
         "vmo": "SysmemContiguousPool",
         "event_code": 1
     },
@@ -44,7 +44,7 @@ TEST_F(ConfigUnitTest, ValidConfiguration) {
   BucketMatch& match_0 = bucket_matches[0];
   EXPECT_EQ(match_0.name(), "ContiguousPool");
   EXPECT_EQ(match_0.event_code(), 1);
-  EXPECT_TRUE(match_0.ProcessMatch(Process{1, "driver_host:some_process", {}}));
+  EXPECT_TRUE(match_0.ProcessMatch(Process{1, "driver_host", {}}));
   EXPECT_TRUE(match_0.VmoMatch("SysmemContiguousPool"));
 
   BucketMatch& match_1 = bucket_matches[1];

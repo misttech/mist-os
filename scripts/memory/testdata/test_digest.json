@@ -50,13 +50,9 @@
       "process": ".*-resolver\\.cm.*"
     },
     {
-      "name": "CompositeDrivers",
-      "process": "driver_host:composite-device"
-    },
-    {
-      "name": "OtherDrivers",
+      "name": "Drivers",
       "process": [
-        "driver_host:.*",
+        "driver_host",
         "pwrbtn-monitor\\.cm"
       ]
     },

@@ -647,9 +647,6 @@ zx_status_t PlatformDevice::Start() {
         .set_fidl_protocol_offers(protocol_offers)
         .set_fidl_service_offers(offers);
 
-    char argstr[64];
-    snprintf(argstr, sizeof(argstr), "pdev:%s,", name);
-    args.set_proxy_args(argstr);
     return DdkAdd(std::move(args));
   } else if (type_ == Fragment) {
     return DdkAdd(std::move(args));

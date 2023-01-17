@@ -32,12 +32,8 @@
     "process": ".*-resolver\\.cm.*"
   },
   {
-    "name": "CompositeDrivers",
-    "process": "driver_host:composite-device"
-  },
-  {
-    "name": "OtherDrivers",
-    "process": "driver_host:.*|pwrbtn-monitor\\.cm"
+    "name": "Drivers",
+    "process": "driver_host|pwrbtn-monitor\\.cm"
   },
   {
     "name": "DriverFramework",

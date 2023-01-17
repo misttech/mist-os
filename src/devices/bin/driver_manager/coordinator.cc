@@ -71,6 +71,7 @@ namespace fdd = fuchsia_driver_development;
 namespace fdm = fuchsia_device_manager;
 namespace fpm = fuchsia_power_manager;
 
+constexpr char kDriverHostName[] = "driver_host";
 constexpr char kDriverHostPath[] = "/pkg/bin/driver_host";
 constexpr const char* kItemsPath = fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::Items>;
 
@@ -148,7 +149,6 @@ zx_status_t CreateStubDevice(const fbl::RefPtr<Device>& dev,
 
 // send message to driver_host, requesting the creation of a device
 zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<DriverHost>& dh,
-                              const char* args,
                               fidl::ServerEnd<fuchsia_device_manager::DeviceController> controller,
                               zx::channel rpc_proxy) {
   // If we don't have a driver name, then create a stub instead.
@@ -168,9 +168,8 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   }
 
   auto driver_path = fidl::StringView::FromExternal(dev->libname().data(), dev->libname().size());
-  auto args_view = fidl::StringView::FromExternal(args, strlen(args));
 
-  fdm::wire::ProxyDevice proxy{driver_path, std::move(vmo), std::move(rpc_proxy), args_view};
+  fdm::wire::ProxyDevice proxy{driver_path, std::move(vmo), std::move(rpc_proxy)};
   auto type = fdm::wire::DeviceType::WithProxy(arena, std::move(proxy));
 
   dh->controller()
@@ -351,7 +350,7 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
   }
 
   root_device_ =
-      fbl::MakeRefCounted<Device>(this, "sys", root_device_driver, "sys,", nullptr, 0, zx::vmo(),
+      fbl::MakeRefCounted<Device>(this, "sys", root_device_driver, nullptr, 0, zx::vmo(),
                                   fidl::ClientEnd<fuchsia_device_manager::DeviceController>(),
                                   fidl::ClientEnd<fio::Directory>());
   root_device_->flags = DEV_CTX_IMMORTAL | DEV_CTX_MUST_ISOLATE;
@@ -600,24 +599,6 @@ zx_status_t Coordinator::PrepareProxy(const fbl::RefPtr<Device>& dev,
     return ZX_OK;
   }
 
-  // proxy args are "processname,args"
-  const char* arg0 = dev->args().data();
-  const char* arg1 = strchr(arg0, ',');
-  size_t arg0len;
-  if (arg1 != nullptr) {
-    arg0len = arg1 - arg0;
-    arg1++;
-  } else {
-    arg0len = dev->args().size();
-  }
-
-  if (arg1 == nullptr) {
-    arg1 = "";
-  }
-
-  char driver_hostname[32];
-  snprintf(driver_hostname, sizeof(driver_hostname), "driver_host:%.*s", (int)arg0len, arg0);
-
   zx::result controller = fidl::CreateEndpoints<fuchsia_device_manager::DeviceController>();
   if (controller.is_error()) {
     return controller.status_value();
@@ -644,9 +625,9 @@ zx_status_t Coordinator::PrepareProxy(const fbl::RefPtr<Device>& dev,
     }
   }
   if (target_driver_host == nullptr) {
-    const zx_status_t status = NewDriverHost(driver_hostname, &target_driver_host);
+    const zx_status_t status = NewDriverHost(kDriverHostName, &target_driver_host);
     if (status != ZX_OK) {
-      LOGF(ERROR, "Failed to create driver_host '%s': %s", driver_hostname,
+      LOGF(ERROR, "Failed to create driver_host '%s': %s", kDriverHostName,
            zx_status_get_string(status));
       return status;
     }
@@ -654,11 +635,11 @@ zx_status_t Coordinator::PrepareProxy(const fbl::RefPtr<Device>& dev,
 
   dev->proxy()->set_host(std::move(target_driver_host));
   if (const zx_status_t status =
-          CreateProxyDevice(dev->proxy(), dev->proxy()->host(), arg1, std::move(controller_server),
+          CreateProxyDevice(dev->proxy(), dev->proxy()->host(), std::move(controller_server),
                             std::move(child_channel));
       status != ZX_OK) {
     LOGF(ERROR, "Failed to create proxy device '%s' in driver_host '%s': %s", dev->name().data(),
-         driver_hostname, zx_status_get_string(status));
+         kDriverHostName, zx_status_get_string(status));
     return status;
   }
   if (need_proxy_rpc) {
@@ -666,7 +647,7 @@ zx_status_t Coordinator::PrepareProxy(const fbl::RefPtr<Device>& dev,
             dev->device_controller()->ConnectProxy(std::move(parent_channel));
         !result.ok()) {
       LOGF(ERROR, "Failed to connect to proxy device '%s' in driver_host '%s': %s",
-           dev->name().data(), driver_hostname, result.status_string());
+           dev->name().data(), kDriverHostName, result.status_string());
     }
   }
   if (dev == root_device_) {
@@ -695,12 +676,9 @@ zx_status_t Coordinator::PrepareFidlProxy(const fbl::RefPtr<Device>& dev,
     return status;
   }
 
-  char driver_hostname[32];
-  snprintf(driver_hostname, sizeof(driver_hostname), "driver_host:%s", dev->name().c_str());
-
   if (target_driver_host == nullptr) {
-    if (zx_status_t status = NewDriverHost(driver_hostname, &target_driver_host); status != ZX_OK) {
-      LOGF(ERROR, "Failed to create driver_host '%s': %s", driver_hostname,
+    if (zx_status_t status = NewDriverHost(kDriverHostName, &target_driver_host); status != ZX_OK) {
+      LOGF(ERROR, "Failed to create driver_host '%s': %s", kDriverHostName,
            zx_status_get_string(status));
       return status;
     }
@@ -721,7 +699,7 @@ zx_status_t Coordinator::PrepareFidlProxy(const fbl::RefPtr<Device>& dev,
                                 std::move(controller_server), std::move(outgoing_dir));
       status != ZX_OK) {
     LOGF(ERROR, "Failed to create proxy device '%s' in driver_host '%s': %s", dev->name().c_str(),
-         driver_hostname, zx_status_get_string(status));
+         kDriverHostName, zx_status_get_string(status));
     return status;
   }
 

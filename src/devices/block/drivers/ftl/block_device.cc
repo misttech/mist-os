@@ -128,7 +128,7 @@ zx_status_t BlockDevice::Init() {
 
   zx_handle_t profile = ZX_HANDLE_INVALID;
   zx_status_t status = device_get_deadline_profile(this->zxdev(), capacity, deadline, period,
-                                                   "driver_host:pdev:05:00:f:ftl_worker", &profile);
+                                                   "driver_host:ftl_worker", &profile);
   if (status != ZX_OK) {
     zxlogf(WARNING, "FTL: Failed to get deadline profile: %d\n", status);
   } else {

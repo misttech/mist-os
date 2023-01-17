@@ -14,7 +14,7 @@
     {
         "event_code": 26,
         "name": "ContiguousPoolUnallocated",
-        "process": "driver_host:sys",
+        "process": "driver_host",
         "vmo": "SysmemContiguousPool"
     },
     {
@@ -120,15 +120,9 @@
         "vmo": ""
     },
     {
-        "event_code": 47,
-        "name": "CompositeDrivers",
-        "process": "driver_host:composite-device",
-        "vmo": ""
-    },
-    {
         "event_code": 48,
-        "name": "OtherDrivers",
-        "process": "driver_host:.*",
+        "name": "Drivers",
+        "process": "driver_host",
         "vmo": ""
     },
     {

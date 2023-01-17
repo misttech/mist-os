@@ -92,7 +92,6 @@ zx_status_t publish_cpu_trace(zx_handle_t bti, zx_device_t* sys_root) {
   args.prop_count = std::size(props);
   args.proto_id = ZX_PROTOCOL_PDEV;
   args.proto_ops = &cpu_trace_proto_ops;
-  args.proxy_args = NULL;
   args.flags = 0;
 
   // add as a child of the sysroot

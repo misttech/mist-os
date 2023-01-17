@@ -100,8 +100,8 @@ class Device final
   using DriverHostListTag = internal::DeviceDriverHostListTag;
   using AllDevicesListTag = internal::DeviceAllDevicesListTag;
 
-  Device(Coordinator* coord, fbl::String name, fbl::String libname, fbl::String args,
-         fbl::RefPtr<Device> parent, uint32_t protocol_id, zx::vmo inspect,
+  Device(Coordinator* coord, fbl::String name, fbl::String libname, fbl::RefPtr<Device> parent,
+         uint32_t protocol_id, zx::vmo inspect,
          fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
          fidl::ClientEnd<fio::Directory> outgoing_dir);
   ~Device() override;
@@ -112,8 +112,8 @@ class Device final
   // coordinator's devices_ list, or trigger publishing
   static zx_status_t Create(
       Coordinator* coordinator, const fbl::RefPtr<Device>& parent, fbl::String name,
-      fbl::String driver_path, fbl::String args, uint32_t protocol_id,
-      fbl::Array<zx_device_prop_t> props, fbl::Array<StrProperty> str_props,
+      fbl::String driver_path, uint32_t protocol_id, fbl::Array<zx_device_prop_t> props,
+      fbl::Array<StrProperty> str_props,
       fidl::ServerEnd<fuchsia_device_manager::Coordinator> coordinator_request,
       fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
       bool want_init_task, fuchsia_device_manager::wire::AddDeviceConfig add_device_config,
@@ -313,7 +313,6 @@ class Device final
 
   const fbl::String& name() const { return name_; }
   const fbl::String& libname() const { return libname_; }
-  const fbl::String& args() const { return args_; }
 
   Coordinator* coordinator;
   uint32_t flags = 0;
@@ -413,7 +412,6 @@ class Device final
 
   const fbl::String name_;
   const fbl::String libname_;
-  const fbl::String args_;
 
   // The device's parent in the device tree. If this is a composite device, its
   // parent will be null.

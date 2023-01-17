@@ -65,10 +65,6 @@ void DeviceAddArgs::CopyRawDeviceAddArgs(const device_add_args_t& args) {
     fidl_protocol_offer_strings_.assign(args.fidl_protocol_offers,
                                         args.fidl_protocol_offers + args.fidl_protocol_offer_count);
   }
-  proxy_args_.clear();
-  if (args.proxy_args) {
-    proxy_args_ = args.proxy_args;
-  }
 
   // Update the raw pointers in our device_add_args_t to point to our locally copied data.
   SetRawPointers();
@@ -97,8 +93,6 @@ void DeviceAddArgs::SetRawPointers() {
   args_.fidl_protocol_offers =
       fidl_protocol_offers_.empty() ? nullptr : fidl_protocol_offers_.data();
   args_.fidl_protocol_offer_count = static_cast<uint8_t>(fidl_protocol_offers_.size());
-
-  args_.proxy_args = proxy_args_.empty() ? nullptr : proxy_args_.c_str();
 }
 
 FakeDevice::FakeDevice(uint64_t id, zx_device_t* parent, device_add_args_t dev_args,

@@ -261,7 +261,7 @@ zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
 
   // Create a new driver host and return it.
   auto coordinator = GetPrimaryFragment()->bound_device()->coordinator;
-  auto status = coordinator->NewDriverHost("driver_host:composite", &driver_host_);
+  auto status = coordinator->NewDriverHost("driver_host", &driver_host_);
   if (status != ZX_OK) {
     return zx::error(status);
   }

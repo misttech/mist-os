@@ -222,7 +222,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
   [&]() {
     zx::profile profile;
     if (zx_status_t status = device_get_deadline_profile(zxdev(), capacity, deadline, period,
-                                                         "driver_host:pdev:05:00:f:block_server",
+                                                         "driver_host:block_server",
                                                          profile.reset_and_get_address());
         status != ZX_OK) {
       zxlogf(WARNING, "block: Failed to get deadline profile: %s\n", zx_status_get_string(status));

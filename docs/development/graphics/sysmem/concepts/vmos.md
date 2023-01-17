@@ -158,21 +158,21 @@ snapshots and other client applications. Here's a simple example hierarchy:
           collection-5:
             channel_koid = 20048
             debug_id = 5498
-            debug_name = driver_host:pdev:00:00:1e
+            debug_name = driver_host
           collection-6:
             channel_koid = 20050
             debug_id = 5498
-            debug_name = driver_host:pdev:00:00:1e
+            debug_name = driver_host
           collection-at-allocation-7:
             debug_id = 19829
             debug_name = virtual-console.cm
             min_buffer_count = 1
           collection-at-allocation-8:
             debug_id = 5498
-            debug_name = driver_host:pdev:00:00:1e
+            debug_name = driver_host
           collection-at-allocation-9:
             debug_id = 5498
-            debug_name = driver_host:pdev:00:00:1e
+            debug_name = driver_host
           vmo-20085:
             koid = 20085
       heaps:

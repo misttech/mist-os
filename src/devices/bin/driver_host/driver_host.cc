@@ -362,7 +362,6 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
   if (!coordinator_client) {
     return ZX_ERR_IO_REFUSED;
   }
-  size_t proxy_args_len = add_args->proxy_args ? strlen(add_args->proxy_args) : 0;
   zx_status_t call_status = ZX_OK;
   static_assert(sizeof(zx_device_prop_t) == sizeof(uint64_t));
   uint64_t device_id = 0;
@@ -380,7 +379,6 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
       .protocol_id = child->protocol_id(),
       .property_list = std::move(property_list),
       .driver_path = fidl::StringView::FromExternal(child->zx_driver()->libname()),
-      .args = fidl::StringView::FromExternal(add_args->proxy_args, proxy_args_len),
       .device_add_config = add_device_config,
       .has_init = child->ops()->init != nullptr,
       .dfv2_device_symbol = reinterpret_cast<uint64_t>(child->get_dfv2_symbol()),
@@ -689,7 +687,7 @@ StatusOrConn DriverHostControllerConnection::CreateProxyDevice(CreateDeviceReque
 
   status =
       drv->CreateOp(&creation_context, creation_context.parent->driver, creation_context.parent,
-                    "proxy", proxy.proxy_args.data(), proxy.parent_proxy.release());
+                    "proxy", "", proxy.parent_proxy.release());
 
   // Suppress a warning about dummy device being in a bad state.  The
   // message is spurious in this case, since the dummy parent never

@@ -56,7 +56,6 @@ class DeviceAddArgs {
   std::vector<device_performance_state_info_t> performance_states_;
   std::vector<std::string> fidl_protocol_offer_strings_;
   std::vector<const char*> fidl_protocol_offers_;
-  std::string proxy_args_;
 };
 
 class FakeDevice {

@@ -57,7 +57,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .props = child_props,
       .prop_count = countof(child_props),
       .flags = DEVICE_ADD_MUST_ISOLATE | DEVICE_ADD_ALLOW_MULTI_COMPOSITE,
-      .proxy_args = ",",
   };
 
   status = device_add(parent, &args, &test->zxdev);

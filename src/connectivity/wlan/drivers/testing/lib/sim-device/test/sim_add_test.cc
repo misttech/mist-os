@@ -309,7 +309,6 @@ const char *kFidlProtocolOffers[] = {
     "three",
     "four",
 };
-constexpr char kProxyArgs[] = "proxy args";
 
 class DeviceAddArgsTest : public ::testing::Test {
  public:
@@ -342,8 +341,6 @@ class DeviceAddArgsTest : public ::testing::Test {
       EXPECT_STREQ(left.fidl_protocol_offers[i], right.fidl_protocol_offers[i]);
     }
 
-    EXPECT_NE(left.proxy_args, right.proxy_args);
-    EXPECT_STREQ(left.proxy_args, right.proxy_args);
   }
 
   const device_add_args_t original_args_ = {
@@ -355,7 +352,6 @@ class DeviceAddArgsTest : public ::testing::Test {
       .performance_state_count = std::size(kPerformanceStates),
       .fidl_protocol_offers = kFidlProtocolOffers,
       .fidl_protocol_offer_count = std::size(kFidlProtocolOffers),
-      .proxy_args = kProxyArgs,
   };
 };
 

@@ -192,7 +192,7 @@ TEST_F(DigestUnitTest, DefaultBuckets) {
            .processes = {
                {.koid = 1, .name = "bin/bootsvc", .vmos = {1}},
                {.koid = 2, .name = "test", .vmos = {2, 25, 26}},
-               {.koid = 3, .name = "driver_host:pdev:00:00:1b", .vmos = {3, 4}},
+               {.koid = 3, .name = "driver_host", .vmos = {3, 4}},
                {.koid = 4, .name = "fshost.cm", .vmos = {5}},
                {.koid = 5, .name = "/boot/bin/minfs", .vmos = {6}},
                {.koid = 6, .name = "/boot/bin/blobfs", .vmos = {7, 23, 24}},
@@ -201,7 +201,7 @@ TEST_F(DigestUnitTest, DefaultBuckets) {
                {.koid = 8, .name = "web_engine_exe:renderer", .vmos = {11}},
                {.koid = 9, .name = "web_engine_exe:gpu", .vmos = {12, 27, 32, 33}},
                {.koid = 11, .name = "scenic.cmx", .vmos = {13, 27, 28, 29, 30, 31}},
-               {.koid = 12, .name = "driver_host:pdev:05:00:f", .vmos = {14}},
+               {.koid = 12, .name = "driver_host", .vmos = {14}},
                {.koid = 13, .name = "netstack.cmx", .vmos = {15}},
                {.koid = 14, .name = "pkgfs", .vmos = {16}},
                {.koid = 15, .name = "cast_agent.cmx", .vmos = {17}},
@@ -220,9 +220,9 @@ TEST_F(DigestUnitTest, DefaultBuckets) {
        ".*|Magma.*|ImagePipe2Surface.*|GFXBufferCollection.*|ScenicImageMemory|Display.*|"
        "CompactImage.*|GFX Device Memory.*"},
       // Unused protected pool memory.
-      {"ProtectedPool", "driver_host:.*", "SysmemAmlogicProtectedPool"},
+      {"ProtectedPool", "driver_host", "SysmemAmlogicProtectedPool"},
       // Unused contiguous pool memory.
-      {"ContiguousPool", "driver_host:.*", "SysmemContiguousPool"},
+      {"ContiguousPool", "driver_host", "SysmemContiguousPool"},
       {"Fshost", "fshost.cm", ".*"},
       {"Minfs", ".*minfs", ".*"},
       {"BlobfsInactive", ".*blobfs", "inactive-blob-.*"},
@@ -232,7 +232,7 @@ TEST_F(DigestUnitTest, DefaultBuckets) {
       {"Web", "web_engine_exe:.*", ".*"},
       {"Kronk", "kronk.cmx", ".*"},
       {"Scenic", "scenic.cmx", ".*"},
-      {"Amlogic", "driver_host:pdev:05:00:f", ".*"},
+      {"Amlogic", "driver_host", ".*"},
       {"Netstack", "netstack.cmx", ".*"},
       {"Pkgfs", "pkgfs", ".*"},
       {"Cast", "cast_agent.cmx", ".*"},

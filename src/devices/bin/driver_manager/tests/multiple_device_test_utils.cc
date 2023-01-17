@@ -263,7 +263,7 @@ void MultipleDeviceTestCase::SetUp() {
         /* props_data */ nullptr, /* props_count */ 0, /* str_props_data */ nullptr,
         /* str_props_count */ 0, "platform-bus", 0,
         /* driver_path */ {},
-        /* args */ {}, /* add_device_config */ {}, /* has_init */ false,
+        /* add_device_config */ {}, /* has_init */ false,
         /* always_init */ true,
         /*inspect*/ zx::vmo(),
         /* outgoing_dir */ fidl::ClientEnd<fio::Directory>(), &platform_bus_.device);
@@ -328,7 +328,7 @@ void MultipleDeviceTestCase::AddDevice(const fbl::RefPtr<Device>& parent, const 
       parent, std::move(*controller_client), std::move(*coordinator_server),
       /* props_data */ nullptr,
       /* props_count */ 0, /* str_props_data */ nullptr,
-      /* str_props_count */ 0, name, protocol_id, /* driver_path */ driver.data(), /* args */ {},
+      /* str_props_count */ 0, name, protocol_id, /* driver_path */ driver.data(),
       /* add_device_config */ add_device_config, /* has_init */ has_init,
       /* always_init */ always_init, std::move(inspect), /* outgoing_dir */ std::move(outgoing_dir),
       &state.device);

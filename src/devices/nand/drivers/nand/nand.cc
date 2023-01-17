@@ -408,7 +408,7 @@ zx_status_t NandDevice::Init() {
 
   zx_handle_t profile = ZX_HANDLE_INVALID;
   status = device_get_deadline_profile(this->zxdev(), capacity, deadline, period,
-                                       "driver_host:pdev:05:00:f:nand-worker", &profile);
+                                       "driver_host:nand-worker", &profile);
   if (status != ZX_OK) {
     zxlogf(WARNING, "nand: failed to get deadline profile: %d\n", status);
   } else {

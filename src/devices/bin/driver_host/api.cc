@@ -212,9 +212,6 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   if (out) {
     *out = dev.get();
   }
-  if (!(args->flags & DEVICE_ADD_MUST_ISOLATE)) {
-    args->proxy_args = nullptr;
-  }
   if (zx_status_t status =
           api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect), std::move(outgoing_dir));
       status != ZX_OK) {

@@ -176,7 +176,7 @@ TEST(MiscTestCase, BindDevices) {
       coordinator.root_device(), std::move(controller_endpoints->client),
       std::move(coordinator_endpoints->server), nullptr /* props_data */, 0 /* props_count */,
       nullptr /* str_props_data */, 0 /* str_props_count */, "mock-device", ZX_PROTOCOL_TEST,
-      {} /* driver_path */, {} /* args */, {} /* add_device_config */, false /* has_init */,
+      {} /* driver_path */, {} /* add_device_config */, false /* has_init */,
       true /* always_init */, zx::vmo() /*inspect*/,
       fidl::ClientEnd<fio::Directory>() /* outgoing_dir */, &device);
   ASSERT_OK(status);
@@ -265,7 +265,7 @@ void AddDeviceWithProperties(const fuchsia_device_manager::wire::DeviceProperty*
   auto status = coordinator.device_manager()->AddDevice(
       coordinator.root_device(), std::move(controller_endpoints->client),
       std::move(coordinator_endpoints->server), props_data, props_count, str_props_data,
-      str_props_count, "mock-device", ZX_PROTOCOL_TEST, {} /* driver_path */, {} /* args */,
+      str_props_count, "mock-device", ZX_PROTOCOL_TEST, {} /* driver_path */,
       {} /* add_device_config */, false /* has_init */, true /* always_init */,
       zx::vmo() /*inspect*/, fidl::ClientEnd<fio::Directory>() /* outgoing_dir */, &device);
   ASSERT_OK(status);
@@ -345,7 +345,7 @@ TEST(MiscTestCase, InvalidStringProperties) {
   auto status = coordinator.device_manager()->AddDevice(
       coordinator.root_device(), std::move(controller_endpoints->client),
       std::move(coordinator_endpoints->server), nullptr /* props */, 0 /* props_count */, str_props,
-      std::size(str_props), "mock-device", ZX_PROTOCOL_TEST, {} /* driver_path */, {} /* args */,
+      std::size(str_props), "mock-device", ZX_PROTOCOL_TEST, {} /* driver_path */,
       {} /* add_device_config */, false /* has_init */, true /* always_init */,
       zx::vmo() /*inspect*/, fidl::ClientEnd<fio::Directory>() /* outgoing_dir */, &device);
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, status);
@@ -384,7 +384,7 @@ TEST(MiscTestCase, DeviceAlreadyBoundFromDriverIndex) {
       coordinator.root_device(), std::move(controller_endpoints->client),
       std::move(coordinator_endpoints->server), nullptr /* props_data */, 0 /* props_count */,
       nullptr /* str_props_data */, 0 /* str_props_count */, "mock-device", ZX_PROTOCOL_TEST,
-      {} /* driver_path */, {} /* args */,
+      {} /* driver_path */,
       fuchsia_device_manager::AddDeviceConfig::kSkipAutobind /* add_device_config */,
       false /* has_init */, true /* always_init */, zx::vmo() /*inspect*/,
       fidl::ClientEnd<fio::Directory>() /*outgoing_dir*/, &device);
@@ -444,7 +444,7 @@ TEST(MiscTestCase, AddNodeGroup) {
       coordinator.root_device(), std::move(controller_endpoints->client),
       std::move(coordinator_endpoints->server), nullptr /* props_data */, 0 /* props_count */,
       nullptr /* str_props_data */, 0 /* str_props_count */, "mock-device", ZX_PROTOCOL_TEST,
-      {} /* driver_path */, {} /* args */,
+      {} /* driver_path */,
       fuchsia_device_manager::AddDeviceConfig::kSkipAutobind /* add_device_config */,
       false /* has_init */, true /* always_init */, zx::vmo() /*inspect*/,
       fidl::ClientEnd<fio::Directory>() /*outgoing_dir*/, &device);
