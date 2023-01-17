@@ -6,6 +6,7 @@ group("integration_graphics_tests") {
   testonly = true
 
   deps = [
+    "carnelian-pixel-tests:tests",
     "display-pixel-ratio:tests",
     "display-rotation:tests",
     "presentation:tests",

@@ -1,0 +1,31 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "inspect/client.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+
+        // system-test is needed to access fuchsia.sysmem.Allocator
+        // and fuchsia.vulkan.loader.Loader.
+        "sys/testing/system-test.shard.cml",
+    ],
+    program: {
+        binary: "bin/carnelian_pixel_test_bin",
+    },
+    offer: [
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sys.Environment",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
+}
