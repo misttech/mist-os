@@ -47,8 +47,8 @@ static bool for_each_lr(IchState* ich_state, F function) {
     }
     InterruptState state;
     uint32_t vector = gic_get_vector_from_lr(ich_state->lr[i], &state);
-    zx_status_t status = function(i, state, vector);
-    if (status == ZX_ERR_STOP) {
+    auto result = function(i, state, vector);
+    if (result.is_error()) {
       return false;
     }
   }
@@ -83,15 +83,16 @@ static void gich_maybe_interrupt(GichState* gich_state, IchState* ich_state) {
     InterruptState state = InterruptState::PENDING;
 
     if (gich_state->InListRegister(vector)) {
-      bool skip = for_each_lr(ich_state, [&](uint8_t i, InterruptState s, uint32_t v) {
-        if (v != vector || s != InterruptState::ACTIVE) {
-          return ZX_ERR_NEXT;
-        }
-        // If the interrupt is active, change its state to pending and active.
-        state = InterruptState::PENDING_AND_ACTIVE;
-        lr_index = i;
-        return ZX_ERR_STOP;
-      });
+      bool skip =
+          for_each_lr(ich_state, [&](uint8_t i, InterruptState s, uint32_t v) -> zx::result<> {
+            if (v != vector || s != InterruptState::ACTIVE) {
+              return zx::ok();
+            }
+            // If the interrupt is active, change its state to pending and active.
+            state = InterruptState::PENDING_AND_ACTIVE;
+            lr_index = i;
+            return zx::error(ZX_ERR_STOP);
+          });
       if (skip) {
         // Skip an interrupt if it is in an LR, and its state is not changing.
         continue;
@@ -111,9 +112,9 @@ GichState::GichState() {
 
 void GichState::TrackAllListRegisters(IchState* ich_state) {
   lr_tracker_.ClearAll();
-  for_each_lr(ich_state, [this](uint8_t i, InterruptState s, uint32_t v) {
+  for_each_lr(ich_state, [this](uint8_t i, InterruptState s, uint32_t v) -> zx::result<> {
     lr_tracker_.SetOne(v);
-    return ZX_ERR_NEXT;
+    return zx::ok();
   });
 }
 
