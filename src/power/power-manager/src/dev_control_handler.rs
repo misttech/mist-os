@@ -7,11 +7,12 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::utils::{connect_to_driver, result_debug_panic::ResultDebugPanic};
+use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fidl_fuchsia_device as fdev;
+use fidl_fuchsia_io as fio;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_zircon as zx;
 use serde_derive::Deserialize;
@@ -234,7 +235,24 @@ impl Node for DeviceControlHandler {
         // Connect to the driver. Typically this is None, but it may be set by tests.
         let mut option = self.driver_proxy.borrow_mut();
         if option.is_none() {
-            let proxy = connect_to_driver::<fdev::ControllerMarker>(&self.driver_path).await?;
+            // TODO(https://fxbug.dev/107961): Avoid relying on dev-topological access.
+            const DEV: &str = "/dev/";
+
+            let dir =
+                fuchsia_fs::directory::open_in_namespace(DEV, fio::OpenFlags::RIGHT_READABLE)?;
+
+            let path = self.driver_path.strip_prefix(DEV).ok_or_else(|| {
+                anyhow::anyhow!("driver_path={} not in {}", self.driver_path, DEV)
+            })?;
+
+            let proxy = device_watcher::wait_for_device_with(&dir, |info| {
+                (path == info.filename).then(|| {
+                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                        fdev::ControllerMarker,
+                    >(&dir, path)
+                })
+            })
+            .await??;
             *option = Some(proxy);
         }
 

@@ -6,11 +6,11 @@ use crate::error::PowerManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::types::{Hertz, PState, Volts};
-use crate::utils::connect_to_driver;
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl;
+use fidl_fuchsia_io as fio;
 use fuchsia_inspect as inspect;
 use serde_derive::Deserialize;
 use serde_json as json;
@@ -191,7 +191,28 @@ impl Node for CpuDeviceHandler {
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
             Some(p) => p.clone(),
-            None => connect_to_driver::<fcpu_ctrl::DeviceMarker>(&self.driver_path).await?,
+            None => {
+                const DEV_CLASS_CPUCTRL: &str = "/dev/class/cpu-ctrl/";
+
+                let dir = fuchsia_fs::directory::open_in_namespace(
+                    DEV_CLASS_CPUCTRL,
+                    fio::OpenFlags::RIGHT_READABLE,
+                )?;
+
+                // TODO(https://fxbug.dev/113828): Remove this requirement when the configuration
+                // specifies the device more robustly than by its sequential number.
+                let path = self.driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {
+                    anyhow::anyhow!("driver_path={} not in {}", self.driver_path, DEV_CLASS_CPUCTRL)
+                })?;
+                device_watcher::wait_for_device_with(&dir, |info| {
+                    (info.filename == path).then(|| {
+                        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                            fcpu_ctrl::DeviceMarker,
+                        >(&dir, path)
+                    })
+                })
+                .await??
+            }
         };
 
         // Query the CPU P-states

@@ -8,11 +8,11 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::types::{Farads, Hertz, PState, Volts, Watts};
-use crate::utils::connect_to_driver;
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl;
+use fidl_fuchsia_io as fio;
 use fuchsia_inspect::{self as inspect, Property};
 use serde_derive::Deserialize;
 use serde_json as json;
@@ -472,7 +472,33 @@ impl Node for CpuControlHandler {
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
             Some(p) => p.clone(),
-            None => connect_to_driver::<fcpuctrl::DeviceMarker>(&self.cpu_driver_path).await?,
+            None => {
+                const DEV_CLASS_CPUCTRL: &str = "/dev/class/cpu-ctrl/";
+
+                let dir = fuchsia_fs::directory::open_in_namespace(
+                    DEV_CLASS_CPUCTRL,
+                    fio::OpenFlags::RIGHT_READABLE,
+                )?;
+
+                // TODO(https://fxbug.dev/113828): Remove this requirement when the configuration
+                // specifies the device more robustly than by its sequential number.
+                let path =
+                    self.cpu_driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "driver_path={} not in {}",
+                            self.cpu_driver_path,
+                            DEV_CLASS_CPUCTRL
+                        )
+                    })?;
+                device_watcher::wait_for_device_with(&dir, |info| {
+                    (info.filename == path).then(|| {
+                        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                            fcpuctrl::DeviceMarker,
+                        >(&dir, path)
+                    })
+                })
+                .await??
+            }
         };
 
         // Query the CPU P-states

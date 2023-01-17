@@ -6,7 +6,7 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::shutdown_request::ShutdownRequest;
-use crate::utils::{connect_to_driver, result_debug_panic::ResultDebugPanic};
+use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_input::{DeviceMarker as LidMarker, DeviceProxy as LidProxy};
@@ -318,10 +318,9 @@ async fn find_lid_sensor() -> Result<LidProxy, Error> {
 /// report descriptor is found.
 async fn open_sensor(filename: &PathBuf) -> Result<LidProxy, Error> {
     let path = Path::new(INPUT_DEVICES_DIRECTORY).join(filename);
-    let device = connect_to_driver::<LidMarker>(&String::from(
-        path.to_str().ok_or(format_err!("Could not read path {:?}", path))?,
-    ))
-    .await?;
+    let device = fuchsia_component::client::connect_to_protocol_at_path::<LidMarker>(
+        &String::from(path.to_str().ok_or(format_err!("Could not read path {:?}", path))?),
+    )?;
     if let Ok(device_descriptor) = device.get_report_desc().await {
         if device_descriptor.len() < HID_LID_DESCRIPTOR.len() {
             return Err(format_err!("Short HID header"));

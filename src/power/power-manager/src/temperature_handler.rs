@@ -8,7 +8,7 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::types::{Celsius, Nanoseconds, Seconds};
-use crate::utils::{connect_to_driver, result_debug_panic::ResultDebugPanic};
+use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -311,11 +311,14 @@ impl Node for TemperatureHandler {
     async fn init(&self) -> Result<(), Error> {
         fuchsia_trace::duration!("power_manager", "TemperatureHandler::init");
 
-        // Connect to the temperature driver. Typically this is None, but it may be set by tests.
-        let driver_proxy = match &self.mutable_inner.borrow().driver_proxy {
-            Some(p) => p.clone(),
-            None => connect_to_driver::<fthermal::DeviceMarker>(&self.driver_path).await?,
-        };
+        // Connect to the thermal driver. Typically this is None, but it may be set by tests.
+        let driver_proxy =
+            match &self.mutable_inner.borrow().driver_proxy {
+                Some(p) => p.clone(),
+                None => fuchsia_component::client::connect_to_protocol_at_path::<
+                    fthermal::DeviceMarker,
+                >(&self.driver_path)?,
+            };
 
         self.mutable_inner.borrow_mut().driver_proxy = Some(driver_proxy);
         self.init_done.signal();
