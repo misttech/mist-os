@@ -4,105 +4,129 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/images/paths.gni")
 import("//src/sys/core/build/core.gni")
 
-# NOTE:  The guest image should not be varied by any of the global GN args that
-# are set by the //product/<foo>.gni product-definition files.  It should always
-# be the same regardless of the "main product" that is being built for, as it is
-# its own product-like assembly.
+# NOTE:  The _contents_ of the guest image should not vary based any of the
+# global GN args that are set by the //product/<foo>.gni product-definition
+# files.  If it exists, it should always be the same regardless of the "main
+# product" that is being built for, as it is its own product-like assembly.
 #
 # The guest image is meant to be run in a VM hosted by the virtualization
-# subsystem in Fuchsia (running a Fuchsia VM on top of Fuchsia).
+# subsystem in Fuchsia (running a Fuchsia VM on top of Fuchsia).  As this is not
+# available on bringup builds, the guest image is made into no-op group in that
+# build configuration, in order to work around ninja dependency tracking issues
+# for incremental builds when changing from an `fx set core...` to
+# `fx set bringup...`.  When this happens, ninja tries to build dependencies it
+# remembered from the `core` product, even if those are nonsense (or not
+# buildable) for bringup.
+#
+# And so the use of an empty group when building for bringup is an optimization
+# to make these targets fall out of the build graph in these situations, which
+# reduces build times and flake rates.
+#
+# See:  http://fxbug.dev/110852 for context.
 
-core_realm_definition("core") {
-  testonly = true
-  restrict_persistent_storage = false
-  deps = [
-    "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
-    "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
-    "//src/sys/process-resolver:core_shard",
-  ]
-}
-
-product_assembly_configuration("product_assembly_config") {
-  platform = {
-    feature_set_level = "minimal"
-    build_type = "eng"
+if (labels.images == "//build/images/bringup") {
+  group("guest") {
+    testonly = true
   }
-}
+} else {
+  # In all other builds, define the guest assembly.
 
-assembled_system("guest") {
-  testonly = true
-
-  # The guest image always needs to have an fvm, because it has base packages.
-  generate_fvm = true
-
-  product_assembly_config_file =
-      get_label_info(":product_assembly_config", "target_out_dir") +
-      "/product_assembly_config/product_assembly_config.json"
-  product_assembly_config_dep = ":product_assembly_config"
-
-  base_packages = [
-    "//src/performance/trace",
-    "//src/sys/appmgr:appmgr_scheme_config",
-    "//src/sys/appmgr:component_id_index_no_restrict_storage",
-    "//src/sys/appmgr:core_component_id_index",
-    "//src/sys/appmgr",
-    "//src/sys/pkg/bin/system-update-checker",
-    "//src/sys/process-resolver",
-    "//src/virtualization/tests:virtualization_test_utils_pkg",
-    "//src/cobalt/bin/app:cobalt_registry",
-    "//src/cobalt/bin/app:config",
-  ]
-
-  bootfs_labels = [
-    "//src/bringup/bin/virtcon:bootfs",
-    "//src/power/power-manager:base_config",
-    "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
-    "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
-    "//src/connectivity/network/bin/ping",
-    "//src/connectivity/network/drivers/network-device",
-    "//src/devices/bin/lsdev",
-    "//src/devices/block/drivers/virtio:virtio_block",
-    "//src/devices/block/drivers/virtio:virtio_scsi",
-    "//src/devices/board/drivers/machina",
-    "//src/devices/bundles:bootstrap-dev",
-    "//src/devices/bus/drivers/pci:bus-pci",
-    "//src/devices/misc/drivers/virtio-rng:virtio_rng",
-    "//src/devices/serial/drivers/virtio-console:virtio_console",
-    "//src/devices/sysmem/drivers/sysmem",
-    "//src/diagnostics/archivist:default-service-config",
-    "//src/diagnostics/bundles:bootstrap",
-    "//src/graphics/display/drivers/display",
-    "//src/graphics/drivers/virtio:virtio_gpu",
-    "//src/storage/bin/minfs",
-    "//src/storage/bin/dd",
-    "//src/storage/bin/df",
-    "//src/storage/bin/mount",
-    "//src/storage/bin/umount",
-    "//src/storage/fvm/driver",
-    "//src/sys/bin/psutils",
-    "//src/sys/component_manager:component_manager_bootfs_config",
-    "//src/ui/input/drivers/hid",
-    "//src/ui/input/drivers/hid-input-report",
-    "//src/ui/input/drivers/virtio:virtio_input",
-    "//zircon/third_party/uapp/dash",
-  ]
-
-  fshost_config = {
-    no_zxcrypt = true
-  }
-
-  if (current_cpu == "x64") {
-    bootfs_labels += [
-      "//src/devices/block/drivers/ahci",
-      "//src/devices/block/drivers/mbr",
-      "//src/devices/board/drivers/x86:platform-bus-x86",
-      "//src/devices/i2c/drivers/intel-i2c",
-      "//src/devices/serial/drivers/uart16550",
+  # Guest's specific core realm (not based on core_realm_shards).
+  core_realm_definition("core") {
+    testonly = true
+    restrict_persistent_storage = false
+    deps = [
+      "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
+      "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
+      "//src/sys/process-resolver:core_shard",
     ]
   }
 
-  include_component_id_index = true
-  core_realm_definition = ":core"
+  # Guest's specific product assembly.  It's based on the minimal feature set
+  # and is specifically an "eng" build-type so that it can run tests.
+  product_assembly_configuration("product_assembly_config") {
+    platform = {
+      build_type = "eng"
+    }
+  }
+
+  # The guest image itself.
+  assembled_system("guest") {
+    testonly = true
+
+    # The guest image always needs to have an fvm, because it has base packages.
+    generate_fvm = true
+
+    product_assembly_config_file =
+        get_label_info(":product_assembly_config", "target_out_dir") +
+        "/product_assembly_config/product_assembly_config.json"
+    product_assembly_config_dep = ":product_assembly_config"
+
+    base_packages = [
+      "//src/performance/trace",
+      "//src/sys/appmgr:appmgr_scheme_config",
+      "//src/sys/appmgr:component_id_index_no_restrict_storage",
+      "//src/sys/appmgr:core_component_id_index",
+      "//src/sys/appmgr",
+      "//src/sys/pkg/bin/system-update-checker",
+      "//src/sys/process-resolver",
+      "//src/virtualization/tests:virtualization_test_utils_pkg",
+      "//src/cobalt/bin/app:cobalt_registry",
+      "//src/cobalt/bin/app:config",
+    ]
+
+    bootfs_labels = [
+      "//src/bringup/bin/virtcon:bootfs",
+      "//src/power/power-manager:base_config",
+      "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
+      "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
+      "//src/connectivity/network/bin/ping",
+      "//src/connectivity/network/drivers/network-device",
+      "//src/devices/bin/lsdev",
+      "//src/devices/block/drivers/virtio:virtio_block",
+      "//src/devices/block/drivers/virtio:virtio_scsi",
+      "//src/devices/board/drivers/machina",
+      "//src/devices/bundles:bootstrap-dev",
+      "//src/devices/bus/drivers/pci:bus-pci",
+      "//src/devices/misc/drivers/virtio-rng:virtio_rng",
+      "//src/devices/serial/drivers/virtio-console:virtio_console",
+      "//src/devices/sysmem/drivers/sysmem",
+      "//src/diagnostics/archivist:default-service-config",
+      "//src/diagnostics/bundles:bootstrap",
+      "//src/graphics/display/drivers/display",
+      "//src/graphics/drivers/virtio:virtio_gpu",
+      "//src/storage/bin/minfs",
+      "//src/storage/bin/dd",
+      "//src/storage/bin/df",
+      "//src/storage/bin/mount",
+      "//src/storage/bin/umount",
+      "//src/storage/fvm/driver",
+      "//src/sys/bin/psutils",
+      "//src/sys/component_manager:component_manager_bootfs_config",
+      "//src/ui/input/drivers/hid",
+      "//src/ui/input/drivers/hid-input-report",
+      "//src/ui/input/drivers/virtio:virtio_input",
+      "//zircon/third_party/uapp/dash",
+    ]
+
+    fshost_config = {
+      no_zxcrypt = true
+    }
+
+    if (current_cpu == "x64") {
+      bootfs_labels += [
+        "//src/devices/block/drivers/ahci",
+        "//src/devices/block/drivers/mbr",
+        "//src/devices/board/drivers/x86:platform-bus-x86",
+        "//src/devices/i2c/drivers/intel-i2c",
+        "//src/devices/serial/drivers/uart16550",
+      ]
+    }
+
+    include_component_id_index = true
+    core_realm_definition = ":core"
+  }
 }
