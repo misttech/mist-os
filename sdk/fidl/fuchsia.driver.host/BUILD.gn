@@ -12,5 +12,4 @@ fidl("fuchsia.driver.host") {
     "//sdk/fidl/fuchsia.ldsvc",
     "//zircon/vdso/zx",
   ]
-  enable_c = true
 }
