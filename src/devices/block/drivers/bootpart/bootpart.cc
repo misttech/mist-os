@@ -55,14 +55,14 @@ static uint64_t get_lba_count(bootpart_device_t* dev) {
 // implement device protocol:
 
 static void bootpart_query(void* ctx, block_info_t* bi, size_t* bopsz) {
-  bootpart_device_t* bootpart = ctx;
+  bootpart_device_t* bootpart = static_cast<bootpart_device_t*>(ctx);
   memcpy(bi, &bootpart->info, sizeof(block_info_t));
   *bopsz = bootpart->block_op_size;
 }
 
 static void bootpart_queue(void* ctx, block_op_t* bop, block_impl_queue_callback completion_cb,
                            void* cookie) {
-  bootpart_device_t* bootpart = ctx;
+  bootpart_device_t* bootpart = static_cast<bootpart_device_t*>(ctx);
 
   switch (bop->command & BLOCK_OP_MASK) {
     case BLOCK_OP_READ:
@@ -91,7 +91,7 @@ static void bootpart_queue(void* ctx, block_op_t* bop, block_impl_queue_callback
 }
 
 static void bootpart_init(void* ctx) {
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
 
   // Add empty partition map metadata to prevent this driver from binding to its child devices.
   zx_status_t status = device_add_metadata(device->zxdev, DEVICE_METADATA_PARTITION_MAP, NULL, 0);
@@ -101,12 +101,12 @@ static void bootpart_init(void* ctx) {
 }
 
 static void bootpart_unbind(void* ctx) {
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
   device_unbind_reply(device->zxdev);
 }
 
 static void bootpart_release(void* ctx) {
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
   free(device);
 }
 
@@ -118,7 +118,7 @@ static block_impl_protocol_ops_t block_ops = {
 static_assert(ZBI_PARTITION_GUID_LEN == GUID_LENGTH, "GUID length mismatch");
 
 static zx_status_t bootpart_get_guid(void* ctx, guidtype_t guid_type, guid_t* out_guid) {
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
   switch (guid_type) {
     case GUIDTYPE_TYPE:
       memcpy(out_guid, device->part.type_guid, ZBI_PARTITION_GUID_LEN);
@@ -138,7 +138,7 @@ static zx_status_t bootpart_get_name(void* ctx, char* out_name, size_t capacity)
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
 
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
   strlcpy(out_name, device->part.name, ZBI_PARTITION_NAME_LEN);
   return ZX_OK;
 }
@@ -149,16 +149,16 @@ static block_partition_protocol_ops_t partition_ops = {
 };
 
 static zx_status_t bootpart_get_protocol(void* ctx, uint32_t proto_id, void* out) {
-  bootpart_device_t* device = ctx;
+  bootpart_device_t* device = static_cast<bootpart_device_t*>(ctx);
   switch (proto_id) {
     case ZX_PROTOCOL_BLOCK_IMPL: {
-      block_impl_protocol_t* protocol = out;
+      block_impl_protocol_t* protocol = static_cast<block_impl_protocol_t*>(out);
       protocol->ctx = device;
       protocol->ops = &block_ops;
       return ZX_OK;
     }
     case ZX_PROTOCOL_BLOCK_PARTITION: {
-      block_partition_protocol_t* protocol = out;
+      block_partition_protocol_t* protocol = static_cast<block_partition_protocol_t*>(out);
       protocol->ctx = device;
       protocol->ops = &partition_ops;
       return ZX_OK;
@@ -217,7 +217,8 @@ static zx_status_t bootpart_bind(void* ctx, zx_device_t* parent) {
            "\n",
            i, name, type_guid, uniq_guid, part->name, part->first_block, part->last_block);
 
-    bootpart_device_t* device = calloc(1, sizeof(bootpart_device_t));
+    bootpart_device_t* device =
+        static_cast<bootpart_device_t*>(calloc(1, sizeof(bootpart_device_t)));
     if (!device) {
       return ZX_ERR_NO_MEMORY;
     }

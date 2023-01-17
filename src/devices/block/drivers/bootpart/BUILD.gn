@@ -24,7 +24,7 @@ fuchsia_driver("bootpart-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "bootpart.c" ]
+  sources = [ "bootpart.cc" ]
   deps = [
     ":bootpart_bind",
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
