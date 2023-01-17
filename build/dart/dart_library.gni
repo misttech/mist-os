@@ -763,6 +763,23 @@ if (current_toolchain == dart_toolchain) {
       not_needed(invoker, "*")
 
       public_deps = [ ":$target_name($dart_toolchain)" ]
+
+      # Ignore the Dart libraries that are only present in private versions of
+      # the SDK as they don't have the same versioning constraints.
+      is_vendor_google_library =
+          string_replace(target_out_dir, "/vendor/google", "") != target_out_dir
+
+      # 'dart_library()' targets in the 'partner' or 'public' category that are
+      # not testonly or private must be tracked by
+      # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
+      # checks (see https://fxbug.dev/118903).
+      if (!is_vendor_google_library &&
+          (!defined(invoker.testonly) || !invoker.testonly) &&
+          (defined(invoker.sdk_category) &&
+           (invoker.sdk_category == "partner" ||
+            invoker.sdk_category == "public"))) {
+        deps = [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
+      }
     }
   }
 }
