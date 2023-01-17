@@ -6,7 +6,7 @@
 
 #include <fcntl.h>
 #include <lib/fit/result.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/time.h>
 #include <zircon/syscalls/profile.h>
@@ -266,7 +266,8 @@ fit::result<std::string, unsigned int> GetUint(const char* name, const rapidjson
 void ParseProfiles(const std::string& filename, const rapidjson::Document& document,
                    zircon_profile::ProfileMap* profiles) {
   if (!document.IsObject()) {
-    FX_LOG(WARNING, "ProfileProvider", "The profile config document must be a JSON object!");
+    FX_SLOG(WARNING, "The profile config document must be a JSON object!",
+            KV("filename", filename.c_str()), KV("tag", "ProfileProvider"));
     return;
   }
 
@@ -286,20 +287,20 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       } else if (!strcmp(*result, "product")) {
         scope = ProfileScope::Product;
       } else {
-        FX_LOGF(WARNING, "ProfileProvider", "%s: Invalid role scope \"%s\", defaulting to none!",
-                filename.c_str(), *result);
+        FX_SLOG(WARNING, "Invalid role scope, defaulting to none!",
+                KV("filename", filename.c_str()), KV("scope", *result),
+                KV("tag", "ProfileProvider"));
       }
     }
   } else {
-    FX_LOGF(WARNING, "ProfileProvider", "%s: Missing role scope, defaulting to none!",
-            filename.c_str());
+    FX_SLOG(WARNING, "Missing role scope, defaulting to none!", KV("filename", filename.c_str()));
   }
 
   for (const auto& profile : IterateMembers(profile_member)) {
     const char* profile_name = profile.name.GetString();
     if (!profile.value.IsObject()) {
-      FX_LOGF(WARNING, "ProfileProvider", "%s: Profile \"%s\" value must be a JSON object!",
-              filename.c_str(), profile_name);
+      FX_SLOG(WARNING, "Profile value must be a JSON object!", KV("filename", filename.c_str()),
+              KV("profile", profile_name), KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -320,27 +321,27 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
         info.priority =
             std::clamp<int32_t>(result.value(), ZX_PRIORITY_LOWEST, ZX_PRIORITY_HIGHEST);
       } else {
-        FX_LOGF(WARNING, "ProfileProvider", "\"%s\": %s", profile_name,
-                result.error_value().c_str());
+        FX_SLOG(WARNING, result.error_value().c_str(), KV("profile_name", profile_name),
+                KV("tag", "ProfileProvider"));
         continue;
       }
     } else if (!has_priority && has_complete_deadline) {
       auto capacity_result = ParseDuration(profile.value["capacity"]);
       if (capacity_result.is_error()) {
-        FX_LOGF(WARNING, "ProfileProvider", "\"%s\": %s", profile_name,
-                capacity_result.error_value().c_str());
+        FX_SLOG(WARNING, capacity_result.error_value().c_str(), KV("profile_name", profile_name),
+                KV("tag", "ProfileProvider"));
         continue;
       }
       auto deadline_result = ParseDuration(profile.value["deadline"]);
       if (deadline_result.is_error()) {
-        FX_LOGF(WARNING, "ProfileProvider", "\"%s\": %s", profile_name,
-                deadline_result.error_value().c_str());
+        FX_SLOG(WARNING, deadline_result.error_value().c_str(), KV("profile_name", profile_name),
+                KV("tag", "ProfileProvider"));
         continue;
       }
       auto period_result = ParseDuration(profile.value["period"]);
       if (period_result.is_error()) {
-        FX_LOGF(WARNING, "ProfileProvider", "\"%s\": %s", profile_name,
-                period_result.error_value().c_str());
+        FX_SLOG(WARNING, period_result.error_value().c_str(), KV("profile_name", profile_name),
+                KV("tag", "ProfileProvider"));
         continue;
       }
       info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
@@ -348,15 +349,14 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
                                                         .relative_deadline = deadline_result->get(),
                                                         .period = period_result->get()};
     } else if (has_priority && has_some_deadline) {
-      FX_LOGF(WARNING, "ProfileProvider",
-              "%s: \"%s\": Priority and deadline parameters are mutually exclusive!",
-              filename.c_str(), profile_name);
+      FX_SLOG(WARNING, "Priority and deadline parameters are mutually exclusive!",
+              KV("filename", filename.c_str()), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
       continue;
     } else if (!has_priority && !has_complete_deadline && has_some_deadline) {
-      FX_LOGF(
-          WARNING, "ProfileProvider",
-          "%s: \"%s\": Deadline profiles must specify \"capacity\", \"deadline\", and \"period\"!",
-          filename.c_str(), profile_name);
+      FX_SLOG(WARNING, "Deadline profiles must specify \"capacity\", \"deadline\", and \"period\"!",
+              KV("filename", filename.c_str()), KV("profile_name", profile_name),
+              KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -376,10 +376,11 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
 
         for (const auto& value : IterateValues(affinity_member)) {
           if (!value.IsUint()) {
-            FX_LOGF(WARNING, "ProfileProvider",
-                    "%s: \"%s\": Array element %zu of profile member \"affinity\" must be an "
+            FX_SLOG(WARNING,
+                    "Array element of profile member \"affinity\" must be an "
                     "unsigned integer!",
-                    filename.c_str(), profile_name, element_count);
+                    KV("element_count", element_count), KV("filename", filename.c_str()),
+                    KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
             failed = true;
             break;
           }
@@ -388,10 +389,9 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
           const size_t cpu_number = value.GetUint();
 
           if (cpu_number >= ZX_CPU_SET_MAX_CPUS) {
-            FX_LOGF(
-                WARNING, "ProfileProvider",
-                "%s: \"%s\": Profile member \"affinity\" must be an integer in the range [0, %u)!",
-                filename.c_str(), profile_name, ZX_CPU_SET_MAX_CPUS);
+            FX_SLOG(WARNING, "Profile member \"affinity\" must be an integer < ZX_CPU_SET_MAX_CPUS",
+                    KV("filename", filename.c_str()), KV("profile_name", profile_name),
+                    KV("ZX_CPU_SET_MAX_CPUS", ZX_CPU_SET_MAX_CPUS), KV("tag", "ProfileProvider"));
             failed = true;
             break;
           }
@@ -403,17 +403,16 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
           continue;
         }
       } else {
-        FX_LOGF(
-            WARNING, "ProfileProvider",
-            "%s: \"%s\": Profile member \"affinity\" must be a uint64 or an array of CPU indices!",
-            filename.c_str(), profile_name);
+        FX_SLOG(WARNING, "Profile member \"affinity\" must be a uint64 or an array of CPU indices!",
+                KV("filename", filename.c_str()), KV("profile_name", profile_name),
+                KV("tag", "ProfileProvider"));
         continue;
       }
     }  // if (has_affinity)
 
     if (info.flags == 0) {
-      FX_LOGF(WARNING, "ProfileProvider", "%s: Ignoring empty profile \"%s\".", filename.c_str(),
-              profile_name);
+      FX_SLOG(WARNING, "Ignoring empty profile.", KV("filename", filename.c_str()),
+              KV("profile_name", profile_name), KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -421,11 +420,14 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
     if (!added) {
       const ProfileScope existing_scope = iter->second.scope;
       if (existing_scope >= scope) {
-        FX_LOGF(WARNING, "ProfileProvider", "%s: Profile \"%s\" already exists at %s scope.",
-                filename.c_str(), profile_name, ToString(existing_scope).c_str());
+        FX_SLOG(WARNING, "Profile already exists at scope.", KV("filename", filename.c_str()),
+                KV("profile_name", profile_name),
+                KV("existing_scope", ToString(existing_scope).c_str()),
+                KV("scope", ToString(scope).c_str()), KV("tag", "ProfileProvider"));
       } else if (iter->second.scope < scope) {
-        FX_LOGF(INFO, "ProfileProvider", "%s: Profile \"%s\" overridden at %s scope.",
-                filename.c_str(), profile_name, ToString(scope).c_str());
+        FX_SLOG(INFO, "Profile overridden at scope.", KV("filename", filename.c_str()),
+                KV("profile_name", profile_name), KV("scope", ToString(scope).c_str()),
+                KV("tag", "ProfileProvider"));
         iter->second = Profile{scope, info};
       }
     }
@@ -443,7 +445,8 @@ fit::result<fit::failed, Role> ParseRoleSelector(const std::string& role_selecto
   Role role;
   std::string selectors;
   if (!re2::RE2::FullMatch(role_selector, kReRoleParts, &role.name, &selectors)) {
-    FX_LOGF(WARNING, "ProfileProvider", "Bad selector: %s", role_selector.c_str());
+    FX_SLOG(WARNING, "Bad selector.", KV("role_selector", role_selector.c_str()),
+            KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
@@ -452,8 +455,9 @@ fit::result<fit::failed, Role> ParseRoleSelector(const std::string& role_selecto
   while (re2::RE2::Consume(&input, kSelector, &key, &value)) {
     const auto [iter, added] = role.selectors.emplace(key, value);
     if (!added) {
-      FX_LOGF(WARNING, "ProfileProvider", "Duplicate key in selector: %s=%s", key.c_str(),
-              value.c_str());
+      FX_SLOG(WARNING, "Duplicate key in selector.", KV("key", key.c_str()),
+              KV("value", value.c_str()), KV("role_selector", role_selector.c_str()),
+              KV("tag", "ProfileProvider"));
     }
   }
 
@@ -474,15 +478,17 @@ fit::result<fit::failed, MediaRole> MaybeMediaRole(const Role& role) {
 
   int64_t capacity;
   if (!re2::RE2::FullMatch(capacity_iter->second, "(\\d+)", &capacity)) {
-    FX_LOGF(WARNING, "ProfileProvider", "Media role \"%s\" has invalid capacity selector: %s",
-            role.name.c_str(), capacity_iter->second.c_str());
+    FX_SLOG(WARNING, "Media role has invalid capacity selector.",
+            KV("role_name", role.name.c_str()),
+            KV("capacity_selector", capacity_iter->second.c_str()), KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
   int64_t deadline;
   if (!re2::RE2::FullMatch(deadline_iter->second, "(\\d+)", &deadline)) {
-    FX_LOGF(WARNING, "ProfileProvider", "Media role \"%s\" has invalid deadline selector: %s",
-            role.name.c_str(), deadline_iter->second.c_str());
+    FX_SLOG(WARNING, "Media role has invalid deadline selector.",
+            KV("role_name", role.name.c_str()),
+            KV("deadline_selector", deadline_iter->second.c_str()), KV("tag", "ProfileProvider"));
     return fit::failed{};
   }
 
@@ -493,7 +499,8 @@ fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path)
   fbl::unique_fd dir_fd(openat(AT_FDCWD, config_path.c_str(), O_RDONLY | O_DIRECTORY));
   if (!dir_fd.is_valid()) {
     // A non-existent directory is not an error.
-    FX_LOGF(WARNING, "ProfileProvider", "Failed to open config dir: %s", config_path.c_str());
+    FX_SLOG(WARNING, "Failed to open config dir.", KV("config_path", config_path.c_str()),
+            KV("error", strerror(errno)), KV("tag", "ProfileProvider"));
     return fit::ok(ProfileMap{});
   }
 
@@ -514,11 +521,13 @@ fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path)
       continue;
     }
 
-    FX_LOGF(INFO, "ProfileProvider", "Loading config: %s", entry.c_str());
+    FX_SLOG(INFO, "Loading config.", KV("config_path", entry.c_str()),
+            KV("tag", "ProfileProvider"));
 
     std::string data;
     if (!files::ReadFileToStringAt(dir_fd.get(), entry, &data)) {
-      FX_LOGF(WARNING, "ProfileProvider", "Failed to read file: %s", entry.c_str());
+      FX_SLOG(WARNING, "Failed to read file.", KV("config_path", entry.c_str()),
+              KV("error", strerror(errno)), KV("tag", "ProfileProvider"));
       continue;
     }
 
@@ -528,18 +537,19 @@ fit::result<std::string, ProfileMap> LoadConfigs(const std::string& config_path)
     document.Parse<kFlags>(data);
 
     if (document.HasParseError()) {
-      FX_LOGF(WARNING, "ProfileProvider", "%s:%s", entry.c_str(),
-              GetErrorMessage(document, data).c_str());
+      FX_SLOG(WARNING, "Failed to parse config.", KV("config_path", entry.c_str()),
+              KV("error", GetErrorMessage(document, data).c_str()), KV("tag", "ProfileProvider"));
       continue;
     }
 
     ParseProfiles(entry, document, &profiles);
   }
 
-  FX_LOGF(INFO, "ProfileProvider", "Loaded profiles:");
+  FX_SLOG(INFO, "Loaded profiles.");
   for (const auto& [key, value] : profiles) {
-    FX_LOGF(INFO, "ProfileProvider", "  %-32s %-10s %s", key.c_str(), ToString(value.scope).c_str(),
-            ToString(value.info).c_str());
+    FX_SLOG(INFO, "Loaded profile.", KV("key", key.c_str()),
+            KV("scope", ToString(value.scope).c_str()), KV("info", ToString(value.info).c_str()),
+            KV("tag", "ProfileProvider"));
   }
 
   return fit::ok(std::move(profiles));

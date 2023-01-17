@@ -16,6 +16,7 @@ zx_library("profile") {
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_c",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp:cpp",
     "//src/lib/files",
     "//third_party/rapidjson",
     "//third_party/re2",
@@ -23,7 +24,6 @@ zx_library("profile") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/svc",
-    "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zx",
   ]
 
@@ -39,10 +39,10 @@ source_set("config-test") {
   ]
   public_deps = [
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp:cpp",
     "//src/lib/files",
     "//third_party/rapidjson",
     "//third_party/re2",
-    "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zx",
   ]
 }
