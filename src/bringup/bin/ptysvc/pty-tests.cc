@@ -539,7 +539,7 @@ TEST_F(PtyTestCase, ClientReadEventsClears) {
 
   // No events yet
   ASSERT_STATUS(
-      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent),
+      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob),
                              zx::time{}, nullptr),
       ZX_ERR_TIMED_OUT);
 
@@ -547,7 +547,7 @@ TEST_F(PtyTestCase, ClientReadEventsClears) {
   ASSERT_NO_FATAL_FAILURE(WriteCtrlC(server));
 
   ASSERT_OK(
-      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent),
+      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob),
                              zx::time::infinite(), nullptr));
 
   {
@@ -559,7 +559,7 @@ TEST_F(PtyTestCase, ClientReadEventsClears) {
 
   // Signal should have cleared
   ASSERT_STATUS(
-      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent),
+      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob),
                              zx::time{}, nullptr),
       ZX_ERR_TIMED_OUT);
 
@@ -587,7 +587,7 @@ TEST_F(PtyTestCase, EventsSentWithNoControllingClient) {
 
   zx::eventpair control_event = GetEvent(control_client.value());
   ASSERT_OK(control_event.wait_one(
-      static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent), zx::time{}, nullptr));
+      static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob), zx::time{}, nullptr));
 
   {
     auto result = control_client->ReadEvents();
@@ -606,7 +606,7 @@ TEST_F(PtyTestCase, SetWindowSizeSendsEvent) {
 
   // No events yet
   ASSERT_STATUS(control_event.wait_one(static_cast<zx_signals_t>(static_cast<zx_signals_t>(
-                                           fuchsia_hardware_pty::wire::kSignalEvent)),
+                                           fuchsia_device::wire::DeviceSignal::kOob)),
                                        zx::time{}, nullptr),
                 ZX_ERR_TIMED_OUT);
   {
@@ -624,7 +624,7 @@ TEST_F(PtyTestCase, SetWindowSizeSendsEvent) {
   }
 
   ASSERT_OK(
-      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent),
+      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob),
                              zx::time::infinite(), nullptr));
   {
     auto result = control_client->ReadEvents();
@@ -668,14 +668,14 @@ TEST_F(PtyTestCase, ActiveClientCloses) {
   zx::eventpair control_event = GetEvent(control_client.value());
   zx_signals_t observed = 0;
   ASSERT_OK(
-      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent),
+      control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob),
                              zx::time::infinite(), &observed));
   // Wait again with no timeout, so that observed doesn't have any transient
   // signals in it.
   ASSERT_OK(
       control_event.wait_one(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kHangup),
                              zx::time{}, &observed));
-  ASSERT_EQ(observed, static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent |
+  ASSERT_EQ(observed, static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob |
                                                 fuchsia_device::wire::DeviceSignal::kHangup));
 
   auto result = control_client->ReadEvents();

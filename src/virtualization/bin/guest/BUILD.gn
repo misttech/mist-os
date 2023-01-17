@@ -18,6 +18,7 @@ rustc_binary("bin") {
   edition = "2021"
   output_name = "guest"
   deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_rust",
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_rust",
     "//src/lib/fdio",

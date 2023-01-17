@@ -46,7 +46,7 @@ class PtyClient : public fidl::WireServer<fuchsia_hardware_pty::Device> {
                        static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kHangup));
   }
   void AssertActiveHungup() {
-    local_.signal_peer(0, static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent |
+    local_.signal_peer(0, static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob |
                                                     fuchsia_device::wire::DeviceSignal::kHangup));
   }
   void AssertReadableSignal() {
@@ -56,9 +56,7 @@ class PtyClient : public fidl::WireServer<fuchsia_hardware_pty::Device> {
     local_.signal_peer(0, static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kWritable));
   }
   void AssertEventSignal() {
-    static_assert(fuchsia_hardware_pty::wire::kSignalEvent ==
-                  fuchsia_device::wire::DeviceSignal::kOob);
-    local_.signal_peer(0, static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent));
+    local_.signal_peer(0, static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob));
   }
 
   void DeAssertReadableSignal() {
@@ -68,7 +66,7 @@ class PtyClient : public fidl::WireServer<fuchsia_hardware_pty::Device> {
     local_.signal_peer(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kWritable), 0);
   }
   void DeAssertEventSignal() {
-    local_.signal_peer(static_cast<zx_signals_t>(fuchsia_hardware_pty::wire::kSignalEvent), 0);
+    local_.signal_peer(static_cast<zx_signals_t>(fuchsia_device::wire::DeviceSignal::kOob), 0);
   }
 
   void ClearSetFlags(uint32_t clr, uint32_t set) { flags_ = (flags_ & ~clr) | set; }

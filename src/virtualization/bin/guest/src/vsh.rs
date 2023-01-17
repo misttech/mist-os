@@ -9,7 +9,7 @@ mod util;
 use {
     anyhow::{anyhow, Context, Result},
     blocking::Unblock,
-    fidl_fuchsia_hardware_pty as fpty,
+    fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_pty as fpty,
     fidl_fuchsia_virtualization::{GuestMarker, HostVsockEndpointMarker},
     fuchsia_async::{self as fasync, Duration, Timer},
     fuchsia_zircon::{self as zx, HandleBased},
@@ -145,7 +145,7 @@ async fn console_in(
 
     // When a new event can be read using ReadEvent, SIGNAL_EVENT is signaled on the eventpair.
     // Convert SIGNAL_EVENT from a DeviceSignal bitflag to a zx::Signal.
-    let signal_event = zx::Signals::from_bits(fpty::SIGNAL_EVENT.bits())
+    let signal_event = zx::Signals::from_bits(fdevice::DeviceSignal::OOB.bits())
         .expect("SIGNAL_EVENT should be a zx::Signal!");
 
     let event_handler = Fuse::terminated();

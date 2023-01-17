@@ -77,6 +77,7 @@ test("console-test") {
   ]
   deps = [
     ":common",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/sync",

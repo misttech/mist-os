@@ -8,10 +8,7 @@ fidl("fuchsia.hardware.pty") {
   sdk_category = "internal"
   api = "fuchsia.hardware.pty.api"
   sources = [ "pty.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.device",
-    "//sdk/fidl/fuchsia.io",
-  ]
+  public_deps = [ "//sdk/fidl/fuchsia.io" ]
 
   # TODO(https://fxbug.dev/88443): Remove this dependency since this target does
   # not directly depend on these libraries.
