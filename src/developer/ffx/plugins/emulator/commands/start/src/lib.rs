@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::editor::edit_configuration;
 use crate::pbm::{list_virtual_devices, make_configs};
 use anyhow::{Context, Result};
 use cfg_if::cfg_if;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_emulator_commands::EngineOption;
-use ffx_emulator_config::{EmulatorEngine, EngineType};
+use ffx_emulator_config::{EmulatorConfiguration, EmulatorEngine, EngineType};
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -29,6 +28,9 @@ mod modules {
 
     pub(super) async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOption> {
         ffx_emulator_commands::get_engine_by_name(name).await
+    }
+    pub(super) fn edit_configuration(emu_config: &mut EmulatorConfiguration) -> Result<()> {
+        crate::editor::edit_configuration(emu_config)
     }
 }
 
@@ -53,9 +55,11 @@ mod start {
 cfg_if! {
     if #[cfg(test)] {
         use self::mock_modules::get_engine_by_name;
+        use self::mock_modules::edit_configuration;
         use self::mock_start::new_engine;
     } else {
         use self::modules::get_engine_by_name;
+        use self::modules::edit_configuration;
         use self::start::new_engine;
     }
 }
@@ -117,6 +121,8 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
         if let Err(e) = edit_configuration(engine.emu_config_mut()) {
             ffx_bail!("{:?}", e.context("Problem editing configuration."));
         }
+        // We rebuild the command again to pull in the user's changes.
+        emulator_cmd = engine.build_emulator_cmd();
     }
 
     if cmd.verbose {
@@ -163,25 +169,35 @@ mod tests {
     use super::*;
     use anyhow::bail;
     use async_trait::async_trait;
-    use ffx_emulator_config::EmulatorEngine;
+    use ffx_emulator_config::{EmulatorEngine, RuntimeConfig};
     use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
     use std::process::Command;
 
     /// TestEngine is a test struct for implementing the EmulatorEngine trait. This version
     /// just captures when the stage and start functions are called, and asserts that they were
-    /// supposed to be. On tear-down, if they were supposed to be and weren't, it will fail the
-    /// test accordingly.
-    #[derive(Default)]
-    struct TestEngine {
-        pub do_stage: bool,
-        pub do_start: bool,
+    /// supposed to be. On tear-down, if they were supposed to be and weren't, it will detect this
+    /// in the Drop implementation and fail the test accordingly.
+    pub struct TestEngine {
+        do_stage: bool,
+        do_start: bool,
         did_stage: bool,
         did_start: bool,
+        stage_test_fn: fn(&mut EmulatorConfiguration) -> Result<()>,
+        start_test_fn: fn(Command) -> Result<()>,
+        config: EmulatorConfiguration,
     }
 
-    impl TestEngine {
-        pub fn new(do_stage: bool, do_start: bool) -> Self {
-            TestEngine { do_stage, do_start, ..Default::default() }
+    impl Default for TestEngine {
+        fn default() -> Self {
+            Self {
+                stage_test_fn: |_| Ok(()),
+                start_test_fn: |_| Ok(()),
+                do_stage: false,
+                do_start: false,
+                did_stage: false,
+                did_start: false,
+                config: EmulatorConfiguration::default(),
+            }
         }
     }
 
@@ -191,27 +207,30 @@ mod tests {
             Ok(())
         }
         fn build_emulator_cmd(&self) -> Command {
-            Command::new("some_program")
+            Command::new(self.config.runtime.name.clone())
         }
         async fn stage(&mut self) -> Result<()> {
             self.did_stage = true;
-            if self.do_stage {
-                Ok(())
-            } else {
+            (self.stage_test_fn)(&mut self.config)?;
+            if !self.do_stage {
                 bail!("Test called stage() when it wasn't supposed to.")
             }
+            Ok(())
         }
         async fn start(
             &mut self,
-            mut _emulator_cmd: Command,
+            emulator_cmd: Command,
             _proxy: &TargetCollectionProxy,
         ) -> Result<i32> {
             self.did_start = true;
-            if self.do_start {
-                Ok(0)
-            } else {
+            (self.start_test_fn)(emulator_cmd)?;
+            if !self.do_start {
                 bail!("Test called start() when it wasn't supposed to.")
             }
+            Ok(0)
+        }
+        fn emu_config_mut(&mut self) -> &mut EmulatorConfiguration {
+            &mut self.config
         }
     }
 
@@ -246,8 +265,7 @@ mod tests {
             .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>));
         get_engine_by_name_ctx.expect().times(0);
 
-        let result = get_engine(&mut cmd).await;
-        assert!(result.is_ok(), "{:?}", result.err());
+        let _ = get_engine(&mut cmd).await?;
         Ok(())
     }
 
@@ -268,8 +286,7 @@ mod tests {
             .times(1);
         get_engine_by_name_ctx.expect().times(0);
 
-        let result = get_engine(&mut cmd).await;
-        assert!(result.is_ok(), "{:?}", result.err());
+        let _ = get_engine(&mut cmd).await?;
         Ok(())
     }
 
@@ -294,8 +311,7 @@ mod tests {
             })
             .times(1);
 
-        let result = get_engine(&mut cmd).await;
-        assert!(result.is_ok(), "{:?}", result.err());
+        let _ = get_engine(&mut cmd).await?;
         Ok(())
     }
 
@@ -319,8 +335,7 @@ mod tests {
             .returning(|_| Ok(EngineOption::DoesNotExist("Warning message".to_string())))
             .times(1);
 
-        let result = get_engine(&mut cmd).await;
-        assert!(result.is_ok(), "{:?}", result.err());
+        let _ = get_engine(&mut cmd).await?;
         Ok(())
     }
 
@@ -347,8 +362,7 @@ mod tests {
             })
             .times(1);
 
-        let result = get_engine(&mut cmd).await;
-        assert!(result.is_ok(), "{:?}", result.err());
+        let _ = get_engine(&mut cmd).await?;
         assert_eq!(cmd.name, "NewName".to_string());
         Ok(())
     }
@@ -368,15 +382,13 @@ mod tests {
         cmd.dry_run = true;
         new_engine_ctx
             .expect()
-            .returning(|_| {
-                Ok(Box::new(TestEngine::new(/*stage=*/ false, /*start=*/ false))
-                    as Box<dyn EmulatorEngine>)
-            })
-            .times(1);
+            .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
 
-        let result = start(cmd, proxy).await;
-
-        assert!(result.is_ok(), "{:?}", result.err());
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
         Ok(())
     }
 
@@ -396,14 +408,18 @@ mod tests {
         new_engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine::new(/*stage=*/ true, /*start=*/ false))
-                    as Box<dyn EmulatorEngine>)
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
             })
-            .times(1);
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
 
-        let result = start(cmd, proxy).await;
-
-        assert!(result.is_ok(), "{:?}", result.err());
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
         Ok(())
     }
 
@@ -413,7 +429,7 @@ mod tests {
     async fn test_start() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let new_engine_ctx = mock_start::new_engine_context();
-        let cmd = StartCommand::default();
+        let mut cmd = StartCommand::default();
         let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
             <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
         >()
@@ -422,14 +438,178 @@ mod tests {
         new_engine_ctx
             .expect()
             .returning(|_| {
-                Ok(Box::new(TestEngine::new(/*stage=*/ true, /*start=*/ true))
-                    as Box<dyn EmulatorEngine>)
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
             })
-            .times(1);
+            .times(2);
 
-        let result = start(cmd, proxy).await;
-
+        let result = start(cmd.clone(), proxy.clone()).await;
         assert!(result.is_ok(), "{:?}", result.err());
+
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
+        Ok(())
+    }
+
+    // Ensure start() skips the stage() call if the reuse flag is true
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_reuse_doesnt_stage() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let get_engine_by_name_ctx = mock_modules::get_engine_by_name_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        cmd.reuse = true;
+
+        get_engine_by_name_ctx
+            .expect()
+            .returning(|_| {
+                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>))
+            })
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
+
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
+        Ok(())
+    }
+
+    // Ensure start() skips the stage() call is a custom config is provided
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_custom_config_doesnt_stage() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        cmd.config = Some("filename".into());
+
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine {
+                    do_stage: false,
+                    do_start: true,
+                    config: EmulatorConfiguration::default(),
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
+
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
+        Ok(())
+    }
+
+    // Check that the final command reflects changes from the edit stage
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_edit() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let edit_ctx = mock_modules::edit_configuration_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        cmd.edit = true;
+
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    start_test_fn: |command| {
+                        assert_eq!(command.get_program(), "EditedValue");
+                        Ok(())
+                    },
+                    config: EmulatorConfiguration {
+                        runtime: RuntimeConfig { name: "name".to_string(), ..Default::default() },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
+            .times(2);
+
+        edit_ctx
+            .expect()
+            .returning(|config| {
+                config.runtime.name = "EditedValue".to_string();
+                Ok(())
+            })
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
+
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
+        Ok(())
+    }
+
+    // Check that the final command reflects changes from staging
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_staging_edits() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine {
+                    do_stage: true,
+                    do_start: true,
+                    stage_test_fn: |config| {
+                        config.runtime.name = "EditedValue".to_string();
+                        Ok(())
+                    },
+                    start_test_fn: |command| {
+                        assert_eq!(command.get_program(), "EditedValue");
+                        Ok(())
+                    },
+                    config: EmulatorConfiguration {
+                        runtime: RuntimeConfig { name: "name".to_string(), ..Default::default() },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }) as Box<dyn EmulatorEngine>)
+            })
+            .times(2);
+        let _ = start(cmd.clone(), proxy.clone()).await?;
+
+        // Verbose shouldn't change the sequence
+        cmd.verbose = true;
+        let _ = start(cmd, proxy).await?;
         Ok(())
     }
 }
