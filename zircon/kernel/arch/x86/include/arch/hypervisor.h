@@ -30,7 +30,7 @@ struct VmxInfo;
 
 class VmxPage : public hypervisor::Page {
  public:
-  zx_status_t Alloc(const VmxInfo& info, uint8_t fill);
+  zx::result<> Alloc(const VmxInfo& info, uint8_t fill);
 
  private:
   using hypervisor::Page::Alloc;

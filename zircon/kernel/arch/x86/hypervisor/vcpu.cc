@@ -686,9 +686,9 @@ zx::result<ktl::unique_ptr<V>> Vcpu::Create(G& guest, uint16_t vpid, zx_vaddr_t 
   }
 
   VmxInfo vmx_info;
-  zx_status_t status = vcpu->vmcs_page_.Alloc(vmx_info, 0);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  auto result = vcpu->vmcs_page_.Alloc(vmx_info, 0);
+  if (result.is_error()) {
+    return result.take_error();
   }
 
   VmxRegion* region = vcpu->vmcs_page_.template VirtualAddress<VmxRegion>();
@@ -700,8 +700,8 @@ zx::result<ktl::unique_ptr<V>> Vcpu::Create(G& guest, uint16_t vpid, zx_vaddr_t 
   // disabled from `vmcs_init` until `SetMigrateFn`. This is important to ensure
   // that we do not migrate CPUs while setting up the VCPU.
   AutoVmcs vmcs(vmcs_address, /*clear=*/true);
-  status = vmcs_init(vmcs, V::kConfig, vpid, entry, guest.MsrBitmapsAddress(), ept_pml4,
-                     &vcpu->vmx_state_, vcpu->extended_register_state_);
+  zx_status_t status = vmcs_init(vmcs, V::kConfig, vpid, entry, guest.MsrBitmapsAddress(), ept_pml4,
+                                 &vcpu->vmx_state_, vcpu->extended_register_state_);
   if (status != ZX_OK) {
     return zx::error(status);
   }

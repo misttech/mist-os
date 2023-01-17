@@ -58,8 +58,8 @@ zx::result<ktl::unique_ptr<G>> Guest::Create() {
 
   // Setup common MSR bitmaps.
   VmxInfo vmx_info;
-  if (zx_status_t status = guest->msr_bitmaps_page_.Alloc(vmx_info, UINT8_MAX); status != ZX_OK) {
-    return zx::error(status);
+  if (auto result = guest->msr_bitmaps_page_.Alloc(vmx_info, UINT8_MAX); result.is_error()) {
+    return result.take_error();
   }
 
   // These are saved/restored by VMCS controls.

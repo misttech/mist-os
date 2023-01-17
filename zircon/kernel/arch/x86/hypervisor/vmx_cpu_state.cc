@@ -197,23 +197,23 @@ EptInfo::EptInfo() {
       BIT_SHIFT(ept_info, 43);
 }
 
-zx_status_t VmxPage::Alloc(const VmxInfo& vmx_info, uint8_t fill) {
+zx::result<> VmxPage::Alloc(const VmxInfo& vmx_info, uint8_t fill) {
   // From Volume 3, Appendix A.1: Bits 44:32 report the number of bytes that
   // software should allocate for the VMXON region and any VMCS region. It is
   // a value greater than 0 and at most 4096 (bit 44 is set if and only if
   // bits 43:32 are clear).
   if (vmx_info.region_size > PAGE_SIZE) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   // Check use of write-back memory for VMX regions is supported.
   if (!vmx_info.write_back) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   // The maximum size for a VMXON or VMCS region is 4096, therefore
   // unconditionally allocating a page is adequate.
-  return hypervisor::Page::Alloc(fill).status_value();
+  return hypervisor::Page::Alloc(fill);
 }
 
 zx::result<> alloc_vmx_state() {
@@ -228,8 +228,8 @@ zx::result<> alloc_vmx_state() {
     fbl::Array<VmxPage> pages(pages_ptr, num_cpus);
     VmxInfo vmx_info;
     for (auto& page : pages) {
-      if (zx_status_t status = page.Alloc(vmx_info, 0); status != ZX_OK) {
-        return zx::error(status);
+      if (auto result = page.Alloc(vmx_info, 0); result.is_error()) {
+        return result;
       }
     }
 
