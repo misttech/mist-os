@@ -15,12 +15,11 @@ use {
     fidl_fuchsia_mem as fmem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client as fclient,
     fuchsia_zircon as zx,
-    futures::{future::BoxFuture, lock::Mutex, FutureExt, TryFutureExt},
+    futures::{future::BoxFuture, FutureExt, TryFutureExt},
     rand::Rng,
     std::{
         collections::HashMap,
         fmt::{self, Display, Formatter},
-        sync::Arc,
     },
     tracing::*,
 };
@@ -310,7 +309,7 @@ impl ProtocolCapability {
     }
 
     /// The path at which this protocol capability will be provided or used. Only relevant if the
-    /// route's source or target is a legacy or local component, as these are the only components
+    /// route's source or target is a local component, as these are the only components
     /// that realm builder will generate a modern component manifest for.
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.path = Some(path.into());
@@ -752,7 +751,6 @@ impl RealmBuilder {
                 realm_proxy,
                 realm_path: vec![],
                 local_component_runner_builder: local_component_runner_builder.clone(),
-                has_legacy_children: Arc::new(Mutex::new(false)),
             },
             builder_proxy,
             local_component_runner_builder,
@@ -824,9 +822,6 @@ impl RealmBuilder {
         self,
         component_manager_fragment_only_url: &str,
     ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
-        if *self.root_realm.has_legacy_children.lock().await {
-            return Err(Error::LegacyChildrenUnsupportedInNestedComponentManager);
-        }
         let collection_name = self.collection_name.clone();
         let (root_url, nested_local_component_runner_task) = self.initialize().await?;
 
@@ -964,16 +959,6 @@ impl RealmBuilder {
         self.root_realm.add_child(name, url, options).await
     }
 
-    /// Adds a new legacy component to the realm
-    pub async fn add_legacy_child(
-        &self,
-        name: impl Into<String>,
-        legacy_url: impl Into<String>,
-        options: ChildOptions,
-    ) -> Result<ChildRef, Error> {
-        self.root_realm.add_legacy_child(name, legacy_url, options).await
-    }
-
     /// Adds a new component to the realm with the given component declaration
     pub async fn add_child_from_decl(
         &self,
@@ -988,7 +973,6 @@ impl RealmBuilder {
     /// only supported for:
     ///
     /// * A component with a local implementation
-    /// * A legacy component
     /// * A component added with a fragment-only component URL (typically,
     ///   components bundled in the same package as the realm builder client,
     ///   sharing the same `/pkg` directory, for example,
@@ -1006,7 +990,6 @@ impl RealmBuilder {
     /// supported for:
     ///
     /// * A component with a local implementation
-    /// * A legacy component
     /// * A component added with a fragment-only component URL (typically,
     ///   components bundled in the same package as the realm builder client,
     ///   sharing the same `/pkg` directory, for example,
@@ -1280,18 +1263,6 @@ pub struct SubRealmBuilder {
     realm_proxy: ftest::RealmProxy,
     realm_path: Vec<String>,
     local_component_runner_builder: LocalComponentRunnerBuilder,
-
-    /// We don't currently support automatically gracefully tearing down realms built in a nested
-    /// component manager. This is typically not a big deal, because any resources those components
-    /// are using (jobs, processes, etc.) live under the nested component manager's job, with the
-    /// singular and important exception of legacy components, which run under the system's appmgr.
-    /// To prevent flakiness and resource leakage caused by this, we disallow legacy children in
-    /// realms constructed in a nested component manager. To accomplish this, we track if legacy
-    /// children have been added to a realm here.
-    ///
-    /// In order to share the single boolean with any related SubRealmBuilders, we put it in an
-    /// Arc<Mutex<_>>
-    has_legacy_children: Arc<Mutex<bool>>,
 }
 
 impl SubRealmBuilder {
@@ -1311,7 +1282,6 @@ impl SubRealmBuilder {
             realm_proxy: child_realm_proxy,
             realm_path: child_path,
             local_component_runner_builder: self.local_component_runner_builder.clone(),
-            has_legacy_children: self.has_legacy_children.clone(),
         })
     }
 
@@ -1349,19 +1319,6 @@ impl SubRealmBuilder {
     ) -> Result<ChildRef, Error> {
         let name: String = name.into();
         self.realm_proxy.add_child(&name, &url.into(), options.into()).await??;
-        Ok(ChildRef::new(name, self.realm_path.clone()))
-    }
-
-    /// Adds a new legacy component to the realm
-    pub async fn add_legacy_child(
-        &self,
-        name: impl Into<String>,
-        legacy_url: impl Into<String>,
-        options: ChildOptions,
-    ) -> Result<ChildRef, Error> {
-        *self.has_legacy_children.lock().await = true;
-        let name: String = name.into();
-        self.realm_proxy.add_legacy_child(&name, &legacy_url.into(), options.into()).await??;
         Ok(ChildRef::new(name, self.realm_path.clone()))
     }
 
@@ -1844,7 +1801,7 @@ impl EventStream {
     }
 
     /// The path at which this event_stream capability will be provided or
-    /// used. Only relevant if the route's source or target is a legacy or local
+    /// used. Only relevant if the route's source or target is a local
     /// component, as these are the only components that realm builder will generate
     /// a modern component manifest for.
     pub fn path(mut self, path: impl Into<String>) -> Self {
@@ -2608,11 +2565,6 @@ mod tests {
             url: String,
             options: ftest::ChildOptions,
         },
-        AddLegacyChild {
-            name: String,
-            legacy_url: String,
-            options: ftest::ChildOptions,
-        },
         AddChildFromDecl {
             name: String,
             decl: fdecl::Component,
@@ -2671,18 +2623,6 @@ mod tests {
                     ftest::RealmRequest::AddChild { responder, name, url, options } => {
                         report_requests
                             .send(ServerRequest::AddChild { name, url, options })
-                            .await
-                            .unwrap();
-                        responder.send(&mut Ok(())).unwrap();
-                    }
-                    ftest::RealmRequest::AddLegacyChild {
-                        responder,
-                        name,
-                        legacy_url,
-                        options,
-                    } => {
-                        report_requests
-                            .send(ServerRequest::AddLegacyChild { name, legacy_url, options })
                             .await
                             .unwrap();
                         responder.send(&mut Ok(())).unwrap();
@@ -2901,22 +2841,6 @@ mod tests {
             receive_server_requests.next().await,
             Some(ServerRequest::AddChild { name, url, options })
                 if &name == "a" && &url == "test://a" && options == ChildOptions::new().into()
-        );
-        assert_matches!(receive_server_requests.next().now_or_never(), None);
-    }
-
-    #[fuchsia::test]
-    async fn add_legacy_child() {
-        let (builder, _server_task, mut receive_server_requests) =
-            new_realm_builder_and_server_task();
-        let _child_a =
-            builder.add_legacy_child("a", "test://a", ChildOptions::new()).await.unwrap();
-        assert_matches!(
-            receive_server_requests.next().await,
-            Some(ServerRequest::AddLegacyChild { name, legacy_url, options })
-                if &name == "a"
-                    && &legacy_url == "test://a"
-                    && options == ChildOptions::new().into()
         );
         assert_matches!(receive_server_requests.next().now_or_never(), None);
     }
@@ -3151,26 +3075,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn add_legacy_child_to_sub_realm() {
-        let (builder, _server_task, mut receive_server_requests) =
-            new_realm_builder_and_server_task();
-        let child_realm = builder.add_child_realm("1", ChildOptions::new()).await.unwrap();
-        let _child_a =
-            child_realm.add_legacy_child("a", "test://a", ChildOptions::new()).await.unwrap();
-        let mut receive_sub_realm_requests =
-            assert_add_child_realm(&mut receive_server_requests, "1", ChildOptions::new().into());
-        assert_matches!(
-            receive_sub_realm_requests.next().await,
-            Some(ServerRequest::AddLegacyChild { name, legacy_url, options })
-                if &name == "a"
-                    && &legacy_url == "test://a"
-                    && options == ChildOptions::new().into()
-        );
-        assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
-        assert_matches!(receive_server_requests.next().now_or_never(), None);
-    }
-
-    #[fuchsia::test]
     async fn add_child_from_decl_to_sub_realm() {
         let (builder, _server_task, mut receive_server_requests) =
             new_realm_builder_and_server_task();
@@ -3393,8 +3297,6 @@ mod tests {
                 .await
                 .unwrap();
             let child_c = builder.add_child("c", "test://c", ChildOptions::new()).await.unwrap();
-            let child_d =
-                builder.add_legacy_child("d", "test://d.cmx", ChildOptions::new()).await.unwrap();
             let child_e = builder
                 .add_child_from_decl("e", cm_rust::ComponentDecl::default(), ChildOptions::new())
                 .await
@@ -3409,7 +3311,6 @@ mod tests {
                     Route::new()
                         .capability(Capability::protocol::<fcomponent::RealmMarker>())
                         .from(&child_e)
-                        .to(&child_d)
                         .to(&child_c)
                         .to(&child_b)
                         .to(&child_realm_a)

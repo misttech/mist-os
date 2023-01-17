@@ -425,6 +425,7 @@ protocol Realm {
     ///   should be used with `AddChild` instead of `AddLegacyChild`.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
+    @available(removed=12)
     AddLegacyChild(struct {
         /// The name of the child that is being added.
         name fuchsia.component.child_name;

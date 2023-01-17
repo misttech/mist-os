@@ -1828,60 +1828,6 @@
               "returnType": "Future<SubRealmBuilder>",
               "type": "MethodDeclarationImpl"
             },
-            "addLegacyChild": {
-              "SimpleFormalParameterImpl": {
-                "legacyUrl": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": false,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": false,
-                  "isPositional": true,
-                  "isRequired": true,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": true,
-                  "name": "legacyUrl",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
-                },
-                "name": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": false,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": false,
-                  "isPositional": true,
-                  "isRequired": true,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": true,
-                  "name": "name",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
-                },
-                "options": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": true,
-                  "isPositional": true,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": false,
-                  "name": "options",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "ChildOptions?"
-                }
-              },
-              "isAbstract": false,
-              "isGetter": false,
-              "isOperator": false,
-              "isSetter": false,
-              "isStatic": false,
-              "name": "addLegacyChild",
-              "returnType": "Future<ChildRef>",
-              "type": "MethodDeclarationImpl"
-            },
             "addLocalChild": {
               "SimpleFormalParameterImpl": {
                 "name": {
@@ -4718,60 +4664,6 @@
               "isStatic": false,
               "name": "addChildRealm",
               "returnType": "Future<SubRealmBuilder>",
-              "type": "MethodDeclarationImpl"
-            },
-            "addLegacyChild": {
-              "SimpleFormalParameterImpl": {
-                "legacyUrl": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": false,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": false,
-                  "isPositional": true,
-                  "isRequired": true,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": true,
-                  "name": "legacyUrl",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
-                },
-                "name": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": false,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": false,
-                  "isPositional": true,
-                  "isRequired": true,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": true,
-                  "name": "name",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
-                },
-                "options": {
-                  "isConst": false,
-                  "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": false,
-                  "isOptionalPositional": true,
-                  "isPositional": true,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
-                  "isRequiredPositional": false,
-                  "name": "options",
-                  "type": "SimpleFormalParameterImpl",
-                  "varType": "ChildOptions?"
-                }
-              },
-              "isAbstract": false,
-              "isGetter": false,
-              "isOperator": false,
-              "isSetter": false,
-              "isStatic": false,
-              "name": "addLegacyChild",
-              "returnType": "Future<ChildRef>",
               "type": "MethodDeclarationImpl"
             },
             "addLocalChild": {

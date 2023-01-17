@@ -417,7 +417,7 @@ class ProtocolCapability extends Capability {
   fdecl.DependencyType type;
 
   /// The path at which this protocol capability will be provided or used. Only
-  /// relevant if the route's source or target is a legacy or local component,
+  /// relevant if the route's source or target is a local component,
   /// as these are the only components that realm builder will generate a modern
   /// component manifest for.
   String? path;
@@ -547,7 +547,7 @@ class DirectoryCapability extends Capability {
 /// [Capability.withStorage()].
 class StorageCapability extends Capability {
   /// The path at which this storage capability will be provided or used. Only
-  /// relevant if the route's source or target is a legacy or local component,
+  /// relevant if the route's source or target is a local component,
   /// as these are the only components that realm builder will generate a modern
   /// component manifest for.
   String? path;
@@ -581,7 +581,7 @@ class StorageCapability extends Capability {
 /// [Capability.withService()].
 class ServiceCapability extends Capability {
   /// The path at which this service capability will be provided or used. Only
-  /// relevant if the route's source or target is a legacy or local component,
+  /// relevant if the route's source or target is a local component,
   /// as these are the only components that realm builder will generate a modern
   /// component manifest for.
   String? path;
@@ -622,7 +622,7 @@ class ServiceCapability extends Capability {
 /// by [Capability.withEventStream()].
 class EventStreamCapability extends Capability {
   /// The path at which this event stream capability will be provided or used.
-  /// Only relevant if the route's source or target is a legacy or local
+  /// Only relevant if the route's source or target is a local
   /// component, as these are the only components that realm builder will
   /// generate a modern component manifest for.
   String? path;
@@ -929,17 +929,6 @@ class SubRealmBuilder {
     await realmProxy.addChild(
       name,
       url,
-      (options ?? ChildOptions()).toFidlType(),
-    );
-    return ChildRef(name, realmPath);
-  }
-
-  /// Adds a new legacy component to the realm.
-  Future<ChildRef> addLegacyChild(String name, String legacyUrl,
-      [ChildOptions? options]) async {
-    await realmProxy.addLegacyChild(
-      name,
-      legacyUrl,
       (options ?? ChildOptions()).toFidlType(),
     );
     return ChildRef(name, realmPath);
@@ -1409,16 +1398,6 @@ class RealmBuilder {
     );
   }
 
-  /// Adds a new legacy component to the realm.
-  Future<ChildRef> addLegacyChild(String name, String legacyUrl,
-      [ChildOptions? options]) {
-    return rootRealm.addLegacyChild(
-      name,
-      legacyUrl,
-      options ?? ChildOptions(),
-    );
-  }
-
   /// Adds a new component to the realm with the given component declaration
   Future<ChildRef> addChildFromDecl(String name, fdecl.Component decl,
       [ChildOptions? options]) {
@@ -1433,7 +1412,6 @@ class RealmBuilder {
   /// only supported for:
   ///
   /// * A component with a local implementation
-  /// * A legacy component
   /// * A component added with a fragment-only component URL (typically,
   ///   components bundled in the same package as the realm builder client,
   ///   sharing the same `/pkg` directory, for example
@@ -1448,7 +1426,6 @@ class RealmBuilder {
   /// supported for:
   ///
   /// * A component with a local implementation
-  /// * A legacy component
   /// * A component added with a fragment-only component URL (typically,
   ///   components bundled in the same package as the realm builder client,
   ///   sharing the same `/pkg` directory, for example

@@ -40,11 +40,6 @@ pub enum Error {
     #[error("unable to use reference {0} in realm {1:?}")]
     RefUsedInWrongRealm(Ref, String),
 
-    #[error(
-        "realms built in a nested component manager are not allowed to contain legacy children"
-    )]
-    LegacyChildrenUnsupportedInNestedComponentManager,
-
     #[error("could not start root component using lifecycle controller: {0:?}")]
     CannotStartRootComponent(anyhow::Error),
 }

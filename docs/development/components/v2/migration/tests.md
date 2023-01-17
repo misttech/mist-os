@@ -427,14 +427,6 @@ To add a CML component with Realm Builder, use `AddChild()`:
 realm_builder->AddChild("example_component", "example_component#meta/default.cm");
 ```
 
-To include a legacy component in the same realm, use `AddLegacyChild()`:
-
-```cpp
-realm_builder->AddLegacyChild(
-    "example_legacy_component",
-    "fuchsia-pkg://fuchsia.com/example-package#meta/example.cmx");
-```
-
 Realm Builder allows you to provide additional options for each new child
 component. The following example marks the child as [`eager`][cml-children] when
 adding it to the realm, indicating the component should start automatically with
@@ -455,19 +447,17 @@ services in their nested environment using the `EnvironmentServices` instance.
 It is not necessary to route these services from the components providing them
 to the test environment.
 
-With Realm Builder, tests must explicitly route all capabilities between
-the components in the realm and the parent using `AddRoute()`.
-The following example makes the `fuchsia.logger.LogSink` protocol available
-from the parent to `example_component` and `example_legacy_component` in the
-realm:
+With Realm Builder, tests must explicitly route all capabilities between the
+components in the realm and the parent using `AddRoute()`. The following example
+makes the `fuchsia.logger.LogSink` protocol available from the parent to
+`example_component` in the realm:
 
 ```cpp
 realm_builder->AddRoute(
     Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
           .source = ParentRef(),
           .targets = {
-              ChildRef{"example_component"},
-              ChildRef{"example_legacy_component"}}});
+              ChildRef{"example_component"}}});
 ```
 
 Note: All components should be added to the realm _before_ adding routes.
@@ -479,13 +469,12 @@ back to the parent, simply adjust the `source` and `target` properties.
 // Route fuchsia.examples.Example from one child to another
 realm_builder->AddRoute(
     Route{.capabilities = {Protocol{"fuchsia.examples.Example"}},
-          .source = ChildRef{"example_component"},
-          .targets = {ChildRef{"example_legacy_component"}}});
+          .targets = {ChildRef{"example_component"}}});
 
 //Route fuchsia.examples.Example2 up to the parent
 realm_builder->AddRoute(
     Route{.capabilities = {Protocol{"fuchsia.examples.Example2"}},
-          .source = ChildRef{"example_legacy_component"},
+          .source = ChildRef{"example_component"},
           .targets = {ParentRef{}}});
 ```
 

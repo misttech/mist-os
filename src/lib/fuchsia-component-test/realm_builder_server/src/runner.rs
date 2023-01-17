@@ -6,11 +6,9 @@ use {
     anyhow::{format_err, Context, Error},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys as fsysv1, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
+    fuchsia_async as fasync,
     futures::lock::Mutex,
     futures::{future::BoxFuture, TryStreamExt},
-    rand::{self, Rng},
     std::{collections::HashMap, sync::Arc},
     tracing::*,
     vfs::execution_scope::ExecutionScope,
@@ -18,7 +16,6 @@ use {
 
 pub const RUNNER_NAME: &'static str = "realm_builder";
 pub const LOCAL_COMPONENT_ID_KEY: &'static str = "local_component_id";
-pub const LEGACY_URL_KEY: &'static str = "legacy_url";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LocalComponentId(String);
@@ -130,13 +127,10 @@ impl Runner {
                         return Err(format_err!("Runtime directory is missing from `StartInfo`."));
                     }
 
-                    match extract_local_component_id_or_legacy_url(program)? {
-                        LocalComponentIdOrLegacyUrl::LocalComponentId(local_component_id) => {
+                    match extract_local_component_id(program)? {
+                        LocalComponentId(local_component_id) => {
                             self.launch_local_component(local_component_id, start_info, controller)
                                 .await?;
-                        }
-                        LocalComponentIdOrLegacyUrl::LegacyUrl(legacy_url) => {
-                            self.launch_v1_component(legacy_url, start_info, controller).await?;
                         }
                     }
                 }
@@ -183,63 +177,18 @@ impl Runner {
         };
         Ok(())
     }
-
-    /// Launches a new v1 component. This is done by using fuchsia.sys.Environment to create a new
-    /// nested environment and then launching a v1 component into that environment, using the "svc"
-    /// entry from `start_info.ns` as the v1 component's additional services. The v1 component's
-    /// outgoing directory is likewise connected to `start_info.outgoing_directory`, allowing
-    /// protocol capabilities to flow in either direction.
-    async fn launch_v1_component(
-        self: &Arc<Self>,
-        legacy_url: String,
-        start_info: fcrunner::ComponentStartInfo,
-        controller: ServerEnd<fcrunner::ComponentControllerMarker>,
-    ) -> Result<(), Error> {
-        let execution_scope = ExecutionScope::new();
-
-        let id: u64 = rand::thread_rng().gen();
-        let realm_label = format!("v2-bridge-{}", id);
-        let parent_env = connect_to_protocol::<fsysv1::EnvironmentMarker>()?;
-
-        let legacy_component = legacy_component_lib::LegacyComponent::run(
-            legacy_url,
-            start_info,
-            parent_env.into(),
-            realm_label,
-            execution_scope.clone(),
-        )
-        .await?;
-        let controller = controller.into_stream()?;
-        fasync::Task::local(async move {
-            legacy_component.serve_controller(controller, execution_scope).await.unwrap()
-        })
-        .detach();
-
-        Ok(())
-    }
 }
 
-enum LocalComponentIdOrLegacyUrl {
-    LocalComponentId(String),
-    LegacyUrl(String),
-}
-
-/// Extracts either the value for the `local_component_id` key or the `legacy_url` key from the provided
-/// dictionary. It is an error for both keys to be present at once, or for anything else to be
-/// present in the dictionary.
-fn extract_local_component_id_or_legacy_url<'a>(
-    dict: fdata::Dictionary,
-) -> Result<LocalComponentIdOrLegacyUrl, Error> {
+/// Extracts either the value for the `local_component_id` key from the provided
+/// dictionary. It is an error for anything else to be present in the dictionary.
+fn extract_local_component_id<'a>(dict: fdata::Dictionary) -> Result<LocalComponentId, Error> {
     let entries = dict.entries.ok_or(format_err!("program section is empty"))?;
     for entry in entries.into_iter() {
         let entry_value =
             entry.value.map(|box_| *box_).ok_or(format_err!("program section is missing value"))?;
         match (entry.key.as_str(), entry_value) {
             (LOCAL_COMPONENT_ID_KEY, fdata::DictionaryValue::Str(s)) => {
-                return Ok(LocalComponentIdOrLegacyUrl::LocalComponentId(s.clone()))
-            }
-            (LEGACY_URL_KEY, fdata::DictionaryValue::Str(s)) => {
-                return Ok(LocalComponentIdOrLegacyUrl::LegacyUrl(s.clone()))
+                return Ok(LocalComponentId(s.clone()))
             }
             _ => continue,
         }

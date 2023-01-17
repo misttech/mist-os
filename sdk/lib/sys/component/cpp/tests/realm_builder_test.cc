@@ -1298,12 +1298,14 @@ TEST(RealmBuilderUnittest, PanicsIfChildNameIsEmpty) {
         realm_builder.AddChild("", kEchoServerUrl);
       },
       "");
+#if __Fuchsia_API_level__ <= 11
   ASSERT_DEATH(
       {
         auto realm_builder = RealmBuilder::Create();
         realm_builder.AddLegacyChild("", kEchoServerUrl);
       },
       "");
+#endif
 
   class BasicLocalImpl : public LocalComponentImpl {
     void OnStart() override {}
@@ -1324,12 +1326,14 @@ TEST(RealmBuilderUnittest, PanicsIfUrlIsEmpty) {
         realm_builder.AddChild("some_valid_name", "");
       },
       "");
+#if __Fuchsia_API_level__ <= 11
   ASSERT_DEATH(
       {
         auto realm_builder = RealmBuilder::Create();
         realm_builder.AddLegacyChild("some_valid_name", "");
       },
       "");
+#endif
 }
 
 TEST(RealmBuilderUnittest, PanicsWhenArgsAreNullptr) {

@@ -24,8 +24,6 @@ use {
     std::convert::TryInto,
 };
 
-const V1_ECHO_CLIENT_URL: &'static str =
-    "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_client.cmx";
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_client.cm";
 const V2_ECHO_CLIENT_FRAGMENT_URL: &'static str = "#meta/echo_client.cm";
@@ -33,8 +31,6 @@ const V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/echo_
 
 const COLLECTION_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/collection_sc.cm";
 
-const V1_ECHO_SERVER_URL: &'static str =
-    "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_server.cmx";
 const V2_ECHO_SERVER_ABSOLUTE_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_server.cm";
 const V2_ECHO_SERVER_FRAGMENT_URL: &'static str = "#meta/echo_server.cm";
@@ -42,35 +38,6 @@ const V2_ECHO_SERVER_FRAGMENT_URL: &'static str = "#meta/echo_server.cm";
 const ECHO_REALM_FRAGMENT_URL: &'static str = "#meta/echo_realm.cm";
 
 const DEFAULT_ECHO_STR: &'static str = "Hello Fuchsia!";
-
-#[fuchsia::test]
-async fn v1_component_route_to_parent() -> Result<(), Error> {
-    let builder = RealmBuilder::new().await?;
-    let child = builder.add_legacy_child("child", V1_ECHO_SERVER_URL, ChildOptions::new()).await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fecho::EchoMarker>())
-                .from(&child)
-                .to(Ref::parent()),
-        )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&child),
-        )
-        .await?;
-    let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
-    assert_eq!(
-        Some(DEFAULT_ECHO_STR.to_string()),
-        echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
-    );
-    Ok(())
-}
 
 #[fuchsia::test]
 async fn absolute_component_route_to_parent() -> Result<(), Error> {
@@ -168,53 +135,6 @@ async fn local_component_route_to_parent() -> Result<(), Error> {
     assert!(
         receive_echo_server_called.next().await.is_some(),
         "failed to observe the mock server report a successful connection from a client"
-    );
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn v1_component_route_to_parent_in_sub_realm() -> Result<(), Error> {
-    let builder = RealmBuilder::new().await?;
-    let child_realm = builder.add_child_realm("child-realm", ChildOptions::new()).await?;
-    let child =
-        child_realm.add_legacy_child("child", V1_ECHO_SERVER_URL, ChildOptions::new()).await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fecho::EchoMarker>())
-                .from(&child_realm)
-                .to(Ref::parent()),
-        )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&child_realm),
-        )
-        .await?;
-    child_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fecho::EchoMarker>())
-                .from(&child)
-                .to(Ref::parent()),
-        )
-        .await?;
-    child_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&child),
-        )
-        .await?;
-    let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
-    assert_eq!(
-        Some(DEFAULT_ECHO_STR.to_string()),
-        echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
     );
     Ok(())
 }
@@ -1144,20 +1064,6 @@ async fn echo_clients() -> Result<(), Error> {
     let child_opts = ChildOptions::new().eager();
     {
         let builder = RealmBuilder::new().await?;
-        builder.add_legacy_child(client_name, V1_ECHO_CLIENT_URL, child_opts.clone()).await?;
-        let mut receive_echo_server_called = setup_echo_client_realm(&builder).await?;
-        let realm_instance = builder.build().await?;
-
-        assert!(
-            receive_echo_server_called.next().await.is_some(),
-            "failed to observe the mock server report a successful connection",
-        );
-
-        realm_instance.destroy().await?;
-    }
-
-    {
-        let builder = RealmBuilder::new().await?;
         builder.add_child(client_name, V2_ECHO_CLIENT_ABSOLUTE_URL, child_opts.clone()).await?;
         let mut receive_echo_server_called = setup_echo_client_realm(&builder).await?;
         let realm_instance = builder.build().await?;
@@ -1218,20 +1124,6 @@ async fn echo_clients() -> Result<(), Error> {
 async fn echo_clients_in_nested_component_manager() -> Result<(), Error> {
     // This test runs a series of echo clients from different sources against a mock echo server,
     // confirming that each client successfully connects to the server.
-
-    {
-        let builder = RealmBuilder::new().await?;
-        builder
-            .add_legacy_child("echo-client", V1_ECHO_CLIENT_URL, ChildOptions::new().eager())
-            .await?;
-
-        // assert_matches wants to pretty-print what went wrong if the assert fails, but neither
-        // sub-type in the returned Result here implements Debug.
-        match builder.build_in_nested_component_manager("#meta/component_manager.cm").await {
-            Err(RealmBuilderError::LegacyChildrenUnsupportedInNestedComponentManager) => (),
-            _ => panic!("legacy children should be unsupported in nested component managers"),
-        }
-    }
 
     {
         let builder = RealmBuilder::new().await?;
@@ -1314,20 +1206,6 @@ async fn setup_echo_server_realm(builder: &RealmBuilder) -> Result<mpsc::Receive
 async fn echo_servers() -> Result<(), Error> {
     let server_name = "echo-server";
     let child_opts = ChildOptions::new().eager();
-
-    {
-        let builder = RealmBuilder::new().await?;
-        builder.add_legacy_child(server_name, V1_ECHO_SERVER_URL, child_opts.clone()).await?;
-        let mut receive_echo_client_results = setup_echo_server_realm(&builder).await?;
-        let realm_instance = builder.build().await?;
-
-        assert!(
-            receive_echo_client_results.next().await.is_some(),
-            "failed to observe the mock client report success",
-        );
-
-        realm_instance.destroy().await?;
-    }
 
     {
         let builder = RealmBuilder::new().await?;

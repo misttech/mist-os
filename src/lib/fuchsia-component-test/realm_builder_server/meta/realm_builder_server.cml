@@ -25,17 +25,6 @@
             ],
         },
     ],
-    use: [
-        {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-
-            // Used to support cmx children, if/when appmgr is present.
-            availability: "optional",
-        },
-    ],
     expose: [
         {
             resolver: "realm_builder_resolver",
