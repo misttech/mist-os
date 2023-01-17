@@ -10,11 +10,11 @@ using fuchsia.time.external;
 /// the dev time source to pass a channel to delegate the implementation of the connection to the
 /// test component.
 @discoverable
-protocol TimeSourceControl {
+closed protocol TimeSourceControl {
     /// Forward a PushSource connection.
     /// TODO(satsukiu): possibly add an enum signifying the role (primary, monitor) of the
     /// connecting PushSource.
-    ConnectPushSource(resource struct {
+    strict ConnectPushSource(resource struct {
         push_source server_end:fuchsia.time.external.PushSource;
     });
 };

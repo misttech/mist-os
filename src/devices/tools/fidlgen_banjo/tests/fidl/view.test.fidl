@@ -7,8 +7,8 @@ using banjo.examples.point;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol View {
-    MoveTo(struct {
+closed protocol View {
+    strict MoveTo(struct {
         p banjo.examples.point.Point;
     }) -> ();
 };

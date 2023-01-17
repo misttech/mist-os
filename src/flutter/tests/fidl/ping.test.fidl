@@ -4,6 +4,6 @@
 library test.fuchsia.flutter;
 
 @discoverable
-protocol Pinger {
-    ping() -> ();
+closed protocol Pinger {
+    strict ping() -> ();
 };

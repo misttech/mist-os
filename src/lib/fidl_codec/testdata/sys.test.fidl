@@ -53,18 +53,18 @@ type TerminationReason = strict enum {
 // If the component exits, this protocol will be closed.
 //
 // Typically obtained via `Launcher.CreateComponent`.
-protocol ComponentController {
+closed protocol ComponentController {
     // Terminates the component.
     //
     // This ComponentController connection is closed when the component has
     // terminated.
-    Kill();
+    strict Kill();
 
     // Decouples the lifetime of the component from this controller.
     //
     // After calling `Detach`, the component will not be implicitly killed when
     // this protocol is closed.
-    Detach();
+    strict Detach();
 
     // DEPRECATED: Use OnTerminated instead of Wait().
     // 3: Wait()
@@ -75,7 +75,7 @@ protocol ComponentController {
     // its termination. The return_code is only valid if the termination
     // reason is EXITED. If the termination reason is not EXITED, the
     // return code is guaranteed not to be 0.
-    -> OnTerminated(struct {
+    strict -> OnTerminated(struct {
         return_code int64;
         termination_reason TerminationReason;
     });
@@ -84,7 +84,7 @@ protocol ComponentController {
     //
     // This event will not be triggered for every component, only those that
     // serve a directory over their PA_DIRECTORY_REQUEST handle.
-    -> OnDirectoryReady();
+    strict -> OnDirectoryReady();
 };
 
 // A protocol for controlling an environment.
@@ -95,22 +95,22 @@ protocol ComponentController {
 // If the environment is destroyed, this protocol will be closed.
 //
 // Typically obtained via `Environment.CreateNestedEnvironment`.
-protocol EnvironmentController {
+closed protocol EnvironmentController {
     // Terminates the environment.
     //
     // When an `Environment` is terminated, all applications launched
     // in the environment (and in all transitively nested environments) are also
     // killed.
-    Kill() -> ();
+    strict Kill() -> ();
 
     // Decouples the lifetime of the environment from this controller.
     //
     // After calling `Detach`, the environment will not be implicitly killed when
     // this protocol is closed.
-    Detach();
+    strict Detach();
 
     // Event that is triggered when the environment is created.
-    -> OnCreated();
+    strict -> OnCreated();
 };
 
 // Maximum length for an environment label.
@@ -138,7 +138,7 @@ type EnvironmentOptions = struct {
 // Applications run inside environments, which provide ambient services and
 // support for their lifecycle.
 @discoverable
-protocol Environment {
+closed protocol Environment {
     // Creates a new environment nested inside this environment.
     //
     // When applications are created inside the nested environment using the
@@ -164,7 +164,7 @@ protocol Environment {
     //
     // `options` provides additional options, see `EnvironmentOptions` for
     // details.
-    CreateNestedEnvironment(resource struct {
+    strict CreateNestedEnvironment(resource struct {
         environment server_end:Environment;
         controller server_end:EnvironmentController;
         label string;
@@ -176,19 +176,19 @@ protocol Environment {
     //
     // Applications created using this application launcher will be given the
     // environment services provided by this environment's `host_directory`.
-    GetLauncher(resource struct {
+    strict GetLauncher(resource struct {
         launcher server_end:Launcher;
     });
 
     // Gets a superset of services provided by this environment's
     // `host_directory`.
-    GetServices(resource struct {
+    strict GetServices(resource struct {
         services server_end:Provider;
     });
 
     // Gets a superset of services provided by this environment's
     // `host_directory`.
-    GetDirectory(resource struct {
+    strict GetDirectory(resource struct {
         directory_request zx.handle:CHANNEL;
     });
 };
@@ -207,9 +207,9 @@ type FlatNamespace = resource struct {
 // created in the context of an already-identified realm, so there is no need
 // to explicitly identify the realm below.
 @discoverable
-protocol JobProvider {
+closed protocol JobProvider {
     // Gets the root job associated with the realm.
-    GetJob() -> (resource struct {
+    strict GetJob() -> (resource struct {
         job zx.handle:JOB;
     });
 };
@@ -285,7 +285,7 @@ type ServiceList = resource struct {
 //
 // Typically obtained via `Environment.GetLauncher`.
 @discoverable
-protocol Launcher {
+closed protocol Launcher {
     // Creates a new instance of the component described by `launch_info`.
     //
     // The component instance is created in the `Environment`
@@ -296,7 +296,7 @@ protocol Launcher {
     // The `controller` can be used to control the lifecycle of the created
     // component instance. If provided, the component instance is killed when
     // the `ComponentController` client endpoint is closed.
-    CreateComponent(resource struct {
+    strict CreateComponent(resource struct {
         launch_info LaunchInfo;
         controller server_end:<ComponentController, optional>;
     });
@@ -304,9 +304,9 @@ protocol Launcher {
 
 // A protocol for loading from packages.
 @discoverable
-protocol Loader {
+closed protocol Loader {
     // LoadUrl a package by url.
-    LoadUrl(struct {
+    strict LoadUrl(struct {
         url string;
     }) -> (resource struct {
         package box<Package>;
@@ -369,7 +369,7 @@ type Package = resource struct {
 // particular classes of programs. For example, the Dart virtual machine exposes
 // this protocol to run Dart programs.
 @discoverable
-protocol Runner {
+closed protocol Runner {
     // Execute the given component.
     //
     // Upon startup, the component is to be given the information in
@@ -379,7 +379,7 @@ protocol Runner {
     // The `controller` protocol request typically originates from the
     // `Launcher.CreateComponent` message that caused this
     // component to be started.
-    StartComponent(resource struct {
+    strict StartComponent(resource struct {
         package Package;
         startup_info StartupInfo;
         controller server_end:<ComponentController, optional>;
@@ -394,11 +394,11 @@ protocol Runner {
 // This protocol is deprecated.  Services should be published as directory
 // entries instead, just like files.
 // TODO(fxbug.dev/31262): Point to the FIDL protocol for file I/O once RIO is migrated.
-protocol Provider {
+closed protocol Provider {
     // Asks the host to provide the service identified by `service_name` through
     // the `channel` endpoint supplied by the caller. If the host is not willing
     // or able to provide the requested service, it should close the `channel`.
-    ConnectToService(resource struct {
+    strict ConnectToService(resource struct {
         service_name string;
         channel zx.handle:CHANNEL;
     });

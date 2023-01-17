@@ -7,10 +7,10 @@ alias PingString = string:100;
 alias PongString = string:105;
 
 @discoverable
-protocol Ping {
+closed protocol Ping {
     /// Returns a string that is the concatenation of the input `ping`
     /// a space and the string "pong".
-    Ping(struct {
+    strict Ping(struct {
         ping PingString;
     }) -> (struct {
         pong PongString;

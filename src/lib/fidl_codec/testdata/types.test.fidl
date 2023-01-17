@@ -5,8 +5,8 @@ library test.fidlcodec.examples;
 
 using zx;
 
-protocol Echo {
-    EchoString(struct {
+closed protocol Echo {
+    strict EchoString(struct {
         value string:<100, optional>;
     }) -> (struct {
         response string:<100, optional>;
@@ -17,243 +17,243 @@ type Named = struct {
     s string:200;
 };
 
-protocol FidlCodecTestProtocol {
-    Empty();
-    String(struct {
+closed protocol FidlCodecTestProtocol {
+    strict Empty();
+    strict String(struct {
         s string:100;
     });
-    Named(Named);
-    Bool(struct {
+    strict Named(Named);
+    strict Bool(struct {
         b bool;
     });
-    Int8(struct {
+    strict Int8(struct {
         i8 int8;
     });
-    Int16(struct {
+    strict Int16(struct {
         i16 int16;
     });
-    Int32(struct {
+    strict Int32(struct {
         i32 int32;
     });
-    Int64(struct {
+    strict Int64(struct {
         i64 int64;
     });
-    Uint8(struct {
+    strict Uint8(struct {
         ui8 uint8;
     });
-    Uint16(struct {
+    strict Uint16(struct {
         ui16 uint16;
     });
-    Uint32(struct {
+    strict Uint32(struct {
         ui32 uint32;
     });
-    Uint64(struct {
+    strict Uint64(struct {
         ui64 uint64;
     });
-    Float32(struct {
+    strict Float32(struct {
         f32 float32;
     });
-    Float64(struct {
+    strict Float64(struct {
         f64 float64;
     });
 
-    Complex(struct {
+    strict Complex(struct {
         real int32;
         imaginary int32;
     });
-    StringInt(struct {
+    strict StringInt(struct {
         s string:100;
         i32 int32;
     });
-    StringIntTable(table {
+    strict StringIntTable(table {
         1: s string:100;
         2: i32 int32;
     });
-    StringIntUnion(union {
+    strict StringIntUnion(union {
         1: s string:100;
         2: i32 int32;
     });
 
-    Array1(struct {
+    strict Array1(struct {
         b_1 array<int32, 1>;
     });
-    Array2(struct {
+    strict Array2(struct {
         b_2 array<int32, 2>;
     });
-    Vector(struct {
+    strict Vector(struct {
         v_1 vector<int32>:<10, optional>;
     });
 
-    TwoStringArrayInt(struct {
+    strict TwoStringArrayInt(struct {
         arr array<string:100, 2>;
         i32 int32;
     });
-    TwoStringVectorInt(struct {
+    strict TwoStringVectorInt(struct {
         vec vector<string:100>:10;
         i32 int32;
     });
-    TwoStringVectors(struct {
+    strict TwoStringVectors(struct {
         v_1 vector<string:100>:10;
         v_2 vector<string:100>:10;
     });
-    VectorUint8(struct {
+    strict VectorUint8(struct {
         v vector<uint8>:100;
     });
-    VectorUint32(struct {
+    strict VectorUint32(struct {
         v vector<uint32>:100;
     });
-    VectorStruct(struct {
+    strict VectorStruct(struct {
         v vector<SmallStruct>:100;
     });
-    ArrayStruct(struct {
+    strict ArrayStruct(struct {
         a array<SmallStruct, 3>;
     });
-    VectorStruct2(struct {
+    strict VectorStruct2(struct {
         v vector<SmallUnevenStruct>:100;
     });
-    ArrayStruct2(struct {
+    strict ArrayStruct2(struct {
         a array<SmallUnevenStruct, 3>;
     });
 
-    Struct(struct {
+    strict Struct(struct {
         p PrimitiveTypes;
     });
-    BoolStruct(struct {
+    strict BoolStruct(struct {
         s BoolStructType;
     });
-    NullableStruct(struct {
+    strict NullableStruct(struct {
         p box<PrimitiveTypes>;
     });
-    NullableStructAndInt(struct {
+    strict NullableStructAndInt(struct {
         p box<PrimitiveTypes>;
         i int32;
     });
-    ArrayNullableStruct(struct {
+    strict ArrayNullableStruct(struct {
         a array<box<TwoStringStruct>, 3>;
     });
 
-    SmallStructAfterByte(struct {
+    strict SmallStructAfterByte(struct {
         u uint8;
         s1 SmallStruct;
         s2 SmallStruct;
     });
 
-    TwoStringStructInt(struct {
+    strict TwoStringStructInt(struct {
         s TwoStringStruct;
         i32 int32;
     });
-    TwoStringNullableStructInt(struct {
+    strict TwoStringNullableStructInt(struct {
         s box<TwoStringStruct>;
         i32 int32;
     });
 
-    Union(struct {
+    strict Union(struct {
         isu IntStructUnion;
         i int32;
     });
-    NullableUnion(struct {
+    strict NullableUnion(struct {
         isu IntStructUnion:optional;
         i int32;
     });
-    NullableUnionIntFirst(struct {
+    strict NullableUnionIntFirst(struct {
         i int32;
         isu IntStructUnion:optional;
     });
-    ArrayNullableUnion(struct {
+    strict ArrayNullableUnion(struct {
         a array<IntStructUnion:optional, 3>;
     });
 
-    XUnion(struct {
+    strict XUnion(struct {
         isu IntStructXunion;
         i int32;
     });
-    NullableXUnion(struct {
+    strict NullableXUnion(struct {
         isu IntStructXunion:optional;
         i int32;
     });
-    NullableXUnionIntFirst(struct {
+    strict NullableXUnionIntFirst(struct {
         i int32;
         isu IntStructXunion:optional;
     });
 
-    ShortUnion(struct {
+    strict ShortUnion(struct {
         u U8U16Union;
         i int32;
     });
-    ShortUnionReserved(struct {
+    strict ShortUnionReserved(struct {
         u U8U16UnionReserved;
         i int32;
     });
-    ShortXUnion(struct {
+    strict ShortXUnion(struct {
         u U8U16Xunion;
         i int32;
     });
-    RecursiveUnion(struct {
+    strict RecursiveUnion(struct {
         e DataElement;
     });
 
-    U8U16UnionStruct(struct {
+    strict U8U16UnionStruct(struct {
         s U8U16UnionStructType;
     });
 
-    DefaultEnumMessage(struct {
+    strict DefaultEnumMessage(struct {
         ev DefaultEnum;
     });
-    I8EnumMessage(struct {
+    strict I8EnumMessage(struct {
         ev I8Enum;
     });
-    I16EnumMessage(struct {
+    strict I16EnumMessage(struct {
         ev I16Enum;
     });
-    I32EnumMessage(struct {
+    strict I32EnumMessage(struct {
         ev I32Enum;
     });
-    I64EnumMessage(struct {
+    strict I64EnumMessage(struct {
         ev I64Enum;
     });
 
-    DefaultBitsMessage(struct {
+    strict DefaultBitsMessage(struct {
         v DefaultBits;
     });
-    I8BitsMessage(struct {
+    strict I8BitsMessage(struct {
         v I8Bits;
     });
-    I16BitsMessage(struct {
+    strict I16BitsMessage(struct {
         v I16Bits;
     });
-    I32BitsMessage(struct {
+    strict I32BitsMessage(struct {
         v I32Bits;
     });
-    I64BitsMessage(struct {
+    strict I64BitsMessage(struct {
         v I64Bits;
     });
 
-    Table(struct {
+    strict Table(struct {
         table ValueTable;
         i int32;
     });
 
-    Handle(resource struct {
+    strict Handle(resource struct {
         ch zx.handle:CHANNEL;
     });
-    NullableHandle(resource struct {
+    strict NullableHandle(resource struct {
         ch zx.handle:<CHANNEL, optional>;
     });
-    HandleStructMessage(resource struct {
+    strict HandleStructMessage(resource struct {
         hs HandleStruct;
     });
-    HandleTableMessage(resource struct {
+    strict HandleTableMessage(resource struct {
         t HandleTable;
     });
-    TraversalOrderMessage(resource struct {
+    strict TraversalOrderMessage(resource struct {
         t TraversalOrder;
     });
-    TraversalMainMessage(resource struct {
+    strict TraversalMainMessage(resource struct {
         v vector<box<TraversalMain>>:3;
         s box<TraversalStruct>;
     });
 
-    Protocol(resource struct {
+    strict Protocol(resource struct {
         ch client_end:ParamProtocol;
     });
 };
@@ -437,6 +437,6 @@ type TraversalMain = resource struct {
     y box<TraversalStruct>;
 };
 
-protocol ParamProtocol {
-    Method();
+closed protocol ParamProtocol {
+    strict Method();
 };

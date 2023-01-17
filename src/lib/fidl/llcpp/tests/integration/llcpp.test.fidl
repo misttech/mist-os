@@ -7,11 +7,11 @@ type TestEnum = strict enum : uint32 {
     ONE = 1;
 };
 
-protocol Llcpp {
-    Action() -> (struct {
+closed protocol Llcpp {
+    strict Action() -> (struct {
         v int32;
     });
-    EnumAction() -> (struct {
+    strict EnumAction() -> (struct {
         v TestEnum;
     });
 };

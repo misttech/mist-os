@@ -12,6 +12,6 @@ library test.fidlcodec.composedinto;
 using test.fidlcodec.examples;
 
 // For testing what happens when fidl_codec encounters a composed method.
-protocol ComposedParamProtocol {
+closed protocol ComposedParamProtocol {
     compose test.fidlcodec.examples.ParamProtocol;
 };

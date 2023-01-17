@@ -26,15 +26,15 @@ type MutableField = struct {
 };
 
 @transport("Banjo")
-protocol InOutProtocol {
-    DoSomething(struct {
+closed protocol InOutProtocol {
+    strict DoSomething(struct {
         @in_out
         param SomeType;
     }) -> ();
-    DoSomeOtherThing(struct {
+    strict DoSomeOtherThing(struct {
         param box<SomeType>;
     }) -> ();
-    DoSomeDefaultThing(struct {
+    strict DoSomeDefaultThing(struct {
         param SomeType;
     }) -> ();
 };

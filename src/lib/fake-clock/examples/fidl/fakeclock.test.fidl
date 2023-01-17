@@ -6,17 +6,17 @@ using zx;
 
 /// An example protocol for demonstrating fake time.
 @discoverable
-protocol Example {
+closed protocol Example {
     /// Gets the current monotonic time.
-    GetMonotonic() -> (struct {
+    strict GetMonotonic() -> (struct {
         time zx.time;
     });
     /// Wait until the given absolute time, then return.
-    WaitUntil(struct {
+    strict WaitUntil(struct {
         timeout zx.time;
     }) -> ();
     /// Wait for `duration` time, then return.
-    WaitFor(struct {
+    strict WaitFor(struct {
         duration zx.duration;
     }) -> ();
 };

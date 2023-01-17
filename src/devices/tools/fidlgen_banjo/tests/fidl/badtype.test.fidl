@@ -5,8 +5,8 @@ library banjo.examples.badtype;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol BadType {
-    BadType(struct {
+closed protocol BadType {
+    strict BadType(struct {
         p uint64_t;
     }) -> ();
 };

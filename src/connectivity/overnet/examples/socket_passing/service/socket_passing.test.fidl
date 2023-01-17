@@ -6,8 +6,8 @@ library fuchsia.overnet.socketpassingexample;
 using zx;
 
 @discoverable
-protocol Example {
-    Pass(resource struct {
+closed protocol Example {
+    strict Pass(resource struct {
         socket zx.handle:SOCKET;
     }) -> ();
 };

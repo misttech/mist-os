@@ -7,14 +7,14 @@ library fuchsia.archivist.tests;
 /// a puppet to write logs to stdio. This allows the controller to verify stdio
 /// piping.
 @discoverable
-protocol StdioPuppet {
+closed protocol StdioPuppet {
     /// Writes |line| to stdout, appending a newline character.
-    WritelnStdout(struct {
+    strict WritelnStdout(struct {
         line string:1024;
     });
 
     /// Writes |line| to stderr, appending a newline character.
-    WritelnStderr(struct {
+    strict WritelnStderr(struct {
         line string:1024;
     });
 };

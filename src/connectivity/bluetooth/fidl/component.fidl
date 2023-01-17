@@ -12,9 +12,9 @@ type LifecycleState = strict enum {
 /// Protocol for querying the lifecycle of a component beyond that which
 /// is provided by zircon primitives.
 @discoverable
-protocol Lifecycle {
+closed protocol Lifecycle {
     /// Hanging Get method for querying the `LifecycleState` of a component
-    GetState() -> (struct {
+    strict GetState() -> (struct {
         state LifecycleState;
     });
 };

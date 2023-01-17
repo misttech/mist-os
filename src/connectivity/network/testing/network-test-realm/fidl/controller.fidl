@@ -54,7 +54,7 @@ type Error = strict enum {
 ///  * Coordinating interactions with the system's Netstack. This includes
 ///    temporarily taking over and mutating system interfaces.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Starts a hermetic network realm corresponding to `netstack`.
     ///
     /// Any previously running hermetic network realm will be terminated before
@@ -70,7 +70,7 @@ protocol Controller {
     /// + request `netstack` the type of Netstack that will be run.
     /// * error `INTERNAL` for internal errors, including failure to start the
     ///     specified `netstack`.
-    StartHermeticNetworkRealm(struct {
+    strict StartHermeticNetworkRealm(struct {
         netstack strict enum {
             /// Netstack2.
             V2 = 1;
@@ -89,7 +89,7 @@ protocol Controller {
     ///     is not running.
     /// * error `INTERNAL` for internal errors, including failure to destroy the
     ///     realm.
-    StopHermeticNetworkRealm() -> () error Error;
+    strict StopHermeticNetworkRealm() -> () error Error;
 
     /// Attaches an interface to the hermetic Netstack.
     ///
@@ -111,7 +111,7 @@ protocol Controller {
     ///     not be found on the system.
     /// * error `INTERNAL` for internal errors, including failure to read the
     ///     system's interfaces or configure an interface.
-    AddInterface(struct {
+    strict AddInterface(struct {
         mac_address fuchsia.net.MacAddress;
         name fuchsia.net.interfaces.Name;
         wait_any_ip_address bool;
@@ -130,7 +130,7 @@ protocol Controller {
     /// * error `INTERNAL` for internal errors, including failure to add the
     ///     desired stub within the hermetic network realm.
     /// * error `INVALID_ARGUMENTS` if the `component_url` is malformed.
-    StartStub(struct {
+    strict StartStub(struct {
         component_url fuchsia.url.Url;
     }) -> () error Error;
 
@@ -144,7 +144,7 @@ protocol Controller {
     /// * error `STUB_NOT_RUNNING` if there is no running stub.
     /// * error `INTERNAL` for internal errors, including failure to destroy the
     ///     stub component.
-    StopStub() -> () error Error;
+    strict StopStub() -> () error Error;
 
     /// Sends an ICMP echo request to the `target` using a socket provided by
     /// the hermetic Netstack.
@@ -170,7 +170,7 @@ protocol Controller {
     ///     ping.
     /// * error `TIMEOUT_EXCEEDED` if the ping reply is not received before the
     ///     specifed `timeout`.
-    Ping(struct {
+    strict Ping(struct {
         target fuchsia.net.IpAddress;
         payload_length uint16;
         interface_name string:<fuchsia.net.interfaces.INTERFACE_NAME_LENGTH, optional>;
@@ -195,7 +195,7 @@ protocol Controller {
     ///     attempts expire without successfully receiving a reply from the target address.
     /// * error `INTERNAL` for internal errors, including failure to create a socket or other
     ///     failures to send/receive datagrams from the target address.
-    PollUdp(struct {
+    strict PollUdp(struct {
         target fuchsia.net.SocketAddress;
         payload vector<uint8>:MAX_UDP_POLL_LENGTH;
         timeout zx.duration;
@@ -220,7 +220,7 @@ protocol Controller {
     /// * error `INVALID_ARGUMENTS` if the specified `interface_id` does not
     ///     exist or the `address` does not correspond to a valid multicast
     ///     address.
-    JoinMulticastGroup(struct {
+    strict JoinMulticastGroup(struct {
         address fuchsia.net.IpAddress;
         interface_id fuchsia.net.InterfaceId;
     }) -> () error Error;
@@ -240,7 +240,7 @@ protocol Controller {
     /// * error `INVALID_ARGUMENTS` if the specified `interface_id` does not
     ///     exist or the `address` does not correspond to a valid multicast
     ///     address.
-    LeaveMulticastGroup(struct {
+    strict LeaveMulticastGroup(struct {
         address fuchsia.net.IpAddress;
         interface_id fuchsia.net.InterfaceId;
     }) -> () error Error;
@@ -261,7 +261,7 @@ protocol Controller {
     /// * error `INVALID_ARGUMENTS` if any required parameters are omitted.
     /// * error `ALREADY_EXISTS` if there is a client running on the interface
     ///     identified by `interface_id` already.
-    StartDhcpv6Client(table {
+    strict StartDhcpv6Client(table {
         1: interface_id fuchsia.net.InterfaceId;
         2: address fuchsia.net.Ipv6Address;
         3: stateful bool;
@@ -271,5 +271,5 @@ protocol Controller {
     /// Stops all DHCPv6 clients.
     ///
     /// * error `DHCPV6_CLIENT_NOT_RUNNING` if no DHCPv6 client is running.
-    StopDhcpv6Client() -> () error Error;
+    strict StopDhcpv6Client() -> () error Error;
 };

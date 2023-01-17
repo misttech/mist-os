@@ -247,9 +247,9 @@ type LazyAction = flexible union {
 };
 
 @discoverable
-protocol Validate {
+closed protocol Validate {
     /// Initializes the Inspect library being tested by the puppet.
-    Initialize(struct {
+    strict Initialize(struct {
         params InitializationParams;
     }) -> (resource struct {
         vmo zx.handle:optional;
@@ -258,7 +258,7 @@ protocol Validate {
 
     /// Use instead of `Initialize` on puppets which support the Tree / Lazy method of getting VMOs.
     /// The root VMO can be obtained via the returned Tree protocol.
-    InitializeTree(struct {
+    strict InitializeTree(struct {
         params InitializationParams;
     }) -> (resource struct {
         tree client_end:<inspect.Tree, optional>;
@@ -269,24 +269,24 @@ protocol Validate {
     ///
     /// Note: It is an error for more than one Validate connection to
     /// Publish at once. Unpublish must be called to cleanup.
-    Publish() -> (struct {
+    strict Publish() -> (struct {
         result TestResult;
     });
 
     /// Instruct the puppet to unpublish any data it currently has present in out/diagnostics.
-    Unpublish() -> (struct {
+    strict Unpublish() -> (struct {
         result TestResult;
     });
 
     /// Modifies the contents of the VMO.
-    Act(struct {
+    strict Act(struct {
         action Action;
     }) -> (struct {
         result TestResult;
     });
 
     /// Modifies the contents of a lazy node.
-    ActLazy(struct {
+    strict ActLazy(struct {
         lazy_action LazyAction;
     }) -> (struct {
         result TestResult;

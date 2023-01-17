@@ -6,18 +6,18 @@ library fuchsia.hardware.compat;
 
 using zx;
 
-protocol Leaf {
-    GetString() -> (struct {
+closed protocol Leaf {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 
     /// This returns the driver's global counter, and then increments it.
     /// The global counter starts at 0.
-    GlobalCounter() -> (struct {
+    strict GlobalCounter() -> (struct {
         value uint32;
     });
 
-    AddChild(struct {
+    strict AddChild(struct {
         name string:MAX;
     }) -> (struct {
         status zx.status;
@@ -26,8 +26,8 @@ protocol Leaf {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Parent {
-    GetString() -> (struct {
+closed protocol Parent {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };

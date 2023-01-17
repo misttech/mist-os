@@ -6,8 +6,8 @@ library fuchsia.overnet.eventpairexample;
 using zx;
 
 @discoverable
-protocol Example {
-    Pass(resource struct {
+closed protocol Example {
+    strict Pass(resource struct {
         event_pair zx.handle:EVENTPAIR;
     }) -> ();
 };

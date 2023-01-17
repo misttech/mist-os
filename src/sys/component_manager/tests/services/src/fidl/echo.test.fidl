@@ -9,8 +9,8 @@ const MAX_STRING_LENGTH uint64 = 32;
 
 // [START echo]
 @discoverable
-protocol Echo {
-    EchoString(struct {
+closed protocol Echo {
+    strict EchoString(struct {
         value string:MAX_STRING_LENGTH;
     }) -> (struct {
         response string:MAX_STRING_LENGTH;

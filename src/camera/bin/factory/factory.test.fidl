@@ -20,12 +20,12 @@ type ExposureMode = strict enum : uint8 {
 
 /// This interface provides access to factory-only functionality in the ISP driver.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Instructs the controller to switch its stream format based on the ISP's output.
     /// + request `on` The ISP's streaming mode:
     ///                 `True` 16-bit portable grey map format.
     ///                 `False` 10-bit RGB format.
-    IsIspBypassModeEnabled(struct {
+    strict IsIspBypassModeEnabled(struct {
         enabled bool;
     });
 
@@ -40,7 +40,7 @@ protocol Controller {
     ///                                  not a directory.
     /// - response `image_info` A struct outlining the image's properties, e.g.
     ///                         width/height, pixel format, etc.
-    CaptureFrames(struct {
+    strict CaptureFrames(struct {
         dir_path string;
     }) -> (struct {
         s zx.status;
@@ -55,7 +55,7 @@ protocol Controller {
     ///                 `ZX_OK` if the operation succeeded.
     ///                 `ZX_ERR_UNAVAILABLE` if there are no active streams to display from.
     ///                 `ZX_ERR_NOT_SUPPORTED` if the DUT does not have a screen.
-    DisplayToScreen(struct {
+    strict DisplayToScreen(struct {
         stream_index uint32;
     }) -> (struct {
         s zx.status;
@@ -64,7 +64,7 @@ protocol Controller {
 
 /// This interface provides access to factory-only functionality in the ISP driver.
 @discoverable
-protocol Isp {
+closed protocol Isp {
     // Getters
 
     /// Retrieves the data stored in the camera module's One-Time Programmable Memory.
@@ -75,7 +75,7 @@ protocol Isp {
     ///                             unavailable.
     ///                 `ZX_ERR_NOT_SUPPORTED` if the camera module does not have an OTP.
     /// - response `otp_data` A handle to a VMO containing the requested OTP data.
-    GetOtpData() -> (resource struct {
+    strict GetOtpData() -> (resource struct {
         s zx.status;
         byte_count uint64;
         otp_data zx.handle:VMO;
@@ -88,7 +88,7 @@ protocol Isp {
     ///                 `ZX_ERR_IO` if the sensor is not initialized or is otherwise unavailable.
     ///                 `ZX_ERR_NOT_SUPPORTED` if the sensor does not support this feature.
     /// - response `temp` The sensor's operating temperature (in degrees Celsius).
-    GetSensorTemperature() -> (struct {
+    strict GetSensorTemperature() -> (struct {
         s zx.status;
         temp int32;
     });
@@ -100,7 +100,7 @@ protocol Isp {
     /// + request `mode` An AWB mode.
     /// + request `temp` The white balance temperature to use (in degrees Kelvin).
     ///                  Has no effect if the mode is not set to MANUAL.
-    SetAWBMode(struct {
+    strict SetAWBMode(struct {
         mode WhiteBalanceMode;
         temp uint32;
     }) -> ();
@@ -108,7 +108,7 @@ protocol Isp {
     /// Enables or disables the ISP's Auto Exposure feature.
     ///
     /// + request `mode` An AE mode.
-    SetAEMode(struct {
+    strict SetAEMode(struct {
         mode ExposureMode;
     }) -> ();
 
@@ -126,7 +126,7 @@ protocol Isp {
     ///
     /// * See [`camera-sensor.banjo`] for more information on these params:
     ///     //sdk/banjo/fuchsia.hardware.camera.sensor/camera-sensor.banjo
-    SetExposure(struct {
+    strict SetExposure(struct {
         integration_time float32;
         analog_gain float32;
         digital_gain float32;
@@ -139,7 +139,7 @@ protocol Isp {
     ///
     /// * See [`camera-sensor.banjo`] for more information on this param:
     ///     //sdk/banjo/fuchsia.hardware.camera.sensor/camera-sensor.banjo
-    SetSensorMode(struct {
+    strict SetSensorMode(struct {
         mode uint32;
     }) -> ();
 
@@ -149,14 +149,14 @@ protocol Isp {
     ///
     /// * See [`camera-sensor.banjo`] for more information on this param:
     ///     //sdk/banjo/fuchsia.hardware.camera.sensor/camera-sensor.banjo
-    SetTestPatternMode(struct {
+    strict SetTestPatternMode(struct {
         mode uint16;
     }) -> ();
 
     /// Sets the bypass mode.
     ///
     /// + request `on` True to enable 19:4 (16-bit) bypass mode, outputting raw sensor bits
-    SetBypassMode(struct {
+    strict SetBypassMode(struct {
         on bool;
     }) -> ();
 };

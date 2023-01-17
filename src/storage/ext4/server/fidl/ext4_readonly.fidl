@@ -191,7 +191,7 @@ type MountVmoResult = flexible union {
 };
 
 @discoverable
-protocol Server {
+closed protocol Server {
     /// Read the VMO content as an Ext4 image and return a channel to the
     /// root of the mounted file system.
     ///
@@ -211,7 +211,7 @@ protocol Server {
     ///           `root` connection even before received a response.  In
     ///           case of an error one of the other values will be returned
     ///           and the `root` connection will be closed.
-    MountVmo(resource struct {
+    strict MountVmo(resource struct {
         source fuchsia.mem.Buffer;
         flags fuchsia.io.OpenFlags;
         root server_end:fuchsia.io.Directory;

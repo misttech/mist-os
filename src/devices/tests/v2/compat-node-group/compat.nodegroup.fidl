@@ -8,8 +8,8 @@ using zx;
 
 // TODO(fxb/113089): Wrap this protocol in a Service.
 @discoverable
-protocol Waiter {
-    Ack(struct {
+closed protocol Waiter {
+    strict Ack(struct {
         status zx.status;
     });
 };

@@ -19,8 +19,8 @@ type Corpus = flexible enum : uint8 {
 
 /// Receives a sequence of test inputs belonging to a fuzzer's corpus.
 /// Returns an error if the transfer fails.
-protocol CorpusReader {
-    Next(resource struct {
+closed protocol CorpusReader {
+    strict Next(resource struct {
         test_input Input;
     }) -> (struct {
         result zx.status;

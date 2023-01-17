@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.hardware.usb.virtualbustest;
 
-protocol BusTest {
-    RunShortPacketTest() -> (struct {
+closed protocol BusTest {
+    strict RunShortPacketTest() -> (struct {
         success bool;
     });
 };

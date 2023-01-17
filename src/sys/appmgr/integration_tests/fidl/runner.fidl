@@ -12,44 +12,44 @@ type ComponentInfo = struct {
 };
 
 // interface to control the fake component created by MockRunner.
-protocol MockComponent {
-    Kill(struct {
+closed protocol MockComponent {
+    strict Kill(struct {
         errorcode uint64;
     });
-    ConnectToService(resource struct {
+    strict ConnectToService(resource struct {
         service_name string;
         channel zx.handle:CHANNEL;
     });
 
     // Set backend service directory which can be used by `PublishService` to
     // publish mock services.
-    SetServiceDirectory(resource struct {
+    strict SetServiceDirectory(resource struct {
         channel zx.handle:CHANNEL;
     });
 
     // Publishes `service_name` and connects to |backend service directory| when
     // request comes in.
-    PublishService(struct {
+    strict PublishService(struct {
         service_name string;
     }) -> ();
 
     // Gets program metadata for that particular component.
-    GetProgramMetadata() -> (struct {
+    strict GetProgramMetadata() -> (struct {
         metadata vector<fuchsia.sys.ProgramMetadata>:20;
     });
 };
 
-protocol MockRunner {
-    Crash();
-    ConnectToComponent(resource struct {
+closed protocol MockRunner {
+    strict Crash();
+    strict ConnectToComponent(resource struct {
         id uint64;
         req server_end:MockComponent;
     });
 
-    -> OnComponentCreated(struct {
+    strict -> OnComponentCreated(struct {
         info ComponentInfo;
     });
-    -> OnComponentKilled(struct {
+    strict -> OnComponentKilled(struct {
         id uint64;
     });
 };
@@ -59,8 +59,8 @@ protocol MockRunner {
 //
 // Mock runners should register to this service when started.
 @discoverable
-protocol MockRunnerRegistry {
-    Register(resource struct {
+closed protocol MockRunnerRegistry {
+    strict Register(resource struct {
         runner client_end:MockRunner;
     });
 };

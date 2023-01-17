@@ -6,9 +6,9 @@ library fuchsia.device.restarttest;
 using zx;
 
 /// Interface for communication between tests and the test device.
-protocol TestDevice {
+closed protocol TestDevice {
     /// Get the pid of the driver.
-    GetPid() -> (struct {
+    strict GetPid() -> (struct {
         pid zx.koid;
     }) error zx.status;
 };

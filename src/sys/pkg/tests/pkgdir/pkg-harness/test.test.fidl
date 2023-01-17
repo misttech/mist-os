@@ -22,7 +22,7 @@ type ConnectError = strict enum {
 
 /// This protocol can be used to connect to a package.
 @discoverable
-protocol Harness {
+closed protocol Harness {
     /// Connects to a package with the requested `backing`. A package is a directory tree with
     /// additional constraints: e.g. there is a meta/ subdirectory, meta/contents and meta/package
     /// files, the entries in meta/contents appear in the directory tree itself, and the files are
@@ -32,7 +32,7 @@ protocol Harness {
     /// + request `backing` is the package directory implementation.
     /// + request `dir` is the server end to serve the package over.
     /// * error a `ConnectError` value indicating failure reason.
-    ConnectPackage(resource struct {
+    strict ConnectPackage(resource struct {
         backing Backing;
         dir server_end:fuchsia.io.Directory;
     }) -> () error ConnectError;

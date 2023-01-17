@@ -16,9 +16,9 @@ type Data = table {
 
 /// A test-specific scheme to gather signal from  the client-under-test.
 @discoverable
-protocol ResponseListener {
+closed protocol ResponseListener {
     /// Notify the test that client-under-test has received expected input.
-    Respond(struct {
+    strict Respond(struct {
         focus_data Data;
     });
 };

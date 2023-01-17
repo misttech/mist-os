@@ -10,9 +10,9 @@ using zx;
 /// crashing, so that anyone using fuchsia.sys2.CrashIntrospect will know what
 /// thread koid to look for
 @discoverable
-protocol ThreadKoidReporter {
+closed protocol ThreadKoidReporter {
     /// Reports the koid for this component's thread
-    ReportMyThreadKoid(resource struct {
+    strict ReportMyThreadKoid(resource struct {
         thread_koid zx.koid;
     });
 };

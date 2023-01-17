@@ -39,7 +39,7 @@ type ExampleHandleStruct = resource struct {
     channel zx.handle:<CHANNEL, zx.rights.DUPLICATE>;
 };
 
-protocol Protocol {};
+closed protocol Protocol {};
 
 type ExampleEndpointStruct = resource struct {
     client_end client_end:Protocol;

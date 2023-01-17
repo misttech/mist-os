@@ -9,10 +9,10 @@ const MAX_DEVICE_PATH uint64 = 100;
 
 /// Protocol to control the target-side component of power failure tests for the filesystems.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Run the setup step for this test. Often, this involves formatting the filesystem of choice
     /// onto the block device, and perhaps setting up a base of files to work with.
-    Setup(struct {
+    strict Setup(struct {
         device_label string:MAX_DEVICE_PATH;
         device_path string:<MAX_DEVICE_PATH, optional>;
         seed uint64;
@@ -24,7 +24,7 @@ protocol Controller {
     /// approximately that amount of time, but the load will continue to run. If the duration
     /// provided is zero, then the test will return when it's done, which for a lot of normal
     /// blackout tests might be never.
-    Test(struct {
+    strict Test(struct {
         device_label string:MAX_DEVICE_PATH;
         device_path string:<MAX_DEVICE_PATH, optional>;
         seed uint64;
@@ -33,7 +33,7 @@ protocol Controller {
 
     /// Run the verify step for this test. Most of the time it involves running fsck on the block
     /// device and returning the result.
-    Verify(struct {
+    strict Verify(struct {
         device_label string:MAX_DEVICE_PATH;
         device_path string:<MAX_DEVICE_PATH, optional>;
         seed uint64;

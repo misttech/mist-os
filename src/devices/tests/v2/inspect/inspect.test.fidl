@@ -4,6 +4,6 @@
 
 library fuchsia.inspect.test;
 
-protocol Handshake {
-    Do() -> ();
+closed protocol Handshake {
+    strict Do() -> ();
 };

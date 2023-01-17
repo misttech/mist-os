@@ -9,8 +9,8 @@ type SomeData = struct {
 };
 
 @transport("Banjo")
-protocol SomeMethods {
-    DoSomething(struct {
+closed protocol SomeMethods {
+    strict DoSomething(struct {
         @buffer
         input vector<uint8>;
     }) -> ();

@@ -6,8 +6,8 @@ library fuchsia.overnet.examples.interfacepassing;
 using test.placeholders;
 
 @discoverable
-protocol Example {
-    Request(resource struct {
+closed protocol Example {
+    strict Request(resource struct {
         iface server_end:test.placeholders.Echo;
     });
 };

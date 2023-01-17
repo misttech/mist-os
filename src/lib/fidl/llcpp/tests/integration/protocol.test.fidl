@@ -30,41 +30,41 @@ type HandleUnionStruct = resource struct {
     u HandleUnion;
 };
 
-protocol Frobinator {
-    Frob(struct {
+closed protocol Frobinator {
+    strict Frob(struct {
         value string;
     });
-    Grob(struct {
+    strict Grob(struct {
         value string;
     }) -> (struct {
         value string;
     });
-    -> Hrob(struct {
+    strict -> Hrob(struct {
         value string;
     });
-    TwoWayEmptyArg() -> ();
+    strict TwoWayEmptyArg() -> ();
 };
 
-protocol HandleProvider {
-    GetHandle() -> (resource struct {
+closed protocol HandleProvider {
+    strict GetHandle() -> (resource struct {
         value HandleStruct;
     });
-    GetHandleVector(struct {
+    strict GetHandleVector(struct {
         count uint32;
     }) -> (resource struct {
         value vector<HandleStruct>;
     });
-    GetHandleUnion() -> (resource struct {
+    strict GetHandleUnion() -> (resource struct {
         value HandleUnionStruct;
     });
-    SwapHandle(HandleTable) -> (HandleUnion);
+    strict SwapHandle(HandleTable) -> (HandleUnion);
 };
 
-protocol EnumMethods {
-    SendEnum(struct {
+closed protocol EnumMethods {
+    strict SendEnum(struct {
         e MyError;
     });
-    GetEnum() -> (struct {
+    strict GetEnum() -> (struct {
         e MyError;
     });
 };

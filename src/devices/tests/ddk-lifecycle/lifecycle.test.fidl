@@ -5,11 +5,11 @@ library fuchsia.device.lifecycle.test;
 
 using zx;
 
-protocol TestDevice {
+closed protocol TestDevice {
     /// Adds a child device and returns a unique |id| for the created device.
     /// |complete_init| specifies whether the init hook should be replied to immediately,
     /// or completed later by the caller with |CompleteChildInit|.
-    AddChild(struct {
+    strict AddChild(struct {
         init_complete bool;
         init_status zx.status;
     }) -> (struct {
@@ -17,36 +17,36 @@ protocol TestDevice {
     }) error zx.status;
 
     /// Removes the child device of the given |id|.
-    RemoveChild(struct {
+    strict RemoveChild(struct {
         child_id uint64;
     }) -> () error zx.status;
 
     /// Asynchronously removes a child device.
     /// The remove must be completed with CompleteUnbind.
-    AsyncRemoveChild(struct {
+    strict AsyncRemoveChild(struct {
         child_id uint64;
     }) -> () error zx.status;
 
     /// Replies to the child init hook.
     /// Returns an error if the child has no pending init.
-    CompleteChildInit(struct {
+    strict CompleteChildInit(struct {
         child_id uint64;
     }) -> () error zx.status;
 
     /// Registers the client for device lifecycle events.
-    SubscribeToLifecycle(resource struct {
+    strict SubscribeToLifecycle(resource struct {
         client server_end:Lifecycle;
     }) -> () error zx.status;
 
     /// Finishes an unbind started by AsyncRemoveChild.
-    CompleteUnbind(struct {
+    strict CompleteUnbind(struct {
         child_id uint64;
     }) -> () error zx.status;
 };
 
-protocol Lifecycle {
+closed protocol Lifecycle {
     /// Sent when the ChildPreRelease hook is called.
-    -> OnChildPreRelease(struct {
+    strict -> OnChildPreRelease(struct {
         child_id uint64;
     });
 };

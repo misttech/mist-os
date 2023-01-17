@@ -4,13 +4,13 @@
 library banjo.examples.order2;
 
 @transport("Banjo")
-protocol Foo {
-    Hello() -> ();
+closed protocol Foo {
+    strict Hello() -> ();
 };
 
 @transport("Banjo")
-protocol Bar {
-    World(resource struct {
+closed protocol Bar {
+    strict World(resource struct {
         foo client_end:Foo;
     }) -> ();
 };

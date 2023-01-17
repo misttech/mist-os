@@ -4,6 +4,6 @@
 library fuchsia.zircon.benchmarks;
 
 // Example interface for testing performance of FIDL async loop.
-protocol Notification {
-    Notify();
+closed protocol Notification {
+    strict Notify();
 };

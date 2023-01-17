@@ -4,8 +4,8 @@
 library test.placeholders;
 
 @discoverable
-protocol Echo {
-    EchoString(struct {
+closed protocol Echo {
+    strict EchoString(struct {
         value string:<2048, optional>;
     }) -> (struct {
         response string:<2048, optional>;

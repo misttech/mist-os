@@ -25,28 +25,28 @@ type Directory = struct {
     }>;
 };
 
-protocol Interop {
+closed protocol Interop {
     /// [`RoundTrip`] exercises sending a complex data structure back and forth.
-    RoundTrip(struct {
+    strict RoundTrip(struct {
         node Node;
     }) -> (struct {
         node Node;
     });
 
     /// [`TryRoundTrip`] tests API and handling of the error syntax.
-    TryRoundTrip(struct {
+    strict TryRoundTrip(struct {
         node Node;
     }) -> (struct {
         node Node;
     }) error zx.status;
 
     /// [`OneWay`] tests one way calls.
-    OneWay(struct {
+    strict OneWay(struct {
         node Node;
     });
 
     /// [`OnNode`] tests events.
-    -> OnNode(struct {
+    strict -> OnNode(struct {
         node Node;
     });
 };

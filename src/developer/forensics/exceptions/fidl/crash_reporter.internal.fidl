@@ -8,12 +8,12 @@ using fuchsia.component;
 
 /// Internal protocol that allows exceptions.cmx to build crash reports and send them to the system
 /// crash reporter in an isolated process.
-protocol CrashReporter {
+closed protocol CrashReporter {
     /// A CrashReporter needs an optional exception, process, and thread so it can attempt to create
     /// a crash report with a minidump and annotations on the thread that crashed.
     ///
     /// Returns the moniker of the component that crashed, if available.
-    Send(resource struct {
+    strict Send(resource struct {
         exception zx.handle:<EXCEPTION, optional>;
         crashed_process zx.handle:<PROCESS, optional>;
         crashed_thread zx.handle:<THREAD, optional>;

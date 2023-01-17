@@ -23,22 +23,22 @@ type LargeMessageResourced = resource struct {
     handles array<zx.handle:optional, 64>;
 };
 
-protocol OverflowingProtocol {
+closed protocol OverflowingProtocol {
     @experimental_overflowing(request=true)
-    TwoWayRequestOnly(LargeMessageUnion) -> (table {});
+    strict TwoWayRequestOnly(LargeMessageUnion) -> (table {});
 
     @experimental_overflowing(response=true)
-    TwoWayResponseOnly(table {}) -> (LargeMessageTable);
+    strict TwoWayResponseOnly(table {}) -> (LargeMessageTable);
 
     @experimental_overflowing(request=true, response=true)
-    TwoWayBothRequestAndResponse(LargeMessageStruct) -> (LargeMessageStruct);
+    strict TwoWayBothRequestAndResponse(LargeMessageStruct) -> (LargeMessageStruct);
 
     @experimental_overflowing(request=true)
-    OneWayCall(LargeMessageTable);
+    strict OneWayCall(LargeMessageTable);
 
     @experimental_overflowing(response=true)
-    -> OnOneWayReplyEvent(LargeMessageUnion);
+    strict -> OnOneWayReplyEvent(LargeMessageUnion);
 
     @experimental_overflowing(request=true, response=true)
-    Resourced(LargeMessageResourced) -> (LargeMessageResourced);
+    strict Resourced(LargeMessageResourced) -> (LargeMessageResourced);
 };

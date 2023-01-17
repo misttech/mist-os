@@ -11,11 +11,11 @@ const DEFAULT_REALM string = "gis_default";
 
 /// Enables discovery of guest VM's for control in tests.
 @discoverable
-protocol Discovery {
+closed protocol Discovery {
     /// Finds the guest VM specified by realm name/guest name pair and connects to it to enable
     /// file transfers and execution of commands.  If `realm_name` is null, `DEFAULT_REALM` is
     /// used instead.
-    GetGuest(resource struct {
+    strict GetGuest(resource struct {
         realm_name string:<GUEST_INTERACTION_MAX_LENGTH, optional>;
         guest_name string:GUEST_INTERACTION_MAX_LENGTH;
         guest server_end:Interaction;
@@ -28,24 +28,24 @@ type EnvironmentVariable = struct {
     value string:GUEST_INTERACTION_MAX_LENGTH;
 };
 
-protocol CommandListener {
+closed protocol CommandListener {
     /// Signal to a client that is attempting to exec inside of a guest whether
     /// or not the subprocess was successfully started.
-    -> OnStarted(struct {
+    strict -> OnStarted(struct {
         status zx.status;
     });
 
     /// Signal to a client that the Exec request has completed.
-    -> OnTerminated(struct {
+    strict -> OnTerminated(struct {
         status zx.status;
         return_code int32;
     });
 };
 
-protocol Interaction {
+closed protocol Interaction {
     /// Take a local file from the Fuchsia host and transfer it to a destination
     /// location on the guest under test.
-    PutFile(resource struct {
+    strict PutFile(resource struct {
         local_file client_end:fuchsia.io.File;
         remote_path string:GUEST_INTERACTION_MAX_LENGTH;
     }) -> (struct {
@@ -54,7 +54,7 @@ protocol Interaction {
 
     /// Pull a file from the guest under test and copy it to the specified
     /// location on the Fuchsia host.
-    GetFile(resource struct {
+    strict GetFile(resource struct {
         remote_path string:GUEST_INTERACTION_MAX_LENGTH;
         local_file client_end:fuchsia.io.File;
     }) -> (struct {
@@ -63,7 +63,7 @@ protocol Interaction {
 
     /// Execute command on the guest under test and return the resulting output,
     /// error, and return code.
-    ExecuteCommand(resource struct {
+    strict ExecuteCommand(resource struct {
         command string:GUEST_INTERACTION_MAX_LENGTH;
         env vector<EnvironmentVariable>:GUEST_INTERACTION_MAX_LENGTH;
         stdin zx.handle:<SOCKET, optional>;

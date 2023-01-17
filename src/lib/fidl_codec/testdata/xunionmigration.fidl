@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 library test.fidlcodec.examples;
 
-protocol FidlCodecXUnion {
-    SendAfterMigration(struct {
+closed protocol FidlCodecXUnion {
+    strict SendAfterMigration(struct {
         u NowAsXUnion;
         i int32;
     });

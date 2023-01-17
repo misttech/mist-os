@@ -8,25 +8,25 @@ using zx;
 
 const MAX_TRANSFER_SIZE uint32 = 4096;
 
-protocol TestDevice {
+closed protocol TestDevice {
     /// Sets the test data that can be retrieved from this device using a runtime channel.
-    SetTestData(struct {
+    strict SetTestData(struct {
         in vector<uint8>:MAX_TRANSFER_SIZE;
     }) -> () error zx.status;
 };
 
-protocol TestDeviceChild {
+closed protocol TestDeviceChild {
     /// Returns the test data stored in the parent device using the runtime channel.
-    GetParentDataOverDriverTransport() -> (struct {
+    strict GetParentDataOverDriverTransport() -> (struct {
         out vector<uint8>:MAX_TRANSFER_SIZE;
     }) error zx.status;
 };
 
 @discoverable
 @transport("Driver")
-protocol DriverTransportProtocol {
+closed protocol DriverTransportProtocol {
     /// Returns the test data stored in the parent device.
-    TransmitData() -> (struct {
+    strict TransmitData() -> (struct {
         out vector<uint8>:MAX_TRANSFER_SIZE;
     }) error zx.status;
 };

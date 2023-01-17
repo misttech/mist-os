@@ -5,8 +5,8 @@
 library fuchsia.composite.test;
 
 @discoverable
-protocol Device {
-    GetNumber() -> (struct {
+closed protocol Device {
+    strict GetNumber() -> (struct {
         number uint32;
     });
 };

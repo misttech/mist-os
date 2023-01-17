@@ -11,7 +11,7 @@ using zx;
 /// creates to the fuzz_manager. The other end is passed as a startup handle to the fuzzer component
 /// itself, which provides |Controller|s on request.
 @discoverable
-protocol Registrar {
+closed protocol Registrar {
     /// Adds a |ControllerProvider|. This should be called by the fuzzer itself, using the channel
     /// provided by the fuzz-test-runner, and in response to being started by the fuzz-manager. This
     /// call will block until the fuzz-manager calls |GetProvider| and supplies the URL to associate
@@ -19,7 +19,7 @@ protocol Registrar {
     ///
     /// The registry will close the channel to the fuzzer on error, on a corresponding call to
     /// |ClearProvider|, or on exit. The fuzzer should exit when the channel closes.
-    Register(resource struct {
+    strict Register(resource struct {
         fuzzer_url fuchsia.url.Url;
         provider client_end:ControllerProvider;
     }) -> ();
@@ -29,7 +29,7 @@ protocol Registrar {
 /// the test runner framework to register a |ControllerProvider|, and to stop those fuzzers when no
 /// additional fuzzing workflows remain to be performed.
 @discoverable
-protocol Registry {
+closed protocol Registry {
     /// Connects the |Controller| to a registered fuzzer at |fuzzer_url|.
     ///
     /// Uses a |ControllerProvider| that has been |Register|ed at the given |fuzzer_url| to connect
@@ -39,7 +39,7 @@ protocol Registry {
     ///
     /// Returns ZX_ERR_TIMED_OUT if |timeout| elapses without the provider becoming available.
     /// Returns ZX_ERR_SHOULD_WAIT if already waiting for a fuzzer to start.
-    Connect(resource struct {
+    strict Connect(resource struct {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
         timeout zx.duration;
@@ -51,7 +51,7 @@ protocol Registry {
     /// The associated fuzzer should exit upon channel closure.
     ///
     /// Return ZX_ERR_NOT_FOUND if no such provider exists in the registry.
-    Disconnect(struct {
+    strict Disconnect(struct {
         fuzzer_url fuchsia.url.Url;
     }) -> (struct {
         result zx.status;

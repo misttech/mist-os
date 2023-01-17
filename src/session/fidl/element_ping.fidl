@@ -6,7 +6,7 @@ library fuchsia.session.examples;
 /// A protocol which is used by an example element to ping the session it was
 /// added to.
 @discoverable
-protocol ElementPing {
+closed protocol ElementPing {
     /// Sends a ping to the example session.
-    Ping();
+    strict Ping();
 };

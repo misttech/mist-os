@@ -17,38 +17,38 @@ type EchoMore = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Echo {
-    Echo32(struct {
+closed protocol Echo {
+    strict Echo32(struct {
         uint32 uint32;
     }) -> (struct {
         response uint32;
     });
-    Echo64(struct {
+    strict Echo64(struct {
         uint64 uint64;
     }) -> (struct {
         response uint64;
     });
-    EchoEnum(struct {
+    strict EchoEnum(struct {
         req EchoMe;
     }) -> (struct {
         response EchoMe;
     });
-    EchoHandle(resource struct {
+    strict EchoHandle(resource struct {
         req zx.handle;
     }) -> (resource struct {
         response zx.handle;
     });
-    EchoChannel(resource struct {
+    strict EchoChannel(resource struct {
         req zx.handle:CHANNEL;
     }) -> (resource struct {
         response zx.handle:CHANNEL;
     });
-    EchoStruct(struct {
+    strict EchoStruct(struct {
         req EchoMore;
     }) -> (struct {
         response EchoMore;
     });
-    EchoEmpty() -> () error uint32;
+    strict EchoEmpty() -> () error uint32;
 };
 
 const favorite_echo EchoMe = EchoMe.zero;

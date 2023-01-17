@@ -4,16 +4,16 @@
 
 library fuchsia.hardware.compat;
 
-protocol Leaf {
-    GetString() -> (struct {
+closed protocol Leaf {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Parent {
-    GetString() -> (struct {
+closed protocol Parent {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };

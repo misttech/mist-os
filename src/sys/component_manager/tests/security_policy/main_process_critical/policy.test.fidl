@@ -4,10 +4,10 @@
 library test.policy;
 
 @discoverable
-protocol ExitController {
+closed protocol ExitController {
     // Instructs the protocol provider to terminate their process with the
     // provided code.
-    Exit(struct {
+    strict Exit(struct {
         code int32;
     });
 };

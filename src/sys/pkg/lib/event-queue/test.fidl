@@ -4,8 +4,8 @@
 library test.pkg.eventqueue;
 
 // This is an example event monitor FIDL protocol that can be used with the event queue library.
-protocol ExampleEventMonitor {
-    OnEvent(struct {
+closed protocol ExampleEventMonitor {
+    strict OnEvent(struct {
         event string:100;
     }) -> ();
 };

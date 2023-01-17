@@ -4,18 +4,18 @@
 library fuchsia.ffx.test;
 
 @discoverable
-protocol Noop {
+closed protocol Noop {
     /// Does a noop.
-    DoNoop() -> ();
+    strict DoNoop() -> ();
 };
 
 @discoverable
-protocol Counter {
+closed protocol Counter {
     /// Adds one to the internal state.
-    AddOne() -> ();
+    strict AddOne() -> ();
 
     /// Gets the internal state.
-    GetCount() -> (struct {
+    strict GetCount() -> (struct {
         count uint64;
     });
 };

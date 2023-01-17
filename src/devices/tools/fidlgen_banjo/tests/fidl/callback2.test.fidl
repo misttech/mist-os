@@ -5,6 +5,6 @@ library banjo.examples.callback2;
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol DrawCallback {
-    Callback() -> ();
+closed protocol DrawCallback {
+    strict Callback() -> ();
 };

@@ -24,8 +24,8 @@ type Action = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol ActionNotify {
-    Callback(struct {
+closed protocol ActionNotify {
+    strict Callback(struct {
         p Point;
         d Direction;
     }) -> ();
@@ -33,14 +33,14 @@ protocol ActionNotify {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol ActionProtocol {
-    RegisterCallback(resource struct {
+closed protocol ActionProtocol {
+    strict RegisterCallback(resource struct {
         id uint32;
         cb client_end:ActionNotify;
     }) -> (struct {
         s zx.status;
     });
-    GetCallback(struct {
+    strict GetCallback(struct {
         id uint32;
     }) -> (resource struct {
         s zx.status;

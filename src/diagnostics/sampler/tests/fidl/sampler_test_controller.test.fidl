@@ -8,13 +8,13 @@ type SamplingError = strict enum : int32 {
 };
 
 @discoverable
-protocol SamplerTestController {
-    IncrementInt(struct {
+closed protocol SamplerTestController {
+    strict IncrementInt(struct {
         property_id uint16;
     }) -> ();
-    SetOptional(struct {
+    strict SetOptional(struct {
         value int64;
     }) -> ();
-    RemoveOptional() -> ();
-    WaitForSample() -> () error SamplingError;
+    strict RemoveOptional() -> ();
+    strict WaitForSample() -> () error SamplingError;
 };

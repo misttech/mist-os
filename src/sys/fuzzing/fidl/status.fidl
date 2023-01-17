@@ -93,9 +93,9 @@ type Status = table {
 };
 
 /// See |Status|. This protocol is used to push status from the |Controller| to callers.
-protocol Monitor {
+closed protocol Monitor {
     /// Sends the current status.
-    Update(struct {
+    strict Update(struct {
         reason UpdateReason;
         status Status;
     }) -> ();

@@ -6,6 +6,6 @@ library driver.multiname.test;
 
 using zx;
 
-protocol TestAddDevice {
-    AddDevice() -> () error zx.status;
+closed protocol TestAddDevice {
+    strict AddDevice() -> () error zx.status;
 };

@@ -48,12 +48,12 @@ type DecompressResponse = struct {
 };
 
 @discoverable
-protocol DecompressorCreator {
+closed protocol DecompressorCreator {
     /// Takes the server end of a fifo for `DecompressRangeRequest` objects to
     /// handle requests and put `DecopmressRangeResponse` responses on. Data
     /// for requests is read from `compressed_vmo` and results written to
     /// `decompressed_vmo`.
-    Create(resource struct {
+    strict Create(resource struct {
         server_end zx.handle:FIFO;
         compressed_vmo zx.handle:VMO;
         decompressed_vmo zx.handle:VMO;

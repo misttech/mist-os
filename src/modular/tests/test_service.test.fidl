@@ -5,9 +5,9 @@ library fuchsia.testing.modular;
 
 // An interface for a test service.
 @discoverable
-protocol TestProtocol {
+closed protocol TestProtocol {
     // Returns a nice message.
-    GetMessage() -> (struct {
+    strict GetMessage() -> (struct {
         message string:1024;
     });
 };

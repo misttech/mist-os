@@ -11,10 +11,10 @@ using fuchsia.developer.ffx;
 const MAX_STRING_LENGTH uint64 = 2048;
 
 @discoverable
-protocol Sl4fBridge {
+closed protocol Sl4fBridge {
     /// Execute passes commands from the SL4F host-side server to the client-side server and on to
     /// the SL4F component.
-    Execute(struct {
+    strict Execute(struct {
         /// The device target.
         target_query fuchsia.developer.ffx.TargetQuery;
         /// The SL4F query to send to the client-side SL4F instance.

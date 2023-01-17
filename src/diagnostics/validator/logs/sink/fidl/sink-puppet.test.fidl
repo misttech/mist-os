@@ -37,22 +37,22 @@ type PrintfRecordSpec = struct {
 };
 
 @discoverable
-protocol LogSinkPuppet {
+closed protocol LogSinkPuppet {
     /// Returns the information the puppet knows about itself.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         info PuppetInfo;
     });
 
     /// Logs a record.
-    EmitLog(struct {
+    strict EmitLog(struct {
         spec RecordSpec;
     }) -> ();
 
     /// Logs a printf record.
-    EmitPrintfLog(struct {
+    strict EmitPrintfLog(struct {
         spec PrintfRecordSpec;
     }) -> ();
 
     /// Disables the interest listener
-    StopInterestListener() -> ();
+    strict StopInterestListener() -> ();
 };

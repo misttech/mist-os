@@ -16,21 +16,21 @@ const MAX_PARAMETER_LEN uint16 = 256;
 /// See also:
 ///     https://llvm.org/docs/LibFuzzer.html#fuzz-target
 @discoverable
-protocol TargetAdapter {
+closed protocol TargetAdapter {
     /// Retrieves the target-specific fuzzer parameters, e.g. the package-relative location of seed
     /// corpora. These parameters are specific to individual fuzzers, and are used by both the
     /// fuzzing engine and the "test-engine" used to create fuzzer unit tests. For these reasons,
     /// it is most convenient for fuzzer authors to specify them as part of the (fuzzer-specific)
     /// target adapter's component manifest file, and have the engine and test-engine retrieve them
     /// via this method.
-    GetParameters() -> (struct {
+    strict GetParameters() -> (struct {
         parameters vector<string:MAX_PARAMETER_LEN>:MAX_PARAMETERS;
     });
 
     /// Provides the eventpair used by driver and adapter to signal each other, and the shared VMO
     /// used to provide test inputs to the adapter. The VMO must have the ZX_PROP_VMO_CONTENT_SIZE
     /// property set.
-    Connect(resource struct {
+    strict Connect(resource struct {
         eventpair zx.handle:EVENTPAIR;
         test_input zx.handle:VMO;
     }) -> ();

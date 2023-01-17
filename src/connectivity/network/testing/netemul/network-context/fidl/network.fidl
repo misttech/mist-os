@@ -45,13 +45,13 @@ type NetworkConfig = table {
 };
 
 /// Manages virtual networks.
-protocol NetworkManager {
+closed protocol NetworkManager {
     /// Lists emulated networks by name.
-    ListNetworks() -> (struct {
+    strict ListNetworks() -> (struct {
         nets vector<string:MAX_NAME_LENGTH>:MAX;
     });
     /// Creates a new network with given name and config.
-    CreateNetwork(struct {
+    strict CreateNetwork(struct {
         name string:MAX_NAME_LENGTH;
         config NetworkConfig;
     }) -> (resource struct {
@@ -59,7 +59,7 @@ protocol NetworkManager {
         net client_end:<Network, optional>;
     });
     /// Gets a handle to a network.
-    GetNetwork(struct {
+    strict GetNetwork(struct {
         name string:MAX_NAME_LENGTH;
     }) -> (resource struct {
         net client_end:<Network, optional>;
@@ -76,13 +76,13 @@ type EndpointConfig = struct {
 };
 
 /// Manages virtual endpoints.
-protocol EndpointManager {
+closed protocol EndpointManager {
     /// Lists endpoints by name.
-    ListEndpoints() -> (struct {
+    strict ListEndpoints() -> (struct {
         endp vector<string:MAX_NAME_LENGTH>:MAX;
     });
     /// Creates endpoint with given name and config.
-    CreateEndpoint(struct {
+    strict CreateEndpoint(struct {
         name string:MAX_NAME_LENGTH;
         config EndpointConfig;
     }) -> (resource struct {
@@ -90,7 +90,7 @@ protocol EndpointManager {
         endpoint client_end:<Endpoint, optional>;
     });
     /// Gets a handle to an endpoint.
-    GetEndpoint(struct {
+    strict GetEndpoint(struct {
         name string:MAX_NAME_LENGTH;
     }) -> (resource struct {
         endpoint client_end:<Endpoint, optional>;
@@ -98,9 +98,9 @@ protocol EndpointManager {
 };
 
 /// Fake endpoint can be added to a network to snoop or inject packets.
-protocol FakeEndpoint {
+closed protocol FakeEndpoint {
     /// Writes a frame to the network.
-    Write(struct {
+    strict Write(struct {
         data vector<uint8>:MAX;
     }) -> ();
     /// Reads a single frame from the network.
@@ -111,79 +111,79 @@ protocol FakeEndpoint {
     ///
     /// Issuing a second `Read` request when the first one is still pending will cause the channel
     /// to be closed with `ZX_ERR_BAD_STATE`.
-    Read() -> (struct {
+    strict Read() -> (struct {
         data vector<uint8>:MAX;
         dropped_frames uint64;
     });
 };
 
 /// Virtual network.
-protocol Network {
+closed protocol Network {
     // Allows guest VMs to interact with the [`Network`].
     compose fuchsia.net.virtualization.Network;
 
     /// Gets network configuration.
-    GetConfig() -> (struct {
+    strict GetConfig() -> (struct {
         config NetworkConfig;
     });
     /// Gets network name.
-    GetName() -> (struct {
+    strict GetName() -> (struct {
         name string:MAX_NAME_LENGTH;
     });
     /// Updates network configuration.
-    SetConfig(struct {
+    strict SetConfig(struct {
         config NetworkConfig;
     }) -> (struct {
         status zx.status;
     });
     /// Attaches endpoint with given name to network.
-    AttachEndpoint(struct {
+    strict AttachEndpoint(struct {
         name string:MAX_NAME_LENGTH;
     }) -> (struct {
         status zx.status;
     });
     /// Removes endpoint with given name from network.
-    RemoveEndpoint(struct {
+    strict RemoveEndpoint(struct {
         name string:MAX_NAME_LENGTH;
     }) -> (struct {
         status zx.status;
     });
     /// Injects a fake endpoint.
-    CreateFakeEndpoint(resource struct {
+    strict CreateFakeEndpoint(resource struct {
         ep server_end:FakeEndpoint;
     });
 };
 
 /// Simple interface to serve devices over fidl.
-protocol DeviceProxy {
+closed protocol DeviceProxy {
     /// Fulfills the device request.
     ///
     /// This interface provides erased types to match devfs behavior.
-    ServeDevice(resource struct {
+    strict ServeDevice(resource struct {
         req zx.handle:CHANNEL;
     });
 };
 
 /// Virtual ethernet endpoint.
-protocol Endpoint {
+closed protocol Endpoint {
     // Gets endpoint configuration.
-    GetConfig() -> (struct {
+    strict GetConfig() -> (struct {
         config EndpointConfig;
     });
     /// Gets endpoint name.
-    GetName() -> (struct {
+    strict GetName() -> (struct {
         name string:MAX_NAME_LENGTH;
     });
     /// Sends link up or down signal
-    SetLinkUp(struct {
+    strict SetLinkUp(struct {
         up bool;
     }) -> ();
     /// Connects to the underlying device port.
-    GetPort(resource struct {
+    strict GetPort(resource struct {
         port server_end:fuchsia.hardware.network.Port;
     });
     /// Gets a proxy to open requests with zircon ethernet device.
-    GetProxy(resource struct {
+    strict GetProxy(resource struct {
         proxy server_end:DeviceProxy;
     });
 };
@@ -211,22 +211,22 @@ type EndpointSetup = struct {
 
 /// Handle returned when using NetworkContext.Setup for quick network configuration.
 /// Networks and endpoints created by Setup are tied to the lifecycle of the SetupHandle's channel.
-protocol SetupHandle {};
+closed protocol SetupHandle {};
 
 /// Main entry point to manage virtual networks and endpoints.
 @discoverable
-protocol NetworkContext {
-    GetNetworkManager(resource struct {
+closed protocol NetworkContext {
+    strict GetNetworkManager(resource struct {
         net_manager server_end:NetworkManager;
     });
-    GetEndpointManager(resource struct {
+    strict GetEndpointManager(resource struct {
         endp_manager server_end:EndpointManager;
     });
     /// Creates a collection of networks described by `networks`.
     /// `status` is `ZX_OK` for success
     /// `setup_handle` is a resource that references and maintains the lifecycle of
     ///                the created networks and endpoints.
-    Setup(struct {
+    strict Setup(struct {
         networks vector<NetworkSetup>:MAX;
     }) -> (resource struct {
         status zx.status;

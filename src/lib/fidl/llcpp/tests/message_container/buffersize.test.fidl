@@ -10,34 +10,34 @@ type Array4096Elements = struct {
     value array<uint8, 4096>;
 };
 
-protocol Protocol {
-    RequestWith496ByteArray(struct {
+closed protocol Protocol {
+    strict RequestWith496ByteArray(struct {
         value array<byte, 496>;
     });
-    RequestWith497ByteArray(struct {
+    strict RequestWith497ByteArray(struct {
         value array<byte, 497>;
     });
 
     // A small request that should be stack-allocated when sending.
-    SmallRequestWithFlexibleType(struct {
+    strict SmallRequestWithFlexibleType(struct {
         u flexible union {
             1: value int64;
         };
     });
 
-    SmallResponseWithFlexibleType() -> (struct {
+    strict SmallResponseWithFlexibleType() -> (struct {
         r flexible union {
             1: value int64;
         };
     });
 
-    RequestWith496ByteArrayAndResponseOf256Bytes(struct {
+    strict RequestWith496ByteArrayAndResponseOf256Bytes(struct {
         value array<byte, 496>;
     }) -> (struct {
         value array<byte, 240>;
     });
 
-    -> EventOf256Bytes(struct {
+    strict -> EventOf256Bytes(struct {
         value array<byte, 240>;
     });
 };

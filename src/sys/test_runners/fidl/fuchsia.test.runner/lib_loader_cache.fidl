@@ -8,9 +8,9 @@ using fuchsia.ldsvc;
 
 
 /// Caches lib loader requests in memory.
-protocol LibraryLoaderCache {
+closed protocol LibraryLoaderCache {
     /// Serve the cache over provided handle.
-    Serve(resource struct {
+    strict Serve(resource struct {
         loader server_end:fuchsia.ldsvc.Loader;
     });
 };
@@ -20,12 +20,12 @@ protocol LibraryLoaderCache {
 /// to make test execution faster when launching same process in a package
 /// multiple times.
 @discoverable
-protocol LibraryLoaderCacheBuilder {
+closed protocol LibraryLoaderCacheBuilder {
     /// Create a new LibraryLoaderCache backed by `lib_directory`.
     /// `lib_directory`: Handle to /pkg/lib of the component which needs
     ///                  to be launched.
     /// `cache`: The handle which will serve |LibraryLoaderCache|.
-    Create(resource struct {
+    strict Create(resource struct {
         lib_directory client_end:fuchsia.io.Directory;
         cache server_end:LibraryLoaderCache;
     });

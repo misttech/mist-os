@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 library test.benchmarkfidl;
 
-protocol HandleArrayEvent64EventProtocol {
-    -> Send(resource struct {
+closed protocol HandleArrayEvent64EventProtocol {
+    strict -> Send(resource struct {
         val HandleArrayEvent64;
     });
 };
 
-protocol HandleArrayEvent64EchoCall {
-    Echo(resource struct {
+closed protocol HandleArrayEvent64EchoCall {
+    strict Echo(resource struct {
         val HandleArrayEvent64;
     }) -> (resource struct {
         val HandleArrayEvent64;
@@ -18,8 +18,8 @@ protocol HandleArrayEvent64EchoCall {
 };
 
 @transport("Driver")
-protocol HandleArrayEvent64EchoCallDriver {
-    Echo(resource struct {
+closed protocol HandleArrayEvent64EchoCallDriver {
+    strict Echo(resource struct {
         val HandleArrayEvent64;
     }) -> (resource struct {
         val HandleArrayEvent64;

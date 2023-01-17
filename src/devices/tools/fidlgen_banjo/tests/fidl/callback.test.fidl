@@ -20,8 +20,8 @@ type Direction = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol Draw {
-    Callback(struct {
+closed protocol Draw {
+    strict Callback(struct {
         p Point;
         d Direction;
     }) -> ();
@@ -29,26 +29,26 @@ protocol Draw {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Drawing {
-    RegisterCallback(resource struct {
+closed protocol Drawing {
+    strict RegisterCallback(resource struct {
         cb client_end:Draw;
     }) -> ();
-    DeregisterCallback() -> ();
-    RegisterCallback2(resource struct {
+    strict DeregisterCallback() -> ();
+    strict RegisterCallback2(resource struct {
         cb client_end:banjo.examples.callback2.DrawCallback;
     }) -> ();
-    DrawLots(resource struct {
+    strict DrawLots(resource struct {
         commands zx.handle:VMO;
     }) -> (struct {
         result int32;
         p Point;
     });
-    DrawArray(struct {
+    strict DrawArray(struct {
         points array<Point, 4>;
     }) -> (struct {
         rv zx.status;
     });
-    Describe(struct {
+    strict Describe(struct {
         one string:64;
     }) -> (struct {
         two string:128;

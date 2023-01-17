@@ -90,53 +90,53 @@ type NumberCollision = struct {
 // fidlc will only expose coding tables for message types.
 // However, we can obtain the coding tables for SomeStruct/MyXUnion etc. via the coding table
 // for request message types, by defining dummy methods which take a single desired argument.
-protocol Coding {
-    SomeStruct(struct {
+closed protocol Coding {
+    strict SomeStruct(struct {
         s SomeStruct;
     });
-    StructWithSomeFieldsRemovedFromCodingTables(struct {
+    strict StructWithSomeFieldsRemovedFromCodingTables(struct {
         s StructWithSomeFieldsRemovedFromCodingTables;
     });
 
     // Various trickery to avoid directly refering a xunion/table inline,
     // which is not supported in the C bindings.
-    MyXUnion(struct {
+    strict MyXUnion(struct {
         x MyXUnion:optional;
     });
-    MyStrictXUnion(struct {
+    strict MyStrictXUnion(struct {
         x MyStrictXUnion:optional;
     });
 
     // Ensuring support for multiple uses of the same nullable type.
-    MyXUnion2(struct {
+    strict MyXUnion2(struct {
         x MyXUnion:optional;
     });
-    MyStrictXUnion2(struct {
+    strict MyStrictXUnion2(struct {
         x MyStrictXUnion:optional;
     });
 
-    VectorOfMyTable(struct {
+    strict VectorOfMyTable(struct {
         t vector<MyTable>;
     });
-    VectorOfMyXUnion(struct {
+    strict VectorOfMyXUnion(struct {
         x vector<MyXUnion>;
     });
-    VectorOfMyStrictXUnion(struct {
+    strict VectorOfMyStrictXUnion(struct {
         x vector<MyStrictXUnion>;
     });
 
-    MyBits(struct {
+    strict MyBits(struct {
         b MyBits;
     });
-    MyEnum(struct {
+    strict MyEnum(struct {
         e MyEnum;
     });
 
-    NumberCollision(struct {
+    strict NumberCollision(struct {
         x NumberCollision;
     });
 
-    ForeignXUnions(struct {
+    strict ForeignXUnions(struct {
         tx deplib.MyXUnionA;
     }) -> (struct {
         rx deplib.MyXUnionA:optional;

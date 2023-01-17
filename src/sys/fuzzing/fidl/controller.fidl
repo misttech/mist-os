@@ -69,18 +69,18 @@ type Result = flexible enum : uint32 {
 ///
 /// The fuzz-registry will close the channel upon error, or upon its own exit. The fuzzer should
 ///  exit and not attempt to reconnect when on channel close.
-protocol ControllerProvider {
+closed protocol ControllerProvider {
     /// Connects a client to the fuzzer.
     ///
     /// Within the component fuzzing framework, the fuzz-manager forwards |Controller| connection
     /// requests to the fuzz-registry, which uses clients of this interface provided by the fuzzers
     /// themselves to perform the connection.
-    Connect(resource struct {
+    strict Connect(resource struct {
         controller server_end:Controller;
     }) -> ();
 
     /// Interrupt any current workflow, closes the channel, and exits the fuzzing engine.
-    Stop();
+    strict Stop();
 };
 
 /// Provides the management interface for fuzzing.
@@ -90,7 +90,7 @@ protocol ControllerProvider {
 ///
 /// The channel is closed when the fuzzer is no longer needed, and on error. Clients should exit and
 /// not attempt to reconnect.
-protocol Controller {
+closed protocol Controller {
     /// See |Options|. Sets various execution and error detection parameters. This may be called
     /// multiple times; only the most recently received options are used. If the |Options| parameter
     /// omits one or more fields, those parameters are unchanged in the fuzzer. Until the initial
@@ -99,7 +99,7 @@ protocol Controller {
     /// Returns ZX_OK if the options were set.
     /// Returns ZX_ERR_BAD_STATE if a long-running call such as.Execute, Cleanse, Minimize, Fuzz, or
     /// Merge is in progress.
-    Configure(struct {
+    strict Configure(struct {
         options Options;
     }) -> (struct {
         result zx.status;
@@ -107,13 +107,13 @@ protocol Controller {
 
     /// See |Options|. Gets the current values for the various execution and error detection
     /// parameters.
-    GetOptions() -> (struct {
+    strict GetOptions() -> (struct {
         options Options;
     });
 
     /// Writes the provided |input| to either the "seed" or "live" |corpus|.
     /// Returns an error if transferring the input fails; see |Input| for details.
-    AddToCorpus(resource struct {
+    strict AddToCorpus(resource struct {
         corpus Corpus;
         input Input;
     }) -> (struct {
@@ -121,7 +121,7 @@ protocol Controller {
     });
 
     /// Returns a connected |corpus_reader| for either the "seed" or "live" corpus.
-    ReadCorpus(resource struct {
+    strict ReadCorpus(resource struct {
         corpus Corpus;
         corpus_reader client_end:CorpusReader;
     }) -> ();
@@ -132,36 +132,36 @@ protocol Controller {
     ///
     /// Returns an error if transferring the input fails; see |Input| for details.
     /// Returns ZX_ERR_INVALID_ARGS if parsing the dictionary fails.
-    WriteDictionary(resource struct {
+    strict WriteDictionary(resource struct {
         dictionary Input;
     }) -> (struct {
         result zx.status;
     });
 
     /// Returns the current dictionary as an Input, which may be empty.
-    ReadDictionary() -> (resource struct {
+    strict ReadDictionary() -> (resource struct {
         dictionary Input;
     });
 
     /// See |Status|. Returns various fuzzing metrics, e.g. total coverage, speed, etc.
-    GetStatus() -> (struct {
+    strict GetStatus() -> (struct {
         status Status;
     });
 
     // Installs a |Monitor| to push status. To pull status instead, use |GetStatus|.
-    AddMonitor(resource struct {
+    strict AddMonitor(resource struct {
         monitor client_end:Monitor;
     }) -> ();
 
     /// Returns the result and the triggering input, if it exists, from the last fuzzing session.
-    GetResults() -> (resource struct {
+    strict GetResults() -> (resource struct {
         result Result;
         error_input Input;
     });
 
     /// Returns the result of running the target with a single |test_input|.
     /// Returns an error if transferring the input fails; see |Input| for details.
-    Execute(resource struct {
+    strict Execute(resource struct {
         test_input Input;
     }) -> (struct {
         result Result;
@@ -177,7 +177,7 @@ protocol Controller {
     /// Returns ZX_ERR_BAD_STATE if another long-running call is in progress.
     /// Returns ZX_ERR_INVALID_ARGS if the provided |test_input| does not cause an error.
     /// Returns an error if taking an input fails; see |Input| for details.
-    Minimize(resource struct {
+    strict Minimize(resource struct {
         test_input Input;
     }) -> (resource struct {
         minimized Input;
@@ -188,7 +188,7 @@ protocol Controller {
     ///
     /// Returns ZX_ERR_INVALID_ARGS if the provided |test_input| does not cause an error.
     /// Returns an error if taking an input fails; see |Input| for details.
-    Cleanse(resource struct {
+    strict Cleanse(resource struct {
         test_input Input;
     }) -> (resource struct {
         cleansed Input;
@@ -211,7 +211,7 @@ protocol Controller {
     /// when it completes.
     ///
     /// Returns ZX_ERR_BAD_STATE if another long-running call is in progress.
-    Fuzz() -> (resource struct {
+    strict Fuzz() -> (resource struct {
         result Result;
         error_input Input;
     }) error zx.status;
@@ -227,7 +227,7 @@ protocol Controller {
     /// Returns ZX_ERR_BAD_STATE if another long-running call is in progress.
     /// Returns ZX_ERR_INVALID_ARGS if an input in the seed corpus causes an error. Skips inputs in
     /// the live corpus that cause errors.
-    Merge() -> (struct {
+    strict Merge() -> (struct {
         result zx.status;
     });
 };

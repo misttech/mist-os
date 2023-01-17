@@ -9,14 +9,14 @@ type Resource = resource table {
     1: handle zx.handle:EVENTPAIR;
 };
 
-protocol Protocol {
-    SendResource(resource struct {
+closed protocol Protocol {
+    strict SendResource(resource struct {
         r Resource;
     });
-    GetResource() -> (resource struct {
+    strict GetResource() -> (resource struct {
         r Resource;
     });
-    -> ResourceEvent(resource struct {
+    strict -> ResourceEvent(resource struct {
         r Resource;
     });
 };

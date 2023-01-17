@@ -8,14 +8,14 @@ using fuchsia.hardware.camera;
 /// This interface provides manipulation methods for a standard DeviceWatcher. This is intended for
 /// test purposes only.
 @discoverable
-protocol DeviceWatcherTester {
+closed protocol DeviceWatcherTester {
     /// Inserts the given controller implementation as a new device.
-    InjectDevice(resource struct {
+    strict InjectDevice(resource struct {
         camera client_end:fuchsia.hardware.camera.Device;
     });
 
     /// Inserts the given controller implementation as a new device path.
-    InjectDeviceByPath(resource struct {
+    strict InjectDeviceByPath(resource struct {
         path string;
     });
 };

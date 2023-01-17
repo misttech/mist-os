@@ -4,16 +4,16 @@
 
 library fuchsia.compat.runtime.test;
 
-protocol Leaf {
-    GetString() -> (struct {
+closed protocol Leaf {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };
 
 @discoverable
 @transport("Driver")
-protocol Root {
-    GetString() -> (struct {
+closed protocol Root {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };
@@ -23,6 +23,6 @@ service Service {
 };
 
 @discoverable
-protocol Waiter {
-    Ack();
+closed protocol Waiter {
+    strict Ack();
 };

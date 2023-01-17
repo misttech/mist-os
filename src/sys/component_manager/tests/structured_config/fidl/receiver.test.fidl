@@ -5,8 +5,8 @@
 library test.structuredconfig.receiver;
 
 @discoverable
-protocol ConfigReceiverPuppet {
-    GetConfig() -> (struct {
+closed protocol ConfigReceiverPuppet {
+    strict GetConfig() -> (struct {
         config ReceiverConfig;
     });
 };

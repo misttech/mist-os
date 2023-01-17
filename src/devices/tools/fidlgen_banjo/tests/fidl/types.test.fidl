@@ -14,10 +14,10 @@ type this_is_a_union = strict union {
 };
 
 @transport("Banjo")
-protocol this_is_an_interface {
+closed protocol this_is_an_interface {
     @some_attrib
     @another_attrib("Value containing, a comma")
-    Copy(struct {
+    strict Copy(struct {
         s string;
         count uint32;
     }) -> (struct {

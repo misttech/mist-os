@@ -6,8 +6,8 @@ library componentmanager.test;
 using zx;
 
 @discoverable
-protocol TestOutcomeReport {
-    Report(struct {
+closed protocol TestOutcomeReport {
+    strict Report(struct {
         backstop zx.time;
         current_time zx.time;
     }) -> ();

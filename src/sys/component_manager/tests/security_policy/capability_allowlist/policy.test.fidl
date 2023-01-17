@@ -4,37 +4,37 @@
 library test.policy;
 
 @discoverable
-protocol Restricted {
+closed protocol Restricted {
     // Returns the string restricted.
-    GetRestricted() -> (struct {
+    strict GetRestricted() -> (struct {
         response string;
     });
 };
 
 @discoverable
-protocol Unrestricted {
+closed protocol Unrestricted {
     // Returns the string unrestricted
-    GetUnrestricted() -> (struct {
+    strict GetUnrestricted() -> (struct {
         response string;
     });
 };
 
 @discoverable
-protocol Access {
+closed protocol Access {
     // Attempts to access the restricted protocol.
-    AccessRestrictedProtocol() -> (struct {
+    strict AccessRestrictedProtocol() -> (struct {
         response bool;
     });
     // Attempt to access the unrestricted protocol
-    AccessUnrestrictedProtocol() -> (struct {
+    strict AccessUnrestrictedProtocol() -> (struct {
         response bool;
     });
     // Attempts to access the restricted directory.
-    AccessRestrictedDirectory() -> (struct {
+    strict AccessRestrictedDirectory() -> (struct {
         response bool;
     });
     // Attempt to access the unrestricted directory
-    AccessUnrestrictedDirectory() -> (struct {
+    strict AccessUnrestrictedDirectory() -> (struct {
         response bool;
     });
 };

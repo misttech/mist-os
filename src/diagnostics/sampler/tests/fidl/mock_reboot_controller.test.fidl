@@ -9,7 +9,7 @@ type RebootError = strict enum : int32 {
 };
 
 @discoverable
-protocol MockRebootController {
-    TriggerReboot() -> () error RebootError;
-    CrashRebootChannel() -> () error RebootError;
+closed protocol MockRebootController {
+    strict TriggerReboot() -> () error RebootError;
+    strict CrashRebootChannel() -> () error RebootError;
 };

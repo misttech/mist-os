@@ -3,6 +3,6 @@
 // found in the LICENSE file.
 library fidl.llcpp.empty.test;
 
-protocol OnlyEmpty {
-    Empty() -> ();
+closed protocol OnlyEmpty {
+    strict Empty() -> ();
 };

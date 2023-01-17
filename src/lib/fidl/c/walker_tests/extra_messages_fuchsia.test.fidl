@@ -8,11 +8,11 @@ library fidl.test.coding.fuchsia;
 
 using zx;
 
-protocol LinearizerTest {
-    VectorOfUint32(struct {
+closed protocol LinearizerTest {
+    strict VectorOfUint32(struct {
         v vector<uint32>;
     });
-    VectorOfString(struct {
+    strict VectorOfString(struct {
         v vector<string>;
     });
 };

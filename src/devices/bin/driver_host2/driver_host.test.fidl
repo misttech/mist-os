@@ -4,7 +4,7 @@
 library fuchsia.driverhost.test;
 
 @discoverable
-protocol Incoming {};
+closed protocol Incoming {};
 
 @discoverable
-protocol Outgoing {};
+closed protocol Outgoing {};

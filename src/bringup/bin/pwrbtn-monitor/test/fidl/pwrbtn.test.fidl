@@ -4,8 +4,8 @@
 library fuchsia.test.pwrbtn;
 
 @discoverable
-protocol Tests {
+closed protocol Tests {
     /// Run the tests. This function returns when the tests have successfully
     /// passed, and is closed without a response when the tests fail.
-    Run() -> ();
+    strict Run() -> ();
 };

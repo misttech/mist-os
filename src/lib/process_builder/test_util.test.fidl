@@ -9,28 +9,28 @@ type EnvVar = struct {
 };
 
 @discoverable
-protocol Util {
-    GetArguments() -> (struct {
+closed protocol Util {
+    strict GetArguments() -> (struct {
         args vector<string>;
     });
-    GetArgumentCount() -> (struct {
+    strict GetArgumentCount() -> (struct {
         count uint64;
     });
-    GetEnvironment() -> (struct {
+    strict GetEnvironment() -> (struct {
         vars vector<EnvVar>;
     });
-    GetEnvironmentCount() -> (struct {
+    strict GetEnvironmentCount() -> (struct {
         count uint64;
     });
-    DumpNamespace() -> (struct {
+    strict DumpNamespace() -> (struct {
         contents string;
     });
-    ReadFile(struct {
+    strict ReadFile(struct {
         path string;
     }) -> (struct {
         contents string;
     });
-    GetLifecycleKoid() -> (struct {
+    strict GetLifecycleKoid() -> (struct {
         koid uint64;
     });
 };

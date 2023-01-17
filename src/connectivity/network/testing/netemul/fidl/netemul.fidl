@@ -22,7 +22,7 @@ type Empty = struct {};
 /// the connection to the `Sandbox` protocol. If the channel is closed, all the
 /// realms and the components created within them will be terminated.
 @discoverable
-protocol Sandbox {
+closed protocol Sandbox {
     /// Creates a new realm configured by `options`.
     ///
     /// + request `realm` request handle to the newly created managed realm.
@@ -33,7 +33,7 @@ protocol Sandbox {
     /// * error `ZX_ERR_INVALID_ARGS` if `options` was invalid.
     /// * error `ZX_ERR_INTERNAL` for internal errors, including failures to
     ///     build the requested component topology.
-    CreateRealm(resource struct {
+    strict CreateRealm(resource struct {
         realm server_end:ManagedRealm;
         options @generated_name("RealmOptions") resource table {
             /// Realm name.
@@ -156,7 +156,7 @@ protocol Sandbox {
     /// Gets this sandbox's network context.
     ///
     /// + request `network_context` request handle to the network context.
-    GetNetworkContext(resource struct {
+    strict GetNetworkContext(resource struct {
         network_context server_end:fuchsia.netemul.network.NetworkContext;
     });
 };
@@ -173,12 +173,12 @@ protocol Sandbox {
 ///
 /// The lifetime of a `ManagedRealm` and all its children are tied to its
 /// channel. Upon closure, all children of the realm will be destroyed.
-protocol ManagedRealm {
+closed protocol ManagedRealm {
     /// Returns the relative moniker of the root of the managed realm.
     ///
     /// - response `moniker` the relative moniker of the root of the generated
     ///     topology that contains this realm's child components.
-    GetMoniker() -> (struct {
+    strict GetMoniker() -> (struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     });
     /// Connects to a protocol named `protocol_name` provided by a child in this
@@ -192,7 +192,7 @@ protocol ManagedRealm {
     ///     the requested protocol.
     /// + request `req` a channel to be bound to an implementation of the
     ///     protocol.
-    ConnectToProtocol(resource struct {
+    strict ConnectToProtocol(resource struct {
         protocol_name fuchsia.component.name;
         child_name fuchsia.component.name:optional;
         req zx.handle:CHANNEL;
@@ -209,7 +209,7 @@ protocol ManagedRealm {
     /// * error `ZX_ERR_ALREADY_EXISTS` if `device.path` is already in use.
     /// * error `ZX_ERR_INVALID_ARGS` if an element of `path` exceeds
     ///     [`fuchsia.io/MAX_FILENAME`] bytes in length.
-    AddDevice(resource struct {
+    strict AddDevice(resource struct {
         path string:MAX;
         device client_end:fuchsia.netemul.network.DeviceProxy;
     }) -> () error zx.status;
@@ -220,13 +220,13 @@ protocol ManagedRealm {
     /// * error `ZX_ERR_NOT_FOUND` if `path` is not currently bound to a device.
     /// * error `ZX_ERR_INVALID_ARGS` if an element of `path` exceeds
     ///     [`fuchsia.io/MAX_FILENAME`] bytes in length.
-    RemoveDevice(struct {
+    strict RemoveDevice(struct {
         path string:MAX;
     }) -> () error zx.status;
     /// Connects to netemul's `devfs` instance for this realm.
     ///
     /// + request `devfs` request handle to the `devfs` directory.
-    GetDevfs(resource struct {
+    strict GetDevfs(resource struct {
         devfs server_end:fuchsia.io.Directory;
     });
     /// Stops the specified child component in this realm. Stopping an already
@@ -238,14 +238,14 @@ protocol ManagedRealm {
     /// * error `ZX_ERR_INVALID_ARGS` if `child_name` cannot be composed into a
     ///     well-formed moniker.
     /// * error `ZX_ERR_INTERNAL` if the call to the service dependency fails.
-    StopChildComponent(struct {
+    strict StopChildComponent(struct {
         child_name fuchsia.component.name;
     }) -> () error zx.status;
     /// Request that the managed realm shut down.
     ///
     /// The realm will send an `OnShutdown` event when shutdown is complete and
     /// before closing the channel.
-    Shutdown();
+    strict Shutdown();
     /// Signals that shutdown is complete and the channel will be closed.
-    -> OnShutdown();
+    strict -> OnShutdown();
 };

@@ -8,12 +8,12 @@ type Uint32Union = strict union {
     1: v uint32;
 };
 
-protocol TestProtocol {
-    MethodWithRequest(struct {
+closed protocol TestProtocol {
+    strict MethodWithRequest(struct {
         u Uint32Union;
     });
 
-    MethodWithResponse() -> (struct {
+    strict MethodWithResponse() -> (struct {
         u Uint32Union;
     });
 };

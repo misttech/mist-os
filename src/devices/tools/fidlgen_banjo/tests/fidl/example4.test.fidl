@@ -13,8 +13,8 @@ type Enum = strict enum {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Interface {
-    func(struct {
+closed protocol Interface {
+    strict func(struct {
         x bool;
     }) -> ();
 };

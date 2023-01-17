@@ -4,18 +4,18 @@
 library fidl.cpp.wire.bindinggroup.test;
 
 /// A protocol specifically designed to test the binding group interface.
-protocol Testable {
+closed protocol Testable {
     /// Echos a string.
-    Echo(struct {
+    strict Echo(struct {
         str string;
     }) -> (struct {
         str string;
     });
 
     /// Causes the other end to close and execute its close handler.
-    Terminate();
+    strict Terminate();
 };
 
-protocol Foo {};
+closed protocol Foo {};
 
-protocol Bar {};
+closed protocol Bar {};

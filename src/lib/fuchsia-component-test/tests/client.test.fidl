@@ -5,18 +5,18 @@ library fuchsia.component.client.test;
 
 /// A discoverable service.
 @discoverable
-protocol ServiceA {
+closed protocol ServiceA {
     /// Does nothing.
-    Foo() -> ();
+    strict Foo() -> ();
 };
 
 /// Yet another discoverable service.
 @discoverable
-protocol ServiceB {
+closed protocol ServiceB {
     /// Does nothing.
-    Foo() -> ();
+    strict Foo() -> ();
 };
 
 /// An empty protocol.
 @discoverable
-protocol EmptyProtocol {};
+closed protocol EmptyProtocol {};

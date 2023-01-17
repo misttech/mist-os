@@ -4,8 +4,8 @@
 library fidl.test.protocoleventadd;
 
 // [START contents]
-protocol Example {
-    -> OnExistingEvent();
-    -> OnNewEvent();
+closed protocol Example {
+    strict -> OnExistingEvent();
+    strict -> OnNewEvent();
 };
 // [END contents]

@@ -4,16 +4,16 @@
 library fuchsia.archivist.tests;
 
 @discoverable
-protocol SocketPuppetController {
+closed protocol SocketPuppetController {
     /// Send a puppet client to the controller. This channel is closed after this call.
-    ControlPuppet(resource struct {
+    strict ControlPuppet(resource struct {
         to_control client_end:SocketPuppet;
     });
 };
 
-protocol SocketPuppet {
-    ConnectToLogSink() -> ();
-    EmitPacket(struct {
+closed protocol SocketPuppet {
+    strict ConnectToLogSink() -> ();
+    strict EmitPacket(struct {
         packet vector<uint8>:32768;
     }) -> ();
 };

@@ -5,9 +5,9 @@ library fidl.test.components;
 
 /// Simple FIDL protocol for tests that allows triggering an action.
 @discoverable
-protocol Trigger {
+closed protocol Trigger {
     /// Triggers some action, returning a string encoding the result.
-    Run() -> (struct {
+    strict Run() -> (struct {
         result string:MAX;
     });
 };

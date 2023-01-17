@@ -4,8 +4,8 @@
 library fidl.test.protocoleventremove;
 
 // [START contents]
-protocol Example {
-    -> OnExistingEvent();
-    -> OnOldEvent();
+closed protocol Example {
+    strict -> OnExistingEvent();
+    strict -> OnOldEvent();
 };
 // [END contents]

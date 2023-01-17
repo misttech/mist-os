@@ -18,34 +18,34 @@ type Event = table {
 /// Represents a named bus:
 ///    a bus is a broadcast pub/sub network that distributes Events.
 ///    Events are not stored, only forwarded to attached clients.
-protocol Bus {
+closed protocol Bus {
     /// Publishes event on the bus.
-    Publish(struct {
+    strict Publish(struct {
         data Event;
     });
     /// Publishes data on bus and only returns when data has been dispatched.
     /// Use this if you need guarantees that the data was broadcast before continuing.
     /// Note that this ensures that the data will be *published* to all listening clients,
     /// but it cannot guarantee that all clients will have observed the event before it returns.
-    EnsurePublish(struct {
+    strict EnsurePublish(struct {
         data Event;
     }) -> ();
     /// Notifies client of new event.
-    -> OnBusData(struct {
+    strict -> OnBusData(struct {
         data Event;
     });
     /// Get list of named clients.
-    GetClients() -> (struct {
+    strict GetClients() -> (struct {
         clients vector<string:MAX>:MAX;
     });
     /// Notifies a client is now attached.
     /// Upon subscribing to a bus, a client will always receive an `OnClientAttached` event for each
     /// client present on the bus at the moment it joined.
-    -> OnClientAttached(struct {
+    strict -> OnClientAttached(struct {
         client string:MAX;
     });
     /// Notifies a client was detached.
-    -> OnClientDetached(struct {
+    strict -> OnClientDetached(struct {
         client string:MAX;
     });
     /// Waits for up to `timeout` (nsec) for all the clients in `clients`.
@@ -53,7 +53,7 @@ protocol Bus {
     /// If `result` is false, `absent` will contain the entries in `clients` that still weren't
     /// present on the bus when the timout expired.
     /// Use `timeout` <= 0 for indefinite wait.
-    WaitForClients(struct {
+    strict WaitForClients(struct {
         clients vector<string:MAX>:MAX;
         timeout zx.duration;
     }) -> (struct {
@@ -64,7 +64,7 @@ protocol Bus {
     /// Event equality is performed by comparing *all* set fields in `data`.
     /// Returns true if event was received before timeout expired.
     /// Use `timeout` <= 0 for indefinite wait.
-    WaitForEvent(struct {
+    strict WaitForEvent(struct {
         data Event;
         timeout zx.duration;
     }) -> (struct {
@@ -76,10 +76,10 @@ protocol Bus {
 /// primitives.
 /// The client's 'ticket' to remain on the bus is the channel obtained through the 'BusSubscribe' call.
 @discoverable
-protocol SyncManager {
+closed protocol SyncManager {
     /// Subscribes to bus 'busName' with a given client name.
     /// Duplicate client names are disallowed and will cause the request to return unfulfilled.
-    BusSubscribe(resource struct {
+    strict BusSubscribe(resource struct {
         bus_name string:MAX;
         client_name string:MAX;
         bus server_end:Bus;
@@ -88,7 +88,7 @@ protocol SyncManager {
     /// Functon will return true if the number of waits pending on the barrier matches or exceeds
     /// `threshold` before  `timeout` (nsec) expires.
     /// Use `timeout` <= 0 for indefinite wait.
-    WaitForBarrierThreshold(struct {
+    strict WaitForBarrierThreshold(struct {
         barrier_name string:MAX;
         threshold uint32;
         timeout zx.duration;

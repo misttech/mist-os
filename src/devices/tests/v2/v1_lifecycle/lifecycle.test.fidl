@@ -5,15 +5,15 @@
 library fuchsia.lifecycle.test;
 
 @discoverable
-protocol Device {
-    Ping() -> ();
+closed protocol Device {
+    strict Ping() -> ();
 
-    GetString() -> (struct {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 
     /// Replies in prepare stop.
-    Stop() -> ();
+    strict Stop() -> ();
 };
 
 service Service {
@@ -22,10 +22,10 @@ service Service {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Parent {
+closed protocol Parent {
     /// Get the test string from the parent device. This string should always
     /// read "hello world!"
-    GetString() -> (struct {
+    strict GetString() -> (struct {
         response string:MAX;
     });
 };

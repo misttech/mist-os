@@ -12,8 +12,8 @@ type Entry = struct {
     did uint32;
 };
 
-protocol Board {
-    CreateDevice(struct {
+closed protocol Board {
+    strict CreateDevice(struct {
         entry Entry;
     }) -> ();
 };

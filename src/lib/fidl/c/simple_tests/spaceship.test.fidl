@@ -23,8 +23,8 @@ type PlanetData = struct {
 };
 
 @for_deprecated_c_bindings
-protocol AstrometricsListener {
-    OnNova();
+closed protocol AstrometricsListener {
+    strict OnNova();
 };
 
 type Alert = strict enum {
@@ -60,36 +60,36 @@ const MaxStarsAdjustHeading uint32 = 64;
 const MaxStarsScanForLifeforms uint32 = 64;
 
 @for_deprecated_c_bindings
-protocol SpaceShip {
-    AdjustHeading(struct {
+closed protocol SpaceShip {
+    strict AdjustHeading(struct {
         stars vector<uint32>:MaxStarsAdjustHeading;
     }) -> (struct {
         result int8;
     });
-    ScanForLifeforms() -> (struct {
+    strict ScanForLifeforms() -> (struct {
         lifesigns vector<uint32>:MaxStarsScanForLifeforms;
     });
-    SetAstrometricsListener(resource struct {
+    strict SetAstrometricsListener(resource struct {
         listener client_end:AstrometricsListener;
     });
-    SetDefenseCondition(struct {
+    strict SetDefenseCondition(struct {
         alert Alert;
     });
-    GetFuelRemaining(resource struct {
+    strict GetFuelRemaining(resource struct {
         cancel zx.handle:<EVENTPAIR, optional>;
     }) -> (struct {
         status zx.status;
         level box<FuelLevel>;
     });
-    AddFuelTank(struct {
+    strict AddFuelTank(struct {
         level box<FuelLevel>;
     }) -> (struct {
         consumed uint32;
     });
-    ScanForTensorLifeforms() -> (struct {
+    strict ScanForTensorLifeforms() -> (struct {
         lifesigns array<array<array<uint32, 3>, 5>, 8>;
     });
-    ActivateShields(struct {
+    strict ActivateShields(struct {
         shields Shields;
     });
 };
@@ -102,8 +102,8 @@ type CaptainKirkWhereabouts = table {
 };
 
 /// The USS Enterprise is far from simple.
-protocol UssEnterprise {
-    WhereIsCaptainKirk() -> (struct {
+closed protocol UssEnterprise {
+    strict WhereIsCaptainKirk() -> (struct {
         whereabouts CaptainKirkWhereabouts;
     });
 };

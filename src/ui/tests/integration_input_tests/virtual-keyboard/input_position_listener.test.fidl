@@ -14,9 +14,9 @@ type BoundingBox = struct {
 
 /// A test-specific scheme to gather signal from the client-under-test.
 @discoverable
-protocol InputPositionListener {
+closed protocol InputPositionListener {
     /// Notify the test that client-under-test has computed the position of the input box.
-    Notify(struct {
+    strict Notify(struct {
         bounding_box BoundingBox;
     });
 };

@@ -5,68 +5,68 @@ library banjo.examples.protocolprimitive;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol SynchronousPrimitive {
-    Bool(struct {
+closed protocol SynchronousPrimitive {
+    strict Bool(struct {
         b bool;
     }) -> (struct {
         b bool;
         b_2 bool;
     });
-    Int8(struct {
+    strict Int8(struct {
         i8 int8;
     }) -> (struct {
         i8 int8;
         i8_2 int8;
     });
-    Int16(struct {
+    strict Int16(struct {
         i16 int16;
     }) -> (struct {
         i16 int16;
         i16_2 int16;
     });
-    Int32(struct {
+    strict Int32(struct {
         i32 int32;
     }) -> (struct {
         i32 int32;
         i32_2 int32;
     });
-    Int64(struct {
+    strict Int64(struct {
         i64 int64;
     }) -> (struct {
         i64 int64;
         i64_2 int64;
     });
-    Uint8(struct {
+    strict Uint8(struct {
         u8 uint8;
     }) -> (struct {
         u8 uint8;
         u8_2 uint8;
     });
-    Uint16(struct {
+    strict Uint16(struct {
         u16 uint16;
     }) -> (struct {
         u16 uint16;
         u16_2 uint16;
     });
-    Uint32(struct {
+    strict Uint32(struct {
         u32 uint32;
     }) -> (struct {
         u32 uint32;
         u32_2 uint32;
     });
-    Uint64(struct {
+    strict Uint64(struct {
         u64 uint64;
     }) -> (struct {
         u64 uint64;
         u64_2 uint64;
     });
-    Float32(struct {
+    strict Float32(struct {
         f32 float32;
     }) -> (struct {
         f32 float32;
         f32_2 float32;
     });
-    Float64(struct {
+    strict Float64(struct {
         u64 float64;
     }) -> (struct {
         f64 float64;
@@ -76,79 +76,79 @@ protocol SynchronousPrimitive {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol AsyncPrimitive {
+closed protocol AsyncPrimitive {
     @async
-    Bool(struct {
+    strict Bool(struct {
         b bool;
     }) -> (struct {
         b bool;
         b_2 bool;
     });
     @async
-    Int8(struct {
+    strict Int8(struct {
         i8 int8;
     }) -> (struct {
         i8 int8;
         i8_2 int8;
     });
     @async
-    Int16(struct {
+    strict Int16(struct {
         i16 int16;
     }) -> (struct {
         i16 int16;
         i16_2 int16;
     });
     @async
-    Int32(struct {
+    strict Int32(struct {
         i32 int32;
     }) -> (struct {
         i32 int32;
         i32_2 int32;
     });
     @async
-    Int64(struct {
+    strict Int64(struct {
         i64 int64;
     }) -> (struct {
         i64 int64;
         i64_2 int64;
     });
     @async
-    Uint8(struct {
+    strict Uint8(struct {
         u8 uint8;
     }) -> (struct {
         u8 uint8;
         u8_2 uint8;
     });
     @async
-    Uint16(struct {
+    strict Uint16(struct {
         u16 uint16;
     }) -> (struct {
         u16 uint16;
         u16_2 uint16;
     });
     @async
-    Uint32(struct {
+    strict Uint32(struct {
         u32 uint32;
     }) -> (struct {
         u32 uint32;
         u32_2 uint32;
     });
     @async
-    Uint64(struct {
+    strict Uint64(struct {
         u64 uint64;
     }) -> (struct {
         u64 uint64;
         u64_2 uint64;
     });
     @async
-    Float32(struct {
+    strict Float32(struct {
         f32 float32;
     }) -> (struct {
         f32 float32;
         f32_2 float32;
     });
     @async
-    Float64(struct {
+    strict Float64(struct {
         u64 float64;
     }) -> (struct {
         f64 float64;

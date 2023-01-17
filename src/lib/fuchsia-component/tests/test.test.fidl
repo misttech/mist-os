@@ -4,17 +4,17 @@
 library fuchsia.component.test;
 
 /// A 32-bit counter.
-protocol Counter {
+closed protocol Counter {
     /// Return the current counter value, then increment it.
-    GetAndIncrement() -> (struct {
+    strict GetAndIncrement() -> (struct {
         response uint32;
     });
 };
 
 /// A new, 64-bit counter.
-protocol CounterV2 {
+closed protocol CounterV2 {
     /// Return the current counter value, then increment it.
-    GetAndIncrement() -> (struct {
+    strict GetAndIncrement() -> (struct {
         response uint64;
     });
 };

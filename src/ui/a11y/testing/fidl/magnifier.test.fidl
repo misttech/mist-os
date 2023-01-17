@@ -8,9 +8,9 @@ library test.accessibility;
 //
 // For use with GFX only.
 @discoverable
-protocol Magnifier {
+closed protocol Magnifier {
     // Sets the new magnification transform using the scale and translation provided.
-    SetMagnification(struct {
+    strict SetMagnification(struct {
         // The new mangification scale.
         scale float32;
 

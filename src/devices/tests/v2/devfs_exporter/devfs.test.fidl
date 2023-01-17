@@ -5,6 +5,6 @@
 library fuchsia.devfs.test;
 
 @discoverable
-protocol Device {
-    Ping() -> ();
+closed protocol Device {
+    strict Ping() -> ();
 };

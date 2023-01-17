@@ -8,7 +8,7 @@ library fuchsia.update.installer;
 /// Clients interested in receiving progress information for an update attempt
 /// should implement this protocol and provide the client end to
 /// [`Installer.StartUpdate`] or [`Installer.MonitorUpdate`].
-protocol Monitor {
+closed protocol Monitor {
     /// Receives a status update for this installation attempt.
     ///
     /// This request will be called for all state changes, skipping none.
@@ -29,7 +29,7 @@ protocol Monitor {
     /// + request `state` The new state of the update installation attempt.
     /// - response        The implementation is ready to receive the next
     ///                   [`State`] from the [`Installer`].
-    OnState(struct {
+    strict OnState(struct {
         state State;
     }) -> ();
 };

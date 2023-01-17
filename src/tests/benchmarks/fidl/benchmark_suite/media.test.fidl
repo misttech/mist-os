@@ -19,14 +19,14 @@ type StreamPacket = struct {
     stream_segment_id uint64 = 0;
 };
 
-protocol StreamPacketEventProtocol {
-    -> Send(struct {
+closed protocol StreamPacketEventProtocol {
+    strict -> Send(struct {
         val StreamPacket;
     });
 };
 
-protocol StreamPacketEchoCall {
-    Echo(struct {
+closed protocol StreamPacketEchoCall {
+    strict Echo(struct {
         val StreamPacket;
     }) -> (struct {
         val StreamPacket;
@@ -34,8 +34,8 @@ protocol StreamPacketEchoCall {
 };
 
 @transport("Driver")
-protocol StreamPacketEchoCallDriver {
-    Echo(struct {
+closed protocol StreamPacketEchoCallDriver {
+    strict Echo(struct {
         val StreamPacket;
     }) -> (struct {
         val StreamPacket;

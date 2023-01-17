@@ -4,7 +4,7 @@
 
 library test.conformance;
 
-protocol Protocol {};
+closed protocol Protocol {};
 
 type StructOfEndpoints = resource struct {
     client_end client_end:Protocol;

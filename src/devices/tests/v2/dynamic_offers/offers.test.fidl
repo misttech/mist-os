@@ -5,8 +5,8 @@
 library fuchsia.offers.test;
 
 @discoverable
-protocol Handshake {
-    Do() -> ();
+closed protocol Handshake {
+    strict Do() -> ();
 };
 
 service Service {
@@ -14,6 +14,6 @@ service Service {
 };
 
 @discoverable
-protocol Waiter {
-    Ack();
+closed protocol Waiter {
+    strict Ack();
 };

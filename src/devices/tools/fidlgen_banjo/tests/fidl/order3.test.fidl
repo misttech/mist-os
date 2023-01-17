@@ -8,8 +8,8 @@ type Foo = strict enum {
 };
 
 @transport("Banjo")
-protocol Bar {
-    World(struct {
+closed protocol Bar {
+    strict World(struct {
         foo Foo;
     }) -> ();
 };

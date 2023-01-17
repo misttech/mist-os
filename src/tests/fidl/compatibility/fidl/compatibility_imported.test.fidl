@@ -42,12 +42,12 @@ type ErrorableRequestStruct = struct {
 // composition.
 // TODO(fxbug.dev/94910): Only test these tests in "N+M" mode, and move them into their
 // own file, as they are not specifically concerned with wire compatibility across bindings.
-protocol Composed {
-    EchoTableRequestComposed(table {
+closed protocol Composed {
+    strict EchoTableRequestComposed(table {
         1: value uint64;
         2: forward_to_server string;
     }) -> (ResponseStruct);
-    EchoUnionResponseWithErrorComposed(struct {
+    strict EchoUnionResponseWithErrorComposed(struct {
         value int64;
         want_absolute_value bool;
         forward_to_server string;

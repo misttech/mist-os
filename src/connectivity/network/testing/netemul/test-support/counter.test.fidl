@@ -9,14 +9,14 @@ using zx;
 
 /// Sample interface that keeps a stateful integer counter starting at zero.
 @discoverable
-protocol Counter {
+closed protocol Counter {
     /// Increments internal counter by one and returns new counter value.
-    Increment() -> (struct {
+    strict Increment() -> (struct {
         value uint32;
     });
     /// Connects `request` to a protocol in the `/svc` directory named
     /// `protocol_name`.
-    ConnectToProtocol(resource struct {
+    strict ConnectToProtocol(resource struct {
         protocol_name fuchsia.component.name;
         request zx.handle:CHANNEL;
     });
@@ -30,7 +30,7 @@ protocol Counter {
     ///     namespace.
     /// + request `flags` the rights with which to open the node.
     /// + request `request` the server end channel to the node.
-    OpenInNamespace(resource struct {
+    strict OpenInNamespace(resource struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
         flags fuchsia.io.OpenFlags;
         request zx.handle:CHANNEL;
@@ -40,7 +40,7 @@ protocol Counter {
     /// + request `path` the absolute path from the server's namespace.
     /// * error `ZX_ERR_NOT_FOUND` if the directory at `path` is not in the server's namespace.
     /// * error `ZX_ERR_IO` if there is some other unspecified error during I/O.
-    TryOpenDirectory(struct {
+    strict TryOpenDirectory(struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
     }) -> () error zx.status;
 };

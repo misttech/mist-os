@@ -13,25 +13,25 @@ const MAX_TEST_PATTERN_DATA uint16 = 128;
 /// functionality. Not all blocks will implement all methods in this protocol and may instead
 /// choose to return ZX_ERR_NOT_SUPPORTED.
 @discoverable
-protocol Debug {
+closed protocol Debug {
     /// Retrieves the available test pattern modes supported by the block.
-    GetAvailableTestPatternModes() -> (struct {
+    strict GetAvailableTestPatternModes() -> (struct {
         modes vector<uint32>:MAX_TEST_PATTERN_MODES;
     }) error zx.status;
     /// Retrieves the test pattern mode the block is currently set to.
-    GetCurrentTestPatternMode() -> (struct {
+    strict GetCurrentTestPatternMode() -> (struct {
         value uint16;
     }) error zx.status;
     /// Changes the block's test pattern mode.
-    SetTestPatternMode(struct {
+    strict SetTestPatternMode(struct {
         mode uint16;
     }) -> () error zx.status;
     /// Retrieves the test pattern data being used.
-    GetTestPatternData() -> (struct {
+    strict GetTestPatternData() -> (struct {
         data vector<uint32>:MAX_TEST_PATTERN_DATA;
     }) error zx.status;
     /// Changes data passed into the test pattern. Only used by certain modes.
-    SetTestPatternData(struct {
+    strict SetTestPatternData(struct {
         data vector<uint32>:MAX_TEST_PATTERN_DATA;
     }) -> () error zx.status;
 };

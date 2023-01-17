@@ -6,9 +6,9 @@ library fuchsia.diagnostics.test;
 /// Controller for an embedded Archivist.
 /// This is only to be used from tests.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Consume/Drain all the pending messages and connection requests and clean exit.
     /// Clients should check for observer to die as this connection would be closed as
     /// soon as stop is processed by observer.
-    Stop();
+    strict Stop();
 };

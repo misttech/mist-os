@@ -17,7 +17,7 @@ using fuchsia.thermal;
 /// directly trigger state-change commands to that client by calling
 /// `ClientStateControl/SetThermalState`.
 @discoverable
-protocol ClientStateControl {
+closed protocol ClientStateControl {
     /// Checks if a client of the specified type has an active
     /// `fuchsia.thermal.ClientStateWatcher` connection.
     ///
@@ -26,7 +26,7 @@ protocol ClientStateControl {
     /// If a `ClientStateWatcher` was connected but then closes the channel,
     /// this method would then return false for that client type until a later
     /// time if/when that client type reconnects.
-    IsClientTypeConnected(struct {
+    strict IsClientTypeConnected(struct {
         client_type fuchsia.thermal.ClientType;
     }) -> (struct {
         connected bool;
@@ -44,7 +44,7 @@ protocol ClientStateControl {
     /// If a client of the specified type does not have a pending `Watch`
     /// request, then the new thermal state will be cached and this method will
     /// be completed immediately.
-    SetThermalState(struct {
+    strict SetThermalState(struct {
         client_type fuchsia.thermal.ClientType;
         state uint64;
     }) -> ();

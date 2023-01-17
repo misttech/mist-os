@@ -5,6 +5,6 @@
 library fuchsia.interop.test;
 
 @discoverable
-protocol Waiter {
-    Ack();
+closed protocol Waiter {
+    strict Ack();
 };

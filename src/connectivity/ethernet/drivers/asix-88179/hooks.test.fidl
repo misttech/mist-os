@@ -7,8 +7,8 @@ using zx;
 
 /// Test helper for asix-88179-function to explicitly control online.
 @for_deprecated_c_bindings
-protocol Hooks {
-    SetOnline(struct {
+closed protocol Hooks {
+    strict SetOnline(struct {
         online bool;
     }) -> (struct {
         status zx.status;

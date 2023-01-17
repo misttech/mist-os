@@ -4,6 +4,6 @@
 library fuchsia.appmgr;
 
 @discoverable
-protocol Startup {
-    LaunchAppmgr();
+closed protocol Startup {
+    strict LaunchAppmgr();
 };

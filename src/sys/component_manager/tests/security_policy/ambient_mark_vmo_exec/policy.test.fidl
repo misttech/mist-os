@@ -6,10 +6,10 @@ library test.policy;
 using zx;
 
 @discoverable
-protocol ProtectedOperations {
+closed protocol ProtectedOperations {
     // Attempts to use zx_vmo_replace_as_executable on the given VMO handle using an invalid
     // resource handle, which exercises the ZX_POL_AMBIENT_MARK_VMO_EXEC job policy.
-    AmbientReplaceAsExecutable(resource struct {
+    strict AmbientReplaceAsExecutable(resource struct {
         vmo zx.handle:VMO;
     }) -> (resource struct {
         vmo zx.handle:VMO;

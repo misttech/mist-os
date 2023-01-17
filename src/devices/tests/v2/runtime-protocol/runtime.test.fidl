@@ -12,16 +12,16 @@ type WrappedValue = table {
 
 @discoverable
 @transport("Driver")
-protocol Setter {
-    Set(struct {
+closed protocol Setter {
+    strict Set(struct {
         wrapped_value WrappedValue;
     }) -> () error zx.status;
 };
 
 @discoverable
 @transport("Driver")
-protocol Getter {
-    Get() -> (struct {
+closed protocol Getter {
+    strict Get() -> (struct {
         value uint32;
     }) error zx.status;
 };
@@ -32,6 +32,6 @@ service Service {
 };
 
 @discoverable
-protocol Waiter {
-    Ack();
+closed protocol Waiter {
+    strict Ack();
 };

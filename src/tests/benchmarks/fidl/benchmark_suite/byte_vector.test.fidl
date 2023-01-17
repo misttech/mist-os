@@ -7,14 +7,14 @@ type ByteVector = struct {
     bytes vector<uint8>;
 };
 
-protocol ByteVectorEventProtocol {
-    -> Send(struct {
+closed protocol ByteVectorEventProtocol {
+    strict -> Send(struct {
         val ByteVector;
     });
 };
 
-protocol ByteVectorEchoCall {
-    Echo(struct {
+closed protocol ByteVectorEchoCall {
+    strict Echo(struct {
         val ByteVector;
     }) -> (struct {
         val ByteVector;
@@ -22,8 +22,8 @@ protocol ByteVectorEchoCall {
 };
 
 @transport("Driver")
-protocol ByteVectorEchoCallDriver {
-    Echo(struct {
+closed protocol ByteVectorEchoCallDriver {
+    strict Echo(struct {
         val ByteVector;
     }) -> (struct {
         val ByteVector;

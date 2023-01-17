@@ -4,9 +4,9 @@
 library fidl.test.protocolmethodremove;
 
 // [START contents]
-protocol Example {
-    ExistingMethod();
+closed protocol Example {
+    strict ExistingMethod();
     @transitional
-    OldMethod();
+    strict OldMethod();
 };
 // [END contents]

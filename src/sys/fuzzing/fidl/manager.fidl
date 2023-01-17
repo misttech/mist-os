@@ -12,7 +12,7 @@ using zx;
 /// *not* stop the associated fuzzer. Instead, since fuzzing is meant to be long-running, clients
 /// may drop the connection and re-|Connect| some time later.
 @discoverable
-protocol Manager {
+closed protocol Manager {
     /// Connects to a fuzzer that implements the `fuchsia.fuzzer.Controller` protocol.
     ///
     /// If the fuzzer is not currently running, the fuzz-manager will first start it (via the
@@ -29,7 +29,7 @@ protocol Manager {
     /// Returns ZX_ERR_INTERNAL for other, unspecified test_manager failures.
     /// Returns ZX_ERR_TIMED_OUT if the fuzzer not present or added to fuzz-registry after starting.
     /// Returns ZX_ERR_SHOULD_WAIT if another fuzzer is still starting.
-    Connect(resource struct {
+    strict Connect(resource struct {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
     }) -> (struct {
@@ -44,7 +44,7 @@ protocol Manager {
     /// Returns ZX_ERR_INVALID_ARGS if the URL cannot be parsed.
     /// Returns ZX_ERR_NOT_FOUND if the fuzzer URL was not recognized by test_manager.
     /// Returns ZX_ERR_BAD_STATE if the fuzzer is not connected.
-    GetOutput(resource struct {
+    strict GetOutput(resource struct {
         fuzzer_url fuchsia.url.Url;
         output TestOutput;
         socket zx.handle:SOCKET;
@@ -57,7 +57,7 @@ protocol Manager {
     ///
     /// Returns ZX_OK if the given fuzzer was active.
     /// Returns ZX_ERR_NOT_FOUND if no fuzzer was active with the given URL.
-    Stop(struct {
+    strict Stop(struct {
         fuzzer_url fuchsia.url.Url;
     }) -> (struct {
         result zx.status;

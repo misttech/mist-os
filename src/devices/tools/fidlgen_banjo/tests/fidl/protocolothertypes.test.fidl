@@ -23,43 +23,43 @@ const strings_size uint32 = 32;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol OtherTypes {
-    Struct(struct {
+closed protocol OtherTypes {
+    strict Struct(struct {
         s ThisIsAStruct;
     }) -> (struct {
         s ThisIsAStruct;
     });
-    Union(struct {
+    strict Union(struct {
         u ThisIsAUnion;
     }) -> (struct {
         u ThisIsAUnion;
     });
-    Enum(struct {
+    strict Enum(struct {
         e ThisIsAnEnum;
     }) -> (struct {
         e ThisIsAnEnum;
     });
-    Bits(struct {
+    strict Bits(struct {
         e ThisIsABits;
     }) -> (struct {
         e ThisIsABits;
     });
-    String(struct {
+    strict String(struct {
         s string;
     }) -> (struct {
         s string;
     });
-    StringSized(struct {
+    strict StringSized(struct {
         s string:4;
     }) -> (struct {
         s string:4;
     });
-    StringSized2(struct {
+    strict StringSized2(struct {
         s string:strings_size;
     }) -> (struct {
         s string:strings_size;
     });
-    InlineTable(table {
+    strict InlineTable(table {
         1: request_member uint32;
     }) -> (table {
         1: response_member uint32;
@@ -68,45 +68,45 @@ protocol OtherTypes {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol OtherTypesAsync {
+closed protocol OtherTypesAsync {
     @async
-    Struct(struct {
+    strict Struct(struct {
         s ThisIsAStruct;
     }) -> (struct {
         s ThisIsAStruct;
     });
     @async
-    Union(struct {
+    strict Union(struct {
         u ThisIsAUnion;
     }) -> (struct {
         u ThisIsAUnion;
     });
     @async
-    Enum(struct {
+    strict Enum(struct {
         e ThisIsAnEnum;
     }) -> (struct {
         e ThisIsAnEnum;
     });
     @async
-    Bits(struct {
+    strict Bits(struct {
         e ThisIsABits;
     }) -> (struct {
         e ThisIsABits;
     });
     @async
-    String(struct {
+    strict String(struct {
         s string;
     }) -> (struct {
         s string;
     });
     @async
-    StringSized(struct {
+    strict StringSized(struct {
         s string:4;
     }) -> (struct {
         s string:4;
     });
     @async
-    StringSized2(struct {
+    strict StringSized2(struct {
         s string:strings_size;
     }) -> (struct {
         s string:strings_size;
@@ -115,28 +115,28 @@ protocol OtherTypesAsync {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol OtherTypesReference {
-    Struct(struct {
+closed protocol OtherTypesReference {
+    strict Struct(struct {
         s box<ThisIsAStruct>;
     }) -> (struct {
         s box<ThisIsAStruct>;
     });
-    Union(struct {
+    strict Union(struct {
         u ThisIsAUnion:optional;
     }) -> (struct {
         u ThisIsAUnion:optional;
     });
-    String(struct {
+    strict String(struct {
         s string:optional;
     }) -> (struct {
         s string:optional;
     });
-    StringSized(struct {
+    strict StringSized(struct {
         s string:<4, optional>;
     }) -> (struct {
         s string:<4, optional>;
     });
-    StringSized2(struct {
+    strict StringSized2(struct {
         s string:<strings_size, optional>;
     }) -> (struct {
         s string:<strings_size, optional>;
@@ -145,33 +145,33 @@ protocol OtherTypesReference {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol OtherTypesAsyncReference {
+closed protocol OtherTypesAsyncReference {
     @async
-    Struct(struct {
+    strict Struct(struct {
         s box<ThisIsAStruct>;
     }) -> (struct {
         s box<ThisIsAStruct>;
     });
     @async
-    Union(struct {
+    strict Union(struct {
         u ThisIsAUnion:optional;
     }) -> (struct {
         u ThisIsAUnion:optional;
     });
     @async
-    String(struct {
+    strict String(struct {
         s string:optional;
     }) -> (struct {
         s string:optional;
     });
     @async
-    StringSized(struct {
+    strict StringSized(struct {
         s string:<4, optional>;
     }) -> (struct {
         s string:<4, optional>;
     });
     @async
-    StringSized2(struct {
+    strict StringSized2(struct {
         s string:<strings_size, optional>;
     }) -> (struct {
         s string:<strings_size, optional>;
@@ -180,25 +180,25 @@ protocol OtherTypesAsyncReference {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Interface {
-    Value(resource struct {
+closed protocol Interface {
+    strict Value(resource struct {
         intf client_end:OtherTypes;
     }) -> (resource struct {
         intf client_end:OtherTypes;
     });
-    Reference(resource struct {
+    strict Reference(resource struct {
         intf client_end:<OtherTypes, optional>;
     }) -> (resource struct {
         intf client_end:<OtherTypes, optional>;
     });
     @async
-    Async(resource struct {
+    strict Async(resource struct {
         intf client_end:OtherTypes;
     }) -> (resource struct {
         intf client_end:OtherTypes;
     });
     @async
-    AsyncRefernce(resource struct {
+    strict AsyncRefernce(resource struct {
         intf client_end:<OtherTypes, optional>;
     }) -> (resource struct {
         intf client_end:<OtherTypes, optional>;

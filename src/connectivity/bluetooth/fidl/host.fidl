@@ -12,23 +12,23 @@ using fuchsia.bluetooth.gatt2;
 using fuchsia.bluetooth.le;
 
 /// Interface for interacting with a Bluetooth host device (bt-host)
-protocol Host {
+closed protocol Host {
     /// The following methods fulfill a given interface request. bt-host device
     /// will start processing FIDL messages. If the request cannot be fulfilled,
     /// the bt-host device will close its end of the given channel.
-    RequestLowEnergyCentral(resource struct {
+    strict RequestLowEnergyCentral(resource struct {
         central server_end:fuchsia.bluetooth.le.Central;
     });
-    RequestLowEnergyPeripheral(resource struct {
+    strict RequestLowEnergyPeripheral(resource struct {
         peripheral server_end:fuchsia.bluetooth.le.Peripheral;
     });
-    RequestGattServer(resource struct {
+    strict RequestGattServer(resource struct {
         server server_end:fuchsia.bluetooth.gatt.Server;
     });
-    RequestGatt2Server(resource struct {
+    strict RequestGatt2Server(resource struct {
         server server_end:fuchsia.bluetooth.gatt2.Server;
     });
-    RequestProfile(resource struct {
+    strict RequestProfile(resource struct {
         profile server_end:fuchsia.bluetooth.bredr.Profile;
     });
 
@@ -45,7 +45,7 @@ protocol Host {
     ///
     /// The Host will continue to send OnDeviceUpdated events as procedures get
     /// terminated.
-    Close();
+    strict Close();
 
     /// Returns information about the Bluetooth host subsystem and controller managed by this Host
     /// instance. If there has been no change to the state since the last call to this method, the
@@ -54,12 +54,12 @@ protocol Host {
     /// The returned `info` structure will be populated with the current state of the bt-host
     /// device. However the `active` parameter will never be populated. This field is managed
     /// by a higher layer.
-    WatchState() -> (struct {
+    strict WatchState() -> (struct {
         info sys.HostInfo;
     });
 
     /// Assigns local data to this host.
-    SetLocalData(struct {
+    strict SetLocalData(struct {
         host_data sys.HostData;
     });
 
@@ -76,18 +76,18 @@ protocol Host {
     ///
     /// - response `updated` Peers that were added or updated since the last call to WatchPeers().
     /// - response `removed` Ids of peers that were removed since the last call to WatchPeers().
-    WatchPeers() -> (struct {
+    strict WatchPeers() -> (struct {
         updated vector<sys.Peer>:MAX;
         removed vector<bt.PeerId>:MAX;
     });
 
     /// Sets the local name for this host device.
-    SetLocalName(struct {
+    strict SetLocalName(struct {
         local_name bt.DeviceName;
     }) -> () error sys.Error;
 
     /// Sets the device class for this host device.
-    SetDeviceClass(struct {
+    strict SetDeviceClass(struct {
         device_class bt.DeviceClass;
     }) -> () error sys.Error;
 
@@ -99,22 +99,22 @@ protocol Host {
     /// Discovery will continue until it is terminated via StopDiscovery() or if the Host protocol
     /// channel gets closed. If the device does not support BR/EDR, only LE discovery will be
     /// performed.
-    StartDiscovery() -> () error sys.Error;
+    strict StartDiscovery() -> () error sys.Error;
 
     /// Terminates discovery if one was started via StartDiscovery().
     ///
     /// NOTE: If another client is performing discovery (e.g. via its own le.Central interface
     /// handle), then the system will continue performing device discovery even if this method
     /// results in success.
-    StopDiscovery();
+    strict StopDiscovery();
 
     /// Sets whether this host should be connectable.
-    SetConnectable(struct {
+    strict SetConnectable(struct {
         enabled bool;
     }) -> () error sys.Error;
 
     /// Sets whether this host should be discoverable.
-    SetDiscoverable(struct {
+    strict SetDiscoverable(struct {
         enabled bool;
     }) -> () error sys.Error;
 
@@ -136,7 +136,7 @@ protocol Host {
     /// The result of the procedure will be communicated via `status`. If the remote device
     /// supports both BR/EDR and LE transports and a link cannot be established over both, then an
     /// error Status will be returned and neither transport will be connected.
-    Connect(struct {
+    strict Connect(struct {
         id bt.PeerId;
     }) -> () error sys.Error;
 
@@ -146,7 +146,7 @@ protocol Host {
     /// - response `status` Contains an error if either LE or BR/EDR transport fails to disconnect.
     ///                     Contains success when both transports are successfully disconnected or
     ///                     if the peer is already disconnected.
-    Disconnect(struct {
+    strict Disconnect(struct {
         id bt.PeerId;
     }) -> () error sys.Error;
 
@@ -160,7 +160,7 @@ protocol Host {
     /// NOTE: This is intended to satisfy test scenarios that require pairing procedures to be
     /// initiated without relying on service access. In normal operation, Bluetooth security is
     /// enforced during service access.
-    Pair(struct {
+    strict Pair(struct {
         id bt.PeerId;
         options sys.PairingOptions;
     }) -> () error sys.Error;
@@ -172,7 +172,7 @@ protocol Host {
     /// Returns success after no peer exists that's identified by `device_id` (even if it didn't
     /// exist before Forget), failure if the peer specified by `device_id` could not be
     /// disconnected or deleted and still exists.
-    Forget(struct {
+    strict Forget(struct {
         id bt.PeerId;
     }) -> () error sys.Error;
 
@@ -180,14 +180,14 @@ protocol Host {
     /// device will continuously perform a passive LE scan in the background when
     /// no device discovery sessions are active and accept connection requests from
     /// bonded peripherals.
-    EnableBackgroundScan(struct {
+    strict EnableBackgroundScan(struct {
         enabled bool;
     });
 
     /// Enable or disable the LE privacy feature. When enabled, the bt-host device will use a
     /// private device address in all LE procedures. When disabled, the public identity address will
     /// be used instead (which is the default).
-    EnablePrivacy(struct {
+    strict EnablePrivacy(struct {
         enabled bool;
     });
 
@@ -195,7 +195,7 @@ protocol Host {
     /// security modes, i.e. Mode 1 and Secure Connections Only mode. If the security mode is set
     /// to Secure Connections Only, any existing encrypted connections which do not meet the
     /// security requirements of Secure Connections Only mode will be disconnected.
-    SetLeSecurityMode(struct {
+    strict SetLeSecurityMode(struct {
         le_security_mode sys.LeSecurityMode;
     });
 
@@ -203,7 +203,7 @@ protocol Host {
     /// I/O capabilities. Calling this method cancels any on-going pairing procedure started
     /// using a previous delegate. Pairing requests will be rejected if no PairingDelegate has been
     /// assigned.
-    SetPairingDelegate(resource struct {
+    strict SetPairingDelegate(resource struct {
         input sys.InputCapability;
         output sys.OutputCapability;
         delegate client_end:sys.PairingDelegate;
@@ -219,7 +219,7 @@ protocol Host {
     /// `errors`. This can happen for entries that are malformed and for peers that are already
     /// known to the bt-host. An empty `errors` list indicates that all bonds were successfully
     /// restored.
-    RestoreBonds(struct {
+    strict RestoreBonds(struct {
         bonds vector<sys.BondingData>:MAX;
     }) -> (struct {
         errors vector<sys.BondingData>:MAX;
@@ -228,7 +228,7 @@ protocol Host {
     // ===== Events =====
 
     /// Notifies when bonding data for a peer has been updated.
-    -> OnNewBondingData(struct {
+    strict -> OnNewBondingData(struct {
         data sys.BondingData;
     });
 

@@ -7,14 +7,14 @@ library fuchsia.composite.test;
 using zx;
 
 @discoverable
-protocol Waiter {
-    Ack(struct {
+closed protocol Waiter {
+    strict Ack(struct {
         status zx.status;
     });
 };
 
-protocol Device {
-    GetNumber() -> (struct {
+closed protocol Device {
+    strict GetNumber() -> (struct {
         number uint32;
     });
 };

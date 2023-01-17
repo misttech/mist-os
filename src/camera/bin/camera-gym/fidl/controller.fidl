@@ -59,11 +59,11 @@ type Command = strict union {
 };
 
 @discoverable
-protocol Controller {
+closed protocol Controller {
     // SendCommand sends a single Command to camera-gym to execute.
     //
     // The error return indicates the reason for failure of execution.
-    SendCommand(struct {
+    strict SendCommand(struct {
         command Command;
     }) -> () error CommandError;
 };

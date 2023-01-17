@@ -102,7 +102,7 @@ type Power = struct {
 
 /// A protocol for managing on-demand metrics logging.
 @discoverable
-protocol MetricsLogger {
+closed protocol MetricsLogger {
     /// Initiates logging of specified metrics for the provided duration.
     /// Supports concurrent logging of different metrics. Logging may be
     /// terminated early with a call to `StopLogging`.
@@ -123,7 +123,7 @@ protocol MetricsLogger {
     ///     statistics to syslog.
     /// + error a [fuchsia.metrics.test/MeticsLoggerError] value indicating why
     ///     the request failed.
-    StartLogging(struct {
+    strict StartLogging(struct {
         client_id ClientId;
         metrics vector<Metric>:MAX;
         duration_ms uint32;
@@ -146,7 +146,7 @@ protocol MetricsLogger {
     ///     statistics to syslog.
     /// + error a [fuchsia.metrics.test/MetricsLoggerError] value indicating why
     ///     the request failed.
-    StartLoggingForever(struct {
+    strict StartLoggingForever(struct {
         client_id ClientId;
         metrics vector<Metric>:MAX;
         output_samples_to_syslog bool;
@@ -159,7 +159,7 @@ protocol MetricsLogger {
     /// + request `client_id` String format Id of the client.
     /// - response `status` A bool value indicating if existing logging was
     ///     stopped (true) or there'sno existing logging for the client.
-    StopLogging(struct {
+    strict StopLogging(struct {
         client_id ClientId;
     }) -> (struct {
         stopped bool;

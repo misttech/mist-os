@@ -11,7 +11,7 @@ using fuchsia.hardware.network;
 /// This protocol provides a simplified interface to an underlying netstack that
 /// allows the caller to configure it for use in a test environment.
 @discoverable
-protocol ConfigurableNetstack {
+closed protocol ConfigurableNetstack {
     /// Installs a device in the netstack with the provided configuration.
     ///
     /// + request `options` configuration options on the interface.
@@ -22,7 +22,7 @@ protocol ConfigurableNetstack {
     ///     on the netstack, e.g. attempting to add an invalid route.
     /// * error `INTERNAL` if an unexpected error is encountered that is not
     ///     caused by the client, e.g. an error communicating with the netstack.
-    ConfigureInterface(@generated_name("InterfaceOptions") resource table {
+    strict ConfigureInterface(@generated_name("InterfaceOptions") resource table {
         /// The name of the interface to be created.
         ///
         /// Required.

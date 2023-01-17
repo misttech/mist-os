@@ -88,29 +88,29 @@ const MAX_ACTIONS uint32 = 10;
 /// Interface for controlling a mock device.  The test suite will implement this interface.
 /// Any method that returns a list of actions is interpreted as requesting the corresponding hook
 /// to perform that list of actions in order.
-protocol MockDevice {
+closed protocol MockDevice {
     /// `record.device_id` corresponds to the parent here.
-    Bind(struct {
+    strict Bind(struct {
         record HookInvocation;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
 
-    Release(struct {
+    strict Release(struct {
         record HookInvocation;
     });
-    GetProtocol(struct {
+    strict GetProtocol(struct {
         record HookInvocation;
         protocol_id uint32;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
-    Unbind(struct {
+    strict Unbind(struct {
         record HookInvocation;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
-    Suspend(struct {
+    strict Suspend(struct {
         record HookInvocation;
         requested_state uint8;
         enable_wake bool;
@@ -118,58 +118,58 @@ protocol MockDevice {
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
-    Resume(struct {
+    strict Resume(struct {
         record HookInvocation;
         requested_state uint32;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
 
-    Message(struct {
+    strict Message(struct {
         record HookInvocation;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
-    Rxrpc(struct {
+    strict Rxrpc(struct {
         record HookInvocation;
     }) -> (resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
 
     /// Notification that the requested action was done
-    AddDeviceDone(struct {
+    strict AddDeviceDone(struct {
         action_id uint64;
     });
-    UnbindReplyDone(struct {
+    strict UnbindReplyDone(struct {
         action_id uint64;
     });
-    SuspendReplyDone(struct {
+    strict SuspendReplyDone(struct {
         action_id uint64;
     });
-    ResumeReplyDone(struct {
+    strict ResumeReplyDone(struct {
         action_id uint64;
     });
 };
 
 /// Interface for requesting a mock device thread do something.  The mock device implements
 /// this interface.  Closing the interface causes the thread to exit.
-protocol MockDeviceThread {
+closed protocol MockDeviceThread {
     /// Perform the actions in the given list.  Threads may not create other threads.
-    PerformActions(resource struct {
+    strict PerformActions(resource struct {
         actions vector<Action>:MAX_ACTIONS;
     });
 
     /// Notification that the requested action was done
-    -> AddDeviceDone(struct {
+    strict -> AddDeviceDone(struct {
         action_id uint64;
     });
-    -> UnbindReplyDone(struct {
+    strict -> UnbindReplyDone(struct {
         action_id uint64;
     });
-    -> SuspendReplyDone(struct {
+    strict -> SuspendReplyDone(struct {
         action_id uint64;
     });
-    -> ResumeReplyDone(struct {
+    strict -> ResumeReplyDone(struct {
         action_id uint64;
     });
 };

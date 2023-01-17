@@ -581,7 +581,7 @@ type ResponseUnion = strict union {
 };
 
 @discoverable
-protocol Echo {
+closed protocol Echo {
     compose imp.Composed;
 
     // If `forward_to_server` is empty, just returns `value`.
@@ -590,28 +590,28 @@ protocol Echo {
     // `forward_to_server` arg acts as a proxy for that other server.
     // For the error variants: if should_error is true, the provided err result
     // error is sent, otherwise the response variant is sent.
-    EchoMinimal(struct {
+    strict EchoMinimal(struct {
         forward_to_server string;
     }) -> ();
-    EchoMinimalWithError(struct {
+    strict EchoMinimalWithError(struct {
         forward_to_server string;
         result_variant RespondWith;
     }) -> () error uint32;
 
     // Same as the above, but the server should use the event to return the
     // response, rather than a return value.
-    EchoMinimalNoRetVal(struct {
+    strict EchoMinimalNoRetVal(struct {
         forward_to_server string;
     });
-    -> EchoMinimalEvent();
+    strict -> EchoMinimalEvent();
 
-    EchoStruct(resource struct {
+    strict EchoStruct(resource struct {
         value Struct;
         forward_to_server string;
     }) -> (resource struct {
         value Struct;
     });
-    EchoStructWithError(resource struct {
+    strict EchoStructWithError(resource struct {
         value Struct;
         result_err default_enum;
         forward_to_server string;
@@ -619,20 +619,20 @@ protocol Echo {
     }) -> (resource struct {
         value Struct;
     }) error default_enum;
-    EchoStructNoRetVal(resource struct {
+    strict EchoStructNoRetVal(resource struct {
         value Struct;
         forward_to_server string;
     });
-    -> EchoEvent(resource struct {
+    strict -> EchoEvent(resource struct {
         value Struct;
     });
-    EchoArrays(resource struct {
+    strict EchoArrays(resource struct {
         value ArraysStruct;
         forward_to_server string;
     }) -> (resource struct {
         value ArraysStruct;
     });
-    EchoArraysWithError(resource struct {
+    strict EchoArraysWithError(resource struct {
         value ArraysStruct;
         result_err default_enum;
         forward_to_server string;
@@ -641,13 +641,13 @@ protocol Echo {
         value ArraysStruct;
     }) error default_enum;
 
-    EchoVectors(resource struct {
+    strict EchoVectors(resource struct {
         value VectorsStruct;
         forward_to_server string;
     }) -> (resource struct {
         value VectorsStruct;
     });
-    EchoVectorsWithError(resource struct {
+    strict EchoVectorsWithError(resource struct {
         value VectorsStruct;
         result_err default_enum;
         forward_to_server string;
@@ -656,13 +656,13 @@ protocol Echo {
         value VectorsStruct;
     }) error default_enum;
 
-    EchoTable(resource struct {
+    strict EchoTable(resource struct {
         value AllTypesTable;
         forward_to_server string;
     }) -> (resource struct {
         value AllTypesTable;
     });
-    EchoTableWithError(resource struct {
+    strict EchoTableWithError(resource struct {
         value AllTypesTable;
         result_err default_enum;
         forward_to_server string;
@@ -674,13 +674,13 @@ protocol Echo {
 
     // TODO(fxbug.dev/88343): renamed these tests to make clearer the difference between these and
     // the payload tests below.
-    EchoXunions(resource struct {
+    strict EchoXunions(resource struct {
         value vector<AllTypesXunion>;
         forward_to_server string;
     }) -> (resource struct {
         value vector<AllTypesXunion>;
     });
-    EchoXunionsWithError(resource struct {
+    strict EchoXunionsWithError(resource struct {
         value vector<AllTypesXunion>;
         result_err default_enum;
         forward_to_server string;
@@ -689,23 +689,23 @@ protocol Echo {
         value vector<AllTypesXunion>;
     }) error default_enum;
 
-    EchoNamedStruct(imp.RequestStruct) -> (imp.ResponseStruct);
-    EchoNamedStructWithError(imp.ErrorableRequestStruct) -> (imp.ResponseStruct) error uint32;
-    EchoNamedStructNoRetVal(imp.EventTriggeringRequestStruct);
-    -> OnEchoNamedEvent(imp.ResponseStruct);
+    strict EchoNamedStruct(imp.RequestStruct) -> (imp.ResponseStruct);
+    strict EchoNamedStructWithError(imp.ErrorableRequestStruct) -> (imp.ResponseStruct) error uint32;
+    strict EchoNamedStructNoRetVal(imp.EventTriggeringRequestStruct);
+    strict -> OnEchoNamedEvent(imp.ResponseStruct);
 
-    EchoTablePayload(RequestTable) -> (ResponseTable);
-    EchoTablePayloadWithError(table {
+    strict EchoTablePayload(RequestTable) -> (ResponseTable);
+    strict EchoTablePayloadWithError(table {
         1: value uint64;
         2: forward_to_server string;
         3: result_err default_enum;
         4: result_variant RespondWith;
     }) -> (ResponseTable) error default_enum;
-    EchoTablePayloadNoRetVal(RequestTable);
-    -> OnEchoTablePayloadEvent(ResponseTable);
+    strict EchoTablePayloadNoRetVal(RequestTable);
+    strict -> OnEchoTablePayloadEvent(ResponseTable);
 
-    EchoUnionPayload(RequestUnion) -> (ResponseUnion);
-    EchoUnionPayloadWithError(flexible union {
+    strict EchoUnionPayload(RequestUnion) -> (ResponseUnion);
+    strict EchoUnionPayloadWithError(flexible union {
         1: unsigned @generated_name("UnsignedErrorable") struct {
             value uint64;
             forward_to_server string;
@@ -719,6 +719,6 @@ protocol Echo {
             result_variant RespondWith;
         };
     }) -> (ResponseUnion) error default_enum;
-    EchoUnionPayloadNoRetVal(RequestUnion);
-    -> OnEchoUnionPayloadEvent(ResponseUnion);
+    strict EchoUnionPayloadNoRetVal(RequestUnion);
+    strict -> OnEchoUnionPayloadEvent(ResponseUnion);
 };

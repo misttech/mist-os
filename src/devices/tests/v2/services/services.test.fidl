@@ -4,12 +4,12 @@
 
 library fuchsia.services.test;
 
-protocol ControlPlane {
-    ControlDo() -> ();
+closed protocol ControlPlane {
+    strict ControlDo() -> ();
 };
 
-protocol DataPlane {
-    DataDo() -> ();
+closed protocol DataPlane {
+    strict DataDo() -> ();
 };
 
 service Device {

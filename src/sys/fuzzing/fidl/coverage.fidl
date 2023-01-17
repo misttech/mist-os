@@ -22,7 +22,7 @@ type InstrumentedProcess = resource struct {
 /// diagnostics with target processes under test. The connection should be established very early in
 /// a target process's lifecycle, i.e. before `main` begins.
 ///
-protocol CoverageDataCollector {
+closed protocol CoverageDataCollector {
     /// Registers the instrumented target process.
     ///
     /// This method is called once per connection to set up the eventpair and process handle used by
@@ -37,7 +37,7 @@ protocol CoverageDataCollector {
     /// This method must be called before the target process can call `AddLlvmModule`.
     ///
     /// The channel is closed on FIDL error. Clients should not attempt to reconnect.
-    Initialize(resource struct {
+    strict Initialize(resource struct {
         instrumented InstrumentedProcess;
     }) -> (struct {
         options Options;
@@ -61,7 +61,7 @@ protocol CoverageDataCollector {
     ///
     /// See also:
     ///     https://clang.llvm.org/docs/SanitizerCoverage.html#inline-8bit-counters
-    AddLlvmModule(resource struct {
+    strict AddLlvmModule(resource struct {
         inline_8bit_counters zx.handle:VMO;
     }) -> ();
 };
@@ -81,9 +81,9 @@ type CoverageData = strict resource union {
 ///
 /// The channel is closed on FIDL error. Clients should exit and not attempt to reconnect.
 @discoverable
-protocol CoverageDataProvider {
+closed protocol CoverageDataProvider {
     /// Sets the options to be returned by `fuchsia.fuzzer.CoverageDataCollector/Initialize`.
-    SetOptions(struct {
+    strict SetOptions(struct {
         options Options;
     });
 
@@ -91,7 +91,7 @@ protocol CoverageDataProvider {
     /// modules have already been retrieved using this method, it will block until another call to
     /// `fuchsia.fuzzer.CoverageDataCollector/Initialize` or
     /// `fuchsia.fuzzer.CoverageDataCollector/AddLlvmModule` is made.
-    GetCoverageData() -> (resource struct {
+    strict GetCoverageData() -> (resource struct {
         coverage_data CoverageData;
     });
 };

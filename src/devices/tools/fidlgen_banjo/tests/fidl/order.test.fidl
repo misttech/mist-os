@@ -22,6 +22,6 @@ type XxStruct = struct {
 };
 
 @transport("Banjo")
-protocol IiInterface {
-    DoSomething() -> ();
+closed protocol IiInterface {
+    strict DoSomething() -> ();
 };

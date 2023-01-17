@@ -6,12 +6,12 @@ library fidl.test.echo;
 using zx;
 
 @for_deprecated_c_bindings
-protocol Echo {
-    Echo(resource struct {
+closed protocol Echo {
+    strict Echo(resource struct {
         process zx.handle:EVENTPAIR;
         thread zx.handle:EVENTPAIR;
     }) -> (struct {
         status zx.status;
     });
-    Ping();
+    strict Ping();
 };

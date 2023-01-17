@@ -23,23 +23,23 @@ type Direction = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Drawing {
-    Draw(struct {
+closed protocol Drawing {
+    strict Draw(struct {
         p Point;
         d Direction;
     }) -> ();
-    DrawLots(resource struct {
+    strict DrawLots(resource struct {
         commands zx.handle:VMO;
     }) -> (struct {
         result zx.status;
         p Point;
     });
-    DrawArray(struct {
+    strict DrawArray(struct {
         points array<Point, 4>;
     }) -> (struct {
         rv zx.status;
     });
-    Describe(struct {
+    strict Describe(struct {
         one string:64;
     }) -> (struct {
         two string:128;

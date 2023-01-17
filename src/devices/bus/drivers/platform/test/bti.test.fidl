@@ -4,11 +4,11 @@
 library fuchsia.hardware.btitest;
 
 @discoverable
-protocol BtiDevice {
+closed protocol BtiDevice {
     /// Returns koid for BTI retrieved from platform bus.
-    GetKoid() -> (struct {
+    strict GetKoid() -> (struct {
         koid uint64;
     });
     /// Crashes driver host.
-    Crash();
+    strict Crash();
 };

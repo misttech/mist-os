@@ -6,8 +6,8 @@ library banjo.examples.example7;
 // ¡🇷🇸🇷
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Hello {
-    Say(struct {
+closed protocol Hello {
+    strict Say(struct {
         req string;
     }) -> (struct {
         response string;

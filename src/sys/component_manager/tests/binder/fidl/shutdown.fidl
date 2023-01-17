@@ -5,6 +5,6 @@ library fuchsia.component.tests;
 
 /// Simple FIDL protocol for tests that notifies server to shutdown.
 @discoverable
-protocol Shutdowner {
-    Shutdown();
+closed protocol Shutdowner {
+    strict Shutdown();
 };

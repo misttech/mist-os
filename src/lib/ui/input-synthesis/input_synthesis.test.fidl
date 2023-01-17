@@ -21,7 +21,7 @@ using fuchsia.input.report;
 /// you need to expose more functionality, feel free to add methods to this
 /// protocol.
 @discoverable
-protocol Text {
+closed protocol Text {
     /// Sends `text` through the input pipeline, pretending to be a keyboard,
     /// effectively converting the text into key presses as if on a US QWERTY
     /// keyboard, and typing characters up one at a time with a brief pause
@@ -43,7 +43,7 @@ protocol Text {
     /// This API does not support sending multiple key events at the same time.
     /// Feel free to expose the appropriate functionality from the
     /// `input-synthesis` library if you need that.
-    Send(struct {
+    strict Send(struct {
         text string:1024;
     }) -> ();
 };
@@ -65,9 +65,9 @@ type Error = flexible enum : uint32 {
 /// you need to expose more functionality, feel free to add methods to this
 /// protocol.
 @discoverable
-protocol Mouse {
+closed protocol Mouse {
     /// Add a new device for testing.
-    AddDevice() -> (struct {
+    strict AddDevice() -> (struct {
         device_id uint32;
     });
 
@@ -75,7 +75,7 @@ protocol Mouse {
     /// the caller until the input report is dispatched. `event_time` used as
     /// the timestamp in the `InputReport`, it doesn't change the timing of
     /// when the report is dispatched to the input pipeline.
-    SendInputReport(struct {
+    strict SendInputReport(struct {
         device_id uint32;
         report fuchsia.input.report.MouseInputReport;
         event_time uint64;

@@ -13,9 +13,9 @@ using fuchsia.intl;
 /// user's internationalization preferences from a preferences service and generating a `Profile`,
 /// rather than allowing a `Profile` to be set directly.
 @discoverable
-protocol PropertyManager {
+closed protocol PropertyManager {
     /// Set the internationalization profile that is served by this provider.
-    SetProfile(struct {
+    strict SetProfile(struct {
         intl_profile fuchsia.intl.Profile;
     }) -> ();
 };

@@ -5,11 +5,11 @@
 library fuchsia.runtime.test;
 
 @discoverable
-protocol Handshake {
-    Do() -> ();
+closed protocol Handshake {
+    strict Do() -> ();
 };
 
 @discoverable
-protocol Waiter {
-    Ack();
+closed protocol Waiter {
+    strict Ack();
 };

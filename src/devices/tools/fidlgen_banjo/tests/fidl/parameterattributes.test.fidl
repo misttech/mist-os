@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 library banjo.examples.paramattr;
 
-protocol Foo {
-    Bar(struct {
+closed protocol Foo {
+    strict Bar(struct {
         param_one uint16;
         @very_good
         param_two bool;
     });
-    Blah() -> (struct {
+    strict Blah() -> (struct {
         @even_better("this one")
         out_one int64;
         out_two string;

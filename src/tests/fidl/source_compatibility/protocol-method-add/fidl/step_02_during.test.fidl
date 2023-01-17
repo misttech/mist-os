@@ -4,9 +4,9 @@
 library fidl.test.protocolmethodadd;
 
 // [START contents]
-protocol Example {
-    ExistingMethod();
+closed protocol Example {
+    strict ExistingMethod();
     @transitional
-    NewMethod();
+    strict NewMethod();
 };
 // [END contents]

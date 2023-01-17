@@ -6,7 +6,7 @@ library fuchsia.hardware.adhoc.intelrtc;
 using fuchsia.hardware.nvram;
 using fuchsia.hardware.rtc;
 
-protocol Device {
+closed protocol Device {
     compose fuchsia.hardware.nvram.Device;
     compose fuchsia.hardware.rtc.Device;
 };

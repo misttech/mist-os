@@ -12,13 +12,13 @@ alias AttemptId = string:36; // 36 == strlen("01234567-89ab-cdef-0123-456789abcd
 /// This protocol is intended to be consumed by a component capable of
 /// discovering when to update and what version of the system to install.
 @discoverable
-protocol Installer {
+closed protocol Installer {
     /// Get the status of the last update attempt. If this device hasn't
     /// attempted an update since the last factory reset, every field in the
     /// result will be absent.
     ///
     /// - response `info` the status of the last update attempt, if available.
-    GetLastUpdateResult() -> (struct {
+    strict GetLastUpdateResult() -> (struct {
         info UpdateResult;
     });
 
@@ -28,7 +28,7 @@ protocol Installer {
     ///
     /// + request `attempt_id` UUID identifying the requested update attempt.
     /// - response `info` the status of the last update attempt, if available.
-    GetUpdateResult(struct {
+    strict GetUpdateResult(struct {
         attempt_id AttemptId;
     }) -> (struct {
         info UpdateResult;
@@ -53,7 +53,7 @@ protocol Installer {
     ///     updates that require a reboot, components may use this identifier to
     ///     disambiguate the completion of this update attempt from new update
     ///     attempts that start post-reboot.
-    StartUpdate(resource struct {
+    strict StartUpdate(resource struct {
         url fuchsia.pkg.PackageUrl;
         options Options;
         monitor client_end:Monitor;
@@ -72,7 +72,7 @@ protocol Installer {
     /// - response `attached` Whether or not the provided monitor was attached
     ///     to an in-progress update attempt. If false, monitor will be closed
     ///     by the server.
-    MonitorUpdate(resource struct {
+    strict MonitorUpdate(resource struct {
         attempt_id AttemptId:optional;
         monitor client_end:Monitor;
     }) -> (struct {
@@ -85,7 +85,7 @@ protocol Installer {
 /// If the client end of a [`RebootController`] is closed without calling
 /// [`RebootController.Detach()`], the update attempt will fall back to the
 /// default behavior of rebooting as soon as it is ready.
-protocol RebootController {
+closed protocol RebootController {
     /// Informs the update attempt that it may reboot when ready, unblocking a
     /// pending reboot if it is already ready to reboot.
     ///
@@ -93,11 +93,11 @@ protocol RebootController {
     /// [`RebootController.Detach`], the update attempt reclaims control of the
     /// timing of the reboot, behaving as if the update attempt was not given a
     /// [`RebootController`] at all.
-    Unblock();
+    strict Unblock();
 
     /// Informs the update attempt that it should wait to reboot indefinitely,
     /// even if this [`RebootController`] connection is dropped.
-    Detach();
+    strict Detach();
 };
 
 /// Metadata about a prior update attempt.

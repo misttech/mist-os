@@ -11,10 +11,10 @@ type PuppetError = strict enum {
 };
 
 @discoverable
-protocol EncodingPuppet {
+closed protocol EncodingPuppet {
     /// Log takes a record and converts it into a buffer.
     /// Returns an error if record contains unsupported type
-    Encode(struct {
+    strict Encode(struct {
         record fuchsia.diagnostics.stream.Record;
     }) -> (resource struct {
         result fuchsia.mem.Buffer;

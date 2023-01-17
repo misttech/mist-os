@@ -6,11 +6,11 @@ library fuchsia.overnet.triangletests;
 using test.placeholders;
 
 @discoverable
-protocol Conscript {
-    Serve(resource struct {
+closed protocol Conscript {
+    strict Serve(resource struct {
         iface server_end:test.placeholders.Echo;
     });
-    Issue(resource struct {
+    strict Issue(resource struct {
         iface client_end:test.placeholders.Echo;
         request string:optional;
     }) -> (struct {

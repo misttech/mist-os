@@ -15,7 +15,7 @@ type AudioRecordingError = strict enum {
 
 /// A protocol that supports audio input injection and audio capture.
 @discoverable
-protocol AudioRecordingControl {
+closed protocol AudioRecordingControl {
 
     /// Writes and appends `audio_data` at `index`.
     ///
@@ -27,7 +27,7 @@ protocol AudioRecordingControl {
     /// + request `index` refers a specific `audio_data` input record. We can have multiple records.
     /// + request `audio_data` vector containing audio_data bytes.
     /// - response `byte_count` the total number of bytes stored.
-    PutInputAudio(resource struct {
+    strict PutInputAudio(resource struct {
         index int32;
         audio_data vector<uint8>:AUDIO_INPUT_BYTES_MAX;
     }) -> (struct {
@@ -40,7 +40,7 @@ protocol AudioRecordingControl {
     ///
     /// + request `index` refers a specific `audio_data` input record to clear.
     /// - response `error` a AudioRecordingError value indicating success or failure.
-    ClearInputAudio(resource struct {
+    strict ClearInputAudio(resource struct {
         index int32;
     }) -> () error AudioRecordingError;
 
@@ -49,7 +49,7 @@ protocol AudioRecordingControl {
     /// User should have first called `StartOutputSave` and `StopOutputSave`.
     ///
     /// + request `audio_data` vmo containing the full captured audio data.
-    GetOutputAudio() -> (resource struct {
+    strict GetOutputAudio() -> (resource struct {
         audio_data zx.handle:VMO;
     });
 
@@ -58,24 +58,24 @@ protocol AudioRecordingControl {
     ///
     /// + request `index` refers a specific `audio_data` input record to clear.
     /// - response `error` a AudioRecordingError value indicating success or failure.
-    StartInputInjection(resource struct {
+    strict StartInputInjection(resource struct {
         index int32;
     }) -> () error AudioRecordingError;
 
     /// Stops inject audio data.
     ///
     /// - response `error` a AudioRecordingError value indicating success or failure.
-    StopInputInjection() -> () error AudioRecordingError;
+    strict StopInputInjection() -> () error AudioRecordingError;
 
     /// Start capturing audio output
     ///
     /// - response `error` a AudioRecordingError value indicating success or failure.
-    StartOutputSave() -> () error AudioRecordingError;
+    strict StartOutputSave() -> () error AudioRecordingError;
 
     /// Stops capturing the audio output.
     ///
     /// Use `GetOutputAudio` to get the latest audio capture.
     ///
     /// - response `error` a AudioRecordingError value indicating success or failure.
-    StopOutputSave() -> () error AudioRecordingError;
+    strict StopOutputSave() -> () error AudioRecordingError;
 };

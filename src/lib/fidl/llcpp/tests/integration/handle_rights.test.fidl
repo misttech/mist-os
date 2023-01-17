@@ -5,29 +5,29 @@ library llcpptest.handlerights.test;
 
 using zx;
 
-protocol HandleRights {
-    SyncGetHandleWithTooFewRights() -> (resource struct {
+closed protocol HandleRights {
+    strict SyncGetHandleWithTooFewRights() -> (resource struct {
         h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
     });
-    AsyncGetHandleWithTooFewRights() -> (resource struct {
+    strict AsyncGetHandleWithTooFewRights() -> (resource struct {
         h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
     });
-    SyncGetHandleWithTooManyRights() -> (resource struct {
+    strict SyncGetHandleWithTooManyRights() -> (resource struct {
         h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
     });
-    AsyncGetHandleWithTooManyRights() -> (resource struct {
+    strict AsyncGetHandleWithTooManyRights() -> (resource struct {
         h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
     });
-    SyncGetHandleWithWrongType() -> (resource struct {
+    strict SyncGetHandleWithWrongType() -> (resource struct {
         h zx.handle:CHANNEL;
     });
-    AsyncGetHandleWithWrongType() -> (resource struct {
+    strict AsyncGetHandleWithWrongType() -> (resource struct {
         h zx.handle:CHANNEL;
     });
-    SendEventWithTransferAndSignal(resource struct {
+    strict SendEventWithTransferAndSignal(resource struct {
         h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
     });
-    SendChannel(resource struct {
+    strict SendChannel(resource struct {
         h zx.handle:CHANNEL;
     });
 };

@@ -11,11 +11,11 @@ type Container = resource struct {
 };
 
 @transport("Banjo")
-protocol Doer {
-    DoSomething(resource struct {
+closed protocol Doer {
+    strict DoSomething(resource struct {
         the_handle zx.handle:CHANNEL;
     }) -> ();
-    DoSomethingElse(resource struct {
+    strict DoSomethingElse(resource struct {
         the_handle_too zx.handle:CHANNEL;
     }) -> ();
 };

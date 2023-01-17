@@ -17,31 +17,31 @@ type TestStatusInfo = struct {
     out_performance_state uint8;
 };
 
-protocol TestDevice {
+closed protocol TestDevice {
     /// Add Test Device with some powerargs
-    AddDeviceWithPowerArgs(struct {
+    strict AddDeviceWithPowerArgs(struct {
         info vector<fuchsia.device.DevicePowerStateInfo>:MAX;
         perf_state_info vector<fuchsia.device.DevicePerformanceStateInfo>:MAX;
         make_visible bool;
     }) -> () error zx.status;
     /// Get current power state of the device
-    GetCurrentDevicePowerState() -> (struct {
+    strict GetCurrentDevicePowerState() -> (struct {
         cur_state fuchsia.device.DevicePowerState;
     }) error zx.status;
     /// Get the suspend reason of the last suspend call
-    GetCurrentSuspendReason() -> (struct {
+    strict GetCurrentSuspendReason() -> (struct {
         cur_suspend_reason uint8;
     }) error zx.status;
     /// Get current auto suspend status and deepest_sleep_state
-    GetCurrentDeviceAutoSuspendConfig() -> (struct {
+    strict GetCurrentDeviceAutoSuspendConfig() -> (struct {
         enabled bool;
         deepest_sleep_state fuchsia.device.DevicePowerState;
     }) error zx.status;
-    SetTestStatusInfo(struct {
+    strict SetTestStatusInfo(struct {
         test_info TestStatusInfo;
     }) -> () error zx.status;
 
-    GetSuspendCompletionEvent() -> (resource struct {
+    strict GetSuspendCompletionEvent() -> (resource struct {
         event zx.handle:EVENT;
     }) error zx.status;
 };

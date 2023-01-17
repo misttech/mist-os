@@ -73,16 +73,16 @@ type CheckOptions = resource struct {};
 
 // TODO(fxbug.dev/90702): Figure out a more flexible configuration option strategy.
 @discoverable
-protocol Startup {
+closed protocol Startup {
     /// Start this filesystem, using the provided block device and Start options. When start is
     /// called, the filesystem will populate its outgoing directory and then return.
-    Start(resource struct {
+    strict Start(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options StartOptions;
     }) -> () error zx.status;
 
     /// Format the provided block device with this filesystem.
-    Format(resource struct {
+    strict Format(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options FormatOptions;
     }) -> () error zx.status;
@@ -90,7 +90,7 @@ protocol Startup {
     /// Check the provided block device for filesystem consistency.
     /// Note that some filesystems (e.g. Fxfs) support online fsck, in which case they can be
     /// checked after being started.  In this case, the passed block device is ignored.
-    Check(resource struct {
+    strict Check(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options CheckOptions;
     }) -> () error zx.status;

@@ -9,104 +9,104 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol SynchronousHandle {
-    Handle(resource struct {
+closed protocol SynchronousHandle {
+    strict Handle(resource struct {
         h zx.handle;
     }) -> (resource struct {
         h zx.handle;
         h2 zx.handle;
     });
-    Process(resource struct {
+    strict Process(resource struct {
         h zx.handle:PROCESS;
     }) -> (resource struct {
         h zx.handle:PROCESS;
         h2 zx.handle:PROCESS;
     });
-    Thread(resource struct {
+    strict Thread(resource struct {
         h zx.handle:THREAD;
     }) -> (resource struct {
         h zx.handle:THREAD;
         h2 zx.handle:THREAD;
     });
-    Vmo(resource struct {
+    strict Vmo(resource struct {
         h zx.handle:VMO;
     }) -> (resource struct {
         h zx.handle:VMO;
         h2 zx.handle:VMO;
     });
-    Channel(resource struct {
+    strict Channel(resource struct {
         h zx.handle:CHANNEL;
     }) -> (resource struct {
         h zx.handle:CHANNEL;
         h2 zx.handle:CHANNEL;
     });
-    Event(resource struct {
+    strict Event(resource struct {
         h zx.handle:EVENT;
     }) -> (resource struct {
         h zx.handle:EVENT;
         h2 zx.handle:EVENT;
     });
-    Port(resource struct {
+    strict Port(resource struct {
         h zx.handle:PORT;
     }) -> (resource struct {
         h zx.handle:PORT;
         h2 zx.handle:PORT;
     });
-    Interrupt(resource struct {
+    strict Interrupt(resource struct {
         h zx.handle:INTERRUPT;
     }) -> (resource struct {
         h zx.handle:INTERRUPT;
         h2 zx.handle:INTERRUPT;
     });
-    Socket(resource struct {
+    strict Socket(resource struct {
         h zx.handle:SOCKET;
     }) -> (resource struct {
         h zx.handle:SOCKET;
         h2 zx.handle:SOCKET;
     });
-    Resource(resource struct {
+    strict Resource(resource struct {
         h zx.handle:RESOURCE;
     }) -> (resource struct {
         h zx.handle:RESOURCE;
         h2 zx.handle:RESOURCE;
     });
-    EventPair(resource struct {
+    strict EventPair(resource struct {
         h zx.handle:EVENTPAIR;
     }) -> (resource struct {
         h zx.handle:EVENTPAIR;
         h2 zx.handle:EVENTPAIR;
     });
-    Job(resource struct {
+    strict Job(resource struct {
         h zx.handle:JOB;
     }) -> (resource struct {
         h zx.handle:JOB;
         h2 zx.handle:JOB;
     });
-    Vmar(resource struct {
+    strict Vmar(resource struct {
         h zx.handle:VMAR;
     }) -> (resource struct {
         h zx.handle:VMAR;
         h2 zx.handle:VMAR;
     });
-    Fifo(resource struct {
+    strict Fifo(resource struct {
         h zx.handle:FIFO;
     }) -> (resource struct {
         h zx.handle:FIFO;
         h2 zx.handle:FIFO;
     });
-    Guest(resource struct {
+    strict Guest(resource struct {
         h zx.handle:GUEST;
     }) -> (resource struct {
         h zx.handle:GUEST;
         h2 zx.handle:GUEST;
     });
-    Timer(resource struct {
+    strict Timer(resource struct {
         h zx.handle:TIMER;
     }) -> (resource struct {
         h zx.handle:TIMER;
         h2 zx.handle:TIMER;
     });
-    Profile(resource struct {
+    strict Profile(resource struct {
         h zx.handle:PROFILE;
     }) -> (resource struct {
         h zx.handle:PROFILE;
@@ -116,8 +116,8 @@ protocol SynchronousHandle {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol AnotherSynchronousHandle {
-    Handle(resource struct {
+closed protocol AnotherSynchronousHandle {
+    strict Handle(resource struct {
         h zx.handle;
     }) -> (resource struct {
         h zx.handle;
@@ -127,121 +127,121 @@ protocol AnotherSynchronousHandle {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol AsyncHandle {
+closed protocol AsyncHandle {
     @async
-    Handle(resource struct {
+    strict Handle(resource struct {
         h zx.handle;
     }) -> (resource struct {
         h zx.handle;
         h2 zx.handle;
     });
     @async
-    Process(resource struct {
+    strict Process(resource struct {
         h zx.handle:PROCESS;
     }) -> (resource struct {
         h zx.handle:PROCESS;
         h2 zx.handle:PROCESS;
     });
     @async
-    Thread(resource struct {
+    strict Thread(resource struct {
         h zx.handle:THREAD;
     }) -> (resource struct {
         h zx.handle:THREAD;
         h2 zx.handle:THREAD;
     });
     @async
-    Vmo(resource struct {
+    strict Vmo(resource struct {
         h zx.handle:VMO;
     }) -> (resource struct {
         h zx.handle:VMO;
         h2 zx.handle:VMO;
     });
     @async
-    Channel(resource struct {
+    strict Channel(resource struct {
         h zx.handle:CHANNEL;
     }) -> (resource struct {
         h zx.handle:CHANNEL;
         h2 zx.handle:CHANNEL;
     });
     @async
-    Event(resource struct {
+    strict Event(resource struct {
         h zx.handle:EVENT;
     }) -> (resource struct {
         h zx.handle:EVENT;
         h2 zx.handle:EVENT;
     });
     @async
-    Port(resource struct {
+    strict Port(resource struct {
         h zx.handle:PORT;
     }) -> (resource struct {
         h zx.handle:PORT;
         h2 zx.handle:PORT;
     });
     @async
-    Interrupt(resource struct {
+    strict Interrupt(resource struct {
         h zx.handle:INTERRUPT;
     }) -> (resource struct {
         h zx.handle:INTERRUPT;
         h2 zx.handle:INTERRUPT;
     });
     @async
-    Socket(resource struct {
+    strict Socket(resource struct {
         h zx.handle:SOCKET;
     }) -> (resource struct {
         h zx.handle:SOCKET;
         h2 zx.handle:SOCKET;
     });
     @async
-    Resource(resource struct {
+    strict Resource(resource struct {
         h zx.handle:RESOURCE;
     }) -> (resource struct {
         h zx.handle:RESOURCE;
         h2 zx.handle:RESOURCE;
     });
     @async
-    EventPair(resource struct {
+    strict EventPair(resource struct {
         h zx.handle:EVENTPAIR;
     }) -> (resource struct {
         h zx.handle:EVENTPAIR;
         h2 zx.handle:EVENTPAIR;
     });
     @async
-    Job(resource struct {
+    strict Job(resource struct {
         h zx.handle:JOB;
     }) -> (resource struct {
         h zx.handle:JOB;
         h2 zx.handle:JOB;
     });
     @async
-    Vmar(resource struct {
+    strict Vmar(resource struct {
         h zx.handle:VMAR;
     }) -> (resource struct {
         h zx.handle:VMAR;
         h2 zx.handle:VMAR;
     });
     @async
-    Fifo(resource struct {
+    strict Fifo(resource struct {
         h zx.handle:FIFO;
     }) -> (resource struct {
         h zx.handle:FIFO;
         h2 zx.handle:FIFO;
     });
     @async
-    Guest(resource struct {
+    strict Guest(resource struct {
         h zx.handle:GUEST;
     }) -> (resource struct {
         h zx.handle:GUEST;
         h2 zx.handle:GUEST;
     });
     @async
-    Timer(resource struct {
+    strict Timer(resource struct {
         h zx.handle:TIMER;
     }) -> (resource struct {
         h zx.handle:TIMER;
         h2 zx.handle:TIMER;
     });
     @async
-    Profile(resource struct {
+    strict Profile(resource struct {
         h zx.handle:PROFILE;
     }) -> (resource struct {
         h zx.handle:PROFILE;

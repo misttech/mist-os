@@ -5,13 +5,13 @@ library fuchsia.device.firmware.test;
 
 using zx;
 
-protocol TestDevice {
+closed protocol TestDevice {
     /// Call load_firmware and make sure it worked.
-    LoadFirmware(struct {
+    strict LoadFirmware(struct {
         path string;
     }) -> () error zx.status;
     /// Call load_firmware_async and make sure it worked.
-    LoadFirmwareAsync(struct {
+    strict LoadFirmwareAsync(struct {
         path string;
     }) -> () error zx.status;
 };
