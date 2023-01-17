@@ -161,18 +161,74 @@ async fn get_engine(cmd: &mut StartCommand) -> Result<Box<dyn EmulatorEngine>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::bail;
     use async_trait::async_trait;
     use ffx_emulator_config::EmulatorEngine;
+    use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+    use std::process::Command;
 
-    /// TestEngine is a test struct for implementing the EmulatorEngine trait
-    /// Currently this one only exposes the running flag which is returned from
-    /// EmulatorEngine::is_running().
+    /// TestEngine is a test struct for implementing the EmulatorEngine trait. This version
+    /// just captures when the stage and start functions are called, and asserts that they were
+    /// supposed to be. On tear-down, if they were supposed to be and weren't, it will fail the
+    /// test accordingly.
     #[derive(Default)]
-    pub struct TestEngine {}
-    cfg_if! {
-        if #[cfg(test)] {
-            #[async_trait]
-            impl EmulatorEngine for TestEngine {}
+    struct TestEngine {
+        pub do_stage: bool,
+        pub do_start: bool,
+        did_stage: bool,
+        did_start: bool,
+    }
+
+    impl TestEngine {
+        pub fn new(do_stage: bool, do_start: bool) -> Self {
+            TestEngine { do_stage, do_start, ..Default::default() }
+        }
+    }
+
+    #[async_trait]
+    impl EmulatorEngine for TestEngine {
+        fn save_to_disk(&self) -> Result<()> {
+            Ok(())
+        }
+        fn build_emulator_cmd(&self) -> Command {
+            Command::new("some_program")
+        }
+        async fn stage(&mut self) -> Result<()> {
+            self.did_stage = true;
+            if self.do_stage {
+                Ok(())
+            } else {
+                bail!("Test called stage() when it wasn't supposed to.")
+            }
+        }
+        async fn start(
+            &mut self,
+            mut _emulator_cmd: Command,
+            _proxy: &TargetCollectionProxy,
+        ) -> Result<i32> {
+            self.did_start = true;
+            if self.do_start {
+                Ok(0)
+            } else {
+                bail!("Test called start() when it wasn't supposed to.")
+            }
+        }
+    }
+
+    impl Drop for TestEngine {
+        fn drop(&mut self) {
+            if self.do_stage {
+                assert!(
+                    self.did_stage,
+                    "The stage() function was supposed to be called but never was."
+                );
+            }
+            if self.do_start {
+                assert!(
+                    self.did_start,
+                    "The start() function was supposed to be called but never was."
+                );
+            }
         }
     }
 
@@ -294,6 +350,86 @@ mod tests {
         let result = get_engine(&mut cmd).await;
         assert!(result.is_ok(), "{:?}", result.err());
         assert_eq!(cmd.name, "NewName".to_string());
+        Ok(())
+    }
+
+    // Ensure dry-run stops after building command, doesn't stage/run
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_dry_run() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        cmd.dry_run = true;
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine::new(/*stage=*/ false, /*start=*/ false))
+                    as Box<dyn EmulatorEngine>)
+            })
+            .times(1);
+
+        let result = start(cmd, proxy).await;
+
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Ensure stage stops after staging the files, doesn't run
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_stage() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let mut cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        cmd.stage = true;
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine::new(/*stage=*/ true, /*start=*/ false))
+                    as Box<dyn EmulatorEngine>)
+            })
+            .times(1);
+
+        let result = start(cmd, proxy).await;
+
+        assert!(result.is_ok(), "{:?}", result.err());
+        Ok(())
+    }
+
+    // Ensure start goes through config and staging by default and calls start
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_start() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let new_engine_ctx = mock_start::new_engine_context();
+        let cmd = StartCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        new_engine_ctx
+            .expect()
+            .returning(|_| {
+                Ok(Box::new(TestEngine::new(/*stage=*/ true, /*start=*/ true))
+                    as Box<dyn EmulatorEngine>)
+            })
+            .times(1);
+
+        let result = start(cmd, proxy).await;
+
+        assert!(result.is_ok(), "{:?}", result.err());
         Ok(())
     }
 }
