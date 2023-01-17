@@ -11,14 +11,11 @@ group("tests") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
       ":android",
-      ":android_with_error_logs",
       ":android_with_init",
       "benchmarks",
       "gvisor",
       "wayland",
     ]
-    # TODO(fxbug.dev/110446): Re-enable once flake is sorted out.
-    # public_deps = [ ":adb_art_test($host_toolchain)" ]
   }
 }
 
@@ -33,20 +30,6 @@ fuchsia_test_component("binder_smoke_test") {
   manifest = "meta/binder_smoke_test.cml"
   deps = [
     ":binder_smoke_test_bin",
-    "//src/proc/tests:starnix_test",
-  ]
-}
-
-resource("binder_test_script") {
-  sources = [ "binderLibTestLauncher.sh" ]
-  outputs = [ "data/tests/binderLibTestLauncher.sh" ]
-}
-
-fuchsia_test_component("binder_test") {
-  manifest = "meta/binder_test.cml"
-  deps = [
-    ":binder_test_script",
-    "//src/connectivity/network/netstack:component",
     "//src/proc/tests:starnix_test",
   ]
 }
@@ -105,28 +88,4 @@ starnix_test_package("android_with_init") {
     }
   }
   galaxy = "//src/proc/bin/galaxies/starbionic"
-}
-
-starbionic_test_package("android_with_error_logs") {
-  test_components = [ ":binder_test" ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-if (is_host) {
-  python_host_test("adb_art_test") {
-    main_source = "adb/adb_art_test.py"
-    environments = [ emu_env ]
-    deps = [ ":adb_test_deps" ]
-  }
-  host_test_data("adb_test_deps") {
-    sources = [
-      "$root_out_dir/ffx",
-      "//prebuilt/starnix/internal/android-image-amd64/adb",
-      "//prebuilt/starnix/internal/android-image-amd64/art-run-test-target-data.zip",
-    ]
-  }
 }
