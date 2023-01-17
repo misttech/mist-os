@@ -415,13 +415,13 @@ mod tests {
         let opts = result.unwrap();
         assert_eq!(opts.host.gpu, GpuType::Host);
 
-        cmd.gpu = Some(String::from("guest"));
+        cmd.gpu = Some(String::from("swiftshader_indirect"));
 
-        assert_eq!(cmd.gpu().await.unwrap(), "guest");
+        assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
         let result = apply_command_line_options(emu_config.clone(), &cmd).await;
         assert!(result.is_ok(), "{:?}", result.err());
         let opts = result.unwrap();
-        assert_eq!(opts.host.gpu, GpuType::Guest);
+        assert_eq!(opts.host.gpu, GpuType::SwiftshaderIndirect);
 
         Ok(())
     }

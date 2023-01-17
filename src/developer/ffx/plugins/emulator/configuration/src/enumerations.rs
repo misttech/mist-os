@@ -176,18 +176,13 @@ pub enum GpuType {
     /// Use the GPU on your computer for hardware acceleration. This option
     /// typically provides the highest graphics quality and performance for the
     /// emulator. However, if your graphics drivers have issues rendering
-    /// OpenGL, you might need to use the swiftshader_indirect or
-    /// angle_indirect options.
+    /// OpenGL, you might need to use the swiftshader_indirect option.
     Host,
 
     /// Use a Quick Boot-compatible variant of SwiftShader to render graphics
     /// using software acceleration. This option is a good alternative to host
     /// mode if your computer can't use hardware acceleration.
     SwiftshaderIndirect,
-
-    /// Use guest-side software rendering. This option provides the lowest
-    /// graphics quality and performance for the emulator.
-    Guest,
 }
 
 impl Default for GpuType {
