@@ -19,6 +19,7 @@
 
 #include <inspector/inspector.h>
 
+#include "backtrace.h"
 #include "gwp-asan.h"
 #include "utils-impl.h"
 
@@ -354,12 +355,9 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
             thread_name, tid);
   }
 
-  if (!skip_markup_context)
-    inspector_print_markup_context(out, process->get());
-
   inspector_dsoinfo_t* dso_list = inspector_dso_fetch_list(process->get());
-  inspector_print_backtrace_markup(out, process->get(), thread->get(), dso_list, decoded.pc,
-                                   decoded.sp, decoded.fp);
+  print_backtrace_markup(out, process->get(), thread->get(), dso_list, decoded.pc, decoded.sp,
+                         decoded.fp, skip_markup_context);
   if (on_exception)
     print_gwp_asan_info(out, *process, report);
 

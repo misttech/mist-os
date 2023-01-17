@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <lib/stdcompat/span.h>
+#include <stdio.h>
 #include <zircon/types.h>
 
 #include "utils-impl.h"
@@ -17,3 +19,12 @@ struct inspector_dsoinfo {
   char* debug_file;
   char name[];
 };
+
+namespace inspector {
+
+// Writes markup context to |f|. If |pcs| is empty, context for all modules will be written.
+// Otherwise, context for a module will only be printed if one of the addresses in |pcs| lies within
+// the bounds of the module.
+void print_markup_context(FILE* f, zx_handle_t process, cpp20::span<uint64_t> pcs);
+
+}  // namespace inspector

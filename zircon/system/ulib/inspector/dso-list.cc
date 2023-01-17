@@ -17,6 +17,7 @@
 
 #include "dso-list-impl.h"
 #include "inspector/inspector.h"
+#include "lib/stdcompat/functional.h"
 #include "utils-impl.h"
 
 #define rdebug_off_lmap offsetof(struct r_debug, r_map)
@@ -141,10 +142,35 @@ __EXPORT inspector_dsoinfo_t* inspector_dso_lookup(inspector_dsoinfo_t* dso_list
   return nullptr;
 }
 
-__EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
+namespace {
+
+bool ModuleContainsFrameAddress(const elf_search::ModuleInfo& info, const uint64_t pc) {
+  auto contains_frame_address = [pc, &info](const Elf64_Phdr& phdr) {
+    uintptr_t start = phdr.p_vaddr;
+    uintptr_t end = phdr.p_vaddr + phdr.p_memsz;
+
+    return pc >= info.vaddr + start && pc < info.vaddr + end;
+  };
+
+  return std::any_of(info.phdrs.begin(), info.phdrs.end(), contains_frame_address);
+}
+
+}  // namespace
+
+namespace inspector {
+
+void print_markup_context(FILE* f, zx_handle_t process, cpp20::span<uint64_t> pcs) {
   fprintf(f, "{{{reset}}}\n");
   elf_search::ForEachModule(
-      *zx::unowned_process{process}, [f, count = 0u](const elf_search::ModuleInfo& info) mutable {
+      *zx::unowned_process{process},
+      [f, &pcs, count = 0u](const elf_search::ModuleInfo& info) mutable {
+        auto is_frame_from_module = [&info](const uint64_t pc) {
+          return ModuleContainsFrameAddress(info, pc);
+        };
+        if (!pcs.empty() && std::none_of(pcs.begin(), pcs.end(), is_frame_from_module)) {
+          return;
+        }
+
         const size_t kPageSize = zx_system_get_page_size();
         unsigned int module_id = count++;
         // Print out the module first.
@@ -174,6 +200,12 @@ __EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
           fprintf(f, ":%#" PRIxPTR "}}}\n", start);
         }
       });
+}
+
+}  // namespace inspector
+
+__EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
+  inspector::print_markup_context(f, process, {});
 }
 
 __EXPORT zx_status_t inspector_dso_find_debug_file(inspector_dsoinfo_t* dso,

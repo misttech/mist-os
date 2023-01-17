@@ -5,6 +5,8 @@
 // N.B. The offline symbolizer (scripts/symbolize) reads our output,
 // don't break it.
 
+#include "zircon/system/ulib/inspector/backtrace.h"
+
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -14,6 +16,8 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <iterator>
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -217,6 +221,12 @@ extern "C" __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t p
                                                           inspector_dsoinfo_t* dso_list,
                                                           uintptr_t pc, uintptr_t sp,
                                                           uintptr_t fp) {
+  print_backtrace_markup(f, process, thread, dso_list, pc, sp, fp, /*skip_markup_context=*/true);
+}
+
+void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
+                            inspector_dsoinfo_t* dso_list, uintptr_t pc, uintptr_t sp, uintptr_t fp,
+                            const bool skip_markup_context) {
   // Check the consistency between ngunwind's stack and SCS. Print both if they mismatch.
   std::vector<Frame> stack = unwind_from_ngunwind(process, thread, dso_list, pc, sp, fp);
   std::vector<Frame> scs = unwind_from_shadow_call_stack(process, thread);
@@ -231,11 +241,23 @@ extern "C" __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t p
   }
 
   if (scs_it != scs.end()) {
+    if (!skip_markup_context) {
+      // Print all modules.
+      print_markup_context(f, process, {});
+    }
+
     print_stack(f, scs);
     fprintf(
         f,
         "warning: the backtrace above is from the shadow call stack because the backtrace from "
         "metadata-based unwinding is incomplete or corrupted. Here's the original backtrace:\n");
+  } else if (!skip_markup_context) {
+    // Only print modules present in the stack.
+    std::vector<uint64_t> pcs;
+    std::transform(stack.begin(), stack.end(), std::back_inserter(pcs),
+                   [](const Frame& frame) { return frame.pc; });
+
+    print_markup_context(f, process, pcs);
   }
 
   print_stack(f, stack);
