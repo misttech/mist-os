@@ -135,6 +135,9 @@ template("fidl") {
   enable_c = defined(invoker.enable_c) && invoker.enable_c
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
 
+  # TODO(https://fxbug.dev/119953): Temporary for migration.
+  not_needed(invoker, [ "enable_hlcpp" ])
+
   not_needed([
                "enable_banjo",
                "enable_c",
