@@ -5,7 +5,7 @@
 // These tests should run without any network interface (except loopback).
 
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <sys/utsname.h>
 
 #include <gtest/gtest.h>

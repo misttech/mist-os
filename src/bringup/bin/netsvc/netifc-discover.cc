@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <stdio.h>

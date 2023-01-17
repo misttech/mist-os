@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fdio/watcher.h>

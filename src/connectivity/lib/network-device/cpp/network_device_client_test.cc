@@ -5,7 +5,7 @@
 #include "src/connectivity/lib/network-device/cpp/network_device_client.h"
 
 #include <fidl/fuchsia.net.tun/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
