@@ -104,6 +104,13 @@ bool FuchsiaFirmwareStorageWrite(FuchsiaFirmwareStorage* ops, size_t offset, siz
 // data when offset, size or `src` is unaligned.
 bool FuchsiaFirmwareStorageWriteConst(FuchsiaFirmwareStorage* ops, size_t offset, size_t size,
                                       const void* src);
+
+#ifdef ENABLE_FIRMWARE_STORAGE_LOG
+#define firmware_storage_log printf
+#else
+#define firmware_storage_log(...)
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
@@ -6,6 +6,7 @@
 """The code is to provide a reference of how test_images.h is generated"""
 
 import os
+import pathlib
 import tempfile
 from typing import List
 import subprocess
@@ -155,6 +156,32 @@ def GenerateVariableDeclarationHeader(decls: List[str], out_file: str):
     subprocess.run(['fx', 'format-code', f'--files={out_file}'])
 
 
+def GenerateTestGptDeclaration() -> str:
+    # Generate a realistic GPT disk for testing firmware sdk and reference code
+    with tempfile.TemporaryDirectory() as temp_dir:
+        filepath = pathlib.Path(os.path.join(temp_dir, 'gpt.bin'))
+        partitions = [
+            #(name, size Kb)
+            ("zircon_a", 2),
+            ("zircon_b", 2),
+            ("zircon_r", 2),
+            ("vbmeta_a", 6),
+            ("vbmeta_b", 6),
+            ("vbmeta_r", 6),
+            ("durable_boot", 1),
+        ]
+        total_size = (1 + 33 * 2) * 512  # MBR + (gpt header + entries) * 2
+        args = ["sgdisk", filepath, "--clear", "--set-alignment", "512"]
+        for i, (name, size_kb) in enumerate(partitions, start=1):
+            args += [
+                "--new", f"{i}:+0:+{size_kb}K", "--change-name", f"{i}:{name}"
+            ]
+            total_size += size_kb * 1024
+        filepath.write_bytes(b'\x00' * total_size)
+        ret = subprocess.run(args, check=True, text=True)
+        return GetCArrayDeclaration(filepath.read_bytes(), "kTestGptDisk")
+
+
 if __name__ == '__main__':
     decls = []
     # slot images
@@ -164,4 +191,5 @@ if __name__ == '__main__':
     # permanent attributes
     decls.append(
         GeneratePermanentAttributesDeclaration(ATX_PERMANENT_ATTRIBUTES))
+    decls.append(GenerateTestGptDeclaration())
     GenerateVariableDeclarationHeader(decls, 'test_images.h')

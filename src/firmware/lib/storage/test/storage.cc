@@ -2,72 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "storage.h"
+// #include "storage.h"
 
 #include <gtest/gtest.h>
 
+#include "test_utils.h"
+
 namespace {
-
-class AlignedBuffer {
- public:
-  AlignedBuffer(size_t size) : buffer_(size + FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT) {}
-
-  uint8_t* get() {
-    uintptr_t addr = reinterpret_cast<uintptr_t>(buffer_.data());
-    addr = (addr + FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT - 1) /
-           FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT * FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT;
-    return reinterpret_cast<uint8_t*>(addr);
-  }
-
- private:
-  std::vector<uint8_t> buffer_;
-};
-
-class TestFuchsiaFirmwareStorage {
- public:
-  TestFuchsiaFirmwareStorage(size_t size, size_t block_size)
-      : scratch_buffer_(block_size), block_size_(block_size) {
-    // Initialize buffer data;
-    for (size_t i = 0; i < size; i++) {
-      buffer_.push_back(static_cast<uint8_t>(i));
-    }
-  }
-
-  FuchsiaFirmwareStorage GetFuchsiaFirmwareStorage() {
-    return {
-        block_size_, buffer_.size() / block_size_, scratch_buffer_.get(), this, Read, Write,
-    };
-  }
-
-  const std::vector<uint8_t>& buffer() { return buffer_; }
-
- private:
-  static bool Read(void* ctx, size_t block_offset, size_t blocks_count, void* dst) {
-    TestFuchsiaFirmwareStorage* ptr = static_cast<TestFuchsiaFirmwareStorage*>(ctx);
-    size_t offset = block_offset * ptr->block_size_, size = blocks_count * ptr->block_size_;
-    if ((reinterpret_cast<uintptr_t>(dst) % FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT) ||
-        offset + size > ptr->buffer_.size()) {
-      return false;
-    }
-    memcpy(dst, ptr->buffer_.data() + offset, size);
-    return true;
-  }
-
-  static bool Write(void* ctx, size_t block_offset, size_t blocks_count, const void* src) {
-    TestFuchsiaFirmwareStorage* ptr = static_cast<TestFuchsiaFirmwareStorage*>(ctx);
-    size_t offset = block_offset * ptr->block_size_, size = blocks_count * ptr->block_size_;
-    if ((reinterpret_cast<uintptr_t>(src) % FUCHSIA_FIRMWARE_STORAGE_BUFFER_ALIGNMENT) ||
-        offset + size > ptr->buffer_.size()) {
-      return false;
-    }
-    memcpy(ptr->buffer_.data() + offset, src, size);
-    return true;
-  }
-
-  AlignedBuffer scratch_buffer_;
-  std::vector<uint8_t> buffer_;
-  size_t block_size_;
-};
 
 struct FuchsiaFirmwareStorageTestCase {
   size_t offset;
@@ -204,7 +145,7 @@ void FuchsiaFirmwareStorageWriteTest(const FuchsiaFirmwareStorageTestCase& test_
   ASSERT_EQ(memcmp(write_buffer.get(), original.data(), total_buffer_size), 0);
 }
 
-TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteTestParameterized) {
+TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteConstTestParameterized) {
   const FuchsiaFirmwareStorageTestCase& test_case = GetParam();
   auto function = [](FuchsiaFirmwareStorage* ops, size_t offset, size_t size, const void* src) {
     return FuchsiaFirmwareStorageWriteConst(ops, offset, size, src);
@@ -212,7 +153,7 @@ TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteTestParameterized)
   FuchsiaFirmwareStorageWriteTest<>(test_case, function);
 }
 
-TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteMutableTestParameterized) {
+TEST_P(FuchsiaFirmwareStorageTest, FuchsiaFirmwareStorageWriteTestParameterized) {
   const FuchsiaFirmwareStorageTestCase& test_case = GetParam();
   auto function = [](FuchsiaFirmwareStorage* ops, size_t offset, size_t size, void* src) {
     return FuchsiaFirmwareStorageWrite(ops, offset, size, src);

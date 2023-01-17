@@ -36,12 +36,8 @@ library_sources = [
   "$vboot_dir/firmware/bdb/secrets.c",
   "$vboot_dir/firmware/bdb/sha.c",
   "$vboot_dir/firmware/bdb/stub.c",
-  "$vboot_dir/firmware/lib/cgptlib/cgptlib.c",
-  "$vboot_dir/firmware/lib/cgptlib/cgptlib_internal.c",
-  "$vboot_dir/firmware/lib/cgptlib/crc32.c",
   "$vboot_dir/firmware/lib/ec_sync.c",
   "$vboot_dir/firmware/lib/ec_sync_all.c",
-  "$vboot_dir/firmware/lib/gpt_misc.c",
   "$vboot_dir/firmware/lib/region-fw.c",
   "$vboot_dir/firmware/lib/region-init.c",
   "$vboot_dir/firmware/lib/region-kernel.c",
@@ -134,7 +130,11 @@ executable("cgpt") {
       "$vboot_dir/cgpt/cmd_find.c",
     ]
   }
-  deps = [ "//third_party/boringssl:crypto" ]
+  deps = [
+    "//third_party/boringssl:crypto",
+    "//third_party/vboot_reference/firmware/lib:gpt_misc",
+    "//third_party/vboot_reference/firmware/lib:headers",
+  ]
   configs += [ ":internal_config" ]
 
   # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
@@ -177,7 +177,13 @@ executable("futility") {
     "$vboot_dir/futility/vb1_helper.c",
     "$vboot_dir/futility/vb2_helper.c",
   ]
-  deps = [ ":futility_cmds.c" ]
+  deps = [
+    ":futility_cmds.c",
+    "//third_party/vboot_reference/firmware:headers",
+    "//third_party/vboot_reference/firmware/2lib:headers",
+    "//third_party/vboot_reference/firmware/lib:gpt_misc",
+    "//third_party/vboot_reference/firmware/lib:headers",
+  ]
   sources += get_target_outputs(":futility_cmds.c")
   if (!is_mac) {
     sources += [

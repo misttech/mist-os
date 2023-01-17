@@ -10,8 +10,12 @@ group("test") {
 }
 
 test("firmware_storage_test") {
-  sources = [ "storage.cc" ]
+  sources = [
+    "gpt_utils.cc",
+    "storage.cc",
+  ]
   deps = [
+    "//sdk/lib/fit",
     "//src/firmware/lib/storage",
     "//src/lib/fxl/test:gtest_main",
   ]

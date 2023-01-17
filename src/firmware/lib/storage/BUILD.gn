@@ -12,8 +12,11 @@ sdk_source_set("storage") {
   sdk_name = "firwmare_storage"
   category = "experimental"
   sources = [
+    "gpt_utils.c",
+    "gpt_utils.h",
     "storage.c",
     "storage.h",
   ]
   public_configs = [ ":includes" ]
+  public_deps = [ "//third_party/vboot_reference/firmware/lib:gpt_misc" ]
 }
