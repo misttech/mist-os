@@ -281,6 +281,7 @@ if (target_cpu == "x64") {
   # The starnix kernel manifest, used by all galaxies.
   fuchsia_component_manifest("starnix_kernel_manifest") {
     manifest = "meta/starnix_kernel.cml"
+    component_name = "starnix_kernel"
   }
 
   # The starnix kernel configuration library, used by the Rust binary to parse configuration.
@@ -306,5 +307,35 @@ if (target_cpu == "x64") {
         max_severity = "ERROR"
       }
     }
+  }
+
+  # The default init executable. Used if the starnix kernel configuration has no init.
+  resource("default_init") {
+    init_label =
+        "//src/proc/bin/galaxies/default_init(//build/toolchain:linux_x64)"
+    out_dir = get_label_info(init_label, "root_out_dir")
+    sources = [ "${out_dir}/default_init" ]
+    outputs = [ "data/init" ]
+    deps = [ init_label ]
+  }
+
+  fuchsia_component("starnix_kernel") {
+    cm_label = ":starnix_kernel_manifest"
+    deps = [ ":starnix_kernel_bin" ]
+  }
+
+  fuchsia_structured_config_values("kernel_config") {
+    cm_label = ":starnix_kernel_manifest"
+    values_source = "//src/proc/bin/galaxies/starless/config.json5"
+  }
+
+  fuchsia_package("starnix_kernel_package") {
+    package_name = "starnix_kernel"
+    deps = [
+      ":default_init",
+      ":kernel_config",
+      ":starnix_kernel",
+      ":starnix_kernel_manifest",
+    ]
   }
 }

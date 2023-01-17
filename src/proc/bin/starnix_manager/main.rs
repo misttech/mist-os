@@ -3,39 +3,68 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, format_err, Context, Error};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_starnix_developer as fstardev;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
-use fuchsia_async as fasync;
-use fuchsia_component::{client as fclient, server::ServiceFs};
+use frunner::ComponentStartInfo;
+use fuchsia_component::client::{self as fclient, connect_to_protocol};
 use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use rand::Rng;
+use std::sync::Arc;
+use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
 
 #[fuchsia::main(logging_tags = ["starnix_manager"])]
 async fn main() -> Result<(), Error> {
-    let mut fs = ServiceFs::new_local();
+    const KERNELS_DIRECTORY: &str = "kernels";
+    const SVC_DIRECTORY: &str = "svc";
 
-    fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::local(async move {
-            serve_starnix_manager(stream).await.expect("failed to start manager service.")
-        })
-        .detach();
-    });
-    fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::local(async move {
-            serve_runner(stream).await.expect("failed to start runner service.")
-        })
-        .detach();
-    });
+    let outgoing_dir_handle =
+        fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
+            .ok_or(anyhow!("Failed to get startup handle"))?;
+    let outgoing_dir_server_end =
+        fidl::endpoints::ServerEnd::new(zx::Channel::from(outgoing_dir_handle));
 
-    fs.take_and_serve_directory_handle()?;
-    fs.collect::<()>().await;
+    let outgoing_dir = vfs::directory::immutable::simple();
+    let kernels_dir = vfs::directory::immutable::simple();
+    outgoing_dir.add_entry(KERNELS_DIRECTORY, kernels_dir.clone())?;
+
+    let svc_dir = vfs::directory::immutable::simple();
+    svc_dir.add_entry(
+        fstardev::ManagerMarker::PROTOCOL_NAME,
+        vfs::service::host(move |requests| async move {
+            serve_starnix_manager(requests).await.expect("Error serving starnix manager.");
+        }),
+    )?;
+    svc_dir.add_entry(
+        frunner::ComponentRunnerMarker::PROTOCOL_NAME,
+        vfs::service::host(move |requests| {
+            let kernels_dir = kernels_dir.clone();
+            async move {
+                serve_component_runner(requests, kernels_dir.clone())
+                    .await
+                    .expect("Error serving component runner.");
+            }
+        }),
+    )?;
+    outgoing_dir.add_entry(SVC_DIRECTORY, svc_dir.clone())?;
+
+    let execution_scope = vfs::execution_scope::ExecutionScope::new();
+    outgoing_dir.open(
+        execution_scope.clone(),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        0,
+        vfs::path::Path::dot(),
+        outgoing_dir_server_end,
+    );
+    execution_scope.wait().await;
 
     Ok(())
 }
@@ -68,12 +97,15 @@ pub async fn serve_starnix_manager(
     Ok(())
 }
 
-pub async fn serve_runner(
+pub async fn serve_component_runner(
     mut request_stream: frunner::ComponentRunnerRequestStream,
+    kernels_dir: Arc<vfs::directory::immutable::Simple>,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
-            frunner::ComponentRunnerRequest::Start { .. } => {}
+            frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                create_new_kernel(&kernels_dir, start_info, controller).await?;
+            }
         }
     }
     Ok(())
@@ -162,4 +194,143 @@ pub async fn create_child_component(
     // The component is run in a `SingleRun` collection instance, and will be automatically
     // deleted when it exits.
     Ok(())
+}
+
+/// Takes a `name` and generates a `String` suitable to use as the name of a component in a
+/// collection.
+///
+/// Used to avoid creating children with the same name.
+fn generate_kernel_name(name: &str) -> String {
+    let random_id: String = rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+    name.to_owned() + "_" + &random_id
+}
+
+/// Creates a new instance of `starnix_kernel`.
+///
+/// This is done by creating a new child in the `kernels` collection. A directory is offered to the
+/// `starnix_kernel`, at `/galaxy_config`. The directory contains the `program` block of the galaxy,
+/// and the galaxy's `/pkg` directory.
+///
+/// The component controller for the galaxy is also passed to the `starnix_kernel`, via the `User0`
+/// handle. The `controller` is closed when the `starnix_kernel` finishes executing (e.g., when
+/// the init task completes).
+async fn create_new_kernel(
+    kernels_dir: &vfs::directory::immutable::Simple,
+    component_start_info: frunner::ComponentStartInfo,
+    controller: ServerEnd<frunner::ComponentControllerMarker>,
+) -> Result<(), Error> {
+    // The name of the collection that the starnix_kernel is run in.
+    const KERNEL_COLLECTION: &str = "kernels";
+    // The name of the directory capability that is being offered to the starnix_kernel.
+    const KERNEL_DIRECTORY: &str = "kernels";
+    // The url of the starnix_kernel component, which is packaged with the starnix_manager.
+    const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
+    // The name of the directory as seen by the starnix_kernel.
+    const CONFIG_DIRECTORY: &str = "galaxy_config";
+
+    // Create a new configuration directory for the starnix_kernel instance.
+    let kernel_name = generate_kernel_config_directory(kernels_dir, component_start_info)?;
+
+    // Pass the component_controller for the galaxy to the starnix_kernel as handle `User0`.
+    let controller_handle_info = fprocess::HandleInfo {
+        handle: controller.into_channel().into_handle(),
+        id: HandleInfo::new(HandleType::User0, 0).as_raw(),
+    };
+    let numbered_handles = vec![controller_handle_info];
+
+    // Create a new instance of starnix_kernel in the kernel collection. Offer the directory that
+    // contains all the configuration information for the galaxy that it is running.
+    let realm =
+        connect_to_protocol::<fcomponent::RealmMarker>().expect("Failed to connect to realm.");
+    realm
+        .create_child(
+            &mut fdecl::CollectionRef { name: KERNEL_COLLECTION.into() },
+            fdecl::Child {
+                name: Some(kernel_name.to_string()),
+                url: Some(KERNEL_URL.to_string()),
+                startup: Some(fdecl::StartupMode::Lazy),
+                ..fdecl::Child::EMPTY
+            },
+            fcomponent::CreateChildArgs {
+                dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {
+                    source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                    source_name: Some(KERNEL_DIRECTORY.to_string()),
+                    target_name: Some(CONFIG_DIRECTORY.to_string()),
+                    rights: Some(
+                        fio::Operations::READ_BYTES
+                            | fio::Operations::CONNECT
+                            | fio::Operations::ENUMERATE
+                            | fio::Operations::TRAVERSE
+                            | fio::Operations::GET_ATTRIBUTES,
+                    ),
+                    subdir: Some(kernel_name.clone()),
+                    dependency_type: Some(fdecl::DependencyType::Strong),
+                    availability: Some(fdecl::Availability::Required),
+                    ..fdecl::OfferDirectory::EMPTY
+                })]),
+                numbered_handles: Some(numbered_handles),
+                ..fcomponent::CreateChildArgs::EMPTY
+            },
+        )
+        .await?
+        .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
+
+    Ok(())
+}
+
+/// Creates a new subdirectory in `kernels_dir`, named after the galaxy being created.
+///
+/// This directory is populated with the galaxy's `/pkg` directory and `program` block.
+///
+/// Returns the name of the newly created directory.
+fn generate_kernel_config_directory(
+    kernels_dir: &vfs::directory::immutable::Simple,
+    mut component_start_info: ComponentStartInfo,
+) -> Result<String, Error> {
+    // The name of the directory that contains the galaxy's /pkg.
+    const PKG_DIRECTORY: &str = "pkg";
+    // The name of the file that the starnix_kernel's configuration is written to.
+    const CONFIG_FILE: &str = "config";
+
+    // Grab the /pkg directory of the galaxy component. This will be provided to the starnix_kernel.
+    let mut ns = component_start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
+    let pkg = ns
+        .iter_mut()
+        .find(|entry| entry.path == Some("/pkg".to_string()))
+        .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?
+        .directory
+        .take()
+        .ok_or_else(|| anyhow!("Missing directory handle in pkg namespace entry"))?
+        .into_proxy()?;
+
+    let mut program_block =
+        component_start_info.program.ok_or(anyhow!("Missing program block in galaxy."))?;
+
+    // Add the galaxy configuration file to the directory that is provided to the starnix_kernel.
+    let kernel_config_file =
+        vfs::file::vmo::read_only_static(fidl::encoding::persist(&mut program_block)?);
+
+    let kernel_config_dir = vfs::directory::immutable::simple();
+    kernel_config_dir.add_entry(CONFIG_FILE, kernel_config_file)?;
+    kernel_config_dir.add_entry(PKG_DIRECTORY, vfs::remote::remote_dir(pkg))?;
+
+    // This particular starnix_kernel's configuration directory is stored in the `kernels_dir`. We
+    // then offer a subdirectory of said directory to the starnix_kernel.
+    let kernel_name = {
+        let galaxy_url =
+            component_start_info.resolved_url.clone().ok_or(anyhow!("Missing resolved URL"))?;
+        let galaxy_name = galaxy_url
+            .split('/')
+            .last()
+            .expect("Could not find last path component in resolved URL");
+        generate_kernel_name(galaxy_name)
+    };
+
+    kernels_dir.add_entry(kernel_name.clone(), kernel_config_dir)?;
+
+    Ok(kernel_name)
 }

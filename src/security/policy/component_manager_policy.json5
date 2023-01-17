@@ -48,6 +48,7 @@
                 "/bootstrap/shutdown_shim",
             ],
             create_raw_processes: [
+                "/core/starnix_manager/kernels:**",
                 "/core/starnix_manager/starmium",
                 "/core/starnix_manager/stardroid",
                 "/core/starnix_manager/starbionic",
@@ -257,6 +258,7 @@
                     "/core/debian-guest-manager/vmm",
                     "/core/session-manager/session:session/workstation_session/login_shell/application_shell:*/chrome",
                     "/core/termina-guest-manager/vmm",
+                    "/core/starnix_manager/kernels:**",
                     "/core/starnix_manager/starmium",
                     "/core/starnix_manager/stardroid",
                     "/core/starnix_manager/starbionic",
@@ -651,6 +653,7 @@
                     "/core/network/netstack",
                     "/core/lowpan-ot-driver",
                     "/core/starnix_manager",
+                    "/core/starnix_manager/kernels:**",
                     "/core/starnix_manager/starmium",
                     "/core/starnix_manager/stardroid",
                     "/core/starnix_manager/starbionic",

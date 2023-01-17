@@ -33,6 +33,13 @@
             path: "/dev/class/gpu",
         },
         {
+            directory: "galaxy_config",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/galaxy_config",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.posix.socket.Provider",

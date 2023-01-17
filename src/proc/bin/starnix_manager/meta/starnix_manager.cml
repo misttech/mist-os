@@ -34,6 +34,7 @@
         {
             name: "kernels",
             durability: "single_run",
+            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
@@ -46,6 +47,11 @@
                 "fuchsia.component.runner.ComponentRunner",
                 "fuchsia.starnix.developer.Manager",
             ],
+        },
+        {
+            directory: "kernels",
+            rights: [ "r*" ],
+            path: "/kernels",
         },
     ],
     use: [
@@ -128,6 +134,17 @@
                 "#starmium",
             ],
         },
+        {
+            directory: "galaxy_config",
+            from: "void",
+            to: [
+                "#starbionic",
+                "#stardroid",
+                "#starless",
+                "#starmium",
+            ],
+            availability: "optional",
+        },
     ],
     expose: [
         {
@@ -183,6 +200,10 @@
                     runner: "starnix",
                     from: "#starless",
                     as: "starless",
+                },
+                {
+                    runner: "starnix",
+                    from: "self",
                 },
             ],
         },
