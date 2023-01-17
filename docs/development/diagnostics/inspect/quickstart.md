@@ -236,12 +236,12 @@ to help you get started.
 
 * {Rust}
 
-  Refer to [C++ Library Concepts](#c++), as similar concepts apply in Rust.
+  The Rust library provides two ways of managing nodes and properties: creation
+  and recording.
 
-  The Rust library provides two ways of managing nodes and properties: creation and recording.
-
-  With the `create_*` methods, the ownership of the property or node object to the caller.
-  When the returned object is dropped, it is removed. For example:
+  With the `create_*` methods, the ownership of the property or node object belongs
+  to the caller. When the returned object is dropped, the property is removed.
+  For example:
 
   ```rust
   {
@@ -249,12 +249,11 @@ to help you get started.
   }
   ```
 
-  In this example, the property went out of scope so a drop on the property is
+  In this example, `property` went out of scope so a drop on the property is
   called. Readers won't see this property.
 
-  With the `record_*` methods, the lifetime of the node the method is
-  called on is entangled with the resulting property. When the node the method was called
-  is deleted, the recorded property is deleted.
+  With the `record_*` methods, the lifetime of the property is tied to the parent
+  node. When the node is deleted, the recorded property is deleted.
 
   ```rust
   {
@@ -266,8 +265,8 @@ to help you get started.
   }
   ```
 
-  In this example, neither the `name` node nor the uint property is visible to readers
-  after `node` is dropped.
+  In this example, the uint property associated with `name` is visible to readers
+  until the parent `node` goes out of scope.
 
 ### Dynamic values
 
