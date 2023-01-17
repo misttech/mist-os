@@ -888,9 +888,9 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
                 assert_eq!(*boxed, fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {}));
                 Ok(())
             }
-            Some(Ok(other)) => return Err(anyhow!("wrong node event returned: {:?}", other)),
+            Some(Ok(other)) => Err(anyhow!("wrong node event returned: {:?}", other)),
             Some(Err(e)) => Err(e).context("failed to call onopen"),
-            None => return Err(anyhow!("no events!")),
+            None => Err(anyhow!("no events!")),
         }
     }
 

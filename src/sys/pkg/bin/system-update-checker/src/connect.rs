@@ -55,7 +55,7 @@ mod test {
 
     impl ServiceConnect for FailServiceConnector {
         fn connect_to_service<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-            return Err(format_err!("no services here"));
+            Err(format_err!("no services here"))
         }
     }
 }

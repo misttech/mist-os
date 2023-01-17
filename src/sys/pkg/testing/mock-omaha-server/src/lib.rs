@@ -245,7 +245,7 @@ pub async fn handle_request(
         return handle_set_responses(req, omaha_server).await;
     }
 
-    return handle_omaha_request(req, omaha_server).await;
+    handle_omaha_request(req, omaha_server).await
 }
 
 pub async fn handle_set_responses(

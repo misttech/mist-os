@@ -154,7 +154,7 @@ impl InputState {
         device_type: InputDeviceType,
         device_name: String,
     ) -> Result<DeviceState, Error> {
-        return Ok(self
+        Ok(self
             .input_categories
             .get(&device_type)
             .ok_or_else(|| {
@@ -167,7 +167,7 @@ impl InputState {
             .ok_or_else(|| {
                 ControllerError::UnexpectedError("Failed to get input device by device name".into())
             })?
-            .state);
+            .state)
     }
 
     /// Returns true if the state map is empty.

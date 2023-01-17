@@ -34,7 +34,7 @@ impl ServiceRegistry {
             }
         }
 
-        return Err(format_err!("channel not handled for service: {}", service_name));
+        Err(format_err!("channel not handled for service: {}", service_name))
     }
 
     pub(crate) fn serve(registry_handle: ServiceRegistryHandle) -> GenerateService {
@@ -44,11 +44,11 @@ impl ServiceRegistry {
                 let service_name_clone = String::from(service_name);
 
                 Box::pin(async move {
-                    return registry_handle_clone
+                    registry_handle_clone
                         .lock()
                         .await
                         .service_channel(service_name_clone.as_str(), channel)
-                        .await;
+                        .await
                 })
             },
         )

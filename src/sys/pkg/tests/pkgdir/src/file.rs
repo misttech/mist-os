@@ -511,7 +511,7 @@ async fn assert_clone_success(
 
 async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, path: &str) {
     async fn verify_file_clone_sends_on_open_event(file: fio::FileProxy) -> Result<(), Error> {
-        return match file.take_event_stream().next().await {
+        match file.take_event_stream().next().await {
             Some(Ok(fio::FileEvent::OnOpen_ { s, info: Some(boxed) })) => {
                 assert_eq!(zx::Status::from_raw(s), zx::Status::OK);
                 match *boxed {
@@ -522,7 +522,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
             Some(Ok(other)) => Err(anyhow!("wrong node type returned: {:?}", other)),
             Some(Err(e)) => Err(e).context("failed to call onopen"),
             None => Err(anyhow!("no events!")),
-        };
+        }
     }
 
     let parent = open_file(package_root, path, fio::OpenFlags::RIGHT_READABLE)

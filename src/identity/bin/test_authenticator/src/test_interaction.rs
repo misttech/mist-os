@@ -117,7 +117,7 @@ mod tests {
             create_proxy::<TestInteractionMarker>().expect("Failed to create interaction proxy");
         let test_interaction_handler = TestInteraction::new();
         let task = Task::local(async move {
-            return test_interaction_handler
+            test_interaction_handler
                 .handle_requests_from_stream(server_end.into_stream().expect(
                     "Failed to create \
                         fuchsia.identity.authentication.TestInteraction stream \
@@ -127,7 +127,7 @@ mod tests {
                 .expect(
                     "Error while handling \
                     fuchsia.identity.authentication.TestInteraction request stream",
-                );
+                )
         });
         (proxy, task)
     }

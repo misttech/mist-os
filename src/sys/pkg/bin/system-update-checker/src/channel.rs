@@ -477,7 +477,7 @@ mod tests {
                 };
                 match mode {
                     Some(FlakeMode::ErrorOnConnect) => {
-                        return Err(anyhow::format_err!("test error on connect"))
+                        Err(anyhow::format_err!("test error on connect"))
                     }
                     Some(FlakeMode::DropConnection) => {
                         let (proxy, _stream) = fidl::endpoints::create_proxy::<P>().unwrap();
