@@ -439,7 +439,7 @@ pub mod tests {
 
     #[test]
     fn test_caching() -> Result<(), Error> {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(Seconds(0.0).into());
 
         let sensor_temperature = Rc::new(Cell::new(Celsius(0.0)));

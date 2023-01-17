@@ -213,7 +213,7 @@ mod tests {
 
     #[fuchsia::test]
     fn interaction_notifier_listener_gets_updated_idle_state() -> Result<(), Error> {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);
@@ -242,7 +242,7 @@ mod tests {
 
     #[fuchsia::test]
     fn interaction_notifier_listener_gets_updated_active_state() -> Result<(), Error> {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);
@@ -298,7 +298,7 @@ mod tests {
         // these cases, we first assert that ACTIVITY_TIMEOUT is an even number.
         assert_eq!(ACTIVITY_TIMEOUT.into_nanos() % 2, 0);
 
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);
@@ -345,7 +345,7 @@ mod tests {
 
     #[fuchsia::test]
     fn actvity_manager_drops_late_activities() -> Result<(), Error> {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);
@@ -400,7 +400,7 @@ mod tests {
     #[fuchsia::test]
     fn activity_manager_rate_limits_activities_notifies_idle_state() -> Result<(), Error> {
         let less_than_one_second = zx::Duration::from_millis(999);
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);
@@ -452,7 +452,7 @@ mod tests {
     #[fuchsia::test]
     fn activity_manager_rate_limits_activities_notifies_active_state() -> Result<(), Error> {
         let less_than_one_second = zx::Duration::from_millis(999);
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT);

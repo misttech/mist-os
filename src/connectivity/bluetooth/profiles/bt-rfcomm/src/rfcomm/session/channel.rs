@@ -559,7 +559,7 @@ mod tests {
         credits: Credits,
     ) -> (fasync::TestExecutor, inspect::Inspector, CreditFlowController, mpsc::Receiver<Frame>)
     {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(time);
         let inspect = inspect::Inspector::new();
 
@@ -975,7 +975,7 @@ mod tests {
 
     #[test]
     fn session_channel_inspect_updates_when_established() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(7_000_000));
 
         // Set up and establish a channel with inspect.

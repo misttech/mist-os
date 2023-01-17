@@ -501,7 +501,7 @@ mod tests {
     fn test_get_current_timestamp() {
         use crate::types::Nanoseconds;
 
-        let exec = fuchsia_async::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fuchsia_async::TestExecutor::new_with_fake_time();
 
         exec.set_fake_time(fuchsia_async::Time::from_nanos(0));
         assert_eq!(get_current_timestamp(), Nanoseconds(0));
@@ -528,7 +528,7 @@ pub mod run_all_tasks_until_stalled {
 
         #[test]
         fn test_run_all_tasks_until_stalled() {
-            let mut executor = fuchsia_async::TestExecutor::new_with_fake_time().unwrap();
+            let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
             let completed = Rc::new(Cell::new(false));
             let completed_clone = completed.clone();

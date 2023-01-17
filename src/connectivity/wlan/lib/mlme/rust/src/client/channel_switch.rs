@@ -732,8 +732,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_beacon_frame() {
-        let exec =
-            fasync::TestExecutor::new_with_fake_time().expect("Failed to create test executor");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut time = fasync::Time::from_nanos(0);
@@ -792,8 +791,7 @@ mod tests {
 
     #[test]
     fn channel_state_cannot_pause_tx() {
-        let _exec =
-            fasync::TestExecutor::new_with_fake_time().expect("Failed to create test executor");
+        let _exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut actions = MockChannelActions::default();
@@ -807,8 +805,7 @@ mod tests {
 
     #[test]
     fn channel_state_cannot_parse_malformed_csa() {
-        let _exec =
-            fasync::TestExecutor::new_with_fake_time().expect("Failed to create test executor");
+        let _exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
         let mut actions = MockChannelActions::default();
@@ -845,8 +842,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_announcement_frame() {
-        let exec =
-            fasync::TestExecutor::new_with_fake_time().expect("Failed to create test executor");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
         let bcn_time: fasync::Time =
@@ -890,8 +886,7 @@ mod tests {
 
     #[test]
     fn channel_state_handles_delayed_csa_in_announcement_frame_with_missed_beacon() {
-        let exec =
-            fasync::TestExecutor::new_with_fake_time().expect("Failed to create test executor");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
         exec.set_fake_time(fasync::Time::from_nanos(0));

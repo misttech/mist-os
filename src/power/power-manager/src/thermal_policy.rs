@@ -979,7 +979,7 @@ pub mod tests {
 
         // The executor's fake time must be set before node creation to ensure the periodic timer's
         // deadline is properly initialized.
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(Seconds(0.0).into());
 
         let mock_metrics = mock_maker.make("MockPlatformMetrics", vec![]);

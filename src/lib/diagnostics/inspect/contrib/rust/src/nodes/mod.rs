@@ -105,7 +105,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_create_time_and_update() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(0));
         let inspector = Inspector::new();
         let time_property = inspector.root().create_time("time");
@@ -120,7 +120,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_record_time() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(55));
         let inspector = Inspector::new();
         inspector.root().record_time("time");

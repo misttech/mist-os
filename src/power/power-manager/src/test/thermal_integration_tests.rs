@@ -310,7 +310,7 @@ impl<'a> ThermalPolicyTest<'a> {
             );
         }
         let time = Seconds(0.0);
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(time.into());
 
         let cpu_params = sim_params.cpu_params.clone();

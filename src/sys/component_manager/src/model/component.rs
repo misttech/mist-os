@@ -2196,7 +2196,7 @@ pub mod tests {
     /// The scenario where the controller stops the component after a delay
     /// which is before the controller reaches its timeout.
     fn stop_component_successful_stop_with_delay() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create a mock controller which simulates shutting down the component
         // after a delay. The delay is much shorter than the period allotted
@@ -2285,7 +2285,7 @@ pub mod tests {
     /// the `kill` message to the controller. The runner then does not kill the
     /// component within the kill time out period.
     fn stop_component_successful_with_kill_timeout_result() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create a controller which takes far longer than allowed to stop the
         // component.
@@ -2394,7 +2394,7 @@ pub mod tests {
     /// the `kill` message to the controller. The controller then kills the
     /// component before the kill timeout is reached.
     fn stop_component_successful_with_kill_result() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create a controller which takes far longer than allowed to stop the
         // component.
@@ -2470,7 +2470,7 @@ pub mod tests {
     /// goes to send the kill message, it finds the control channel is closed,
     /// indicating the component stopped.
     fn stop_component_successful_race_with_controller() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create a controller which takes far longer than allowed to stop the
         // component.

@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn service_level_connection_inspect_tree() {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1230000));
         let inspect = inspect::Inspector::new();
 

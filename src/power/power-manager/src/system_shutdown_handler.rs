@@ -631,7 +631,7 @@ pub mod tests {
         let mut mock_maker = MockNodeMaker::new();
 
         // Need to use an TestExecutor with fake time to test the timeout value
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(Seconds(0.0).into());
 
         // Arbitrary shutdown request to be used in the test

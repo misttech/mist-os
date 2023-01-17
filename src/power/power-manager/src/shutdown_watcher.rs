@@ -529,7 +529,7 @@ mod tests {
     /// from the list of registered reboot watchers.
     #[test]
     fn test_watcher_response_timeout() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let node = ShutdownWatcherBuilder::new().build().unwrap();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 

@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn test_timers_fire() {
         set_logger_for_test();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let (t, mut fired) = TestContext::new();
         run_in_executor(&mut executor, async {
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn test_get_scheduled_instant() {
         set_logger_for_test();
-        let mut _executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut _executor = fasync::TestExecutor::new_with_fake_time();
         let (t, _) = TestContext::new();
 
         let mut lock = t.0.try_lock().unwrap();
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn test_cancel() {
         set_logger_for_test();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let (mut t, mut rcv) = TestContext::new();
 
         // timer 1 and 2 are scheduled.
@@ -485,7 +485,7 @@ mod tests {
         // future will fire, but we'll cancel it before the timer dispatcher has
         // a chance to commit it).
 
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let time1 = nanos_from_now(1);
         let time2 = nanos_from_now(2);
@@ -527,7 +527,7 @@ mod tests {
     #[test]
     fn test_reschedule() {
         set_logger_for_test();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let (mut t, mut rcv) = TestContext::new();
 
         // timer 1 and 2 are scheduled.
@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn test_cancel_with() {
         set_logger_for_test();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let (mut t, mut rcv) = TestContext::new();
 
         t.with_disp_sync(|d| {

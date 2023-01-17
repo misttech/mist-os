@@ -868,7 +868,7 @@ mod tests {
     // Check that the remote will attempt to connect to a peer if we have a profile.
     #[fuchsia::test]
     fn trigger_connection_test() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(1);
@@ -933,7 +933,7 @@ mod tests {
     // and browsing.
     #[fuchsia::test]
     fn trigger_connections_test() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(1);
@@ -1017,7 +1017,7 @@ mod tests {
     /// underlying channel, and spawns a new task to handle incoming requests.
     #[fuchsia::test]
     fn test_peer_reconnection() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(123);
@@ -1102,7 +1102,7 @@ mod tests {
     /// reconnect.
     #[fuchsia::test]
     fn test_simultaneous_control_connections() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(123);
@@ -1203,7 +1203,7 @@ mod tests {
     /// Tests that when connection fails, we don't infinitely retry.
     #[fuchsia::test]
     fn test_connection_no_retries() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(123);
@@ -1316,7 +1316,7 @@ mod tests {
     /// reconnect.
     #[fuchsia::test]
     fn test_simultaneous_browse_connections() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(123);
@@ -1442,7 +1442,7 @@ mod tests {
     /// control and browse connections are dropped.
     #[fuchsia::test]
     fn incoming_channel_resets_connections() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(1);
@@ -1550,7 +1550,7 @@ mod tests {
     /// control and browse connections are dropped.
     #[fuchsia::test]
     fn incoming_browse_channel_dropped() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(1);
@@ -1591,7 +1591,7 @@ mod tests {
 
     #[fuchsia::test]
     fn outgoing_connection_error_updates_inspect() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
 
         let id = PeerId(30789);

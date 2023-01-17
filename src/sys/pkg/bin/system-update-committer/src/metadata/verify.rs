@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn blobfs_fail_timeout() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Create a mock blobfs verifier that will never respond.
         let mock = Arc::new(MockVerifierService::new(HangingVerifyHook));

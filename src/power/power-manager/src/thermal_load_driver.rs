@@ -560,7 +560,7 @@ mod tests {
     /// correctly.
     #[test]
     fn test_multiple_temperature_inputs() {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();
@@ -641,7 +641,7 @@ mod tests {
     /// the ThermalLoadDriver node initiates a system reboot due to high temperature.
     #[test]
     fn test_trigger_shutdown() {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();
@@ -692,7 +692,7 @@ mod tests {
     /// Tests that the expected Inspect properties are present.
     #[test]
     fn test_inspect_data() {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::new();
 
         // Create mock nodes
@@ -778,7 +778,7 @@ mod tests {
     /// Tests for correct platform metrics sent to the PlatformMetrics node.
     #[test]
     fn test_platform_metrics() {
-        let exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fasync::TestExecutor::new_with_fake_time();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();

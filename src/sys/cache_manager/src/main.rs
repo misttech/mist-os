@@ -232,7 +232,7 @@ mod tests {
     ) -> (UnboundedReceiver<CallType>, TestExecutor, Duration, fsys::StorageAdminProxy, Config)
     {
         let (calls_tx, calls_rx) = futures::channel::mpsc::unbounded::<CallType>();
-        let exec = TestExecutor::new_with_fake_time().unwrap();
+        let exec = TestExecutor::new_with_fake_time();
         let time_step = Duration::from_millis(5000);
         let config = Config {
             cache_clearing_threshold: 20,

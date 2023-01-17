@@ -1276,7 +1276,7 @@ mod tests {
     where
         F: FnOnce(fasync::TestExecutor, StreamConfig) -> (),
     {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("Executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let (client, request_stream) =
             fidl::endpoints::create_request_stream::<StreamConfigMarker>()
                 .expect("Error creating stream config endpoint");

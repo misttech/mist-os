@@ -2898,7 +2898,7 @@ mod tests {
     impl TestHelper {
         fn new_(with_fake_time: bool) -> Self {
             let executor = if with_fake_time {
-                fuchsia_async::TestExecutor::new_with_fake_time().unwrap()
+                fuchsia_async::TestExecutor::new_with_fake_time()
             } else {
                 fuchsia_async::TestExecutor::new()
             };

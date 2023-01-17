@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_client_timeout() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut helper = Helper::new();
 
         let (_view_ref, _listener) = helper.create_and_focus_client_sync(&mut exec)?;

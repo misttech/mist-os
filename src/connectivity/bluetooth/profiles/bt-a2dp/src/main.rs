@@ -735,7 +735,7 @@ mod tests {
     /// Tests that A2DP sink assumes the initiator role when a peer is found, but
     /// not connected, and the timeout completes.
     fn wait_to_initiate_success_with_no_connected_peer() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (peers, mut prof_stream) = setup_connected_peers();
         // Initialize context to a fixed point in time.
         exec.set_fake_time(fasync::Time::from_nanos(1000000000));
@@ -810,7 +810,7 @@ mod tests {
     /// Tests that A2DP sink does not assume the initiator role when a peer connects
     /// before `INITIATOR_DELAY` timeout completes.
     fn wait_to_initiate_returns_early_with_connected_peer() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (peers, mut prof_stream) = setup_connected_peers();
         // Initialize context to a fixed point in time.
         exec.set_fake_time(fasync::Time::from_nanos(1000000000));

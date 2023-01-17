@@ -120,8 +120,7 @@ mod test {
 
     #[test]
     fn test_timer() {
-        let mut executor =
-            fasync::TestExecutor::new_with_fake_time().expect("creating executor failed");
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let start_time = executor.now();
         let mut timer = NamedTimer::new(&DEADLINE_ID, ONE_HOUR);
         assert!(executor.run_until_stalled(&mut timer).is_pending());
@@ -133,8 +132,7 @@ mod test {
 
     #[test]
     fn test_timeout_not_invoked() {
-        let mut executor =
-            fasync::TestExecutor::new_with_fake_time().expect("creating executor failed");
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let mut ready_future =
             futures::future::ready("ready").on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout");
@@ -143,8 +141,7 @@ mod test {
 
     #[test]
     fn test_timeout_invoked() {
-        let mut executor =
-            fasync::TestExecutor::new_with_fake_time().expect("creating executor failed");
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let start_time = executor.now();
         let mut stalled_future =

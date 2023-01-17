@@ -482,7 +482,7 @@ pub mod tests {
 
     impl Runner {
         fn new() -> Self {
-            let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+            let executor = fasync::TestExecutor::new_with_fake_time();
             executor.set_fake_time(fasync::Time::from_nanos(0));
 
             let inspector = inspect::Inspector::new();

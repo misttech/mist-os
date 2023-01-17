@@ -151,7 +151,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_connect_fails() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
         let mut event_sender = MockSendEvent::new();
         event_sender.expect_send().with(eq(Event::Error("".to_string()))).times(1).return_const(());

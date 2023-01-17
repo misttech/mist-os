@@ -415,7 +415,7 @@ pub(crate) mod tests {
     /// 3) Tests PlayerStatus and Metadata -> Full update
     /// 4) Tests neither PlayerStatus and Metadata -> No updates
     fn test_update_session_info() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
@@ -504,7 +504,7 @@ pub(crate) mod tests {
     /// 3) Normal view of the world, ask for specific settings.
     /// 4) Normal view of the world, ask for unsupported settings.
     fn test_get_player_application_settings() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
@@ -561,7 +561,7 @@ pub(crate) mod tests {
     /// Test that given the current view of the world, getting PlayStatus
     /// returns as expected after time passes.
     fn test_get_play_status() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
@@ -626,7 +626,7 @@ pub(crate) mod tests {
     /// 2) Query with a supported Event ID, with default state.
     /// 3) Query with all supported Event IDs.
     fn test_get_notification_value() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(555555555));
         let (session_proxy, _) =
             create_proxy::<SessionControlMarker>().expect("Couldn't create fidl proxy.");

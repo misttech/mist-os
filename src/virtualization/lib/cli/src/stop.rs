@@ -202,7 +202,7 @@ mod test {
 
     #[test]
     fn graceful_stop_waits_for_shutdown() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::now());
 
         let (manager_proxy, mut manager_stream) = create_proxy_and_stream::<GuestManagerMarker>()

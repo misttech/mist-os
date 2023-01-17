@@ -157,7 +157,7 @@ fn create_env_and_executor_with_config(
     // the environment.
     initial_input_info: Option<InputInfoSources>,
 ) -> (TestExecutor, TestInputEnvironment) {
-    let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = TestExecutor::new_with_fake_time();
     let env_future = if let Some(initial_info) = initial_input_info {
         TestInputEnvironmentBuilder::new()
             .set_input_device_config(config)

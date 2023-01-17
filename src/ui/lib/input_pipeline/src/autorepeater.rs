@@ -581,7 +581,7 @@ mod tests {
         // TestExecutor puts itself as the thread local executor. Any local
         // task spawned from here on will run on the test executor in fake time,
         // and will need `run_with_fake_time` to drive it to completion.
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         // `input` is where the test fixture will inject the fake input events.
         // `receiver` is where the autorepeater will read these events from.
@@ -668,7 +668,7 @@ mod tests {
 
     #[test]
     fn basic_sync_and_cancel_only() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
         let (sender, output) = mpsc::unbounded();
@@ -722,7 +722,7 @@ mod tests {
     // Ensures that we forward but not act on handled events.
     #[test]
     fn handled_events_are_forwarded() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
         let (sender, output) = mpsc::unbounded();
@@ -780,7 +780,7 @@ mod tests {
     // settings should trigger the autorepeat.
     #[test]
     fn autorepeat_simple() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -856,7 +856,7 @@ mod tests {
     // accordingly.
     #[test]
     fn autorepeat_simple_longer() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -936,7 +936,7 @@ mod tests {
     // B """"""""""""""""""""\_________________/""""
     #[test]
     fn autorepeat_takeover() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -1062,7 +1062,7 @@ mod tests {
     // B """"""""""""""""""\________/"""""""""""""
     #[test]
     fn autorepeat_takeover_and_back() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -1180,7 +1180,7 @@ mod tests {
 
     #[test]
     fn no_autorepeat_for_left_shift() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -1242,7 +1242,7 @@ mod tests {
     // LeftShift """\__________________________/""""
     #[test]
     fn shift_a_encapsulated() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());
@@ -1347,7 +1347,7 @@ mod tests {
     // LeftShift """\_________________/"""""""""""
     #[test]
     fn shift_a_interleaved() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
         let handler = Autorepeater::new_with_settings(receiver, default_settings());

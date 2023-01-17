@@ -105,7 +105,7 @@ mod tests {
 
     #[fuchsia::test]
     fn ring_stream_output_frequency() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
         let _ = exec.wake_expired_timers();
 

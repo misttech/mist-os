@@ -766,7 +766,7 @@ mod dual_state_tests {
             power_on_delay_ms: i64,
             initial_backlight_state: BacklightCommand,
         ) -> (fasync::TestExecutor, Handles) {
-            let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+            let mut exec = fasync::TestExecutor::new_with_fake_time();
             exec.set_fake_time(zx::Time::ZERO.into());
 
             let fake_backlight_service = FakeBacklightService::new();

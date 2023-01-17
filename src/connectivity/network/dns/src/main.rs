@@ -1974,7 +1974,7 @@ mod tests {
 
     #[test]
     fn test_query_stats_inspect_average() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
@@ -2034,7 +2034,7 @@ mod tests {
 
     #[test]
     fn test_query_stats_inspect_error_counters() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
@@ -2079,7 +2079,7 @@ mod tests {
 
     #[test]
     fn test_query_stats_inspect_no_records_found() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
@@ -2144,7 +2144,7 @@ mod tests {
 
     #[test]
     fn test_query_stats_resolved_address_counts() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
         exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
@@ -2203,7 +2203,7 @@ mod tests {
 
     #[test]
     fn test_query_stats_inspect_oldest_stats_erased() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 

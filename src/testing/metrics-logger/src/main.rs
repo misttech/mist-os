@@ -580,7 +580,7 @@ mod tests {
     impl RunnerBuilder {
         fn new() -> Self {
             // Fuchsia Executor must be created first.
-            let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+            let executor = fasync::TestExecutor::new_with_fake_time();
             executor.set_fake_time(fasync::Time::from_nanos(0));
 
             Self {

@@ -670,7 +670,7 @@ mod tests {
         ServiceCapability,
         ServiceCapability,
     ) {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000));
         let (proxy, stream) =
             create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");

@@ -418,7 +418,7 @@ pub mod tests {
     #[test]
     fn test_handle_get_cpu_loads() {
         // Use executor so we can advance the fake time
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Fake idle times that will be fed into the node. These idle times mean the node will first
         // see idle times of 0 for both CPUs, then idle times of 1s and 2s on the next poll.
@@ -452,7 +452,7 @@ pub mod tests {
     #[test]
     fn test_handle_get_cpu_loads_with_staleness() {
         // Use executor so we can advance the fake time
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Fake idle times that will be fed into the node. These idle times mean the node will first
         // see idle times of 0 for both CPUs, then idle times of 1s and 2s on the next poll.

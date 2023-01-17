@@ -521,7 +521,7 @@ mod tests {
     where
         F: FnOnce(fasync::TestExecutor, StreamConfigProxy, AudioFrameStream) -> (),
     {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         let format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
@@ -574,7 +574,7 @@ mod tests {
             channel_map: vec![AudioChannelId::Lf, AudioChannelId::Rf],
         };
 
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (client, frame_stream) = SoftPcmOutput::build(
             TEST_UNIQUE_ID,
             &"Google".to_string(),

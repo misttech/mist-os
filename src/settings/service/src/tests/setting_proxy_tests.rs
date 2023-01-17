@@ -369,8 +369,7 @@ async fn test_message_hub_presence() {
 
 #[fuchsia::test]
 fn test_notify() {
-    let mut executor =
-        fasync::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fasync::TestExecutor::new_with_fake_time();
 
     let environment_fut = init_listen_env();
     futures::pin_mut!(environment_fut);
@@ -716,8 +715,7 @@ async fn inspect_errors_roll_after_limit() {
 fn test_regeneration() {
     let setting_type = SettingType::Unknown;
 
-    let mut executor =
-        fasync::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fasync::TestExecutor::new_with_fake_time();
 
     async fn run_once(setting_type: SettingType) -> (oneshot::Receiver<()>, TestEnvironment) {
         let (done_tx, done_rx) = oneshot::channel();
@@ -950,8 +948,7 @@ fn test_retry() {
         (environment, _event_receptor)
     }
 
-    let mut executor =
-        fasync::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fasync::TestExecutor::new_with_fake_time();
 
     let environment_fut = run_retries(setting_type);
     futures::pin_mut!(environment_fut);
@@ -1073,8 +1070,7 @@ async fn test_early_exit() {
 // Ensures timeouts trigger retry flow.
 #[fuchsia::test]
 fn test_timeout() {
-    let mut executor =
-        fuchsia_async::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
     let fut = async move {
         let setting_type = SettingType::Unknown;
@@ -1180,8 +1176,7 @@ fn test_timeout() {
 // Ensures that timeouts cause an error when retry is not enabled for them.
 #[fuchsia::test]
 fn test_timeout_no_retry() {
-    let mut executor =
-        fuchsia_async::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
     let fut = async move {
         let setting_type = SettingType::Unknown;

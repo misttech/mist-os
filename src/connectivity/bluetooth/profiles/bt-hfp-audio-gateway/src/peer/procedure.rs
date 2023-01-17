@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn answer_procedure_default_inspect_tree() {
-        let exec = fuchsia_async::TestExecutor::new_with_fake_time().unwrap();
+        let exec = fuchsia_async::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fuchsia_async::Time::from_nanos(1000));
 
         let inspect = inspect::Inspector::new();

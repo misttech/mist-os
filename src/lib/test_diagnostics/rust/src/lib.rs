@@ -257,7 +257,7 @@ mod tests {
 
         #[test]
         fn log_buffer_without_timeout() {
-            let mut executor = TestExecutor::new_with_fake_time().unwrap();
+            let mut executor = TestExecutor::new_with_fake_time();
             let output = Arc::new(Mutex::new(vec![]));
             let writer = MutexBytes(output.clone());
             let (log_buffer, mut timeout_task) =
@@ -277,7 +277,7 @@ mod tests {
 
         #[test]
         fn log_buffer_flush_on_drop() {
-            let mut executor = TestExecutor::new_with_fake_time().unwrap();
+            let mut executor = TestExecutor::new_with_fake_time();
             let output = Arc::new(Mutex::new(vec![]));
             let writer = MutexBytes(output.clone());
             let (log_buffer, mut timeout_task) =
@@ -297,7 +297,7 @@ mod tests {
 
         #[test]
         fn log_buffer_with_timeout() {
-            let mut executor = TestExecutor::new_with_fake_time().unwrap();
+            let mut executor = TestExecutor::new_with_fake_time();
             let output = Arc::new(Mutex::new(vec![]));
             let writer = MutexBytes(output.clone());
             let (log_buffer, mut timeout_task) =
@@ -319,7 +319,7 @@ mod tests {
 
         #[test]
         fn log_buffer_capacity_reached() {
-            let _executor = TestExecutor::new_with_fake_time().unwrap();
+            let _executor = TestExecutor::new_with_fake_time();
             let output = Arc::new(Mutex::new(vec![]));
             let writer = MutexBytes(output.clone());
             let (log_buffer, _timeout_task) =

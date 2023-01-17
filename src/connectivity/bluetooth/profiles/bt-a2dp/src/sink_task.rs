@@ -620,7 +620,7 @@ mod tests {
 
     #[fuchsia::test]
     fn media_stream_stats() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let sbc_config = MediaCodecConfig::min_sbc();
         let (player, mut sink_requests, mut consumer_requests, _vmo) =
             player::tests::setup_player(&mut exec, sbc_config);
@@ -698,7 +698,7 @@ mod tests {
 
     #[fuchsia::test]
     fn media_stream_task_reopens_player() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         let (audio_consumer_factory_proxy, mut audio_consumer_factory_request_stream) =
             create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()

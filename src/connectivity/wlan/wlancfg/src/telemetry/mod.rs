@@ -6413,7 +6413,7 @@ mod tests {
     }
 
     fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = ()>>>) {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let (monitor_svc_proxy, monitor_svc_stream) =

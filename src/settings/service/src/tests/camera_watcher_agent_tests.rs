@@ -113,7 +113,7 @@ async fn test_camera_agent_proxy() {
 fn test_camera_devices_watcher_timeout() {
     // Custom executor for this test so that we can advance the clock arbitrarily and verify the
     // state of the executor at any given point.
-    let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = TestExecutor::new_with_fake_time();
     executor.set_fake_time(Time::from_nanos(0));
 
     let service_hub = service::MessageHub::create_hub();

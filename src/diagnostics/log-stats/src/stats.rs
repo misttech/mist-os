@@ -332,7 +332,7 @@ mod tests {
 
     impl GranularTestState {
         fn new() -> Result<GranularTestState, anyhow::Error> {
-            let exec = fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+            let exec = fasync::TestExecutor::new_with_fake_time();
             exec.set_fake_time(fasync::Time::from_nanos(0));
             let inspector = Inspector::new();
             let mut granular_stats = GranularLogStats::default();
@@ -852,8 +852,7 @@ mod tests {
 
     impl ComponentTestState {
         fn new(max_run_until_stalled_iterations: u32) -> Result<ComponentTestState, anyhow::Error> {
-            let executor =
-                fasync::TestExecutor::new_with_fake_time().expect("executor should build");
+            let executor = fasync::TestExecutor::new_with_fake_time();
             executor.set_fake_time(fasync::Time::from_nanos(0));
             Ok(ComponentTestState { executor, max_run_until_stalled_iterations })
         }

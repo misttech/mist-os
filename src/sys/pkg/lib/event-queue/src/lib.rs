@@ -620,7 +620,7 @@ mod tests {
 
     #[test]
     fn flush_with_pending_events_fails_at_timeout() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         let (event_queue, mut handle) = EventQueue::<MpscNotifier<&'static str>>::new();
         let _event_queue = fasync::Task::local(event_queue);
 

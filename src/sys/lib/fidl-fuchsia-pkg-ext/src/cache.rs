@@ -1135,7 +1135,7 @@ mod tests {
         use futures::{future::Either, pin_mut};
         use std::task::Poll;
 
-        let mut executor = fuchsia_async::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
 
         let fut = async {
             let (get, pending_get) = PendingGet::new().await;

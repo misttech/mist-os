@@ -399,7 +399,7 @@ mod tests {
     /// appropriate amount of time.
     #[test]
     fn test_set_volume_command() -> Result<(), Error> {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) =
             setup_volume_relay()?;
 

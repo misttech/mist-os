@@ -3511,8 +3511,7 @@ mod tests {
 
         #[fuchsia::test]
         fn logs_to_inspect() {
-            let mut executor =
-                fasync::TestExecutor::new_with_fake_time().expect("failed to create executor");
+            let mut executor = fasync::TestExecutor::new_with_fake_time();
             let basic_mismatch_contender = Box::new(StubContender::new());
             let detailed_uint_mismatch_contender = Box::new(StubContender::new());
             let detailed_float_mismatch_contender = Box::new(StubContender::new());
@@ -4019,8 +4018,7 @@ mod tests {
 
         #[fuchsia::test]
         fn retains_palm_contacts() {
-            let mut executor =
-                fasync::TestExecutor::new_with_fake_time().expect("failed to create executor");
+            let mut executor = fasync::TestExecutor::new_with_fake_time();
             let inspector = fuchsia_inspect::Inspector::new();
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(EmptyContenderFactory {}),

@@ -1509,8 +1509,7 @@ mod tests {
     /// Tests that the worker can handle watchers coming and going.
     #[test]
     fn watcher_turnaround() {
-        let mut executor =
-            fuchsia_async::TestExecutor::new_with_fake_time().expect("failed to create executor");
+        let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
         let (worker, mut watcher_sink, interface_sink) = Worker::new();
         let sink_keep = watcher_sink.clone();
         let create_watchers = fuchsia_async::Task::spawn(async move {
@@ -1615,8 +1614,7 @@ mod tests {
 
     #[test]
     fn watcher_blocking_push() {
-        let mut executor =
-            fuchsia_async::TestExecutor::new_with_fake_time().expect("failed to create executor");
+        let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>()
                 .expect("failed to create watcher");

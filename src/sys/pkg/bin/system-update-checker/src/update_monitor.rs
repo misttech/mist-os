@@ -317,7 +317,7 @@ mod test {
             update_state: State,
             version_available in random_version_available(),
         ) {
-            let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+            let mut executor = fasync::TestExecutor::new_with_fake_time();
             // Can't use run_singlethreaded on executor with fake time.
             let update_monitor_fut = random_update_monitor::<_, FakeAttemptNotifier>(Some(update_state), version_available);
             pin_mut!(update_monitor_fut);

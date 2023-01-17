@@ -662,7 +662,7 @@ mod historical_max_cpu_temperature_tests {
     /// temperature at the end of each N samples.
     #[test]
     fn test_reset_max_temperature_after_sample_count() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::new();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
@@ -695,7 +695,7 @@ mod historical_max_cpu_temperature_tests {
     /// temperature samples are observed.
     #[test]
     fn test_dispatch_reading_after_n_samples() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::new();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
@@ -739,7 +739,7 @@ mod historical_max_cpu_temperature_tests {
     /// into Inspect.
     #[test]
     fn test_max_record_count() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::new();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 2);
@@ -773,7 +773,7 @@ mod historical_max_cpu_temperature_tests {
     /// Tests that the actual max value is recorded after varying temperature values were logged.
     #[test]
     fn test_max_temperature_selection() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         let inspector = inspect::Inspector::new();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 3);
@@ -803,7 +803,7 @@ mod inspect_throttle_history_tests {
     #[test]
     fn test_inspect_throttle_history_window() {
         // Need an executor for the `get_current_timestamp()` calls
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
 
         // Create a InspectThrottleHistory with capacity for only one throttling entry
         let inspector = inspect::Inspector::new();
@@ -899,7 +899,7 @@ mod tests {
     ///     - update `throttle_history`
     #[test]
     fn test_log_throttling_active() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = inspect::Inspector::new();
         let platform_metrics = PlatformMetricsBuilder {
@@ -950,7 +950,7 @@ mod tests {
     ///     - crash report filed
     #[test]
     fn test_log_throttling_result_mitigated() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let mut mock_maker = MockNodeMaker::new();
         let crash_report_handler = mock_maker.make(
@@ -1059,7 +1059,7 @@ mod tests {
     ///     - update `throttle_history`
     #[test]
     fn test_log_throttling_result_shutdown() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = inspect::Inspector::new();
         let (cobalt_sender, mut cobalt_receiver) = futures::channel::mpsc::channel(10);
@@ -1137,7 +1137,7 @@ mod tests {
     ///     - dispatch a Cobalt event for the `raw_temperature` metric
     #[test]
     fn test_cpu_temperature_logging_task() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Initialize current time
         let mut current_time = Seconds(0.0);
@@ -1248,7 +1248,7 @@ mod tests {
     /// otherwise.
     #[test]
     fn test_log_thermal_load() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = inspect::Inspector::new();
         let platform_metrics = PlatformMetricsBuilder {

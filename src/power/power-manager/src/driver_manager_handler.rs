@@ -657,7 +657,7 @@ pub mod tests {
     /// Tests that the node expectedly returns an error if the registration timeout expires.
     #[test]
     fn test_wait_for_registration_timeout() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut service_fs = ServiceFs::new_local();

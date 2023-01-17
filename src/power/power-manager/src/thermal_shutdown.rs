@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_platform_metrics() {
         let mut mock_maker = MockNodeMaker::new();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(Seconds(10.0).into()); // arbitrary nonzero time
         let node_futures = FuturesUnordered::new();
         let node = ThermalShutdownBuilder::new(

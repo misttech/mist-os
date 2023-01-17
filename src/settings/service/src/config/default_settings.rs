@@ -198,7 +198,7 @@ pub(crate) mod testing {
     fn test_config_inspect_write() {
         clock::mock::set(Time::from_nanos(0));
 
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let mut setting = DefaultSetting::new(Some(TestConfigData { value: 3 }), "nuthatch");
         let load_result = move_executor_forward_and_get(

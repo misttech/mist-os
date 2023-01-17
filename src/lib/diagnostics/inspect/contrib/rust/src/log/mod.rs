@@ -233,7 +233,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_log_basic() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(0));
         let (inspector, mut node) = inspector_and_list_node();
 
@@ -267,7 +267,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_log_nested() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         inspect_log!(node, {
@@ -300,7 +300,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_log_var_key_syntax() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let key = "@@@";
@@ -364,7 +364,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_option() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 
@@ -382,7 +382,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_bytes() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let bytes = [11u8, 22, 33];
@@ -402,7 +402,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_list() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let list = [11u8, 22, 33];
@@ -425,7 +425,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_list_closure() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
         let list = [13u32, 17, 29];
@@ -477,7 +477,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_make_inspect_loggable() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 
@@ -506,7 +506,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_inspect_string_reference() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(12345));
         let (inspector, mut node) = inspector_and_list_node();
 

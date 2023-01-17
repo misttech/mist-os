@@ -550,7 +550,7 @@ mod tests {
             real_executor.run_singlethreaded(future).expect("failed to construct channel_manager");
         std::mem::drop(real_executor);
         let mut task = c.run().boxed();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
@@ -596,7 +596,7 @@ mod tests {
             real_executor.run_singlethreaded(future).expect("failed to construct channel_manager");
         std::mem::drop(real_executor);
         let mut task = c.run().boxed();
-        let mut executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         connector.set_flake_mode(FlakeMode::StatusOnCall(CobaltStatus::InvalidArguments));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
         assert_eq!(connector.connect_count(), 1);

@@ -549,7 +549,7 @@ mod tests {
 
     #[fuchsia::test]
     fn factory_reset_countdown_listener_is_notified_on_state_change() -> Result<(), Error> {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         let reset_handler = FactoryResetHandler::new();
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 

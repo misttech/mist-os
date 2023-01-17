@@ -249,7 +249,7 @@ mod tests {
 
     #[fuchsia::test]
     fn listen_unlisten_listen_on_port() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
         let mut port_manager = PortManager::new();
 
@@ -319,7 +319,7 @@ mod tests {
 
     #[fuchsia::test]
     fn port_stays_active_when_connection_quarantined() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
         let mut port_manager = PortManager::new();
 
@@ -344,7 +344,7 @@ mod tests {
 
     #[fuchsia::test]
     fn port_stays_active_when_no_connections_but_listener() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
         let mut port_manager = PortManager::new();
 
@@ -378,7 +378,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connection_pair_recycled_after_quarantine() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
         let mut port_manager = PortManager::new();
 

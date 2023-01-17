@@ -2092,7 +2092,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_peer_starts_waiting_streams() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
 
         exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
 

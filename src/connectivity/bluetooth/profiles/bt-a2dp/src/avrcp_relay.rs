@@ -634,7 +634,7 @@ mod tests {
     /// the data is translated.
     #[fuchsia::test]
     fn test_relay_sends_correct_media_info() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
@@ -677,7 +677,7 @@ mod tests {
     /// When playback status changes the new track info is sent to the Player client.
     #[fuchsia::test]
     fn test_relay_new_avrcp_track_info() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
@@ -816,7 +816,7 @@ mod tests {
     /// When the position update happens, the new position is updated for the Player.
     #[fuchsia::test]
     fn test_relay_updates_position() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
@@ -1038,7 +1038,7 @@ mod tests {
     /// available players status.
     #[fuchsia::test]
     fn test_relay_avrcp_available_players_changed() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();

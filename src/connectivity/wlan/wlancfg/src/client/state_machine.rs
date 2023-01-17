@@ -1226,8 +1226,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connecting_state_successfully_scans_and_connects() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(123));
         let mut test_values = test_setup();
         let next_network_ssid = types::Ssid::try_from("bar").unwrap();
@@ -2254,8 +2253,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_gets_disconnect_selection() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut test_values = test_setup();
@@ -2385,8 +2383,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_records_unexpected_disconnect() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let test_values = test_setup();
@@ -2502,8 +2499,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_reconnect_resets_connected_duration() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let test_values = test_setup();
@@ -2597,8 +2593,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_records_unexpected_disconnect_unspecified_bss() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let connection_attempt_time = fasync::Time::from_nanos(0);
         exec.set_fake_time(connection_attempt_time);
         let test_values = test_setup();
@@ -2695,8 +2690,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_gets_duplicate_connect_selection() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2753,8 +2747,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_gets_different_connect_selection() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut test_values = test_setup();
@@ -3325,8 +3318,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_on_signal_report() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut test_values = test_setup();
@@ -3441,8 +3433,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_should_roam() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let test_values = test_setup();
@@ -3487,8 +3478,7 @@ mod tests {
 
     #[fuchsia::test]
     fn connected_state_on_channel_switched() {
-        let mut exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let test_values = test_setup();

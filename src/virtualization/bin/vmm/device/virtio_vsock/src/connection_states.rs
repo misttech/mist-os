@@ -2118,8 +2118,7 @@ mod tests {
 
     #[fuchsia::test]
     fn read_write_guest_send_packet_after_shutdown_send_leeway() {
-        let mut executor =
-            TestExecutor::new_with_fake_time().expect("failed to create test executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::now());
 
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
@@ -2340,8 +2339,7 @@ mod tests {
 
     #[fuchsia::test]
     fn client_initiated_shutdown_timeout_due_to_no_guest_reply() {
-        let mut executor =
-            TestExecutor::new_with_fake_time().expect("failed to create test executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::now());
 
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);

@@ -534,7 +534,7 @@ mod tests {
     #[fuchsia::test]
     fn test_first_write_syncs_immediately() {
         let written_value = VALUE1;
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
@@ -614,7 +614,7 @@ mod tests {
     fn test_second_write_syncs_after_interval() {
         let written_value = VALUE1;
         let second_value = VALUE2;
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
@@ -850,7 +850,7 @@ mod tests {
     fn test_multiple_write_debounce() {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
@@ -980,7 +980,7 @@ mod tests {
     #[test_case(13, 1_800_000)]
     #[test_case(14, 1_800_000)]
     fn test_exponential_backoff(retry_count: usize, max_wait_time: usize) {
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};

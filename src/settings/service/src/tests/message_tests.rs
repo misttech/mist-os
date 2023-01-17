@@ -274,8 +274,7 @@ async fn test_observe_addressable() {
 // Validates that timeout status is reached when there is no response
 #[fuchsia::test]
 fn test_timeout() {
-    let mut executor =
-        fuchsia_async::TestExecutor::new_with_fake_time().expect("Failed to create executor");
+    let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
     let timeout_ms = 1000;
 
     let fut = async move {

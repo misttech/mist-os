@@ -42,8 +42,7 @@ struct SubloopExecutorBorrowMut<'a, F> {
 impl<F> SubloopExecutor<F> {
     /// Constructs a new `SubloopExecutor` with the given main future.
     pub(crate) fn new(future: F) -> SubloopExecutor<F> {
-        let mut executor =
-            fasync::TestExecutor::new_with_fake_time().expect("unable to create executor");
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
         executor.wake_main_future();
         SubloopExecutor { executor, future, _pinned: PhantomPinned }
     }

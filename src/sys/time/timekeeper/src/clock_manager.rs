@@ -699,7 +699,7 @@ mod tests {
 
     #[fuchsia::test]
     fn slew_clock_updates_fn() {
-        let executor = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let executor = fasync::TestExecutor::new_with_fake_time();
         executor.set_fake_time(fasync::Time::from_nanos(0));
 
         // Simple constructor lambdas to improve readability of the test logic.

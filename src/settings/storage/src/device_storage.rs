@@ -667,7 +667,7 @@ mod tests {
     #[fuchsia::test]
     fn test_flush_fail_writes_to_inspect() {
         let written_value = VALUE2;
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -747,7 +747,7 @@ mod tests {
     #[fuchsia::test]
     fn test_first_write_flushes_immediately() {
         let written_value = VALUE2;
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
 
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
@@ -854,7 +854,7 @@ mod tests {
     fn test_multiple_write_debounce() {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
-        let mut executor = TestExecutor::new_with_fake_time().expect("Failed to create executor");
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
         let (stash_proxy, mut stash_stream) =

@@ -632,7 +632,7 @@ mod test {
     #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     fn suite_start_timeout() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time().expect("create executor");
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         // Create a RunBuilder stream that doesn't process requests to simulate a timeout.
         let (builder_proxy, _run_builder_stream) =

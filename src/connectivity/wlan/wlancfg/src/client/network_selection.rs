@@ -963,8 +963,7 @@ mod tests {
         -71; "5GHz score is RSSI, when below threshold")]
     #[fuchsia::test(add_test_attr = false)]
     fn scoring_test(bss: types::Bss, expected_score: i16) {
-        let _exec =
-            fasync::TestExecutor::new_with_fake_time().expect("failed to create an executor");
+        let _exec = fasync::TestExecutor::new_with_fake_time();
         let mut rng = rand::thread_rng();
 
         let network_id = types::NetworkIdentifier {

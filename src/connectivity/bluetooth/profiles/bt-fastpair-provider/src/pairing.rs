@@ -1421,7 +1421,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn procedure_terminates_after_timer_completes() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let id = PeerId(123);
@@ -1454,7 +1454,7 @@ pub(crate) mod tests {
 
     #[fuchsia::test]
     fn procedure_evicted_after_deadline() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
@@ -1568,7 +1568,7 @@ pub(crate) mod tests {
     /// after the Account Key write.
     #[fuchsia::test]
     fn procedure_without_name_write_evicted_after_deadline() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
@@ -1702,7 +1702,7 @@ pub(crate) mod tests {
 
     #[test]
     fn pairing_manager_inspect_tree() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor creation");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
         let inspect = inspect::Inspector::new();
         let mut pairing_inspect =

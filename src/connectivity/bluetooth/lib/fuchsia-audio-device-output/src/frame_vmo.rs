@@ -416,7 +416,7 @@ mod tests {
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn test_poll_frames(mut vmo: FrameVmo) {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let start_time = fasync::Time::now();
@@ -478,7 +478,7 @@ mod tests {
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn test_poll_frames_waking(mut vmo: FrameVmo) {
-        let mut exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let half_dur = TEST_VMO_DURATION / 2;
@@ -525,7 +525,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_multibyte_poll_frames() {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
         let mut vmo = FrameVmo::new().expect("can't make a framevmo");
         let format = AudioSampleFormat::Sixteen { unsigned: false, invert_endian: false };
@@ -550,7 +550,7 @@ mod tests {
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn test_poll_frames_boundaries(mut vmo: FrameVmo) {
-        let exec = fasync::TestExecutor::new_with_fake_time().expect("executor needed");
+        let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
 

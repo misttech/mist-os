@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn connect_timeout() {
         // Fake time to test the timeout.
-        let mut exec = fasync::TestExecutor::new_with_fake_time().unwrap();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         fn network_id() -> wlan_policy::NetworkIdentifier {

@@ -172,8 +172,8 @@ impl TestExecutor {
 
     /// Create a new single-threaded executor running with fake time.
     #[allow(deprecated)]
-    pub fn new_with_fake_time() -> Result<Self, zx::Status> {
-        Self::try_new_with_fake_time()
+    pub fn new_with_fake_time() -> Self {
+        Self::try_new_with_fake_time().unwrap()
     }
 
     /// Deprecated, will be deleted.
@@ -527,7 +527,7 @@ mod tests {
         };
         let fut = future::poll_fn(fut_fn);
         pin_mut!(fut);
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.wake_main_future();
         assert_eq!(executor.is_waiting(), WaitState::Ready);
         assert_eq!(fut_step.get(), 0);
@@ -545,7 +545,7 @@ mod tests {
     #[test]
     // Runs a future that waits on a timer.
     fn stepwise_timer() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
         let fut = Timer::new(Time::after(1000.nanos()));
         pin_mut!(fut);
@@ -564,7 +564,7 @@ mod tests {
     // Runs a future that waits on an event.
     #[test]
     fn stepwise_event() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         let event = zx::Event::create();
         let fut = OnSignals::new(&event, zx::Signals::USER_0);
         pin_mut!(fut);
@@ -581,7 +581,7 @@ mod tests {
     // compared to normal execution.
     #[test]
     fn run_until_stalled_preserves_order() {
-        let mut executor = TestExecutor::new_with_fake_time().unwrap();
+        let mut executor = TestExecutor::new_with_fake_time();
         let spawned_fut_completed = Arc::new(AtomicBool::new(false));
         let spawned_fut_completed_writer = spawned_fut_completed.clone();
         let spawned_fut = Box::pin(async move {
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn time_now_fake_time() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
         let t1 = Time::from_zx(zx::Time::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(Time::now(), t1);
@@ -672,7 +672,7 @@ mod tests {
 
     #[test]
     fn time_after_overflow() {
-        let executor = TestExecutor::new_with_fake_time().unwrap();
+        let executor = TestExecutor::new_with_fake_time();
 
         executor.set_fake_time(Time::INFINITE - 100.nanos());
         assert_eq!(Time::after(200.seconds()), Time::INFINITE);
