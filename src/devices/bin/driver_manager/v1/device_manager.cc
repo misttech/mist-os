@@ -163,6 +163,15 @@ zx_status_t DeviceManager::AddDevice(
           dev->props().size(), dev->parent().get());
   }
 
+  // TODO(fxb/118905): Remove debug logs once the flake is resolved.
+  auto result = dev->GetTopologicalPath();
+  if (result.is_ok()) {
+    LOGF(DEBUG, "Added device at %s", result->c_str());
+  } else {
+    LOGF(DEBUG, "Unable to retrieve topological path for device %s: %s", dev->name().data(),
+         zx_status_get_string(result.status_value()));
+  }
+
   *new_device = std::move(dev);
   return ZX_OK;
 }
