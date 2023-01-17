@@ -151,8 +151,15 @@ struct ExternalInterfaces {
     monitor_service_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     monitor_service_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
     stash_server: fidl_stash::StoreAccessorRequestStream,
-    client_provider_proxy: fidl_policy::ClientProviderProxy,
+    client_controller: fidl_policy::ClientControllerProxy,
+    listener_updates_stream: fidl_policy::ClientStateUpdatesRequestStream,
     _telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
+}
+
+struct ExistingConnectionSmeObjects {
+    iface_sme_stream: fidl_sme::ClientSmeRequestStream,
+    state_machine_sme_stream: fidl_sme::ClientSmeRequestStream,
+    connect_txn_handle: fidl_sme::ConnectTransactionControlHandle,
 }
 
 // setup channels and proxies needed for the tests
@@ -255,6 +262,8 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         .fuse(),
     );
 
+    let (client_controller, listener_updates_stream) = request_controller(&client_provider_proxy);
+
     // Combine all our "internal" futures into one, since we don't care about their individual progress
     let internal_futures = join_all(vec![
         serve_fut,
@@ -273,8 +282,9 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
     let external_interfaces = ExternalInterfaces {
         monitor_service_proxy,
         monitor_service_stream,
-        client_provider_proxy,
         stash_server,
+        client_controller,
+        listener_updates_stream,
         _telemetry_receiver: telemetry_receiver,
     };
 
@@ -321,14 +331,14 @@ fn security_support_with_wpa3() -> fidl_common::SecuritySupport {
 /// Adds a phy and prepares client interfaces by turning on client connections
 fn prepare_client_interface(
     exec: &mut TestExecutor,
-    controller: &fidl_policy::ClientControllerProxy,
     test_values: &mut TestValues,
 ) -> fidl_sme::ClientSmeRequestStream {
     // Add the phy
     add_phy(exec, test_values);
 
     // Use the Policy API to start client connections
-    let start_connections_fut = controller.start_client_connections();
+    let start_connections_fut =
+        test_values.external_interfaces.client_controller.start_client_connections();
     pin_mut!(start_connections_fut);
     assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
 
@@ -590,6 +600,198 @@ fn security_protocols_from_protection(
     }
 }
 
+// Setup a client iface, save a network, and connect to that network via the new client iface.
+// Returns the SME streams and transaction handle for the connected iface and state machine. If
+// these are dropped, the connected state machine will exit when progressed.
+fn save_and_connect(
+    ssid: types::Ssid,
+    saved_security: fidl_policy::SecurityType,
+    scanned_security: fidl_sme::Protection,
+    test_credentials: TestCredentials,
+    exec: &mut fasync::TestExecutor,
+    test_values: &mut TestValues,
+) -> ExistingConnectionSmeObjects {
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Initial update should reflect client connections are disabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Get ready for client connections
+    let mut iface_sme_stream = prepare_client_interface(exec, test_values);
+
+    // Check for a listener update saying client connections are enabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Generate network ID
+    let network_id = fidl_policy::NetworkIdentifier { ssid: ssid.to_vec(), type_: saved_security };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(test_credentials.policy.clone()),
+        ..fidl_policy::NetworkConfig::EMPTY
+    };
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    pin_mut!(save_fut);
+
+    // Begin processing the save request and the stash write from the save
+    process_stash_write(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
+
+    // Continue processing the save request. Auto-connection process starts, and save request returns once the scan has been queued.
+    let save_resp = run_while(exec, &mut test_values.internal_objects.internal_futures, save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
+
+    // Check for a listener update saying we're connecting
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+
+    // BSS selection scans occur for requested network. Return scan results.
+    let expected_scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
+        ssids: vec![TEST_SSID.clone().into()],
+        channels: vec![],
+    });
+    let mutual_security_protocols = security_protocols_from_protection(scanned_security);
+    assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
+    let mock_scan_results = vec![fidl_sme::ScanResult {
+        compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
+        timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(scanned_security),
+            bssid: [0, 0, 0, 0, 0, 0],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: 10,
+            snr_db: 10,
+            channel: types::WlanChan::new(1, types::Cbw::Cbw20),
+        ),
+    }];
+    let next_sme_stream_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        iface_sme_stream.next(),
+    );
+    assert_variant!(
+        next_sme_stream_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+            req, responder
+        })) => {
+            assert_eq!(req, expected_scan_request);
+            responder.send(&mut Ok(mock_scan_results)).expect("failed to send scan data");
+        }
+    );
+
+    // Expect to get an SME request for state machine creation.
+    let next_device_monitor_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    let sme_server = assert_variant!(
+        next_device_monitor_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+            iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
+        })) => {
+            // Send back a positive acknowledgement.
+            assert!(responder.send(&mut Ok(())).is_ok());
+            sme_server
+        }
+    );
+    let mut state_machine_sme_stream =
+        sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
+
+    // State machine does an initial disconnect. Ack.
+    let next_sme_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        state_machine_sme_stream.next(),
+    );
+    assert_variant!(
+        next_sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
+            reason, responder
+        })) => {
+            assert_eq!(fidl_sme::UserDisconnectReason::Startup, reason);
+            assert!(responder.send().is_ok());
+        }
+    );
+
+    // State machine connects
+    let next_sme_req = run_while(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        state_machine_sme_stream.next(),
+    );
+    let connect_txn_handle = assert_variant!(
+        next_sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Connect {
+            req, txn, control_handle: _
+        })) => {
+            assert_eq!(req.ssid, TEST_SSID.clone());
+            assert_eq!(test_credentials.sme.clone(), req.authentication.credentials);
+            let (_stream, ctrl) = txn.expect("connect txn unused")
+                .into_stream_and_control_handle().expect("error accessing control handle");
+            ctrl
+        }
+    );
+    connect_txn_handle
+        .send_on_connect_result(&mut fidl_sme::ConnectResult {
+            code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        })
+        .expect("failed to send connection completion");
+
+    // Process stash write for the recording of connect results
+    process_stash_write(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
+
+    // Check for a listener update saying we're connected
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connected);
+
+    ExistingConnectionSmeObjects { iface_sme_stream, state_machine_sme_stream, connect_txn_handle }
+}
+
 use fidl_policy::SecurityType as Saved;
 use fidl_sme::Protection as Scanned;
 #[test_case(Saved::None, Scanned::Open, TEST_CREDS.none.clone())]
@@ -640,193 +842,22 @@ use fidl_sme::Protection as Scanned;
 #[test_case(Saved::Wpa3, Scanned::Wpa3Personal, TEST_CREDS.wpa_pass_max.clone())]
 #[fuchsia::test(add_test_attr = false)]
 /// Tests saving and connecting across various security types
-fn save_and_connect(
+fn test_save_and_connect(
     saved_security: fidl_policy::SecurityType,
     scanned_security: fidl_sme::Protection,
     test_credentials: TestCredentials,
 ) {
-    let saved_credential = test_credentials.policy.clone();
-    let expected_credential = test_credentials.sme.clone();
-
     let mut exec = fasync::TestExecutor::new();
     let mut test_values = test_setup(&mut exec);
 
-    // No request has been sent yet. Future should be idle.
-    assert_variant!(
-        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-        Poll::Pending
-    );
-
-    // Request a new controller.
-    let (controller, mut client_listener_update_requests) =
-        request_controller(&test_values.external_interfaces.client_provider_proxy);
-
-    // Initial update should reflect client connections are disabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+    let _ = save_and_connect(
+        TEST_SSID.clone(),
+        saved_security,
+        scanned_security,
+        test_credentials,
         &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
+        &mut test_values,
     );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
-    assert_eq!(networks.unwrap().len(), 0);
-
-    // Get ready for client connections
-    let mut iface_sme_stream = prepare_client_interface(&mut exec, &controller, &mut test_values);
-
-    // Check for a listener update saying client connections are enabled
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
-    );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-    assert_eq!(networks.unwrap().len(), 0);
-
-    // Generate network ID
-    let network_id =
-        fidl_policy::NetworkIdentifier { ssid: TEST_SSID.clone().into(), type_: saved_security };
-    let network_config = fidl_policy::NetworkConfig {
-        id: Some(network_id.clone()),
-        credential: Some(saved_credential),
-        ..fidl_policy::NetworkConfig::EMPTY
-    };
-
-    // Save the network
-    let save_fut = controller.save_network(network_config);
-    pin_mut!(save_fut);
-
-    // Begin processing the save request and the stash write from the save
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
-    // Continue processing the save request. Auto-connection process starts, and save request returns once the scan has been queued.
-    let save_resp =
-        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
-    assert_variant!(save_resp, Ok(Ok(())));
-
-    // Check for a listener update saying we're connecting
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
-    );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-    let mut networks = networks.unwrap();
-    assert_eq!(networks.len(), 1);
-    let network = networks.pop().unwrap();
-    assert_eq!(network.id.unwrap(), network_id.clone());
-    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
-
-    // BSS selection scans occur for requested network. Return scan results.
-    let expected_scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
-        ssids: vec![TEST_SSID.clone().into()],
-        channels: vec![],
-    });
-    let mutual_security_protocols = security_protocols_from_protection(scanned_security);
-    assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
-    let mock_scan_results = vec![fidl_sme::ScanResult {
-        compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-        timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
-        bss_description: random_fidl_bss_description!(
-            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(scanned_security),
-            bssid: [0, 0, 0, 0, 0, 0],
-            ssid: TEST_SSID.clone(),
-            rssi_dbm: 10,
-            snr_db: 10,
-            channel: types::WlanChan::new(1, types::Cbw::Cbw20),
-        ),
-    }];
-    let next_sme_stream_req = run_while(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        iface_sme_stream.next(),
-    );
-    assert_variant!(
-        next_sme_stream_req,
-        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
-            req, responder
-        })) => {
-            assert_eq!(req, expected_scan_request);
-            responder.send(&mut Ok(mock_scan_results)).expect("failed to send scan data");
-        }
-    );
-
-    // Expect to get an SME request for state machine creation.
-    let next_device_monitor_req = run_while(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        test_values.external_interfaces.monitor_service_stream.next(),
-    );
-    let sme_server = assert_variant!(
-        next_device_monitor_req,
-        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
-            iface_id: TEST_CLIENT_IFACE_ID, sme_server, responder
-        })) => {
-            // Send back a positive acknowledgement.
-            assert!(responder.send(&mut Ok(())).is_ok());
-            sme_server
-        }
-    );
-    let mut sme_stream = sme_server.into_stream().expect("failed to create ClientSmeRequestStream");
-
-    // State machine does an initial disconnect. Ack.
-    let next_sme_req =
-        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
-    assert_variant!(
-        next_sme_req,
-        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
-            reason, responder
-        })) => {
-            assert_eq!(fidl_sme::UserDisconnectReason::Startup, reason);
-            assert!(responder.send().is_ok());
-        }
-    );
-
-    // State machine connects
-    let next_sme_req =
-        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, sme_stream.next());
-    let connect_txn_handle = assert_variant!(
-        next_sme_req,
-        Some(Ok(fidl_sme::ClientSmeRequest::Connect {
-            req, txn, control_handle: _
-        })) => {
-            assert_eq!(req.ssid, TEST_SSID.clone());
-            assert_eq!(expected_credential, req.authentication.credentials);
-            let (_stream, ctrl) = txn.expect("connect txn unused")
-                .into_stream_and_control_handle().expect("error accessing control handle");
-            ctrl
-        }
-    );
-    connect_txn_handle
-        .send_on_connect_result(&mut fidl_sme::ConnectResult {
-            code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
-            is_credential_rejected: false,
-            is_reconnect: false,
-        })
-        .expect("failed to send connection completion");
-
-    // Process stash write for the recording of connect results
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
-    // Check for a listener update saying we're connected
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
-    );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-    let mut networks = networks.unwrap();
-    assert_eq!(networks.len(), 1);
-    let network = networks.pop().unwrap();
-    assert_eq!(network.id.unwrap(), network_id.clone());
-    assert_eq!(network.state.unwrap(), types::ConnectionState::Connected);
 }
 
 // TODO(fxbug.dev/85817): reenable credential upgrading, which will make these cases connect
@@ -873,7 +904,7 @@ fn save_and_connect(
 #[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_psk.clone())]
 #[fuchsia::test(add_test_attr = false)]
 /// Tests saving and connecting across various security types, where the connection is expected to fail
-fn save_and_fail_to_connect(
+fn test_save_and_fail_to_connect(
     saved_security: fidl_policy::SecurityType,
     scanned_security: fidl_sme::Protection,
     test_credentials: TestCredentials,
@@ -889,27 +920,23 @@ fn save_and_fail_to_connect(
         Poll::Pending
     );
 
-    // Request a new controller.
-    let (controller, mut client_listener_update_requests) =
-        request_controller(&test_values.external_interfaces.client_provider_proxy);
-
     // Initial update should reflect client connections are disabled
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
+        &mut test_values.external_interfaces.listener_updates_stream,
     );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
     assert_eq!(networks.unwrap().len(), 0);
 
     // Get ready for client connections
-    let mut iface_sme_stream = prepare_client_interface(&mut exec, &controller, &mut test_values);
+    let mut iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
 
     // Check for a listener update saying client connections are enabled
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
+        &mut test_values.external_interfaces.listener_updates_stream,
     );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     assert_eq!(networks.unwrap().len(), 0);
@@ -924,7 +951,7 @@ fn save_and_fail_to_connect(
     };
 
     // Save the network
-    let save_fut = controller.save_network(network_config);
+    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
     pin_mut!(save_fut);
 
     // Begin processing the save request and the stash write from the save
@@ -939,7 +966,7 @@ fn save_and_fail_to_connect(
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
+        &mut test_values.external_interfaces.listener_updates_stream,
     );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
@@ -1001,7 +1028,7 @@ fn save_and_fail_to_connect(
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut client_listener_update_requests,
+        &mut test_values.external_interfaces.listener_updates_stream,
     );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
@@ -1009,4 +1036,208 @@ fn save_and_fail_to_connect(
     let network = networks.pop().unwrap();
     assert_eq!(network.state.unwrap(), types::ConnectionState::Failed);
     assert_eq!(network.id.unwrap(), network_id.clone());
+}
+
+// Tests the connect request path to a new network while already connected.
+#[fuchsia::test]
+fn test_connect_to_new_network() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values = test_setup(&mut exec);
+
+    // Connect to a network initially.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::Wpa2,
+        Scanned::Wpa2Personal,
+        TEST_CREDS.wpa_pass_min.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Generate a second network ID.
+    let second_ssid = types::Ssid::try_from("test_ssid_2").unwrap();
+    let network_id =
+        fidl_policy::NetworkIdentifier { ssid: second_ssid.to_vec(), type_: Saved::Wpa2 };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
+        ..fidl_policy::NetworkConfig::EMPTY
+    };
+
+    // Save the second network.
+    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    pin_mut!(save_fut);
+
+    // Process the stash write from the save.
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
+
+    // Save request returns.
+    let save_fut_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
+    assert_variant!(save_fut_resp, Ok(Ok(())));
+
+    // Send a request to connect to the second network.
+    let connect_fut =
+        test_values.external_interfaces.client_controller.connect(&mut network_id.clone());
+    pin_mut!(connect_fut);
+
+    // Check that connect request was acknowledged.
+    let connect_fut_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, connect_fut);
+    assert_variant!(connect_fut_resp, Ok(fidl_common::RequestStatus::Acknowledged));
+
+    // Check for a listener update saying we're both connected and connecting.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let networks = networks.unwrap();
+    assert_eq!(networks.len(), 2);
+    for network in networks {
+        if network.id.unwrap() == network_id.clone() {
+            assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting)
+        } else {
+            assert_eq!(network.state.unwrap(), types::ConnectionState::Connected)
+        }
+    }
+
+    // Expect a directed active scan, return scan results.
+    let expected_scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
+        ssids: vec![second_ssid.to_vec()],
+        channels: vec![],
+    });
+    let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
+    let mock_scan_results = vec![
+        fidl_sme::ScanResult {
+            compatibility: Some(Box::new(fidl_sme::Compatibility {
+                mutual_security_protocols: mutual_security_protocols.clone(),
+            })),
+            timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+            bss_description: random_fidl_bss_description!(
+                protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
+                bssid: [0, 0, 0, 0, 0, 0],
+                ssid: second_ssid.clone(),
+                rssi_dbm: -70,
+                snr_db: 20,
+                channel: types::WlanChan::new(1, types::Cbw::Cbw20),
+            ),
+        },
+        fidl_sme::ScanResult {
+            compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
+            timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+            bss_description: random_fidl_bss_description!(
+                protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
+                bssid: [0, 0, 0, 0, 0, 1],
+                ssid: second_ssid.clone(),
+                rssi_dbm: -40,
+                snr_db: 30,
+                channel: types::WlanChan::new(36, types::Cbw::Cbw40),
+            ),
+        },
+    ];
+    let client_sme_request = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        existing_connection.iface_sme_stream.next(),
+    );
+    assert_variant!(
+        client_sme_request,
+        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+            req, responder
+        })) => {
+            assert_eq!(req, expected_scan_request);
+            responder.send(&mut Ok(mock_scan_results.clone())).expect("failed to send scan data");
+        }
+    );
+
+    // State machine disconnects due to new connect request.
+    let client_sme_request = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        existing_connection.state_machine_sme_stream.next(),
+    );
+    assert_variant!(
+        client_sme_request,
+        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
+            reason, responder
+        })) => {
+            assert_eq!(fidl_sme::UserDisconnectReason::FidlConnectRequest, reason);
+            assert!(responder.send().is_ok());
+        }
+    );
+
+    // Listener update should now show first network as disconnected, second as still connecting.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let networks = networks.unwrap();
+    assert_eq!(networks.len(), 2);
+    for network in networks {
+        if network.id.unwrap() == network_id.clone() {
+            assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting)
+        } else {
+            assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected)
+        }
+    }
+
+    // State machine connects, create new connect txt handle. Verify the SME connect request is for
+    // the much better BSS.
+    let client_sme_request = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        existing_connection.state_machine_sme_stream.next(),
+    );
+    let connect_txn_handle = assert_variant!(
+        client_sme_request,
+        Some(Ok(fidl_sme::ClientSmeRequest::Connect {
+            req, txn, control_handle: _
+        })) => {
+            assert_eq!(req.ssid, second_ssid.clone());
+            assert_eq!(TEST_CREDS.wpa_pass_min.sme.clone(), req.authentication.credentials);
+            assert_eq!(req.bss_description.bssid, [0, 0, 0, 0, 0, 1]);
+            let (_stream, ctrl) = txn.expect("connect txn unused")
+                .into_stream_and_control_handle().expect("error accessing control handle");
+            ctrl
+        }
+    );
+    connect_txn_handle
+        .send_on_connect_result(&mut fidl_sme::ConnectResult {
+            code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        })
+        .expect("failed to send connection completion");
+
+    // Update sme connect transaction handle. The previous handle was not used, but had to be held
+    // to prevent the channel from closing.
+    existing_connection.connect_txn_handle = connect_txn_handle;
+
+    // Process stash write for the recording of connect results.
+    process_stash_write(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.stash_server,
+    );
+
+    // Listener update should now show only the second network with connected state.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap().ssid, second_ssid.to_vec());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connected);
 }
