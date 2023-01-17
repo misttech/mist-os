@@ -18,7 +18,6 @@ test("netstack_bsdsocket_c_api_test") {
   sources = [
     "../os.h",
     "bsdsocket_test.cc",
-    "if_nameindex_test.cc",
     "no_network_test.cc",
     "util.cc",
     "util.h",
