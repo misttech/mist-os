@@ -65,18 +65,7 @@ impl StoredMessage {
     pub fn debuglog(record: zx::sys::zx_log_record_t) -> Option<Self> {
         let data_len = record.datalen as usize;
 
-        let mut contents = match std::str::from_utf8(&record.data[0..data_len]) {
-            Err(_) => {
-                format!(
-                    "INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: {}",
-                    String::from_utf8_lossy(&record.data[0..data_len])
-                )
-            }
-            Ok(utf8) => {
-                let boxed_utf8: Box<str> = utf8.into();
-                boxed_utf8.into_string()
-            }
-        };
+        let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
         if let Some(b'\n') = contents.bytes().last() {
             contents.pop();
         }

@@ -140,10 +140,7 @@ fn string_ref(
         if support_invalid_utf8 {
             parsed = match std::str::from_utf8(name) {
                 Ok(valid) => Cow::Borrowed(valid),
-                Err(_) => Cow::Owned(format!(
-                    "INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: {}",
-                    String::from_utf8_lossy(name)
-                )),
+                Err(_) => String::from_utf8_lossy(name),
             };
         } else {
             parsed = Cow::Borrowed(

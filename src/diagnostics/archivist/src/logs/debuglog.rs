@@ -121,18 +121,7 @@ impl<K: DebugLog> DebugLogBridge<K> {
 pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Option<LogsData> {
     let data_len = record.datalen as usize;
 
-    let mut contents = match std::str::from_utf8(&record.data[0..data_len]) {
-        Err(_) => {
-            format!(
-                "INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: {}",
-                String::from_utf8_lossy(&record.data[0..data_len])
-            )
-        }
-        Ok(utf8) => {
-            let boxed_utf8: Box<str> = utf8.into();
-            boxed_utf8.into_string()
-        }
-    };
+    let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
     if let Some(b'\n') = contents.bytes().last() {
         contents.pop();
     }
@@ -254,11 +243,7 @@ mod tests {
 
         // invalid utf-8
         let klog = TestDebugEntry::new(b"\x00\x9f\x92");
-        assert!(convert_debuglog_to_log_message(&klog.record)
-            .unwrap()
-            .msg()
-            .unwrap()
-            .contains("INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: "));
+        assert_eq!(convert_debuglog_to_log_message(&klog.record).unwrap().msg().unwrap(), "\x00��");
     }
 
     #[fasync::run_until_stalled(test)]
@@ -326,10 +311,7 @@ mod tests {
         let mut log_stream = Box::pin(log_bridge.listen());
         let log_message =
             log_stream.try_next().await.unwrap().unwrap().parse(&KERNEL_IDENTITY).unwrap();
-        assert_eq!(
-            log_message.msg().unwrap(),
-            "INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: �"
-        );
+        assert_eq!(log_message.msg().unwrap(), "�");
     }
 
     #[fasync::run_until_stalled(test)]

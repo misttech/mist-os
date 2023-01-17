@@ -217,11 +217,14 @@ impl Puppet {
         if test_invalid_unicode {
             info!("Testing invalid unicode.");
             assert_eq!(
-                    puppet.read_record(ReadRecordArgs{new_file_line_rules, override_file_line: true}).await?.unwrap(),
-                    RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
-                        .add_string("message", "INVALID UTF-8 SEE https://fxbug.dev/88259, message may be corrupted: Puppet started.�(")
-                        .build(puppet.start_time..zx::Time::get_monotonic())
-                );
+                puppet
+                    .read_record(ReadRecordArgs { new_file_line_rules, override_file_line: true })
+                    .await?
+                    .unwrap(),
+                RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
+                    .add_string("message", "Puppet started.�(")
+                    .build(puppet.start_time..zx::Time::get_monotonic())
+            );
         } else {
             info!("Reading regular record.");
             assert_eq!(
