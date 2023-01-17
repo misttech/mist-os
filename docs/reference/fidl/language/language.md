@@ -391,8 +391,8 @@ Structs, tables, and unions containing handles must be marked with the
 ### Structs {#structs}
 
 *   Record type consisting of a sequence of typed fields.
-*   Declaration is not intended to be modified once deployed; use protocol
-    extension instead.
+*   Adding or removing fields or changing their types is generally
+    not ABI compatible.
 *   Declaration can have the [`resource` modifier](#value-vs-resource).
 *   References may be `box`ed.
 *   Structs contain zero or more members.
