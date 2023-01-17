@@ -679,49 +679,57 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         }
     }
 
-    /// Returns any waitable child matching the given `selector` and `options`. Returns None if no
-    /// child matching the selector is waitable. Returns ECHILD if no child matches the selector at
-    /// all.
-    ///
-    /// Will remove the waitable status from the child depending on `options`.
-    pub fn get_waitable_child(
+    fn get_waitable_zombie(
         &mut self,
+        selector: ProcessSelector,
+        options: &WaitingOptions,
+    ) -> Option<ZombieProcess> {
+        // The zombies whose pid matches the pid selector queried.
+        let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {
+            ProcessSelector::Any => true,
+            ProcessSelector::Pid(pid) => zombie.pid == pid,
+            ProcessSelector::Pgid(pgid) => zombie.pgid == pgid,
+        };
+
+        // The zombies whose exit signal matches the waiting options queried.
+        let zombie_matches_wait_options: fn(&ZombieProcess) -> bool = if options.wait_for_all {
+            |_zombie: &ZombieProcess| true
+        } else if options.wait_for_clone {
+            // A "clone" zombie is one which has delivered no signal, or a signal other than SIGCHLD to its parent upon termination.
+            |zombie: &ZombieProcess| zombie.exit_signal != Some(SIGCHLD)
+        } else {
+            |zombie: &ZombieProcess| zombie.exit_signal == Some(SIGCHLD)
+        };
+
+        // We look for the last zombie in the vector that matches pid selector and waiting options
+        let selected_zombie_position = self
+            .zombie_children
+            .iter()
+            .rev()
+            .position(|zombie: &ZombieProcess| {
+                zombie_matches_wait_options(zombie) && zombie_matches_pid_selector(zombie)
+            })
+            .map(|position_starting_from_the_back| {
+                self.zombie_children.len() - 1 - position_starting_from_the_back
+            });
+
+        selected_zombie_position.map(|position| {
+            if options.keep_waitable_state {
+                self.zombie_children[position].clone()
+            } else {
+                self.zombie_children.remove(position)
+            }
+        })
+    }
+
+    fn get_waitable_running_children(
+        &self,
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &PidTable,
     ) -> Result<Option<ZombieProcess>, Errno> {
-        if options.wait_for_exited {
-            if let Some(child) = match selector {
-                ProcessSelector::Any => {
-                    if !self.zombie_children.is_empty() {
-                        Some(self.zombie_children.len() - 1)
-                    } else {
-                        None
-                    }
-                }
-                ProcessSelector::Pgid(pid) => {
-                    self.zombie_children.iter().position(|zombie| zombie.pgid == pid)
-                }
-                ProcessSelector::Pid(pid) => {
-                    self.zombie_children.iter().position(|zombie| zombie.pid == pid)
-                }
-            }
-            .map(|pos| {
-                if options.keep_waitable_state {
-                    self.zombie_children[pos].clone()
-                } else {
-                    self.zombie_children.remove(pos)
-                }
-            }) {
-                return Ok(Some(child));
-            }
-        }
-
-        // TODO(tbodt): Try and unify .zombie_children with .waitable. This function is essentially
-        // the same code twice. See also the TODO on zombie_children.
-
-        // The vector of potential matches.
-        let children_filter = |child: &Arc<ThreadGroup>| match selector {
+        // The children whose pid matches the pid selector queried.
+        let filter_children_by_pid_selector = |child: &Arc<ThreadGroup>| match selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => child.leader == pid,
             ProcessSelector::Pgid(pgid) => {
@@ -729,8 +737,37 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             }
         };
 
-        let mut selected_children =
-            self.children.values().map(|t| t.upgrade().unwrap()).filter(children_filter).peekable();
+        // The children whose exit signal matches the waiting options queried.
+        let filter_children_by_waiting_options: fn(&Arc<ThreadGroup>) -> bool =
+            if options.wait_for_all {
+                |_child: &Arc<ThreadGroup>| true
+            } else if options.wait_for_clone {
+                // A "clone" child is one which delivers no signal, or a signal other than SIGCHLD to its parent upon termination.
+                |child: &Arc<ThreadGroup>| {
+                    let exit_task = match child.read().get_task() {
+                        Ok(task) => task,
+                        Err(_) => return false, // I don't really think this can be ignored, maybe this closure needs to bubble up the Result
+                    };
+                    exit_task.exit_signal != Some(SIGCHLD)
+                }
+            } else {
+                |child: &Arc<ThreadGroup>| {
+                    let exit_task = match child.read().get_task() {
+                        Ok(task) => task,
+                        Err(_) => return false, // I don't really think this can be ignored, maybe this closure needs to bubble up the Result
+                    };
+                    exit_task.exit_signal == Some(SIGCHLD)
+                }
+            };
+
+        // If wait_for_exited flag is disabled or no terminated children were found we look for living children.
+        let mut selected_children = self
+            .children
+            .values()
+            .map(|t| t.upgrade().unwrap())
+            .filter(filter_children_by_pid_selector)
+            .filter(filter_children_by_waiting_options)
+            .peekable();
         if selected_children.peek().is_none() {
             return error!(ECHILD);
         }
@@ -769,6 +806,26 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         Ok(None)
     }
 
+    /// Returns any waitable child matching the given `selector` and `options`. Returns None if no
+    /// child matching the selector is waitable. Returns ECHILD if no child matches the selector at
+    /// all.
+    ///
+    /// Will remove the waitable status from the child depending on `options`.
+    pub fn get_waitable_child(
+        &mut self,
+        selector: ProcessSelector,
+        options: &WaitingOptions,
+        pids: &PidTable,
+    ) -> Result<Option<ZombieProcess>, Errno> {
+        if options.wait_for_exited {
+            if let Some(waitable_zombie) = self.get_waitable_zombie(selector, options) {
+                return Ok(Some(waitable_zombie));
+            }
+        }
+
+        self.get_waitable_running_children(selector, options, pids)
+    }
+
     /// Returns a task in the current thread group.
     fn get_task(&self) -> Result<Arc<Task>, Errno> {
         self.tasks
@@ -802,7 +859,7 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(current_task.thread_group.setsid(), error!(EPERM));
 
-        let child_task = current_task.clone_task_for_test(0);
+        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
         assert_eq!(get_process_group(&current_task), get_process_group(&child_task));
 
         let old_process_group = child_task.thread_group.read().process_group.clone();
@@ -817,7 +874,7 @@ mod test {
     #[::fuchsia::test]
     fn test_exit_status() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let child = current_task.clone_task_for_test(0);
+        let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
         child.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child);
         assert_eq!(
@@ -831,11 +888,11 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
         assert_eq!(current_task.thread_group.setsid(), error!(EPERM));
 
-        let child_task1 = current_task.clone_task_for_test(0);
-        let child_task2 = current_task.clone_task_for_test(0);
-        let execd_child_task = current_task.clone_task_for_test(0);
+        let child_task1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_task2 = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let execd_child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
         execd_child_task.thread_group.write().did_exec = true;
-        let other_session_child_task = current_task.clone_task_for_test(0);
+        let other_session_child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
         assert_eq!(other_session_child_task.thread_group.setsid(), Ok(()));
 
         assert_eq!(child_task1.thread_group.setpgid(&current_task, 0), error!(ESRCH));

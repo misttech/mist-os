@@ -40,7 +40,8 @@ test("syscalls_test_bin") {
     "test_helper_test.cc",
     "timerfd_test.cc",
     "trivial_test.cc",
-    "waitpid_test.cc",
+    "waitpid_exit_signal_test.cc",
+    "waitpid_flags_test.cc",
   ]
   deps = [
     "//src/lib/files",

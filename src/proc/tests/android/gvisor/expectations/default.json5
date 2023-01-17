@@ -1215,17 +1215,9 @@
                 "WaitTest.Wait4Rusage",
                 "WaitTest.WaitidRusage",
                 "WaitTest.TraceeWALL",
-                "Waiters/WaitAnyChildTest.CloneSIGCHLD/*",
-                "Waiters/WaitAnyChildTest.ForkAndClone/*",
                 "Waiters/WaitAnyChildTest.WaitedChildRusage/*",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
-                "Waiters/WaitSpecificChildTest.CloneSIGCHLD/*",
-                "Waiters/WaitSpecificChildTest.CloneNoSIGCHLD/*",
-                "Waiters/WaitSpecificChildTest.CloneAfterExit/*",
-                "Waiters/WaitSpecificChildTest.CloneWCLONE/0",
-                "Waiters/WaitSpecificChildTest.ForkWCLONE/0",
-                "Waiters/WaitSpecificChildTest.WALL/0",
                 "Waiters/WaitSpecificChildTest.AfterChildExecve/*",
 
                 // write_test
@@ -1323,6 +1315,15 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
+
+                // TODO(fxbug.dev/114813): Re-enable once CLONE_VM | CLONE_THREAD is implemented
+                "Waiters/WaitAnyChildTest.CloneSIGCHLD/*",
+                "Waiters/WaitAnyChildTest.ForkAndClone/*",
+                "Waiters/WaitSpecificChildTest.CloneSIGCHLD/*",
+                "Waiters/WaitSpecificChildTest.CloneNoSIGCHLD/*",
+                "Waiters/WaitSpecificChildTest.CloneAfterExit/*",
+                "Waiters/WaitSpecificChildTest.CloneWCLONE/*",
+                "Waiters/WaitSpecificChildTest.WALL/*",
             ],
         },
     ],

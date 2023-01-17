@@ -76,6 +76,24 @@ class CloneHelper {
   static constexpr size_t _childStackSize = 0x5000;
 };
 
+// Helper class to modify signal masks of processes
+class SignalMaskHelper {
+ public:
+  // Blocks the specified signal and saves the original signal mask
+  // to _sigmaskCopy.
+  void blockSignal(int signal);
+
+  // Blocks the execution until the specified signal is received.
+  void waitForSignal(int signal);
+
+  // Sets the signal mask of the process with _sigmaskCopy.
+  void restoreSigmask();
+
+ private:
+  sigset_t _sigset;
+  sigset_t _sigmaskCopy;
+};
+
 class ScopedFD {
  public:
   explicit ScopedFD(int fd = -1) : fd_(fd) {}
@@ -125,4 +143,9 @@ class ScopedTempFD {
     eintr_wrapper_result;                                   \
   })
 
+void waitForChildSucceeds(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
+                          int (*parentRunFunction)(void *));
+
+void waitForChildFails(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
+                       int (*parentRunFunction)(void *));
 #endif  // SRC_PROC_TESTS_CHROMIUMOS_SYSCALLS_TEST_HELPER_H_

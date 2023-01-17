@@ -807,7 +807,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_attach_terminal() {
         let (kernel, task1) = create_kernel_and_task();
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setsid().expect("setsid");
 
         let fs = dev_pts_fs(&kernel);
@@ -836,7 +836,7 @@ mod tests {
         let (kernel, task1) = create_kernel_and_task();
         task1.set_creds(Credentials::from_passwd("nobody:x:1:1").expect("credentials"));
 
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
 
         let fs = dev_pts_fs(&kernel);
         let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
@@ -887,9 +887,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_set_foreground_process() {
         let (kernel, init) = create_kernel_and_task();
-        let task1 = init.clone_task_for_test(0);
+        let task1 = init.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setpgid(&task2, 0).expect("setpgid");
         let task2_pgid = task2.thread_group.read().process_group.leader;
 
@@ -955,7 +955,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_detach_session() {
         let (kernel, task1) = create_kernel_and_task();
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setsid().expect("setsid");
 
         let fs = dev_pts_fs(&kernel);

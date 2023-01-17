@@ -480,9 +480,9 @@ impl Task {
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
     /// exit signal as in clone().
     #[cfg(test)]
-    pub fn clone_task_for_test(&self, flags: u64) -> CurrentTask {
+    pub fn clone_task_for_test(&self, flags: u64, exit_signal: Option<Signal>) -> CurrentTask {
         let result = self
-            .clone_task(flags, None, UserRef::default(), UserRef::default())
+            .clone_task(flags, exit_signal, UserRef::default(), UserRef::default())
             .expect("failed to create task in test");
 
         // Take the lock on thread group and task in the correct order to ensure any wrong ordering
@@ -1137,12 +1137,12 @@ mod test {
     fn test_clone_pid_and_parent_pid() {
         let (_kernel, current_task) = create_kernel_and_task();
         let thread =
-            current_task.clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64);
+            current_task.clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64, Some(SIGCHLD));
         assert_eq!(current_task.get_pid(), thread.get_pid());
         assert_ne!(current_task.get_tid(), thread.get_tid());
         assert_eq!(current_task.thread_group.leader, thread.thread_group.leader);
 
-        let child_task = current_task.clone_task_for_test(0);
+        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
         assert_ne!(current_task.get_pid(), child_task.get_pid());
         assert_ne!(current_task.get_tid(), child_task.get_tid());
         assert_eq!(current_task.get_pid(), child_task.thread_group.read().get_ppid());

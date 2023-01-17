@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <sched.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/syscall.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <vector>
@@ -32,13 +28,13 @@ void ensureWait(int pid, unsigned int waitFlags) {
 }
 }  // namespace
 
-class WaitpidTests : public testing::Test {
+class WaitpidExitSignalTest : public testing::Test {
  protected:
   void SetUp() override {
     receivedSignals.clear();
+    errno = 0;
     signal(SIGUSR1, handler);
     signal(SIGCHLD, handler);
-    errno = 0;
   }
   void TearDown() override {
     signal(SIGUSR1, SIG_DFL);
@@ -50,29 +46,26 @@ class WaitpidTests : public testing::Test {
  * Main process (P0) creates a child process (P1).
  * On termination, P1 sends its exit signal (if any) to P0.
  */
-TEST_F(WaitpidTests, childProcessSendsDefaultSignalOnTerminationToParentProcess) {
+TEST_F(WaitpidExitSignalTest, childProcessSendsDefaultSignalOnTerminationToParentProcess) {
   CloneHelper testCloneHelper;
   int pid = testCloneHelper.runInClonedChild(SIGCHLD, CloneHelper::doNothing);
-  // TODO: This should be __WALL to follow linux behaviour, but starnix did not implement this yet.
-  ensureWait(pid, 0);
+  ensureWait(pid, __WALL);
   EXPECT_TRUE(receivedSignals.size() == 1);
   EXPECT_EQ(receivedSignals[0], SIGCHLD);
 }
 
-TEST_F(WaitpidTests, childProcessSendsCustomExitSignalOnTerminationToParentProcess) {
+TEST_F(WaitpidExitSignalTest, childProcessSendsCustomExitSignalOnTerminationToParentProcess) {
   CloneHelper testCloneHelper;
   int pid = testCloneHelper.runInClonedChild(SIGUSR1, CloneHelper::doNothing);
-  // TODO: This should be __WALL to follow linux behaviour, but starnix did not implement this yet.
-  ensureWait(pid, 0);
+  ensureWait(pid, __WALL);
   EXPECT_TRUE(receivedSignals.size() == 1);
   EXPECT_EQ(receivedSignals[0], SIGUSR1);
 }
 
-TEST_F(WaitpidTests, childProcessSendsNoExitSignalOnTerminationToParentProcess) {
+TEST_F(WaitpidExitSignalTest, childProcessSendsNoExitSignalOnTerminationToParentProcess) {
   CloneHelper testCloneHelper;
   int pid = testCloneHelper.runInClonedChild(0, CloneHelper::doNothing);
-  // TODO: This should be __WALL to follow linux behaviour, but starnix did not implement this yet.
-  ensureWait(pid, 0);
+  ensureWait(pid, __WALL);
   EXPECT_TRUE(receivedSignals.empty());
 }
 
@@ -94,20 +87,18 @@ int processThatFinishBeforeChildThread(void *) {
   return 0;
 }
 
-TEST_F(WaitpidTests, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesLast) {
+TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesLast) {
   CloneHelper testCloneHelper;
   int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishAfterChildThread);
-  // TODO: This should be __WALL to follow linux behaviour, but starnix did not implement this yet.
-  ensureWait(pid, 0);
+  ensureWait(pid, __WALL);
   EXPECT_TRUE(receivedSignals.size() == 1);
   EXPECT_EQ(receivedSignals[0], SIGUSR1);
 }
 
-TEST_F(WaitpidTests, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesFirst) {
+TEST_F(WaitpidExitSignalTest, childThreadGroupSendsCorrectExitSignalWhenLeaderTerminatesFirst) {
   CloneHelper testCloneHelper;
   int pid = testCloneHelper.runInClonedChild(SIGUSR1, processThatFinishBeforeChildThread);
-  // TODO: This should be __WALL to follow linux behaviour, but starnix did not implement this yet.
-  ensureWait(pid, 0);
+  ensureWait(pid, __WALL);
   EXPECT_TRUE(receivedSignals.size() == 1);
   EXPECT_EQ(receivedSignals[0], SIGUSR1);
 }

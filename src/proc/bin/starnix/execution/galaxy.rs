@@ -333,7 +333,7 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task = current_task.clone_task_for_test(CLONE_FS as u64);
+        let init_task = current_task.clone_task_for_test(CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
         fasync::Task::local(async move {

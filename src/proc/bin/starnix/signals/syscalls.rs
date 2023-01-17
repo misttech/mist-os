@@ -480,6 +480,10 @@ pub struct WaitingOptions {
     pub block: bool,
     /// Do not clear the waitable state.
     pub keep_waitable_state: bool,
+    /// Wait for all children processes.
+    pub wait_for_all: bool,
+    /// Wait for children who deliver no signal or a signal other than SIGCHLD, ignored if wait_for_all is true
+    pub wait_for_clone: bool,
 }
 
 impl WaitingOptions {
@@ -491,12 +495,15 @@ impl WaitingOptions {
             wait_for_continued: options & WCONTINUED > 0,
             block: options & WNOHANG == 0,
             keep_waitable_state: options & WNOWAIT > 0,
+            wait_for_all: options & __WALL > 0,
+            wait_for_clone: options & __WCLONE > 0,
         }
     }
 
     /// Build a `WaitingOptions` from the waiting flags of waitid.
     pub fn new_for_waitid(task: &Task, options: u32) -> Result<Self, Errno> {
-        if options & !(WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED) != 0 {
+        if options & !(__WCLONE | __WALL | WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED) != 0
+        {
             not_implemented!(task, "unsupported waitid options: {:#x}", options);
             return error!(EINVAL);
         }
@@ -508,7 +515,7 @@ impl WaitingOptions {
 
     /// Build a `WaitingOptions` from the waiting flags of wait4.
     pub fn new_for_wait4(task: &Task, options: u32) -> Result<Self, Errno> {
-        if options & !(WNOHANG | WUNTRACED | WCONTINUED) != 0 {
+        if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
             not_implemented!(task, "unsupported wait4 options: {:#x}", options);
             return error!(EINVAL);
         }
@@ -1041,9 +1048,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_kill_own_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
-        let task1 = init_task.clone_task_for_test(0);
+        let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&task1, 0, SIGINT.into()), Ok(()));
         assert_eq!(task1.read().signals.queued_count(SIGINT), 1);
@@ -1055,9 +1062,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_kill_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
-        let task1 = init_task.clone_task_for_test(0);
+        let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&task1, -task1.id, SIGINT.into()), Ok(()));
         assert_eq!(task1.read().signals.queued_count(SIGINT), 1);
@@ -1069,9 +1076,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_kill_all() {
         let (_kernel, init_task) = create_kernel_and_task();
-        let task1 = init_task.clone_task_for_test(0);
+        let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&task1, -1, SIGINT.into()), Ok(()));
         assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
@@ -1093,7 +1100,7 @@ mod tests {
         let (_kernel, task1) = create_kernel_and_task();
         // Task must not have the kill capability.
         task1.set_creds(Credentials::from_passwd("foo:x:1:1").expect("Credentials::from_passwd"));
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.set_creds(
             Credentials::from_passwd("bin:x:2:2:bin:/bin:/usr/sbin/nologin")
                 .expect("build credentials"),
@@ -1108,9 +1115,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_kill_invalid_task_in_thread_group() {
         let (_kernel, init_task) = create_kernel_and_task();
-        let task1 = init_task.clone_task_for_test(0);
+        let task1 = init_task.clone_task_for_test(0, Some(SIGCHLD));
         task1.thread_group.setsid().expect("setsid");
-        let task2 = task1.clone_task_for_test(0);
+        let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.thread_group.setsid().expect("setsid");
         task2.set_creds(
             Credentials::from_passwd("bin:x:2:2:bin:/bin:/usr/sbin/nologin")
@@ -1238,7 +1245,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_stop_cont() {
         let (_kernel, task) = create_kernel_and_task();
-        let mut child = task.clone_task_for_test(0);
+        let mut child = task.clone_task_for_test(0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&task, child.id, UncheckedSignal::from(SIGSTOP)), Ok(()));
         dequeue_signal(&mut child);
@@ -1338,9 +1345,9 @@ mod tests {
     #[::fuchsia::test]
     fn test_no_error_when_zombie() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let child = current_task.clone_task_for_test(0);
+        let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let expected_zombie = ZombieProcess {
-            exit_signal: None,
+            exit_signal: Some(SIGCHLD),
             pid: child.id,
             pgid: child.thread_group.read().process_group.leader,
             uid: 0,
@@ -1362,7 +1369,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_waiting_for_child() {
         let (_kernel, task) = create_kernel_and_task();
-        let child = task.clone_task_for_test(0);
+        let child = task.clone_task_for_test(0, Some(SIGCHLD));
 
         // No child is currently terminated.
         assert_eq!(
@@ -1414,7 +1421,7 @@ mod tests {
         );
 
         // Start a child task. This will ensure that `wait_on_pid` tries to wait for the child.
-        let _child = task.clone_task_for_test(0);
+        let _child = task.clone_task_for_test(0, Some(SIGCHLD));
 
         // Send a signal to the task. `wait_on_pid` should realize there is a signal pending when
         // entering a wait and return with `EINTR`.
@@ -1432,7 +1439,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_sigkill() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut child = current_task.clone_task_for_test(0);
+        let mut child = current_task.clone_task_for_test(0, Some(SIGCHLD));
 
         // Send SigKill to the child. As kill is handled immediately, no need to dequeue signals.
         send_signal(&child, SignalInfo::default(SIGKILL));
@@ -1448,9 +1455,9 @@ mod tests {
         assert_eq!(wstatus, SIGKILL.number() as i32);
     }
 
-    fn test_exit_status_for_signal(sig: Signal, wait_status: i32) {
+    fn test_exit_status_for_signal(sig: Signal, wait_status: i32, exit_signal: Option<Signal>) {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut child = current_task.clone_task_for_test(0);
+        let mut child = current_task.clone_task_for_test(0, exit_signal);
 
         // Send the signal to the child.
         send_signal(&child, SignalInfo::default(sig));
@@ -1469,19 +1476,19 @@ mod tests {
     #[::fuchsia::test]
     fn test_exit_status() {
         // Default action is Terminate
-        test_exit_status_for_signal(SIGTERM, SIGTERM.number() as i32);
+        test_exit_status_for_signal(SIGTERM, SIGTERM.number() as i32, Some(SIGCHLD));
         // Default action is CoreDump
-        test_exit_status_for_signal(SIGSEGV, (SIGSEGV.number() as i32) | 0x80);
+        test_exit_status_for_signal(SIGSEGV, (SIGSEGV.number() as i32) | 0x80, Some(SIGCHLD));
     }
 
     #[::fuchsia::test]
     fn test_wait4_by_pgid() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let child1 = current_task.clone_task_for_test(0);
+        let child1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let child1_pid = child1.id;
         child1.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child1);
-        let child2 = current_task.clone_task_for_test(0);
+        let child2 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         child2.thread_group.setsid().expect("setsid");
         let child2_pid = child2.id;
         child2.thread_group.exit(ExitStatus::Exit(42));
@@ -1500,11 +1507,11 @@ mod tests {
     #[::fuchsia::test]
     fn test_waitid_by_pgid() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let child1 = current_task.clone_task_for_test(0);
+        let child1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         let child1_pid = child1.id;
         child1.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child1);
-        let child2 = current_task.clone_task_for_test(0);
+        let child2 = current_task.clone_task_for_test(0, Some(SIGCHLD));
         child2.thread_group.setsid().expect("setsid");
         let child2_pid = child2.id;
         child2.thread_group.exit(ExitStatus::Exit(42));

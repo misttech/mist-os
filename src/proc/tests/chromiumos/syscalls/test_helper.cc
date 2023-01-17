@@ -5,6 +5,8 @@
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 #include <sched.h>
+#include <signal.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -91,7 +93,52 @@ int CloneHelper::sleep_1sec(void *) {
 
 int CloneHelper::doNothing(void *) { return 0; }
 
+void SignalMaskHelper::blockSignal(int signal) {
+  sigemptyset(&this->_sigset);
+  sigaddset(&this->_sigset, signal);
+  sigprocmask(SIG_BLOCK, &this->_sigset, &this->_sigmaskCopy);
+}
+
+void SignalMaskHelper::waitForSignal(int signal) {
+  int sig;
+  int result = sigwait(&this->_sigset, &sig);
+  ASSERT_EQ(result, 0);
+  ASSERT_EQ(sig, signal);
+}
+
+void SignalMaskHelper::restoreSigmask() { sigprocmask(SIG_SETMASK, &this->_sigmaskCopy, NULL); }
+
 ScopedTempFD::ScopedTempFD() : name_("/tmp/proc_test_file_XXXXXX") {
   char *mut_name = const_cast<char *>(name_.c_str());
   fd_ = ScopedFD(mkstemp(mut_name));
+}
+
+void waitForChildSucceeds(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
+                          int (*parentRunFunction)(void *)) {
+  CloneHelper cloneHelper;
+  int expectedWaitPid = cloneHelper.runInClonedChild(cloneFlags, childRunFunction);
+
+  parentRunFunction(NULL);
+
+  int expectedWaitStatus = 0;
+  int expectedErrno = 0;
+  int actualWaitStatus;
+  int actualWaitPid = waitpid(expectedWaitPid, &actualWaitStatus, waitFlag);
+  EXPECT_EQ(actualWaitPid, expectedWaitPid);
+  EXPECT_EQ(actualWaitStatus, expectedWaitStatus);
+  EXPECT_EQ(errno, expectedErrno);
+}
+
+void waitForChildFails(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
+                       int (*parentRunFunction)(void *)) {
+  CloneHelper cloneHelper;
+  int pid = cloneHelper.runInClonedChild(cloneFlags, childRunFunction);
+
+  parentRunFunction(NULL);
+
+  int expectedWaitPid = -1;
+  int actualWaitPid = waitpid(pid, NULL, waitFlag);
+  EXPECT_EQ(actualWaitPid, expectedWaitPid);
+  EXPECT_EQ(errno, ECHILD);
+  errno = 0;
 }
