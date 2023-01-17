@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <fuchsia/driver/development/cpp/fidl.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/fd.h>

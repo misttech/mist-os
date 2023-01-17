@@ -13,7 +13,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/receiver.h>
 #include <lib/async/cpp/task.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>

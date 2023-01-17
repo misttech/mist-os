@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>

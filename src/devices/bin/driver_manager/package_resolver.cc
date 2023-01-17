@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 
 #include <fbl/string_printf.h>

@@ -5,7 +5,7 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include <algorithm>
 #include <latch>

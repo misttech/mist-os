@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.adb/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
 #include <zircon/errors.h>

@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/zx/process.h>
 #include <lib/zx/resource.h>

@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/driver/compat/cpp/connect.h>
 #include <lib/driver/component/cpp/promise.h>

@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/cpp/vmo/types.h>

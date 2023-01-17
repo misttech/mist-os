@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.usb.hcitest/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <stdio.h>

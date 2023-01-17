@@ -5,7 +5,7 @@
 #include "multiple_device_test.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <zircon/errors.h>
 
 #include <string>

@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <inttypes.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/watcher.h>
