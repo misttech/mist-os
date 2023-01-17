@@ -478,7 +478,7 @@ zx_status_t Device::InitializeToDevfs() {
   }
 
   zx_status_t status =
-      parent.devfs.topological_node()->add_child(name_, protocol_id_,
+      parent.devfs.topological_node()->add_child(name_, ProtocolIdToClassName(protocol_id_),
                                                  Devnode::Remote{
                                                      .connector = device_controller_.Clone(),
                                                  },

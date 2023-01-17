@@ -83,10 +83,10 @@ class Devnode {
   Devnode(Devnode&&) = delete;
   Devnode& operator=(Devnode&&) = delete;
 
-  // Add a child to this devnode with a given `name`, `protocol`, and `remote.
-  // The child will be constructed in `out_child`.
-  zx_status_t add_child(std::string_view name, uint32_t protocol, Remote remote,
-                        DevfsDevice& out_child);
+  // Add a child to this Devnode. The child will be added to both the topological path and under the
+  // given `class_name`.
+  zx_status_t add_child(std::string_view name, std::optional<std::string_view> class_name,
+                        Target target, DevfsDevice& out_child);
 
   // Exports `target`.
   //

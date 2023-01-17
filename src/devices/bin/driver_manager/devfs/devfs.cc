@@ -59,6 +59,26 @@ static constexpr ProtocolInfo proto_infos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
+zx::result<Devnode::Target> clone_target(Devnode::Target& target) {
+  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(Devnode::NoRemote()));
+                               },
+                               [](Devnode::Service& service) -> zx::result<Devnode::Target> {
+                                 zx::result clone = service.Clone();
+                                 if (clone.is_error()) {
+                                   return clone.take_error();
+                                 }
+                                 return zx::ok(Devnode::Target(std::move(clone.value())));
+                               },
+                               [](Devnode::Remote& remote) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(remote.Clone()));
+                               },
+                               [](Devnode::Connector& connector) -> zx::result<Devnode::Target> {
+                                 return zx::ok(Devnode::Target(connector.Clone()));
+                               }},
+                    target);
+}
+
 }  // namespace
 
 namespace fio = fuchsia_io;
@@ -435,8 +455,8 @@ zx::result<fbl::String> ProtoNode::seq_name() {
   return zx::error(ZX_ERR_ALREADY_EXISTS);
 }
 
-zx_status_t Devnode::add_child(std::string_view name, uint32_t protocol, Remote remote,
-                               DevfsDevice& out_child) {
+zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_view> class_name,
+                               Target target, DevfsDevice& out_child) {
   // Check that the child does not have a duplicate name.
   const std::optional other = devfs_.Lookup(children(), name);
   if (other.has_value()) {
@@ -445,38 +465,31 @@ zx_status_t Devnode::add_child(std::string_view name, uint32_t protocol, Remote 
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  // Find the protocol directory.
-  std::optional<std::reference_wrapper<ProtoNode>> proto_dir;
-  switch (const uint32_t id = protocol; id) {
-    case ZX_PROTOCOL_TEST_PARENT:
-    case ZX_PROTOCOL_MISC:
-      // misc devices are singletons, not a class in the sense of other device
-      // classes.  They do not get aliases in /dev/class/misc/...  instead they
-      // exist only under their parent device.
-      break;
-    default:
-      proto_dir = devfs_.proto_node(id);
-  }
-
-  // Get the name of our new device in the protocol directory.
-  fbl::String class_name;
-  if (proto_dir.has_value()) {
-    class_name = name;
-    if (protocol != ZX_PROTOCOL_CONSOLE) {
-      zx::result seq_name = proto_dir.value().get().seq_name();
-      if (seq_name.is_error()) {
-        return seq_name.status_value();
+  // Export the device to its class directory.
+  if (class_name.has_value()) {
+    std::optional proto_dir = devfs_.proto_node(class_name.value());
+    if (proto_dir.has_value()) {
+      fbl::String instance_name;
+      // TODO(https://fxbug.dev/119949): Stop using device names in /dev/class/console.
+      if (class_name.value() == "console") {
+        instance_name = name;
+      } else {
+        zx::result seq_name = proto_dir.value().get().seq_name();
+        if (seq_name.is_error()) {
+          return seq_name.status_value();
+        }
+        instance_name = seq_name.value();
       }
-      class_name = seq_name.value();
+
+      zx::result target_clone = clone_target(target);
+      if (target_clone.is_error()) {
+        return target_clone.error_value();
+      }
+      out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(),
+                                        std::move(target_clone.value()), instance_name);
     }
   }
-
-  // Setup the DevfsDevice.
-  if (proto_dir.has_value()) {
-    out_child.protocol_node().emplace(devfs_, proto_dir.value().get().children(), remote.Clone(),
-                                      class_name);
-  }
-  out_child.topological_node().emplace(devfs_, children(), std::move(remote), name);
+  out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
 
   return ZX_OK;
 }
@@ -613,26 +626,6 @@ bool should_publish(const Devnode::Target& target) {
                    return !(connector.export_options & Devnode::ExportOptions::kInvisible);
                  }},
       target);
-}
-
-zx::result<Devnode::Target> clone_target(Devnode::Target& target) {
-  return std::visit(overloaded{[](Devnode::NoRemote& no_remote) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(Devnode::NoRemote()));
-                               },
-                               [](Devnode::Service& service) -> zx::result<Devnode::Target> {
-                                 zx::result clone = service.Clone();
-                                 if (clone.is_error()) {
-                                   return clone.take_error();
-                                 }
-                                 return zx::ok(Devnode::Target(std::move(clone.value())));
-                               },
-                               [](Devnode::Remote& remote) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(remote.Clone()));
-                               },
-                               [](Devnode::Connector& connector) -> zx::result<Devnode::Target> {
-                                 return zx::ok(Devnode::Target(connector.Clone()));
-                               }},
-                    target);
 }
 
 }  // namespace
