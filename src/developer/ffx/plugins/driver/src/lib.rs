@@ -112,9 +112,9 @@ impl DriverConnector {
                     println!("Error: please choose a correct value.");
                     continue;
                 }
-                // TODO(fxbug.dev/85516): We have to replace ':' with '*' because they are parsed
-                // incorrectly in a selector.
-                return Ok(capabilities[choice].replace(":", "*") + ":expose:" + capability);
+                // We have to escape colons in the capability name to distinguish them from the
+                // syntactically meaningful colons in the ':expose:" string.
+                return Ok(capabilities[choice].replace(":", "\\:") + ":expose:" + capability);
             }
         }
 

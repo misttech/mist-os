@@ -8,7 +8,10 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":driver_tools_tests" ]
+  deps = [
+    ":driver_tools_tests",
+    "tests",
+  ]
 }
 
 _host_or_test = [
