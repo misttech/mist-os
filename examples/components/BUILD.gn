@@ -11,6 +11,7 @@ group("components") {
     "routing:components-routing-example",
     "routing_failed:components-routing-failed-example",
     "services",
+    "storage",
   ]
 }
 
@@ -22,6 +23,7 @@ group("tests") {
     "realm_builder:tests",
     "routing:tests",
     "services:tests",
+    "storage:tests",
     "subpackages:tests",
   ]
 }
