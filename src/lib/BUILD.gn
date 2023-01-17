@@ -102,6 +102,7 @@ group("tests") {
     "fidl_codec:tests",
     "fidl_table_validation:tests",
     "files:tests",
+    "flyweights:tests",
     "fostr:tests",
     "fuchsia:tests",
     "fuchsia-async:tests",
