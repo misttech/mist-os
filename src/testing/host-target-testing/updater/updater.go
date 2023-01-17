@@ -31,6 +31,7 @@ const (
 
 type client interface {
 	ExpectReboot(ctx context.Context, f func() error) error
+	Reboot(ctx context.Context) error
 	DisconnectionListener() <-chan struct{}
 	ServePackageRepository(
 		ctx context.Context,
@@ -136,6 +137,11 @@ func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, cr
 		return err
 	}
 
+	cmd := []string{"/bin/update", "wait-for-commit"}
+	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
+		logger.Warningf(ctx, "update wait-for-commit failed: %v", err)
+	}
+
 	logger.Infof(ctx, "OTA completed in %s", time.Now().Sub(startTime))
 
 	return nil
@@ -172,6 +178,20 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 	}
 
 	logger.Infof(ctx, "OTA successfully downloaded in %s", time.Now().Sub(startTime))
+
+	logger.Infof(ctx, "Rebooting device")
+	startTime = time.Now()
+
+	if err = c.Reboot(ctx); err != nil {
+		return fmt.Errorf("device failed to reboot after OTA applied: %w", err)
+	}
+
+	logger.Infof(ctx, "Reboot complete in %s", time.Now().Sub(startTime))
+
+	cmd = []string{"/bin/update", "wait-for-commit"}
+	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
+		logger.Warningf(ctx, "update wait-for-commit failed: %v", err)
+	}
 
 	return nil
 }

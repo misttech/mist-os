@@ -491,14 +491,6 @@ func otaToPackage(
 		return fmt.Errorf("failed to download OTA: %w", err)
 	}
 
-	logger.Infof(ctx, "Rebooting device")
-	startTime := time.Now()
-
-	if err = device.Reboot(ctx); err != nil {
-		return fmt.Errorf("device failed to reboot after OTA applied: %w", err)
-	}
-
-	logger.Infof(ctx, "Reboot complete in %s", time.Now().Sub(startTime))
 	logger.Infof(ctx, "Validating device")
 
 	// Disconnect from sl4f since we rebooted the device.
