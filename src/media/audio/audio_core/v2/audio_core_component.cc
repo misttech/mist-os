@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.audio.mixer/cpp/wire.h>
 #include <fidl/fuchsia.media/cpp/hlcpp_conversion.h>
 #include <lib/async-loop/default.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/client.h>
 

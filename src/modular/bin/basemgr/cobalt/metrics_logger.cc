@@ -4,7 +4,7 @@
 
 #include "src/modular/bin/basemgr/cobalt/metrics_logger.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/modular/bin/basemgr/cobalt/basemgr_metrics_registry.cb.h"

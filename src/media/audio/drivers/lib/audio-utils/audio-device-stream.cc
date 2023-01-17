@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
 #include <inttypes.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/zx/channel.h>

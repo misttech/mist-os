@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <getopt.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/unsafe.h>
 #include <stdio.h>

@@ -5,7 +5,7 @@
 #include <dlfcn.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>

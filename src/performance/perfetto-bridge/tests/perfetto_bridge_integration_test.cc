@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
 #include <fidl/fuchsia.tracing/cpp/fidl.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/socket.h>
 #include <stdlib.h>
 

@@ -12,7 +12,7 @@
 
 #include <cstdlib>
 
-#include <sdk/lib/component/incoming/cpp/service_client.h>
+#include <sdk/lib/component/incoming/cpp/protocol.h>
 
 #include "src/media/audio/audio_core/shared/mix_profile_config.h"
 

@@ -5,7 +5,7 @@
 #ifndef SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/channel.h>

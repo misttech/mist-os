@@ -5,7 +5,7 @@
 #include "src/graphics/bin/vulkan_loader/goldfish_device.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/syslog/cpp/macros.h>
 

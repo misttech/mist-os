@@ -4,7 +4,7 @@
 
 #include "src/lib/storage/fs_management/cpp/mkfs_with_default.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include <iostream>
 

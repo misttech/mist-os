@@ -4,7 +4,7 @@
 
 #include "src/media/audio/audio_core/shared/metrics/metrics_impl.h"
 
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 

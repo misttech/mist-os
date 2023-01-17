@@ -5,7 +5,7 @@
 
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.metrics/cpp/natural_types.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/syslog/cpp/macros.h>
 

@@ -45,7 +45,7 @@ source_set("ddktl") {
 
   if (is_fuchsia) {
     public_deps += [
-      # <ddktl/device.h> has #include <lib/component/incoming/cpp/service_client.h>.
+      # <ddktl/device.h> has #include <lib/component/incoming/cpp/protocol.h>.
       "//sdk/lib/component/incoming/cpp",
 
       # <ddktl/device.h> has #include <lib/fidl_driver/cpp/transport.h>
