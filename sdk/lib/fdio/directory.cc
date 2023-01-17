@@ -16,10 +16,6 @@
 
 namespace fio = fuchsia_io;
 
-// TODO(https://fxbug.dev/101092): Shrink this to 0.
-constexpr uint32_t kServiceFlags = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                                         fio::wire::OpenFlags::kPosixWritable);
-
 __EXPORT
 zx_status_t fdio_service_connect(const char* path, zx_handle_t h) {
   zx::handle handle{h};
@@ -27,12 +23,14 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t h) {
   if (zx_status_t status = fdio_ns_get_installed(&ns); status != ZX_OK) {
     return status;
   }
-  return fdio_ns_open(ns, path, kServiceFlags, handle.release());
+  return fdio_ns_service_connect(ns, path, handle.release());
 }
 
 __EXPORT
 zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t h) {
-  return fdio_open_at(dir, path, kServiceFlags, h);
+  // TODO(https://fxbug.dev/101092): Shrink this to 0.
+  constexpr uint32_t flags = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable);
+  return fdio_open_at(dir, path, flags, h);
 }
 
 __EXPORT

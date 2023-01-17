@@ -17,11 +17,8 @@
 class BankAccountTest : public ::gtest::RealLoopFixture {
  public:
   explicit BankAccountTest() {
-    auto context = sys::ComponentContext::Create();
     // Connect to the fuchsia.component.Realm framework protocol
-    context->svc()->Connect(realm_proxy_.NewRequest());
-    // Return a channel connected to the /svc directory.
-    svc_ = context->svc()->CloneChannel();
+    sys::ComponentContext::Create()->svc()->Connect(realm_proxy_.NewRequest());
   }
 
   // Create and instance of the provider component and return its exposed directory
@@ -54,10 +51,6 @@ class BankAccountTest : public ::gtest::RealLoopFixture {
     return exposed_dir;
   }
 
- protected:
-  // TODO(https://fxbug.dev/101092): Use default namespace to connect services.
-  fidl::InterfaceHandle<fuchsia::io::Directory> svc_;
-
  private:
   fuchsia::component::RealmSyncPtr realm_proxy_;
 };
@@ -68,14 +61,13 @@ TEST_F(BankAccountTest, ReadWriteMultipleServiceInstances) {
   StartProvider("b", "provider-b#meta/default.cm");
 
   // List available instances of the BankAccount service
-  auto service_aggregate =
-      sys::OpenServiceAggregateAt<fuchsia::examples::services::BankAccount>(svc_);
+  auto service_aggregate = sys::OpenServiceAggregate<fuchsia::examples::services::BankAccount>();
   auto instance_names = service_aggregate.ListInstances();
   ZX_ASSERT(!instance_names.empty());
 
   // Debit both bank accounts by $5.
   for (auto& instance : instance_names) {
-    auto service = sys::OpenServiceAt<fuchsia::examples::services::BankAccount>(svc_, instance);
+    auto service = sys::OpenService<fuchsia::examples::services::BankAccount>(instance);
     // Connect to the ReadOnlyAccount protocol offered by this service
     fuchsia::examples::services::ReadOnlyAccountSyncPtr read_only_account =
         service.read_only().Connect().BindSync();

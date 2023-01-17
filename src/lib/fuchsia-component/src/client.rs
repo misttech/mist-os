@@ -35,9 +35,7 @@ use {
 const SVC_DIR: &'static str = "/svc";
 
 // TODO(https://fxbug.dev/101092): Shrink this to 0.
-const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::POSIX_WRITABLE);
+const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty().union(fio::OpenFlags::RIGHT_READABLE);
 const SERVICE_DIR_FLAGS: fio::OpenFlags = SERVICE_FLAGS.union(fio::OpenFlags::DIRECTORY);
 
 /// A protocol connection request that allows checking if the protocol exists.
