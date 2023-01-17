@@ -198,12 +198,7 @@ template("bazel_action") {
 
     args += [ "--" ]
     if (bazel_quiet) {
-      args += [
-        "--noshow_loading_progress",
-        "--noshow_progress",
-        "--show_result=0",
-        "--ui_event_filters=-info",
-      ]
+      args += [ "--config=quiet" ]
     }
 
     if (defined(invoker.extra_bazel_args)) {

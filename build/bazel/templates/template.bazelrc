@@ -25,6 +25,15 @@ build --experimental_workspace_rules_log_file={log_file}
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config={config_file}
 
+# Disable verbose Bazel output with --config=quiet
+# Note that --show_result=0 is not supported by `bazel query`.
+common:quiet --noshow_loading_progress
+common:quiet --noshow_progress
+common:quiet --ui_event_filters=-info
+cquery:quiet --show_result=0
+aquery:quiet --show_result=0
+build:quiet --show_result=0
+
 # Ensure the embedded JDK that comes with Bazel is always used
 # This prevents Bazel from downloading extra host JDKs from the
 # network, even when a project never uses Java-related  rules
