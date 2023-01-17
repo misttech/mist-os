@@ -11,7 +11,7 @@
 // [START includes]
 #include <fidl/fuchsia.examples/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 // [END includes]
 

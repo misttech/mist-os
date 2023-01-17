@@ -7,7 +7,8 @@
 #include <fidl/fuchsia.inspect/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/diagnostics/cpp/fidl.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fpromise/promise.h>
 #include <lib/inspect/component/cpp/service.h>
 #include <lib/inspect/component/cpp/testing.h>

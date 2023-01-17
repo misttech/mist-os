@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.dotmatrixdisplay/cpp/wire.h>
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
 #include <filesystem>
 

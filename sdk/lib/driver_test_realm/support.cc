@@ -18,7 +18,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/vector_view.h>

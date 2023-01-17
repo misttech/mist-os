@@ -7,7 +7,8 @@
 
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/component/cpp/handlers.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdio/directory.h>
