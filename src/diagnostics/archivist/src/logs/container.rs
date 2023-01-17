@@ -367,8 +367,8 @@ impl LogsArtifactsContainer {
                 Some(Ok(message)) => {
                     self.ingest_message(message).await;
                 }
-                Some(Err(e)) => {
-                    warn!(source = %self.identity, %e, "closing socket");
+                Some(Err(err)) => {
+                    warn!(source = %self.identity, %err, "closing socket");
                     break;
                 }
                 None => break,

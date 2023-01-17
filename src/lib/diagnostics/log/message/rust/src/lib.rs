@@ -273,7 +273,7 @@ impl TryFrom<&[u8]> for LoggerMessage {
 
             let tag_start = cursor + 1;
             let tag_end = tag_start + tag_len;
-            let tag = str::from_utf8(&bytes[tag_start..tag_end])?;
+            let tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]);
             tags.push(tag.into());
 
             cursor = tag_end;
@@ -287,7 +287,7 @@ impl TryFrom<&[u8]> for LoggerMessage {
                 msg_end += 1;
                 continue;
             }
-            let message = str::from_utf8(&bytes[msg_start..msg_end])?.to_owned();
+            let message = String::from_utf8_lossy(&bytes[msg_start..msg_end]).into_owned();
             let message_len = message.len();
             let (severity, verbosity) = severity.for_structured();
             let result = LoggerMessage {

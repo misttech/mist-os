@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use super::stats::LogStreamStats;
-use crate::logs::error::StreamError;
 use crate::logs::stored_message::StoredMessage;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -17,8 +16,7 @@ use std::{
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
     /// Attempt to parse a message from the given buffer
-    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>)
-        -> Result<StoredMessage, StreamError>;
+    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage;
 }
 
 /// An encoding that can parse the legacy [logger/syslog wire format]
@@ -34,13 +32,13 @@ pub struct LegacyEncoding;
 pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage {
         StoredMessage::legacy(&buf, stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Result<StoredMessage, StreamError> {
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage {
         StoredMessage::structured(buf, stats)
     }
 }
@@ -74,7 +72,7 @@ impl<E> Stream for LogMessageSocket<E>
 where
     E: Encoding + Unpin,
 {
-    type Item = Result<StoredMessage, StreamError>;
+    type Item = Result<StoredMessage, zx::Status>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -85,7 +83,7 @@ where
                 // If the socket got a PEER_CLOSED then finalize the stream.
                 Poll::Ready(Err(zx::Status::PEER_CLOSED)) => return Poll::Ready(None),
                 // If the socket got some other error, return that error.
-                Poll::Ready(Err(status)) => return Poll::Ready(Some(Err(status.into()))),
+                Poll::Ready(Err(status)) => return Poll::Ready(Some(Err(status))),
                 // If the socket read 0 bytes, then retry until we get some data or an error. This
                 // can happen when the zx_object_get_info call returns 0 outstanding read bytes,
                 // but by the time we do zx_socket_read there's data available.
@@ -93,7 +91,7 @@ where
                 // If we got data, then return the data we read.
                 Poll::Ready(Ok(_len)) => {
                     let buf = std::mem::take(&mut this.buffer);
-                    return Poll::Ready(Some(E::wrap_bytes(buf, this.stats.clone())));
+                    return Poll::Ready(Some(Ok(E::wrap_bytes(buf, this.stats.clone()))));
                 }
             }
         }

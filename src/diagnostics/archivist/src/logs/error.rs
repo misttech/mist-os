@@ -1,12 +1,9 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::events::error::EventError;
-use fuchsia_zircon as zx;
-use thiserror::Error;
-
 use super::listener::ListenerError;
-use diagnostics_message::error::MessageError;
+use crate::events::error::EventError;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LogsError {
@@ -30,26 +27,4 @@ pub enum LogsError {
         #[from]
         source: ListenerError,
     },
-}
-
-#[derive(Debug, Error)]
-pub enum StreamError {
-    #[error("couldn't read from socket. Status: {0}")]
-    Io(#[from] zx::Status),
-    #[error(transparent)]
-    Message(#[from] MessageError),
-    #[error("couldn't convert debuglog message")]
-    DebugLogMessage,
-}
-
-#[cfg(test)]
-impl PartialEq for StreamError {
-    fn eq(&self, other: &Self) -> bool {
-        use StreamError::*;
-        match (self, other) {
-            (Io(s1), Io(s2)) => s1 == s2,
-            (Message(source), Message(s2)) => source == s2,
-            _ => false,
-        }
-    }
 }

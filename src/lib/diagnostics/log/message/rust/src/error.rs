@@ -6,7 +6,7 @@ use diagnostics_data::SeverityError;
 use diagnostics_log_encoding::parse::ParseError;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum MessageError {
     #[error(transparent)]
     InvalidSeverity(#[from] SeverityError),
@@ -18,11 +18,6 @@ pub enum MessageError {
     ParseError {
         #[from]
         parse_error: ParseError,
-    },
-    #[error("string with invalid UTF-8 encoding: {source:?}")]
-    InvalidString {
-        #[from]
-        source: std::str::Utf8Error,
     },
     #[error("incorrect or corrupt metadata indicates to read past end of buffer")]
     OutOfBounds,
@@ -50,7 +45,6 @@ impl PartialEq for MessageError {
             }
             (OutOfBounds, OutOfBounds) => true,
             (InvalidSeverity(a), InvalidSeverity(b)) => a == b,
-            (InvalidString { source }, InvalidString { source: s2 }) => source == s2,
             _ => false,
         }
     }

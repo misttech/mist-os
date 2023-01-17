@@ -78,7 +78,7 @@ impl From<LegacySeverity> for c_int {
     }
 }
 
-#[derive(Debug, Eq, Error, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum SeverityError {
     #[error("invalid or corrupt severity received: {provided}")]
     Invalid { provided: c_int },

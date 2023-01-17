@@ -85,6 +85,34 @@ fn short_reads() {
 }
 
 #[fuchsia::test]
+fn invalid_utf8_is_handled() {
+    let mut packet = test_packet();
+    // No tags
+    packet.data[0] = 0;
+    // Start message
+    let bytes = b"This is \xF0\x90\x80 invalid";
+    for i in 1..=bytes.len() {
+        packet.data[i] = bytes[i - 1] as c_char;
+    }
+    packet.data[bytes.len() + 1] = 0;
+    let buffer = &packet.as_bytes()[..METADATA_SIZE + bytes.len() + 2];
+    let logger_message = LoggerMessage::try_from(buffer).unwrap();
+    let parsed = crate::from_logger(get_test_identity(), logger_message);
+    let expected = LogsDataBuilder::new(BuilderArgs {
+        timestamp_nanos: packet.metadata.time.into(),
+        component_url: Some(TEST_IDENTITY.url.clone()),
+        moniker: TEST_IDENTITY.moniker.clone(),
+        severity: Severity::Debug,
+    })
+    .set_dropped(packet.metadata.dropped_logs.into())
+    .set_pid(packet.metadata.pid)
+    .set_message("This is � invalid".to_string())
+    .set_tid(packet.metadata.tid)
+    .build();
+    assert_eq!(parsed, expected);
+}
+
+#[fuchsia::test]
 fn unterminated() {
     let mut packet = test_packet();
     let end = 9;

@@ -157,7 +157,7 @@ fn string_ref(
 }
 
 /// Errors which occur when interacting with streams of diagnostic records.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum ParseError {
     /// We attempted to parse bytes as a type for which the bytes are not a valid pattern.
     #[error("value out of range")]
