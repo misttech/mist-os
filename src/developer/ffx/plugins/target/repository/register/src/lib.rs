@@ -5,6 +5,7 @@
 use {
     anyhow::{Context, Result},
     errors::ffx_bail,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_target_repository_register_args::RegisterCommand,
     fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget},
@@ -14,7 +15,7 @@ use {
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn register_cmd(cmd: RegisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
     register(
-        ffx_config::get("target.default").await.context("getting default target from config")?,
+        ffx_config::get(TARGET_DEFAULT_KEY).await.context("getting default target from config")?,
         cmd,
         repos,
     )

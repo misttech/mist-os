@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_core::ffx_plugin;
 use ffx_target_default_args::{SubCommand, TargetDefaultCommand, TargetDefaultGetCommand};
-
-pub(crate) const TARGET_DEFAULT_KEY: &str = "target.default";
 
 #[ffx_plugin()]
 pub async fn exec_target_default(cmd: TargetDefaultCommand) -> Result<()> {

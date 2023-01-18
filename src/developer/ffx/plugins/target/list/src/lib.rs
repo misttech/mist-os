@@ -6,6 +6,7 @@ use {
     crate::target_formatter::{JsonTargetFormatter, TargetFormatter},
     anyhow::Result,
     errors::{ffx_bail, ffx_bail_with_code},
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_list_args::{AddressTypes, ListCommand},
     ffx_writer::Writer,
@@ -79,13 +80,13 @@ pub async fn list_targets(
             if writer.is_machine() {
                 let res = target_formatter::filter_targets_by_address_types(res, address_types);
                 let mut formatter = JsonTargetFormatter::try_from(res)?;
-                let default: Option<String> = ffx_config::get("target.default").await?;
+                let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
                 JsonTargetFormatter::set_default_target(&mut formatter.targets, default.as_deref());
                 writer.machine(&formatter.targets)?;
             } else {
                 let formatter =
                     Box::<dyn TargetFormatter>::try_from((cmd.format, address_types, res))?;
-                let default: Option<String> = ffx_config::get("target.default").await?;
+                let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
                 writer.line(formatter.lines(default.as_deref()).join("\n"))?;
             }
         }

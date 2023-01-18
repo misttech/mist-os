@@ -5,6 +5,7 @@
 use {
     anyhow::{Context as _, Result},
     errors::ffx_bail,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_target_forward_tcp_args::TcpCommand,
     fidl_fuchsia_developer_ffx as ffx,
@@ -13,7 +14,7 @@ use {
 #[ffx_plugin(ffx::TunnelProxy = "daemon::protocol")]
 pub async fn forward_tcp(forward_port: ffx::TunnelProxy, cmd: TcpCommand) -> Result<()> {
     let target: Option<String> =
-        ffx_config::get("target.default").await.context("getting default target from config")?;
+        ffx_config::get(TARGET_DEFAULT_KEY).await.context("getting default target from config")?;
     let target = if let Some(target) = target {
         target
     } else {

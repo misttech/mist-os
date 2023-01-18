@@ -57,6 +57,7 @@ if (is_host) {
       "src/api/value.rs",
       "src/cache.rs",
       "src/environment.rs",
+      "src/keys.rs",
       "src/lib.rs",
       "src/logging.rs",
       "src/mapping/cache.rs",

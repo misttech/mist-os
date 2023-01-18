@@ -5,6 +5,7 @@
 use {
     anyhow::{Context, Result},
     errors::ffx_bail,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_target_repository_deregister_args::DeregisterCommand,
     fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
@@ -14,7 +15,7 @@ use {
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn deregister_cmd(cmd: DeregisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
     deregister(
-        ffx_config::get("target.default").await.context("getting default target from config")?,
+        ffx_config::get(TARGET_DEFAULT_KEY).await.context("getting default target from config")?,
         cmd,
         repos,
     )

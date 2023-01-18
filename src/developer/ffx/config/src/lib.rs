@@ -14,6 +14,7 @@ use std::{convert::From, io::Write};
 
 pub mod api;
 pub mod environment;
+pub mod keys;
 pub mod logging;
 pub mod runtime;
 
