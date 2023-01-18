@@ -229,43 +229,72 @@ mod test {
         assert_eq!(RSSI_AND_VELOCITY_SCORE_WEIGHT + SNR_SCORE_WEIGHT, 1.0);
     }
 
+    // Trivial scoring algorithm test cases. Should pass (or be removed with acknowledgment) for
+    // any scoring algorithm implementation.
     #[fuchsia::test]
-    fn test_trivial_signal_data_scores() {
-        let strong_clear_stable_signal =
-            SignalData::new(-55, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let weak_clear_stable_signal = SignalData::new(-80, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+    fn high_rssi_scores_higher_than_low_rssi() {
+        let strong_clear_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let weak_clear_signal = SignalData::new(-85, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        assert_gt!(score_signal_data(strong_clear_signal), score_signal_data(weak_clear_signal));
 
-        let mut strong_clear_degrading_signal =
-            SignalData::new(-55, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        strong_clear_degrading_signal.ewma_rssi_velocity =
+        let strong_noisy_signal = SignalData::new(-50, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let weak_noisy_signal = SignalData::new(-85, 55, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        assert_gt!(score_signal_data(strong_noisy_signal), score_signal_data(weak_noisy_signal));
+    }
+
+    #[fuchsia::test]
+    fn high_snr_scores_higher_than_low_snr() {
+        let strong_clear_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let strong_noisy_signal = SignalData::new(-50, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        assert_gt!(score_signal_data(strong_clear_signal), score_signal_data(strong_noisy_signal));
+
+        let weak_clear_signal = SignalData::new(-85, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let weak_noisy_signal = SignalData::new(-85, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        assert_gt!(score_signal_data(weak_clear_signal), score_signal_data(weak_noisy_signal));
+    }
+
+    #[fuchsia::test]
+    fn positive_velocity_scores_higher_than_negative_velocity() {
+        let mut improving_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        improving_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
+        let mut degrading_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        degrading_signal.ewma_rssi_velocity =
             EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3);
-        let mut weak_clear_improving_signal =
-            SignalData::new(-80, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        weak_clear_improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 2);
+        assert_gt!(score_signal_data(improving_signal), score_signal_data(degrading_signal));
+    }
 
-        let strong_noisy_stable_signal =
-            SignalData::new(-55, 15, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+    #[fuchsia::test]
+    fn stable_high_rssi_scores_higher_than_volatile_high_rssi() {
+        let strong_stable_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let mut strong_improving_signal = strong_stable_signal;
+        strong_improving_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
 
         assert_gt!(
-            score_signal_data(strong_clear_stable_signal),
-            score_signal_data(weak_clear_stable_signal)
+            score_signal_data(strong_stable_signal),
+            score_signal_data(strong_improving_signal)
         );
 
-        assert_gt!(
-            score_signal_data(strong_clear_stable_signal),
-            score_signal_data(strong_clear_degrading_signal)
-        );
+        let mut strong_degrading_signal = strong_stable_signal;
+        strong_degrading_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3);
 
         assert_gt!(
-            score_signal_data(weak_clear_improving_signal),
-            score_signal_data(weak_clear_stable_signal)
+            score_signal_data(strong_stable_signal),
+            score_signal_data(strong_degrading_signal)
         );
+    }
 
-        assert_gt!(
-            score_signal_data(strong_clear_stable_signal),
-            score_signal_data(strong_noisy_stable_signal)
-        )
+    #[fuchsia::test]
+    fn improving_weak_rssi_scores_higher_than_stable_weak_rssi() {
+        let mut weak_improving_signal =
+            SignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        weak_improving_signal.ewma_rssi_velocity =
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
+        let weak_stable_signal = SignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+
+        assert_gt!(score_signal_data(weak_improving_signal), score_signal_data(weak_stable_signal));
     }
 
     #[fuchsia::test]
