@@ -6,9 +6,9 @@
 
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/event.h>
-#include <zircon/device/network.h>
 
 #include "definitions.h"
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 
 namespace network::testing {
 

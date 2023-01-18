@@ -12,9 +12,7 @@
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
-#include <zircon/device/network.h>
 #include <zircon/status.h>
-
 namespace network {
 namespace client {
 

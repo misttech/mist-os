@@ -9,11 +9,11 @@
 #include <lib/sync/completion.h>
 #include <lib/syslog/global.h>
 #include <lib/zx/time.h>
-#include <zircon/device/network.h>
 #include <zircon/status.h>
 
 #include <gmock/gmock.h>
 
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 #include "tun_ctl.h"

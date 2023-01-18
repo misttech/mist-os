@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_DEVICE_NETWORK_H_
-#define SYSROOT_ZIRCON_DEVICE_NETWORK_H_
+#ifndef SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_BUFFER_DESCRIPTOR_BUFFER_DESCRIPTOR_H_
+#define SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_BUFFER_DESCRIPTOR_BUFFER_DESCRIPTOR_H_
 
 #include <stdint.h>
 
@@ -14,7 +14,12 @@
 // Flags and constants are found on the definition of the
 // fuchsia.hardware.network FIDL library.
 
-#define NETWORK_DEVICE_DESCRIPTOR_VERSION ((uint8_t)1)
+// LINT.IfChange
+
+// TODO(https://github.com/rust-lang/rust-bindgen/issues/316): Remove redundant
+// definition when Rust bindgen can handle this.
+#define __NETWORK_DEVICE_DESCRIPTOR_VERSION (1)
+#define NETWORK_DEVICE_DESCRIPTOR_VERSION ((uint8_t)__NETWORK_DEVICE_DESCRIPTOR_VERSION)
 
 // A buffer descriptor, which contains a region of the data VMO that can be used
 // to store data plus associated metadata.
@@ -86,4 +91,8 @@ typedef struct buffer_descriptor {
   uint32_t return_flags;
 } buffer_descriptor_t;
 
-#endif  // SYSROOT_ZIRCON_DEVICE_NETWORK_H_
+// Notify humans to update Rust bindings because there's no bindgen automation.
+// TODO(https://fxbug.dev/73858): Remove lint when no longer necessary.
+// LINT.ThenChange(/src/connectivity/lib/network-device/rust/src/session/buffer/sys.rs)
+
+#endif  // SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_BUFFER_DESCRIPTOR_BUFFER_DESCRIPTOR_H_

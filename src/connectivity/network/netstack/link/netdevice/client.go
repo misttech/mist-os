@@ -30,7 +30,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
-// #include <zircon/device/network.h>
+// #include "buffer_descriptor.h"
 import "C"
 
 const tag = "netdevice"

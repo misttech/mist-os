@@ -140,15 +140,13 @@ impl Inner {
         let session_info = {
             // The following two constants are not provided by user, panic
             // instead of returning an error.
-            let descriptor_version = u8::try_from(NETWORK_DEVICE_DESCRIPTOR_VERSION)
-                .expect("descriptor version not representable by u8");
             let descriptor_length =
                 u8::try_from(NETWORK_DEVICE_DESCRIPTOR_LENGTH / std::mem::size_of::<u64>())
                     .expect("descriptor length in 64-bit words not representable by u8");
             netdev::SessionInfo {
                 descriptors: Some(descriptors),
                 data: Some(data),
-                descriptor_version: Some(descriptor_version),
+                descriptor_version: Some(NETWORK_DEVICE_DESCRIPTOR_VERSION),
                 descriptor_length: Some(descriptor_length),
                 descriptor_count: Some(config.num_tx_buffers.get() + config.num_rx_buffers.get()),
                 options: Some(config.options),
@@ -350,7 +348,7 @@ impl DeviceInfo {
             rx_accel: _,
             tx_accel: _,
         } = self;
-        if NETWORK_DEVICE_DESCRIPTOR_VERSION != u32::from(*descriptor_version) {
+        if NETWORK_DEVICE_DESCRIPTOR_VERSION != *descriptor_version {
             return Err(Error::Config(format!(
                 "descriptor version mismatch: {} != {}",
                 NETWORK_DEVICE_DESCRIPTOR_VERSION, descriptor_version

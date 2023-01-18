@@ -27,7 +27,7 @@ use types::{ChainLength, DESCID_NO_NEXT};
 
 pub use pool::{AllocKind, Buffer, Rx, Tx};
 /// Network device descriptor version.
-pub(super) use sys::NETWORK_DEVICE_DESCRIPTOR_VERSION;
+pub const NETWORK_DEVICE_DESCRIPTOR_VERSION: u8 = sys::__NETWORK_DEVICE_DESCRIPTOR_VERSION as u8;
 pub(super) use types::DescId;
 /// Network device descriptor length.
 pub(super) const NETWORK_DEVICE_DESCRIPTOR_LENGTH: usize =

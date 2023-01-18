@@ -6,13 +6,13 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/fit/defer.h>
-#include <zircon/device/network.h>
 
 #include <fbl/alloc_checker.h>
 
 #include "log.h"
 #include "rx_queue.h"
 #include "session.h"
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
 
 // Static sanity assertions from far-away defined buffer_descriptor_t.

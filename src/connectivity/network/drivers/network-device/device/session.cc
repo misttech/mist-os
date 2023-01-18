@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/fit/defer.h>
-#include <zircon/device/network.h>
 
 #include <optional>
 
@@ -17,6 +16,7 @@
 #include "device_interface.h"
 #include "lib/stdcompat/span.h"
 #include "log.h"
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
 
 namespace network::internal {

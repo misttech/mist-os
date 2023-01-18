@@ -14,7 +14,6 @@
 #include <lib/zx/event.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/vmo.h>
-#include <zircon/device/network.h>
 
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
@@ -26,6 +25,7 @@
 #include "device_port.h"
 #include "public/locks.h"
 #include "rx_queue.h"
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
 
 namespace network::internal {

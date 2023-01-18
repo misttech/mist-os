@@ -14,6 +14,7 @@ source_set("cpp") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",

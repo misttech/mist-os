@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_TEST_UTIL_H_
 
 #include <lib/zx/event.h>
-#include <zircon/device/network.h>
 
 #include <memory>
 #include <vector>
@@ -16,6 +15,7 @@
 
 #include "definitions.h"
 #include "device_interface.h"
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "test_session.h"
 
 namespace network::testing {

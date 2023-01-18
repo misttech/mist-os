@@ -22,7 +22,6 @@
 #include <lib/zx/fifo.h>
 #include <lib/zx/vmo.h>
 #include <unistd.h>
-#include <zircon/device/network.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 

@@ -41,6 +41,7 @@ ddk_source_split("device") {
     "//sdk/banjo/fuchsia.hardware.network.mac:fuchsia.hardware.network.mac_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
     "//sdk/lib/fidl",
+    "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

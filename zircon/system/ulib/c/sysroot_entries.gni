@@ -109,7 +109,6 @@ sysroot_uninstrumented_libc_entries = [
         "zircon/device/block.h",
         "zircon/device/bt-hci.h",
         "zircon/device/intel-hda.h",
-        "zircon/device/network.h",
       ]
     }
   },

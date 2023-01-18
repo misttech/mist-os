@@ -10,11 +10,12 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
-#include <zircon/device/network.h>
 
 #include <queue>
 
 #include <src/lib/fxl/macros.h>
+
+#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 
 namespace network {
 namespace client {

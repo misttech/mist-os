@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/go/toolchain.gni")
+import("netdevice_include_dirs.gni")
 
 go_library("netdevice") {
   deps = [
@@ -36,6 +37,7 @@ go_library("netdevice") {
 
 go_test("link_netdevice_test") {
   library = ":netdevice"
+  include_dirs = netdevice_include_dirs
 }
 
 fuchsia_unittest_component("netstack-link-netdevice-test-component") {

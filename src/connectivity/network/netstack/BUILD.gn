@@ -7,12 +7,14 @@ import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/go/toolchain.gni")
+import("link/netdevice/netdevice_include_dirs.gni")
 import("tracing/go_tracing_include_dirs.gni")
 import("udp_serde/udp_serde_include_dirs.gni")
 
 go_binary("bin") {
   library = "stub"
   output_name = string_replace(target_name, "bin", "netstack")
+  include_dirs = udp_serde_include_dirs + netdevice_include_dirs
 }
 
 fuchsia_component("component") {
@@ -35,7 +37,7 @@ go_binary("bin_with_deadlock_detection") {
   output_name = string_replace(target_name, "bin", "netstack")
 
   tags = [ "deadlock_detection" ]
-  include_dirs = udp_serde_include_dirs
+  include_dirs = udp_serde_include_dirs + netdevice_include_dirs
 }
 
 fuchsia_component("component-debug") {
@@ -74,7 +76,8 @@ go_binary("bin_with_tracing") {
   output_name = string_replace(target_name, "bin", "netstack")
 
   tags = [ "tracing" ]
-  include_dirs = go_tracing_include_dirs + udp_serde_include_dirs
+  include_dirs =
+      go_tracing_include_dirs + udp_serde_include_dirs + netdevice_include_dirs
 }
 
 fuchsia_component("component-with-tracing") {
@@ -186,7 +189,7 @@ go_library("lib") {
 
 go_test("netstack_test") {
   library = ":lib"
-  include_dirs = udp_serde_include_dirs
+  include_dirs = udp_serde_include_dirs + netdevice_include_dirs
   deps = [ "//third_party/golibs:go.uber.org/goleak" ]
 }
 
