@@ -79,7 +79,8 @@ class BufferFactoryImpl : public BufferFactory {
       return status;
     }
     zx::pmt pmt;
-    status = bti.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, 0, size, &phys, 1, &pmt);
+    status = bti.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE | ZX_BTI_CONTIGUOUS, vmo, 0, size, &phys,
+                     1, &pmt);
     if (status != ZX_OK) {
       return status;
     }

@@ -112,6 +112,18 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
     return ZX_ERR_BAD_HANDLE;
   }
 
+  if (options & ZX_BTI_CONTIGUOUS) {
+    if (addrs_count != 1) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  } else {
+    const auto num_pages =
+        fbl::round_up(size, zx_system_get_page_size()) / zx_system_get_page_size();
+    if (addrs_count != num_pages) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
   zx::result get_res = fake_object::FakeHandleTable().Get(vmo_handle);
   if (!get_res.is_ok()) {
     return get_res.status_value();
