@@ -7,14 +7,16 @@ use {
     crate::{consumer_controls_binding, input_device},
     anyhow::{Context, Error},
     async_trait::async_trait,
+    fidl::endpoints::Proxy,
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
     fuchsia_syslog::fx_log_err,
     fuchsia_syslog::fx_log_info,
     fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::TryStreamExt,
+    fuchsia_zircon::AsHandleRef,
+    futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
+    std::collections::HashMap,
     std::rc::Rc,
 };
 
@@ -31,12 +33,14 @@ pub struct MediaButtonsHandler {
 
 #[derive(Debug)]
 struct MediaButtonsHandlerInner {
-    /// The media button listeners.
-    pub listeners: Vec<fidl_ui_policy::MediaButtonsListenerProxy>,
+    /// The media button listeners, key referenced by proxy channel's raw handle.
+    pub listeners: HashMap<u32, fidl_ui_policy::MediaButtonsListenerProxy>,
 
     /// The last MediaButtonsEvent sent to all listeners.
     /// This is used to send new listeners the state of the media buttons.
     pub last_event: Option<fidl_ui_input::MediaButtonsEvent>,
+
+    pub send_event_task_tracker: LocalTaskTracker,
 }
 
 #[async_trait(?Send)]
@@ -96,7 +100,11 @@ impl MediaButtonsHandler {
     ) -> Rc<Self> {
         let media_buttons_handler = Self {
             aggregator_proxy,
-            inner: Mutex::new(MediaButtonsHandlerInner { listeners: Vec::new(), last_event: None }),
+            inner: Mutex::new(MediaButtonsHandlerInner {
+                listeners: HashMap::new(),
+                last_event: None,
+                send_event_task_tracker: LocalTaskTracker::new(),
+            }),
         };
         Rc::new(media_buttons_handler)
     }
@@ -125,7 +133,7 @@ impl MediaButtonsHandler {
                     if let Ok(proxy) = listener.into_proxy() {
                         // Add the listener to the registry.
                         let mut inner = self.inner.lock().await;
-                        inner.listeners.push(proxy.clone());
+                        inner.listeners.insert(proxy.as_channel().raw_handle(), proxy.clone());
 
                         // Send the listener the last media button event.
                         if let Some(event) = &inner.last_event {
@@ -187,21 +195,29 @@ impl MediaButtonsHandler {
     /// # Parameters
     /// - `event`: The event to send to the listeners.
     async fn send_event_to_listeners(self: &Rc<Self>, event: &fidl_ui_input::MediaButtonsEvent) {
-        let mut inner = self.inner.lock().await;
-        let mut listeners_to_keep = Vec::new();
+        let inner = self.inner.lock().await;
 
-        for listener in inner.listeners.drain(..) {
-            match listener.on_event(event.clone()).await {
-                Ok(()) => listeners_to_keep.push(listener),
-                Err(e) => {
-                    fx_log_info!(
-                        "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
-                        e
-                    )
+        for (handle, listener) in &inner.listeners {
+            let weak_handler = Rc::downgrade(&self);
+            let listener_clone = listener.clone();
+            let handle_clone = handle.clone();
+            let event_to_send = event.clone();
+            let fut = async move {
+                match listener_clone.on_event(event_to_send).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        if let Some(handler) = weak_handler.upgrade() {
+                            handler.inner.lock().await.listeners.remove(&handle_clone);
+                            fx_log_info!(
+                                "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
+                                e
+                            )
+                        }
+                    }
                 }
-            }
+            };
+            inner.send_event_task_tracker.track(fasync::Task::local(fut));
         }
-        inner.listeners.append(&mut listeners_to_keep);
     }
 
     /// Reports the given event_time to the activity service, if available.
@@ -214,14 +230,51 @@ impl MediaButtonsHandler {
     }
 }
 
+/// Maintains a collection of pending local [`Task`]s, allowing them to be dropped (and cancelled)
+/// en masse.
+#[derive(Debug)]
+pub struct LocalTaskTracker {
+    sender: mpsc::UnboundedSender<fasync::Task<()>>,
+    _receiver_task: fasync::Task<()>,
+}
+
+impl LocalTaskTracker {
+    pub fn new() -> Self {
+        let (sender, receiver) = mpsc::unbounded();
+        let receiver_task = fasync::Task::local(async move {
+            // Drop the tasks as they are completed.
+            receiver.for_each_concurrent(None, |task: fasync::Task<()>| task).await
+        });
+
+        Self { sender, _receiver_task: receiver_task }
+    }
+
+    /// Submits a new task to track.
+    pub fn track(&self, task: fasync::Task<()>) {
+        match self.sender.unbounded_send(task) {
+            Ok(_) => {}
+            // `Full` should never happen because this is unbounded.
+            // `Disconnected` might happen if the `Service` was dropped. However, it's not clear how
+            // to create such a race condition.
+            Err(e) => tracing::error!("Unexpected {e:?} while pushing task"),
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::input_handler::InputHandler;
 
     use {
-        super::*, crate::testing_utilities, assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_input_report as fidl_input_report,
-        fuchsia_async as fasync, futures::StreamExt, pretty_assertions::assert_eq,
+        super::*,
+        crate::testing_utilities,
+        anyhow::Error,
+        assert_matches::assert_matches,
+        fidl::endpoints::create_proxy_and_stream,
+        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
+        futures::{channel::oneshot, StreamExt},
+        pretty_assertions::assert_eq,
+        std::{cell::RefCell, rc::Rc, task::Poll},
     };
 
     fn spawn_device_listener_registry_server(
@@ -284,6 +337,21 @@ mod tests {
         Some(proxy)
     }
 
+    /// Makes a `Task` that waits for a `oneshot`'s value to be set, and then forwards that value to
+    /// a reference-counted container that can be observed outside the task.
+    fn make_signalable_task<T: Default + 'static>(
+    ) -> (oneshot::Sender<T>, fasync::Task<()>, Rc<RefCell<T>>) {
+        let (sender, receiver) = oneshot::channel();
+        let task_completed = Rc::new(RefCell::new(<T as Default>::default()));
+        let task_completed_ = task_completed.clone();
+        let task = fasync::Task::local(async move {
+            if let Ok(value) = receiver.await {
+                *task_completed_.borrow_mut() = value;
+            }
+        });
+        (sender, task, task_completed)
+    }
+
     /// Tests that a media button listener can be registered and is sent the latest event upon
     /// registration.
     #[fasync::run_singlethreaded(test)]
@@ -295,8 +363,9 @@ mod tests {
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
             aggregator_proxy: Some(aggregator_proxy),
             inner: Mutex::new(MediaButtonsHandlerInner {
-                listeners: vec![],
+                listeners: HashMap::new(),
                 last_event: Some(create_ui_input_media_buttons_event(Some(1), None, None, None)),
+                send_event_task_tracker: LocalTaskTracker::new(),
             }),
         });
         let device_listener_proxy =
@@ -415,16 +484,105 @@ mod tests {
     }
 
     /// Tests that listener is unregistered if channel is closed and we try to send input event to listener
+    #[fuchsia::test]
+    fn unregister_listener_if_channel_closed() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let event_time = zx::Time::get_monotonic();
+        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
+        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let media_buttons_handler_clone = media_buttons_handler.clone();
+
+        let mut task = fasync::Task::local(async move {
+            let device_listener_proxy =
+                spawn_device_listener_registry_server(media_buttons_handler.clone());
+
+            // Register three listeners.
+            let (first_listener, mut first_listener_stream) =
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
+                    .unwrap();
+            let (second_listener, mut second_listener_stream) =
+                fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
+                    .unwrap();
+            let (third_listener, third_listener_stream) = fidl::endpoints::create_request_stream::<
+                fidl_ui_policy::MediaButtonsListenerMarker,
+            >()
+            .unwrap();
+            let _ = device_listener_proxy.register_listener(first_listener).await;
+            let _ = device_listener_proxy.register_listener(second_listener).await;
+            let _ = device_listener_proxy.register_listener(third_listener).await;
+            let inner = media_buttons_handler.inner.lock().await;
+            assert_eq!(inner.listeners.len(), 3);
+            drop(inner);
+
+            // Generate input event to be handled by MediaButtonsHandler.
+            let descriptor = testing_utilities::consumer_controls_device_descriptor();
+            let input_event = testing_utilities::create_consumer_controls_event(
+                vec![fidl_input_report::ConsumerControlButton::VolumeUp],
+                event_time,
+                &descriptor,
+            );
+
+            let expected_media_buttons_event =
+                create_ui_input_media_buttons_event(Some(1), Some(false), Some(false), Some(false));
+
+            // Drop third registered listener.
+            std::mem::drop(third_listener_stream);
+
+            let _ = media_buttons_handler.clone().handle_input_event(input_event).await;
+            // First listener stalls, responder doesn't send response - subsequent listeners should still be able receive event.
+            if let Some(request) = first_listener_stream.next().await {
+                match request {
+                    Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
+                        event,
+                        responder: _,
+                    }) => {
+                        pretty_assertions::assert_eq!(event, expected_media_buttons_event);
+
+                        // No need to send response because we want to simulate reader getting stuck.
+                    }
+                    _ => assert!(false),
+                }
+            } else {
+                assert!(false);
+            }
+
+            // Send response from responder on second listener stream
+            if let Some(request) = second_listener_stream.next().await {
+                match request {
+                    Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
+                        event,
+                        responder,
+                    }) => {
+                        pretty_assertions::assert_eq!(event, expected_media_buttons_event);
+                        let _ = responder.send();
+                    }
+                    _ => assert!(false),
+                }
+            } else {
+                assert!(false);
+            }
+        });
+
+        // Must manually run tasks with executor to ensure all tasks in LocalTaskTracker complete/stall before we call final assertion.
+        let _ = exec.run_until_stalled(&mut task);
+
+        // Should only be two listeners still registered in 'inner' after we unregister the listener with closed channel.
+        let _ = exec.run_singlethreaded(async {
+            assert_eq!(media_buttons_handler_clone.inner.lock().await.listeners.len(), 2);
+        });
+    }
+
+    /// Tests that handle_input_event returns even if reader gets stuck while sending event to listener
     #[fasync::run_singlethreaded(test)]
-    async fn unregister_listener_if_channel_closed() {
+    async fn stuck_reader_wont_block_input_pipeline() {
         let event_time = zx::Time::get_monotonic();
         let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
         let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
-        // Register two listeners.
-        let (first_listener, first_listener_stream) =
+        let (first_listener, mut first_listener_stream) =
             fidl::endpoints::create_request_stream::<fidl_ui_policy::MediaButtonsListenerMarker>()
                 .unwrap();
         let (second_listener, mut second_listener_stream) =
@@ -432,45 +590,164 @@ mod tests {
                 .unwrap();
         let _ = device_listener_proxy.register_listener(first_listener).await;
         let _ = device_listener_proxy.register_listener(second_listener).await;
-        let inner = media_buttons_handler.inner.lock().await;
-        assert_eq!(inner.listeners.len(), 2);
-        drop(inner);
 
-        // Generate input event to be handled by MediaButtonsHandler.
+        // Setup events and expectations.
         let descriptor = testing_utilities::consumer_controls_device_descriptor();
-        let input_event = testing_utilities::create_consumer_controls_event(
-            vec![fidl_input_report::ConsumerControlButton::VolumeUp],
+        let first_unhandled_input_event = input_device::UnhandledInputEvent {
+            device_event: input_device::InputDeviceEvent::ConsumerControls(
+                consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                    fidl_input_report::ConsumerControlButton::VolumeUp,
+                ]),
+            ),
+            device_descriptor: descriptor.clone(),
             event_time,
-            &descriptor,
+            trace_id: None,
+        };
+        let first_expected_media_buttons_event =
+            create_ui_input_media_buttons_event(Some(1), Some(false), Some(false), Some(false));
+
+        assert_matches!(
+            media_buttons_handler
+                .clone()
+                .handle_unhandled_input_event(first_unhandled_input_event)
+                .await
+                .as_slice(),
+            [input_device::InputEvent { handled: input_device::Handled::Yes, .. }]
         );
 
-        // Drop first registered listener.
-        std::mem::drop(first_listener_stream);
+        let mut save_responder = None;
 
-        // Send input event to MediaButtonsHandler to be processed.
-        // Since one of the listeners was dropped, meaning its channel is closed, we ensure
-        // that listener has also been unregistered.
-        fasync::Task::local(async move {
-            let _ = media_buttons_handler.clone().handle_input_event(input_event).await;
+        // Ensure handle_input_event attempts to send event to first listener.
+        if let Some(request) = first_listener_stream.next().await {
+            match request {
+                Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent { event, responder }) => {
+                    pretty_assertions::assert_eq!(event, first_expected_media_buttons_event);
 
-            // Should only be one listener left in 'inner' after we unregister the listener with closed channel.
-            assert_eq!(media_buttons_handler.inner.lock().await.listeners.len(), 1);
-        })
-        .detach();
+                    // No need to send response because we want to simulate reader getting stuck.
 
-        // Send response from responder on second listener stream
+                    // Save responder to send response later
+                    save_responder = Some(responder);
+                }
+                _ => assert!(false),
+            }
+        } else {
+            assert!(false)
+        }
+
+        // Ensure handle_input_event still sends event to second listener when reader for first listener is stuck.
         if let Some(request) = second_listener_stream.next().await {
             match request {
-                Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
-                    event: _,
-                    responder,
-                }) => {
+                Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent { event, responder }) => {
+                    pretty_assertions::assert_eq!(event, first_expected_media_buttons_event);
                     let _ = responder.send();
                 }
                 _ => assert!(false),
             }
         } else {
-            assert!(false);
+            assert!(false)
         }
+
+        // Setup second event to handle
+        let second_unhandled_input_event = input_device::UnhandledInputEvent {
+            device_event: input_device::InputDeviceEvent::ConsumerControls(
+                consumer_controls_binding::ConsumerControlsEvent::new(vec![
+                    fidl_input_report::ConsumerControlButton::MicMute,
+                ]),
+            ),
+            device_descriptor: descriptor.clone(),
+            event_time,
+            trace_id: None,
+        };
+        let second_expected_media_buttons_event =
+            create_ui_input_media_buttons_event(Some(0), Some(true), Some(false), Some(false));
+
+        // Ensure we can handle a subsequent event if listener stalls on first event.
+        assert_matches!(
+            media_buttons_handler
+                .clone()
+                .handle_unhandled_input_event(second_unhandled_input_event)
+                .await
+                .as_slice(),
+            [input_device::InputEvent { handled: input_device::Handled::Yes, .. }]
+        );
+
+        // Ensure events are still sent to listeners if a listener stalls on a previous event.
+        if let Some(request) = second_listener_stream.next().await {
+            match request {
+                Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent { event, responder }) => {
+                    pretty_assertions::assert_eq!(event, second_expected_media_buttons_event);
+                    let _ = responder.send();
+                }
+                _ => assert!(false),
+            }
+        } else {
+            assert!(false)
+        }
+
+        match save_responder {
+            Some(save_responder) => {
+                // Simulate delayed response to first listener for first event
+                let _ = save_responder.send();
+                // First listener should now receive second event after delayed response for first event
+                if let Some(request) = first_listener_stream.next().await {
+                    match request {
+                        Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
+                            event,
+                            responder: _,
+                        }) => {
+                            pretty_assertions::assert_eq!(
+                                event,
+                                second_expected_media_buttons_event
+                            );
+
+                            // No need to send response
+                        }
+                        _ => assert!(false),
+                    }
+                } else {
+                    assert!(false)
+                }
+            }
+            None => {
+                assert!(false)
+            }
+        }
+    }
+
+    // Test for LocalTaskTracker
+    #[fuchsia::test]
+    fn local_task_tracker_test() -> Result<(), Error> {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (mut sender_1, task_1, completed_1) = make_signalable_task::<bool>();
+        let (sender_2, task_2, completed_2) = make_signalable_task::<bool>();
+
+        let mut tracker = LocalTaskTracker::new();
+
+        tracker.track(task_1);
+        tracker.track(task_2);
+
+        assert_matches!(exec.run_until_stalled(&mut tracker._receiver_task), Poll::Pending);
+        assert_eq!(Rc::strong_count(&completed_1), 2);
+        assert_eq!(Rc::strong_count(&completed_2), 2);
+        assert!(!sender_1.is_canceled());
+        assert!(!sender_2.is_canceled());
+
+        assert!(sender_2.send(true).is_ok());
+        assert_matches!(exec.run_until_stalled(&mut tracker._receiver_task), Poll::Pending);
+
+        assert_eq!(Rc::strong_count(&completed_1), 2);
+        assert_eq!(Rc::strong_count(&completed_2), 1);
+        assert_eq!(*completed_1.borrow(), false);
+        assert_eq!(*completed_2.borrow(), true);
+        assert!(!sender_1.is_canceled());
+
+        drop(tracker);
+        let mut sender_1_cancellation = sender_1.cancellation();
+        assert_matches!(exec.run_until_stalled(&mut sender_1_cancellation), Poll::Ready(()));
+        assert_eq!(Rc::strong_count(&completed_1), 1);
+        assert!(sender_1.is_canceled());
+
+        Ok(())
     }
 }
