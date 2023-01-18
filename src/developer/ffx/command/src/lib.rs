@@ -38,13 +38,6 @@ fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
     write!(out, "{}\n", exit_code).ok();
 }
 
-/// Helper function for converting argh early exit errors to ffx errors.
-pub fn argh_to_ffx_err(err: argh::EarlyExit) -> Error {
-    let output = err.output;
-    let code = err.status.map_or(1, |_| 0);
-    Error::Help { output, code }
-}
-
 /// If given an error result, prints a user-meaningful interpretation of it
 /// to the given output handle
 pub async fn report_user_error(err: &Error) -> anyhow::Result<()> {
@@ -65,8 +58,8 @@ pub async fn report_user_error(err: &Error) -> anyhow::Result<()> {
 }
 
 pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
-    let cmd = ffx::FfxCommandLine::from_env()?;
-    let app = cmd.parse::<T>()?;
+    let cmd = ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help)?;
+    let app = &cmd.global;
 
     let context = app.load_context()?;
 
@@ -75,15 +68,14 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     context.env_file_path().map_err(|e| {
         let output = format!("ffx could not determine the environment configuration path: {}\nEnsure that $HOME is set, or pass the --env option to specify an environment configuration path", e);
         let code = 1;
-        Error::Help { output, code }
+        Error::Help { command: cmd.command.clone(), output, code }
     })?;
 
-    let tools = T::from_env(&app, &context)?;
+    let tools = T::from_env(&context)?;
 
-    let args_ref = Vec::from_iter(app.subcommand.iter().map(|arg| &**arg));
-    let tool = tools.from_args(&cmd, &args_ref).await;
+    let tool = tools.try_from_args(&cmd).await?;
     // If the line above succeeds, then this will succeed as well.
-    let sanitized_args = match tools.redact_arg_values(&cmd, &args_ref) {
+    let sanitized_args = match tools.redact_arg_values(&cmd) {
         Ok(a) => format!("{} {}", cmd.redact_args_flags_only(), a[1..].join(" ")).trim().to_owned(),
         Err(e) => format!("{e}"),
     };

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Error, Result, ToolSuite};
+use crate::FfxContext;
+use crate::{Error, Result};
 use anyhow::Context;
 use argh::FromArgs;
 use errors::ffx_error;
@@ -27,7 +28,8 @@ const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
 /// reconstruct an ffx command invocation.
 pub struct FfxCommandLine {
     pub command: Vec<String>,
-    pub args: Vec<String>,
+    pub ffx_args: Vec<String>,
+    pub global: Ffx,
 }
 
 impl FfxCommandLine {
@@ -37,43 +39,25 @@ impl FfxCommandLine {
     pub fn from_env() -> Result<Self> {
         let argv = Vec::from_iter(std::env::args());
         let wrapper_name = std::env::var(FFX_WRAPPER_INVOKE).ok();
-        Self::new(wrapper_name, argv)
+        Self::new(wrapper_name.as_deref(), &argv)
     }
 
     /// Extract the command name from the given argument list, allowing for an overridden command name
     /// from a wrapper invocation so we provide useful information to the user. If the override has spaces, it will
     /// be split into multiple commands.
-    ///
-    /// Returns a tuple of the command and the remaining arguments
-    pub fn new(
-        wrapper_name: Option<String>,
-        argv: impl IntoIterator<Item = String>,
-    ) -> Result<Self> {
-        let mut args = argv.into_iter();
-        let arg0 = args.next().context("No first argument in argument vector")?;
+    pub fn new(wrapper_name: Option<&str>, argv: &[impl AsRef<str>]) -> Result<Self> {
+        let mut args = argv.iter().map(AsRef::as_ref);
+        let arg0 = args.next().context("No first argument in argument vector").bug()?;
         let args = Vec::from_iter(args);
-        let command = wrapper_name.map_or_else(
-            || vec![Self::base_cmd(&arg0)],
-            |s| s.split(" ").map(str::to_owned).collect(),
-        );
-        Ok(Self { command, args })
-    }
-
-    /// Parse the command line arguments given into an Ffx argument struct, returning the
-    /// EarlyExit error if the parse failed
-    pub fn parse<T: ToolSuite>(&self) -> Result<Ffx> {
-        Ffx::from_args(&Vec::from_iter(self.cmd_iter()), &Vec::from_iter(self.args_iter())).map_err(
-            |early_exit| {
-                let output = early_exit.output
-                    + &format!(
-                        "\nBuilt-in Commands:{subcommands}\n\nNote: There may be more commands available, use `{cmd} commands` for a complete list.\nSee '{cmd} <command> help' for more information on a specific command.",
-                        subcommands = argh::print_subcommands(T::global_command_list().iter().copied()),
-                        cmd = self.command.join(" "),
-                    );
-                let code = early_exit.status.map_or(1, |_| 0);
-                Error::Help { output, code }
-            },
-        )
+        let command =
+            wrapper_name.map_or_else(|| vec![Self::base_cmd(&arg0)], |s| s.split(" ").collect());
+        let global =
+            Ffx::from_args(&command, &args).map_err(|err| Error::from_early_exit(&command, err))?;
+        // the ffx args are the ones not including those captured by the ffx struct's remain vec.
+        let ffx_args_len = args.len() - global.subcommand.len();
+        let ffx_args = args.into_iter().take(ffx_args_len).map(str::to_owned).collect();
+        let command = command.into_iter().map(str::to_owned).collect();
+        Ok(Self { command, ffx_args, global })
     }
 
     /// Create a string of the current process's `env::args` that replaces user-supplied parameter
@@ -83,8 +67,8 @@ impl FfxCommandLine {
     /// was unsuccessful or if information like `--help` was requested.
     pub fn redact_arg_values(&self) -> String {
         let x = Ffx::redact_arg_values(
-            &Vec::from_iter(self.cmd_iter()),
-            &Vec::from_iter(self.args_iter()),
+            &["ffx"],
+            &Vec::from_iter(self.ffx_args_iter().chain(self.subcmd_iter())),
         );
         match x {
             Ok(s) => s[1..].join(" "),
@@ -96,15 +80,9 @@ impl FfxCommandLine {
     /// for analytics. This only contains the top-level flags before any subcommands have been
     /// entered.
     pub fn redact_args_flags_only(&self) -> String {
-        let x = Ffx::redact_arg_values(
-            &Vec::from_iter(self.cmd_iter()),
-            &Vec::from_iter(self.args_iter()),
-        );
+        let x = Ffx::redact_arg_values(&["ffx"], &Vec::from_iter(self.ffx_args_iter()));
         let res = match x {
-            Ok(a) => {
-                let end = a.iter().position(|s| s == "subcommand").unwrap_or(a.len() - 1);
-                a[1..end].join(" ")
-            }
+            Ok(s) => s[1..].join("sep"),
             Err(e) => e.output,
         };
         res
@@ -116,27 +94,27 @@ impl FfxCommandLine {
     }
 
     /// Returns an iterator of the command part of the command line
-    pub fn args_iter<'a>(&'a self) -> impl Iterator<Item = &'a str> {
-        self.args.iter().map(|s| s.as_str())
+    pub fn ffx_args_iter<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.ffx_args.iter().map(|s| s.as_str())
+    }
+
+    /// Returns an iterator of the subcommand and its arguments
+    pub fn subcmd_iter<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.global.subcommand.iter().map(String::as_str)
     }
 
     /// Returns an iterator of the whole command line
     pub fn all_iter<'a>(&'a self) -> impl Iterator<Item = &'a str> {
-        self.cmd_iter().chain(self.args_iter())
+        self.cmd_iter().chain(self.ffx_args_iter()).chain(self.subcmd_iter())
     }
 
     /// Extract the base cmd from a path
-    fn base_cmd(path: &str) -> String {
-        std::path::Path::new(path)
-            .file_name()
-            .map(|s| s.to_str())
-            .flatten()
-            .unwrap_or(path)
-            .to_owned()
+    fn base_cmd(path: &str) -> &str {
+        std::path::Path::new(path).file_name().map(|s| s.to_str()).flatten().unwrap_or(path)
     }
 }
 
-#[derive(Clone, FfxConfigBacked, FromArgs, Debug, PartialEq)]
+#[derive(Clone, Default, FfxConfigBacked, FromArgs, Debug, PartialEq)]
 /// Fuchsia's developer tool
 pub struct Ffx {
     #[argh(option, short = 'c')]
@@ -250,27 +228,27 @@ mod test {
 
     #[test]
     fn cmd_only_last_component() {
-        let args = ["test/things/ffx", "--help"].map(String::from);
-        let cmd_line = FfxCommandLine::new(None, args).expect("Command line should parse");
+        let args = ["test/things/ffx", "--verbose"].map(String::from);
+        let cmd_line = FfxCommandLine::new(None, &args).expect("Command line should parse");
         assert_eq!(cmd_line.command, vec!["ffx"]);
-        assert_eq!(cmd_line.args, vec!["--help"]);
+        assert_eq!(cmd_line.ffx_args, vec!["--verbose"]);
     }
 
     #[test]
     fn cmd_override_invoke() {
-        let args = ["test/things/ffx", "--help"].map(String::from);
-        let cmd_line = FfxCommandLine::new(Some("tools/ffx".to_owned()), args)
-            .expect("Command line should parse");
+        let args = ["test/things/ffx", "--verbose"].map(String::from);
+        let cmd_line =
+            FfxCommandLine::new(Some("tools/ffx"), &args).expect("Command line should parse");
         assert_eq!(cmd_line.command, vec!["tools/ffx"]);
-        assert_eq!(cmd_line.args, vec!["--help"]);
+        assert_eq!(cmd_line.ffx_args, vec!["--verbose"]);
     }
 
     #[test]
     fn cmd_override_multiple_terms_invoke() {
-        let args = ["test/things/ffx", "--help"].map(String::from);
-        let cmd_line = FfxCommandLine::new(Some("fx ffx".to_owned()), args)
-            .expect("Command line should parse");
+        let args = ["test/things/ffx", "--verbose"].map(String::from);
+        let cmd_line =
+            FfxCommandLine::new(Some("fx ffx"), &args).expect("Command line should parse");
         assert_eq!(cmd_line.command, vec!["fx", "ffx"]);
-        assert_eq!(cmd_line.args, vec!["--help"]);
+        assert_eq!(cmd_line.ffx_args, vec!["--verbose"]);
     }
 }

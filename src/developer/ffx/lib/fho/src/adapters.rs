@@ -14,9 +14,9 @@ macro_rules! embedded_plugin {
             cmd: <$tool as $crate::FfxTool>::Command,
         ) -> $crate::macro_deps::anyhow::Result<()> {
             #[allow(unused_imports)]
-            use $crate::macro_deps::{anyhow::Context, argh, global_env_context, Ffx};
+            use $crate::macro_deps::{anyhow::Context, argh, global_env_context, FfxCommandLine};
 
-            let ffx: &Ffx = &argh::from_env();
+            let ffx = &FfxCommandLine::from_env()?;
             let context = &global_env_context().context("Loading global environment context")?;
 
             let env = $crate::FhoEnvironment { ffx, context, injector };

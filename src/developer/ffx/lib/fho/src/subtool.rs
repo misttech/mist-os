@@ -6,8 +6,7 @@ use argh::{CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_command::{
-    argh_to_ffx_err, DaemonVersionCheck, Error, Ffx, FfxCommandLine, FfxContext, Result,
-    ToolRunner, ToolSuite,
+    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
@@ -82,24 +81,24 @@ pub(crate) struct ToolCommand<M: FfxTool> {
 }
 
 pub struct FhoSuite<M> {
-    ffx: Ffx,
     context: EnvironmentContext,
     _p: std::marker::PhantomData<fn(M) -> ()>,
 }
 
 impl<M> Clone for FhoSuite<M> {
     fn clone(&self) -> Self {
-        Self { ffx: self.ffx.clone(), context: self.context.clone(), _p: self._p.clone() }
+        Self { context: self.context.clone(), _p: self._p.clone() }
     }
 }
 
 struct FhoTool<M: FfxTool> {
     suite: FhoSuite<M>,
+    ffx: FfxCommandLine,
     command: ToolCommand<M>,
 }
 
 pub struct FhoEnvironment<'a> {
-    pub ffx: &'a Ffx,
+    pub ffx: &'a FfxCommandLine,
     pub context: &'a EnvironmentContext,
     pub injector: &'a dyn Injector,
 }
@@ -140,8 +139,8 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
                     ))?;
                 let build_info = self.suite.context.build_info();
                 let injector = self
-                    .suite
                     .ffx
+                    .global
                     .initialize_overnet(
                         hoist_cache_dir.path(),
                         None,
@@ -149,7 +148,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
                     )
                     .await?;
                 let env = FhoEnvironment {
-                    ffx: &self.suite.ffx,
+                    ffx: &self.ffx,
                     context: &self.suite.context,
                     injector: &injector,
                 };
@@ -163,10 +162,9 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
 
 #[async_trait::async_trait(?Send)]
 impl<M: FfxTool> ToolSuite for FhoSuite<M> {
-    fn from_env(ffx: &Ffx, context: &EnvironmentContext) -> Result<Self> {
-        let ffx = ffx.clone();
+    fn from_env(context: &EnvironmentContext) -> Result<Self> {
         let context = context.clone();
-        Ok(Self { ffx: ffx, context: context, _p: Default::default() })
+        Ok(Self { context: context, _p: Default::default() })
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -176,19 +174,22 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
     async fn try_from_args(
         &self,
         cmd: &FfxCommandLine,
-        args: &[&str],
     ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
+        let args = Vec::from_iter(cmd.global.subcommand.iter().map(String::as_str));
         let found = FhoTool {
             suite: self.clone(),
-            command: ToolCommand::<M>::from_args(&Vec::from_iter(cmd.cmd_iter()), args)
-                .map_err(argh_to_ffx_err)?,
+            ffx: cmd.clone(),
+            command: ToolCommand::<M>::from_args(&Vec::from_iter(cmd.cmd_iter()), &args)
+                .map_err(|err| Error::from_early_exit(&cmd.command, err))?,
         };
         Ok(Some(Box::new(found)))
     }
 
-    fn redact_arg_values(&self, cmd: &FfxCommandLine, args: &[&str]) -> Result<Vec<String>> {
+    fn redact_arg_values(&self, cmd: &FfxCommandLine) -> Result<Vec<String>> {
+        let args = Vec::from_iter(cmd.global.subcommand.iter().map(String::as_str));
         let cmd_vec = Vec::from_iter(cmd.cmd_iter());
-        ToolCommand::<M>::redact_arg_values(&cmd_vec, args).map_err(argh_to_ffx_err)
+        ToolCommand::<M>::redact_arg_values(&cmd_vec, &args)
+            .map_err(|err| Error::from_early_exit(&cmd.command, err))
     }
 }
 
@@ -455,7 +456,6 @@ mod tests {
     use crate::testing::*;
     use crate::FhoDetails;
     use crate::Only;
-    use argh::FromArgs;
     use async_trait::async_trait;
     use ffx_writer::Writer;
     use fho_macro::FfxTool;
@@ -527,14 +527,14 @@ mod tests {
     async fn present_metadata() {
         let tmpdir = tempfile::tempdir().expect("tempdir");
 
-        let ffx = Ffx::from_args(&["ffx"], &[]).expect("ffx command line to parse");
+        let ffx = FfxCommandLine::new(None, &["ffx"]).expect("ffx command line to parse");
         let context = EnvironmentContext::default();
-        let suite: FhoSuite<FakeTool> = FhoSuite { ffx, context, _p: Default::default() };
+        let suite: FhoSuite<FakeTool> = FhoSuite { context, _p: Default::default() };
         let output_path = tmpdir.path().join("metadata.json");
         let subcommand =
             FhoHandler::Metadata(MetadataCmd { output_path: Some(output_path.clone()) });
         let command = ToolCommand { subcommand };
-        let tool = Box::new(FhoTool { suite, command });
+        let tool = Box::new(FhoTool { ffx, suite, command });
 
         tool.run().await.expect("running metadata command");
 

@@ -5,8 +5,8 @@
 use argh::{FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    argh_to_ffx_err, DaemonVersionCheck, Error, Ffx, FfxCommandLine, FfxContext, FfxToolInfo,
-    Result, ToolRunner, ToolSuite,
+    DaemonVersionCheck, Error, Ffx, FfxCommandLine, FfxContext, FfxToolInfo, Result, ToolRunner,
+    ToolSuite,
 };
 use ffx_config::EnvironmentContext;
 use ffx_lib_args::FfxBuiltIn;
@@ -16,14 +16,13 @@ use std::{os::unix::process::ExitStatusExt, process::ExitStatus};
 
 /// The command to be invoked and everything it needs to invoke
 struct FfxSubCommand {
-    app: Ffx,
+    app: FfxCommandLine,
     context: EnvironmentContext,
     cmd: FfxBuiltIn,
 }
 
 /// The suite of commands FFX supports.
 struct FfxSuite {
-    app: Ffx,
     context: EnvironmentContext,
     external_commands: ExternalSubToolSuite,
 }
@@ -32,13 +31,12 @@ const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_mill
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for FfxSuite {
-    fn from_env(app: &Ffx, env: &EnvironmentContext) -> Result<Self> {
-        let app = app.clone();
+    fn from_env(env: &EnvironmentContext) -> Result<Self> {
         let context = env.clone();
 
-        let external_commands = ExternalSubToolSuite::from_env(&app, env)?;
+        let external_commands = ExternalSubToolSuite::from_env(env)?;
 
-        Ok(Self { app, context, external_commands })
+        Ok(Self { context, external_commands })
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -54,23 +52,23 @@ impl ToolSuite for FfxSuite {
     async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
-        args: &[&str],
     ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
         let context = self.context.clone();
-        let app = self.app.clone();
+        let app = ffx_cmd.clone();
+        let args = Vec::from_iter(app.global.subcommand.iter().map(String::as_str));
         match args.first().copied() {
             Some("commands") => {
                 let mut output = String::new();
                 self.print_command_list(&mut output).await.ok();
                 let code = 0;
-                Err(Error::Help { output, code })
+                Err(Error::Help { command: ffx_cmd.command.clone(), output, code })
             }
             Some(name) if SubCommand::COMMANDS.iter().any(|c| c.name == name) => {
-                let cmd = FfxBuiltIn::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), args)
-                    .map_err(argh_to_ffx_err)?;
+                let cmd = FfxBuiltIn::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), &args)
+                    .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
                 Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
             }
-            Some(name) => match self.external_commands.try_from_args(ffx_cmd, args).await? {
+            Some(name) => match self.external_commands.try_from_args(ffx_cmd).await? {
                 Some(tool) => Ok(Some(tool)),
                 _ => {
                     let mut output = format!(
@@ -78,7 +76,7 @@ impl ToolSuite for FfxSuite {
                     );
                     self.print_command_list(&mut output).await.ok();
                     let code = 1;
-                    return Err(Error::Help { output, code });
+                    return Err(Error::Help { command: ffx_cmd.command.clone(), output, code });
                 }
             },
             None => {
@@ -89,16 +87,18 @@ impl ToolSuite for FfxSuite {
                         let mut output = help_err.output;
                         let code = help_err.status.map_or(1, |_| 0);
                         self.print_command_list(&mut output).await.ok();
-                        Err(Error::Help { output, code })
+                        Err(Error::Help { command: ffx_cmd.command.clone(), output, code })
                     }
                 }
             }
         }
     }
 
-    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine, args: &[&str]) -> Result<Vec<String>> {
+    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine) -> Result<Vec<String>> {
+        let args = Vec::from_iter(ffx_cmd.global.subcommand.iter().map(String::as_str));
         let cmd_vec = Vec::from_iter(ffx_cmd.cmd_iter());
-        FfxBuiltIn::redact_arg_values(&cmd_vec, args).map_err(argh_to_ffx_err)
+        FfxBuiltIn::redact_arg_values(&cmd_vec, &args)
+            .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))
     }
 }
 
@@ -120,12 +120,12 @@ impl ToolRunner for FfxSubCommand {
                 Ok(ExitStatus::from_raw(0))
             }
             subcommand => {
-                if self.app.machine.is_some()
+                if self.app.global.machine.is_some()
                     && !ffx_lib_suite::ffx_plugin_is_machine_supported(&subcommand)
                 {
                     Err(ffx_error!("The machine flag is not supported for this subcommand").into())
                 } else {
-                    run_legacy_subcommand(self.app, self.context, subcommand)
+                    run_legacy_subcommand(self.app.global, self.context, subcommand)
                         .await
                         .map(|_| ExitStatus::from_raw(0))
                 }

@@ -16,6 +16,8 @@ pub enum Error {
     /// An early-exit that should result in outputting help to the user (like [`argh::EarlyExit`]),
     /// but is not itself an error in any meaningful sense.
     Help {
+        /// The command name (argv[0..]) that should be used in supplemental help output
+        command: Vec<String>,
         /// The text to output to the user
         output: String,
         /// The exit status
@@ -71,6 +73,20 @@ impl From<FfxError> for Error {
 }
 
 impl Error {
+    /// Map an argh early exit to our kind of error
+    pub fn from_early_exit(command: &[impl AsRef<str>], early_exit: argh::EarlyExit) -> Self {
+        let command = Vec::from_iter(command.iter().map(|s| s.as_ref().to_owned()));
+        let output = early_exit.output;
+        // if argh's early_exit status is Ok() that means it's printing help because
+        // of a `--help` argument or `help` as a subcommand was passed. Otherwise
+        // it's just an error parsing the arguments. So only map `status: Ok(())`
+        // as help output.
+        match early_exit.status {
+            Ok(_) => Error::Help { command, output, code: 0 },
+            Err(_) => Error::Config(anyhow::anyhow!("{}", output)),
+        }
+    }
+
     /// Get the exit code this error should correspond to if it bubbles up to `main()`
     pub fn exit_code(&self) -> i32 {
         match self {

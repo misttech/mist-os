@@ -4,7 +4,7 @@
 
 use std::{fmt::Write, path::PathBuf, process::ExitStatus};
 
-use crate::{Error, Ffx, FfxCommandLine};
+use crate::{Error, FfxCommandLine};
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
@@ -60,7 +60,7 @@ pub trait ToolRunner {
 #[async_trait::async_trait(?Send)]
 pub trait ToolSuite: Sized {
     /// Initializes the tool suite from the ffx invocation's environment.
-    fn from_env(app: &Ffx, env: &EnvironmentContext) -> Result<Self, Error>;
+    fn from_env(env: &EnvironmentContext) -> Result<Self, Error>;
 
     /// Lists commands that should be available no matter how and where this tool
     /// is invoked.
@@ -77,22 +77,17 @@ pub trait ToolSuite: Sized {
     async fn try_from_args(
         &self,
         cmd: &FfxCommandLine,
-        args: &[&str],
     ) -> Result<Option<Box<dyn ToolRunner + '_>>, Error>;
 
     /// Parses the given command line into a command, then returns a redacted string usable in
     /// analytics. See [`FromArgs::redact_arg_values`] for the kind of output to expect.
-    fn redact_arg_values(&self, cmd: &FfxCommandLine, args: &[&str]) -> Result<Vec<String>, Error>;
+    fn redact_arg_values(&self, cmd: &FfxCommandLine) -> Result<Vec<String>, Error>;
 
     /// Parses the given command line information into a runnable command
     /// object, exiting and printing the early exit output if help is requested
     /// or an error occurs.
-    async fn from_args(
-        &self,
-        cmd: &FfxCommandLine,
-        args: &[&str],
-    ) -> Option<Box<dyn ToolRunner + '_>> {
-        self.try_from_args(cmd, args).await.unwrap_or_else(|early_exit| {
+    async fn from_args(&self, cmd: &FfxCommandLine) -> Option<Box<dyn ToolRunner + '_>> {
+        self.try_from_args(cmd).await.unwrap_or_else(|early_exit| {
             print!("{}", early_exit);
 
             std::process::exit(early_exit.exit_code())
@@ -101,33 +96,60 @@ pub trait ToolSuite: Sized {
 
     /// Prints out a list of the commands this suite has available
     async fn print_command_list(&self, w: &mut impl Write) -> Result<(), std::fmt::Error> {
-        let mut built_in = None;
-        let mut workspace = None;
-        let mut sdk = None;
-        for cmd in &self.command_list().await {
-            use FfxToolSource::*;
-            let kind = match cmd.source {
-                BuiltIn => built_in.get_or_insert_with(String::new),
-                Workspace => workspace.get_or_insert_with(String::new),
-                Sdk => sdk.get_or_insert_with(String::new),
-            };
-            cmd.write_description(kind);
-        }
-
-        if let Some(built_in) = built_in {
-            writeln!(w, "Built-in Commands:\n{built_in}\n")?;
-        }
-        if let Some(workspace) = workspace {
-            writeln!(w, "Workspace Commands:\n{workspace}\n")?;
-        }
-        if let Some(sdk) = sdk {
-            writeln!(w, "SDK Commands:\n{sdk}\n")?;
-        }
-        Ok(())
+        print_command_list(w, &self.command_list().await)
     }
 
     /// Finds the given tool by name in the available command list
     async fn find_tool_by_name(&self, name: &str) -> Option<FfxToolInfo> {
         self.command_list().await.into_iter().find(|cmd| cmd.name == name)
     }
+
+    /// Use this with `map_err` on a result from [`crate::FfxCommandLine::from_env`]
+    /// call to append the global command list to the help, if that's the kind of error
+    /// this had.
+    fn add_globals_to_help(err: Error) -> Error {
+        match err {
+            Error::Help { command, mut output, code } => {
+                let cmd = command.join(" ");
+                writeln!(&mut output).and_then(|_| {
+                    print_command_list(
+                        &mut output,
+                        &Vec::from_iter(
+                            Self::global_command_list().iter().cloned().map(FfxToolInfo::from),
+                        ),
+                    )?;
+                    writeln!(&mut output, "Note: There may be more commands available, use `{cmd} commands` for a complete list.")?;
+                    writeln!(&mut output, "See '{cmd} <command> help' for more information on a specific command.")
+                }).expect("Failed to append command list to help");
+                Error::Help { command, output, code }
+            }
+            err => err,
+        }
+    }
+}
+
+fn print_command_list(w: &mut impl Write, commands: &[FfxToolInfo]) -> Result<(), std::fmt::Error> {
+    let mut built_in = None;
+    let mut workspace = None;
+    let mut sdk = None;
+    for cmd in commands {
+        use FfxToolSource::*;
+        let kind = match cmd.source {
+            BuiltIn => built_in.get_or_insert_with(String::new),
+            Workspace => workspace.get_or_insert_with(String::new),
+            Sdk => sdk.get_or_insert_with(String::new),
+        };
+        cmd.write_description(kind);
+    }
+
+    if let Some(built_in) = built_in {
+        writeln!(w, "Built-in Commands:\n{built_in}\n")?;
+    }
+    if let Some(workspace) = workspace {
+        writeln!(w, "Workspace Commands:\n{workspace}\n")?;
+    }
+    if let Some(sdk) = sdk {
+        writeln!(w, "SDK Commands:\n{sdk}\n")?;
+    }
+    Ok(())
 }

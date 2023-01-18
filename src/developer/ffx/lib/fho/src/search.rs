@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context;
 use argh::FromArgs;
-use ffx_command::{
-    argh_to_ffx_err, Ffx, FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite,
-};
-use ffx_command::{FfxContext, Result};
+use ffx_command::{Error, FfxContext, Result};
+use ffx_command::{Ffx, FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 use ffx_config::{EnvironmentContext, Sdk};
 use std::{
     collections::HashMap,
@@ -52,7 +49,12 @@ impl ToolRunner for ExternalSubTool {
         // location.
         std::process::Command::new(&self.path)
             .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin().await?)
-            .args(self.cmd_line.cmd_iter().skip(1).chain(self.cmd_line.args_iter()))
+            .args(
+                self.cmd_line
+                    .cmd_iter()
+                    .skip(1)
+                    .chain(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter())),
+            )
             .spawn()
             .and_then(|mut child| child.wait())
             .bug_context("Running external subtool")
@@ -72,7 +74,8 @@ impl ExternalSubToolSuite {
         Ok(Self { context, workspace_tools })
     }
 
-    fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine, name: &str) -> Option<ExternalSubTool> {
+    fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
+        let name = ffx_cmd.global.subcommand.first()?;
         let cmd = match self.workspace_tools.get(name).and_then(SubToolLocation::validate_tool) {
             Some(FfxToolInfo { path: Some(path), .. }) => {
                 let context = self.context.clone();
@@ -85,13 +88,8 @@ impl ExternalSubToolSuite {
         Some(cmd)
     }
 
-    fn find_sdk_tool(
-        &self,
-        sdk: &Sdk,
-        ffx_cmd: &FfxCommandLine,
-        name: &str,
-    ) -> Option<ExternalSubTool> {
-        let name = "ffx-".to_owned() + name;
+    fn find_sdk_tool(&self, sdk: &Sdk, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
+        let name = format!("ffx-{}", ffx_cmd.global.subcommand.first()?);
         let ffx_tool = sdk.get_ffx_tool(&name)?;
         let location = SubToolLocation::from_path(
             FfxToolSource::Sdk,
@@ -107,7 +105,7 @@ impl ExternalSubToolSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for ExternalSubToolSuite {
-    fn from_env(_app: &Ffx, env: &EnvironmentContext) -> Result<Self> {
+    fn from_env(env: &EnvironmentContext) -> Result<Self> {
         Self::with_tools_from(env.clone(), &env.subtool_paths())
     }
 
@@ -133,32 +131,29 @@ impl ToolSuite for ExternalSubToolSuite {
     async fn try_from_args(
         &self,
         ffx_cmd: &FfxCommandLine,
-        args: &[&str],
     ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
-        let name = args.first().copied().context("parsing command name")?;
         // look in the workspace first
-        if let Some(cmd) = self.find_workspace_tool(ffx_cmd, name) {
+        if let Some(cmd) = self.find_workspace_tool(ffx_cmd) {
             return Ok(Some(Box::new(cmd)));
         }
         // then try the sdk
         let sdk = self.context.get_sdk().await?;
-        if let Some(cmd) = self.find_sdk_tool(&sdk, ffx_cmd, name) {
+        if let Some(cmd) = self.find_sdk_tool(&sdk, ffx_cmd) {
             return Ok(Some(Box::new(cmd)));
         }
         // and we're done
         Ok(None)
     }
 
-    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine, args: &[&str]) -> Result<Vec<String>> {
-        let name = args.first().copied().context("parsing command name")?;
-        if self.find_workspace_tool(ffx_cmd, name).is_none() {
+    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine) -> Result<Vec<String>> {
+        if self.find_workspace_tool(ffx_cmd).is_none() {
             return Ok(Vec::new());
         }
         // This will likely double-report if this is given to analytics.
         let mut res = Ffx::redact_arg_values(&Vec::from_iter(ffx_cmd.cmd_iter()), &vec!["n_o_o_p"])
-            .map_err(argh_to_ffx_err)?;
+            .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
         res.pop();
-        res.push(args.first().copied().unwrap().to_owned());
+        res.push(ffx_cmd.global.subcommand.first().unwrap().to_owned());
         Ok(res)
     }
 }
@@ -440,13 +435,11 @@ mod tests {
         );
 
         suite
-            .try_from_args(
-                &FfxCommandLine {
-                    command: vec!["ffx".to_owned()],
-                    args: vec!["whatever".to_owned()],
-                },
-                &["whatever"],
-            )
+            .try_from_args(&FfxCommandLine {
+                command: vec!["ffx".to_owned()],
+                ffx_args: vec![],
+                global: Ffx { subcommand: vec!["whatever".to_owned()], ..Default::default() },
+            })
             .await
             .expect("should be able to find mock subtool in suite");
     }
