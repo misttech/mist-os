@@ -40,10 +40,6 @@ pub const DEFAULT_MTU: u16 = 1500;
 /// The devfs path at which endpoints show up.
 pub const NETDEVICE_DEVFS_PATH: &'static str = "class/network";
 
-/// Ethernet drivers devfs path.
-// TODO(https://fxbug.dev/109169): Remove when Ethernet is no more.
-pub const ETHERNET_DEVFS_PATH: &'static str = "class/ethernet";
-
 /// Returns the full path for a device node `node_name` relative to devfs root.
 pub fn devfs_device_path(node_name: &str) -> std::path::PathBuf {
     std::path::Path::new(NETDEVICE_DEVFS_PATH).join(node_name)
