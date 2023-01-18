@@ -125,7 +125,13 @@ zx::result<> open_netdevice(async_dispatcher_t* dispatcher,
       return zx::error(result.status());
     }
     if (zx_status_t status = result.value().status; status != ZX_OK) {
-      // Don't consider this a fatal error. Just print a warning.
+      // Don't consider this a fatal error. Just print a warning. This is what
+      // netstack2 does. A number of drivers reply not supported here because
+      // they're always in promiscuous mode or equivalent.
+      //
+      // TODO(https://fxbug.dev/58919): We can probably be more strict here once
+      // multicast filtering is solved in a better way and homogeneously among
+      // drivers.
       printf("netsvc: failed to set device in multicast promiscuous mode %s\n",
              zx_status_get_string(status));
     }
