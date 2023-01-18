@@ -161,29 +161,15 @@ mod tests {
         fuchsia_inspect::{self as inspect, assert_data_tree},
     };
 
-    fn empty_info() -> fsys::HostInfo {
-        fsys::HostInfo {
-            id: None,
-            technology: None,
-            address: None,
-            active: None,
-            local_name: None,
-            discoverable: None,
-            discovering: None,
-            addresses: None,
-            ..fsys::HostInfo::EMPTY
-        }
-    }
-
     #[test]
     fn from_fidl_id_not_present() {
-        let info = HostInfo::try_from(empty_info());
+        let info = HostInfo::try_from(fsys::HostInfo::EMPTY);
         assert!(info.is_err());
     }
 
     #[test]
     fn from_fidl_technology_not_present() {
-        let info = fsys::HostInfo { id: Some(fbt::HostId { value: 1 }), ..empty_info() };
+        let info = fsys::HostInfo { id: Some(fbt::HostId { value: 1 }), ..fsys::HostInfo::EMPTY };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());
     }
@@ -197,7 +183,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }]),
-            ..empty_info()
+            ..fsys::HostInfo::EMPTY
         };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());
@@ -212,7 +198,7 @@ mod tests {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
             }),
-            ..empty_info()
+            ..fsys::HostInfo::EMPTY
         };
         let info = HostInfo::try_from(info);
         assert!(info.is_err());

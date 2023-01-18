@@ -909,21 +909,12 @@ mod tests {
         let fidl = fidl_bredr::Information::try_from(&invalid_local);
         assert!(fidl.is_err());
 
-        let no_lang_fidl = fidl_bredr::Information {
-            language: None,
-            name: None,
-            description: None,
-            provider: None,
-            ..fidl_bredr::Information::EMPTY
-        };
-        let local = Information::try_from(&no_lang_fidl);
+        // No language.
+        let local = Information::try_from(&fidl_bredr::Information::EMPTY);
         assert!(local.is_err());
 
         let empty_lang_fidl = fidl_bredr::Information {
             language: Some(empty_language),
-            name: None,
-            description: None,
-            provider: None,
             ..fidl_bredr::Information::EMPTY
         };
         let local = Information::try_from(&empty_lang_fidl);
@@ -1092,7 +1083,6 @@ mod tests {
         let fidl = fidl_bredr::ChannelParameters {
             channel_mode,
             max_rx_sdu_size,
-            security_requirements: None,
             ..fidl_bredr::ChannelParameters::EMPTY
         };
 
@@ -1124,9 +1114,7 @@ mod tests {
             security_requirements: None,
         };
         let fidl = fidl_bredr::ChannelParameters {
-            channel_mode: None,
             max_rx_sdu_size: too_small_sdu,
-            security_requirements: None,
             ..fidl_bredr::ChannelParameters::EMPTY
         };
 

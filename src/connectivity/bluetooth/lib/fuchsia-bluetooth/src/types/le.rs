@@ -237,16 +237,7 @@ mod tests {
 
     #[test]
     fn advertising_data_from_fidl_empty() {
-        let data = fble::AdvertisingData {
-            name: None,
-            tx_power_level: None,
-            appearance: None,
-            service_uuids: None,
-            service_data: None,
-            manufacturer_data: None,
-            uris: None,
-            ..fble::AdvertisingData::EMPTY
-        };
+        let empty_data = fble::AdvertisingData::EMPTY;
         let expected = AdvertisingData {
             name: None,
             tx_power_level: None,
@@ -256,7 +247,7 @@ mod tests {
             manufacturer_data: vec![],
             uris: vec![],
         };
-        let data = AdvertisingData::from(data);
+        let data = AdvertisingData::from(empty_data);
         assert_eq!(expected, data);
     }
 
@@ -379,10 +370,7 @@ mod tests {
     #[test]
     fn peer_from_fidl_no_id() {
         let peer = fble::Peer {
-            id: None,
-            connectable: None,
-            rssi: None,
-            advertising_data: None,
+            id: None, // Omitted
             ..fble::Peer::EMPTY
         };
         let peer = Peer::try_from(peer);
@@ -391,13 +379,7 @@ mod tests {
 
     #[test]
     fn peer_from_fidl_mandatory_fields_only() {
-        let peer = fble::Peer {
-            id: Some(fbt::PeerId { value: 1 }),
-            connectable: None,
-            rssi: None,
-            advertising_data: None,
-            ..fble::Peer::EMPTY
-        };
+        let peer = fble::Peer { id: Some(fbt::PeerId { value: 1 }), ..fble::Peer::EMPTY };
         let expected = Peer {
             id: PeerId(1),
             name: None,
@@ -419,10 +401,6 @@ mod tests {
                 name: Some("hello".to_string()),
                 tx_power_level: Some(-10),
                 appearance: Some(fbt::Appearance::Watch),
-                service_uuids: None,
-                service_data: None,
-                manufacturer_data: None,
-                uris: None,
                 ..fble::AdvertisingData::EMPTY
             }),
             ..fble::Peer::EMPTY
