@@ -848,6 +848,7 @@ TEST_F(DeviceEnumerationTest, AtlasTest) {
   static const char* kDfv1DevicePaths[] = {
       "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-I2C4/acpi-DLG7/pt/acpi-DLG7-composite/DA7219-output",
       "sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-I2C4/acpi-DLG7/pt/acpi-DLG7-composite/DA7219-input",
+      "sys/platform/pt/pci/00:1f.3_/pci-00:1f.3-fidl/intel-hda-000/intel-sst-dsp",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
