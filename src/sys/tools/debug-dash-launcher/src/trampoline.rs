@@ -9,8 +9,12 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_kernel as fkernel;
 use fidl_fuchsia_pkg as fpkg;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl};
 use fuchsia_zircon as zx;
+use indexmap::IndexMap;
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::DirectlyMutable;
@@ -27,6 +31,14 @@ const BASE_TOOLS_PATH: &str = "/.dash/tools";
 struct PkgDir {
     pkg_url: AbsolutePackageUrl,
     dir: fio::DirectoryProxy,
+    resource: Option<String>,
+}
+
+fn parse_url(url: &str) -> Result<(AbsolutePackageUrl, Option<String>), LauncherError> {
+    if let Ok(comp_url) = url.parse::<AbsoluteComponentUrl>() {
+        return Ok((comp_url.package_url().clone(), Some(comp_url.resource().to_string())));
+    }
+    Ok((url.parse::<AbsolutePackageUrl>().map_err(|_| LauncherError::BadUrl)?, None))
 }
 
 // For each of the given packages, resolve them and create a PkgDir with its URL and DirectoryProxy.
@@ -36,71 +48,173 @@ async fn get_pkg_dirs(
 ) -> Result<Vec<PkgDir>, LauncherError> {
     let mut dirs: Vec<PkgDir> = vec![];
     for url in tool_urls {
-        let pkg_url = url.parse::<AbsolutePackageUrl>().map_err(|_| LauncherError::BadUrl)?;
+        let (pkg_url, resource) = parse_url(&url)?;
         let (dir, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .map_err(|_| LauncherError::Internal)?;
         resolver
-            .resolve(&url, server)
+            .resolve(&pkg_url.to_string(), server)
             .await
             .map_err(|_| LauncherError::Internal)?
             .map_err(|_| LauncherError::PackageResolver)?;
-        dirs.push(PkgDir { pkg_url, dir });
+        dirs.push(PkgDir { pkg_url, dir, resource });
     }
     Ok(dirs)
 }
 
 // A Trampoline holds the resolve script contents and the name that the used to run it.
+#[derive(Clone)]
 struct Trampoline {
     contents: String,
     binary_name: String,
 }
 
-// A package can have multiple binaries, so PkgTrampolines contains the list of required trampolines
-// for each package.
-struct PkgTrampolines {
-    pkg_name: String,
-    pkg_trampolines: Vec<Trampoline>,
+// Using a BTreeSet will ensure that binaries are unique by name and are stored in insertion order.
+// The Hash, Ord, PartialOrd, PartialEq, and Eq implementations enable Trampoline to be used in
+// BTreeSet and are defined only on the `binary_name` field.
+impl Hash for Trampoline {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.binary_name.hash(state);
+    }
+}
+impl Ord for Trampoline {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.binary_name.cmp(&other.binary_name)
+    }
+}
+
+impl PartialOrd for Trampoline {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Trampoline {
+    fn eq(&self, other: &Self) -> bool {
+        self.binary_name == other.binary_name
+    }
+}
+impl Eq for Trampoline {}
+
+// A package can have multiple binaries, so Trampolines contains the trampolines for each package.
+struct Trampolines {
+    // Use an IndexMap to maintain the keys in insertion order.
+    map: IndexMap<String, BTreeSet<Trampoline>>,
+}
+
+impl Trampolines {
+    fn new() -> Self {
+        Trampolines { map: IndexMap::new() }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    // Insert the given set of trampolines into the map. The trampolines are merged in to common
+    // package names. The trampoline names within packages are not repeated. Return a
+    // NonUniqueBinaryName if an attempt is made to add a duplicate trampoline name within a
+    // package.
+    fn insert(
+        &mut self,
+        pkg_name: String,
+        trampolines: BTreeSet<Trampoline>,
+    ) -> Result<(), LauncherError> {
+        match self.map.get_mut(&pkg_name) {
+            None => {
+                self.map.insert(pkg_name, trampolines);
+            }
+            Some(set) => {
+                for t in &trampolines {
+                    if !set.insert(t.clone()) {
+                        return Err(LauncherError::NonUniqueBinaryName);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // For each of the entries in the map, create an executable VMO file in a directory named after
+    // the package. Accumulate these into a tools directory, updating a path string as well. Return
+    // the directory and the path.
+    fn make_tools_dir(
+        &self,
+        resource: zx::Resource,
+    ) -> Result<(Arc<Simple<MutableConnection>>, String), LauncherError> {
+        let tools_dir = vfs::mut_pseudo_directory! {};
+        let mut path = String::new();
+        for (pkg_name, trampolines) in &self.map {
+            if !path.is_empty() {
+                path.push(':');
+            }
+            path.push_str(&format!("{}/{}", BASE_TOOLS_PATH, &pkg_name));
+            let pkg_dir = vfs::mut_pseudo_directory! {};
+
+            for trampoline in trampolines {
+                let read_exec_vmo = make_executable_vmo_file(&resource, &trampoline.contents)?;
+                pkg_dir
+                    .add_entry(&trampoline.binary_name, read_exec_vmo)
+                    .map_err(|_| LauncherError::Internal)?;
+            }
+            tools_dir.add_entry(pkg_name, pkg_dir).map_err(|_| LauncherError::Internal)?;
+        }
+        Ok((tools_dir, path))
+    }
 }
 
 // For each package, create the trampoline specifications for each of its binaries.
 // For the user's information, a directory entry will be created even if there are no
 // binaries found.
-async fn create_trampolines(pkg_dirs: &Vec<PkgDir>) -> Result<Vec<PkgTrampolines>, LauncherError> {
-    let mut all_trampolines: Vec<PkgTrampolines> = vec![];
+async fn create_trampolines(pkg_dirs: &Vec<PkgDir>) -> Result<Trampolines, LauncherError> {
+    let mut trampolines = Trampolines::new();
     for pkg_dir in pkg_dirs {
-        let mut pkg_trampolines: Vec<Trampoline> = vec![];
+        match &pkg_dir.resource {
+            Some(res) => {
+                let contents = format!("#!resolve {}#{}\n", &pkg_dir.pkg_url, res);
+                let binary_name =
+                    res.split('/').next_back().ok_or_else(|| LauncherError::BadUrl)?.to_string();
+                let pkg_name = pkg_dir.pkg_url.name().to_string();
+                let mut set = BTreeSet::new();
+                set.insert(Trampoline { contents, binary_name });
+                trampolines.insert(pkg_name, set)?;
+            }
+            None => {
+                // Read the package binaries.
+                let bin_dir = fuchsia_fs::directory::open_directory(
+                    &pkg_dir.dir,
+                    "bin",
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                )
+                .await
+                .map_err(|_| LauncherError::ToolsBinaryRead)?;
+                let entries = fuchsia_fs::directory::readdir(&bin_dir)
+                    .await
+                    .map_err(|_| LauncherError::Internal)?;
 
-        // Read the package binaries.
-        let bin_dir = fuchsia_fs::directory::open_directory(
-            &pkg_dir.dir,
-            "bin",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .await
-        .map_err(|_| LauncherError::ToolsBinaryRead)?;
-        let entries =
-            fuchsia_fs::directory::readdir(&bin_dir).await.map_err(|_| LauncherError::Internal)?;
-
-        // Create the trampoline specifications.
-        for entry in entries {
-            if entry.kind == fio::DirentType::File {
-                let contents = format!("#!resolve {}#bin/{}\n", &pkg_dir.pkg_url, entry.name);
-                let binary_name = entry.name;
-                pkg_trampolines.push(Trampoline { contents, binary_name });
+                // Create the trampoline specifications.
+                let mut pkg_trampolines = BTreeSet::new();
+                for entry in entries {
+                    if entry.kind == fio::DirentType::File {
+                        let contents =
+                            format!("#!resolve {}#bin/{}\n", &pkg_dir.pkg_url, entry.name);
+                        let binary_name = entry.name;
+                        pkg_trampolines.insert(Trampoline { contents, binary_name });
+                    }
+                }
+                // Package names are used in the directory layout to allow binary names to repeat
+                // among packages. However, the pkg_name uses only the URL's name(), dropping the
+                // host, variant, and hash, if present. The result is that the paths shown to the
+                // user will be readable, like `/.dash/tools/hello-world/hello_world_rust` and
+                // `/.dash/tools/debug-dash-launcher/ls`. However, as only unique package names can
+                // be added to a directory, this means that binaries cannot be added from packages
+                // differing only the host, variant, or hash. The simple workaround is to add such
+                // packages in separate invocations of `ffx component explore`.
+                let pkg_name = pkg_dir.pkg_url.name().to_string();
+                trampolines.insert(pkg_name, pkg_trampolines)?;
             }
         }
-        // Package names are used in the directory layout to allow binary names to repeat among
-        // packages. However, the pkg_name uses only the URL's name(), dropping the host, variant,
-        // and hash, if present. The result is that the paths shown to the user will be readable,
-        // like `/.dash/tools/hello-world/hello_world_rust` and
-        // `/.dash/tools/debug-dash-launcher/ls`. However, as only unique package names can be added
-        // to a directory, this means that binaries cannot be added from packages differing only the
-        // host, variant, or hash. The simple workaround is to add such packages in separate
-        // invocations of `ffx component explore`.
-        let pkg_name = pkg_dir.pkg_url.name().to_string();
-        all_trampolines.push(PkgTrampolines { pkg_name, pkg_trampolines });
     }
-    Ok(all_trampolines)
+    Ok(trampolines)
 }
 
 async fn create_vmex_resource() -> Result<zx::Resource, LauncherError> {
@@ -112,7 +226,7 @@ async fn create_vmex_resource() -> Result<zx::Resource, LauncherError> {
 
 fn make_executable_vmo_file(
     resource: &zx::Resource,
-    contents: String,
+    contents: &str,
 ) -> Result<Arc<dyn DirectoryEntry>, LauncherError> {
     let vmo = zx::Vmo::create(contents.len() as u64).map_err(|_| LauncherError::Internal)?;
     vmo.write(contents.as_bytes(), 0).map_err(|_| LauncherError::Internal)?;
@@ -162,31 +276,13 @@ fn directory_to_proxy(
 //
 // Return the VFS directory containing the executables and the associated path environment variable.
 async fn make_trampoline_vfs(
-    pkg_trampolines: Vec<PkgTrampolines>,
+    trampolines: Trampolines,
 ) -> Result<(Option<fio::DirectoryProxy>, Option<String>), LauncherError> {
-    if pkg_trampolines.is_empty() {
+    if trampolines.is_empty() {
         return Ok((None, None));
     }
     let resource = create_vmex_resource().await?;
-    let tools_dir = vfs::mut_pseudo_directory! {};
-    let mut path = String::new();
-    for pkg_trampoline in pkg_trampolines {
-        let pkg_name = pkg_trampoline.pkg_name;
-        if !path.is_empty() {
-            path.push(':');
-        }
-        path.push_str(&format!("{}/{}", BASE_TOOLS_PATH, &pkg_name));
-        let pkg_dir = vfs::mut_pseudo_directory! {};
-
-        for trampoline in pkg_trampoline.pkg_trampolines {
-            let read_exec_vmo = make_executable_vmo_file(&resource, trampoline.contents)?;
-            pkg_dir
-                .add_entry(&trampoline.binary_name, read_exec_vmo)
-                .map_err(|_| LauncherError::Internal)?;
-        }
-        // This line will fail if the user tries to add two packages with the the same package name.
-        tools_dir.add_entry(&pkg_name, pkg_dir).map_err(|_| LauncherError::NonUniquePackageName)?;
-    }
+    let (tools_dir, path) = trampolines.make_tools_dir(resource)?;
     // Return it as an executable directory.
     let dir = directory_to_proxy(tools_dir)?;
     Ok((Some(dir), Some(path)))
@@ -222,18 +318,55 @@ pub fn create_env_path(tools_path: Option<String>) -> String {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_pkg as fpkg;
     use fio::OpenFlags;
     use fuchsia_async as fasync;
     use fuchsia_fs::directory::open_file;
     use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
-    use vfs::directory::entry::DirectoryEntry;
+    use std::fmt;
     use vfs::directory::immutable::connection::io1::ImmutableConnection;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only_static;
     use vfs::path::Path;
+
+    #[fuchsia::test]
+    async fn parse_url_test() {
+        assert_matches!(parse_url(""), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("f"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pk://h/n#foo"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pkg#://h/n#"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pkg#://h/n"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pkg://h"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pkg://h/#"), Err(LauncherError::BadUrl));
+        assert_matches!(parse_url("fuchsia-pkg://📡/n#foo"), Err(LauncherError::BadUrl));
+
+        let (abs_url, res) = parse_url("fuchsia-pkg://h/n").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://h/n");
+        assert_eq!(res, None);
+
+        // Multiple #'s allowed by fuchsia_url's parser!
+        let (abs_url, res) = parse_url("fuchsia-pkg://h/n###foo").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://h/n");
+        assert_eq!(res, Some("##foo".to_string()));
+
+        let (abs_url, res) = parse_url("fuchsia-pkg://h/n#foo/bar").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://h/n");
+        assert_eq!(res, Some("foo/bar".to_string()));
+
+        let (abs_url, res) = parse_url("fuchsia-pkg://earth.org/spacex_pkg/variant0#foo").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://earth.org/spacex_pkg/variant0");
+        assert_eq!(res, Some("foo".to_string()));
+
+        let (abs_url, res) = parse_url("fuchsia-pkg://earth.org/spacex_pkg?hash=0000000000000000000000000000000000000000000000000000000000000000#foo").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://earth.org/spacex_pkg?hash=0000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(res, Some("foo".to_string()));
+
+        let (abs_url, res) = parse_url("fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000#foo").unwrap();
+        assert_eq!(&abs_url.to_string(), "fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(res, Some("foo".to_string()));
+    }
 
     #[fuchsia::test]
     async fn get_pkg_dirs_test() {
@@ -272,6 +405,23 @@ mod tests {
         assert_eq!(v[0].pkg_url.hash(), None);
     }
 
+    // Required for assert_matches!().
+    impl fmt::Debug for Trampolines {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "map size: {}", self.map.len())
+        }
+    }
+
+    impl Trampolines {
+        fn len(&self) -> usize {
+            self.map.len()
+        }
+
+        fn get_nth_package(&self, i: usize) -> Option<(&String, &BTreeSet<Trampoline>)> {
+            self.map.iter().nth(i)
+        }
+    }
+
     async fn open_directory(server: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
         let (proxy, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
@@ -281,16 +431,21 @@ mod tests {
     }
 
     async fn make_pkg(url: &str, name: &str, root: &Arc<Simple<ImmutableConnection>>) -> PkgDir {
-        PkgDir {
-            pkg_url: url.parse::<AbsolutePackageUrl>().unwrap(),
-            dir: open_directory(root.get_entry(name).expect("error obtaining directory entry"))
-                .await,
-        }
+        let (pkg_url, resource) = parse_url(&url.to_string()).unwrap();
+        let dir =
+            open_directory(root.get_entry(name).expect("error obtaining directory entry")).await;
+        PkgDir { pkg_url, dir, resource }
     }
 
-    fn check_trampoline(t: &Trampoline, contents: &str, binary_name: &str) {
-        assert_eq!(t.contents, contents.to_string());
-        assert_eq!(t.binary_name, binary_name.to_string());
+    fn check_trampoline(
+        trampolines: &BTreeSet<Trampoline>,
+        bin: usize,
+        contents: &str,
+        binary_name: &str,
+    ) {
+        let trampoline = trampolines.iter().nth(bin).unwrap();
+        assert_eq!(trampoline.contents, contents);
+        assert_eq!(trampoline.binary_name, binary_name);
     }
 
     #[fuchsia::test]
@@ -322,165 +477,182 @@ mod tests {
         }
 
         let pkg_dirs = create_test_directory_proxies().await;
-        let r = create_trampolines(&pkg_dirs).await.unwrap();
-        assert_eq!(r.len(), 3); // Includes one for "blueorigin_pkg", which had no binaries.
-        assert_eq!(r[0].pkg_trampolines.len(), 2);
-        assert_eq!(r[0].pkg_name, "nasa_pkg".to_string());
+        let pkg_trampolines = create_trampolines(&pkg_dirs).await.unwrap();
+        assert_eq!(pkg_trampolines.len(), 3); // Includes one for "blueorigin_pkg", which had no binaries.
+        let (name, list) = pkg_trampolines.get_nth_package(0).unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(name, "nasa_pkg");
         check_trampoline(
-            &r[0].pkg_trampolines[0],
+            &list,
+            0,
             "#!resolve fuchsia-pkg://earth.org/nasa_pkg#bin/go2moon_v1969\n",
             "go2moon_v1969",
         );
         check_trampoline(
-            &r[0].pkg_trampolines[1],
+            &list,
+            1,
             "#!resolve fuchsia-pkg://earth.org/nasa_pkg#bin/go2moon_v2024\n",
             "go2moon_v2024",
         );
 
-        assert_eq!(r[1].pkg_trampolines.len(), 2);
-        assert_eq!(r[1].pkg_name, "spacex_pkg".to_string());
+        let (name, list) = pkg_trampolines.get_nth_package(1).unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(name, "spacex_pkg");
         check_trampoline(
-            &r[1].pkg_trampolines[0],
+            &list,
+            0,
             "#!resolve fuchsia-pkg://earth.org/spacex_pkg#bin/go2mars\n",
             "go2mars",
         );
         check_trampoline(
-            &r[1].pkg_trampolines[1],
+            &list,
+            1,
             "#!resolve fuchsia-pkg://earth.org/spacex_pkg#bin/go2orbit\n",
             "go2orbit",
         );
 
-        assert_eq!(r[2].pkg_trampolines.len(), 0);
-        assert_eq!(r[2].pkg_name, "blueorigin_pkg".to_string());
+        let (name, list) = pkg_trampolines.get_nth_package(2).unwrap();
+        assert_eq!(list.len(), 0);
+        assert_eq!(name, "blueorigin_pkg");
     }
 
     #[fuchsia::test]
-    async fn trampolines_collisions_test() {
-        async fn create_test_directory_proxies_with_collisions() -> Vec<PkgDir> {
-            // Create two packages containing the same binary name.
-            let root = vfs::pseudo_directory! {
-                "Nasa" => vfs::pseudo_directory! {
-                    "bin" => vfs::pseudo_directory! {
-                        "collision" => read_only_static(b"Apollo"),
-                    },
+    async fn trampolines_binary_collisions_test() {
+        // Create two packages containing the same binary name.
+        let root = vfs::pseudo_directory! {
+            "Nasa" => vfs::pseudo_directory! {
+                "bin" => vfs::pseudo_directory! {
+                    "collision" => read_only_static(b"Apollo"),
                 },
-                "SpaceX" => vfs::pseudo_directory! {
-                    "bin" => vfs::pseudo_directory! {
-                        "collision" => read_only_static(b"Falcon 9"),
-                    },
+            },
+            "SpaceX" => vfs::pseudo_directory! {
+                "bin" => vfs::pseudo_directory! {
+                    "collision" => read_only_static(b"Falcon 9"),
                 },
-            };
-            // But use URLs that have unique URLs.
-            vec![
-                make_pkg("fuchsia-pkg://earth.org/nasa_pkg", "Nasa", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant1", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg?hash=0000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg?hash=1000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
-                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant1?hash=1000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
-            ]
-        }
+            },
+        };
+        // But use URLs that have unique URLs.
+        let pkg_dirs = vec![
+            make_pkg("fuchsia-pkg://earth.org/nasa_pkg", "Nasa", &root).await,
+            make_pkg("fuchsia-pkg://earth.org/spacex_pkg", "SpaceX", &root).await,
+        ];
 
-        let pkg_dirs = create_test_directory_proxies_with_collisions().await;
-        let trampolines = create_trampolines(&pkg_dirs).await.unwrap();
-        assert_eq!(trampolines.len(), 8);
-        // Below, the trampolines are all named `collision`. However, the corresponding trampolines
-        // all contain unique, complete URLs. The binaries will be found in the packages.
+        let pkg_trampolines = create_trampolines(&pkg_dirs).await.unwrap();
+        // Below, the trampolines are both named `collision`. However, they are in different
+        // packages, so do not conflict.
+        let (name, list) = pkg_trampolines.get_nth_package(0).unwrap();
+        assert_eq!(name, "nasa_pkg");
+        assert_eq!(list.len(), 1);
         check_trampoline(
-            &trampolines[0].pkg_trampolines[0],
+            &list,
+            0,
             "#!resolve fuchsia-pkg://earth.org/nasa_pkg#bin/collision\n",
             "collision",
         );
+        let (name, list) = pkg_trampolines.get_nth_package(1).unwrap();
+        assert_eq!(name, "spacex_pkg");
+        assert_eq!(list.len(), 1);
         check_trampoline(
-            &trampolines[1].pkg_trampolines[0],
+            &list,
+            0,
             "#!resolve fuchsia-pkg://earth.org/spacex_pkg#bin/collision\n",
             "collision",
         );
-        check_trampoline(
-            &trampolines[2].pkg_trampolines[0],
-            "#!resolve fuchsia-pkg://earth.org/spacex_pkg/variant0#bin/collision\n",
-            "collision",
+
+        // This next set includes hashes and variants, which are ignored. So these collide.
+        assert_matches!(
+            create_trampolines(&vec![
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg", "SpaceX", &root).await,
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0", "SpaceX", &root).await,
+            ])
+            .await,
+            Err(LauncherError::NonUniqueBinaryName)
         );
-        check_trampoline(
-            &trampolines[3].pkg_trampolines[0],
-            "#!resolve fuchsia-pkg://earth.org/spacex_pkg/variant1#bin/collision\n",
-            "collision",
+        assert_matches!(
+            create_trampolines(&vec![
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg", "SpaceX", &root).await,
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg?hash=0000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
+            ]).await,
+            Err(LauncherError::NonUniqueBinaryName)
         );
-        check_trampoline(
-            &trampolines[4].pkg_trampolines[0],
-            "#!resolve fuchsia-pkg://earth.org/spacex_pkg?hash=0000000000000000000000000000000000000000000000000000000000000000#bin/collision\n",
-            "collision",
+        assert_matches!(
+            create_trampolines(&vec![
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg", "SpaceX", &root).await,
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
+            ]).await,
+            Err(LauncherError::NonUniqueBinaryName)
         );
-        check_trampoline(
-           &trampolines[5].pkg_trampolines[0],
-           "#!resolve fuchsia-pkg://earth.org/spacex_pkg?hash=1000000000000000000000000000000000000000000000000000000000000000#bin/collision\n",
-           "collision",
+        assert_matches!(
+            create_trampolines(&vec![
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0", "SpaceX", &root).await,
+                make_pkg("fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000", "SpaceX", &root).await,
+            ]).await,
+            Err(LauncherError::NonUniqueBinaryName)
         );
-        check_trampoline(
-           &trampolines[6].pkg_trampolines[0],
-           "#!resolve fuchsia-pkg://earth.org/spacex_pkg/variant0?hash=1000000000000000000000000000000000000000000000000000000000000000#bin/collision\n",
-           "collision",
-        );
-        check_trampoline(
-           &trampolines[7].pkg_trampolines[0],
-           "#!resolve fuchsia-pkg://earth.org/spacex_pkg/variant1?hash=1000000000000000000000000000000000000000000000000000000000000000#bin/collision\n",
-           "collision",
-        );
-        assert_eq!(trampolines[0].pkg_name, "nasa_pkg".to_string());
-        // However, all of these unique trampolines will be put into directories named with the
-        // package name only, losing the host, variant, and hash. If there were loaded via -tools,
-        // they would fail with NonUniquePackageName as shown in
-        // make_trampoline_vfs_test_non_unique().
-        assert_eq!(trampolines[1].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[2].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[3].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[4].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[5].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[6].pkg_name, "spacex_pkg".to_string());
-        assert_eq!(trampolines[7].pkg_name, "spacex_pkg".to_string());
     }
 
     #[fuchsia::test]
-    async fn make_trampoline_vfs_test_none() {
-        let (dirs, path) = make_trampoline_vfs(vec![]).await.unwrap();
+    async fn trampolines_package_collisions_test() {
+        // Create two packages containing the same package name, but different binaries.
+        let root = vfs::pseudo_directory! {
+            "UpGoer" => vfs::pseudo_directory! {
+                "bin" => vfs::pseudo_directory! {
+                    "apollo" => read_only_static(b"Apollo"),
+                },
+            }
+        };
+        let root1 = vfs::pseudo_directory! {
+            "UpGoer" => vfs::pseudo_directory! {
+                "bin" => vfs::pseudo_directory! {
+                    "falcon9" => read_only_static(b"Falcon 9"),
+                },
+             }
+        };
+        // The package names, being the same, are merged. The binaries are different, so do not
+        // conflict.
+        let pkg_trampolines = create_trampolines(&vec![
+            make_pkg("fuchsia-pkg://earth.org/upgoer_pkg", "UpGoer", &root).await,
+            make_pkg("fuchsia-pkg://earth.org/upgoer_pkg", "UpGoer", &root1).await,
+        ])
+        .await
+        .unwrap();
+        let (name, list) = pkg_trampolines.get_nth_package(0).unwrap();
+        assert_eq!(name, "upgoer_pkg");
+        assert_eq!(list.len(), 2);
+        check_trampoline(
+            &list,
+            0,
+            "#!resolve fuchsia-pkg://earth.org/upgoer_pkg#bin/apollo\n",
+            "apollo",
+        );
+        check_trampoline(
+            &list,
+            1,
+            "#!resolve fuchsia-pkg://earth.org/upgoer_pkg#bin/falcon9\n",
+            "falcon9",
+        );
+    }
+
+    #[fuchsia::test]
+    async fn make_trampoline_vfs_test_empty() {
+        let (dirs, path) = make_trampoline_vfs(Trampolines::new()).await.unwrap();
         assert_matches!(dirs, None);
         assert_matches!(path, None);
     }
 
     #[fuchsia::test]
-    async fn make_trampoline_vfs_test_empty() {
-        // Create a PkgTrampolines with a package that has no binaries.
-        let p1 = PkgTrampolines { pkg_name: "pkg_foobar".to_string(), pkg_trampolines: vec![] };
-        let pkg_trampolines: Vec<PkgTrampolines> = vec![p1];
-        let (dirs, path) = make_trampoline_vfs(pkg_trampolines).await.unwrap();
-        assert_eq!(path, Some("/.dash/tools/pkg_foobar".to_string()));
-        let dir = dirs.unwrap();
-        assert_eq!(
-            fuchsia_fs::directory::readdir(&dir).await.unwrap(),
-            vec![fuchsia_fs::directory::DirEntry {
-                name: "pkg_foobar".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Directory
-            }]
-        );
-        let sub_dir = fuchsia_fs::directory::open_directory(
-            &dir,
-            "pkg_foobar",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
-        assert!(fuchsia_fs::directory::readdir(&sub_dir).await.unwrap().is_empty());
-    }
-
-    #[fuchsia::test]
-    async fn make_trampoline_vfs_test_non_unique() {
-        let p1 = PkgTrampolines { pkg_name: "pkg_foobar".to_string(), pkg_trampolines: vec![] };
-        let p2 = PkgTrampolines { pkg_name: "pkg_foobar".to_string(), pkg_trampolines: vec![] };
-        let pkg_trampolines: Vec<PkgTrampolines> = vec![p1, p2];
-        let res = make_trampoline_vfs(pkg_trampolines).await;
-        assert_matches!(res, Err(LauncherError::NonUniquePackageName));
+    async fn make_trampoline_vfs_test_if_package_repeated() {
+        let mut set = BTreeSet::new();
+        set.insert(Trampoline { contents: "foo".to_string(), binary_name: "bar".to_string() });
+        let mut set2 = BTreeSet::new();
+        set2.insert(Trampoline { contents: "foo2".to_string(), binary_name: "bar2".to_string() });
+        let mut trampolines = Trampolines::new();
+        trampolines.insert("pkg_foobar".to_string(), set).unwrap();
+        trampolines.insert("pkg_foobar".to_string(), set2).unwrap();
+        let (dir, path) = make_trampoline_vfs(trampolines).await.unwrap();
+        assert!(dir.is_some());
+        // There is only one entry in the path for pkg_foobar.
+        assert_eq!(path.unwrap(), "/.dash/tools/pkg_foobar");
     }
 
     #[fuchsia::test]
@@ -493,26 +665,40 @@ mod tests {
                 .unwrap_or_else(|e| panic!("could not open file: {}: {:?}", path, e))
         }
 
-        let p1t1 =
-            Trampoline { contents: "#!resolve foo".to_string(), binary_name: "foo".to_string() };
-        let p1t2 =
-            Trampoline { contents: "#!resolve bar".to_string(), binary_name: "bar".to_string() };
-        let p1 = PkgTrampolines {
-            pkg_name: "pkg_foobar".to_string(),
-            pkg_trampolines: vec![p1t1, p1t2],
-        };
-        let p2t1 =
-            Trampoline { contents: "#!resolve foo2".to_string(), binary_name: "foo2".to_string() };
-        let p2t2 =
-            Trampoline { contents: "#!resolve bar2".to_string(), binary_name: "bar2".to_string() };
-        let p2 = PkgTrampolines {
-            pkg_name: "pkg_foobar2".to_string(),
-            pkg_trampolines: vec![p2t1, p2t2],
-        };
-        let pkg_trampolines: Vec<PkgTrampolines> = vec![p1, p2];
+        let mut pkg_trampolines = Trampolines::new();
+        pkg_trampolines
+            .insert(
+                "pkg_foobar".to_string(),
+                BTreeSet::from([
+                    Trampoline {
+                        contents: "#!resolve foo".to_string(),
+                        binary_name: "foo".to_string(),
+                    },
+                    Trampoline {
+                        contents: "#!resolve bar".to_string(),
+                        binary_name: "bar".to_string(),
+                    },
+                ]),
+            )
+            .unwrap();
+        pkg_trampolines
+            .insert(
+                "pkg_foobar2".to_string(),
+                BTreeSet::from([
+                    Trampoline {
+                        contents: "#!resolve foo2".to_string(),
+                        binary_name: "foo2".to_string(),
+                    },
+                    Trampoline {
+                        contents: "#!resolve bar2".to_string(),
+                        binary_name: "bar2".to_string(),
+                    },
+                ]),
+            )
+            .unwrap();
         let (dirs, path) = make_trampoline_vfs(pkg_trampolines).await.unwrap();
 
-        // Check the path.
+        // Check the path. Order is insertion order.
         assert_eq!(path, Some("/.dash/tools/pkg_foobar:/.dash/tools/pkg_foobar2".to_string()));
 
         // Check the directory.

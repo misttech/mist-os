@@ -39,7 +39,12 @@ The environment also contains the following directories, irrespective of the exp
 
 If additional binaries are provided via --tools, they will be loaded into .dash/tools/<pkg>/<binary>
 The path is set so that they can be run by name. The path preference is in the command line order
-of the --tools arguments, ending with the built-in dash tools (/.dash/tools/debug-dash-launcher)."
+of the --tools arguments, ending with the built-in dash tools (/.dash/tools/debug-dash-launcher).
+
+--tools URLs may be package or binary URLs. Note that collisions can occur if different URLs have
+the same package and binary names. An error, `NonUniqueBinaryName`, is returned if a binary name
+collision occurs.
+"
 )]
 
 pub struct ExploreComponentCommand {

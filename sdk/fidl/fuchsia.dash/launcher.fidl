@@ -36,8 +36,8 @@ type LauncherError = strict enum {
     BAD_URL = 11;
     /// Error reading a binary from a tools package
     TOOLS_BINARY_READ = 12;
-    /// A package name was repeated
-    NON_UNIQUE_PACKAGE_NAME = 13;
+    /// A binary name was repeated
+    NON_UNIQUE_BINARY_NAME = 13;
     /// Error occurred using fuchsia.process.Resolver
     PROCESS_RESOLVER = 14;
     /// Error occurred using fuchsia.kernel.VmexResource
