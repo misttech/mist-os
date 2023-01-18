@@ -56,8 +56,9 @@ template("create_all_drivers_doc") {
       generated_docset = [
         {
           name = "driversdoc"
-          origin_files = [ rebase_path("$root_gen_dir/all_drivers_doc.yaml",
-                                       root_build_dir) ]
+          origin_files =
+              [ rebase_path("$root_gen_dir/bundles/all_drivers_doc.yaml",
+                            root_build_dir) ]
           dest_folder = "sdk/drivers"
         },
       ]

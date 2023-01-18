@@ -1148,15 +1148,6 @@ check_included_drivers("drivers-check") {
   ]
 }
 
-# Generates a global documentation file from driver provided documentation.
-create_all_drivers_doc("create-all-drivers-doc") {
-  testonly = true
-  deps = [
-    "//build/images:default-images",
-    "//build/images/updates:packages",
-  ]
-}
-
 # Provides a flat list of the artifacts needed for assembly, which should be
 # uploaded to CIPD.
 #
@@ -1304,10 +1295,12 @@ build_api_module("licenses") {
 group("default") {
   testonly = true
   deps = [
-    "//:create-all-drivers-doc",
     "//:host",
     "//:test-list",
     "//build/assembly:validate_product_defs",
+
+    # TODO(fxbug.dev/116566) has_board check not working
+    "//build/images:default-images",
     "//build/images/updates:packages",
     "//build/input:build_only",
     "//bundles:boot_tests",
