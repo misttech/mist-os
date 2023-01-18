@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(test)]
 pub(crate) const MANUAL_TARGETS: &'static str = "targets.manual";
 #[cfg(not(test))]
+/// Configuration key containing the list of manual targets
 const MANUAL_TARGETS: &'static str = "targets.manual";
 
 #[async_trait(?Send)]

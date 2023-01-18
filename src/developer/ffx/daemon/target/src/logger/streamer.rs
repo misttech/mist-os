@@ -25,9 +25,13 @@ use {
     },
 };
 
+/// Location for target logs to be cached
 const CACHE_DIRECTORY_CONFIG: &str = "proactive_log.cache_directory";
+/// Maximum log size in bytes
 const MAX_LOG_SIZE_CONFIG: &str = "proactive_log.max_log_size_bytes";
+/// Maximum session size in bytes
 const MAX_SESSION_SIZE_CONFIG: &str = "proactive_log.max_session_size_bytes";
+/// Maximum number of sessions per target
 const MAX_SESSIONS_CONFIG: &str = "proactive_log.max_sessions_per_target";
 
 const READ_STREAM_BUFFER_SIZE: usize = 1000;

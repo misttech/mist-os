@@ -34,8 +34,11 @@ pub mod streamer;
 
 const BRIDGE_SELECTOR: &str =
     "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge";
+/// Configuration flag to enable proactive logging. Defaults to false
 const ENABLED_CONFIG: &str = "proactive_log.enabled";
+/// Configuration flag to enable symbolizer. Default to false
 const SYMBOLIZE_ENABLED_CONFIG: &str = "proactive_log.symbolize.enabled";
+/// Additional arguments to add to the symbolizer
 const SYMBOLIZE_ARGS_CONFIG: &str = "proactive_log.symbolize.extra_args";
 const PIPELINE_SIZE: usize = 20;
 

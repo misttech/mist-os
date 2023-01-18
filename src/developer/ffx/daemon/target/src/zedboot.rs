@@ -23,6 +23,11 @@ use {
     zerocopy::ByteSlice,
 };
 
+/// Zedboot discovery port (must be a nonzero u16)
+const DISCOVERY_ZEDBOOT_ADVERT_PORT: &str = "discovery.zedboot.advert_port";
+/// Determines if zedboot discovery is enabled. Defaults to false
+const DISCOVERY_ZEDBOOT_ENABLED: &str = "discovery.zedboot.enabled";
+
 const ZEDBOOT_MCAST_V6: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 1);
 const ZEDBOOT_REDISCOVERY_INTERFACE_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -32,7 +37,7 @@ pub async fn zedboot_discovery(e: events::Queue<DaemonEvent>) -> Result<Task<()>
 }
 
 async fn port() -> Result<NonZeroU16> {
-    ffx_config::get("discovery.zedboot.advert_port")
+    ffx_config::get(DISCOVERY_ZEDBOOT_ADVERT_PORT)
         .await
         .map(|port| {
             NonZeroU16::new(port).ok_or_else(|| anyhow::anyhow!("advert port must be nonzero"))
@@ -61,13 +66,13 @@ pub async fn interface_discovery(
     let mut should_log_v6_listen_error = true;
     let mut v6_listen_socket: Weak<UdpSocket> = Weak::new();
 
-    if ffx_config::get("discovery.zedboot.enabled").await.unwrap_or(false) {
+    if ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false) {
         tracing::debug!("Starting Zedboot discovery loop");
     };
 
     loop {
         // fxb/90219 - disabled by default
-        let is_enabled: bool = ffx_config::get("discovery.zedboot.enabled").await.unwrap_or(false);
+        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
         if is_enabled {
             if v6_listen_socket.upgrade().is_none() {
                 match make_listen_socket((ZEDBOOT_MCAST_V6, port.get()).into())
@@ -114,7 +119,7 @@ pub async fn interface_discovery(
 async fn recv_loop(sock: Arc<UdpSocket>, e: events::Queue<DaemonEvent>) {
     loop {
         // fxb/90219 - disabled by default
-        let is_enabled: bool = ffx_config::get("discovery.zedboot.enabled").await.unwrap_or(false);
+        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
         if !is_enabled {
             return;
         }
