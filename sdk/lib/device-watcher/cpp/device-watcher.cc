@@ -90,6 +90,7 @@ __EXPORT
 zx_status_t IterateDirectory(const int dir_fd, FileCallback callback) {
   DIR* const dir = fdopendir(dir_fd);
   if (dir == nullptr) {
+    close(dir_fd);
     return ZX_ERR_IO;
   }
   const auto close_dir = fit::defer([dir]() { closedir(dir); });

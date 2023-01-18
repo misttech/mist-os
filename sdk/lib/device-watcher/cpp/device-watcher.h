@@ -36,7 +36,7 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path,
 // protocol. If |callback| returns a status other than ZX_OK, iteration terminates immediately, and
 // the error status is returned. This function does not continue to watch the directory for newly
 // created files.
-// This method does not take ownership of |fd|.
+// This method takes ownership of |fd|.
 using FileCallback = fit::function<zx_status_t(std::string_view, zx::channel)>;
 zx_status_t IterateDirectory(int fd, FileCallback callback);
 
