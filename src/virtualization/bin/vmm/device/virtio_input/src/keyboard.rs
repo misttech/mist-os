@@ -2,7 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::wire, fidl_fuchsia_input::Key, fidl_fuchsia_ui_input3 as input3};
+use {
+    crate::input_device::{InputDevice, InputHandler},
+    crate::wire,
+    anyhow::Error,
+    async_trait::async_trait,
+    fidl_fuchsia_input::Key,
+    fidl_fuchsia_ui_input3 as input3,
+    fidl_fuchsia_ui_input3::{KeyboardListenerRequest, KeyboardListenerRequestStream},
+    futures::{select, stream::Stream, StreamExt},
+    virtio_device::{
+        mem::DriverMem,
+        queue::{DescChain, DriverNotify},
+    },
+};
 
 const HID_USAGE_PAGE_KEYBOARD: u16 = 0x0007;
 const HID_USAGE_PAGE_CONSUMER: u16 = 0x000c;
@@ -313,7 +326,7 @@ fn decode_type(event: &input3::KeyEvent) -> u16 {
     }
 }
 
-pub fn translate_keyboard_event(event: input3::KeyEvent) -> Option<[wire::VirtioInputEvent; 2]> {
+fn translate_keyboard_event(event: input3::KeyEvent) -> Option<[wire::VirtioInputEvent; 2]> {
     let value = decode_value(event.type_?)?;
     let type_ = decode_type(&event);
     let code = decode_key(event.key?)?;
@@ -323,9 +336,84 @@ pub fn translate_keyboard_event(event: input3::KeyEvent) -> Option<[wire::Virtio
     ])
 }
 
+pub struct KeyboardDevice<
+    'a,
+    'b,
+    N: DriverNotify,
+    M: DriverMem,
+    Q: Stream<Item = DescChain<'a, 'b, N>> + Unpin,
+> {
+    input_device: InputDevice<'a, 'b, N, M, Q>,
+    keyboard_stream: KeyboardListenerRequestStream,
+}
+
+#[async_trait(?Send)]
+impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N>> + Unpin>
+    InputHandler for KeyboardDevice<'a, 'b, N, M, Q>
+{
+    async fn run(&mut self) -> Result<(), Error> {
+        loop {
+            select! {
+                // This handles incoming key events from the KeyboardListener service. This will
+                // attempt to decode the key event and produce 1 or more VirtioInputEvents to send
+                // back to the driver.
+                request = self.keyboard_stream.next() => {
+                    if let Some(Ok(request)) = request {
+                        self.handle_keyboard_listener_request(request);
+                    }
+                },
+                _chain = self.input_device.statusq_message() => {
+                    // New status message
+                },
+            }
+        }
+    }
+}
+
+impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N>> + Unpin>
+    KeyboardDevice<'a, 'b, N, M, Q>
+{
+    pub fn new(
+        input_device: InputDevice<'a, 'b, N, M, Q>,
+        keyboard_stream: KeyboardListenerRequestStream,
+    ) -> Self {
+        Self { input_device, keyboard_stream }
+    }
+
+    fn handle_keyboard_listener_request(&mut self, request: KeyboardListenerRequest) {
+        match request {
+            KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                let key_status = if let Some(mut events) = translate_keyboard_event(event) {
+                    if let Err(e) = self.input_device.write_events_to_queue(&mut events) {
+                        tracing::warn!("Failed to write events to the event queue: {}", e);
+                        fidl_fuchsia_ui_input3::KeyEventStatus::NotHandled
+                    } else {
+                        fidl_fuchsia_ui_input3::KeyEventStatus::Handled
+                    }
+                } else {
+                    fidl_fuchsia_ui_input3::KeyEventStatus::NotHandled
+                };
+                if let Err(e) = responder.send(key_status) {
+                    tracing::warn!("Failed to ack KeyEvent: {}", e);
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use {
+        super::*,
+        fidl::endpoints::create_proxy_and_stream,
+        fidl_fuchsia_ui_input3::KeyboardListenerMarker,
+        futures::FutureExt,
+        virtio_device::{
+            fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
+            util::DescChainStream,
+        },
+        zerocopy::FromBytes,
+    };
 
     const FUCHSIA_KEYS: [Key; 110] = [
         Key::A,
@@ -521,5 +609,170 @@ mod tests {
             })
             .unwrap_or_else(|| panic!("Unable to translate fuchsia key {:?}", key));
         }
+    }
+
+    fn read_returned<T: FromBytes>(range: (u64, u32)) -> T {
+        let (data, len) = range;
+        let slice =
+            unsafe { std::slice::from_raw_parts::<u8>(data as usize as *const u8, len as usize) };
+        T::read_from(slice).expect("Failed to read result from returned chain")
+    }
+
+    #[fuchsia::test]
+    async fn test_send_key_press() {
+        let mem = IdentityDriverMem::new();
+        let mut event_queue = TestQueue::new(32, &mem);
+        let status_queue = TestQueue::new(32, &mem);
+        let device = InputDevice::new(
+            &mem,
+            DescChainStream::new(&event_queue.queue),
+            Some(DescChainStream::new(&status_queue.queue)),
+        );
+
+        // Create a keyboard listener proxy and send the server_end to the handler.
+        let (keyboard_proxy, keyboard_request_stream) =
+            create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
+
+        let mut keyboard_device = KeyboardDevice::new(device, keyboard_request_stream);
+
+        // Add two descriptors to the queue.
+        event_queue
+            .fake_queue
+            .publish(
+                ChainBuilder::new()
+                    .writable(std::mem::size_of::<wire::VirtioInputEvent>() as u32, &mem)
+                    .build(),
+            )
+            .unwrap();
+        event_queue
+            .fake_queue
+            .publish(
+                ChainBuilder::new()
+                    .writable(std::mem::size_of::<wire::VirtioInputEvent>() as u32, &mem)
+                    .build(),
+            )
+            .unwrap();
+
+        // Now send a key event to the device over the KeyboardListener.
+        let event = input3::KeyEvent {
+            type_: Some(input3::KeyEventType::Pressed),
+            key: Some(Key::W),
+            ..input3::KeyEvent::EMPTY
+        };
+        // We need to select on both device.run and our proxy call because the device needs to be
+        // polled to service the request.
+        let result = select! {
+            result = keyboard_proxy.on_key_event(event.clone()).fuse() => result.unwrap(),
+            _result = keyboard_device.run().fuse() => {
+                panic!("device.run() exited while processing key event");
+            }
+        };
+
+        // Expect the request was handled.
+        assert_eq!(result, input3::KeyEventStatus::Handled);
+
+        // Expect 2 events (a key press and a sync).
+        let expected_events = translate_keyboard_event(event).unwrap();
+
+        assert_eq!(result, input3::KeyEventStatus::Handled);
+        let returned = event_queue.fake_queue.next_used().unwrap();
+        let mut iter = returned.data_iter();
+        let returned_event = read_returned::<wire::VirtioInputEvent>(iter.next().unwrap());
+        assert_eq!(expected_events[0], returned_event);
+
+        let returned = event_queue.fake_queue.next_used().unwrap();
+        let mut iter = returned.data_iter();
+        let returned_event = read_returned::<wire::VirtioInputEvent>(iter.next().unwrap());
+        assert_eq!(expected_events[1], returned_event);
+
+        assert!(event_queue.fake_queue.next_used().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_drop_key_press_if_no_descriptors_are_available() {
+        let mem = IdentityDriverMem::new();
+        let mut event_queue = TestQueue::new(32, &mem);
+        let status_queue = TestQueue::new(32, &mem);
+        let device = InputDevice::new(
+            &mem,
+            DescChainStream::new(&event_queue.queue),
+            Some(DescChainStream::new(&status_queue.queue)),
+        );
+
+        // Create a keyboard listener proxy and send the server_end to the keyboard device.
+        let (keyboard_proxy, keyboard_request_stream) =
+            create_proxy_and_stream::<KeyboardListenerMarker>().unwrap();
+
+        let mut keyboard_device = KeyboardDevice::new(device, keyboard_request_stream);
+
+        // Add only one descriptor to the queue. This will not be enough to generate a key press
+        // event because we need 2 descriptors for that (one for the key event and one for the sync
+        // event).
+        event_queue
+            .fake_queue
+            .publish(
+                ChainBuilder::new()
+                    .writable(std::mem::size_of::<wire::VirtioInputEvent>() as u32, &mem)
+                    .build(),
+            )
+            .unwrap();
+
+        // Now send a key event to the device over the KeyboardListener. We expect this won't be
+        // handled because jkj
+        let event = input3::KeyEvent {
+            type_: Some(input3::KeyEventType::Pressed),
+            key: Some(Key::P),
+            ..input3::KeyEvent::EMPTY
+        };
+        // We need to select on both device.run and our proxy call because the device needs to be
+        // polled to service the request.
+        let result = select! {
+            result = keyboard_proxy.on_key_event(event).fuse() => result.unwrap(),
+            _result = keyboard_device.run().fuse() => {
+                panic!("device.run() exited while processing key event");
+            }
+        };
+
+        // Expect the request was not handled.
+        assert_eq!(result, input3::KeyEventStatus::NotHandled);
+        assert!(event_queue.fake_queue.next_used().is_none());
+
+        // Add a second descriptor. Combined with the first descriptor this should allow the device
+        // to now handle an event.
+        event_queue
+            .fake_queue
+            .publish(
+                ChainBuilder::new()
+                    .writable(std::mem::size_of::<wire::VirtioInputEvent>() as u32, &mem)
+                    .build(),
+            )
+            .unwrap();
+        let event = input3::KeyEvent {
+            type_: Some(input3::KeyEventType::Pressed),
+            key: Some(Key::Q),
+            ..input3::KeyEvent::EMPTY
+        };
+        let result = select! {
+            result = keyboard_proxy.on_key_event(event.clone()).fuse() => result.unwrap(),
+            _result = keyboard_device.run().fuse() => {
+                panic!("device.run() exited while processing key event");
+            }
+        };
+
+        // Now we should have the event.
+        let expected_events = translate_keyboard_event(event).unwrap();
+
+        assert_eq!(result, input3::KeyEventStatus::Handled);
+        let returned = event_queue.fake_queue.next_used().unwrap();
+        let mut iter = returned.data_iter();
+        let returned_event = read_returned::<wire::VirtioInputEvent>(iter.next().unwrap());
+        assert_eq!(expected_events[0], returned_event);
+
+        let returned = event_queue.fake_queue.next_used().unwrap();
+        let mut iter = returned.data_iter();
+        let returned_event = read_returned::<wire::VirtioInputEvent>(iter.next().unwrap());
+        assert_eq!(expected_events[1], returned_event);
+
+        assert!(event_queue.fake_queue.next_used().is_none());
     }
 }

@@ -7,7 +7,8 @@ mod keyboard;
 mod wire;
 
 use {
-    crate::input_device::InputDevice,
+    crate::input_device::{InputDevice, InputHandler},
+    crate::keyboard::KeyboardDevice,
     anyhow::{anyhow, Context},
     fidl::endpoints::RequestStream,
     fidl_fuchsia_virtualization_hardware::{InputType, VirtioInputRequestStream},
@@ -43,18 +44,21 @@ async fn run_virtio_input(
     .await
     .context("Failed to initialize device.")?;
 
-    let InputType::Keyboard(keyboard_listener) = input_type else {
-        anyhow::bail!("Only keyboard supported");
-    };
-
-    let mut input_device = InputDevice::new(
+    let input_device = InputDevice::new(
         &guest_mem,
-        keyboard_listener
-            .into_stream()
-            .context("Failed to create stream from KeyboardListener server end")?,
         device.take_stream(wire::EVENTQ)?,
         device.take_stream(wire::STATUSQ).ok(),
     );
+
+    let mut input_handler: Box<dyn InputHandler> = match input_type {
+        InputType::Keyboard(keyboard_listener) => Box::new(KeyboardDevice::new(
+            input_device,
+            keyboard_listener
+                .into_stream()
+                .context("Failed to create stream from KeyboardListener server end")?,
+        )),
+        InputType::Mouse(_mouse_source) => unimplemented!("Mouse support is not yet implemented."),
+    };
 
     ready_responder.send()?;
 
@@ -62,7 +66,7 @@ async fn run_virtio_input(
         device
             .run_device_notify(virtio_device_fidl)
             .map_err(|e| anyhow!("run_device_notify: {}", e)),
-        input_device.run(),
+        input_handler.run(),
     )?;
     Ok(())
 }
