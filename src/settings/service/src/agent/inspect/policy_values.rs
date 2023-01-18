@@ -304,7 +304,7 @@ mod tests {
             .unwrap();
 
         // Create the inspect agent.
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);
 
         PolicyValuesInspectAgent::create_with_node(context, inspect_node).await;
@@ -373,7 +373,7 @@ mod tests {
         let (policy_sender, _) = context.delegate.create(MessengerType::Unbound).await.unwrap();
 
         // Create the inspect agent.
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);
         PolicyValuesInspectAgent::create_with_node(context, inspect_node).await;
 

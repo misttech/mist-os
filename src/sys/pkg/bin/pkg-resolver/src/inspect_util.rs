@@ -108,7 +108,7 @@ mod test_inspectable_repository_config {
 
     #[test]
     fn test_initialization() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let fuchsia_url = fuchsia_url::RepositoryUrl::parse("fuchsia-pkg://fuchsia.com/").unwrap();
         let mirror_config =
             MirrorConfigBuilder::new("http://fake-mirror.com".parse::<Uri>().unwrap())
@@ -144,7 +144,7 @@ mod test_inspectable_repository_config {
 
     #[test]
     fn test_watcher() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let fuchsia_url = fuchsia_url::RepositoryUrl::parse("fuchsia-pkg://fuchsia.com").unwrap();
         let config = Arc::new(
             RepositoryConfigBuilder::new(fuchsia_url)

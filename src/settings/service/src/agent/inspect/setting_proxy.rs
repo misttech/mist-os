@@ -544,7 +544,7 @@ mod tests {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let response_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);
         let context = create_context().await;
@@ -626,7 +626,7 @@ mod tests {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let response_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);
         let context = create_context().await;
@@ -725,7 +725,7 @@ mod tests {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let request_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);
         let context = create_context().await;
@@ -773,7 +773,7 @@ mod tests {
         // Set the clock so that timestamps can be controlled.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let request_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);
         let context = create_context().await;
@@ -827,7 +827,7 @@ mod tests {
     async fn inspect_queue_test() {
         // Set the clock so that timestamps will always be 0.
         clock::mock::set(Time::from_nanos(0));
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let response_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);
         let context = create_context().await;

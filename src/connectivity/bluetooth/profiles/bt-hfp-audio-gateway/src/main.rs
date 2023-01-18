@@ -34,7 +34,7 @@ mod service_definitions;
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
 
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
         warn!("Couldn't serve inspect: {}", e);
     }

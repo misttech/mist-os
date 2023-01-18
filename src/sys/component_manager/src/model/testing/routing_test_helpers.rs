@@ -303,7 +303,7 @@ impl RoutingTest {
             reboot_on_terminate_enabled: builder.reboot_on_terminate_enabled,
             ..Default::default()
         };
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut env_builder = BuiltinEnvironmentBuilder::new()
             .set_inspector(inspector)
             .set_runtime_config(config)

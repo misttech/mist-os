@@ -81,7 +81,7 @@ impl TestHarness {
     }
 
     async fn make(hold_sinks: bool) -> Self {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let log_manager = LogsRepository::new(1_000_000, inspector.root()).await;
         let log_server = LogServer::new(log_manager.clone());
 
@@ -401,7 +401,7 @@ pub async fn debuglog_test(
     expected: impl IntoIterator<Item = LogMessage>,
     debug_log: TestDebugLog,
 ) -> Inspector {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let lm = LogsRepository::new(1_000_000, inspector.root()).await;
     let log_server = LogServer::new(lm.clone());
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();

@@ -8,7 +8,7 @@ use diagnostics_hierarchy::{
     DiagnosticsHierarchy,
 };
 use inspect_format::{constants, Container};
-use std::{borrow::Cow, cmp::max, fmt, sync::Arc};
+use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
 use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
@@ -93,46 +93,6 @@ impl Inspector {
         })
     }
 
-    /// Allocates a new VMO and initializes it.
-    fn new_root(max_size: usize) -> Result<(Arc<zx::Vmo>, Node), Error> {
-        let mut size = max(constants::MINIMUM_VMO_SIZE_BYTES, max_size);
-        // If the size is not a multiple of 4096, round up.
-        if size % constants::MINIMUM_VMO_SIZE_BYTES != 0 {
-            size =
-                (1 + size / constants::MINIMUM_VMO_SIZE_BYTES) * constants::MINIMUM_VMO_SIZE_BYTES;
-        }
-        let (mapping, vmo) = Mapping::allocate_with_name(size, "InspectHeap")
-            .map_err(|status| Error::AllocateVmo(status))?;
-        let vmo = Arc::new(vmo);
-        let heap = Heap::new(Arc::new(mapping)).map_err(|e| Error::CreateHeap(Box::new(e)))?;
-        let state =
-            State::create(heap, vmo.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
-        Ok((vmo, Node::new_root(state)))
-    }
-
-    /// Initializes a new Inspect VMO object with the given maximum size. If the
-    /// given size is less than 4K, it will be made 4K which is the minimum size
-    /// the VMO should have.
-    pub fn new_with_size(max_size: usize) -> Self {
-        match Inspector::new_root(max_size) {
-            Ok((vmo, root_node)) => Inspector { vmo: Some(vmo), root_node: Arc::new(root_node) },
-            Err(e) => {
-                error!("Failed to create root node. Error: {:?}", e);
-                Inspector::new_no_op()
-            }
-        }
-    }
-
-    /// Creates a new No-Op inspector
-    pub fn new_no_op() -> Self {
-        Inspector { vmo: None, root_node: Arc::new(Node::new_no_op()) }
-    }
-
-    /// Creates an no-op inspector from the given Vmo. If the VMO is corrupted, reading can fail.
-    pub fn no_op_from_vmo(vmo: Arc<zx::Vmo>) -> Inspector {
-        Inspector { vmo: Some(vmo), root_node: Arc::new(Node::new_no_op()) }
-    }
-
     /// Returns Ok(()) if VMO is frozen, and the generation count if it is not.
     /// Very unsafe. Propagates unrelated errors by panicking.
     #[cfg(test)]
@@ -150,44 +110,17 @@ impl Inspector {
     }
 }
 
-#[cfg(not(target_os = "fuchsia"))]
-impl Inspector {
-    pub fn new_with_size(max_size: usize) -> Self {
-        match Inspector::new_root(max_size) {
-            Ok(root_node) => Inspector { root_node: Arc::new(root_node) },
-            Err(e) => {
-                error!("Failed to create root node. Error: {:?}", e);
-                Inspector::new_no_op()
-            }
-        }
-    }
-
-    fn new_root(max_size: usize) -> Result<Node, Error> {
-        let mut size = max(constants::MINIMUM_VMO_SIZE_BYTES, max_size);
-        if size % constants::MINIMUM_VMO_SIZE_BYTES != 0 {
-            size =
-                (1 + size / constants::MINIMUM_VMO_SIZE_BYTES) * constants::MINIMUM_VMO_SIZE_BYTES;
-        }
-
-        let mut backer = Vec::<u8>::new();
-        backer.resize(size, 0);
-        let heap =
-            Heap::new(Arc::new(Mutex::new(backer))).map_err(|e| Error::CreateHeap(Box::new(e)))?;
-        let state = State::create(heap).map_err(|e| Error::CreateState(Box::new(e)))?;
-        Ok(Node::new_root(state))
-    }
-
-    /// Creates a new No-Op inspector
-    pub fn new_no_op() -> Self {
-        Inspector { root_node: Arc::new(Node::new_no_op()) }
+impl Default for Inspector {
+    fn default() -> Self {
+        Inspector::new(InspectorConfig::default())
     }
 }
 
 impl Inspector {
     /// Initializes a new Inspect VMO object with the
     /// [`default maximum size`][constants::DEFAULT_VMO_SIZE_BYTES].
-    pub fn new() -> Self {
-        Inspector::new_with_size(constants::DEFAULT_VMO_SIZE_BYTES)
+    pub fn new(conf: InspectorConfig) -> Self {
+        conf.build()
     }
 
     /// Returns a copy of the bytes stored in the VMO for this inspector.
@@ -234,6 +167,128 @@ impl Inspector {
     }
 }
 
+/// Classic builder pattern object for constructing an `Inspector`.
+pub struct InspectorConfig {
+    is_no_op: bool,
+    size: usize,
+
+    #[cfg(target_os = "fuchsia")]
+    vmo: Option<Arc<zx::Vmo>>,
+}
+
+impl Default for InspectorConfig {
+    /// A default Inspector:
+    ///     * Fully functional
+    ///     * Size: `constants::DEFAULT_VMO_SIZE_BYTES`
+    ///
+    /// Because the default is so cheap to construct, there is
+    /// no "empty" `InspectorConfig`.
+    fn default() -> Self {
+        Self {
+            is_no_op: false,
+            size: constants::DEFAULT_VMO_SIZE_BYTES,
+            #[cfg(target_os = "fuchsia")]
+            vmo: None,
+        }
+    }
+}
+
+impl InspectorConfig {
+    /// A read-only Inspector.
+    pub fn no_op(mut self) -> Self {
+        self.is_no_op = true;
+        self
+    }
+
+    /// Size of the VMO.
+    pub fn size(mut self, max_size: usize) -> Self {
+        self.size = max_size;
+        self
+    }
+
+    fn create_no_op(self) -> Inspector {
+        return Inspector {
+            #[cfg(target_os = "fuchsia")]
+            vmo: self.vmo,
+            root_node: Arc::new(Node::new_no_op()),
+        };
+    }
+
+    fn adjusted_buffer_size(max_size: usize) -> usize {
+        let mut size = max(constants::MINIMUM_VMO_SIZE_BYTES, max_size);
+        // If the size is not a multiple of 4096, round up.
+        if size % constants::MINIMUM_VMO_SIZE_BYTES != 0 {
+            size =
+                (1 + size / constants::MINIMUM_VMO_SIZE_BYTES) * constants::MINIMUM_VMO_SIZE_BYTES;
+        }
+
+        size
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl InspectorConfig {
+    /// An Inspector with a readable VMO.
+    /// Implicitly no-op.
+    pub fn vmo(mut self, vmo: Arc<zx::Vmo>) -> Self {
+        self.vmo = Some(vmo);
+        self.no_op()
+    }
+
+    fn build(self) -> Inspector {
+        if self.is_no_op {
+            return Self::create_no_op(self);
+        }
+
+        match Self::new_root(self.size) {
+            Ok((vmo, root_node)) => Inspector { vmo: Some(vmo), root_node: Arc::new(root_node) },
+            Err(e) => {
+                error!("Failed to create root node. Error: {:?}", e);
+                return Self::create_no_op(self);
+            }
+        }
+    }
+
+    /// Allocates a new VMO and initializes it.
+    fn new_root(max_size: usize) -> Result<(Arc<zx::Vmo>, Node), Error> {
+        let size = Self::adjusted_buffer_size(max_size);
+        let (mapping, vmo) = Mapping::allocate_with_name(size, "InspectHeap")
+            .map_err(|status| Error::AllocateVmo(status))?;
+        let vmo = Arc::new(vmo);
+        let heap = Heap::new(Arc::new(mapping)).map_err(|e| Error::CreateHeap(Box::new(e)))?;
+        let state =
+            State::create(heap, vmo.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
+        Ok((vmo, Node::new_root(state)))
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl InspectorConfig {
+    fn build(self) -> Inspector {
+        if self.is_no_op {
+            return Self::create_no_op(self);
+        }
+
+        match Self::new_root(self.size) {
+            Ok(root_node) => Inspector { root_node: Arc::new(root_node) },
+            Err(e) => {
+                error!("Failed to create root node. Error: {:?}", e);
+                return Self::create_no_op(self);
+            }
+        }
+    }
+
+    fn new_root(max_size: usize) -> Result<Node, Error> {
+        let size = Self::adjusted_buffer_size(max_size);
+        let mut backer = Vec::<u8>::new();
+        backer.resize(size, 0);
+        let heap =
+            Heap::new(Arc::new(Mutex::new(backer))).map_err(|e| Error::CreateHeap(Box::new(e)))?;
+        let state = State::create(heap).map_err(|e| Error::CreateState(Box::new(e)))?;
+        Ok(Node::new_root(state))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,7 +296,7 @@ mod tests {
 
     #[fuchsia::test]
     fn debug_impl() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int("name", 5);
 
         assert_eq!(format!("{:?}", &inspector), r#"{"root":{"name":5}}"#);
@@ -255,7 +310,7 @@ mod tests {
 
         let two = inspector.root().create_child("two");
         two.record_lazy_child("two_child", || {
-            let insp = Inspector::new();
+            let insp = Inspector::default();
             insp.root().record_double("double", 1.0);
 
             async move { Ok(insp) }.boxed()
@@ -276,13 +331,13 @@ mod tests {
 
     #[fuchsia::test]
     fn inspector_new() {
-        let test_object = Inspector::new();
+        let test_object = Inspector::default();
         assert_eq!(test_object.max_size().unwrap(), constants::DEFAULT_VMO_SIZE_BYTES);
     }
 
     #[fuchsia::test]
     fn inspector_copy_data() {
-        let test_object = Inspector::new();
+        let test_object = Inspector::default();
 
         assert_eq!(test_object.max_size().unwrap(), constants::DEFAULT_VMO_SIZE_BYTES);
 
@@ -292,7 +347,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_op() {
-        let inspector = Inspector::new_with_size(4096);
+        let inspector = Inspector::new(InspectorConfig::default().size(4096));
         // Make the VMO full.
         let nodes = (0..127).map(|_| inspector.root().create_child("test")).collect::<Vec<Node>>();
 
@@ -303,21 +358,21 @@ mod tests {
 
     #[fuchsia::test]
     fn inspector_new_with_size() {
-        let test_object = Inspector::new_with_size(8192);
+        let test_object = Inspector::new(InspectorConfig::default().size(8192));
         assert_eq!(test_object.max_size().unwrap(), 8192);
 
         // If size is not a multiple of 4096, it'll be rounded up.
-        let test_object = Inspector::new_with_size(10000);
+        let test_object = Inspector::new(InspectorConfig::default().size(10000));
         assert_eq!(test_object.max_size().unwrap(), 12288);
 
         // If size is less than the minimum size, the minimum will be set.
-        let test_object = Inspector::new_with_size(2000);
+        let test_object = Inspector::new(InspectorConfig::default().size(2000));
         assert_eq!(test_object.max_size().unwrap(), 4096);
     }
 
     #[fuchsia::test]
     async fn atomic_update() {
-        let insp = Inspector::new();
+        let insp = Inspector::default();
         let gen = insp.state().unwrap().generation_count();
         insp.atomic_update(|n| {
             n.record_int("", 1);
@@ -339,7 +394,7 @@ mod fuchsia_tests {
 
     #[fuchsia::test]
     fn inspector_duplicate_vmo() {
-        let test_object = Inspector::new();
+        let test_object = Inspector::default();
         assert_eq!(
             test_object.vmo.as_ref().unwrap().get_size().unwrap(),
             constants::DEFAULT_VMO_SIZE_BYTES as u64
@@ -353,7 +408,7 @@ mod fuchsia_tests {
     #[fuchsia::test]
     fn inspector_new_root() {
         // Note, the small size we request should be rounded up to a full 4kB page.
-        let (vmo, root_node) = Inspector::new_root(100).unwrap();
+        let (vmo, root_node) = InspectorConfig::new_root(100).unwrap();
         assert_eq!(vmo.get_size().unwrap(), 4096);
         let inner = root_node.inner.inner_ref().unwrap();
         assert_eq!(inner.block_index, 0);
@@ -362,7 +417,7 @@ mod fuchsia_tests {
 
     #[fuchsia::test]
     fn freeze_vmo_works() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let initial = inspector.state().unwrap().header.header_generation_count().unwrap();
         let vmo = inspector.frozen_vmo_copy();
 
@@ -372,26 +427,27 @@ mod fuchsia_tests {
         assert_eq!(initial + 2, is_frozen_result.err().unwrap());
         assert!(is_frozen_result.err().unwrap() % 2 == 0);
 
-        let frozen_insp = Inspector::no_op_from_vmo(Arc::new(vmo.unwrap()));
+        let frozen_insp =
+            Inspector::new(InspectorConfig::default().no_op().vmo(Arc::new(vmo.unwrap())));
         assert!(frozen_insp.is_frozen().is_ok());
     }
 
     #[fuchsia::test]
     fn transactions_block_freezing() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.atomic_update(|_| assert!(inspector.frozen_vmo_copy().is_none()));
     }
 
     #[fuchsia::test]
     fn transactions_block_copying() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.atomic_update(|_| assert!(inspector.copy_vmo().is_none()));
         inspector.atomic_update(|_| assert!(inspector.copy_vmo_data().is_none()));
     }
 
     #[fuchsia::test]
     fn inspector_new_with_size() {
-        let test_object = Inspector::new_with_size(8192);
+        let test_object = Inspector::new(InspectorConfig::default().size(8192));
         assert_eq!(test_object.max_size().unwrap(), 8192);
 
         assert_eq!(
@@ -400,11 +456,11 @@ mod fuchsia_tests {
         );
 
         // If size is not a multiple of 4096, it'll be rounded up.
-        let test_object = Inspector::new_with_size(10000);
+        let test_object = Inspector::new(InspectorConfig::default().size(10000));
         assert_eq!(test_object.max_size().unwrap(), 12288);
 
         // If size is less than the minimum size, the minimum will be set.
-        let test_object = Inspector::new_with_size(2000);
+        let test_object = Inspector::new(InspectorConfig::default().size(2000));
         assert_eq!(test_object.max_size().unwrap(), 4096);
     }
 }

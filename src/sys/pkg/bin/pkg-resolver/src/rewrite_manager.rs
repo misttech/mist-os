@@ -375,7 +375,7 @@ impl RewriteManagerBuilder<UnsetInspectNode> {
     /// In test configurations, allow building the [RewriteManager] without a configured inspect
     /// node.
     pub fn build(self) -> RewriteManager {
-        let node = inspect::Inspector::new().root().create_child("test");
+        let node = inspect::Inspector::default().root().create_child("test");
         self.inspect_node(node).build()
     }
 }
@@ -752,7 +752,7 @@ pub(crate) mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_building_rewrite_manager_populates_inspect() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let node = inspector.root().create_child("rewrite_manager");
         let dynamic_rules = vec![
             rule!("this.example.com" => "that.example.com", "/this_rolldice" => "/that_rolldice"),
@@ -804,7 +804,7 @@ pub(crate) mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_rewrite_manager_no_dynamic_rules_path() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let node = inspector.root().create_child("rewrite_manager");
 
         let _manager = RewriteManagerBuilder::new(None, Option::<&str>::None)
@@ -828,7 +828,7 @@ pub(crate) mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_transaction_updates_inspect() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let node = inspector.root().create_child("rewrite_manager");
         let path = make_rule_config(vec![]);
         let (dynamic_config_dir, dynamic_config_file) = temp_path_into_proxy_and_path(&path);
@@ -981,7 +981,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_create_rule_inspect_state_passes_through_fields() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("rule_node");
 
         let rule = rule!("fuchsia.com" => "example.com", "/foo" => "/bar");

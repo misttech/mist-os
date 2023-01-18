@@ -6,7 +6,7 @@ use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_inspect::{
     reader::snapshot::{Snapshot, SnapshotTree},
-    Inspector, NumericProperty, StringReference,
+    Inspector, InspectorConfig, NumericProperty, StringReference,
 };
 use futures::FutureExt;
 use lazy_static::lazy_static;
@@ -61,7 +61,7 @@ fn add_lazies(inspector: Inspector, num_nodes: usize) {
 
     for i in 0..num_nodes {
         node.record_lazy_child(format!("child-{}", i), move || {
-            let insp = Inspector::new();
+            let insp = Inspector::default();
             insp.root().record_int("int", 1);
             async move { Ok(insp) }.boxed()
         });
@@ -72,7 +72,7 @@ fn add_lazies(inspector: Inspector, num_nodes: usize) {
 /// VMO is being written concurrently at the given frequency. This is fundamental when reading
 /// Inspect data in the archivist.
 fn snapshot_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
-    let inspector = Inspector::new_with_size(size);
+    let inspector = Inspector::new(InspectorConfig::default().size(size));
     let vmo = inspector.duplicate_vmo().expect("failed to duplicate vmo");
     let done_fn = start_inspector_update_thread(inspector, frequency);
 
@@ -95,7 +95,7 @@ fn snapshot_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
 fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
     let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
 
-    let inspector = Inspector::new_with_size(size);
+    let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
 
@@ -123,7 +123,7 @@ fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize
 fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
 
-    let inspector = Inspector::new_with_size(size);
+    let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
@@ -146,7 +146,7 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
 fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, filled_size: i64) {
     let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
 
-    let inspector = Inspector::new_with_size(size);
+    let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 

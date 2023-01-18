@@ -421,7 +421,7 @@ mod tests {
                 self.persisted_repos_dir.as_deref(),
                 config,
                 cobalt_sender,
-                inspect::Inspector::new().root().create_child("inner-node"),
+                inspect::Inspector::default().root().create_child("inner-node"),
                 None,
                 std::time::Duration::from_secs(30),
             )
@@ -761,7 +761,7 @@ mod inspect_tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn initialization_and_destruction() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                 .build()
@@ -814,7 +814,7 @@ mod inspect_tests {
     async fn get_merkle_at_path_updates_inspect() {
         clock::mock::set(zx::Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
@@ -867,7 +867,7 @@ mod inspect_tests {
     #[fasync::run_singlethreaded(test)]
     async fn subscribed_repo_after_event() {
         clock::mock::set(zx::Time::from_nanos(0));
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let repo = Arc::new(
             RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)

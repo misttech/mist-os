@@ -378,7 +378,7 @@ pub mod tests {
             let executor = fasync::TestExecutor::new_with_fake_time();
             executor.set_fake_time(fasync::Time::from_nanos(0));
 
-            let inspector = inspect::Inspector::new();
+            let inspector = inspect::Inspector::default();
             let inspect_root = inspector.root().create_child("MetricsLogger");
 
             let (tasks, drivers, gpu_time_ns, monotonic_time_ns) = create_gpu_drivers();

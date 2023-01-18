@@ -26,7 +26,7 @@
 //! ```rust
 //! use fuchsia_inspect::{Inspector, reader};
 //!
-//! let inspector = Inspector::new();
+//! let inspector = Inspector::default();
 //! // ...
 //! let hierarchy = reader::read(&inspector)?;
 //! ```
@@ -567,7 +567,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_load_string_reference() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
 
         let name_value = StringReference::from("abc");
@@ -589,7 +589,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_string_array() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
 
         let zero = (0..3000).map(|_| '0').collect::<String>();
@@ -613,7 +613,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_unset_string_array() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
 
         let zero = (0..3000).map(|_| '0').collect::<String>();
@@ -633,7 +633,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_vmo() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let _root_int = root.create_int("int-root", 3);
         let root_double_array = root.create_double_array("property-double-array", 5);
@@ -720,7 +720,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn siblings_with_same_name() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let foo: StringReference<'static> = "foo".into();
 
@@ -744,7 +744,7 @@ mod tests {
 
     #[fuchsia::test]
     fn tombstone_reads() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node1 = inspector.root().create_child("child1");
         let node2 = node1.create_child("child2");
         let node3 = node2.create_child("child3");
@@ -840,7 +840,7 @@ mod tests {
     async fn from_invalid_utf8_string() {
         // Creates a perfectly normal Inspector with a perfectly normal string
         // property with a perfectly normal value.
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let prop = root.create_string("property", "hello world");
 
@@ -875,7 +875,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_array_slots() -> Result<(), Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let array = root.create_int_array("int-array", 3);
 
@@ -898,17 +898,17 @@ mod tests {
 
     #[fuchsia::test]
     async fn lazy_nodes() -> Result<(), Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int("int", 3);
         let child = inspector.root().create_child("child");
         child.record_double("double", 1.5);
         inspector.root().record_lazy_child("lazy", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_uint("uint", 5);
                 inspector.root().record_lazy_values("nested-lazy-values", || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         inspector.root().record_string("string", "test");
                         let child = inspector.root().create_child("nested-lazy-child");
                         let array = child.create_int_array("array", 3);
@@ -926,14 +926,14 @@ mod tests {
 
         inspector.root().record_lazy_values("lazy-values", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 let child = inspector.root().create_child("lazy-child-1");
                 child.record_string("test", "testing");
                 inspector.root().record(child);
                 inspector.root().record_uint("some-uint", 3);
                 inspector.root().record_lazy_values("nested-lazy-values", || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         inspector.root().record_int("lazy-int", -3);
                         let child = inspector.root().create_child("one-more-child");
                         child.record_double("lazy-double", 4.3);
@@ -944,7 +944,7 @@ mod tests {
                 });
                 inspector.root().record_lazy_child("nested-lazy-child", || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         // This will go out of scope and is not recorded, so it shouldn't appear.
                         let _double = inspector.root().create_double("double", -1.2);
                         Ok(inspector)
@@ -986,7 +986,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_matching_with_inspector() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         assert_json_diff!(inspector, root: {});
     }
 

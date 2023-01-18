@@ -55,7 +55,7 @@ pub fn main() -> Result<(), Error> {
 }
 
 async fn main_inner_async() -> Result<(), Error> {
-    let inspector = finspect::Inspector::new();
+    let inspector = finspect::Inspector::default();
     let verification_node = inspector.root().create_child("verification");
     let mut health_node = finspect::health::Node::new(inspector.root());
 

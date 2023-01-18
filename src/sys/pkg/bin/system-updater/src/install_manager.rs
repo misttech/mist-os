@@ -413,7 +413,7 @@ mod tests {
         mpsc::Sender<(String, mpsc::Receiver<State>)>,
         mpsc::Sender<State>,
     ) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = inspector.root().create_child("test_does_not_use_inspect");
         start_install_manager_with_update_id_and_node(id, node).await
     }
@@ -711,7 +711,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn writes_status_update_to_inspect() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
             start_install_manager_with_update_id_and_node(
                 "my-attempt",
@@ -748,7 +748,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn writes_newest_status_update_to_inspect() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mut install_manager_ch, _install_manager_task, _updater_sender, mut state_sender) =
             start_install_manager_with_update_id_and_node(
                 "my-attempt",
@@ -800,7 +800,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn writes_status_update_to_inspect_on_second_attempt() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mut install_manager_ch, _install_manager_task, mut updater_sender, mut state_sender) =
             start_install_manager_with_update_id_and_node(
                 "first-attempt-id",
@@ -869,7 +869,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn writes_empty_attempt_node_if_no_attempt_running() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mut _install_manager_ch, _install_manager_task, _updater_sender, _state_sender) =
             start_install_manager_with_update_id_and_node(
                 "my-attempt",
@@ -889,7 +889,7 @@ mod tests {
     /// we haven't gotten a status update (so the said node should be empty).
     #[fasync::run_singlethreaded(test)]
     async fn writes_empty_status_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mut install_manager_ch, _install_manager_task, _updater_sender, _state_sender) =
             start_install_manager_with_update_id_and_node(
                 "my-attempt",

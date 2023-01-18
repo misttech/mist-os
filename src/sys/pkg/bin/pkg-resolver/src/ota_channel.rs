@@ -192,7 +192,7 @@ mod test {
     async fn setup_repo_mgr() -> (RepositoryManager, ChannelInspectState, fuchsia_inspect::Inspector)
     {
         // Set up inspect
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let channel_inspect_state =
             ChannelInspectState::new(inspector.root().create_child("omaha_channel"));
 

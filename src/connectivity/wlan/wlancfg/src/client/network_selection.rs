@@ -739,7 +739,7 @@ mod tests {
             Arc::new(SavedNetworksManager::new_for_test().await.unwrap());
         let saved_network_manager = Arc::new(FakeSavedNetworksManager::new());
         let scan_requester = Arc::new(FakeScanRequester::new());
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child("net_select_test");
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);

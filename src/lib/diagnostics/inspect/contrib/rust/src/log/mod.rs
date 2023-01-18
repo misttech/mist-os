@@ -7,7 +7,7 @@
 //! ## Example
 //!
 //! ```rust
-//! let inspector = Inspector::new();
+//! let inspector = Inspector::default();
 //! let list_node = inspector.root().create_child("list_node");
 //! let list_node = BoundedListNode::new(list_node, 10);
 //! inspect_log!(list_node, k1: "1".to_string(), meaning_of_life: 42u64, k3: 3i64, k4: 4f64);
@@ -530,7 +530,7 @@ mod tests {
     }
 
     fn inspector_and_list_node() -> (Inspector, BoundedListNode) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let list_node = inspector.root().create_child("list_node");
         let list_node = BoundedListNode::new(list_node, 10);
         (inspector, list_node)

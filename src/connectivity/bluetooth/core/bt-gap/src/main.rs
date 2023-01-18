@@ -95,7 +95,7 @@ impl BtGap {
     /// Initialize bt-gap, in particular creating the core HostDispatcher object
     async fn init() -> Result<Self, Error> {
         info!("Initializing bt-gap...");
-        let inspect = fuchsia_inspect::Inspector::new();
+        let inspect = fuchsia_inspect::Inspector::default();
         let stash_inspect = inspect.root().create_child("persistent");
         info!("Initializing data store from Stash...");
         let stash = store::stash::init_stash(BT_GAP_COMPONENT_ID, stash_inspect)

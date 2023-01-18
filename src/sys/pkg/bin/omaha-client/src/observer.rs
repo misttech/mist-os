@@ -278,7 +278,7 @@ mod tests {
 
     async fn new_test_observer() -> FuchsiaObserver<MemStorage, MockOrRealStateMachineController> {
         let fidl = FidlServerBuilder::new().build().await;
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let schedule_node = ScheduleNode::new(inspector.root().create_child("schedule"));
         let protocol_state_node =
             ProtocolStateNode::new(inspector.root().create_child("protocol_state"));

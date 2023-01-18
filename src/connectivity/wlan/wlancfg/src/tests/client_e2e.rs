@@ -183,7 +183,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         saved_networks.clone(),
         scan_requester.clone(),
         create_wlan_hasher(),
-        inspect::Inspector::new().root().create_child("network_selector"),
+        inspect::Inspector::default().root().create_child("network_selector"),
         persistence_req_sender,
         telemetry_sender.clone(),
     ));
@@ -198,7 +198,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
 
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_service_proxy.clone(),
-        inspect::Inspector::new().root().create_child("phy_manager"),
+        inspect::Inspector::default().root().create_child("phy_manager"),
         telemetry_sender.clone(),
     )));
     let (iface_manager, iface_manager_service) = create_iface_manager(

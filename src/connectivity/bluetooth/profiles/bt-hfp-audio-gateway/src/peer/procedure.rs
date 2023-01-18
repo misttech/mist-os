@@ -532,7 +532,7 @@ mod tests {
         let exec = fuchsia_async::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fuchsia_async::Time::from_nanos(1000));
 
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut proc = ProcedureMarker::Answer.initialize();
         let mut state = SlcState::default();
         proc.iattach(&inspect.root(), "procedure_0").expect("can initialize inspect");

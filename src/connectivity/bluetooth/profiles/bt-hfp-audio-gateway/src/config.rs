@@ -95,7 +95,7 @@ mod tests {
 
     #[fuchsia::test]
     fn expected_inspect_tree() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         assert_data_tree!(inspector, root: {});
 
         let mut config = AudioGatewayFeatureSupport::default();

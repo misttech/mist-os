@@ -130,7 +130,7 @@ mod tests {
     // inspect and queue content.
     #[fuchsia::test]
     fn test_queue_under_capacity() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
             .expect("failed to create TestInspectWrapper inspect node");
@@ -161,7 +161,7 @@ mod tests {
     // inspect and queue content.
     #[fuchsia::test]
     fn test_queue_over_capacity() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
             .expect("failed to create TestInspectWrapper inspect node");
@@ -194,7 +194,7 @@ mod tests {
     // excess elements are dropped.
     #[fuchsia::test]
     fn test_size_limit() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "inspect_wrapper")
             .expect("failed to create TestInspectWrapper inspect node");
@@ -223,7 +223,7 @@ mod tests {
     // Tests that removing items from the queue automatically removes them from inspect.
     #[fuchsia::test]
     fn test_queue_remove() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         let mut queue = ManagedInspectQueue::<IValue<String>>::with_node(
             inspector.root().create_child("managed_node"),

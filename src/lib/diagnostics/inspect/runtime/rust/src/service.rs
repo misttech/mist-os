@@ -284,14 +284,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_hanging_lazy_node() -> Result<(), Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         root.record_string("child", "value");
 
         root.record_lazy_values("lazy-node-always-hangs", || {
             async move {
                 fuchsia_async::Timer::new(zx::Duration::from_minutes(30).after_now()).await;
-                Ok(Inspector::new())
+                Ok(Inspector::default())
             }
             .boxed()
         });
@@ -335,15 +335,15 @@ mod tests {
     }
 
     fn test_inspector() -> Inspector {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int("a", 1);
         inspector.root().record_lazy_child("lazy", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_uint("b", 2);
                 inspector.root().record_lazy_values("lazy-vals", || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         inspector.root().record_double("c", 3.0);
                         Ok(inspector)
                     }

@@ -97,7 +97,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_component::{client, server::ServiceObj};
     use fuchsia_component_test::ScopedInstance;
-    use fuchsia_inspect::{reader, testing::assert_data_tree, Inspector};
+    use fuchsia_inspect::{reader, testing::assert_data_tree, InspectorConfig};
     use fuchsia_zircon::DurationNum;
 
     const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
@@ -106,7 +106,7 @@ mod tests {
     async fn new_no_op() -> Result<(), Error> {
         let mut fs: ServiceFs<ServiceObj<'_, ()>> = ServiceFs::new();
 
-        let inspector = Inspector::new_no_op();
+        let inspector = Inspector::new(InspectorConfig::default().no_op());
         assert!(!inspector.is_valid());
 
         // Ensure serve doesn't crash on a No-Op inspector

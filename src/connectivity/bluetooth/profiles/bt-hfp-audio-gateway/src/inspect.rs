@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn call_entry_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut call_entry =
             CallEntryInspect::default().with_inspect(inspect.root(), "call").unwrap();
         call_entry.set_number(Number::from("1234567"));
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn peer_task_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let id = PeerId(2);
         let mut peer_task = PeerTaskInspect::new(id).with_inspect(inspect.root(), "peer").unwrap();
@@ -355,7 +355,7 @@ mod tests {
     fn service_level_connection_inspect_tree() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1230000));
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let mut slc =
             ServiceLevelConnectionInspect::default().with_inspect(inspect.root(), "slc").unwrap();

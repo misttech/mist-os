@@ -1582,7 +1582,7 @@ mod tests {
     fn attach_inspect_with_metrics(
         peer: &mut RemotePeerHandle,
     ) -> (fuchsia_inspect::Inspector, MetricsNode) {
-        let inspect = fuchsia_inspect::Inspector::new();
+        let inspect = fuchsia_inspect::Inspector::default();
         let metrics_node = MetricsNode::default().with_inspect(inspect.root(), "metrics").unwrap();
         peer.iattach(inspect.root(), "peer").unwrap();
         peer.set_metrics_node(metrics_node.clone());

@@ -33,7 +33,7 @@
 //! health.set_ok();
 //! ```
 
-use super::{health, stats, Inspector, LazyNode};
+use super::{health, stats, Inspector, InspectorConfig, LazyNode};
 use inspect_format::constants;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
@@ -45,7 +45,7 @@ lazy_static! {
 
   // The component-level inspector.  We probably want to use this inspector across components where
   // practical.
-  static ref INSPECTOR: Inspector = Inspector::new_with_size(*INSPECTOR_SIZE.lock());
+  static ref INSPECTOR: Inspector = Inspector::new(InspectorConfig::default().size(*INSPECTOR_SIZE.lock()));
 
   // Health node based on the global inspector from `inspector()`.
   static ref HEALTH: Arc<Mutex<health::Node>> = Arc::new(Mutex::new(health::Node::new(INSPECTOR.root())));
@@ -198,7 +198,7 @@ mod tests {
         super::serve_inspect_stats();
         inspector.root().record_lazy_child("foo", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_uint("a", 1);
                 Ok(inspector)
             }

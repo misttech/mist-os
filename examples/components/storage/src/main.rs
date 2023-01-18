@@ -23,7 +23,7 @@ const FILENAME: &str = "counter";
 
 lazy_static! {
     static ref DIRECTORIES: Vec<&'static str> = vec!["data", "cache", "tmp"];
-    static ref INSPECTOR: Inspector = Inspector::new();
+    static ref INSPECTOR: Inspector = Inspector::default();
 }
 
 #[fuchsia::main(logging = true)]
@@ -139,7 +139,7 @@ mod tests {
     #[test_case(vec![0, 0, 0, 0, 1, 2], None, DEFAULT_VALUE; "content too short")]
     fn test_process_existing_file(content: Vec<u8>, read: Option<u64>, write: u64) {
         let (_tempdir, path) = make_file(content);
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         process_file(&path, inspector.root());
         assert_eq!(read_file(&path).unwrap(), write);
         match read {
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn test_process_missing_file() {
         let (_tempdir, path) = make_path();
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         process_file(&path, inspector.root());
         assert_eq!(read_file(&path).unwrap(), DEFAULT_VALUE);
         assert_data_tree!(
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_process_invalid_directory() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         process_file(&PathBuf::from("/i_dont_exist"), inspector.root());
         assert_data_tree!(
         inspector,

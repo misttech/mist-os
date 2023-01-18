@@ -44,7 +44,7 @@ async fn main() -> Result<(), Error> {
     info!("Starting account manager");
 
     let mut fs = ServiceFs::new();
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     inspect_runtime::serve(&inspector, &mut fs)?;
 
     let account_manager = Arc::new(

@@ -25,7 +25,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_unique_name() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let name_1 = unique_name("a");
         assert_eq!(name_1, "a0");

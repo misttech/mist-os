@@ -57,7 +57,7 @@ mod tests {
 
     #[fuchsia::test]
     fn value_list_record() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let child = inspector.root().create_child("test");
         let value_list = ValueList::new();
         assert!(value_list.values.lock().is_none());
@@ -67,7 +67,7 @@ mod tests {
 
     #[fuchsia::test]
     fn value_list_drop_recorded() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let child = inspector.root().create_child("test");
         let value_list = ValueList::new();
         assert!(value_list.values.lock().is_none());

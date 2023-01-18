@@ -60,7 +60,7 @@ fn add_lazy_sampled_node(
                 responder.send(&mut Ok(())).unwrap();
             }
 
-            let samples = fuchsia_inspect::Inspector::new();
+            let samples = fuchsia_inspect::Inspector::default();
             for (_, (name, int_val)) in unwrapped.integer_property_map.clone() {
                 let () = samples.root().record_int(name, int_val);
             }

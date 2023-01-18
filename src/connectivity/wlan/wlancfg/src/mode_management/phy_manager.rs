@@ -877,7 +877,7 @@ mod tests {
                 .expect("failed to create DeviceMonitor proxy");
         let monitor_stream = monitor_requests.into_stream().expect("failed to create stream");
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("phy_manager");
         let (sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(sender);

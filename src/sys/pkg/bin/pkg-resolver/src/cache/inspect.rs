@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn initial_state() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let _blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         assert_data_tree!(
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn http_state_progression() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap());
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn local_mirror_state_progression() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap());
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn state_does_not_change_other_data() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn write_bytes_is_cumulative() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn multiple_fetches() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let _inspect0 = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap());
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn multiple_attempts() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
         let inspect = blob_fetcher.fetch(&BlobId::parse(ZEROES_HASH).unwrap()).local_mirror();

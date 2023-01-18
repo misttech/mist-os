@@ -851,7 +851,7 @@ mod stub {
             )
             .start()
             .await;
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let root = inspector.root();
 
             let apps_node =
@@ -1497,7 +1497,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_apps_on_state_change() {
         for &state in &[state_machine::State::Idle, state_machine::State::WaitingForReboot] {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let apps_node = AppsNode::new(inspector.root().create_child("apps"));
             let fidl = FidlServerBuilder::new().with_apps_node(apps_node).build().await;
 
@@ -1518,7 +1518,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_apps_on_channel_change() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let apps_node = AppsNode::new(inspector.root().create_child("apps"));
         let fidl = FidlServerBuilder::new()
             .with_apps_node(apps_node)
@@ -1549,7 +1549,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_state() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let state_node = StateNode::new(inspector.root().create_child("state"));
         let fidl = FidlServerBuilder::new().with_state_node(state_node).build().await;
 

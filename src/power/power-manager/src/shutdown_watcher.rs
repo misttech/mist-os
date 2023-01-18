@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_inspect_data() {
         let mut exec = fasync::TestExecutor::new();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node =
             ShutdownWatcherBuilder::new().with_inspect_root(inspector.root()).build().unwrap();
 

@@ -355,7 +355,7 @@ mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[test]
     fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         let node =
             SystemProfileHandlerBuilder::new().with_inspect_root(inspector.root()).build().unwrap();

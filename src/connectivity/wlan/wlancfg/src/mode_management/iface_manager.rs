@@ -1569,7 +1569,7 @@ mod tests {
             .run_singlethreaded(SavedNetworksManager::new_for_test())
             .expect("failed to create saved networks manager.");
         let saved_networks = Arc::new(saved_networks);
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("phy_manager");
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -2481,7 +2481,7 @@ mod tests {
             test_values.saved_networks,
             test_values.scan_requester.clone(),
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4340,7 +4340,7 @@ mod tests {
             test_values.saved_networks,
             test_values.scan_requester,
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4399,7 +4399,7 @@ mod tests {
             test_values.saved_networks,
             test_values.scan_requester,
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4447,7 +4447,7 @@ mod tests {
             test_values.saved_networks,
             test_values.scan_requester,
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -4593,7 +4593,7 @@ mod tests {
             test_values.saved_networks,
             test_values.scan_requester,
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5247,7 +5247,7 @@ mod tests {
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5569,7 +5569,7 @@ mod tests {
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));
@@ -5613,7 +5613,7 @@ mod tests {
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
             create_wlan_hasher(),
-            inspect::Inspector::new().root().create_child("network_selector"),
+            inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
         ));

@@ -19,7 +19,7 @@ async fn main() -> Result<(), Error> {
     insp.root().record_lazy_values("lazy-node-always-hangs", || {
         async move {
             Timer::new(Duration::from_minutes(60)).await;
-            Ok(Inspector::new())
+            Ok(Inspector::default())
         }
         .boxed()
     });

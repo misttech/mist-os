@@ -407,7 +407,7 @@ mod test {
             .await?;
 
         // Add a player to the set, and vend an update from it.
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (player_client, player_server) = create_endpoints::<PlayerMarker>()?;
         let player = Player::new(
             Id::new()?,

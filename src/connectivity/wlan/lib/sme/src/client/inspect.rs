@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn test_inspect_update_pulse_connect_disconnect() {
         let hasher = WlanHasher::new([7; 8]);
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let mut pulse = PulseNode::new(root.create_child("last_pulse"));
 
@@ -595,7 +595,7 @@ mod tests {
     #[test]
     fn test_inspect_update_pulse_wmm_status_changed() {
         let hasher = WlanHasher::new([7; 8]);
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let mut pulse = PulseNode::new(root.create_child("last_pulse"));
 

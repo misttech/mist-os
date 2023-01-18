@@ -169,7 +169,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
         let resource = zx::Handle::invalid().into();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let builder = SyscallHandlerBuilder::new()
             .with_cpu_resource(resource)
             .with_inspect_root(inspector.root());

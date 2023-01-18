@@ -354,7 +354,7 @@ mod tests {
     fn sme_shutdown_on_generic_sme_closed() {
         let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
         let (persistence_req_sender, _persistence_stream) =
             test_utils::create_inspect_persistence_channel();
@@ -400,7 +400,7 @@ mod tests {
         role: fidl_common::WlanMacRole,
     ) -> (GenericSmeTestHelper, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
         let mut exec = fasync::TestExecutor::new();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
         let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
         let (persistence_req_sender, persistence_stream) =

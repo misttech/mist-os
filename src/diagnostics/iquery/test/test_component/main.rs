@@ -62,7 +62,7 @@ async fn main() -> Result<(), Error> {
         std::process::exit(1);
     }
 
-    let inspector = inspect::Inspector::new();
+    let inspector = inspect::Inspector::default();
     let root = inspector.root();
     assert!(inspector.is_valid());
 
@@ -148,7 +148,7 @@ async fn main() -> Result<(), Error> {
 
     root.record_lazy_child("lazy-node", || {
         async move {
-            let inspector = inspect::Inspector::new();
+            let inspector = inspect::Inspector::default();
             inspector.root().record_uint("uint", 3);
             Ok(inspector)
         }
@@ -156,7 +156,7 @@ async fn main() -> Result<(), Error> {
     });
     root.record_lazy_values("lazy-values", || {
         async move {
-            let inspector = inspect::Inspector::new();
+            let inspector = inspect::Inspector::default();
             inspector.root().record_double("lazy-double", 3.25);
             Ok(inspector)
         }

@@ -152,7 +152,7 @@ fn main() -> Result<(), Error> {
     diagnostics_log::init!(&["identity", "account_handler"]);
     info!("Starting account handler");
 
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut fs = ServiceFs::new();
     inspect_runtime::serve(&inspector, &mut fs)?;
 

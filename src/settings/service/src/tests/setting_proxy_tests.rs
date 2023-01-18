@@ -236,7 +236,7 @@ impl TestEnvironmentBuilder {
 
         let handler_factory = Arc::new(Mutex::new(FakeFactory::new(delegate.clone())));
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let listener_logger =
             Arc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector)));
         let proxy_handler_signature = SettingProxy::create(
@@ -540,7 +540,7 @@ async fn inspect_catches_errors() {
     let delegate = service::MessageHub::create_hub();
     let (service_client, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     let handler_factory = Arc::new(Mutex::new(ErrorFactory));
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let _proxy_handler_signature = SettingProxy::create(
         SETTING_TYPE,
         handler_factory,
@@ -628,7 +628,7 @@ async fn inspect_errors_roll_after_limit() {
     let delegate = service::MessageHub::create_hub();
     let (service_client, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     let handler_factory = Arc::new(Mutex::new(ErrorFactory));
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let _proxy_handler_signature = SettingProxy::create(
         SETTING_TYPE,
         handler_factory,

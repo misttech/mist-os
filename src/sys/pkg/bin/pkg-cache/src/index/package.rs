@@ -50,7 +50,7 @@ impl PackageIndex {
 
     #[cfg(test)]
     pub(crate) fn new_test() -> Self {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         Self::new(inspector.root().create_child("index"))
     }
 

@@ -478,7 +478,7 @@ mod test {
 
     #[fuchsia::test]
     fn processing_time_tracker() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut tracker = ProcessingTimeTracker::new(inspector.root().create_child("test"));
 
         tracker.track("a", 1e9 as u64);

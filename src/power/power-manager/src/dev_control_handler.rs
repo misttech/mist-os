@@ -409,7 +409,7 @@ pub mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let _node = DeviceControlHandlerBuilder::new()
             .driver_proxy(fidl::endpoints::create_proxy::<fdev::ControllerMarker>().unwrap().0)
             .inspect_root(inspector.root())

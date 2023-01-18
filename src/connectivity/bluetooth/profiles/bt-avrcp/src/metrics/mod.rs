@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn multiple_peers_connection_updates_to_shared_node() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let metrics = MetricsNode::default().with_inspect(inspect.root(), "metrics").unwrap();
 
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     fn controller_peers_service_updates() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let metrics = MetricsNode::default().with_inspect(inspect.root(), "metrics").unwrap();
 
@@ -446,7 +446,7 @@ mod tests {
     fn target_peer_players_update() {
         let mut exec = fasync::TestExecutor::new();
 
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let (proxy, mut receiver) =
             fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()

@@ -47,7 +47,7 @@ fn peer(id: PeerId) -> Peer {
 async fn on_device_changed_inspect_state() {
     // test setup
     let stash = Stash::in_memory_mock();
-    let inspector = inspect::Inspector::new();
+    let inspector = inspect::Inspector::default();
     let system_inspect = inspector.root().create_child("system");
     let (gas_channel_sender, _generic_access_req_stream) = mpsc::channel(0);
     let watch_peers_broker = hanging_get::HangingGetBroker::new(

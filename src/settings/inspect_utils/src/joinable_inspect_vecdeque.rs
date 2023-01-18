@@ -51,7 +51,7 @@ mod tests {
     // Tests that adding and removing from JoinableInspectVecDeque updates the inspect tree.
     #[fuchsia::test]
     fn test_vec_deque() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "wrapper_node")

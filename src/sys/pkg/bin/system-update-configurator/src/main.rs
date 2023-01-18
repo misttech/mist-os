@@ -33,7 +33,7 @@ pub async fn main() -> Result<(), Error> {
 }
 
 async fn run() -> Result<(), Error> {
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     let health_status = health::HealthStatus::new(inspector.root());
 
     let mut fs: service::Fs = ServiceFs::new_local();

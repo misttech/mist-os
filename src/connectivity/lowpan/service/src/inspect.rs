@@ -305,7 +305,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
         *lazy_counters = iface_tree.node.create_lazy_child("counters", move || {
             let counters_clone = counters.clone();
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 match counters_clone.get().await {
                     Ok(all_counters) => {
                         let mac_counters =
@@ -540,7 +540,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
         *lazy_neighbors = iface_tree.node.create_lazy_child("neighbors", move || {
             let device_test_clone = device_test.clone();
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 match device_test_clone.get_neighbor_table().await {
                     Ok(neighbor_table) => {
                         let mut index = -1;
@@ -550,7 +550,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                             inspector.root().record_lazy_child(format!("{}", index), move || {
                                 let neighbor_info_clone = neighbor_info_c.clone();
                                 async move {
-                                    let inspector = Inspector::new();
+                                    let inspector = Inspector::default();
                                     inspector.root().record_int(
                                         "short_address",
                                         neighbor_info_clone.short_address.unwrap_or(0).into(),
@@ -641,7 +641,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
         *lazy_telemetry = iface_tree.node.create_lazy_child("telemetry", move || {
             let telemetry_clone = telemetry.clone();
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 match telemetry_clone.get_telemetry().await {
                     Ok(telemetry_data) => {
                         if let Some(x) = telemetry_data.thread_router_id {
@@ -989,7 +989,7 @@ mod tests {
     async fn test_watch_device_changes() {
         let lookup = connect_to_protocol::<DeviceWatcherMarker>().unwrap();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let inspector_clone = inspector.clone();
         let inspect_tree = Arc::new(LowpanServiceTree::new(inspector_clone));
         let look_up = Arc::new(lookup);

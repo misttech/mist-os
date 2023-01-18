@@ -258,7 +258,7 @@ mod tests {
         // Set the clock so that timestamps will always be 0.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);
         let context = create_context().await;
         let delegate = context.delegate.clone();
@@ -334,7 +334,7 @@ mod tests {
         // Set the clock so that timestamps will always be 0.
         clock::mock::set(Time::from_nanos(0));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);
         let context = create_context().await;
         let delegate = context.delegate.clone();

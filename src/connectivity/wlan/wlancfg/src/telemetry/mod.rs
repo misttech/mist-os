@@ -413,7 +413,7 @@ fn inspect_record_counters(
     inspect_node.record_lazy_child(child_name, move || {
         let counters = Arc::clone(&counters);
         async move {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             {
                 let counters_mutex_guard = counters.lock();
                 let counters = counters_mutex_guard.windowed_stat(None);
@@ -449,7 +449,7 @@ fn inspect_record_connection_status(
         let hasher = hasher.clone();
         let telemetry_sender = telemetry_sender.clone();
         async move {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let (sender, receiver) = oneshot::channel();
             telemetry_sender.send(TelemetryEvent::QueryStatus { sender });
             let info = match receiver.await {
@@ -505,7 +505,7 @@ fn inspect_record_external_data(
     external_inspect_node.node.record_lazy_child("connection_status", move || {
         let telemetry_sender = telemetry_sender.clone();
         async move {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let (sender, receiver) = oneshot::channel();
             telemetry_sender.send(TelemetryEvent::QueryStatus { sender });
             let info = match receiver.await {
@@ -6424,7 +6424,7 @@ mod tests {
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
         let external_inspect_node = inspector.root().create_child("external");
         let (persistence_req_sender, persistence_stream) = create_inspect_persistence_channel();

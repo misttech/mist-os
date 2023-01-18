@@ -538,7 +538,7 @@ mod tests {
         dlci: DLCI,
         flow_control: Option<FlowControlMode>,
     ) -> (inspect::Inspector, SessionChannel, Channel, mpsc::Receiver<Frame>) {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut session_channel =
             SessionChannel::new(dlci, role).with_inspect(inspect.root(), "channel_").unwrap();
         assert!(!session_channel.is_established());
@@ -561,7 +561,7 @@ mod tests {
     {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(time);
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let (frame_sender, outgoing_frames) = mpsc::channel(0);
         let flow_controller = CreditFlowController::new(
@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn session_channel_inspect_updates_with_new_flow_control() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         // Set up a channel with inspect.
         let dlci = DLCI::try_from(8).unwrap();

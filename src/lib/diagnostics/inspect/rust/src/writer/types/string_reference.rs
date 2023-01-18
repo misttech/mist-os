@@ -98,7 +98,7 @@ mod tests {
             static ref BAZ: StringReference<'static> = "baz".into();
         };
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int(&*FOO, 0);
         let child = inspector.root().create_child(&*BAR);
         child.record_double(&*FOO, 3.25);

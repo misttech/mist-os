@@ -204,7 +204,7 @@ struct GenericYak<'a, T: Unit> {
 
 #[fuchsia::test]
 fn unit_primitive() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut num = 127i8;
     let mut num_data = num.inspect_create(&root, "num");
@@ -218,7 +218,7 @@ fn unit_primitive() {
 
 #[fuchsia::test]
 fn unit_flat() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut yakling = Yakling { name: "Lil Sebastian".to_string(), age: 5 };
     let mut yakling_data = yakling.inspect_create(&root, "yak");
@@ -237,7 +237,7 @@ fn unit_flat() {
 
 #[fuchsia::test]
 fn unit_nested() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut yak = Yak {
         name: "Big Sebastian".to_string(),
@@ -276,7 +276,7 @@ fn unit_nested() {
 
 #[fuchsia::test]
 fn unit_basic_types() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut basic = BasicTypes::default();
     let mut basic_data = basic.inspect_create(&root, "basic");
@@ -329,7 +329,7 @@ fn unit_basic_types() {
 
 #[fuchsia::test]
 fn unit_generic() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let a = "some_ref".to_string();
     let mut generic_unit = GenericUnit { _convoluted: &a, easy: "owned".to_string() };
@@ -348,7 +348,7 @@ fn unit_generic() {
 
 #[fuchsia::test]
 fn unit_option() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut option_yakling: Option<Yakling> = None;
     let mut option_yakling_data = option_yakling.inspect_create(inspector.root(), "option_yakling");
     assert_data_tree!(inspector, root: {});
@@ -394,7 +394,7 @@ fn unit_option() -> Result<(), AttachError> {
 
 #[fuchsia::test]
 fn ivalue_primitive() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut num = IValue::attached(126i8, &root, "num");
     assert_data_tree!(inspector, root: { num: 126i64 });
@@ -418,7 +418,7 @@ fn ivalue_primitive() {
 
 #[fuchsia::test]
 fn ivalue_nested() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let yak_base = Yak {
         name: "Big Sebastian".to_string(),
@@ -459,7 +459,7 @@ fn ivalue_nested() {
 
 #[fuchsia::test]
 fn idebug_enum() {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let root = inspector.root();
     let mut horse = IDebug::attached(Horse::Arabian, &root, "horse");
     assert_data_tree!(inspector, root: { horse: "Arabian" });
@@ -539,7 +539,7 @@ fn iowned_display() {
 
 #[fasync::run_until_stalled(test)]
 async fn iowned_composite() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut yak = PowerYak::default();
     yak.iattach(inspector.root(), "my_yak")?;
     assert_data_tree!(inspector, root: { my_yak: {
@@ -572,7 +572,7 @@ async fn iowned_composite() -> Result<(), AttachError> {
 
 #[fasync::run_until_stalled(test)]
 async fn derive_inspect_nested_interior_mut() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut yak_mut = AutoYak::new("Sebastian".to_string());
     yak_mut.iattach(inspector.root(), "my_yak")?;
 
@@ -600,7 +600,7 @@ async fn derive_inspect_nested_interior_mut() -> Result<(), AttachError> {
 
 #[fasync::run_until_stalled(test)]
 async fn derive_inspect_forward() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut yak = AutoYakWrapper::from(AutoYak::new("Sebastian".to_string()));
     yak.iattach(inspector.root(), "my_yak")?;
     assert_data_tree!(inspector, root: {
@@ -619,7 +619,7 @@ async fn derive_inspect_forward() -> Result<(), AttachError> {
 
 #[fasync::run_until_stalled(test)]
 async fn derive_inspect_nodeless() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut yak = NodeLessYak::new("Sebastian".to_string(), 2);
     yak.iattach(inspector.root(), "ignored")?;
     assert_data_tree!(inspector, root: {
@@ -633,7 +633,7 @@ async fn derive_inspect_nodeless() -> Result<(), AttachError> {
 
 #[fuchsia::test]
 fn derive_inspect_generic() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let age = 4u16;
     let mut yak = GenericYak {
         _age: &age,
@@ -655,7 +655,7 @@ fn derive_inspect_generic() -> Result<(), AttachError> {
 
 #[fasync::run_until_stalled(test)]
 async fn with_inspect_mutable() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut yakling = inner::AutoYakling::default().with_inspect(inspector.root(), "my_yak")?;
     let mut happy = IValue::new(false).with_inspect(inspector.root(), "happy")?;
     assert_data_tree!(inspector, root: {
@@ -680,7 +680,7 @@ async fn with_inspect_mutable() -> Result<(), AttachError> {
 
 #[fasync::run_until_stalled(test)]
 async fn with_inspect_interior_mutability() -> Result<(), AttachError> {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let yak = AutoYakWrapper::from(AutoYak::new("Sebastian".to_string()))
         .with_inspect(inspector.root(), "my_yak")?;
     assert_data_tree!(inspector, root: {

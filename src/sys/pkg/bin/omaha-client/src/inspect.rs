@@ -234,7 +234,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_configuration_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = ConfigurationNode::new(inspector.root().create_child("configuration"));
         node.set(&get_config("0.1.2", None, None));
 
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_apps_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = AppsNode::new(inspector.root().create_child("apps"));
         let app =
             App::builder().id("id_2").version([1, 2, 4]).cohort(Cohort::new("cohort")).build();
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_state_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = StateNode::new(inspector.root().create_child("state"));
         let state = State {
             manager_state: state_machine::State::CheckingForUpdates(InstallSource::OnDemand),
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_schedule_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = ScheduleNode::new(inspector.root().create_child("schedule"));
         let schedule = UpdateCheckSchedule::default();
         node.set(&schedule);
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_protocol_state_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = ProtocolStateNode::new(inspector.root().create_child("protocol_state"));
         let protocol_state = ProtocolState::default();
         node.set(&protocol_state);
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_last_results_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut node = LastResultsNode::new(inspector.root().create_child("last_results"));
         let result = Ok(update_check::Response {
             app_responses: vec![update_check::AppResponse {

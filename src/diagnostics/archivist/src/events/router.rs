@@ -648,7 +648,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn inspect_log() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut router = EventRouter::new(inspector.root().create_child("events"));
         let mut producer1 = TestEventProducer::default();
         let mut producer2 = TestEventProducer::default();
@@ -698,7 +698,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn event_stream_semantics() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut router = EventRouter::new(inspector.root().create_child("events"));
         let mut producer1 = TestEventProducer::default();
         let mut producer2 = TestEventProducer::default();
@@ -747,7 +747,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn stream_draining() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut router = EventRouter::new(inspector.root().create_child("events"));
         let mut producer = TestEventProducer::default();
         let (mut receiver, consumer) = TestEventConsumer::new();

@@ -501,7 +501,7 @@ pub mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         let node = TemperatureHandlerBuilder::new()
             .driver_proxy(fake_temperature_driver(|| Celsius(30.0)))

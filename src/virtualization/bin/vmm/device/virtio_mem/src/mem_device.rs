@@ -337,7 +337,7 @@ mod tests {
             let region_size = DEFAULT_REGION_SIZE;
             let plugged_block_size = DEFAULT_PLUGGED_BLOCK_SIZE;
 
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
 
             let state = TestQueue::new(32, mem);
             let (proxy, stream) = create_proxy_and_stream::<VirtioMemMarker>().unwrap();

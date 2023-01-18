@@ -130,7 +130,9 @@ impl FullmacMlme {
 
         let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
         let driver_event_sender_clone = driver_event_sender.clone();
-        let inspector = Inspector::new_with_size(INSPECT_VMO_SIZE_BYTES);
+        let inspector = Inspector::new(
+            fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES),
+        );
         let inspect_usme_node = inspector.root().create_child("usme");
 
         let (startup_sender, startup_receiver) = oneshot::channel();
@@ -700,7 +702,7 @@ mod tests {
             }
 
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let inspect_usme_node = inspector.root().create_child("usme");
             let (startup_sender, startup_receiver) = oneshot::channel();
 

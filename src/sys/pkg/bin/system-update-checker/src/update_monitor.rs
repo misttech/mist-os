@@ -61,7 +61,9 @@ where
     #[cfg(test)]
     pub fn new() -> (impl Future<Output = ()>, impl Future<Output = ()>, Self) {
         Self::from_inspect_node(
-            fuchsia_inspect::Inspector::new().root().create_child("test-update-monitor-root-node"),
+            fuchsia_inspect::Inspector::default()
+                .root()
+                .create_child("test-update-monitor-root-node"),
         )
     }
 
@@ -373,7 +375,7 @@ mod test_inspect {
 
     #[test]
     fn test_inspect_initial_state() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _update_monitor =
             UpdateMonitor::<FakeStateNotifier, FakeAttemptNotifier>::from_inspect_node(
                 inspector.root().create_child("update-monitor"),
@@ -392,7 +394,7 @@ mod test_inspect {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_update_state() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let (fut, att_fut, mut update_monitor) =
             UpdateMonitor::<FakeStateNotifier, FakeAttemptNotifier>::from_inspect_node(
                 inspector.root().create_child("update-monitor"),
@@ -415,7 +417,7 @@ mod test_inspect {
 
     #[test]
     fn test_inspect_version_available() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let (_fut, _att_fut, mut update_monitor) =
             UpdateMonitor::<FakeStateNotifier, FakeAttemptNotifier>::from_inspect_node(
                 inspector.root().create_child("update-monitor"),

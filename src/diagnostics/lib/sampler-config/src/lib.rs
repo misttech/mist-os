@@ -401,12 +401,14 @@ impl SamplerConfig {
         *locked_node = Some(parent_node.create_lazy_child("metrics_sent", move || {
             let local_self = weak_self.upgrade();
             if local_self.is_none() {
-                return async move { Ok(inspect::Inspector::new()) }.boxed();
+                return async move { Ok(inspect::Inspector::default()) }.boxed();
             }
 
             let local_self = local_self.unwrap();
 
-            let inspector = inspect::Inspector::new_with_size(METRICS_INSPECT_SIZE_BYTES);
+            let inspector = inspect::Inspector::new(
+                inspect::InspectorConfig::default().size(METRICS_INSPECT_SIZE_BYTES),
+            );
             let top_node = inspector.root();
 
             for config in local_self.project_configs.iter() {

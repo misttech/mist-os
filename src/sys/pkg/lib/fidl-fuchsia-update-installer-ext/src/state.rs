@@ -1049,7 +1049,7 @@ mod tests {
         // * we create a string property called 'state' in all cases
         #[test]
         fn state_populates_inspect_with_id(state: State) {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             state.write_to_inspect(inspector.root());
 
             assert_data_tree! {
@@ -1155,7 +1155,7 @@ mod tests {
             }
             .with_stage_reason(StageFailureReason::Internal),
         );
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         state.write_to_inspect(inspector.root());
         assert_data_tree! {
             inspector,
@@ -1182,7 +1182,7 @@ mod tests {
             }
             .with_fetch_reason(FetchFailureReason::Internal),
         );
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         state.write_to_inspect(inspector.root());
         assert_data_tree! {
             inspector,
@@ -1203,7 +1203,7 @@ mod tests {
     #[test]
     fn populates_inspect_fail_prepare() {
         let state = State::FailPrepare(PrepareFailureReason::OutOfSpace);
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         state.write_to_inspect(inspector.root());
         assert_data_tree! {
             inspector,
@@ -1220,7 +1220,7 @@ mod tests {
             info: UpdateInfo { download_size: 4096 },
             progress: Progress { bytes_downloaded: 2048, fraction_completed: 0.5 },
         });
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         state.write_to_inspect(inspector.root());
         assert_data_tree! {
             inspector,

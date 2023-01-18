@@ -72,7 +72,7 @@ async fn main_inner() -> Result<(), Error> {
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
 
     // Inspect
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     inspect_runtime::serve(&inspector, &mut fs)?;
     let root = inspector.root();
     let configuration_node = inspect::ConfigurationNode::new(root.create_child("configuration"));

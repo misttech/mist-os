@@ -406,7 +406,7 @@ mod tests {
         async fn create_persistent_account(
             &self,
         ) -> Result<Account<MinfsStorageManager<MockDiskManager>>, AccountManagerError> {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let account_dir = self.location.path.clone();
             Account::create(
                 AccountLifetime::Persistent { account_dir },
@@ -420,7 +420,7 @@ mod tests {
         async fn create_ephemeral_account(
             &self,
         ) -> Result<Account<MinfsStorageManager<MockDiskManager>>, AccountManagerError> {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             Account::create(
                 AccountLifetime::Ephemeral,
                 make_provisioned_minfs_storage_manager().await,
@@ -433,7 +433,7 @@ mod tests {
         async fn load_account(
             &self,
         ) -> Result<Account<MinfsStorageManager<MockDiskManager>>, AccountManagerError> {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             Account::load(
                 AccountLifetime::Persistent { account_dir: self.location.path.clone() },
                 make_provisioned_minfs_storage_manager().await,
@@ -449,7 +449,7 @@ mod tests {
             (Account<MinfsStorageManager<MockDiskManager>>, oneshot::Receiver<()>),
             AccountManagerError,
         > {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let account_dir = self.location.path.clone();
             let (sender, receiver) = storage_lock_request::channel();
 
@@ -559,7 +559,7 @@ mod tests {
     /// Attempting to load an ephemeral account fails.
     #[fasync::run_until_stalled(test)]
     async fn test_load_ephemeral() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         assert!(Account::load(
             AccountLifetime::Ephemeral,
             make_provisioned_minfs_storage_manager().await,

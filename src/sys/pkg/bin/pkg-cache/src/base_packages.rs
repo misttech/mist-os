@@ -151,7 +151,7 @@ impl BasePackages {
             hashes_to_paths.entry(hash).or_default().push(path)
         }
 
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         Self {
             base_blobs: BaseBlobs::new(blobs, inspector.root().clone_weak()),
             hashes_to_paths,
@@ -190,7 +190,7 @@ mod tests {
                 .await;
             system_image.write_to_blobfs_dir(&blobfs_dir);
 
-            let inspector = finspect::Inspector::new();
+            let inspector = finspect::Inspector::default();
 
             let base_packages = BasePackages::new(
                 &blobfs_client,
@@ -333,7 +333,7 @@ mod tests {
         let system_image = PackageBuilder::new("system_image").build().await.unwrap();
         system_image.write_to_blobfs_dir(&blobfs_dir);
 
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
 
         let base_packages_res = BasePackages::new(
             &blobfs_client,
@@ -355,7 +355,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn empty_inspect() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let _base_packages = BasePackages::empty(inspector.root().create_child("base-packages"));
 
         assert_data_tree!(inspector, root: {

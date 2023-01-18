@@ -129,7 +129,7 @@ mod tests {
         crate::{inspect, watchable_map},
         fidl::endpoints::create_proxy,
         fuchsia_async as fasync,
-        fuchsia_inspect::Inspector,
+        fuchsia_inspect::{Inspector, InspectorConfig},
         fuchsia_zircon::prelude::*,
         futures::task::Poll,
         wlan_common::{assert_variant, test_utils::ExpectWithin},
@@ -140,7 +140,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (phys, _phy_events) = PhyMap::new();
         let phys = Arc::new(phys);
-        let inspector = Inspector::new_with_size(inspect::VMO_SIZE_BYTES);
+        let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
         let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
         let fut = serve_phys(phys.clone(), inspect_tree, "/wrong/path");
         pin_mut!(fut);
@@ -152,7 +152,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (phys, mut phy_events) = PhyMap::new();
         let phys = Arc::new(phys);
-        let inspector = Inspector::new_with_size(inspect::VMO_SIZE_BYTES);
+        let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
         let inspect_tree = Arc::new(inspect::WlanMonitorTree::new(inspector));
 
         let (phy_proxy, phy_server) =

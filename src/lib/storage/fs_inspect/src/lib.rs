@@ -58,7 +58,7 @@ impl FsInspectTree {
         let info_node = root.create_lazy_child(INFO_NODE_NAME, move || {
             let fs_clone = fs_clone.clone();
             async move {
-                let inspector = fuchsia_inspect::Inspector::new();
+                let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(fs) = fs_clone.upgrade() {
                     fs.get_info_data().record_into(inspector.root());
                 }
@@ -71,7 +71,7 @@ impl FsInspectTree {
         let usage_node = root.create_lazy_child(USAGE_NODE_NAME, move || {
             let fs_clone = fs_clone.clone();
             async move {
-                let inspector = fuchsia_inspect::Inspector::new();
+                let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(fs) = fs_clone.upgrade() {
                     fs.get_usage_data().await.record_into(inspector.root());
                 }
@@ -102,7 +102,7 @@ impl FsInspectTree {
             self.volumes_node.create_lazy_child(name, move || {
                 let volume = volume.clone();
                 async move {
-                    let inspector = fuchsia_inspect::Inspector::new();
+                    let inspector = fuchsia_inspect::Inspector::default();
                     if let Some(volume) = volume.upgrade() {
                         volume.get_volume_data().await.record_into(inspector.root());
                     }

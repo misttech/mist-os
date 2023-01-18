@@ -344,7 +344,7 @@ mod tests {
     // Test one device connects.
     #[fuchsia::test]
     async fn watch_devices_one_exists() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         // Create a file in a pseudo directory that represents a ctaphid device.
         let mut count: i8 = 0;
@@ -391,7 +391,7 @@ mod tests {
     // Tests a second device becomes available but the first is still connected.
     #[fuchsia::test]
     async fn watch_devices_second_failed() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         // Create the multiple files in a pseudo directory that represent ctaphid devices.
         let mut count: i8 = 0;
@@ -456,7 +456,7 @@ mod tests {
     // Tests a second device becomes available after the first has already disconnected.
     #[fuchsia::test]
     async fn watch_devices_second_success() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         // Create the multiple files in a pseudo directory that represent ctaphid devices.
         let mut count: i8 = 0;

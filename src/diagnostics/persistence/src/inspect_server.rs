@@ -65,7 +65,7 @@ mod test {
     // be clipped.
     #[fuchsia::test]
     fn test_json_export() -> Result<(), Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let inspect = inspector.root();
         assert_data_tree!(
             inspector,

@@ -101,7 +101,7 @@ mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = Arc::new(ComponentEarlyStartupTimeStats::new(
             inspector.root().create_child("start_times"),
         ));
@@ -138,7 +138,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn doesnt_track_more_than_75_components() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = Arc::new(ComponentEarlyStartupTimeStats::new(
             inspector.root().create_child("start_times"),
         ));

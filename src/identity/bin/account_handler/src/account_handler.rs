@@ -884,7 +884,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
@@ -904,7 +904,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let (_, account_server_end) = create_endpoints().unwrap();
@@ -929,7 +929,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -950,7 +950,7 @@ mod tests {
     #[test]
     fn test_create_get_and_lock_account() {
         let location = TempLocation::new();
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1010,7 +1010,7 @@ mod tests {
     fn test_preload_and_unlock_existing_account() {
         // Create an account
         let location = TempLocation::new();
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1029,7 +1029,7 @@ mod tests {
         );
 
         // Ensure the account is persisted by unlocking it
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1064,7 +1064,7 @@ mod tests {
     fn test_multiple_unlocks() {
         // Create an account
         let location = TempLocation::new();
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1092,7 +1092,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1113,7 +1113,7 @@ mod tests {
     #[test]
     fn test_remove_initialized_account() {
         let location = TempLocation::new();
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1183,7 +1183,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     proxy.create_account(create_account_request(TEST_ACCOUNT_ID_UINT)).await??;
@@ -1215,7 +1215,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(proxy.remove_account().await?, Err(ApiError::FailedPrecondition));
@@ -1234,7 +1234,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
@@ -1272,7 +1272,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| {
                     async move {
@@ -1301,7 +1301,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     let pre_auth_state: Vec<u8> = (&*TEST_PRE_AUTH_EMPTY).try_into()?;
@@ -1324,7 +1324,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![Mechanism::Test])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1348,7 +1348,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![Mechanism::Test, Mechanism::Password])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1372,7 +1372,7 @@ mod tests {
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
-                .inspector(Arc::new(Inspector::new()))
+                .inspector(Arc::new(Inspector::default()))
                 .mechanisms(vec![])
                 .test_fn(|proxy| async move {
                     assert_eq!(
@@ -1392,7 +1392,7 @@ mod tests {
 
     #[test]
     fn test_lock_request_ephemeral_account_failure() {
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)
@@ -1438,7 +1438,7 @@ mod tests {
     #[test]
     fn test_lock_request_persistent_account_without_auth_mechanism() {
         let location = TempLocation::new();
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(location.to_persistent_lifetime())
@@ -1467,7 +1467,7 @@ mod tests {
 
     #[test]
     fn test_create_account_without_id() {
-        let inspector = Arc::new(Inspector::new());
+        let inspector = Arc::new(Inspector::default());
         request_stream_test(
             RequestStreamTestArgs::builder()
                 .lifetime(AccountLifetime::Ephemeral)

@@ -663,7 +663,7 @@ mod historical_max_cpu_temperature_tests {
     #[test]
     fn test_reset_max_temperature_after_sample_count() {
         let executor = fasync::TestExecutor::new_with_fake_time();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
 
@@ -696,7 +696,7 @@ mod historical_max_cpu_temperature_tests {
     #[test]
     fn test_dispatch_reading_after_n_samples() {
         let executor = fasync::TestExecutor::new_with_fake_time();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 10);
 
@@ -740,7 +740,7 @@ mod historical_max_cpu_temperature_tests {
     #[test]
     fn test_max_record_count() {
         let executor = fasync::TestExecutor::new_with_fake_time();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 2);
 
@@ -774,7 +774,7 @@ mod historical_max_cpu_temperature_tests {
     #[test]
     fn test_max_temperature_selection() {
         let executor = fasync::TestExecutor::new_with_fake_time();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut max_temperatures =
             HistoricalMaxCpuTemperature::new_with_max_sample_count(inspector.root(), 3);
 
@@ -806,7 +806,7 @@ mod inspect_throttle_history_tests {
         let executor = fasync::TestExecutor::new_with_fake_time();
 
         // Create a InspectThrottleHistory with capacity for only one throttling entry
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let mut throttle_history =
             InspectThrottleHistory::new_with_throttle_event_count(inspector.root(), 1);
 
@@ -853,7 +853,8 @@ mod inspect_throttle_history_tests {
     #[should_panic(expected = "Must end previous throttling before setting active again")]
     #[cfg(debug_assertions)]
     async fn test_debug_panic_double_set_active() {
-        let mut throttle_history = InspectThrottleHistory::new(&inspect::Inspector::new().root());
+        let mut throttle_history =
+            InspectThrottleHistory::new(&inspect::Inspector::default().root());
         throttle_history.set_active();
         throttle_history.set_active();
     }
@@ -901,7 +902,7 @@ mod tests {
     fn test_log_throttling_active() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let platform_metrics = PlatformMetricsBuilder {
             cpu_temperature_handler: Some(create_dummy_node()),
             crash_report_handler: Some(create_dummy_node()),
@@ -961,7 +962,7 @@ mod tests {
             )],
         );
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let (cobalt_sender, mut cobalt_receiver) = futures::channel::mpsc::channel(10);
         let platform_metrics = PlatformMetricsBuilder {
             cpu_temperature_handler: Some(create_dummy_node()),
@@ -1061,7 +1062,7 @@ mod tests {
     fn test_log_throttling_result_shutdown() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let (cobalt_sender, mut cobalt_receiver) = futures::channel::mpsc::channel(10);
         let platform_metrics = PlatformMetricsBuilder {
             cpu_temperature_handler: Some(create_dummy_node()),
@@ -1145,7 +1146,7 @@ mod tests {
 
         let mut mock_maker = MockNodeMaker::new();
         let mock_cpu_temperature = mock_maker.make("MockCpuTemperature", vec![]);
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let (cobalt_sender, mut cobalt_receiver) = futures::channel::mpsc::channel(10);
         let futures_out = FuturesUnordered::new();
         let _platform_metrics = PlatformMetricsBuilder {
@@ -1250,7 +1251,7 @@ mod tests {
     fn test_log_thermal_load() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let platform_metrics = PlatformMetricsBuilder {
             cpu_temperature_handler: Some(create_dummy_node()),
             crash_report_handler: Some(create_dummy_node()),

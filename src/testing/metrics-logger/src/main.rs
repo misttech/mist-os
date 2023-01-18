@@ -655,7 +655,7 @@ mod tests {
             cpu_stats_driver: Option<CpuStatsDriver>,
             network_drivers: Option<Vec<fhwnet::DeviceProxy>>,
         ) -> Self {
-            let inspector = inspect::Inspector::new();
+            let inspector = inspect::Inspector::default();
 
             // Build the server.
             let mut builder =

@@ -9,7 +9,7 @@ const DEFAULT_BUFFER_SIZE: usize = 100;
 
 pub fn fake_inspect_tree() -> (Arc<inspect::WlanstackTree>, mpsc::Receiver<String>) {
     let (sender, receiver) = mpsc::channel(DEFAULT_BUFFER_SIZE);
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     (Arc::new(inspect::WlanstackTree::new(inspector, sender)), receiver)
 }
 

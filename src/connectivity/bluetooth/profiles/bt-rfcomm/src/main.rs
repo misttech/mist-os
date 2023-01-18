@@ -29,7 +29,7 @@ pub async fn main() -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
 
-    let inspect = fuchsia_inspect::Inspector::new();
+    let inspect = fuchsia_inspect::Inspector::default();
     if let Err(e) = inspect_runtime::serve(&inspect, &mut fs) {
         warn!("Could not serve inspect: {}", e);
     }

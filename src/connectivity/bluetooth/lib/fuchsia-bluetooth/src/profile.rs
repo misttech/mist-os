@@ -1286,7 +1286,7 @@ mod tests {
 
     #[test]
     fn local_sco_parameters_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         assert_data_tree!(inspect, root: {});
 
         let params = fidl_bredr::ScoConnectionParameters {

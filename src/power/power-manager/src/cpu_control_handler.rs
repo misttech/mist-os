@@ -968,7 +968,7 @@ pub mod tests {
         let capacitance = Farads(100.0e-12);
         let logical_cpu_numbers = vec![0, 1, 2, 3];
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         let _node = CpuControlHandlerBuilder::new()
             .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(vec![p_state]))

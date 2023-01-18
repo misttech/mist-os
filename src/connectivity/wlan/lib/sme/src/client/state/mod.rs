@@ -2905,7 +2905,7 @@ mod tests {
 
             let (mlme_sink, mlme_stream) = mpsc::unbounded();
             let (timer, time_stream) = timer::create_timer();
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let hasher = WlanHasher::new([88, 77, 66, 55, 44, 33, 22, 11]);
             let context = Context {
                 device_info: Arc::new(fake_device_info()),

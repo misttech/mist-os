@@ -109,7 +109,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_reverser() -> Result<(), Error> {
         // [START test_inspector]
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         // [END test_inspector]
 
         let node = inspector.root().create_child("reverser_service");

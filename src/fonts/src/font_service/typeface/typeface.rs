@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_typeface_inspect_data() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
 
         let typeface = Typeface {
             asset_id: AssetId(5),

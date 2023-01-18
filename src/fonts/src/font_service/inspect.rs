@@ -239,7 +239,7 @@ mod tests {
     #[allow(unused_variables)]
     #[test]
     fn test_service_inspect_data() -> Result<(), Error> {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
 
         let manifest_paths = vec![
             "/path/to/manifest-a.font_manifest.json".to_string(),

@@ -57,7 +57,7 @@ async fn main_inner() -> Result<(), Error> {
         warn!("Ignoring custom update package url: {}", url);
     }
 
-    let inspector = finspect::Inspector::new();
+    let inspector = finspect::Inspector::default();
 
     let target_channel_manager =
         channel::TargetChannelManager::new(connect::ServiceConnector, "/config/data");

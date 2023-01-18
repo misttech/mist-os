@@ -2117,7 +2117,7 @@ mod tests {
             let block = state_guard
                 .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         inspector.root().record_uint("a", 1);
                         Ok(inspector)
                     }
@@ -2190,7 +2190,7 @@ mod tests {
         let mut state_guard = state.try_lock().expect("lock state");
         state_guard
             .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
-                async move { Ok(Inspector::new()) }.boxed()
+                async move { Ok(Inspector::default()) }.boxed()
             })
             .unwrap();
         let content_block = state_guard.heap().get_block(6).unwrap();
@@ -2205,7 +2205,7 @@ mod tests {
         let _block1 = state_guard
             .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
                 async move {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     inspector.root().record_uint("a", 1);
                     Ok(inspector)
                 }

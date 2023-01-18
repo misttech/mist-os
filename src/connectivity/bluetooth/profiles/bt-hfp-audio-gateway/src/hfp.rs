@@ -832,7 +832,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn expected_inspect_tree() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         assert_data_tree!(inspector, root: {});
 
         let (profile, profile_svc, _server) = setup_profile_and_test_server();

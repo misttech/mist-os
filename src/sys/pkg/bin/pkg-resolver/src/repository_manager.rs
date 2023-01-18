@@ -583,7 +583,7 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
     pub fn build(self) -> RepositoryManager {
         let (sender, _) = futures::channel::mpsc::channel(0);
         let cobalt_sender = ProtocolSender::new(sender);
-        let node = inspect::Inspector::new().root().create_child("test");
+        let node = inspect::Inspector::default().root().create_child("test");
         self.cobalt_sender(cobalt_sender).inspect_node(node).build()
     }
 }
@@ -1092,7 +1092,7 @@ mod tests {
     fn to_inspectable_map(
         from: HashMap<RepositoryUrl, Arc<RepositoryConfig>>,
     ) -> HashMap<RepositoryUrl, InspectableRepositoryConfig> {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         to_inspectable_map_with_node(from, inspector.root())
     }
 
@@ -1665,7 +1665,7 @@ mod tests {
 
         let insp_config = InspectableRepositoryConfig::new(
             Arc::clone(&config),
-            inspect::Inspector::new().root(),
+            inspect::Inspector::default().root(),
             "foo",
         );
         assert_eq!(repomgr.dynamic_configs.insert(fuchsia_url.clone(), insp_config), None);
@@ -1698,7 +1698,7 @@ mod tests {
             .add_static_config("fuchsia.com.json", (*fuchsia_config).clone())
             .build();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         let _repomgr = env
             .repo_manager_builder()
@@ -1742,7 +1742,7 @@ mod tests {
     async fn test_building_repo_manager_with_no_static_configs_populates_inspect() {
         let env = TestEnv::builder().with_empty_dynamic_configs().with_persisted_repos().build();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         let _repomgr = env
             .repo_manager_builder()
@@ -1773,7 +1773,7 @@ mod tests {
     async fn test_insert_remove_updates_inspect() {
         let env = TestEnv::builder().with_empty_dynamic_configs().with_persisted_repos().build();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         let mut repomgr = env
             .repo_manager_builder()

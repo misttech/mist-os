@@ -29,7 +29,7 @@ const WEATHER_REPORT_2: WeatherReport =
 
 #[fuchsia::test]
 fn valid_struct() {
-    let inspector = &Inspector::new();
+    let inspector = &Inspector::default();
     let root = inspector.root();
     // Use the record API to write the initial state one time.
     root.record_child("initial_state", |node| WEATHER_REPORT_1.record(node));

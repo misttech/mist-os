@@ -164,7 +164,7 @@ mod tests {
 
         assert!(config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: true,
@@ -192,7 +192,7 @@ mod tests {
 
         assert!(config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: true,
@@ -230,7 +230,7 @@ mod tests {
 
         assert!(!config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: true,
@@ -260,7 +260,7 @@ mod tests {
 
         assert!(!config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: false,
@@ -292,7 +292,7 @@ mod tests {
 
         assert!(!config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: false,
@@ -323,7 +323,7 @@ mod tests {
 
         assert!(config.has_error());
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         config.record_to_inspect(inspector.root());
         assert_data_tree!(inspector, root: {
             filtering_enabled: true,

@@ -179,7 +179,7 @@ pub(crate) mod tests {
         fidl::endpoints::{create_proxy, RequestStream, ServerEnd},
         fidl_test_inspect_validate::*,
         fuchsia_async as fasync,
-        fuchsia_inspect::{Inspector, IntProperty, Node},
+        fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node},
         fuchsia_zircon::HandleBased,
         futures::prelude::*,
         std::collections::HashMap,
@@ -226,8 +226,10 @@ pub(crate) mod tests {
                     match event {
                         ValidateRequest::Initialize { params, responder } => {
                             let inspector = match params.vmo_size {
-                                Some(size) => Inspector::new_with_size(size as usize),
-                                None => Inspector::new(),
+                                Some(size) => {
+                                    Inspector::new(InspectorConfig::default().size(size as usize))
+                                }
+                                None => Inspector::default(),
                             };
                             responder
                                 .send(

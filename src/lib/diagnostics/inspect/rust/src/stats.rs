@@ -50,7 +50,7 @@ impl Node<LazyNode> {
         let lazy_node = parent.create_lazy_child(FUCHSIA_INSPECT_STATS, move || {
             let root_node = weak_root_node.clone_weak();
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 if let Some(state) = root_node.state() {
                     write_stats(&state, inspector.root());
                 }
@@ -92,13 +92,13 @@ mod tests {
 
     #[fuchsia::test]
     fn inspect_stats() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let snapshot_parent = inspector.root().create_child("snapshot");
         let _snapshot_node = super::Node::snapshot(&inspector, &snapshot_parent);
         let _node = super::Node::new(&inspector, inspector.root());
         inspector.root().record_lazy_child("foo", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_uint("a", 1);
                 Ok(inspector)
             }

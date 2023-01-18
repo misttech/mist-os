@@ -1704,7 +1704,7 @@ pub(crate) mod tests {
     fn pairing_manager_inspect_tree() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut pairing_inspect =
             PairingManagerInspect::default().with_inspect(inspect.root(), "pairing").unwrap();
 

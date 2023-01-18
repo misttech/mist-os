@@ -842,7 +842,7 @@ mod tests {
         let system_power_mode_config =
             SystemPowerModeConfig::new().add_client_config(ClientType::Wlan, ClientConfig::new(1));
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let _node = SystemPowerModeHandlerBuilder::new()
             .with_inspect_root(inspector.root())
             .with_system_power_mode_config(system_power_mode_config)

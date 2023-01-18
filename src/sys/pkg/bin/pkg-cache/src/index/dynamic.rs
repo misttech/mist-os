@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_get_name_if_active() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
         dynamic_index.add_package(
@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_all_blobs() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
         assert_eq!(dynamic_index.all_blobs(), HashSet::new());
 
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn lookup_content_blobs_handles_withmetafar_and_active_states() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_complete_install() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -585,7 +585,7 @@ mod tests {
 
     #[test]
     fn complete_install_unknown_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         assert_matches!(
@@ -596,7 +596,7 @@ mod tests {
 
     #[test]
     fn complete_install_pending_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -609,7 +609,7 @@ mod tests {
 
     #[test]
     fn complete_install_active_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn start_install() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn start_install_do_not_overwrite() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn cancel_install() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -672,7 +672,7 @@ mod tests {
 
     #[test]
     fn cancel_install_with_meta_far() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -692,7 +692,7 @@ mod tests {
 
     #[test]
     fn cancel_install_active() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn cancel_install_unknown() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         dynamic_index.start_install(Hash::from([2; 32]));
@@ -784,7 +784,7 @@ mod tests {
         ]);
 
         let mut dynamic_index =
-            DynamicIndex::new(finspect::Inspector::new().root().create_child("index"));
+            DynamicIndex::new(finspect::Inspector::default().root().create_child("index"));
 
         let () = load_cache_packages(&mut dynamic_index, &cache_packages, &blobfs.client()).await;
 
@@ -824,7 +824,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_transitions_package_from_pending_to_with_meta_far() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -853,7 +853,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_unknown_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut index = DynamicIndex::new(inspector.root().create_child("index"));
 
         assert_matches!(
@@ -864,7 +864,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_package_with_meta_far() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -885,7 +885,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_active_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut index = DynamicIndex::new(inspector.root().create_child("index"));
 
         let hash = Hash::from([2; 32]);
@@ -904,7 +904,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn add_blobs_adds_blobs() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
         let hash = Hash::from([0; 32]);
         let path = PackagePath::from_name_and_variant(
@@ -931,7 +931,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn add_blobs_errors_on_unknown_package() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
 
         assert_matches!(

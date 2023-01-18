@@ -83,7 +83,7 @@ mod quick_start_after {
 
     #[test]
     fn init() -> Result<(), fuchsia_inspect_derive::AttachError> {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         // [START quick_start_after_init]
         // Initialization
@@ -197,7 +197,7 @@ mod derive_inspect {
 
     #[test]
     fn attach_yak() -> Result<(), AttachError> {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         // [START inspect_node_present_init]
         let yak = Yak::new().with_inspect(inspector.root(), "my_yak")?;
@@ -210,7 +210,7 @@ mod derive_inspect {
 
     #[test]
     fn attach_stable() -> Result<(), AttachError> {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         // [START inspect_nested_init]
         // Stable owns a Yak, which also implements Inspect.
@@ -230,7 +230,7 @@ mod smart_pointers {
 
     #[test]
     fn ivalue_demo() -> Result<(), AttachError> {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         // [START smart_pointers_ivalue]
         let mut number = IValue::new(1337u16) // IValue is an IOwned smart pointer
@@ -292,7 +292,7 @@ mod unit {
 
     #[test]
     fn unit_demo() -> Result<(), AttachError> {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
 
         // [START unit_nested_init]
         let rect_original = Rect { tl: Point { x: -3.0, y: 5.0 }, br: Point { x: 2.0, y: -1.5 } };

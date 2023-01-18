@@ -449,7 +449,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn clients_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let clients = Clients::new()
             .with_inspect(inspect.root(), "advertised_channels")
             .expect("valid inspect tree");

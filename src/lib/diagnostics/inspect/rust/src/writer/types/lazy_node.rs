@@ -61,12 +61,12 @@ mod tests {
 
     #[fuchsia::test]
     fn lazy_values() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = inspector.root().create_child("node");
         let node_block = node.get_block().unwrap();
         {
             let lazy_node =
-                node.create_lazy_values("lazy", || async move { Ok(Inspector::new()) }.boxed());
+                node.create_lazy_values("lazy", || async move { Ok(Inspector::default()) }.boxed());
             let lazy_node_block = lazy_node.get_block().unwrap();
             assert_eq!(lazy_node_block.block_type(), BlockType::LinkValue);
             assert_eq!(
@@ -81,12 +81,12 @@ mod tests {
 
     #[fuchsia::test]
     fn lazy_node() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = inspector.root().create_child("node");
         let node_block = node.get_block().unwrap();
         {
             let lazy_node =
-                node.create_lazy_child("lazy", || async move { Ok(Inspector::new()) }.boxed());
+                node.create_lazy_child("lazy", || async move { Ok(Inspector::default()) }.boxed());
             let lazy_node_block = lazy_node.get_block().unwrap();
             assert_eq!(lazy_node_block.block_type(), BlockType::LinkValue);
             assert_eq!(

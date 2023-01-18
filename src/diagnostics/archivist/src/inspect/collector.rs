@@ -249,11 +249,11 @@ mod tests {
 
         // Make a ServiceFs serving an inspect tree.
         let mut fs = ServiceFs::new();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int("a", 1);
         inspector.root().record_lazy_child("lazy", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_double("b", 3.25);
                 Ok(inspector)
             }

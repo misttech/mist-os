@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn record_inspect() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let allow_list = NonStaticAllowList::parse(b"some-name\nother-name").unwrap();
 
         allow_list.record_inspect(inspector.root());

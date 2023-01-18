@@ -20,7 +20,7 @@ use {
 };
 
 lazy_static! {
-    pub static ref INSPECTOR: Inspector = Inspector::new();
+    pub static ref INSPECTOR: Inspector = Inspector::default();
 }
 
 /// A record in inspect of the success count and failure counts for an some operation.
@@ -196,7 +196,7 @@ mod tests {
 
     #[fuchsia::test]
     fn after_initialization() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let _diagnostics = InspectDiagnostics::new(inspector.root());
         assert_data_tree!(
             inspector,
@@ -277,7 +277,7 @@ mod tests {
 
     #[fuchsia::test]
     fn incoming_manager_outcomes() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let diagnostics = InspectDiagnostics::new(inspector.root());
         diagnostics.incoming_manager_outcome(IncomingManagerMethod::AddCredential, Ok(()));
         diagnostics.incoming_manager_outcome(
@@ -325,7 +325,7 @@ mod tests {
 
     #[fuchsia::test]
     fn incoming_reset_outcomes() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let diagnostics = InspectDiagnostics::new(inspector.root());
         diagnostics.incoming_reset_outcome(IncomingResetMethod::Reset, Ok(()));
         diagnostics.incoming_reset_outcome(
@@ -354,7 +354,7 @@ mod tests {
 
     #[fuchsia::test]
     fn pinweaver_outcomes() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let diagnostics = InspectDiagnostics::new(inspector.root());
         diagnostics.pinweaver_outcome(PinweaverMethod::GetLog, Ok(()));
         diagnostics.pinweaver_outcome(PinweaverMethod::TryAuth, Err(PWE::RateLimitReached));
@@ -387,7 +387,7 @@ mod tests {
 
     #[fuchsia::test]
     fn hash_tree_outcomes() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let diagnostics = InspectDiagnostics::new(inspector.root());
         diagnostics.hash_tree_outcome(HashTreeOperation::Load, Err(HTE::DeserializationFailed));
         diagnostics.hash_tree_outcome(HashTreeOperation::Load, Ok(()));
@@ -416,7 +416,7 @@ mod tests {
 
     #[fuchsia::test]
     fn credential_counts() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let diagnostics = InspectDiagnostics::new(inspector.root());
         diagnostics.credential_count(3);
         diagnostics.credential_count(1);

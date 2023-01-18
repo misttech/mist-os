@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn success() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let () = write_to_inspect(inspector.root(), &Ok(()), Duration::from_micros(2));
 
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn failure_blobfs_fidl() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let () = write_to_inspect(
             inspector.root(),
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn failure_blobfs_timeout() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let () = write_to_inspect(
             inspector.root(),
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn failure_blobfs_verify() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let () = write_to_inspect(
             inspector.root(),
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn failure_blobfs_and_netstack() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let () = write_to_inspect(
             inspector.root(),
@@ -205,7 +205,7 @@ mod tests {
          /// Check the largest reported duration is u64::MAX, even if the actual duration is longer.
         #[test]
         fn success_duration_max_u64(nanos in 0u32..1_000_000_000) {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
 
             let () =
                 write_to_inspect(inspector.root(), &Ok(()), Duration::new(u64::MAX, nanos));

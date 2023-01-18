@@ -423,7 +423,7 @@ async fn main() {
 
     let mut fs = ServiceFs::new();
 
-    let inspector = inspect::Inspector::new();
+    let inspector = inspect::Inspector::default();
     inspect_runtime::serve(&inspector, &mut fs).unwrap_or_else(|e| {
         error!("Failed to serve the inspect tree: {:?}", e);
     });

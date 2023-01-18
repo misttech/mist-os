@@ -237,7 +237,7 @@ pub mod tests {
     /// Tests for the presence and correctness of Inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         // For this test, let the server succeed for the Reboot state but give an
         // error for any other state (so that we can test error paths)

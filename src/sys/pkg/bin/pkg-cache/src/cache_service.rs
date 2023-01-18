@@ -1138,7 +1138,7 @@ mod serve_needed_blobs_tests {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
 
         let (blobfs, _) = blobfs::Client::new_test();
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
             inspector.root().create_child("test_does_not_use_inspect "),
         )));
@@ -1164,7 +1164,7 @@ mod serve_needed_blobs_tests {
             fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
 
         let (blobfs, blobfs_mock) = blobfs::Client::new_mock();
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
             inspector.root().create_child("test_does_not_use_inspect "),
         )));
@@ -2360,7 +2360,7 @@ mod get_handler_tests {
         let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (blobfs, _) = blobfs::Client::new_test();
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
             inspector.root().create_child("test_does_not_use_inspect "),
         )));

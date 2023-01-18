@@ -166,7 +166,7 @@ mod tests {
     #[fuchsia::test]
     fn test_auto_persist() {
         let (sender, mut receiver) = mpsc::channel::<String>(100);
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let node = inspector.root().create_child("node");
         let mut auto_persist_node = AutoPersist::new(node, "some-tag", sender);
 

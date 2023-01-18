@@ -465,7 +465,7 @@ mod tests {
             }
         }
 
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
 
         let assets = vec![
             v2::Asset {

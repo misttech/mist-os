@@ -1602,7 +1602,7 @@ mod tests {
 
     #[test]
     fn provider_server_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let provider_inspect =
             ProviderInspect::default().with_inspect(inspect.root(), "provider").unwrap();
 

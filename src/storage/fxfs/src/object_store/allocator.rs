@@ -803,7 +803,7 @@ impl SimpleAllocator {
         parent.record_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
-                let inspector = fuchsia_inspect::Inspector::new();
+                let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
                     let counters = this.counters.lock().unwrap();
                     let root = inspector.root();

@@ -316,7 +316,7 @@ mod tests {
     }
 
     fn inflate_and_validate(pfns: &[u32], expected_calls: &[Range<u64>]) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
         let vmo_size = (*pfns.iter().max().unwrap() as u64 + 1) * PAGE_SIZE as u64;
@@ -375,7 +375,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_deflate_command() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
         let pfns: [u32; 4] = [3, 2, 1, 0];
@@ -416,7 +416,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inflate_command_out_of_bounds_pfn() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
         // 18 here is out of bounds of passed VMO and expected to trigger an error
@@ -462,7 +462,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_free_page_reporting() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
 

@@ -114,7 +114,7 @@ mod tests {
     // Tests that inserting items into the map automatically records them in inspect.
     #[fuchsia::test]
     fn test_map_insert() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let mut map = ManagedInspectMap::<IValue<String>>::with_node(
             inspector.root().create_child("managed_node"),
@@ -134,7 +134,7 @@ mod tests {
     // Tests that removing items from the map automatically removes them from inspect.
     #[fuchsia::test]
     fn test_map_remove() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let mut map = ManagedInspectMap::<IValue<String>>::with_node(
             inspector.root().create_child("managed_node"),
@@ -156,7 +156,7 @@ mod tests {
     // inspect.
     #[fuchsia::test]
     fn test_map_insert_with_property_name() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let mut map = ManagedInspectMap::<IValue<String>>::with_node(
             inspector.root().create_child("managed_node"),
@@ -186,7 +186,7 @@ mod tests {
     // field in a struct that derives Inspect.
     #[fuchsia::test]
     fn test_map_derive_inspect() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let mut wrapper = TestInspectWrapper::default()
             .with_inspect(inspector.root(), "wrapper_node")

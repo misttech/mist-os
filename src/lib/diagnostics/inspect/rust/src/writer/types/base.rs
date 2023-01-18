@@ -211,7 +211,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_reparent_from_state() {
-        let insp = Inspector::new();
+        let insp = Inspector::default();
         let root = insp.root();
         let a = root.create_child("a");
         let b = a.create_child("b");
@@ -232,8 +232,8 @@ mod tests {
 
     #[fuchsia::test]
     fn reparent_from_wrong_state() {
-        let insp1 = Inspector::new();
-        let insp2 = Inspector::new();
+        let insp1 = Inspector::default();
+        let insp2 = Inspector::default();
 
         assert!(insp1.root().reparent(insp2.root()).is_err());
 

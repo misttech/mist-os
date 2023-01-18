@@ -532,7 +532,7 @@ pub mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = CpuStatsHandlerBuilder::new()
             .with_proxy(setup_fake_service(|| vec![Nanoseconds(0); TEST_NUM_CORES as usize]))
             .with_inspect_root(inspector.root())

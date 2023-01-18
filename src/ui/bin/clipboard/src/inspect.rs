@@ -270,7 +270,7 @@ mod tests {
     /// # Arguments
     /// -   `now`: Initialization timestamp.
     fn make_handles(now: zx::Time) -> (ServiceInspectData, Inspector) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let inspect_data = ServiceInspectData::new(inspector.root(), now);
         (inspect_data, inspector)
     }

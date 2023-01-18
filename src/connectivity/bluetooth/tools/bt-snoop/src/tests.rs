@@ -28,7 +28,7 @@ fn setup() -> (
     ConcurrentClientRequestFutures,
     Inspector,
 ) {
-    let inspect = Inspector::new();
+    let inspect = Inspector::default();
     (
         TestExecutor::new(),
         ConcurrentSnooperPacketFutures::new(),
@@ -129,7 +129,7 @@ async fn test_packet_logs_inspect() {
     // This is a test that basic inspect data is plumbed through from the inspect root.
     // More comprehensive testing of possible permutations of packet log inspect data
     // is found in bounded_queue.rs
-    let inspect = Inspector::new();
+    let inspect = Inspector::default();
     let runtime_metrics_node = inspect.root().create_child("runtime_metrics");
     let mut packet_logs =
         PacketLogs::new(2, 256, 256, Duration::from_secs(60), runtime_metrics_node);
@@ -194,7 +194,7 @@ fn test_snoop_config_inspect() {
         truncate_payload: Some(4),
         verbosity: 5,
     };
-    let inspect = Inspector::new();
+    let inspect = Inspector::default();
     let snoop_config_node = inspect.root().create_child("configuration");
     let config = SnoopConfig::from_args(args, snoop_config_node);
     assert_data_tree!(inspect, root: {

@@ -26,7 +26,7 @@ async fn main() -> Result<(), Error> {
     let (profile_proxy, profile_client) = register_profile()?;
     let mut fs: ServiceFs<ServiceObj<'_, ()>> = ServiceFs::new();
 
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
         error!("Could not serve inspect: {}", e);
     }

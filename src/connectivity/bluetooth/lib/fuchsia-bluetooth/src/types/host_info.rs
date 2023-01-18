@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn inspect() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("info");
         let info = HostInfo {
             id: HostId(1),

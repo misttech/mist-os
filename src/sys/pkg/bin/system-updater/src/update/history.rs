@@ -465,7 +465,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn creates_inspect_on_parse_error() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let history_node = inspector.root().create_child("history");
         let history =
             UpdateHistory::load_from_or_default(make_reader("not json"), history_node).await;
@@ -489,7 +489,7 @@ mod tests {
     async fn runs_with_dropped_inspector() {
         // Simulate the oneshot mode, in which we create an inspector and then immediately drop it.
         // Make sure we can still parse history.
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let history_node = inspector.root().create_child("history");
         drop(inspector);
 
@@ -520,7 +520,7 @@ mod tests {
     // Also a useful test that we can actually parse history.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn populates_inspect() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let history_node = inspector.root().create_child("history");
         let mut history = UpdateHistory::load_from_or_default(
             make_reader(

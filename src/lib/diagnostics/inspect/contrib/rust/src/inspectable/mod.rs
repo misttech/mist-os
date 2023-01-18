@@ -282,7 +282,7 @@ mod test {
 
     type InspectableInt = Inspectable<i64, InspectableIntWatcher>;
     fn make_inspectable(i: i64) -> (InspectableInt, Inspector) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let inspectable = InspectableInt::new(i, inspector.root(), "inspectable-int");
         (inspectable, inspector)
     }
@@ -369,7 +369,7 @@ mod test_inspectable_len {
 
     #[fuchsia::test]
     fn test_initialization() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _inspectable = InspectableLen::new(vec![0], inspector.root(), "test-property");
 
         assert_data_tree!(
@@ -382,7 +382,7 @@ mod test_inspectable_len {
 
     #[fuchsia::test]
     fn test_watcher() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let mut inspectable = InspectableLen::new(vec![0], inspector.root(), "test-property");
 
         inspectable.get_mut().push(1);
@@ -403,7 +403,7 @@ mod test_inspectable_debug_string {
 
     #[fuchsia::test]
     fn test_initialization() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _inspectable = InspectableDebugString::new(vec![0], inspector.root(), "test-property");
 
         assert_data_tree!(
@@ -416,7 +416,7 @@ mod test_inspectable_debug_string {
 
     #[fuchsia::test]
     fn test_watcher() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let mut inspectable =
             InspectableDebugString::new(vec![0], inspector.root(), "test-property");
 
@@ -438,7 +438,7 @@ mod test_inspectable_u64 {
 
     #[fuchsia::test]
     fn test_initialization() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _inspectable = InspectableU64::new(0, inspector.root(), "test-property");
 
         assert_data_tree!(
@@ -451,7 +451,7 @@ mod test_inspectable_u64 {
 
     #[fuchsia::test]
     fn test_watcher() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let mut inspectable = InspectableU64::new(0, inspector.root(), "test-property");
 
         *inspectable.get_mut() += 1;
@@ -472,7 +472,7 @@ mod test_inspectable_bool {
 
     #[fuchsia::test]
     fn test_initialization() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _inspectable = InspectableBool::new(false, inspector.root(), "test-property");
 
         assert_data_tree!(
@@ -485,7 +485,7 @@ mod test_inspectable_bool {
 
     #[fuchsia::test]
     fn test_watcher() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let mut inspectable = InspectableBool::new(false, inspector.root(), "test-property");
 
         *inspectable.get_mut() = true;

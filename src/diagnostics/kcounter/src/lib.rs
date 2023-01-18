@@ -38,7 +38,9 @@ async fn publish_kcounter_inspect(
         async move {
             let status = kcounter.update_inspect_vmo().await?;
             let () = zx::ok(status)?;
-            Ok(fuchsia_inspect::Inspector::no_op_from_vmo(vmo))
+            Ok(fuchsia_inspect::Inspector::new(
+                fuchsia_inspect::InspectorConfig::default().no_op().vmo(vmo),
+            ))
         }
         .boxed()
     });
@@ -96,7 +98,7 @@ mod tests {
 
         // Use a local Inspector instead of the static singleton so fasync won't complain about
         // leaking resources.
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         publish_kcounter_inspect(proxy, &inspector).await?;
         {
             let counter = counter.lock().unwrap();

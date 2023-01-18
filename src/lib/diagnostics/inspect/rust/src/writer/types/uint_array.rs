@@ -113,7 +113,7 @@ mod tests {
         let default = UintArrayProperty::default();
         default.add(1, 1);
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
         let node_block = node.get_block().unwrap();

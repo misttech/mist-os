@@ -168,7 +168,7 @@ where
 mod tests {
     use {
         super::*,
-        crate::{assert_data_tree, assert_json_diff, reader, Inspector},
+        crate::{assert_data_tree, assert_json_diff, reader, Inspector, InspectorConfig},
     };
 
     #[fuchsia::test]
@@ -220,14 +220,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn read_with_hanging_lazy_node() -> Result<(), anyhow::Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         root.record_string("child", "value");
 
         root.record_lazy_values("lazy-node-always-hangs", || {
             async move {
                 fuchsia_async::Timer::new(Duration::from_secs(30 * 60).after_now()).await;
-                Ok(Inspector::new())
+                Ok(Inspector::default())
             }
             .boxed()
         });
@@ -245,11 +245,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn missing_value_parse_failure() -> Result<(), anyhow::Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let _lazy_child = inspector.root().create_lazy_child("lazy", || {
             async move {
                 // For the sake of the test, force an invalid vmo.
-                Ok(Inspector::new_no_op())
+                Ok(Inspector::new(InspectorConfig::default().no_op()))
             }
             .boxed()
         });
@@ -262,7 +262,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn missing_value_not_found() -> Result<(), anyhow::Error> {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.state().map(|state| {
             let mut state = state.try_lock().expect("lock state");
             state.allocate_link("missing", "missing-404", LinkNodeDisposition::Child, 0).unwrap();
@@ -276,17 +276,17 @@ mod tests {
     }
 
     fn test_inspector() -> Inspector {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         root.record_int("int", 3);
         root.record_lazy_child("lazy-node", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_string("a", "test");
                 let child = inspector.root().create_child("child");
                 child.record_lazy_values("lazy-values", || {
                     async move {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         inspector.root().record_double("double", 3.25);
                         Ok(inspector)
                     }

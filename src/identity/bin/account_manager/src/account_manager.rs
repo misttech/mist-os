@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let data_dir = TempDir::new().unwrap();
         request_stream_test(
             AccountManager::new(data_dir.path().into(), &inspector).unwrap(),
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn test_initially_empty() {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         request_stream_test(
             create_accounts(vec![], data_dir.path(), &inspector),
             |proxy, _test_object| async move {
@@ -452,7 +452,7 @@ mod tests {
             )],
         );
         stored_account_list.save().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         request_stream_test(read_accounts(data_dir.path(), &inspector), |proxy, _test_object| {
             async move {
                 // Try to delete a very different account from the one we added.
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn test_account_listener() {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         request_stream_test(
             create_accounts(vec![1, 2], data_dir.path(), &inspector),
             |proxy, _| {
@@ -539,7 +539,7 @@ mod tests {
     #[test]
     fn test_account_listener_invalid_requests() {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         request_stream_test(
             create_accounts(vec![1, 2], data_dir.path(), &inspector),
             |proxy, _| async move {

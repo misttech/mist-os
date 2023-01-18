@@ -89,7 +89,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn starts_healthy() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let storage = bridge::testing::Fake::new(OptOutPreference::AllowAllUpdates);
         let _storage = HealthStatus::new(inspector.root()).wrap_bridge(storage);
@@ -99,7 +99,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn updates_health_on_storage_error() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let (storage, fail_requests) =
             bridge::testing::Fake::new_with_error_toggle(OptOutPreference::AllowAllUpdates);
@@ -115,7 +115,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn updates_health_on_storage_success() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let (storage, fail_requests) =
             bridge::testing::Fake::new_with_error_toggle(OptOutPreference::AllowAllUpdates);

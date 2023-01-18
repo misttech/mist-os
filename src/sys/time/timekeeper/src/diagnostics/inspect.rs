@@ -36,7 +36,7 @@ const FREQUENCY_COUNT: usize = 3;
 const CLOCK_CORRECTION_COUNT: usize = 3;
 
 lazy_static! {
-    pub static ref INSPECTOR: Inspector = Inspector::new();
+    pub static ref INSPECTOR: Inspector = Inspector::default();
 }
 
 fn monotonic_time() -> i64 {
@@ -441,7 +441,7 @@ impl InspectDiagnostics {
         node.record_lazy_child("current", move || {
             let clock_clone = Arc::clone(&clock);
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 TimeSet::now(&clock_clone).record(inspector.root());
                 Ok(inspector)
             }
@@ -619,7 +619,7 @@ mod tests {
 
     #[fuchsia::test]
     fn after_initialization() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         let (_inspect_diagnostics, _) = create_test_object(&inspector, false);
         assert_data_tree!(
             inspector,
@@ -654,7 +654,7 @@ mod tests {
 
     #[fuchsia::test]
     fn after_update() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
@@ -712,7 +712,7 @@ mod tests {
 
     #[fuchsia::test]
     fn real_time_clock() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         let (inspect_diagnostics, _) = create_test_object(&inspector, false);
         inspect_diagnostics.record(Event::InitializeRtc {
             outcome: InitializeRtcOutcome::Succeeded,
@@ -748,7 +748,7 @@ mod tests {
 
     #[fuchsia::test]
     fn time_sources() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         let (test, _) = create_test_object(&inspector, true);
         assert_data_tree!(
             inspector,
@@ -795,7 +795,7 @@ mod tests {
 
     #[fuchsia::test]
     fn tracks() {
-        let inspector = &Inspector::new();
+        let inspector = &Inspector::default();
         let (test, _) = create_test_object(&inspector, true);
         assert_data_tree!(
             inspector,

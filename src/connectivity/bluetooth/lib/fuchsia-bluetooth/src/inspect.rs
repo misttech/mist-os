@@ -304,7 +304,7 @@ mod tests {
     ) -> (fasync::TestExecutor, fuchsia_inspect::Inspector, DataStreamInspect) {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(curr_time));
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let d = DataStreamInspect::default()
             .with_inspect(inspector.root(), "data_stream")
             .expect("attach to tree");

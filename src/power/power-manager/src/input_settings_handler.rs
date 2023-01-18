@@ -317,7 +317,7 @@ mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let (proxy, mut fake_settings) = FakeSettingsSvc::new();
         let futures_out = FuturesUnordered::new();
         let _node = InputSettingsHandlerBuilder::new(create_dummy_node())

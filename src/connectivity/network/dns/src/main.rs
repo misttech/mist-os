@@ -960,7 +960,7 @@ fn add_config_state_inspect(
     parent.create_lazy_child("servers", move || {
         let config_state = config_state.clone();
         async move {
-            let srv = fuchsia_inspect::Inspector::new();
+            let srv = fuchsia_inspect::Inspector::default();
             let server_list = config_state.servers();
             for (i, server) in server_list.into_iter().enumerate() {
                 let child = srv.root().create_child(format!("{}", i));
@@ -983,7 +983,7 @@ fn add_query_stats_inspect(
         let stats = stats.clone();
         async move {
             let past_queries = &*stats.inner.lock().await;
-            let node = fuchsia_inspect::Inspector::new();
+            let node = fuchsia_inspect::Inspector::default();
             for (
                 i,
                 QueryWindow {
@@ -1830,7 +1830,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_config_inspect() {
         let env = TestEnvironment::new();
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _config_state_node =
             add_config_state_inspect(inspector.root(), env.config_state.clone());
         assert_data_tree!(inspector, root:{
@@ -1882,7 +1882,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_query_stats_updated() {
         let env = TestEnvironment::new();
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node =
             add_query_stats_inspect(inspector.root(), env.stats.clone());
         assert_data_tree!(inspector, root:{
@@ -1979,7 +1979,7 @@ mod tests {
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const SUCCESSFUL_QUERY_COUNT: u64 = 10;
         const SUCCESSFUL_QUERY_DURATION: zx::Duration = zx::Duration::from_seconds(30);
@@ -2039,7 +2039,7 @@ mod tests {
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const FAILED_QUERY_COUNT: u64 = 10;
         const FAILED_QUERY_DURATION: zx::Duration = zx::Duration::from_millis(500);
@@ -2084,7 +2084,7 @@ mod tests {
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const FAILED_QUERY_COUNT: u64 = 10;
         const FAILED_QUERY_DURATION: zx::Duration = zx::Duration::from_millis(500);
@@ -2149,7 +2149,7 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
 
         // Create some test data to run fake lookups. Simulate a histogram with:
@@ -2208,7 +2208,7 @@ mod tests {
         let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const DELAY: zx::Duration = zx::Duration::from_millis(100);
         for _ in 0..STAT_WINDOW_COUNT {

@@ -790,7 +790,7 @@ mod tests {
                 ClientConfig::new().add_thermal_state(vec![TripPoint::new("sensor1", 15, 20)]),
             );
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = ThermalStateHandlerBuilder {
             node_name: "thermal_state_handler".to_string(),
             inspect_root: Some(inspector.root()),

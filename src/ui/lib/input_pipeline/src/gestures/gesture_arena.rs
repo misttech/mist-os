@@ -1750,7 +1750,7 @@ mod tests {
                 contender_factory: Box::new(contender_factory),
                 mutable_state: RefCell::new(state),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             })
@@ -1765,7 +1765,7 @@ mod tests {
                 contender_factory: contender_factory.clone(),
                 mutable_state: RefCell::new(state),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             });
@@ -1783,7 +1783,7 @@ mod tests {
                 contender_factory: contender_factory.clone(),
                 mutable_state: RefCell::new(state),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             });
@@ -1801,7 +1801,7 @@ mod tests {
                 contender_factory: contender_factory.clone(),
                 mutable_state: RefCell::new(state),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             });
@@ -2200,7 +2200,7 @@ mod tests {
                     buffered_events,
                 }),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             })
@@ -2765,7 +2765,7 @@ mod tests {
                     num_events: 0,
                 }),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
-                    fuchsia_inspect::Inspector::new().root().create_child("some_key"),
+                    fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
             })
@@ -3270,7 +3270,7 @@ mod tests {
             let contender_factory = ContenderFactoryOnceOrPanic::new(vec![contender.clone()]);
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(contender_factory),
-                &fuchsia_inspect::Inspector::new(),
+                &fuchsia_inspect::Inspector::default(),
                 1,
             ));
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
@@ -3329,7 +3329,7 @@ mod tests {
             let contender_factory = ContenderFactoryOnceOrPanic::new(vec![contender.clone()]);
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(contender_factory),
-                &fuchsia_inspect::Inspector::new(),
+                &fuchsia_inspect::Inspector::default(),
                 1,
             ));
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
@@ -3392,7 +3392,7 @@ mod tests {
             let contender_factory = ContenderFactoryOnceOrPanic::new(vec![contender.clone()]);
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(contender_factory),
-                &fuchsia_inspect::Inspector::new(),
+                &fuchsia_inspect::Inspector::default(),
                 1,
             ));
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
@@ -3464,7 +3464,7 @@ mod tests {
             let contender_factory = ContenderFactoryOnceOrPanic::new(vec![contender.clone()]);
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(contender_factory),
-                &fuchsia_inspect::Inspector::new(),
+                &fuchsia_inspect::Inspector::default(),
                 1,
             ));
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
@@ -3544,7 +3544,7 @@ mod tests {
                 }),
             ));
 
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let contender_factory = Box::new(ContenderFactoryOnceOrPanic::new(vec![
                 basic_mismatch_contender,
                 detailed_uint_mismatch_contender,
@@ -3805,7 +3805,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn negative_matching_latency_is_logged_correctly() {
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let gesture_matching_contender = Box::new(StubContender::new());
             let contender_factory =
                 Box::new(ContenderFactoryOnceOrPanic::new(
@@ -3895,7 +3895,7 @@ mod tests {
         #[fuchsia::test(allow_stalls = false)]
         async fn multi_event_gesture_is_logged_correctly(end_gesture_event: EndGestureEvent) {
             // Set up the arena, and send the first touchpad event.
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let matching_contender = Box::new(StubContender::new());
             let arena = Rc::new(GestureArena::new_for_test(
                 // In the `UnconsumedEvent` case, the gesture arena will try to start
@@ -3997,7 +3997,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn retains_latest_events_up_to_cap() {
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(EmptyContenderFactory {}),
                 &inspector,
@@ -4019,7 +4019,7 @@ mod tests {
         #[fuchsia::test]
         fn retains_palm_contacts() {
             let mut executor = fasync::TestExecutor::new_with_fake_time();
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let arena = Rc::new(GestureArena::new_for_test(
                 Box::new(EmptyContenderFactory {}),
                 &inspector,

@@ -543,7 +543,7 @@ pub mod tests {
     /// Tests for the presence and correctness of inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node = SystemShutdownHandlerBuilder::new(create_dummy_node())
             .with_component_mgr_proxy(setup_fake_component_mgr_service(|| {}))
             .with_inspect_root(inspector.root())

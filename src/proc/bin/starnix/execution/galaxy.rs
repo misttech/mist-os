@@ -341,7 +341,7 @@ async fn wait_for_init_file(
 /// Creates a lazy node that will contain the Kernel thread groups state.
 fn create_galaxy_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
     parent.record_lazy_child("kernel", move || {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let thread_groups = inspector.root().create_child("thread_groups");
         for thread_group in kernel.pids.read().get_thread_groups() {
             let tg = thread_group.read();

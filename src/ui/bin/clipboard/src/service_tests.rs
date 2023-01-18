@@ -89,7 +89,7 @@ impl TestHandles {
         let focus_chain_provider_task =
             focus_chain_stream_handler.handle_request_stream(focus_chain_provider_stream);
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let clock = FakeClock::new(zx::Time::from_nanos(0));
 
         let service = Service::<TestServiceDependencies>::new(

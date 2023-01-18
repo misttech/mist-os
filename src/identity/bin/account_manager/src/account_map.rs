@@ -272,7 +272,7 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn empty_map() -> Result<(), AccountManagerError> {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut map = TestAccountMap::load(data_dir.path().into(), inspector.root())?;
         assert_eq!(map.get_account_ids(), vec![]);
         assert_eq!(
@@ -293,7 +293,7 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn check_persisted() -> Result<(), AccountManagerError> {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut map = TestAccountMap::load(data_dir.path().into(), inspector.root())?;
 
         // Regular persistent account
@@ -337,7 +337,7 @@ mod tests {
         std::mem::drop(map);
 
         // New account map loaded from the same directory.
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut map = TestAccountMap::load(data_dir.path().into(), inspector.root())?;
         assert_data_tree!(inspector, root: { accounts: {
             total: 1u64,
@@ -380,7 +380,7 @@ mod tests {
 
         std::mem::drop(map);
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let map = TestAccountMap::load(data_dir.path().into(), inspector.root())?;
 
         // Check that the removed account was persisted correctly
@@ -398,7 +398,7 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn load_errors() -> Result<(), AccountManagerError> {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut accounts = InnerMap::new();
         accounts.insert(*CORRUPT_HANDLER_ACCOUNT_ID, None);
         accounts.insert(*UNKNOWN_ERROR_ACCOUNT_ID, None);
@@ -435,7 +435,7 @@ mod tests {
     #[fuchsia_async::run_until_stalled(test)]
     async fn add_duplicate() -> Result<(), AccountManagerError> {
         let data_dir = TempDir::new().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut accounts = InnerMap::new();
         accounts.insert(*TEST_ACCOUNT_ID_1, None);
         let mut map = TestAccountMap::new(accounts, data_dir.path().into(), inspector.root());

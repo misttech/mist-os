@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn package_state_progression() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let resolver_service =
             ResolverService::from_node(inspector.root().create_child("resolver_service"));
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn concurrent_resolves() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let resolver_service =
             ResolverService::from_node(inspector.root().create_child("resolver_service"));
 
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn cache_fallback_due_to_not_found_increments() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         let resolver_service =
             ResolverService::from_node(inspector.root().create_child("resolver_service"));

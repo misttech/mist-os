@@ -198,7 +198,7 @@ mod tests {
         }))
         .detach();
         let stash = Stash::in_memory_mock();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let system_inspect = inspector.root().create_child("system");
         let watch_peers_broker = hanging_get::HangingGetBroker::new(
             HashMap::new(),

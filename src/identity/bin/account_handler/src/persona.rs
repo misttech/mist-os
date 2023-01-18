@@ -143,7 +143,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_persona() -> Persona {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         Persona::new(
             *TEST_PERSONA_ID,
             Arc::new(AccountLifetime::Persistent { account_dir: PathBuf::from("/nowhere") }),
@@ -153,7 +153,7 @@ mod tests {
     }
 
     fn create_ephemeral_persona() -> Persona {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         Persona::new(
             *TEST_PERSONA_ID,
             Arc::new(AccountLifetime::Ephemeral),

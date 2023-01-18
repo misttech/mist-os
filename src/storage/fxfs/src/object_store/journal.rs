@@ -1437,7 +1437,7 @@ impl Journal {
         parent.record_lazy_child(name, move || {
             let this_clone = this.clone();
             async move {
-                let inspector = fuchsia_inspect::Inspector::new();
+                let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
                     let (journal_min, journal_max, journal_reclaim_size) = {
                         // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.

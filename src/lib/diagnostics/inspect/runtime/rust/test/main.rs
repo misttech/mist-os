@@ -13,12 +13,12 @@ async fn main() -> Result<(), Error> {
     root.record_int("int", 3);
     root.record_lazy_child("lazy-node", || {
         async move {
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             inspector.root().record_string("a", "test");
             let child = inspector.root().create_child("child");
             child.record_lazy_values("lazy-values", || {
                 async move {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     inspector.root().record_double("double", 3.25);
                     Ok(inspector)
                 }

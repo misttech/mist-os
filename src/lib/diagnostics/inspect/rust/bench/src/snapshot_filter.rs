@@ -146,7 +146,7 @@ fn parse_selectors(selectors: &[String]) -> HierarchyMatcher {
 }
 
 fn snapshot_and_select_bench(b: &mut criterion::Bencher, size: usize) {
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
     let mut hierarchy_generator =
         InspectHierarchyGenerator::new(StdRng::seed_from_u64(HIERARCHY_GENERATOR_SEED), inspector);
     hierarchy_generator.generate_hierarchy(size);
@@ -194,7 +194,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn random_generated_hierarchy_is_reproducible() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut hierarchy_generator =
             InspectHierarchyGenerator::new(StdRng::seed_from_u64(0), inspector);
         hierarchy_generator.generate_hierarchy(10);

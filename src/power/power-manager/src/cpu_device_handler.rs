@@ -513,7 +513,7 @@ mod tests {
             PState { frequency: Hertz(1.2e9), voltage: Volts(0.7) },
         ];
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
             setup_fake_controller_proxy(),

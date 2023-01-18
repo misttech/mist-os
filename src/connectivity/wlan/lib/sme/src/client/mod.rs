@@ -1226,7 +1226,7 @@ mod tests {
     #[test]
     fn connecting_to_wep_network_supported() {
         let _executor = fuchsia_async::TestExecutor::new();
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
@@ -1752,7 +1752,7 @@ mod tests {
     #[test]
     fn test_inspect_pulse_persist() {
         let _executor = fuchsia_async::TestExecutor::new();
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, mut persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
@@ -1827,7 +1827,7 @@ mod tests {
     // The unused _exec parameter ensures that an executor exists for the lifetime of the SME.
     // Our internal timer implementation relies on the existence of a local executor.
     fn create_sme(_exec: &fasync::TestExecutor) -> (ClientSme, MlmeStream, TimeStream) {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();

@@ -124,7 +124,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn sco_state_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let mut state =
             InspectableScoState::default().with_inspect(inspect.root(), "sco_connection").unwrap();

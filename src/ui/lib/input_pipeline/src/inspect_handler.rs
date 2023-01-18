@@ -193,7 +193,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn verify_inspect() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let root = inspector.root();
         let test_node = root.create_child("test_node");
 

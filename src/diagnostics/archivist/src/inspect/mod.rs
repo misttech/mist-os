@@ -465,11 +465,11 @@ mod tests {
 
         // Make a ServiceFs serving an inspect tree.
         let mut fs = ServiceFs::new();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_int("a", 1);
         inspector.root().record_lazy_child("lazy", || {
             async move {
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 inspector.root().record_double("b", 3.25);
                 Ok(inspector)
             }
@@ -740,7 +740,7 @@ mod tests {
                         .await;
                 }
 
-                let inspector = Inspector::new();
+                let inspector = Inspector::default();
                 let root = inspector.root();
                 let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
 
@@ -765,7 +765,7 @@ mod tests {
     }
 
     fn inspector_for_reader_test() -> Inspector {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let child_1 = root.create_child("child_1");
         child_1.record_int("some-int", 2);
@@ -810,7 +810,7 @@ mod tests {
             moniker: vec!["test_component.cmx"].into(),
         };
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let test_archive_accessor_node = root.create_child("test_archive_accessor_node");
 

@@ -393,10 +393,10 @@ a value. The callback function is invoked when the property value is read.
   ```rust
   root.create_lazy_{child,values}("lazy", [] {
       async move {
-          let inspector = Inspector::new();
+          let inspector = Inspector::default();
           inspector.root().record_string("version", "1.0");
           inspector.root().record_lazy_{node,values}("lazy", || {
-              let inspector = Inspector::new();
+              let inspector = Inspector::default();
               inspector.root().record_int("value", 10);
               // `_value`'s drop is called when the function returns, so it will be removed.
               // For these situations `record_` is provided.
@@ -472,7 +472,7 @@ a value. The callback function is invoked when the property value is read.
   ```rust
   use fuchsia_inspect::Inspector;
 
-  let inspector = Inspector::new();
+  let inspector = Inspector::default();
   for _ in 0..100 {
     inspector.root().record_child("child");
   }
@@ -489,7 +489,7 @@ a value. The callback function is invoked when the property value is read.
     static ref CHILD: StringReference<'static> = "child".into();
   }
 
-  let inspector = Inspector::new();
+  let inspector = Inspector::default();
   for _ in 0..100 {
     inspector.root().record_child(&*CHILD);
   }
@@ -605,4 +605,4 @@ root:
 [health-check]: /docs/development/diagnostics/inspect/health.md
 [overview]: /docs/development/diagnostics/inspect/README.md
 [moniker]: /reference/components/moniker
-[selectors]: /reference/diagnostics/selectors 
+[selectors]: /reference/diagnostics/selectors

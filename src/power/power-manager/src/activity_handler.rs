@@ -292,7 +292,7 @@ mod tests {
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let (provider_proxy, mut fake_activity) = FakeActivityProvider::new();
         let futures_out = FuturesUnordered::new();
         let _node = ActivityHandlerBuilder::new(create_dummy_node())

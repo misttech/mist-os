@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_iface_manager_eviction() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut ifaces_trees = IfacesTrees::new(2);
 
         ifaces_trees.create_iface_child(inspector.root(), 1);
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_iface_tree_holder() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut ifaces_trees = IfacesTrees::new(2);
 
         let holder = ifaces_trees.create_iface_child(inspector.root(), 1);

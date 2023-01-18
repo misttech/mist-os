@@ -204,7 +204,7 @@ macro_rules! tree_assertion {
 /// The first argument can be an `Inspector`, in which case the whole tree is read from the
 /// `Inspector` and matched against:
 /// ```
-/// let inspector = Inspector::new();
+/// let inspector = Inspector::default();
 /// assert_data_tree!(inspector, root: {});
 /// ```
 ///

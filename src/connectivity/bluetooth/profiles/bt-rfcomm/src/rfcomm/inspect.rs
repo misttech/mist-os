@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn session_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let id = PeerId(999);
         let mut session_inspect =
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn session_multiplexer_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let mut multiplexer = SessionMultiplexerInspect::default()
             .with_inspect(inspect.root(), "multiplexer")
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn session_channel_inspect_tree() {
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut channel =
             SessionChannelInspect::default().with_inspect(inspect.root(), "channel").unwrap();
 
@@ -265,7 +265,7 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_234_567));
 
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         let mut stream =
             DuplexDataStreamInspect::default().with_inspect(inspect.root(), "stream").unwrap();
         // Default inspect tree.

@@ -441,7 +441,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn replace_index_sets_inspect() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
 
         let mut index = RetainedIndex::new(inspector.root().create_child("test-node"));
 

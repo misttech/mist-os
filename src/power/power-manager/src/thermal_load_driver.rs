@@ -693,7 +693,7 @@ mod tests {
     #[test]
     fn test_inspect_data() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
 
         // Create mock nodes
         let mut mock_maker = MockNodeMaker::new();

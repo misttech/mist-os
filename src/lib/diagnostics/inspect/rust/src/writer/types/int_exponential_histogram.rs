@@ -101,7 +101,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_int_exp_histogram() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
         let node_block = node.get_block().unwrap();
@@ -130,7 +130,7 @@ mod tests {
 
     #[fuchsia::test]
     fn exp_histogram_insert() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let hist = root.create_int_exponential_histogram(
             "test",

@@ -28,7 +28,7 @@ async fn main() {
     fuchsia_syslog::init_with_tags(&["system-updater"]).expect("can't init logger");
     fx_log_info!("starting system updater");
 
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     let history_node = inspector.root().create_child("history");
 
     let history = Arc::new(Mutex::new(UpdateHistory::load(history_node).await));

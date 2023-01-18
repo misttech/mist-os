@@ -334,7 +334,7 @@ mod tests {
         fn new() -> Result<GranularTestState, anyhow::Error> {
             let exec = fasync::TestExecutor::new_with_fake_time();
             exec.set_fake_time(fasync::Time::from_nanos(0));
-            let inspector = Inspector::new();
+            let inspector = Inspector::default();
             let mut granular_stats = GranularLogStats::default();
             granular_stats.iattach(inspector.root(), "granular_stats")?;
             Ok(GranularTestState {
@@ -905,7 +905,7 @@ mod tests {
         let mut state = ComponentTestState::new(1000)?;
         state.assert_no_timers();
 
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut component_stats = LogStatsByComponent::default();
         component_stats.iattach(inspector.root(), "component_stats")?;
         let component_a = "a";

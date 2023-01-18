@@ -250,7 +250,7 @@ mod tests {
             create_request_stream::<AccountListenerMarker>().unwrap();
         let listener_1 = client_end_1.into_proxy().unwrap();
         let listener_2 = client_end_2.into_proxy().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let account_event_emitter = AccountEventEmitter::new(inspector.root());
 
         let serve_fut_1 = async move {
@@ -335,7 +335,7 @@ mod tests {
         let options = Options { initial_state: false, add_account: true, remove_account: true };
         let (client_end, mut stream) = create_request_stream::<AccountListenerMarker>().unwrap();
         let listener = client_end.into_proxy().unwrap();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let account_event_emitter = AccountEventEmitter::new(inspector.root());
         assert!(account_event_emitter
             .add_listener(listener, options, &TEST_ACCOUNT_IDS)

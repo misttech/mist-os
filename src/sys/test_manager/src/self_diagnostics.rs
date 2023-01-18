@@ -182,7 +182,7 @@ mod test {
 
     #[fuchsia::test]
     fn inspect_lifetimes() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
         assert_data_tree!(
@@ -233,7 +233,7 @@ mod test {
 
     #[fuchsia::test]
     fn debug_fmt_hierarchy() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
         assert!(format!("{:?}", root_node).contains("root"));
@@ -260,7 +260,7 @@ mod test {
 
     #[fuchsia::test]
     fn debug_fmt_properties() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root_node = DiagnosticNode::new("root", Arc::new(inspector.root().clone_weak()));
 
         assert!(format!("{:?}", root_node).contains("root"));

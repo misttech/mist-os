@@ -21,12 +21,12 @@ mod utils;
 /// Benchmarks for operations that can be done on an Inspect Node.
 fn node_benchmarks(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Node/create_child", move |b| {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         b.iter_with_large_drop(|| root.create_child(NAME));
     });
     bench = bench.with_function("Node/drop", move |b| {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         b.iter_with_large_setup(|| root.create_child(NAME), |child| drop(child));
     });
@@ -43,31 +43,31 @@ macro_rules! bench_numeric_property_fn {
                 bench = bench.with_function(
                     concat!("Node/create_", stringify!($name), "_property"),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_drop(|| root.[<create_ $name>](NAME, 0 as $type));
                     }
                 );
                 bench = bench.with_function(concat!($Property, "/set"), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     let property = root.[<create_ $name>](NAME, 0 as $type);
                     b.iter(|| property.set(1 as $type));
                 });
                 bench = bench.with_function(concat!($Property, "/add"), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     let property = root.[<create_ $name>](NAME, 0 as $type);
                     b.iter(|| property.add(1 as $type));
                 });
                 bench = bench.with_function(concat!($Property, "/subtract"), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     let property = root.[<create_ $name>](NAME, $type::MAX);
                     b.iter(|| property.subtract(1 as $type));
                 });
                 bench = bench.with_function(concat!($Property, "/drop"), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, 0 as $type),
@@ -76,7 +76,7 @@ macro_rules! bench_numeric_property_fn {
                 bench = bench.with_function(
                     concat!("Node/record_", stringify!($name), "_property"),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         b.iter_with_large_setup(
                             || inspector.root().create_child(NAME),
                             |child| child.[<record_ $name>](NAME, 0 as $type));
@@ -113,7 +113,7 @@ macro_rules! bench_property_fn {
                 bench = bench.with_function(
                     format!("Node/create_{}/{}", stringify!($name), size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_drop(|| root.[<create_ $name>](NAME, &initial_val));
                     }
@@ -124,7 +124,7 @@ macro_rules! bench_property_fn {
                 bench = bench.with_function(
                     format!("{}/set/{}", $Property, size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || {
@@ -140,7 +140,7 @@ macro_rules! bench_property_fn {
                 bench = bench.with_function(
                     format!("{}/set_again/{}", $Property, size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || {
@@ -155,7 +155,7 @@ macro_rules! bench_property_fn {
 
                 let initial_val = initial_value.clone();
                 bench = bench.with_function(format!("{}/drop/{}", $Property, size), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, &initial_val),
@@ -165,7 +165,7 @@ macro_rules! bench_property_fn {
                 bench = bench.with_function(
                     format!("Node/record_{}/{}", stringify!($name), size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         b.iter_with_large_setup(
                             || inspector.root().create_child(NAME),
                             |child| child.[<record_ $name>](NAME, &initial_val));
@@ -188,7 +188,7 @@ macro_rules! bench_numeric_array_property_fn {
                 bench = bench.with_function(
                     format!("Node/create_{}_array/{}", stringify!($name), array_size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_drop(|| root.[<create_ $name _array>](NAME, array_size));
                     });
@@ -196,7 +196,7 @@ macro_rules! bench_numeric_array_property_fn {
                     format!("{}/set/{}", $Array, array_size),
                     move |b| {
                         let mut rng = rand::thread_rng();
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
                         b.iter_with_large_setup(|| rng.gen_range(0..array_size), |index| {
@@ -208,7 +208,7 @@ macro_rules! bench_numeric_array_property_fn {
                     format!("{}/add/{}", $Array, array_size),
                     move |b| {
                         let mut rng = rand::thread_rng();
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
                         b.iter_with_large_setup(|| rng.gen_range(0..array_size), |index| {
@@ -220,7 +220,7 @@ macro_rules! bench_numeric_array_property_fn {
                     format!("{}/subtract/{}", $Array, array_size),
                     move |b| {
                         let mut rng = rand::thread_rng();
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         let array = root.[<create_ $name _array>](NAME, array_size);
                         for i in 0..array_size {
@@ -234,7 +234,7 @@ macro_rules! bench_numeric_array_property_fn {
                 bench = bench.with_function(
                     format!("{}/drop/{}", $Array, array_size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || root.[<create_ $name _array>](NAME, array_size),
@@ -253,13 +253,13 @@ fn string_array_property_benchmarks(
     array_size: usize,
 ) -> criterion::Benchmark {
     bench = bench.with_function(format!("Node/create_string_array/{}", array_size), move |b| {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         b.iter_with_large_drop(|| root.create_string_array(NAME, array_size));
     });
     bench = bench.with_function(format!("StringArrayProperty/set/{}", array_size), move |b| {
         let mut rng = rand::thread_rng();
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let array = root.create_string_array(NAME, array_size);
         b.iter_with_large_setup(
@@ -270,7 +270,7 @@ fn string_array_property_benchmarks(
         );
     });
     bench = bench.with_function(format!("StringArrayProperty/clear/{}", array_size), move |b| {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         let array = root.create_string_array(NAME, array_size);
         b.iter(|| {
@@ -278,7 +278,7 @@ fn string_array_property_benchmarks(
         });
     });
     bench = bench.with_function(format!("StringArrayProperty/drop/{}", array_size), move |b| {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         b.iter_with_large_setup(|| root.create_string_array(NAME, array_size), |p| drop(p));
     });
@@ -333,7 +333,7 @@ macro_rules! bench_histogram_property_fn {
                         stringify!($name), stringify!($histogram_type), size
                     ),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_drop(|| {
                             root.[<create_ $name _ $histogram_type _histogram>](NAME, params.clone())
@@ -345,7 +345,7 @@ macro_rules! bench_histogram_property_fn {
                 bench = bench.with_function(
                     format!("{}/insert/{}", $Histogram, size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || {
@@ -361,7 +361,7 @@ macro_rules! bench_histogram_property_fn {
                 bench = bench.with_function(
                     format!("{}/insert_overflow/{}", $Histogram, size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || {
@@ -377,7 +377,7 @@ macro_rules! bench_histogram_property_fn {
                 bench = bench.with_function(
                     format!("{}/insert_underflow/{}", $Histogram, size),
                     move |b| {
-                        let inspector = Inspector::new();
+                        let inspector = Inspector::default();
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || {
@@ -391,7 +391,7 @@ macro_rules! bench_histogram_property_fn {
 
                 let params = parameters.clone();
                 bench = bench.with_function(format!("{}/drop/{}", $Histogram, size), move |b| {
-                    let inspector = Inspector::new();
+                    let inspector = Inspector::default();
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name _ $histogram_type _histogram>](
@@ -474,7 +474,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
 /// served over FIDL
 fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     let mut executor = fasync::LocalExecutor::new().unwrap();
-    let inspector = Inspector::new();
+    let inspector = Inspector::default();
 
     let mut properties = vec![];
 
@@ -527,11 +527,11 @@ fn main() {
         .sample_size(10);
 
     let mut bench = criterion::Benchmark::new("Inspector/new", |b| {
-        b.iter_with_large_drop(|| Inspector::new());
+        b.iter_with_large_drop(|| Inspector::default());
     });
     bench = bench.with_function("Inspector/root", |b| {
         b.iter_with_large_setup(
-            || Inspector::new(),
+            || Inspector::default(),
             |inspector| {
                 inspector.root();
             },

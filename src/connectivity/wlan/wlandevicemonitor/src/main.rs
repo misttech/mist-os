@@ -16,7 +16,7 @@ use {
         client::connect_to_protocol,
         server::{ServiceFs, ServiceObjLocal},
     },
-    fuchsia_inspect::Inspector,
+    fuchsia_inspect::{Inspector, InspectorConfig},
     fuchsia_syslog as syslog,
     futures::{
         channel::mpsc,
@@ -87,7 +87,7 @@ async fn main() -> Result<(), Error> {
 
     let mut fs = ServiceFs::new_local();
 
-    let inspector = Inspector::new_with_size(inspect::VMO_SIZE_BYTES);
+    let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
     inspect_runtime::serve(&inspector, &mut fs)?;
     let cfg = wlandevicemonitor_config::Config::take_from_startup_handle();
     inspector.root().record_child("config", |config_node| cfg.record_inspect(config_node));

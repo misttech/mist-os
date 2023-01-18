@@ -482,7 +482,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_succeeds_with_empty_values() {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
 
         // Create a Stash service interface.
         let accessor = create_stash_accessor("new_stash_succeeds_with_empty_values")
@@ -496,7 +496,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_fails_with_malformed_key_value_entry() {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
 
         // Create a Stash service interface.
         let accessor = create_stash_accessor("new_stash_fails_with_malformed_key_value_entry")
@@ -519,7 +519,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_fails_with_malformed_json() {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
 
         // Create a mock Stash service interface.
         let accessor = create_stash_accessor("new_stash_fails_with_malformed_json")
@@ -751,7 +751,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_succeeds_with_values() {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
 
         // Create a Stash service interface.
         let accessor = create_stash_accessor("new_stash_succeeds_with_values")
@@ -797,7 +797,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_filters_duplicate_bonds() {
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let inspect = inspector.root().create_child(TEST_INSPECT_ROOT);
         // Create a Stash service interface.
         let accessor = create_stash_accessor("new_stash_filters_duplicate_bonds")
@@ -862,7 +862,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn new_stash_fails_loading_same_addrs_different_bond() {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
 
         // Create a Stash service interface.
         let accessor = create_stash_accessor("new_stash_fails_loading_same_addrs_different_bond")
@@ -999,7 +999,7 @@ mod tests {
     }
 
     async fn setup_stash(name: &'static str, entries: Vec<(&'static str, Value)>) -> StashInner {
-        let inspect = fuchsia_inspect::Inspector::new().root().create_child(TEST_INSPECT_ROOT);
+        let inspect = fuchsia_inspect::Inspector::default().root().create_child(TEST_INSPECT_ROOT);
         let accessor = create_stash_accessor(name).await.expect("failed to create StashAccessor");
 
         // Insert initial bonding data values into stash

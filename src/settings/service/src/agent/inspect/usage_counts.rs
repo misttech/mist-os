@@ -226,7 +226,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child("api_usage_counts");
         let context = create_context().await;
 
@@ -277,7 +277,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_mixed_request_types() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child("api_usage_counts");
         let context = create_context().await;
 

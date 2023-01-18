@@ -487,7 +487,7 @@ impl Actor {
         disposition: LinkDisposition,
         actions: Vec<Action>,
     ) -> Result<LazyNode, Error> {
-        let mut actor = Actor::new(Inspector::new());
+        let mut actor = Actor::new(Inspector::default());
         for action in actions.into_iter() {
             if let Err(err) = actor.act(action) {
                 return Err(format_err!("Failed to perform action on lazy node: {:?}", err));
@@ -509,8 +509,8 @@ impl Actor {
 
 fn new_inspector(params: &InitializationParams) -> Inspector {
     match params.vmo_size {
-        Some(size) => Inspector::new_with_size(size as usize),
-        None => Inspector::new(),
+        Some(size) => Inspector::new(InspectorConfig::default().size(size as usize)),
+        None => Inspector::default(),
     }
 }
 

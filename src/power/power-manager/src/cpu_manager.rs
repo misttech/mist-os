@@ -1524,7 +1524,7 @@ mod tests {
             },
         ];
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let builder = CpuManagerBuilder::new(
             make_default_cluster_configs(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],

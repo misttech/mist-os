@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn remote_peer_inspect_tree() {
         let _executor = fasync::TestExecutor::new();
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         let mut peer_inspect =
             RemotePeerInspect::new(PeerId(1)).with_inspect(inspect.root(), "peer").unwrap();

@@ -468,7 +468,7 @@ mod tests {
         })
         .unwrap();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new(realm, &inspector);
         let (launcher, _restarter) = serve_session_manager_services(session_manager);
 
@@ -516,7 +516,7 @@ mod tests {
         })
         .unwrap();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new(realm, &inspector);
         let (launcher, restarter) = serve_session_manager_services(session_manager);
 
@@ -551,7 +551,7 @@ mod tests {
         })
         .unwrap();
 
-        let inspector = fuchsia_inspect::Inspector::new();
+        let inspector = fuchsia_inspect::Inspector::default();
         let session_manager = SessionManager::new(realm, &inspector);
         let (_launcher, restarter) = serve_session_manager_services(session_manager);
 

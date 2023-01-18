@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn test_multiplexer_inspect() {
         let mut exec = fuchsia_async::TestExecutor::new();
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         // Setup multiplexer with inspect.
         let mut multiplexer = SessionMultiplexer::create();

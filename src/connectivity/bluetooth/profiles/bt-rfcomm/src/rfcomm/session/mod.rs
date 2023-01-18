@@ -1296,7 +1296,7 @@ mod tests {
     #[test]
     fn test_session_inner_inspect() {
         let mut exec = fasync::TestExecutor::new();
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
 
         // Setup SessionInner with inspect.
         let (data_sender, data_receiver) = mpsc::channel(0);

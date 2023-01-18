@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn test_inspect_data() {
         let mut executor = fasync::TestExecutor::new();
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let fake_lid_driver = FakeLidDriver::new();
 
         let _node = executor.run_singlethreaded(

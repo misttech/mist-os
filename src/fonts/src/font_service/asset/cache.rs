@@ -158,7 +158,7 @@ mod tests {
 
     /// Creates a `Cache` with some mocked assets.
     fn mock_cache() -> Cache {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         mock_cache_with_inspector(&inspector)
     }
 
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_pop_empty() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut cache = Cache::new(10, inspector.root());
         cache.pop();
         assert_eq!(cache.available, 10);
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_inspect_data() {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let capacity = 3000;
         let mut cache = Cache::new(capacity, inspector.root());
         assert_data_tree!(inspector, root: {

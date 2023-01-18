@@ -145,7 +145,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                 if let Some(this) = weak_self_clone.upgrade() {
                     Ok(this.write_measurements_to_inspect().await)
                 } else {
-                    Ok(inspect::Inspector::new())
+                    Ok(inspect::Inspector::default())
                 }
             }
             .boxed()
@@ -157,7 +157,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                 if let Some(this) = weak_self_clone.upgrade() {
                     Ok(this.write_recent_usage_to_inspect().await)
                 } else {
-                    Ok(inspect::Inspector::new())
+                    Ok(inspect::Inspector::default())
                 }
             }
             .boxed()
@@ -199,7 +199,8 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     }
 
     async fn write_measurements_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
-        let inspector = inspect::Inspector::new_with_size(MAX_INSPECT_SIZE);
+        let inspector =
+            inspect::Inspector::new(inspect::InspectorConfig::default().size(MAX_INSPECT_SIZE));
         let components = inspector.root().create_child("components");
         let (component_count, task_count) = self.write_measurements(&components).await;
         self.write_aggregate_measurements(&components).await;
@@ -214,7 +215,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     }
 
     async fn write_recent_usage_to_inspect(self: &Arc<Self>) -> inspect::Inspector {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         self.totals.lock().await.write_recents_to(inspector.root());
         inspector
     }
@@ -533,7 +534,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn total_tracks_cpu_after_termination() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let stats = ComponentTreeStats::new_with_timesource(
             inspector.root().create_child("cpu_stats"),
@@ -826,7 +827,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn components_are_deleted_when_all_tasks_are_gone() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let stats = ComponentTreeStats::new_with_timesource(
             inspector.root().create_child("cpu_stats"),
@@ -900,7 +901,7 @@ mod tests {
     #[fuchsia::test]
     async fn dead_tasks_are_pruned() {
         let clock = Arc::new(FakeTime::new());
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
                 inspector.root().create_child("cpu_stats"),
@@ -956,7 +957,7 @@ mod tests {
     async fn aggregated_data_available_inspect() {
         let max_dead_tasks = 4;
         let clock = Arc::new(FakeTime::new());
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(
                 inspector.root().create_child("cpu_stats"),
@@ -1055,7 +1056,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn total_holds_sum_of_stats() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
         stats.measure().await;
         stats
@@ -1117,7 +1118,7 @@ mod tests {
     #[fuchsia::test]
     async fn recent_usage() {
         // Set up the test
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
         stats.measure().await;
 
@@ -1211,7 +1212,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn component_stats_are_available_in_inspect() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats = ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await;
         stats
             .track_ready(
@@ -1320,7 +1321,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn on_started_handles_parent_task() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let stats =
             Arc::new(ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await);
         let parent_task = FakeTask::new(
@@ -1412,7 +1413,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn child_tasks_garbage_collection() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let stats = Arc::new(
             ComponentTreeStats::new_with_timesource(

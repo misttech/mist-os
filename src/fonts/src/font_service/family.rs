@@ -415,7 +415,7 @@ mod tests {
             languages: vec!["ar-EG".to_string(), "ar-MA".to_string()],
         }));
 
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let _inspect_data = AliasInspectData::new(inspector.root(), alias, &overrides);
         assert_data_tree!(inspector, root: {
             Alif: {
@@ -459,7 +459,7 @@ mod tests {
             _ => unreachable!(),
         };
 
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut inspect_data =
             FamilyInspectData::new(inspector.root(), &family, &asset_location_lookup);
         inspect_data.add_alias(

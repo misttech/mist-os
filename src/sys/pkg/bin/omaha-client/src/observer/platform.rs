@@ -135,7 +135,7 @@ mod test {
     static TARGET_VERSION: &str = "some-ver";
 
     fn assert_emit_inspect(event: Event<'_>, child: TreeAssertion) {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
         emitter.emit(event);
@@ -235,7 +235,7 @@ mod test {
     #[test]
     fn installation_error() {
         mock::set_session_id(9);
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
         emitter.emit(Event::InstallationError { target_version: Some(TARGET_VERSION) });
@@ -305,7 +305,7 @@ mod test {
 
     #[test]
     fn session_id_persists() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
         mock::set_session_id(9);
@@ -339,7 +339,7 @@ mod test {
 
     #[test]
     fn new_session_new_id() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut emitter = Emitter::from_node(inspector.root().create_child("emitter"));
 
         mock::set_session_id(9);

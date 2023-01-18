@@ -100,7 +100,7 @@ pub fn main() -> Result<(), Error> {
 
 async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
-    let inspector = finspect::Inspector::new();
+    let inspector = finspect::Inspector::default();
 
     let use_system_image = {
         let config = pkg_cache_config::Config::take_from_startup_handle();

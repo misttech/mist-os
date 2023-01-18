@@ -1072,7 +1072,7 @@ mod tests {
     fn connected_peers_inspect() {
         let (_exec, id, mut peers, _stream) = setup_connected_peer_test();
 
-        let inspect = inspect::Inspector::new();
+        let inspect = inspect::Inspector::default();
         peers.iattach(inspect.root(), "peers").expect("should attach to inspect tree");
 
         assert_data_tree!(inspect, root: {

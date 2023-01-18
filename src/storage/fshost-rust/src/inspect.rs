@@ -15,7 +15,7 @@ pub async fn register_stats(root: &fuchsia_inspect::Node, data_dir: DirectoryPro
     root.record_lazy_child("data_stats", move || {
         let data_dir = Clone::clone(&data_dir);
         async move {
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let root = inspector.root();
 
             // Filesystem info stats
@@ -31,7 +31,7 @@ pub async fn register_stats(root: &fuchsia_inspect::Node, data_dir: DirectoryPro
             Ok(inspector)
         }
         .or_else(|e: Error| async move {
-            let inspector = fuchsia_inspect::Inspector::new();
+            let inspector = fuchsia_inspect::Inspector::default();
             let root = inspector.root();
             root.record_string(
                 "error",

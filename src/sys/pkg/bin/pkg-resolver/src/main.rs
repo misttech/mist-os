@@ -131,7 +131,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     // The list of cache packages from the system image, not to be confused with the PackageCache.
     let system_cache_list = Arc::new(cache_package_index::from_proxy(pkg_cache.proxy()).await);
 
-    let inspector = fuchsia_inspect::Inspector::new();
+    let inspector = fuchsia_inspect::Inspector::default();
     inspector
         .root()
         .record_child("structured_config", |node| structured_config.record_inspect(node));

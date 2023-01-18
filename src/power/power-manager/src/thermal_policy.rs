@@ -886,7 +886,7 @@ pub mod tests {
             policy_params: default_policy_params(),
             platform_metrics_node: create_dummy_node(),
         };
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let node_futures = FuturesUnordered::new();
         let _node = ThermalPolicyBuilder::new(thermal_config)
             .with_inspect_root(inspector.root())

@@ -101,7 +101,7 @@ async fn main() -> Result<(), Error> {
         let data = Arc::new(Mutex::new(CounterData { value: starting_value }));
         let data_clone = data.clone();
         let () = inspector.root().record_lazy_child("counter", move || {
-            let srv = fuchsia_inspect::Inspector::new();
+            let srv = fuchsia_inspect::Inspector::default();
             let () = srv.root().record_uint(
                 "count",
                 data.lock().expect("failed to acquire lock on `CounterData`").value.into(),

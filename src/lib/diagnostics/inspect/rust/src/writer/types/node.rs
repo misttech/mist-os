@@ -604,13 +604,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn lazy_child() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let _lazy = inspector.root().create_lazy_child("lazy-1", || {
             async move {
-                let insp = Inspector::new();
+                let insp = Inspector::default();
                 insp.root().record_lazy_child("parent", || {
                     async move {
-                        let insp2 = Inspector::new();
+                        let insp2 = Inspector::default();
                         insp2.root().record_int("create-lazy-child", 0);
                         insp2.root().record_int("create-lazy-child-2", 2);
                         Ok(insp2)
@@ -624,7 +624,7 @@ mod tests {
 
         inspector.root().record_lazy_child("lazy-2", || {
             async move {
-                let insp = Inspector::new();
+                let insp = Inspector::default();
                 insp.root().record_bool("recorded-lazy-child", true);
                 Ok(insp)
             }
@@ -633,7 +633,7 @@ mod tests {
 
         inspector.root().record_lazy_values("lazy", || {
             async move {
-                let insp = Inspector::new();
+                let insp = Inspector::default();
                 insp.root().record_bool("recorded-lazy-values", true);
                 Ok(insp)
             }
@@ -658,7 +658,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_adoption() {
-        let insp = Inspector::new();
+        let insp = Inspector::default();
         let root = insp.root();
         let a = root.create_child("a");
         let b = root.create_child("b");
@@ -770,7 +770,7 @@ mod tests {
 
     #[fuchsia::test]
     fn dummy_partialeq() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
 
         // Types should all be equal to another type. This is to enable clients
@@ -792,7 +792,7 @@ mod tests {
 
     #[fuchsia::test]
     fn record() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let property = inspector.root().create_uint("a", 1);
         inspector.root().record_uint("b", 2);
         {
@@ -819,7 +819,7 @@ mod tests {
 
     #[fuchsia::test]
     fn clear_recorded() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let one = inspector.root().create_child("one");
         let two = inspector.root().create_child("two");
         let one_recorded = one.create_child("one_recorded");
@@ -856,7 +856,7 @@ mod tests {
 
     #[fuchsia::test]
     fn record_child() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_child("test", |node| {
             node.record_int("a", 1);
         });
@@ -869,7 +869,7 @@ mod tests {
 
     #[fuchsia::test]
     fn record_weak() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let main = inspector.root().create_child("main");
         let main_weak = main.clone_weak();
         let property = main_weak.create_uint("a", 1);
@@ -905,7 +905,7 @@ mod tests {
 
     #[fuchsia::test]
     fn string_arrays_on_record() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         inspector.root().record_child("child", |node| {
             node.record_int("my_int", 1i64);
 
@@ -933,7 +933,7 @@ mod fuchsia_tests {
 
     #[fuchsia::test]
     async fn atomic_update_reader() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
 
         // Spawn a read thread that holds a duplicate handle to the VMO that will be written.
         let vmo = inspector.duplicate_vmo().expect("duplicate vmo handle");

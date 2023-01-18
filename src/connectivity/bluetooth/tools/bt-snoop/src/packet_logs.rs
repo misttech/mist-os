@@ -49,7 +49,7 @@ fn generate_lazy_values_for_packet_log(
         drop(guard);
 
         let vmo_size = data.len() + MINIMUM_VMO_SIZE_BYTES;
-        let inspector = inspect::Inspector::new_with_size(vmo_size);
+        let inspector = inspect::Inspector::new(inspect::InspectorConfig::default().size(vmo_size));
         let root = inspector.root();
         root.record_string("hci_device_name", device_name);
         root.record_uint("byte_len", byte_len as u64);

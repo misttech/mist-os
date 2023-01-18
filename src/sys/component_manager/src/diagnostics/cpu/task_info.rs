@@ -381,7 +381,7 @@ mod tests {
         task.measure_if_no_parent().await;
         task.measure_if_no_parent().await;
 
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         task.record_to_node(inspector.root());
         assert_data_tree!(inspector, root: {
             "1": {
@@ -403,7 +403,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn write_more_than_max_samples() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let mut task = TaskInfo::try_from(
             FakeTask::new(
@@ -448,7 +448,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn more_than_max_samples_offset_time() {
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = Arc::new(FakeTime::new());
         let mut task = TaskInfo::try_from(
             FakeTask::new(
@@ -621,7 +621,7 @@ mod tests {
     #[fuchsia::test]
     async fn bucket_cutoffs() {
         let readings = fake_readings(1, vec![1, 0, 500, 989, 990, 991, 999, 0]);
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
             create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());
@@ -682,7 +682,7 @@ mod tests {
     #[fuchsia::test]
     async fn discard_short_intervals() {
         let readings = fake_readings(1, vec![100, 100, 100, 100]);
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
             create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());
@@ -719,7 +719,7 @@ mod tests {
     #[fuchsia::test]
     async fn divide_by_cores() {
         let readings = fake_readings(1, vec![400]);
-        let inspector = inspect::Inspector::new();
+        let inspector = inspect::Inspector::default();
         let clock = FakeTime::new();
         let histogram =
             create_cpu_histogram(&inspector.root(), &ExtendedMoniker::parse_str("/foo").unwrap());

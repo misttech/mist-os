@@ -18,7 +18,7 @@ use argh::FromArgs;
 use fidl_fuchsia_wlan_device_service::DeviceServiceRequestStream;
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use fuchsia_inspect::Inspector;
+use fuchsia_inspect::{Inspector, InspectorConfig};
 use fuchsia_inspect_contrib::auto_persist;
 use fuchsia_syslog as syslog;
 use fuchsia_trace as ftrace;
@@ -76,7 +76,7 @@ async fn main() -> Result<(), Error> {
     info!("Starting");
 
     let mut fs = ServiceFs::new_local();
-    let inspector = Inspector::new_with_size(inspect::VMO_SIZE_BYTES);
+    let inspector = Inspector::new(InspectorConfig::default().size(inspect::VMO_SIZE_BYTES));
     inspect_runtime::serve(&inspector, &mut fs)?;
 
     let cfg = wlanstack_config::Config::take_from_startup_handle();

@@ -179,7 +179,7 @@ mod tests {
 
     #[fuchsia::test]
     fn health_checker_lifecycle() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let root = inspector.root();
         // In the beginning, the inspector has no stats.
         assert_data_tree!(inspector, root: contains {});

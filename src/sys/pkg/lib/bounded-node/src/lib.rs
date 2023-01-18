@@ -17,7 +17,7 @@ use {
 /// # use fuchsia_inspect::{assert_data_tree, Inspector},
 /// # use bounded_node::BoundedNode,
 ///
-/// let inspector = Inspector::new();
+/// let inspector = Inspector::default();
 /// let mut bounded_node =
 ///     BoundedNode::from_node_and_capacity(inspector.root().create_child("bounded-node"), 2);
 ///
@@ -113,7 +113,7 @@ mod test {
 
     #[test]
     fn zero_capacity_push() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut bounded_node =
             BoundedNode::from_node_and_capacity(inspector.root().create_child("bounded-node"), 0);
 
@@ -134,7 +134,7 @@ mod test {
 
     #[test]
     fn push() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut bounded_node =
             BoundedNode::from_node_and_capacity(inspector.root().create_child("bounded-node"), 1);
 
@@ -157,7 +157,7 @@ mod test {
 
     #[test]
     fn push_triggers_drop_of_oldest() {
-        let inspector = Inspector::new();
+        let inspector = Inspector::default();
         let mut bounded_node =
             BoundedNode::from_node_and_capacity(inspector.root().create_child("bounded-node"), 3);
 

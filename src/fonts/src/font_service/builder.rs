@@ -480,7 +480,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_multiple_overlapping_manifests() -> Result<(), Error> {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let mut builder = FontServiceBuilder::with_default_asset_loader(5000, inspector.root());
         builder
             .add_manifest(FontManifestWrapper::Version2(v2::FontsManifest {
@@ -645,7 +645,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_empty_manifest() -> Result<(), Error> {
-        let inspector = finspect::Inspector::new();
+        let inspector = finspect::Inspector::default();
         let manifest = FontManifestWrapper::Version2(v2::FontsManifest::empty());
         let mut builder = FontServiceBuilder::with_default_asset_loader(5000, inspector.root());
         builder.add_manifest(manifest);
