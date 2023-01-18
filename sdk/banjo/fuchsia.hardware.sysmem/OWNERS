@@ -1,0 +1,3 @@
+include /src/devices/sysmem/OWNERS
+
+# COMPONENT: Zircon>drivers

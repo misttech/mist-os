@@ -18,7 +18,7 @@ protocol Sysmem {
     });
 
     /// Takes the client end of a FIDL connection that'll serve
-    /// fuchsia.sysmem.Heap.
+    /// fuchsia.sysmem2.Heap.
     RegisterHeap(resource struct {
         heap uint64;
         heap_connection zx.handle:CHANNEL;
