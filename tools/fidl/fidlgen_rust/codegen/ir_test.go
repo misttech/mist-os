@@ -66,6 +66,8 @@ func TestDerivesCalculation(t *testing.T) {
 }
 
 func TestExperiments(t *testing.T) {
+	default_experiments := []string{"unknown_interactions"}
+
 	cases := []struct {
 		desc        string
 		experiments []string
@@ -80,7 +82,7 @@ func TestExperiments(t *testing.T) {
 		},
 		{
 			desc:        "multiple experiments",
-			experiments: []string{"allow_new_types", "unknown_interactions"},
+			experiments: []string{"allow_new_types", "unknown_interactions_new_defaults"},
 		},
 	}
 	for _, test := range cases {
@@ -98,10 +100,16 @@ func TestExperiments(t *testing.T) {
 
 		rust := string(bytes)
 		all := root.Experiments
-		if len(all) != len(test.experiments) {
-			t.Errorf("case (%s): got %d experiment markers, want %d", test.desc, len(all), len(test.experiments))
+		total_experiments := len(test.experiments) + len(default_experiments)
+		if len(all) != total_experiments {
+			t.Errorf("case (%s): got %d experiment markers, want %d", test.desc, len(all), total_experiments)
 		}
 		for _, ex := range test.experiments {
+			if !strings.Contains(rust, fmt.Sprintf("\n// experiment = %s", ex)) {
+				t.Errorf("case (%s): could not find '// experiment = %s' in output", test.desc, ex)
+			}
+		}
+		for _, ex := range default_experiments {
 			if !strings.Contains(rust, fmt.Sprintf("\n// experiment = %s", ex)) {
 				t.Errorf("case (%s): could not find '// experiment = %s' in output", test.desc, ex)
 			}

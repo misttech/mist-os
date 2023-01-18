@@ -105,6 +105,7 @@ int main(int argc, char* argv[]) {
 
   // Process experimental flags.
   fidl::ExperimentalFlags experimental_flags;
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   for (const auto& experiment : options.experiments) {
     if (!experimental_flags.EnableFlagByName(experiment)) {
       FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Unknown --experiment: %s\n",

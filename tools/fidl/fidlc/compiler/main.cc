@@ -445,6 +445,7 @@ int main(int argc, char* argv[]) {
   std::vector<std::pair<Behavior, std::string>> outputs;
   fidl::VersionSelection version_selection;
   fidl::ExperimentalFlags experimental_flags;
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   while (args->Remaining()) {
     // Try to parse an output type.
     std::string behavior_argument = args->Claim();
