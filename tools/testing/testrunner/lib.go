@@ -54,10 +54,6 @@ type TestrunnerFlags struct {
 	// The path to mount as NsJail's root directory.
 	NsjailRoot string
 
-	// Whether to use runtests when executing tests on fuchsia. If false, the
-	// default will be run_test_suite.
-	UseRuntests bool
-
 	// The output filename for the snapshot. This will be created in the outDir.
 	SnapshotFile string
 
@@ -245,7 +241,7 @@ func execute(
 		if ffx != nil {
 			defer ffx.Stop()
 			t, err := sshTester(
-				ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath, flags.UseRuntests)
+				ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 			}
@@ -279,7 +275,7 @@ func execute(
 				var err error
 				if !flags.UseSerial && sshKeyFile != "" {
 					fuchsiaTester, err = sshTester(
-						ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath, flags.UseRuntests)
+						ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
 				} else {
 					if serialSocketPath == "" {
 						return nil, nil, fmt.Errorf("%q must be set if %q is not set", botanistconstants.SerialSocketEnvKey, botanistconstants.SSHKeyEnvKey)
@@ -303,7 +299,7 @@ func execute(
 			if !flags.UseSerial && fuchsiaTester == nil && sshKeyFile != "" {
 				var err error
 				fuchsiaTester, err = sshTester(
-					ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath, flags.UseRuntests)
+					ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
 				if err != nil {
 					logger.Errorf(ctx, "failed to initialize fuchsia tester: %s", err)
 				}

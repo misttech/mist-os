@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
@@ -898,7 +899,7 @@ func TestExecute(t *testing.T) {
 				ffxInstance = oldFFXInstance
 			}()
 			fuchsiaTester := &fakeTester{}
-			sshTester = func(_ context.Context, _ net.IPAddr, _, _, _ string, _ bool) (Tester, error) {
+			sshTester = func(_ context.Context, _ net.IPAddr, _, _, _ string) (Tester, error) {
 				if c.wantErr {
 					return nil, fmt.Errorf("failed to get tester")
 				}
@@ -925,6 +926,11 @@ func TestExecute(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer o.Close()
+			if c.useFFX {
+				oldValue := os.Getenv(constants.FFXExperimentLevelEnvKey)
+				os.Setenv(constants.FFXExperimentLevelEnvKey, "2")
+				defer os.Setenv(constants.FFXExperimentLevelEnvKey, oldValue)
+			}
 			err = execute(context.Background(), tests, o, net.IPAddr{}, c.sshKeyFile, c.serialSocketPath, t.TempDir(),
 				TestrunnerFlags{SnapshotFile: "snapshot.zip"})
 			if c.wantErr {

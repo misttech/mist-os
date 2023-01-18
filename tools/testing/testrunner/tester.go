@@ -43,9 +43,6 @@ import (
 )
 
 const (
-	// A test output directory within persistent storage.
-	dataOutputDir = "/data/infra/testrunner"
-
 	// TODO(fxb/73171): Fix this path.
 	// The output data directory for component v2 tests.
 	dataOutputDirV2 = "/tmp/test_manager:0/data/debug"
@@ -537,7 +534,7 @@ func NewFFXTester(ffx FFXInstance, sshTester Tester, localOutputDir string, expe
 }
 
 func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
-	return test.IsComponentV2()
+	return t.experimentLevel >= 2
 }
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
@@ -926,16 +923,15 @@ func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile string) (*sshu
 type FuchsiaSSHTester struct {
 	client                      sshClient
 	copier                      dataSinkCopier
-	useRuntests                 bool
 	localOutputDir              string
 	connectionErrorRetryBackoff retry.Backoff
 	serialSocket                serialClient
 }
 
 // NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
-// instance of given nodename, the private key paired with an authorized one
-// and the directive of whether `runtests` should be used to execute the test.
-func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, localOutputDir, serialSocketPath string, useRuntests bool) (Tester, error) {
+// instance of the given nodename and the private key paired with an authorized
+// one.
+func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, localOutputDir, serialSocketPath string) (Tester, error) {
 	client, err := sshToTarget(ctx, addr, sshKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to establish an SSH connection: %w", err)
@@ -947,7 +943,6 @@ func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, local
 	return &FuchsiaSSHTester{
 		client:                      client,
 		copier:                      copier,
-		useRuntests:                 useRuntests,
 		localOutputDir:              localOutputDir,
 		connectionErrorRetryBackoff: retry.NewConstantBackoff(time.Second),
 		serialSocket:                &serialSocket{serialSocketPath},
@@ -1019,7 +1014,7 @@ func (t *FuchsiaSSHTester) runSSHCommandWithRetry(ctx context.Context, command [
 // Test runs a test over SSH.
 func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, _ string) (*TestResult, error) {
 	testResult := BaseTestResultFromTest(test)
-	command, err := commandForTest(&test, t.useRuntests, dataOutputDir, test.Timeout)
+	command, err := commandForTest(&test, false, test.Timeout)
 	if err != nil {
 		testResult.FailReason = err.Error()
 		return testResult, nil
@@ -1047,25 +1042,6 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 		testResult.Result = runtests.TestSuccess
 	}
 
-	var sinkErr error
-	if t.useRuntests && !test.IsComponentV2() {
-		startTime := clock.Now(ctx)
-		var sinksPerTest map[string]runtests.DataSinkReference
-		if sinksPerTest, sinkErr = t.copier.GetReferences(dataOutputDir); sinkErr != nil {
-			logger.Errorf(ctx, "failed to determine data sinks for test %q: %s", test.Name, sinkErr)
-		} else {
-			testResult.DataSinks = sinksPerTest[test.Name]
-		}
-		duration := clock.Now(ctx).Sub(startTime)
-		if testResult.DataSinks.Size() > 0 {
-			logger.Debugf(ctx, "%d data sinks found in %s", testResult.DataSinks.Size(), duration)
-		}
-	}
-
-	if testErr == nil && sinkErr != nil {
-		testResult.Result = runtests.TestFailure
-		testResult.FailReason = sinkErr.Error()
-	}
 	return testResult, nil
 }
 
@@ -1351,7 +1327,7 @@ func (r *parseOutKernelReader) lineWithoutKernelLog(line []byte, isTruncated boo
 
 func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, stdout, _ io.Writer, _ string) (*TestResult, error) {
 	testResult := BaseTestResultFromTest(test)
-	command, err := commandForTest(&test, true, "", test.Timeout)
+	command, err := commandForTest(&test, true, test.Timeout)
 	if err != nil {
 		testResult.FailReason = err.Error()
 		return testResult, nil
@@ -1434,24 +1410,21 @@ func (t *FuchsiaSerialTester) Close() error {
 	return t.socket.Close()
 }
 
-func commandForTest(test *testsharder.Test, useRuntests bool, remoteOutputDir string, timeout time.Duration) ([]string, error) {
+func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duration) ([]string, error) {
 	command := []string{}
-	// For v2 coverage data, use run-test-suite instead of runtests and collect the data from the designated dataOutputDirV2 directory.
-	if useRuntests && !test.IsComponentV2() {
+	if useSerial {
+		// `runtests` is used to run tests over serial.
 		command = []string{runtestsName}
-		if remoteOutputDir != "" {
-			command = append(command, "--output", remoteOutputDir)
-		}
 		if timeout > 0 {
 			command = append(command, "-i", fmt.Sprintf("%d", int64(timeout.Seconds())))
 		}
 		if test.RealmLabel != "" {
 			command = append(command, "--realm-label", test.RealmLabel)
 		}
-		if test.PackageURL != "" {
-			command = append(command, test.PackageURL)
-		} else {
+		if test.Path != "" {
 			command = append(command, test.Path)
+		} else {
+			return nil, fmt.Errorf("Path is not set for %q", test.Name)
 		}
 	} else if test.PackageURL != "" {
 		if test.IsComponentV2() {
@@ -1471,7 +1444,7 @@ func commandForTest(test *testsharder.Test, useRuntests bool, remoteOutputDir st
 		}
 		command = append(command, test.PackageURL)
 	} else {
-		return nil, fmt.Errorf("PackageURL is not set and useRuntests is false for %q", test.Name)
+		return nil, fmt.Errorf("PackageURL is not set and useSerial is false for %q", test.Name)
 	}
 	return command, nil
 }

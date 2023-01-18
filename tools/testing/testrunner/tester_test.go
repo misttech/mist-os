@@ -368,40 +368,39 @@ func (*fakeDataSinkCopier) Close() error {
 func TestFFXTester(t *testing.T) {
 	cases := []struct {
 		name            string
-		runV2           bool
 		sshRunErrs      []error
 		expectedResult  runtests.TestResult
 		testMulti       bool
 		experimentLevel int
 	}{
 		{
-			name:           "run v1 tests with ssh",
-			sshRunErrs:     []error{nil},
-			expectedResult: runtests.TestSuccess,
+			name:            "run tests with ssh if low experiment level",
+			sshRunErrs:      []error{nil},
+			expectedResult:  runtests.TestSuccess,
+			experimentLevel: 1,
 		},
 		{
-			name:           "run v2 tests with ffx",
-			runV2:          true,
-			expectedResult: runtests.TestSuccess,
+			name:            "run v2 tests with ffx",
+			expectedResult:  runtests.TestSuccess,
+			experimentLevel: 2,
 		},
 		{
-			name:           "ffx test fails",
-			runV2:          true,
-			expectedResult: runtests.TestFailure,
+			name:            "ffx test fails",
+			expectedResult:  runtests.TestFailure,
+			experimentLevel: 2,
 		},
 		{
-			name:           "ffx test times out",
-			runV2:          true,
-			expectedResult: runtests.TestAborted,
+			name:            "ffx test times out",
+			expectedResult:  runtests.TestAborted,
+			experimentLevel: 2,
 		},
 		{
-			name:           "ffx test skipped",
-			runV2:          true,
-			expectedResult: runtests.TestSkipped,
+			name:            "ffx test skipped",
+			expectedResult:  runtests.TestSkipped,
+			experimentLevel: 2,
 		},
 		{
 			name:            "run multiple tests",
-			runV2:           true,
 			expectedResult:  runtests.TestSuccess,
 			testMulti:       true,
 			experimentLevel: 3,
@@ -417,7 +416,6 @@ func TestFFXTester(t *testing.T) {
 				client:                      client,
 				copier:                      copier,
 				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
-				useRuntests:                 true,
 			}
 			var outcome string
 			switch c.expectedResult {
@@ -440,12 +438,9 @@ func TestFFXTester(t *testing.T) {
 			}()
 
 			test := testsharder.Test{
-				Test:         build.Test{PackageURL: "fuchsia-pkg://foo"},
+				Test:         build.Test{PackageURL: "fuchsia-pkg://foo#meta/bar.cm"},
 				Runs:         1,
 				RunAlgorithm: testsharder.StopOnSuccess,
-			}
-			if c.runV2 || c.testMulti {
-				test.Test = build.Test{PackageURL: "fuchsia-pkg://foo#meta/bar.cm"}
 			}
 			ctx := context.Background()
 			var testResults []*TestResult
@@ -474,7 +469,7 @@ func TestFFXTester(t *testing.T) {
 					t.Errorf("tester.Test got result: %s, want result: %s", testResult.Result, c.expectedResult)
 				}
 
-				if c.runV2 {
+				if tester.EnabledForTest(test) {
 					testArgs := []string{}
 					if c.experimentLevel == 3 {
 						testArgs = append(testArgs, "--experimental-parallel-execution", "8")
@@ -513,7 +508,7 @@ func TestFFXTester(t *testing.T) {
 				t.Errorf("Run() called wrong number of times. Got: %d, Want: %d", client.runCalls, wantSSHRunCalls)
 			}
 
-			if c.runV2 {
+			if tester.EnabledForTest(test) {
 				// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
 				// v1 tests will already have set the appropriate remoteDir value within Test().
 				outputs := &TestOutputs{OutDir: t.TempDir()}
@@ -532,10 +527,6 @@ func TestFFXTester(t *testing.T) {
 				}
 				if !foundEarlyBootSinks {
 					t.Errorf("failed to find early boot sinks")
-				}
-			} else {
-				if _, ok := copier.remoteDirs[dataOutputDir]; !ok {
-					t.Errorf("expected sinks in dir: %s, but got: %s", dataOutputDir, copier.remoteDirs)
 				}
 			}
 		})
@@ -562,8 +553,6 @@ func TestSSHTester(t *testing.T) {
 		expectedResult  runtests.TestResult
 		wantConnErr     bool
 		runSnapshot     bool
-		useRuntests     bool
-		runV2           bool
 	}{
 		{
 			name:    "success",
@@ -627,7 +616,6 @@ func TestSSHTester(t *testing.T) {
 				copier:                      copier,
 				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
 				serialSocket:                serialSocket,
-				useRuntests:                 c.useRuntests,
 			}
 
 			defer func() {
@@ -667,7 +655,7 @@ func TestSSHTester(t *testing.T) {
 					t.Errorf("failed to run snapshot: %s", err)
 				}
 			}
-			if c.runV2 {
+			if !c.wantConnErr {
 				outputs := &TestOutputs{OutDir: t.TempDir()}
 				if err = tester.EnsureSinks(context.Background(), []runtests.DataSinkReference{testResult.DataSinks}, outputs); err != nil {
 					t.Errorf("failed to collect v2 sinks: %s", err)
@@ -716,11 +704,8 @@ func TestSSHTester(t *testing.T) {
 				t.Errorf("unexpectedly called RunSerialDiagnostics()")
 			}
 
-			if c.useRuntests {
-				expectedRemoteDirs := []string{dataOutputDir}
-				if c.runV2 {
-					expectedRemoteDirs = []string{dataOutputDirV2, dataOutputDirEarlyBoot}
-				}
+			if !c.wantConnErr {
+				expectedRemoteDirs := []string{dataOutputDirV2, dataOutputDirEarlyBoot}
 				for _, dir := range expectedRemoteDirs {
 					if _, ok := copier.remoteDirs[dir]; !ok {
 						t.Errorf("expected sinks in dir: %s, but got: %s", dir, copier.remoteDirs)
@@ -1056,11 +1041,10 @@ func TestCommandForTest(t *testing.T) {
 			useRuntests: true,
 			test: testsharder.Test{
 				Test: build.Test{
-					Path:       "/path/to/test",
 					PackageURL: "fuchsia-pkg://example.com/test.cmx",
 				},
 			},
-			expected: []string{"runtests", "--output", "REMOTE_DIR", "fuchsia-pkg://example.com/test.cmx"},
+			wantErr: true,
 		},
 		{
 			name:        "use runtests path",
@@ -1070,7 +1054,7 @@ func TestCommandForTest(t *testing.T) {
 					Path: "/path/to/test",
 				},
 			},
-			expected: []string{"runtests", "--output", "REMOTE_DIR", "/path/to/test"},
+			expected: []string{"runtests", "/path/to/test"},
 		},
 		{
 			name:        "use runtests timeout",
@@ -1081,7 +1065,7 @@ func TestCommandForTest(t *testing.T) {
 				},
 			},
 			timeout:  time.Second,
-			expected: []string{"runtests", "--output", "REMOTE_DIR", "-i", "1", "/path/to/test"},
+			expected: []string{"runtests", "-i", "1", "/path/to/test"},
 		},
 		{
 			name:        "use runtests realm-label",
@@ -1092,7 +1076,7 @@ func TestCommandForTest(t *testing.T) {
 				},
 				RealmLabel: "testrealm",
 			},
-			expected: []string{"runtests", "--output", "REMOTE_DIR", "--realm-label", "testrealm", "/path/to/test"},
+			expected: []string{"runtests", "--realm-label", "testrealm", "/path/to/test"},
 		},
 		{
 			name:        "system path",
@@ -1165,7 +1149,7 @@ func TestCommandForTest(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			command, err := commandForTest(&c.test, c.useRuntests, "REMOTE_DIR", c.timeout)
+			command, err := commandForTest(&c.test, c.useRuntests, c.timeout)
 			if err == nil {
 				if c.wantErr {
 					t.Errorf("commandForTest returned nil error, want non-nil error")

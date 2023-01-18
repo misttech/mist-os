@@ -177,7 +177,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.testrunnerFlags.NsjailPath, "nsjail", "", "Optional path to an NsJail binary to use for linux host test sandboxing.")
 	f.StringVar(&r.testrunnerFlags.NsjailRoot, "nsjail-root", "", "Path to the directory to use as the NsJail root directory")
 	f.StringVar(&r.testrunnerFlags.LocalWD, "C", "", "Working directory of local testing subprocesses; if unset the current working directory will be used.")
-	f.BoolVar(&r.testrunnerFlags.UseRuntests, "use-runtests", false, "Whether to default to running fuchsia tests with runtests; if false, run_test_component will be used.")
 	f.StringVar(&r.testrunnerFlags.SnapshotFile, "snapshot-output", "", "The output filename for the snapshot. This will be created in the output directory.")
 	f.BoolVar(&r.testrunnerFlags.PrefetchPackages, "prefetch-packages", false, "Prefetch any test packages in the background.")
 	f.BoolVar(&r.testrunnerFlags.UseSerial, "use-serial", false, "Use serial to run tests on the target.")

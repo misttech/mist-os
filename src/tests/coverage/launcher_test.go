@@ -303,10 +303,9 @@ func getTargetTester(t *testing.T, testOutDir string) testrunner.Tester {
 	// Read SSH key which is required to run a test.
 	sshKeyFile := os.Getenv(constants.SSHKeyEnvKey)
 	// Create a new fuchsia tester that is responsible for executing the test.
-	// This is a v2 test, and it uses run-test-suite instead of runtests, so runtests=false.
 	// TODO(fxbug.dev/77634): When we start treating profiles as artifacts, start using ffx
 	// with testrunner.NewFFXTester().
-	tester, err := testrunner.NewFuchsiaSSHTester(ctx, addr, sshKeyFile, testOutDir, "", false)
+	tester, err := testrunner.NewFuchsiaSSHTester(ctx, addr, sshKeyFile, testOutDir, "")
 	if err != nil {
 		t.Fatalf("failed to initialize fuchsia tester: %s", err)
 	}
