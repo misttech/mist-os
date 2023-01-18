@@ -16,6 +16,7 @@ use {
     fuchsia_inspect::Inspector,
     futures::{FutureExt as _, StreamExt as _},
     inspect::InspectInfo,
+    itertools::Itertools,
     named_timer::DeadlineId,
     net_declare::{fidl_subnet, std_ip},
     net_types::ScopeableAddress as _,
@@ -468,9 +469,9 @@ impl Monitor {
     /// have changed.
     pub async fn compute_state(
         &mut self,
-        InterfaceView { properties, routes, neighbors: _ }: InterfaceView<'_>,
+        InterfaceView { properties, routes, neighbors }: InterfaceView<'_>,
     ) {
-        if let Some(info) = compute_state(properties, &routes, &ping::Pinger).await {
+        if let Some(info) = compute_state(properties, &routes, &ping::Pinger, neighbors).await {
             let id = Id::from(properties.id);
             let () = self.update_state(id, &properties.name, info);
         }
@@ -508,6 +509,7 @@ async fn compute_state(
     }: &fnet_interfaces_ext::Properties,
     routes: &[fnet_stack::ForwardingEntry],
     pinger: &dyn Ping,
+    neighbors: Option<&InterfaceNeighborCache>,
 ) -> Option<IpVersions<StateEvent>> {
     if PortType::from(device_class) == PortType::Loopback {
         return None;
@@ -524,10 +526,24 @@ async fn compute_state(
     // state to LinkLayerUp.
 
     let (ipv4, ipv6) = futures::join!(
-        network_layer_state(&name, id, routes, pinger, IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS)
-            .map(|state| StateEvent { state, time: fasync::Time::now() }),
-        network_layer_state(&name, id, routes, pinger, IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS)
-            .map(|state| StateEvent { state, time: fasync::Time::now() })
+        network_layer_state(
+            &name,
+            id,
+            routes,
+            pinger,
+            neighbors,
+            IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS
+        )
+        .map(|state| StateEvent { state, time: fasync::Time::now() }),
+        network_layer_state(
+            &name,
+            id,
+            routes,
+            pinger,
+            neighbors,
+            IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS
+        )
+        .map(|state| StateEvent { state, time: fasync::Time::now() })
     );
     Some(IpVersions { ipv4, ipv6 })
 }
@@ -538,30 +554,67 @@ async fn network_layer_state(
     interface_id: u64,
     routes: &[fnet_stack::ForwardingEntry],
     p: &dyn Ping,
+    neighbors: Option<&InterfaceNeighborCache>,
     internet_ping_address: std::net::IpAddr,
 ) -> State {
     use std::convert::TryInto as _;
 
-    let mut device_routes = routes
+    let device_routes: Vec<_> = routes
         .into_iter()
         .filter(|fnet_stack::ForwardingEntry { subnet: _, device_id, next_hop: _, metric: _ }| {
             *device_id == interface_id
         })
-        .peekable();
+        .collect();
 
-    if device_routes.peek() == None {
+    let (discovered_healthy_neighbors, discovered_healthy_gateway) = match neighbors {
+        None => (false, false),
+        Some(neighbors) => {
+            neighbors
+                .iter_health()
+                .fold_while(
+                    (false, false),
+                    |(found_healthy_neighbors, _found_healthy_gateway), (neighbor, health)| {
+                        let is_gateway = device_routes.iter().any(|route| {
+                            route
+                                .next_hop
+                                .as_ref()
+                                .map(|next_hop| neighbor == &**next_hop)
+                                .unwrap_or(false)
+                        });
+                        match health {
+                            // When we find an unhealthy or unknown neighbor, continue,
+                            // keeping whether we've previously found a healthy neighbor.
+                            neighbor_cache::NeighborHealth::Unhealthy { .. }
+                            | neighbor_cache::NeighborHealth::Unknown => {
+                                itertools::FoldWhile::Continue((found_healthy_neighbors, false))
+                            }
+                            // If there's a healthy gateway, then we're done. If it's
+                            // not a gateway, then we know we have a healthy neighbor, but
+                            // not a healthy gateway.
+                            neighbor_cache::NeighborHealth::Healthy { .. } => {
+                                if !is_gateway {
+                                    return itertools::FoldWhile::Continue((true, false));
+                                }
+                                itertools::FoldWhile::Done((true, true))
+                            }
+                        }
+                    },
+                )
+                .into_inner()
+        }
+    };
+
+    if device_routes.is_empty() && !discovered_healthy_neighbors {
         return State::Up;
     }
 
-    // TODO(https://fxbug.dev/36242) Check neighbor reachability and upgrade state to Local.
-
-    let relevant_routes = device_routes.filter(
+    let relevant_routes = device_routes.iter().filter(
         |fnet_stack::ForwardingEntry { subnet, device_id: _, next_hop: _, metric: _ }| {
             *subnet == UNSPECIFIED_V4 || *subnet == UNSPECIFIED_V6
         },
     );
 
-    let gateway_reachable = relevant_routes
+    let gateway_pingable = relevant_routes
         .filter_map(
             move |fnet_stack::ForwardingEntry { subnet: _, device_id, next_hop, metric: _ }| {
                 next_hop.as_ref().and_then(|next_hop| {
@@ -598,7 +651,13 @@ async fn network_layer_state(
         .next()
         .await
         .is_some();
-    if !gateway_reachable {
+
+    // Neighbor table is not always up to date within each iteration of the probe because the
+    // neighbors table is updated in a separate stream. Therefore, we can consider response to ping
+    // as a signal of an active gateway or use the neighbor discovery signal.
+    // TODO(https://fxbug.dev/119354): Ping internet even if default gateway isn't responding to
+    // probes
+    if !gateway_pingable && !discovered_healthy_gateway {
         return State::Local;
     };
 
@@ -612,6 +671,7 @@ async fn network_layer_state(
 mod tests {
     use {
         super::*,
+        crate::neighbor_cache::{NeighborHealth, NeighborState},
         async_trait::async_trait,
         fidl_fuchsia_net as fnet, fuchsia_async as fasync,
         net_declare::{fidl_ip, fidl_subnet, std_ip},
@@ -804,7 +864,7 @@ mod tests {
             },
         ];
 
-        let fnet_ext::IpAddress(net1_gateway) = net1_gateway.into();
+        let fnet_ext::IpAddress(net1_gateway_ext) = net1_gateway.into();
 
         assert_eq!(
             network_layer_state(
@@ -812,10 +872,11 @@ mod tests {
                 ID1,
                 &route_table,
                 &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway).collect(),
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
                     gateway_response: true,
                     internet_response: true,
                 },
+                None,
                 ping_internet_addr,
             )
             .await,
@@ -829,15 +890,40 @@ mod tests {
                 ID1,
                 &route_table,
                 &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway).collect(),
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
                     gateway_response: true,
                     internet_response: false,
                 },
+                None,
                 ping_internet_addr,
             )
             .await,
             State::Gateway,
-            "Can reach gateway"
+            "Can reach gateway via ping"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table,
+                &FakePing::default(),
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1_gateway,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Gateway,
+            "Can reach gateway via ARP/ND"
         );
 
         assert_eq!(
@@ -846,10 +932,11 @@ mod tests {
                 ID1,
                 &route_table,
                 &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway).collect(),
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
                     gateway_response: false,
                     internet_response: false,
                 },
+                None,
                 ping_internet_addr,
             )
             .await,
@@ -863,6 +950,7 @@ mod tests {
                 ID1,
                 &route_table_2,
                 &FakePing::default(),
+                None,
                 ping_internet_addr,
             )
             .await,
@@ -876,10 +964,11 @@ mod tests {
                 ID1,
                 &route_table_4,
                 &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway).collect(),
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
                     gateway_response: true,
                     internet_response: true,
                 },
+                None,
                 ping_internet_addr,
             )
             .await,
@@ -893,10 +982,11 @@ mod tests {
                 ID1,
                 &route_table_4,
                 &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway).collect(),
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
                     gateway_response: true,
                     internet_response: false,
                 },
+                None,
                 ping_internet_addr,
             )
             .await,
@@ -908,9 +998,110 @@ mod tests {
             network_layer_state(
                 ETHERNET_INTERFACE_NAME,
                 ID1,
+                &route_table_2,
+                &FakePing::default(),
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Local,
+            "Local only, neighbors responsive with no default route"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
                 &route_table_3,
                 &FakePing::default(),
-                ping_internet_addr,
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Local,
+            "Local only, neighbors responsive with no routes"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table,
+                &FakePing::default(),
+                Some(&InterfaceNeighborCache {
+                    neighbors: [
+                        (
+                            net1,
+                            NeighborState::new(NeighborHealth::Healthy {
+                                last_observed: fuchsia_zircon::Time::default(),
+                            })
+                        ),
+                        (
+                            net1_gateway,
+                            NeighborState::new(NeighborHealth::Unhealthy { last_healthy: None })
+                        )
+                    ]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Local,
+            "Local only, gateway unhealthy with healthy neighbor"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table_3,
+                &FakePing::default(),
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1_gateway,
+                        NeighborState::new(NeighborHealth::Unhealthy { last_healthy: None })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Up,
+            "No routes and unhealthy gateway"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table_3,
+                &FakePing::default(),
+                None,
+                ping_internet_addr
             )
             .await,
             State::Up,
@@ -987,7 +1178,7 @@ mod tests {
             routes: &[fnet_stack::ForwardingEntry],
             pinger: &dyn Ping,
         ) -> Result<Option<IpVersions<StateEvent>>, anyhow::Error> {
-            let fut = compute_state(&properties, routes, pinger);
+            let fut = compute_state(&properties, routes, pinger, None);
             futures::pin_mut!(fut);
             match exec.run_until_stalled(&mut fut) {
                 Poll::Ready(got) => Ok(got),

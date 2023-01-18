@@ -64,7 +64,7 @@ impl NeighborHealth {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct NeighborState {
     health: NeighborHealth,
@@ -80,7 +80,7 @@ impl NeighborState {
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct InterfaceNeighborCache {
-    neighbors: HashMap<fnet::IpAddress, NeighborState>,
+    pub(crate) neighbors: HashMap<fnet::IpAddress, NeighborState>,
 }
 
 impl InterfaceNeighborCache {
