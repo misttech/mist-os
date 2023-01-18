@@ -221,7 +221,7 @@ fn generate_kernel_name(name: &str) -> String {
 async fn create_new_kernel(
     kernels_dir: &vfs::directory::immutable::Simple,
     mut component_start_info: frunner::ComponentStartInfo,
-    controller: ServerEnd<frunner::ComponentControllerMarker>,
+    _controller: ServerEnd<frunner::ComponentControllerMarker>,
 ) -> Result<(), Error> {
     // The name of the collection that the starnix_kernel is run in.
     const KERNEL_COLLECTION: &str = "kernels";
@@ -231,12 +231,6 @@ async fn create_new_kernel(
     const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
     // The name of the directory as seen by the starnix_kernel.
     const CONFIG_DIRECTORY: &str = "galaxy_config";
-
-    // Pass the component_controller for the galaxy to the starnix_kernel as handle `User0`.
-    let controller_handle_info = fprocess::HandleInfo {
-        handle: controller.into_channel().into_handle(),
-        id: kernel_config::COMPONENT_CONTROLLER_HANDLE_INFO.as_raw(),
-    };
 
     // Grab the /pkg directory of the galaxy component, and pass it to the starnix_kernel as handle
     // `User1`.
@@ -248,12 +242,20 @@ async fn create_new_kernel(
         .directory
         .take()
         .ok_or_else(|| anyhow!("Missing directory handle in pkg namespace entry"))?;
-
     let pkg_handle_info = fprocess::HandleInfo {
         handle: pkg.into_channel().into_handle(),
         id: kernel_config::PKG_HANDLE_INFO.as_raw(),
     };
-    let numbered_handles = vec![controller_handle_info, pkg_handle_info];
+
+    // Pass the outgoing directory of the galaxy to the starnix_kernel. The kernel uses this to
+    // serve, for example, a component runner on behalf of the galaxy.
+    let outgoing_dir =
+        component_start_info.outgoing_dir.take().expect("Missing outgoing directory.");
+    let outgoing_dir_handle_info = fprocess::HandleInfo {
+        handle: outgoing_dir.into_handle(),
+        id: kernel_config::GALAXY_OUTGOING_DIR_HANDLE_INFO.as_raw(),
+    };
+    let numbered_handles = vec![pkg_handle_info, outgoing_dir_handle_info];
 
     // Create a new configuration directory for the starnix_kernel instance.
     let kernel_name = generate_kernel_config_directory(kernels_dir, component_start_info)?;

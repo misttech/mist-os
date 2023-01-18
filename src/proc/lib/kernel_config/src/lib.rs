@@ -10,6 +10,6 @@ pub const HANDLE_TYPE: fruntime::HandleType = fruntime::HandleType::User0;
 /// The handle info that is used to pass the /pkg directory of a galaxy component.
 pub const PKG_HANDLE_INFO: fruntime::HandleInfo = fruntime::HandleInfo::new(HANDLE_TYPE, 0);
 
-/// The handle info that is used to pass the component controller for a galaxy.
-pub const COMPONENT_CONTROLLER_HANDLE_INFO: fruntime::HandleInfo =
+/// The handle info that is used to pass the outgoing directory for a galaxy.
+pub const GALAXY_OUTGOING_DIR_HANDLE_INFO: fruntime::HandleInfo =
     fruntime::HandleInfo::new(HANDLE_TYPE, 1);

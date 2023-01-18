@@ -36,8 +36,15 @@ use fidl::HandleBased;
 /// exist.
 struct ConfigWrapper {
     config: Config,
-    component_controller: Option<zx::Channel>,
-    dir: Option<zx::Channel>,
+
+    /// The `/pkg` directory of the galaxy.
+    pkg_dir: Option<zx::Channel>,
+
+    /// The outgoing directory of the galaxy, used to serve protocols on behalf of the galaxy.
+    /// For example, the starnix_kernel serves a component runner in the galaxies outgoing
+    /// directory.
+    #[allow(dead_code)]
+    outgoing_dir: Option<zx::Channel>,
 }
 
 impl std::ops::Deref for ConfigWrapper {
@@ -70,10 +77,9 @@ fn get_config() -> ConfigWrapper {
         let startup_file_path =
             get_config_str(&program_dict, "startup_file_path").unwrap_or_default();
 
-        let component_controller =
-            fruntime::take_startup_handle(kernel_config::COMPONENT_CONTROLLER_HANDLE_INFO)
-                .map(zx::Channel::from_handle);
-        let dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
+        let pkg_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
+            .map(zx::Channel::from_handle);
+        let outgoing_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
             .map(zx::Channel::from_handle);
 
         ConfigWrapper {
@@ -87,13 +93,13 @@ fn get_config() -> ConfigWrapper {
                 name,
                 startup_file_path,
             },
-            dir,
-            component_controller,
+            pkg_dir,
+            outgoing_dir,
         }
     } else {
         const COMPONENT_PKG_PATH: &str = "/pkg";
         let (server, dir) = zx::Channel::create();
-        let dir = if fdio::open(
+        let pkg_dir = if fdio::open(
             COMPONENT_PKG_PATH,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             server,
@@ -105,11 +111,7 @@ fn get_config() -> ConfigWrapper {
             None
         };
         // Default to the configuration that is provided by structured config.
-        ConfigWrapper {
-            config: Config::take_from_startup_handle(),
-            dir,
-            component_controller: None,
-        }
+        ConfigWrapper { config: Config::take_from_startup_handle(), pkg_dir, outgoing_dir: None }
     }
 }
 
@@ -169,8 +171,7 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
     const DEFAULT_INIT: &str = "/galaxy/init";
     let mut config = get_config();
 
-    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.dir.take().unwrap());
-    let galaxy_component_controller = config.component_controller.take();
+    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
     let mut kernel = Kernel::new(config.name.as_bytes(), &config.features)?;
     kernel.cmdline = config.kernel_cmdline.as_bytes().to_vec();
@@ -216,9 +217,6 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
     init_task.exec(argv[0].clone(), argv.clone(), vec![])?;
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
-        // Drop the component controller explicitly, since the lifecycle of the galaxy component
-        // is tied to that of the init task in the kernel.
-        std::mem::drop(galaxy_component_controller);
     });
     if let Some(startup_file_path) = startup_file_path {
         wait_for_init_file(&startup_file_path, &system_task).await?;
