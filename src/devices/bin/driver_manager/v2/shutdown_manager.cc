@@ -213,7 +213,7 @@ void ShutdownManager::SignalBootShutdown(fit::callback<void(zx_status_t)> cb) {
 void ShutdownManager::SetTerminationSystemState(
     SetTerminationSystemStateRequestView request,
     SetTerminationSystemStateCompleter::Sync& completer) {
-  if (request->state == fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kFullyOn) {
+  if (request->state == fuchsia_device_manager::wire::SystemPowerState::kFullyOn) {
     LOGF(INFO, "Invalid termination state");
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;

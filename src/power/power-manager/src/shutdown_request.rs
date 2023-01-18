@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_hardware_power_statecontrol as fpower;
+use {
+    fidl_fuchsia_device_manager as fdevice_manager,
+    fidl_fuchsia_hardware_power_statecontrol as fpower,
+};
 
 /// Type alias for the reboot reasons defined in fuchsia.hardware.power.statecontrol.RebootReason.
 pub type RebootReason = fpower::RebootReason;
@@ -19,17 +22,19 @@ pub enum ShutdownRequest {
 }
 
 /// Converts a ShutdownRequest into a fuchsia.hardare.power.statecontrol.SystemPowerState value.
-impl Into<fpower::SystemPowerState> for ShutdownRequest {
-    fn into(self) -> fpower::SystemPowerState {
+impl Into<fdevice_manager::SystemPowerState> for ShutdownRequest {
+    fn into(self) -> fdevice_manager::SystemPowerState {
         match self {
-            ShutdownRequest::PowerOff => fpower::SystemPowerState::Poweroff,
+            ShutdownRequest::PowerOff => fdevice_manager::SystemPowerState::Poweroff,
             ShutdownRequest::Reboot(fpower::RebootReason::OutOfMemory) => {
-                fpower::SystemPowerState::RebootKernelInitiated
+                fdevice_manager::SystemPowerState::RebootKernelInitiated
             }
-            ShutdownRequest::Reboot(_) => fpower::SystemPowerState::Reboot,
-            ShutdownRequest::RebootBootloader => fpower::SystemPowerState::RebootBootloader,
-            ShutdownRequest::RebootRecovery => fpower::SystemPowerState::RebootRecovery,
-            ShutdownRequest::SuspendToRam => fpower::SystemPowerState::SuspendRam,
+            ShutdownRequest::Reboot(_) => fdevice_manager::SystemPowerState::Reboot,
+            ShutdownRequest::RebootBootloader => {
+                fdevice_manager::SystemPowerState::RebootBootloader
+            }
+            ShutdownRequest::RebootRecovery => fdevice_manager::SystemPowerState::RebootRecovery,
+            ShutdownRequest::SuspendToRam => fdevice_manager::SystemPowerState::SuspendRam,
         }
     }
 }

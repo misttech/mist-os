@@ -77,7 +77,7 @@ pub enum Admin {
 #[derive(Debug)]
 pub enum Signal {
     Statecontrol(Admin),
-    DeviceManager(fstatecontrol::SystemPowerState),
+    DeviceManager(fdevicemanager::SystemPowerState),
     Sys2Shutdown(fsys::SystemControllerShutdownResponder),
 }
 

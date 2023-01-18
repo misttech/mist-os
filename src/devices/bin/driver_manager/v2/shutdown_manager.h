@@ -19,7 +19,7 @@
 #include "src/devices/bin/driver_manager/v2/node_remover.h"
 
 namespace dfv2 {
-using fuchsia_hardware_power_statecontrol::wire::SystemPowerState;
+using fuchsia_device_manager::wire::SystemPowerState;
 
 // Theory of operation of ShutdownManager:
 //  There are a number of ways shutdown can be initiated:

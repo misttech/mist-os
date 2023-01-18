@@ -199,12 +199,6 @@
         "value": "5"
     },
     {
-        "kind": "const",
-        "name": "fuchsia.hardware.power.statecontrol/MAX_SYSTEM_POWER_STATES",
-        "type": "uint32",
-        "value": "8"
-    },
-    {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.power.statecontrol/RebootMethodsWatcher.OnReboot",
         "ordinal": "2475395614677539603",

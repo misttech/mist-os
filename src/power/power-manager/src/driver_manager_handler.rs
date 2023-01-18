@@ -10,8 +10,7 @@ use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_device_manager as fdevicemgr;
-use fidl_fuchsia_hardware_power_statecontrol as fpowerstatecontrol;
-use fuchsia_async::{self as fasync};
+use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use fuchsia_zircon as zx;
@@ -102,7 +101,7 @@ impl DriverManagerHandler {
     /// the Driver Manager's termination state.
     async fn handle_set_termination_state_message(
         &self,
-        state: fpowerstatecontrol::SystemPowerState,
+        state: fdevicemgr::SystemPowerState,
     ) -> Result<MessageReturn, PowerManagerError> {
         // TODO(fxbug.dev/44484): This string must live for the duration of the function because the
         // trace macro uses it when the function goes out of scope. Therefore, it must be bound here
@@ -209,7 +208,7 @@ pub mod tests {
         mut set_termination_state: T,
     ) -> fdevicemgr::SystemStateTransitionProxy
     where
-        T: FnMut(fpowerstatecontrol::SystemPowerState) -> Result<(), zx::Status> + 'static,
+        T: FnMut(fdevicemgr::SystemPowerState) -> Result<(), zx::Status> + 'static,
     {
         use futures::TryStreamExt as _;
 
@@ -243,7 +242,7 @@ pub mod tests {
         // For this test, let the server succeed for the Reboot state but give an
         // error for any other state (so that we can test error paths)
         let termination_state_proxy = setup_fake_termination_state_service(|state| match state {
-            fpowerstatecontrol::SystemPowerState::Reboot => Ok(()),
+            fdevicemgr::SystemPowerState::Reboot => Ok(()),
             _ => Err(zx::Status::INVALID_ARGS),
         });
 
@@ -253,14 +252,12 @@ pub mod tests {
         );
 
         // Should succeed so `termination_state` will be populated
-        let _ = node
-            .handle_set_termination_state_message(fpowerstatecontrol::SystemPowerState::Reboot)
-            .await;
+        let _ =
+            node.handle_set_termination_state_message(fdevicemgr::SystemPowerState::Reboot).await;
 
         // Should fail so `set_termination_errors` will be populated
-        let _ = node
-            .handle_set_termination_state_message(fpowerstatecontrol::SystemPowerState::FullyOn)
-            .await;
+        let _ =
+            node.handle_set_termination_state_message(fdevicemgr::SystemPowerState::FullyOn).await;
 
         assert_data_tree!(
             inspector,
@@ -309,8 +306,7 @@ pub mod tests {
     /// calling out to the Driver Manager using the termination state proxy.
     #[fasync::run_singlethreaded(test)]
     async fn test_set_termination_state() {
-        let termination_state =
-            std::rc::Rc::new(Cell::new(fpowerstatecontrol::SystemPowerState::FullyOn));
+        let termination_state = std::rc::Rc::new(Cell::new(fdevicemgr::SystemPowerState::FullyOn));
         let termination_state_clone = termination_state.clone();
 
         let node = DriverManagerHandler::new_with_termination_state_proxy(
@@ -324,14 +320,14 @@ pub mod tests {
         // Send the message and verify it returns successfully
         assert_matches!(
             node.handle_message(&Message::SetTerminationSystemState(
-                fpowerstatecontrol::SystemPowerState::Reboot
+                fdevicemgr::SystemPowerState::Reboot
             ))
             .await,
             Ok(MessageReturn::SetTerminationSystemState)
         );
 
         // Verify the fake termination state service received the correct request
-        assert_eq!(termination_state.get(), fpowerstatecontrol::SystemPowerState::Reboot);
+        assert_eq!(termination_state.get(), fdevicemgr::SystemPowerState::Reboot);
     }
 
     /// Tests for correct ordering of nodes within each available node config file. The

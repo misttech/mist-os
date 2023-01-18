@@ -35,7 +35,7 @@
 namespace fio = fuchsia_io;
 
 using fuchsia_device::wire::DevicePowerState;
-using fuchsia_hardware_power_statecontrol::wire::SystemPowerState;
+using fuchsia_device_manager::wire::SystemPowerState;
 
 namespace internal {
 

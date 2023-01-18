@@ -26,9 +26,8 @@ using fuchsia_device::wire::kDevicePerformanceStateP0;
 using fuchsia_device::wire::kMaxDevicePerformanceStates;
 using fuchsia_device::wire::kMaxDevicePowerStates;
 using fuchsia_device::wire::SystemPowerStateInfo;
+using fuchsia_device_manager::wire::SystemPowerState;
 using fuchsia_device_power_test::TestDevice;
-using fuchsia_hardware_power_statecontrol::wire::kMaxSystemPowerStates;
-using fuchsia_hardware_power_statecontrol::wire::SystemPowerState;
 namespace device_manager_fidl = fuchsia_device_manager;
 namespace lifecycle_fidl = fuchsia_process_lifecycle;
 

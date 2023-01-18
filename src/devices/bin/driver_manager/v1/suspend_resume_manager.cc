@@ -110,23 +110,23 @@ void SuspendResumeManager::Resume(SystemPowerState target_state, ResumeCallback 
 // TODO(fxbug.dev/42257): Temporary helper to convert state to flags.
 // Will be removed eventually.
 uint32_t SuspendResumeManager::GetSuspendFlagsFromSystemPowerState(
-    statecontrol_fidl::wire::SystemPowerState state) const {
+    fuchsia_device_manager::wire::SystemPowerState state) const {
   switch (state) {
-    case statecontrol_fidl::wire::SystemPowerState::kFullyOn:
+    case fuchsia_device_manager::wire::SystemPowerState::kFullyOn:
       return 0;
-    case statecontrol_fidl::wire::SystemPowerState::kReboot:
+    case fuchsia_device_manager::wire::SystemPowerState::kReboot:
       return DEVICE_SUSPEND_FLAG_REBOOT;
-    case statecontrol_fidl::wire::SystemPowerState::kRebootBootloader:
+    case fuchsia_device_manager::wire::SystemPowerState::kRebootBootloader:
       return DEVICE_SUSPEND_FLAG_REBOOT_BOOTLOADER;
-    case statecontrol_fidl::wire::SystemPowerState::kRebootRecovery:
+    case fuchsia_device_manager::wire::SystemPowerState::kRebootRecovery:
       return DEVICE_SUSPEND_FLAG_REBOOT_RECOVERY;
-    case statecontrol_fidl::wire::SystemPowerState::kRebootKernelInitiated:
+    case fuchsia_device_manager::wire::SystemPowerState::kRebootKernelInitiated:
       return DEVICE_SUSPEND_FLAG_REBOOT_KERNEL_INITIATED;
-    case statecontrol_fidl::wire::SystemPowerState::kPoweroff:
+    case fuchsia_device_manager::wire::SystemPowerState::kPoweroff:
       return DEVICE_SUSPEND_FLAG_POWEROFF;
-    case statecontrol_fidl::wire::SystemPowerState::kMexec:
+    case fuchsia_device_manager::wire::SystemPowerState::kMexec:
       return DEVICE_SUSPEND_FLAG_MEXEC;
-    case statecontrol_fidl::wire::SystemPowerState::kSuspendRam:
+    case fuchsia_device_manager::wire::SystemPowerState::kSuspendRam:
       return DEVICE_SUSPEND_FLAG_SUSPEND_RAM;
     default:
       return 0;

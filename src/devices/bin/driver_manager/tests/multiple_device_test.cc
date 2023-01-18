@@ -389,9 +389,9 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl) {
 
   ASSERT_OK(coordinator().system_state_manager().BindPowerManagerInstance(
       coordinator_loop()->dispatcher(), std::move(endpoints->server)));
-  auto response = fidl::WireCall(endpoints->client)
-                      ->SetTerminationSystemState(
-                          fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kPoweroff);
+  auto response =
+      fidl::WireCall(endpoints->client)
+          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kPoweroff);
 
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
@@ -400,7 +400,7 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl) {
   }
   ASSERT_OK(call_status);
   ASSERT_EQ(coordinator().shutdown_system_state(),
-            fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kPoweroff);
+            fuchsia_device_manager::wire::SystemPowerState::kPoweroff);
 }
 
 TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_svchost_fidl) {
@@ -423,9 +423,9 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_svchost_fidl) {
       fidl::DiscoverableProtocolDefaultPath<fuchsia_device_manager::SystemStateTransition>);
   ASSERT_OK(client_end.status_value());
 
-  auto response = fidl::WireCall(*client_end)
-                      ->SetTerminationSystemState(
-                          fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kMexec);
+  auto response =
+      fidl::WireCall(*client_end)
+          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kMexec);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -435,7 +435,7 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_svchost_fidl) {
 
   RunOnCoordinatorLoop([&] {
     ASSERT_EQ(coordinator().shutdown_system_state(),
-              fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kMexec);
+              fuchsia_device_manager::wire::SystemPowerState::kMexec);
   });
   RunOnCoordinatorLoop([&] { outgoing.reset(); });
 }
@@ -450,9 +450,9 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl_wrong_state) {
   ASSERT_OK(coordinator().system_state_manager().BindPowerManagerInstance(
       coordinator_loop()->dispatcher(), std::move(endpoints->server)));
 
-  auto response = fidl::WireCall(endpoints->client)
-                      ->SetTerminationSystemState(
-                          fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kFullyOn);
+  auto response =
+      fidl::WireCall(endpoints->client)
+          ->SetTerminationSystemState(fuchsia_device_manager::wire::SystemPowerState::kFullyOn);
 
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
@@ -462,7 +462,7 @@ TEST_F(MultipleDeviceTestCase, SetTerminationSystemState_fidl_wrong_state) {
   ASSERT_EQ(call_status, ZX_ERR_INVALID_ARGS);
   // Default shutdown_system_state in test is MEXEC.
   ASSERT_EQ(coordinator().shutdown_system_state(),
-            fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kMexec);
+            fuchsia_device_manager::wire::SystemPowerState::kMexec);
 }
 
 // This functor accepts a |fidl::WireUnownedResult<FidlMethod>&| and checks that

@@ -397,9 +397,8 @@ struct zx_device
 
   using DevicePowerStates = std::array<fuchsia_device::wire::DevicePowerStateInfo,
                                        fuchsia_device::wire::kMaxDevicePowerStates>;
-  using SystemPowerStateMapping =
-      std::array<fuchsia_device::wire::SystemPowerStateInfo,
-                 fuchsia_hardware_power_statecontrol::wire::kMaxSystemPowerStates>;
+  using SystemPowerStateMapping = std::array<fuchsia_device::wire::SystemPowerStateInfo,
+                                             fuchsia_device_manager::wire::kMaxSystemPowerStates>;
   using PerformanceStates = std::array<fuchsia_device::wire::DevicePerformanceStateInfo,
                                        fuchsia_device::wire::kMaxDevicePerformanceStates>;
 

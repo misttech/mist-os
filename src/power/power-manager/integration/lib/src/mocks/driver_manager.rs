@@ -4,8 +4,7 @@
 
 use {
     crate::mocks::temperature_driver::MockTemperatureDriver,
-    fidl_fuchsia_device_manager as fdevmgr, fidl_fuchsia_hardware_power_statecontrol as fpower,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_device_manager as fdevmgr, fidl_fuchsia_io as fio,
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
     fuchsia_component_test::LocalComponentHandles,
     futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
@@ -22,7 +21,7 @@ use {
 /// Mocks the Driver Manager to be used in integration tests.
 pub struct MockDriverManager {
     devfs: Arc<vfs::directory::immutable::Simple>,
-    current_termination_state: Arc<RwLock<Option<fpower::SystemPowerState>>>,
+    current_termination_state: Arc<RwLock<Option<fdevmgr::SystemPowerState>>>,
 }
 
 impl MockDriverManager {
@@ -123,7 +122,16 @@ impl MockDriverManager {
             .map_err(Into::into)
     }
 
-    pub fn get_current_termination_state(&self) -> fpower::SystemPowerState {
+    pub fn current_termination_state(&self) -> fdevmgr::SystemPowerState {
         self.current_termination_state.read().expect("Termination state not set")
+    }
+
+    pub fn get_current_termination_state(
+        &self,
+    ) -> fidl_fuchsia_hardware_power_statecontrol::SystemPowerState {
+        fidl_fuchsia_hardware_power_statecontrol::SystemPowerState::from_primitive(
+            self.current_termination_state().into_primitive(),
+        )
+        .expect("trivial conversion")
     }
 }

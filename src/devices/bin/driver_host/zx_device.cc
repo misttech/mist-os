@@ -158,7 +158,7 @@ zx_status_t zx_device::SetPerformanceStates(
 
 namespace {
 
-using fuchsia_hardware_power_statecontrol::wire::SystemPowerState;
+using fuchsia_device_manager::wire::SystemPowerState;
 
 uint8_t get_suspend_reason(SystemPowerState power_state) {
   switch (power_state) {

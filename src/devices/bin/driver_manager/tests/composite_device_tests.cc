@@ -899,8 +899,8 @@ TEST_F(CompositeTestCase, ResumeOrder) {
   }
   comp_device->set_state(Device::State::kSuspended);
 
-  fuchsia_hardware_power_statecontrol::wire::SystemPowerState state =
-      fuchsia_hardware_power_statecontrol::wire::SystemPowerState::kFullyOn;
+  fuchsia_device_manager::wire::SystemPowerState state =
+      fuchsia_device_manager::wire::SystemPowerState::kFullyOn;
   ASSERT_NO_FATAL_FAILURE(DoResume(state));
 
   // First, the sys proxy driver, which is the parent of all of the devices

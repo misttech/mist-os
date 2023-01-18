@@ -53,8 +53,7 @@
 #include "src/devices/bin/driver_manager/v1/suspend_resume_manager.h"
 #include "src/devices/bin/driver_manager/v2/driver_runner.h"
 
-namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
-using statecontrol_fidl::wire::SystemPowerState;
+using fuchsia_device_manager::wire::SystemPowerState;
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf

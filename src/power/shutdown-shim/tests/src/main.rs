@@ -240,7 +240,7 @@ async fn power_manager_missing_poweroff() -> Result<(), Error> {
     });
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Poweroff))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Poweroff))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -263,7 +263,7 @@ async fn power_manager_missing_reboot_system_update() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Reboot))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Reboot))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -288,7 +288,7 @@ async fn power_manager_missing_mexec() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Mexec))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Mexec))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -310,7 +310,7 @@ async fn power_manager_not_present_poweroff() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Poweroff))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Poweroff))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -332,7 +332,7 @@ async fn power_manager_not_present_reboot() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Reboot))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Reboot))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -356,7 +356,7 @@ async fn power_manager_not_present_mexec() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::Mexec))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::Mexec))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -378,7 +378,7 @@ async fn power_manager_not_present_reboot_oom() -> Result<(), Error> {
 
     assert_matches!(
         recv_signals.next().await,
-        Some(Signal::DeviceManager(fstatecontrol::SystemPowerState::RebootKernelInitiated))
+        Some(Signal::DeviceManager(fdevicemanager::SystemPowerState::RebootKernelInitiated))
     );
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
     Ok(())
@@ -391,17 +391,17 @@ async fn power_manager_not_present_reboot_oom() -> Result<(), Error> {
 async fn test_variant_coverage() -> Result<(), Error> {
     struct Mock {}
 
-    impl std::convert::From<fstatecontrol::SystemPowerState> for Mock {
-        fn from(ps: fstatecontrol::SystemPowerState) -> Mock {
+    impl std::convert::From<fdevicemanager::SystemPowerState> for Mock {
+        fn from(ps: fdevicemanager::SystemPowerState) -> Mock {
             match ps {
-                fstatecontrol::SystemPowerState::Reboot
-                | fstatecontrol::SystemPowerState::FullyOn
-                | fstatecontrol::SystemPowerState::RebootBootloader
-                | fstatecontrol::SystemPowerState::RebootRecovery
-                | fstatecontrol::SystemPowerState::Poweroff
-                | fstatecontrol::SystemPowerState::Mexec
-                | fstatecontrol::SystemPowerState::SuspendRam
-                | fstatecontrol::SystemPowerState::RebootKernelInitiated => Mock {},
+                fdevicemanager::SystemPowerState::Reboot
+                | fdevicemanager::SystemPowerState::FullyOn
+                | fdevicemanager::SystemPowerState::RebootBootloader
+                | fdevicemanager::SystemPowerState::RebootRecovery
+                | fdevicemanager::SystemPowerState::Poweroff
+                | fdevicemanager::SystemPowerState::Mexec
+                | fdevicemanager::SystemPowerState::SuspendRam
+                | fdevicemanager::SystemPowerState::RebootKernelInitiated => Mock {},
             }
         }
     }

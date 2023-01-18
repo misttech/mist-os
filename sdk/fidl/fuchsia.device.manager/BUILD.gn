@@ -15,7 +15,6 @@ fidl("fuchsia.device.manager") {
     "//sdk/fidl/fuchsia.device",
     "//sdk/fidl/fuchsia.driver.framework",
     "//sdk/fidl/fuchsia.driver.host",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol",
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]
