@@ -6,7 +6,7 @@ load("@legacy_ninja_build_outputs//:build_args.bzl", "use_vbmeta")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_filesystem_blobfs",
-    "fuchsia_filesystem_empty_minfs",
+    "fuchsia_filesystem_empty_data",
     "fuchsia_filesystem_minfs",
     "fuchsia_filesystem_reserved",
     "fuchsia_fvm_sparse",
@@ -135,9 +135,9 @@ fuchsia_filesystem_minfs(
     name = "minfs",
 )
 
-fuchsia_filesystem_empty_minfs(
-    name = "empty_minfs",
-    empty_minfs_name = "empty-data",
+fuchsia_filesystem_empty_data(
+    name = "empty_data",
+    empty_data_name = "empty-data",
 )
 
 fuchsia_filesystem_reserved(
