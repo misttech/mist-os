@@ -133,9 +133,9 @@ void register_copy(Out& out, const In& in) {
   out.r15 = in.r15;
 }
 
-zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, uintptr_t entry,
-                      paddr_t msr_bitmaps_address, paddr_t ept_pml4, VmxState* vmx_state,
-                      uint8_t* extended_register_state) {
+zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, uintptr_t entry,
+                       paddr_t msr_bitmaps_address, paddr_t ept_pml4, VmxState* vmx_state,
+                       uint8_t* extended_register_state) {
   // Setup secondary processor-based VMCS controls.
   zx_status_t status =
       vmcs.SetControl(VmcsField32::PROCBASED_CTLS2, read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS2), 0,
@@ -153,7 +153,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
                       // If not `unrestricted`, disable unrestricted guest.
                       (config.unrestricted ? 0 : kProcbasedCtls2UnrestrictedGuest));
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // Enable use of INVPCID instruction if available.
@@ -170,7 +170,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
                           kPinbasedCtlsNmiExiting,
                       0);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   const uint32_t cr_ctls =
@@ -203,7 +203,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
                       // If not `cr_exiting`, disable VM exit on CRs.
                       (config.cr_exiting ? 0 : cr_ctls));
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // We only enable interrupt-window exiting above to ensure that the
@@ -229,7 +229,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
                                kExitCtlsLoadIa32Efer,
                            0);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // Whether we are configuring the base processor. The base processor starts in
@@ -251,7 +251,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
   status = vmcs.SetControl(VmcsField32::ENTRY_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_ENTRY_CTLS),
                            read_msr(X86_MSR_IA32_VMX_ENTRY_CTLS), entry_ctls, 0);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // From Volume 3, Section 24.6.3: The exception bitmap is a 32-bit field
@@ -343,7 +343,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
            X86_CR0_PG;   // Enable paging
   }
   if (cr0_is_invalid(vmcs, cr0)) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   vmcs.Write(VmcsFieldXX::GUEST_CR0, cr0);
 
@@ -354,7 +354,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
     cr4 |= X86_CR4_PAE | X86_CR4_PGE;
   }
   if (cr_is_invalid(cr4, X86_MSR_IA32_VMX_CR4_FIXED0, X86_MSR_IA32_VMX_CR4_FIXED1)) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   vmcs.Write(VmcsFieldXX::GUEST_CR4, cr4);
 
@@ -448,7 +448,7 @@ zx_status_t vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, u
     x86_extended_register_init_state_from_bv(extended_register_state, vmx_state->guest_state.xcr0);
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 // Injects an interrupt into the guest, if there is one pending.
@@ -700,10 +700,10 @@ zx::result<ktl::unique_ptr<V>> Vcpu::Create(G& guest, uint16_t vpid, zx_vaddr_t 
   // disabled from `vmcs_init` until `SetMigrateFn`. This is important to ensure
   // that we do not migrate CPUs while setting up the VCPU.
   AutoVmcs vmcs(vmcs_address, /*clear=*/true);
-  zx_status_t status = vmcs_init(vmcs, V::kConfig, vpid, entry, guest.MsrBitmapsAddress(), ept_pml4,
-                                 &vcpu->vmx_state_, vcpu->extended_register_state_);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  result = vmcs_init(vmcs, V::kConfig, vpid, entry, guest.MsrBitmapsAddress(), ept_pml4,
+                     &vcpu->vmx_state_, vcpu->extended_register_state_);
+  if (result.is_error()) {
+    return result.take_error();
   }
 
   {
