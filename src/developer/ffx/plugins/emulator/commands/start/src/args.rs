@@ -87,8 +87,8 @@ pub struct StartCommand {
     #[ffx_config_default(key = "emu.engine", default = "femu")]
     pub engine: Option<String>,
 
-    /// GPU acceleration mode. Allowed values are "host", "guest", "swiftshader_indirect", or
-    /// "auto". Default is "auto". Note: this is unused when using the "qemu" engine type. See
+    /// GPU acceleration mode. Allowed values are "host", "swiftshader_indirect", or "auto".
+    /// Default is "auto". Note: this is unused when using the "qemu" engine type. See
     /// https://developer.android.com/studio/run/emulator-acceleration#command-gpu for details on
     /// the available options. This can be overridden by running `ffx config set emu.gpu <type>`.
     #[argh(option)]

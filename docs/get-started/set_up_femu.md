@@ -251,11 +251,6 @@ the `--gpu` flag with the following options:
    <td><code>ffx emu start --gpu host</code></td>
   </tr>
   <tr>
-   <td>Software (host CPU)</td>
-   <td>Uses the host machine's CPU to simulate GPU processing.</td>
-   <td><code>ffx emu start --gpu guest</code></td>
-  </tr>
-  <tr>
    <td>SwiftShader</td>
    <td>Uses SwiftShader libraries to simulate GPU processing.</td>
    <td><code>ffx emu start --gpu swiftshader_indirect</code></td>
