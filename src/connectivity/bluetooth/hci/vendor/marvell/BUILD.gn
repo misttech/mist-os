@@ -33,9 +33,11 @@ source_set("common") {
     "host_channel_manager.cc",
     "host_channel_manager.h",
     "interrupt_key_allocator.h",
+    "marvell_hci.h",
   ]
   deps = [
     ":bt_hci_marvell_bind",
+    "//src/connectivity/bluetooth/core/bt-host/hci-spec:hci-protocol",
     "//src/devices/lib/driver",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

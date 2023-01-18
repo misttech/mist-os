@@ -23,6 +23,8 @@ class BtHciMockSdioTest : public zxtest::Test {
   // 88W8987
   static constexpr uint32_t kSimProductId = 0x914a;
 
+  static constexpr uint8_t kFakeMacAddr[6] = {0x45, 0x6d, 0x6d, 0x65, 0x74, 0x74};
+
   // The value we'll return for reads from the ioport address registers
   static constexpr uint32_t kSimIoportAddr = 0x4a4d43;
   static constexpr uint8_t kSimIoportAddrLow = kSimIoportAddr & 0xff;
@@ -42,6 +44,12 @@ class BtHciMockSdioTest : public zxtest::Test {
 
   // Prepare for all of the sdio calls associated with enabling interrupts
   void ExpectEnableInterrupts();
+
+  // Prepare for the controller to receive a SetMacAddr frame
+  void ExpectSetMacAddr();
+
+  // Trigger an interrupt for a SetMacAddr command complete event
+  void SendSetMacAddrCompleteInterrupt();
 
   // Create zx::channels and make the appropriate ddk calls to open the channels for communication
   // with the driver.
@@ -76,6 +84,9 @@ class BtHciMockSdioTest : public zxtest::Test {
   zx::channel command_channel_;
   zx::channel acl_data_channel_;
   zx::channel sco_channel_;
+
+  // Just frames that we want to keep around until the test completes
+  std::list<TestFrame> frames_;
 
  private:
   void UnbindAndRelease();

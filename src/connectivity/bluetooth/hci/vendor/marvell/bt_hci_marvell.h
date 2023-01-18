@@ -25,6 +25,9 @@ namespace bt_hci_marvell {
 // our ddkInit operation.
 constexpr size_t kFirmwareWaitSeconds = 300;
 
+// How many seconds to wait for a response to a driver-initiated vendor command.
+constexpr size_t kVendorCmdResponseWaitSeconds = 10;
+
 class BtHciMarvell;
 using BtHciMarvellType =
     ddk::Device<BtHciMarvell, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable>;
@@ -67,6 +70,14 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
 
   // Load firmware (or wait for notification that firmware has been loaded by another driver)
   zx_status_t LoadFirmware();
+
+  // Create a channel by which the driver itself can send vendor-specific commands to the controller
+  zx_status_t OpenVendorCmdChannel();
+
+  zx_status_t SetMacAddr();
+
+  // Handle vendor-specific events. At the moment that only includes SetMacAddr commands.
+  bool ProcessVendorEvent(const uint8_t* frame, size_t frame_size);
 
   // Control whether interrupts will be sent for a host channel
   zx_status_t ArmChannelInterrupts(const HostChannel* host_channel);
@@ -121,6 +132,8 @@ class BtHciMarvell : public BtHciMarvellType, public ddk::BtHciProtocol<BtHciMar
 
   // The baton used to provide an asynchronous status of DdkInit().
   std::unique_ptr<ddk::InitTxn> init_txn_;
+
+  zx::channel vendor_cmd_channel_;
 
   fbl::Mutex mutex_;
   thrd_t driver_thread_;

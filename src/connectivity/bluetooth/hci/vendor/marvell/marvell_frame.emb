@@ -12,3 +12,11 @@ struct MarvellFrame:
   -- Frame as seen by the controller
   0      [+MarvellFrameHeader.$size_in_bytes]  MarvellFrameHeader  header
   $next  [+header.payload_size]                UInt:8[]            payload
+
+struct MarvellCommandHeader:
+  0      [+1]  UInt  cmd_type
+  1      [+1]  UInt  cmd_length  # Exclusive of this header
+
+struct MarvellSetMacAddrCommand:
+  0      [+MarvellCommandHeader.$size_in_bytes]  MarvellCommandHeader  marvell_header
+  $next  [+6]                                    UInt:8[]              mac

@@ -5,6 +5,7 @@
 #include "src/connectivity/bluetooth/hci/vendor/marvell/tests/bt_hci_mock_sdio_test.h"
 
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
+#include <lib/ddk/metadata.h>
 
 // Validate that an SDIO read/write operation matches our expectations. This definition has to be
 // provided when using ddk::MockSdio.
@@ -76,6 +77,9 @@ void BtHciMockSdioTest::SetUp() {
   hw_info.func_hw_info.product_id = kSimProductId;
   mock_sdio_device_.ExpectGetDevHwInfo(ZX_OK, hw_info);
 
+  // Prepare for metadata query
+  fake_parent_->SetMetadata(DEVICE_METADATA_MAC_ADDRESS, &kFakeMacAddr, sizeof(kFakeMacAddr));
+
   // Create a virtual interrupt (and duplicate) for use by the driver
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &sdio_interrupt_));
   zx::interrupt interrupt_dup;
@@ -128,6 +132,8 @@ void BtHciMockSdioTest::SetUp() {
 
   ExpectEnableInterrupts();
 
+  ExpectSetMacAddr();
+
   // Create our driver instance, which should bind to the SDIO mock
   ASSERT_EQ(ZX_OK, BtHciMarvell::Bind(/* ctx */ nullptr, fake_parent_.get()));
 
@@ -159,6 +165,11 @@ void BtHciMockSdioTest::Init() {
   // Invoke ddkInit()
   dut_->InitOp();
 
+  // Wait for the SetMacAddr block write to complete and then send the corresponding command
+  // complete event.
+  mock_sdio_device_.block_write_complete_.Wait();
+  SendSetMacAddrCompleteInterrupt();
+
   // Verify that the Init operation returned a completion status
   ASSERT_EQ(ZX_OK, dut_->WaitUntilInitReplyCalled());
 
@@ -179,6 +190,35 @@ void BtHciMockSdioTest::ExpectEnableInterrupts() {
 
   // Verify that SDIO interrupts are re-enabled
   mock_sdio_device_.ExpectEnableFnIntr(ZX_OK);
+}
+
+void BtHciMockSdioTest::ExpectSetMacAddr() {
+  std::vector<uint8_t> set_mac_addr_frame_data = {
+      // HCI Header: opcode (2 bytes), parameter_total_size
+      0x22, 0xfc, 0x8,
+      // Vendor Header: cmd_type, cmd_length
+      static_cast<uint8_t>(ControllerChannelId::kChannelVendor), 6,
+      // Parameters: mac address (reversed)
+      kFakeMacAddr[5], kFakeMacAddr[4], kFakeMacAddr[3], kFakeMacAddr[2], kFakeMacAddr[1],
+      kFakeMacAddr[0]};
+  auto frame = frames_.emplace(frames_.begin(), set_mac_addr_frame_data,
+                               ControllerChannelId::kChannelVendor, device_oracle_);
+  sdio_rw_txn_t txn = frame->GetSdioTxn(/* is_write */ true, kSimIoportAddr);
+  mock_sdio_device_.ExpectDoRwTxn(ZX_OK, txn);
+}
+
+void BtHciMockSdioTest::SendSetMacAddrCompleteInterrupt() {
+  std::vector<uint8_t> set_mac_addr_complete_frame_data = {
+      // HCI Event Header: event_code, parameter_total_size
+      0xe, 4,
+      // Command complete event: num_hci_command_packets, command_opcode (2 bytes)
+      1, 0x22, 0xfc,
+      // Return parameter (success)
+      0};
+  auto frame = frames_.emplace(frames_.begin(), set_mac_addr_complete_frame_data,
+                               ControllerChannelId::kChannelEvent, device_oracle_);
+  SendInterruptAndProcessFrames(kInterruptMaskReadyToSend | kInterruptMaskPacketAvailable,
+                                &(*frame), nullptr);
 }
 
 void BtHciMockSdioTest::EstablishAllChannels() {

@@ -4,16 +4,21 @@
 
 #include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell.h"
 
+#include <endian.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <sys/random.h>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/connectivity/bluetooth/core/bt-host/hci-spec/hci-protocol.emb.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell_bind.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_frame.emb.h"
+#include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_hci.h"
 
 namespace bt_hci_marvell {
 
@@ -72,10 +77,12 @@ void BtHciMarvell::DdkInit(ddk::InitTxn txn) {
 
 int BtHciMarvell::Thread() {
   zx_status_t status = Init();
-  init_txn_->Reply(status);
-  init_txn_.reset();
   if (status == ZX_OK) {
     EventHandler();
+  }
+  if (init_txn_) {
+    init_txn_->Reply(status);
+    init_txn_.reset();
   }
   return thrd_success;
 }
@@ -153,7 +160,16 @@ zx_status_t BtHciMarvell::Init() {
     return status;
   }
 
-  return status;
+  if ((status = OpenVendorCmdChannel()) != ZX_OK) {
+    return status;
+  }
+
+  if ((status = SetMacAddr()) != ZX_OK) {
+    zxlogf(ERROR, "Failed to set mac address: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 // For now, we rely on wlan to load the firmware image for us, we just have to wait for it.
@@ -173,13 +189,156 @@ zx_status_t BtHciMarvell::LoadFirmware() {
   return ZX_ERR_TIMED_OUT;
 }
 
+zx_status_t BtHciMarvell::OpenVendorCmdChannel() {
+  zx_status_t status;
+  zx::channel channel_mgr_handle;
+
+  status = zx::channel::create(0, &channel_mgr_handle, &vendor_cmd_channel_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to open vendor command channel: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return OpenChannel(std::move(channel_mgr_handle), ControllerChannelId::kChannelVendor,
+                     ControllerChannelId::kChannelVendor, "Vendor Command");
+}
+
+zx_status_t BtHciMarvell::SetMacAddr() {
+  constexpr size_t kMacAddrLen = 6;
+  zx_status_t status;
+  uint8_t mac_addr[kMacAddrLen];
+  size_t actual_len;
+
+  // Read the MAC address from boot data
+  status = DdkGetMetadata(DEVICE_METADATA_MAC_ADDRESS, mac_addr, sizeof(mac_addr), &actual_len);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Bootloader failed to find BT mac address: %s", zx_status_get_string(status));
+    return status;
+  }
+  if (actual_len < kMacAddrLen) {
+    zxlogf(ERROR,
+           "Bootloader returned incomplete mac address (%zu bytes received, expected of %zu)",
+           actual_len, sizeof(mac_addr));
+  }
+  zxlogf(INFO, "Using BT mac address: %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1],
+         mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+
+  constexpr size_t kCommandHeaderSize = pw::bluetooth::emboss::CommandHeaderView::SizeInBytes();
+  constexpr size_t kVendorCommandSize = MarvellSetMacAddrCommandView::SizeInBytes();
+  uint8_t frame[kCommandHeaderSize + kVendorCommandSize];
+
+  // Write out generic HCI command header
+  auto command_header_view =
+      pw::bluetooth::emboss::MakeCommandHeaderView(frame, kCommandHeaderSize);
+  command_header_view.opcode().ogf().Write(kHciOgfVendorSpecificDebug);
+  command_header_view.opcode().ocf().Write(kHciOcfMarvellSetMacAddr);
+  command_header_view.parameter_total_size().Write(static_cast<uint8_t>(kVendorCommandSize));
+
+  // Write out Marvell-specific SetMacAddr command header
+  auto vendor_cmd_view =
+      MakeMarvellSetMacAddrCommandView(&frame[kCommandHeaderSize], kVendorCommandSize);
+  vendor_cmd_view.marvell_header().cmd_type().Write(
+      static_cast<uint8_t>(ControllerChannelId::kChannelVendor));
+  vendor_cmd_view.marvell_header().cmd_length().Write(static_cast<uint8_t>(kMacAddrLen));
+
+  // And finally, the SetMacAddr command data, which needs to be reversed
+  uint8_t* dst_mac_addr = vendor_cmd_view.mac().BackingStorage().data();
+  for (size_t ndx = 0; ndx < kMacAddrLen; ndx++) {
+    dst_mac_addr[ndx] = mac_addr[(kMacAddrLen - 1) - ndx];
+  }
+
+  // Write the command to the vendor command channel, which will be processed by the event loop
+  if ((status = vendor_cmd_channel_.write(0, &frame, sizeof(frame), nullptr, 0)) != ZX_OK) {
+    zxlogf(ERROR, "Failed to write to vendor command channel: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
+}
+
+bool BtHciMarvell::ProcessVendorEvent(const uint8_t* frame, size_t frame_size) {
+  bool is_handled = false;
+
+  // At the moment, the only vendor-specific event we handle is a SetMacAddr, which is the last
+  // step in initialization. So we don't need to run these checks unless we're waiting on it.
+  if (!init_txn_) {
+    return is_handled;
+  }
+
+  // Verify that the frame was sent to the "Event" channel
+  const auto frame_view = MakeMarvellFrameView(frame, frame_size);
+  if (frame_view.header().channel_id().Read() !=
+      static_cast<uint8_t>(ControllerChannelId::kChannelEvent)) {
+    return is_handled;
+  }
+
+  // Verify the HCI event header
+  const size_t payload_size = frame_view.header().payload_size().Read();
+  const uint8_t* payload_data = frame_view.payload().BackingStorage().data();
+  const auto event_view = pw::bluetooth::emboss::MakeEventHeaderView(payload_data, payload_size);
+  if (!event_view.Ok()) {
+    return is_handled;
+  }
+  if (event_view.event_code().Read() != kHciEventCodeCommandComplete) {
+    return is_handled;
+  }
+
+  // Verify the HCI Command Complete event fields
+  const auto cmd_complete_event_view =
+      pw::bluetooth::emboss::MakeCommandCompleteEventView(payload_data, payload_size);
+  uint16_t opcode = cmd_complete_event_view.command_opcode().BackingStorage().ReadUInt();
+  if (opcode != kHciOpcodeMarvellSetMacAddr) {
+    return is_handled;
+  }
+
+  // Beyond this point, we know it's a Marvell SetMacAddr operation, so we will handle all necessary
+  // processing ourselves and won't expect the frame to be passed back to the host.
+  is_handled = true;
+
+  // Isolate the return parameters and cross-check sizes
+  const size_t return_params_length =
+      cmd_complete_event_view.header().parameter_total_size().Read() -
+      pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes();
+  if (return_params_length < 1) {
+    zxlogf(ERROR,
+           "Insufficient parameters received in response to vendor SetMacAddr HCI operation");
+    return is_handled;
+  }
+  if (payload_size <
+      (pw::bluetooth::emboss::EventHeaderView::SizeInBytes() +
+       pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes() + return_params_length)) {
+    zxlogf(ERROR, "Improperly formatted command complete frame - ignoring");
+    return is_handled;
+  }
+  const uint8_t* return_params =
+      &payload_data[pw::bluetooth::emboss::EventHeaderView::SizeInBytes() +
+                    pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes()];
+
+  // Finally, check that the status code returned is correct
+  if (return_params[0] != kHciMarvellCmdCompleteSuccess) {
+    zxlogf(ERROR, "Attempt to set mac address rejected by controller with status %#02x",
+           return_params[0]);
+    return is_handled;
+  }
+
+  zxlogf(INFO, "Received confirmation of mac address set - sending ddkInit response");
+  init_txn_->Reply(ZX_OK);
+  init_txn_.reset();
+  return is_handled;
+}
+
 void BtHciMarvell::EventHandler() {
   zx_status_t status;
   zx_port_packet_t packet;
   bool halt = false;
 
   do {
-    status = port_.wait(zx::deadline_after(zx::duration::infinite()), &packet);
+    // If we haven't completed initialization, then we are still waiting to get a response from the
+    // controller to our set mac address request. In that case, we will limit our wait time to a
+    // finite value.
+    zx::duration wait_duration =
+        init_txn_ ? zx::sec(kVendorCmdResponseWaitSeconds) : zx::duration::infinite();
+    status = port_.wait(zx::deadline_after(wait_duration), &packet);
 
     if (status != ZX_OK) {
       zxlogf(ERROR, "Port wait failed (%s), terminating event handler",
@@ -296,8 +455,8 @@ zx_status_t BtHciMarvell::ReadFromCard() {
     zxlogf(ERROR, "Failed to create and map VMO: %s", zx_status_get_string(status));
     return status;
   }
-  const auto frame_view =
-      MakeMarvellFrameView(reinterpret_cast<uint8_t*>(mapper.start()), buffer_size);
+  const uint8_t* buffer_ptr = reinterpret_cast<uint8_t*>(mapper.start());
+  const auto frame_view = MakeMarvellFrameView(buffer_ptr, buffer_size);
   if (!frame_view.IsComplete()) {
     zxlogf(ERROR, "Failure parsing incoming frame - ignoring");
     return ZX_ERR_IO_DATA_INTEGRITY;
@@ -322,6 +481,10 @@ zx_status_t BtHciMarvell::ReadFromCard() {
   if ((status = sdio_.DoRwTxn(&txn)) != ZX_OK) {
     zxlogf(ERROR, "SDIO transaction failed: %s", zx_status_get_string(status));
     return status;
+  }
+
+  if (ProcessVendorEvent(buffer_ptr, buffer_size)) {
+    return ZX_OK;
   }
 
   // Write the frame to the appropriate channel based on its channel Id. Header size includes the
