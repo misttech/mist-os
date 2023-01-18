@@ -974,7 +974,8 @@ void UsbXhci::UsbHciNormalRequestQueue(Request request) {
     // consider any request for a zero-length pipe as invalid (see USB 2.0 spec. 5.6.2).
     if (pending_transfer.max_packet_size == 0) {
       transaction_lock.release();
-      request.Complete(ZX_ERR_IO_INVALID, 0);
+      pending_transfer.status = ZX_ERR_INVALID_ARGS;
+      pending_transfer.Complete();
       return;
     }
 
@@ -987,6 +988,26 @@ void UsbXhci::UsbHciNormalRequestQueue(Request request) {
       return;
     }
     state->transaction_lock().Acquire();
+
+    // Check again since we've re-acquired lock
+    if (state->IsDisconnecting()) {
+      transaction_lock.release();
+      pending_transfer.status = ZX_ERR_IO_NOT_PRESENT;
+      pending_transfer.Complete();
+      return;
+    }
+    if (state->GetTransferRing(index).stalled()) {
+      transaction_lock.release();
+      pending_transfer.status = ZX_ERR_IO_REFUSED;
+      pending_transfer.Complete();
+      return;
+    }
+    if (!state->GetTransferRing((index)).active()) {
+      transaction_lock.release();
+      pending_transfer.status = ZX_ERR_INTERNAL;
+      pending_transfer.Complete();
+      return;
+    }
   }
 
   // Start the transaction
@@ -1497,7 +1518,7 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
     zxlogf(ERROR, "%s expects that slot is in use. hub_state should not be nullptr", __func__);
     return ZX_ERR_IO_NOT_PRESENT;
   }
-  uint32_t slot;
+  uint32_t device_id;
   {
     fbl::AutoLock _(&hub_state->transaction_lock());
     // In the case where the hub itself is unplugged,
@@ -1508,28 +1529,22 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
     if (!hub_state->GetHubLocked()) {
       return ZX_OK;
     }
-    uint32_t device_id = hub_state->GetHubLocked()->port_to_device[port - 1];
-    auto device_state = device_state_[device_id];
-    if (!device_state) {
-      zxlogf(ERROR, "%s expects that slot is in use. device_state should not be nullptr", __func__);
-      return ZX_ERR_IO_NOT_PRESENT;
-    }
-    slot = device_state->GetSlot();
+    device_id = hub_state->GetHubLocked()->port_to_device[port - 1];
   }
-  auto state = std::move(device_state_[slot - 1]);
-  if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+  auto device_state = std::move(device_state_[device_id]);
+  if (!device_state) {
+    zxlogf(ERROR, "%s expects that slot is in use. device_state should not be nullptr", __func__);
     return ZX_ERR_IO_NOT_PRESENT;
   }
   {
-    fbl::AutoLock _(&state->transaction_lock());
-    state->Disconnect();
+    fbl::AutoLock _(&device_state->transaction_lock());
+    device_state->Disconnect();
   }
   for (size_t i = 0; i < 32; i++) {
     fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
     {
-      fbl::AutoLock _(&state->transaction_lock());
-      trbs = state->GetTransferRing(i).TakePendingTRBs();
+      fbl::AutoLock _(&device_state->transaction_lock());
+      trbs = device_state->GetTransferRing(i).TakePendingTRBs();
     }
     for (auto& trb : trbs) {
       trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
@@ -1538,8 +1553,8 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
   RunUntilIdle();
   fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
   {
-    fbl::AutoLock _(&state->transaction_lock());
-    trbs = state->GetTransferRing().TakePendingTRBs();
+    fbl::AutoLock _(&device_state->transaction_lock());
+    trbs = device_state->GetTransferRing().TakePendingTRBs();
   }
   for (auto& trb : trbs) {
     trb.request->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
@@ -1548,7 +1563,7 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
   // Bus should always be valid since we're getting a callback from a hub
   // that is a child of the bus.
   ZX_ASSERT(bus_.is_valid());
-  zx_status_t status = bus_.RemoveDevice(slot - 1);
+  zx_status_t status = bus_.RemoveDevice(device_state->GetSlot() - 1);
   if (status != ZX_OK) {
     return status;
   }
@@ -1724,8 +1739,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciCancelAllAsync(uint32_t devi
         }
 
         // It's possible that the dequeue pointer was in the middle of a multi-TRB TD when we
-        // stopped. If this is the case, we need to adjust the dequeue pointer to point to the index
-        // of the first TRB that we know about.
+        // stopped. If this is the case, we need to adjust the dequeue pointer to point to the
+        // index of the first TRB that we know about.
         SetTRDequeuePointer cmd;
         cmd.set_ENDPOINT(index + 2);
         cmd.set_SLOT(state->GetSlot());
@@ -2089,8 +2104,8 @@ zx_status_t UsbXhci::HciFinalize() {
   cr.WriteTo(&mmio_.value());
 
   // Initialize all interrupters.
-  // TODO: For optimization, we could demand allocate interrupters and not start all interrupters in
-  // the beginning.
+  // TODO: For optimization, we could demand allocate interrupters and not start all interrupters
+  // in the beginning.
   for (uint16_t i = 0; i < irq_count_; i++) {
     if (status = interrupter(i).Start(offset, mmio_.value().View(0)); status != ZX_OK) {
       zxlogf(ERROR, "interrupter(%d).Start(): %s", i, zx_status_get_string(status));
