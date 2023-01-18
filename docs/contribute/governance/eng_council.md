@@ -1,19 +1,19 @@
-# Fuchsia Eng Council Charter
+# Fuchsia Engineering Council Charter
 
 ## Overview
 
-The Fuchsia Eng Council is a small group of senior technical leaders
+The Fuchsia Engineering Council (FEC) is a small group of senior technical leaders
 responsible for providing a coherent technical vision for Fuchsia. The council
 largely operates by delegation and ratification, promulgating engineering
 standards, values, and objectives throughout the community and then reviewing
 and ratifying concrete engineering proposals from project contributors.
-Concretely, the Eng Council is charged with approving or rejecting Fuchsia RFCs
+Concretely, the FEC is charged with approving or rejecting Fuchsia RFCs
 using the [Fuchsia RFC Process][rfc-process] and resolving technical disputes
 that cannot be resolved within subteams.
 
 ## Goals
 
-The goal of the Fuchsia Eng Council is to drive technical excellence in the
+The goal of the FEC is to drive technical excellence in the
 Fuchsia platform by providing a coherent technical vision for the project.
 
 > *Any organization that designs a system (defined broadly) will produce a
