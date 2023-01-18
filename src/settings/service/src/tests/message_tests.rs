@@ -57,10 +57,6 @@ mod test {
         crate::message::message_hub::MessageHub<crate::Payload, crate::Address>;
 }
 
-mod num_test {
-    pub(crate) type MessageHub = crate::message::message_hub::MessageHub<u64, u64>;
-}
-
 // Tests message client creation results in unique ids.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_message_client_equality() {
@@ -82,8 +78,8 @@ async fn test_message_client_equality() {
 // Tests messenger creation and address space collision.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_messenger_creation() {
-    let delegate = num_test::MessageHub::create();
-    let address = 1;
+    let delegate = test::MessageHub::create();
+    let address = crate::Address::Test(1);
 
     let messenger_1_result = delegate.create(MessengerType::Addressable(address)).await;
     assert!(messenger_1_result.is_ok());
@@ -94,7 +90,7 @@ async fn test_messenger_creation() {
 // Tests whether the client is reported as present after being created.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_messenger_presence() {
-    let delegate = num_test::MessageHub::create();
+    let delegate = test::MessageHub::create();
 
     // Create unbound messenger
     let (_, receptor) =
@@ -108,7 +104,7 @@ async fn test_messenger_presence() {
     {
         assert_eq!(
             delegate
-                .contains(crate::message::base::Signature::Address(1))
+                .contains(crate::message::base::Signature::Address(crate::Address::Test(1)))
                 .await
                 .expect("check should complete"),
             false
@@ -119,8 +115,8 @@ async fn test_messenger_presence() {
 // Tests messenger creation and address space collision.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_messenger_deletion() {
-    let delegate = num_test::MessageHub::create();
-    let address = 1;
+    let delegate = test::MessageHub::create();
+    let address = crate::Address::Test(1);
 
     {
         let (_, _) = delegate.create(MessengerType::Addressable(address)).await.unwrap();
@@ -147,8 +143,8 @@ async fn test_messenger_deletion() {
 
 #[fuchsia::test(allow_stalls = false)]
 async fn test_messenger_deletion_with_fingerprint() {
-    let delegate = num_test::MessageHub::create();
-    let address = 1;
+    let delegate = test::MessageHub::create();
+    let address = crate::Address::Test(1);
     let (_, mut receptor) =
         delegate.create(MessengerType::Addressable(address)).await.expect("should get receptor");
     delegate.delete(receptor.get_signature());
