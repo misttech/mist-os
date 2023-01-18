@@ -127,7 +127,8 @@ Do not request a code review until you have approval from the OSRB in these circ
 To update an external crate, do the following:
 
    1. Increase the patch number of the crate in
-      [`third_party/rust_crates/Cargo.toml`][external-cargo-toml].
+      [`third_party/rust_crates/Cargo.toml`][external-cargo-toml]
+      1. For transitive deps (which don't appear in the root `Cargo.toml`), you can use a command like `cargo +fuchsia update --manifest-path third_party/rust_crates/Cargo.toml --package $crate_name`, instead.
 
    1. Run the following command:
 
