@@ -35,7 +35,7 @@ pub struct VirtualMachine<H: Hypervisor> {
     hypervisor: H,
     guest: Arc<H::GuestHandle>,
     guest_physical_address_space: H::AddressSpaceHandle,
-    memory: Memory,
+    memory: Memory<H>,
     vcpus: [Option<Vcpu<H>>; MAX_SUPPORTED_VCPUS as usize],
     boot_params: BootParams,
 }
@@ -46,10 +46,14 @@ impl<H: Hypervisor> VirtualMachine<H> {
             tracing::error!("Failed to create zx::Guest: {}", e);
             GuestError::InternalError
         })?;
-        let memory = Memory::new_from_config(&config, &hypervisor).map_err(|e| {
+
+        let memory = Memory::new_from_config(&config, hypervisor.clone()).map_err(|e| {
             tracing::error!("Failed to create guest memory: {}", e);
             e.into()
         })?;
+        memory.map_into_host().map_err(|e| e.into())?;
+        memory.map_into_guest(&guest_physical_address_space).map_err(|e| e.into())?;
+
         Ok(VirtualMachine {
             hypervisor,
             guest: Arc::new(guest),

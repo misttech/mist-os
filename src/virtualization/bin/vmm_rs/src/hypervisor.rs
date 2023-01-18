@@ -50,12 +50,65 @@ pub trait Hypervisor: Send + Sync + Clone + 'static {
     ///
     /// # Errors:
     ///
-    /// The full set of errors can be found on the documentation for the
+    /// The full set of errors can be found in the documentation for the
     /// [zx_guest_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/guest_create) syscall.
     fn guest_create(&self) -> Result<(Self::GuestHandle, Self::AddressSpaceHandle), zx::Status>;
 
     /// Allocates a [zx::Vmo] that can be mapped into the address space for a guest.
     fn allocate_memory(&self, bytes: u64) -> Result<zx::Vmo, zx::Status>;
+
+    /// Create a VMAR parented to the local process's root VMAR.
+    ///
+    /// # Arguments:
+    ///
+    /// * `size` - The size of the new VMAR in bytes.
+    ///
+    /// # Errors:
+    ///
+    /// The full set of errors can be found in the documentation for the
+    /// [zx_vmar_allocate](https://fuchsia.dev/fuchsia-src/reference/syscalls/vmar_allocate)
+    /// syscall.
+    fn vmar_allocate(&self, size: u64) -> Result<(Self::AddressSpaceHandle, usize), zx::Status>;
+
+    /// Map a region of a VMO into the given VMAR. The VMAR must have the CAN_MAP_SPECIFIC
+    /// permission set so that the offset into the VMAR and the offset into the VMO is the same.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vmar`        - A VMAR (either from vmar_allocate or guest_create)
+    /// * `vmar_offset` - The offset into the given VMAR, in bytes.
+    /// * `vmo`         - The VMO backing the guest physical memory.
+    /// * `vmo_offset`  - The offset into the given VMO, in bytes.
+    /// * `length`      - The length of this region, in bytes.
+    /// * `flags`       - Permissions for this mapped region.
+    ///
+    /// # Errors:
+    ///
+    /// The full set of errors can be found in the documentation for the
+    /// [zx_vmar_map](https://fuchsia.dev/fuchsia-src/reference/syscalls/vmar_map) syscall.
+    fn vmar_map(
+        &self,
+        vmar: &Self::AddressSpaceHandle,
+        vmar_offset: usize,
+        vmo: &zx::Vmo,
+        vmo_offset: u64,
+        length: usize,
+        flags: zx::VmarFlags,
+    ) -> Result<usize, zx::Status>;
+
+    /// Destroy a VMAR. This should be called on child VMARs created via vmar_allocate. For
+    /// information about safety, see the comments in /src/lib/zircon/rust/src/vmar.rs::Vmar::unmap.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vmar` - An allocated child VMAR (not the root VMAR returned from guest_create).
+    ///
+    /// # Errors:
+    ///
+    /// The full set of errors can be found in the documentation for the
+    /// [zx_vmar_destroy](https://fuchsia.dev/fuchsia-src/reference/syscalls/vmar_destroy)
+    /// syscall.
+    unsafe fn vmar_destroy(&self, vmar: &Self::AddressSpaceHandle) -> Result<(), zx::Status>;
 
     /// Creates a new vcpu for a guest.
     ///
@@ -66,7 +119,7 @@ pub trait Hypervisor: Send + Sync + Clone + 'static {
     ///
     /// # Errors:
     ///
-    /// The full set of errors can be found on the documentation for the
+    /// The full set of errors can be found in the documentation for the
     /// [zx_vcpu_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/vcpu_create) syscall.
     fn vcpu_create(
         &self,
@@ -164,6 +217,32 @@ impl FuchsiaHypervisor {
             }),
         })
     }
+
+    fn vmar_allocate(size: u64) -> Result<(zx::Vmar, usize), zx::Status> {
+        let vmar_flags = zx::VmarFlags::CAN_MAP_READ
+            | zx::VmarFlags::CAN_MAP_WRITE
+            | zx::VmarFlags::CAN_MAP_SPECIFIC;
+        fuchsia_runtime::vmar_root_self().allocate(
+            0,
+            size.try_into().expect("u64 should fit into usize"),
+            vmar_flags,
+        )
+    }
+
+    fn vmar_map(
+        vmar: &zx::Vmar,
+        vmar_offset: usize,
+        vmo: &zx::Vmo,
+        vmo_offset: u64,
+        length: usize,
+        flags: zx::VmarFlags,
+    ) -> Result<usize, zx::Status> {
+        vmar.map(vmar_offset, vmo, vmo_offset, length, flags)
+    }
+
+    unsafe fn vmar_destroy(vmar: &zx::Vmar) -> Result<(), zx::Status> {
+        vmar.destroy()
+    }
 }
 
 // We add the `PhantomData<*const ()>` here to remove the default [Send] impl for this handle
@@ -220,6 +299,26 @@ impl Hypervisor for FuchsiaHypervisor {
     fn vcpu_kick(&self, vcpu: &Self::VcpuControlHandle) -> Result<(), zx::Status> {
         vcpu.0.kick()
     }
+
+    fn vmar_allocate(&self, size: u64) -> Result<(Self::AddressSpaceHandle, usize), zx::Status> {
+        FuchsiaHypervisor::vmar_allocate(size)
+    }
+
+    fn vmar_map(
+        &self,
+        vmar: &Self::AddressSpaceHandle,
+        vmar_offset: usize,
+        vmo: &zx::Vmo,
+        vmo_offset: u64,
+        length: usize,
+        flags: zx::VmarFlags,
+    ) -> Result<usize, zx::Status> {
+        FuchsiaHypervisor::vmar_map(vmar, vmar_offset, vmo, vmo_offset, length, flags)
+    }
+
+    unsafe fn vmar_destroy(&self, vmar: &Self::AddressSpaceHandle) -> Result<(), zx::Status> {
+        FuchsiaHypervisor::vmar_destroy(vmar)
+    }
 }
 
 #[cfg(test)]
@@ -227,32 +326,66 @@ pub mod testing {
     use {
         super::*,
         parking_lot::Mutex,
-        std::cell::RefCell,
-        std::sync::{mpsc, Arc},
+        std::{
+            cell::RefCell,
+            rc::Rc,
+            sync::{mpsc, Arc},
+        },
     };
 
-    #[derive(Clone, Debug)]
-    pub struct MockAddressSpace {}
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct MockMemoryMapping {
+        pub vmar_offset: usize,
+        pub vmo_offset: u64,
+        pub length: usize,
+        pub flags: zx::VmarFlags,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum MockAddressSpaceType {
+        FullMock,
+        RealVmar,
+        Destroyed,
+    }
+
+    #[derive(Debug)]
+    pub struct MockAddressSpace {
+        pub inner: zx::Vmar,
+        pub mappings: Vec<MockMemoryMapping>,
+        pub mock_type: MockAddressSpaceType,
+    }
 
     impl MockAddressSpace {
-        pub fn new() -> Self {
-            Self {}
+        // TODO(fxbug.dev/102872): Allow setting the behavior to use the mock or the real VMAR.
+        pub fn new_with_invalid_handle() -> Rc<RefCell<Self>> {
+            Rc::new(RefCell::new(Self {
+                inner: zx::Handle::invalid().into(),
+                mappings: Vec::new(),
+                mock_type: MockAddressSpaceType::FullMock,
+            }))
+        }
+
+        pub fn new_with_valid_handle(size: u64) -> Result<(Rc<RefCell<Self>>, usize), zx::Status> {
+            let (inner, address) = FuchsiaHypervisor::vmar_allocate(size)?;
+            Ok((
+                Rc::new(RefCell::new(Self {
+                    inner,
+                    mappings: Vec::new(),
+                    mock_type: MockAddressSpaceType::RealVmar,
+                })),
+                address,
+            ))
         }
     }
 
     #[derive(Debug)]
     pub struct MockGuest {
-        address_space: MockAddressSpace,
         vcpus: Arc<Mutex<Vec<MockVcpuController>>>,
     }
 
     impl MockGuest {
         pub fn new() -> Self {
-            Self { address_space: MockAddressSpace::new(), vcpus: Arc::new(Mutex::new(Vec::new())) }
-        }
-
-        pub fn address_space(&self) -> MockAddressSpace {
-            self.address_space.clone()
+            Self { vcpus: Arc::new(Mutex::new(Vec::new())) }
         }
 
         pub fn vcpus(&self) -> Vec<MockVcpuController> {
@@ -347,9 +480,9 @@ pub mod testing {
     /// The default callable used to implement [Hypervisor::guest_create] for [MockHypervisor].
     ///
     /// This simply returns Ok with a [MockGuest] and [MockAddressSpace].
-    pub fn mock_guest_create() -> Result<(MockGuest, MockAddressSpace), zx::Status> {
+    pub fn mock_guest_create() -> Result<(MockGuest, Rc<RefCell<MockAddressSpace>>), zx::Status> {
         let guest = MockGuest::new();
-        let address_space = guest.address_space();
+        let address_space = MockAddressSpace::new_with_invalid_handle();
         Ok((guest, address_space))
     }
 
@@ -448,7 +581,7 @@ pub mod testing {
 
     impl Hypervisor for MockHypervisor {
         type GuestHandle = MockGuest;
-        type AddressSpaceHandle = MockAddressSpace;
+        type AddressSpaceHandle = Rc<RefCell<MockAddressSpace>>;
         type VcpuHandle = MockVcpu;
         type VcpuControlHandle = MockVcpuController;
 
@@ -466,6 +599,58 @@ pub mod testing {
                 return Err(status);
             }
             mock_allocate_memory(bytes)
+        }
+
+        fn vmar_allocate(
+            &self,
+            size: u64,
+        ) -> Result<(Self::AddressSpaceHandle, usize), zx::Status> {
+            MockAddressSpace::new_with_valid_handle(size)
+        }
+
+        fn vmar_map(
+            &self,
+            vmar: &Self::AddressSpaceHandle,
+            vmar_offset: usize,
+            vmo: &zx::Vmo,
+            vmo_offset: u64,
+            length: usize,
+            flags: zx::VmarFlags,
+        ) -> Result<usize, zx::Status> {
+            assert!(vmar.borrow().mock_type != MockAddressSpaceType::Destroyed);
+            let location = if let MockAddressSpaceType::RealVmar = vmar.borrow().mock_type {
+                FuchsiaHypervisor::vmar_map(
+                    &vmar.borrow().inner,
+                    vmar_offset,
+                    vmo,
+                    vmo_offset,
+                    length,
+                    flags,
+                )?
+            } else {
+                vmar_offset
+            };
+
+            vmar.borrow_mut().mappings.push(MockMemoryMapping {
+                vmar_offset,
+                vmo_offset,
+                length,
+                flags,
+            });
+
+            Ok(location)
+        }
+
+        unsafe fn vmar_destroy(&self, vmar: &Self::AddressSpaceHandle) -> Result<(), zx::Status> {
+            assert!(vmar.borrow().mock_type != MockAddressSpaceType::Destroyed);
+            if let MockAddressSpaceType::RealVmar = vmar.borrow().mock_type {
+                FuchsiaHypervisor::vmar_destroy(&vmar.borrow().inner)?;
+            }
+
+            vmar.borrow_mut().mock_type = MockAddressSpaceType::Destroyed;
+            vmar.borrow_mut().mappings.clear();
+
+            Ok(())
         }
 
         fn vcpu_create(

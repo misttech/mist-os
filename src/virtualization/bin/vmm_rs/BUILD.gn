@@ -30,6 +30,7 @@ rustc_binary("vmm_rs") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

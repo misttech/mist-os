@@ -115,6 +115,9 @@ pub enum MemoryError {
     )]
     FailedToPlaceGuestMemory { actual: u64, target: u64 },
 
+    #[error("Failed to allocate child VMAR in host process: {}", status)]
+    FailedToAllocateVmar { status: zx::Status },
+
     #[error("Failed to map region into VMAR: {}", status)]
     FailedToMapMemoryRegion { status: zx::Status },
 
@@ -134,6 +137,7 @@ impl Into<GuestError> for MemoryError {
             MemoryError::NoMemoryRequested => GuestError::BadConfig,
             MemoryError::FailedToPlaceGuestMemory { .. } => GuestError::GuestInitializationFailure,
             MemoryError::FailedToMapMemoryRegion { .. }
+            | MemoryError::FailedToAllocateVmar { .. }
             | MemoryError::FailedToAllocateMemory { .. }
             | MemoryError::ZeroDeviceSize { .. } => GuestError::InternalError,
             MemoryError::AddressConflict { .. } => GuestError::DeviceMemoryOverlap,
@@ -143,8 +147,114 @@ impl Into<GuestError> for MemoryError {
 
 // TODO(fxbug.dev/102872): Replace with the implementation from vm-memory.
 struct GuestMemoryMmap;
-type GuestAddress = u64;
-type GuestUsize = u64;
+pub type GuestAddress = u64;
+pub type GuestUsize = u64;
+
+// Get the size of the guest physical memory address space. In most cases this will be larger
+// than the amount of RAM the guest actually sees, as this would include MMIO device ranges
+// (if encompassed by RAM), and pluggable memory regions.
+fn get_guest_physical_address_space_size(
+    standard_ram: &Vec<MemoryRegion>,
+    pluggable_ram: &Vec<MemoryRegion>,
+) -> GuestUsize {
+    let region = if let Some(last) = pluggable_ram.last() {
+        last
+    } else {
+        standard_ram.last().expect("there must be at least one region of RAM")
+    };
+
+    region.base + region.size
+}
+
+// Attempts to place `guest_memory` bytes into the guest physical address space, avoiding
+// restricted regions. Restricted regions are architecture dependent, and include things such
+// as memory mapped devices and the BIOS registers.
+fn generate_guest_ram_regions(
+    guest_memory: GuestUsize,
+    restrictions: &[MemoryRegion],
+) -> Result<Vec<MemoryRegion>, MemoryError> {
+    let mut iter = GuestMemoryRegion::new(restrictions);
+    let mut regions = Vec::new();
+    let mut mem_remaining = guest_memory;
+
+    while mem_remaining > 0 {
+        if let Some(current) = iter.next() {
+            let mem_used = std::cmp::min(current.size, mem_remaining);
+            regions.push(MemoryRegion::new_tagged(current.base, mem_used, "RAM".to_string()));
+            mem_remaining -= mem_used;
+        } else {
+            return Err(MemoryError::FailedToPlaceGuestMemory {
+                actual: mem_remaining,
+                target: guest_memory,
+            });
+        }
+    }
+
+    Ok(regions)
+}
+
+// Page align memory if necessary, rounding up to the nearest page.
+fn page_align_memory(memory: GuestAddress, tag: &str) -> GuestAddress {
+    let page_alignment = memory % *PAGE_SIZE;
+    if page_alignment != 0 {
+        let padding = *PAGE_SIZE - page_alignment;
+        tracing::info!(
+            "Memory ({}b) for {} is not a multiple of page size ({}b), so increasing by {}b.",
+            memory,
+            tag,
+            *PAGE_SIZE,
+            padding
+        );
+        memory + padding
+    } else {
+        memory
+    }
+}
+
+// Page aligns a memory region. The region is reduced when page aligning to avoid encroaching
+// on adjacent restricted regions.
+fn page_align_memory_region(mut region: MemoryRegion) -> Option<MemoryRegion> {
+    if region.size < *PAGE_SIZE {
+        // This guest region may be bounded by restricted regions, so size cannot be
+        // increased. If this region is smaller than a page this region must just be
+        // discarded.
+        return None;
+    }
+
+    let mut start = region.base;
+    if start % *PAGE_SIZE != 0 {
+        start += *PAGE_SIZE - (start % *PAGE_SIZE);
+    }
+
+    let mut end = start + region.size;
+    if end % *PAGE_SIZE != 0 {
+        end -= end % *PAGE_SIZE;
+    }
+
+    // Require this region be at least a page.
+    if start >= end {
+        return None;
+    }
+
+    region.base = start;
+    region.size = end - start;
+
+    Some(region)
+}
+
+// x86 has reserved memory from 0 to 32KiB, and 512KiB to 1MiB. While we will not allocate guest
+// RAM in those regions (via the e820 memory map), we still want to map these regions into the
+// VMAR as they are not devices and we do not wish to trap on guest access to them.
+fn architecture_dependent_non_ram_vmar_regions() -> Vec<MemoryRegion> {
+    if cfg!(target_arch = "x86_64") {
+        vec![
+            MemoryRegion::new_from_range(0x0, 32 * ONE_KIB),
+            MemoryRegion::new_from_range(512 * ONE_KIB, ONE_MIB),
+        ]
+    } else {
+        vec![]
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct MemoryRegion {
@@ -247,46 +357,72 @@ impl<'a> Iterator for GuestMemoryRegion<'a> {
             MemoryRegion::new(unrestricted_base, unrestricted_size)
         };
 
-        Memory::page_align_memory_region(unaligned).or_else(|| self.next())
+        page_align_memory_region(unaligned).or_else(|| self.next())
     }
 }
 
-pub struct Memory {
+pub struct Memory<H: Hypervisor> {
+    hypervisor: H,
     vmo: zx::Vmo,
+    host_vmar: H::AddressSpaceHandle,
+    host_vmar_offset: GuestAddress,
     mmap: Option<GuestMemoryMmap>,
     next_dynamic_device_address: GuestAddress,
     ram_regions: Vec<MemoryRegion>,
+    pluggable_ram_regions: Vec<MemoryRegion>,
     device_ranges: Vec<MemoryRegion>,
 }
 
-impl Memory {
-    pub fn new_from_config<H: Hypervisor>(
-        guest_config: &GuestConfig,
-        hypervisor: &H,
-    ) -> Result<Self, MemoryError> {
+impl<H: Hypervisor> std::ops::Drop for Memory<H> {
+    fn drop(&mut self) {
+        // A note on safety:
+        //  - The guest must be stopped before this object is destroyed.
+        //  - All devices accessing this physical memory should be stopped before this object is
+        //    is destroyed.
+        //
+        // The VMO underlying the guest physical memory may still be valid if the handle was
+        // passed to other device components, but traps accessing device memory via the VMM
+        // host address space will fault.
+        unsafe {
+            self.hypervisor
+                .vmar_destroy(&self.host_vmar)
+                .expect("failed to destroy host process child VMAR");
+        }
+    }
+}
+
+impl<H: Hypervisor> Memory<H> {
+    pub fn new_from_config(guest_config: &GuestConfig, hypervisor: H) -> Result<Self, MemoryError> {
         Self::new(guest_config.guest_memory.ok_or(MemoryError::NoMemoryRequested)?, hypervisor)
     }
 
-    fn new<H: Hypervisor>(
-        guest_memory_bytes: GuestUsize,
-        hypervisor: &H,
-    ) -> Result<Self, MemoryError> {
-        let guest_memory_bytes =
-            Memory::page_align_memory(guest_memory_bytes, "total_guest_memory");
+    fn new(guest_memory_bytes: GuestUsize, hypervisor: H) -> Result<Self, MemoryError> {
+        let guest_memory_bytes = page_align_memory(guest_memory_bytes, "total_guest_memory");
+
+        let ram_regions = generate_guest_ram_regions(guest_memory_bytes, &RESTRICTED_RANGES)?;
+        // TODO(fxbug.dev/102872): Support pluggable memory.
+        let pluggable_ram_regions = Vec::new();
+
+        let physical_address_size =
+            get_guest_physical_address_space_size(&ram_regions, &pluggable_ram_regions);
 
         let vmo = hypervisor
-            .allocate_memory(guest_memory_bytes)
+            .allocate_memory(physical_address_size)
             .map_err(|status| MemoryError::FailedToAllocateMemory { status })?;
 
-        // TODO(fxbug.dev/102872): Support pluggable memory.
-        let ram_regions =
-            Memory::generate_guest_ram_regions(guest_memory_bytes, &RESTRICTED_RANGES)?;
+        let (host_vmar, host_vmar_offset) = hypervisor
+            .vmar_allocate(physical_address_size)
+            .map_err(|status| MemoryError::FailedToAllocateVmar { status })?;
 
         Ok(Memory {
+            hypervisor,
             vmo,
+            host_vmar,
+            host_vmar_offset: host_vmar_offset.try_into().expect("usize should fit into u64"),
             mmap: None,
             next_dynamic_device_address: FIRST_DYNAMIC_DEVICE_ADDR,
             ram_regions,
+            pluggable_ram_regions,
             device_ranges: Vec::new(),
         })
     }
@@ -298,7 +434,7 @@ impl Memory {
         size: GuestUsize,
         tag: String,
     ) -> Result<GuestAddress, MemoryError> {
-        let size = Memory::page_align_memory(size, tag.as_str());
+        let size = page_align_memory(size, tag.as_str());
         let address = self.next_dynamic_device_address;
         self.next_dynamic_device_address += size;
         self.add_device_range(address, size, tag)?;
@@ -338,92 +474,53 @@ impl Memory {
 
     // Map the generated memory regions into the local process address space.
     pub fn map_into_host(&self) -> Result<(), MemoryError> {
+        // TODO(fxbug.dev/102872): Create a vm-memory::GuestMemoryMmap.
         assert!(self.mmap.is_none());
 
-        // TODO(fxbug.dev/102872): Create a vm-memory::GuestMemoryMmap.
-        unimplemented!();
+        let flags = zx::VmarFlags::PERM_READ
+            | zx::VmarFlags::PERM_WRITE
+            | zx::VmarFlags::SPECIFIC
+            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+        self.map_into_vmar(&self.host_vmar, flags)
     }
 
     // Map the generated memory regions into the guest address space.
-    pub fn map_into_guest(&self, guest_vmar: &zx::Vmar) -> Result<(), MemoryError> {
-        // TODO(fxbug.dev/102872): Map into the guest vmar.
-        unimplemented!();
+    pub fn map_into_guest(&self, guest_vmar: &H::AddressSpaceHandle) -> Result<(), MemoryError> {
+        let flags = zx::VmarFlags::PERM_READ
+            | zx::VmarFlags::PERM_WRITE
+            | zx::VmarFlags::PERM_EXECUTE
+            | zx::VmarFlags::SPECIFIC
+            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+        self.map_into_vmar(guest_vmar, flags)
     }
 
-    // Attempts to place `guest_memory` bytes into the guest physical address space, avoiding
-    // restricted regions. Restricted regions are architecture dependent, and include things such
-    // as memory mapped devices and the BIOS registers.
-    fn generate_guest_ram_regions(
-        guest_memory: GuestUsize,
-        restrictions: &[MemoryRegion],
-    ) -> Result<Vec<MemoryRegion>, MemoryError> {
-        let mut iter = GuestMemoryRegion::new(restrictions);
-        let mut regions = Vec::new();
-        let mut mem_remaining = guest_memory;
+    // Helper function to map non-device regions into a VMAR.
+    fn map_into_vmar(
+        &self,
+        vmar: &H::AddressSpaceHandle,
+        flags: zx::VmarFlags,
+    ) -> Result<(), MemoryError> {
+        let additional_regions = architecture_dependent_non_ram_vmar_regions();
+        let regions = self
+            .ram_regions
+            .iter()
+            .chain(self.pluggable_ram_regions.iter())
+            .chain(additional_regions.iter());
 
-        while mem_remaining > 0 {
-            if let Some(current) = iter.next() {
-                let mem_used = std::cmp::min(current.size, mem_remaining);
-                regions.push(MemoryRegion::new_tagged(current.base, mem_used, "RAM".to_string()));
-                mem_remaining -= mem_used;
-            } else {
-                return Err(MemoryError::FailedToPlaceGuestMemory {
-                    actual: mem_remaining,
-                    target: guest_memory,
-                });
+        for region in regions {
+            if let Err(status) = self.hypervisor.vmar_map(
+                vmar,
+                region.base.try_into().expect("u64 should fit into usize"),
+                &self.vmo,
+                region.base,
+                region.size.try_into().expect("u64 should fit into usize"),
+                flags,
+            ) {
+                return Err(MemoryError::FailedToMapMemoryRegion { status });
             }
         }
 
-        Ok(regions)
-    }
-
-    // Page align memory if necessary, rounding up to the nearest page.
-    fn page_align_memory(memory: GuestAddress, tag: &str) -> GuestAddress {
-        let page_alignment = memory % *PAGE_SIZE;
-        if page_alignment != 0 {
-            let padding = *PAGE_SIZE - page_alignment;
-            tracing::info!(
-                "Memory ({}b) for {} is not a multiple of page size ({}b), so increasing by {}b.",
-                memory,
-                tag,
-                *PAGE_SIZE,
-                padding
-            );
-            memory + padding
-        } else {
-            memory
-        }
-    }
-
-    // Page aligns a memory region. The region is reduced when page aligning to avoid encroaching
-    // on adjacent restricted regions.
-    fn page_align_memory_region(mut region: MemoryRegion) -> Option<MemoryRegion> {
-        if region.size < *PAGE_SIZE {
-            // This guest region may be bounded by restricted regions, so size cannot be
-            // increased. If this region is smaller than a page this region must just be
-            // discarded.
-            return None;
-        }
-
-        let mut start = region.base;
-        if start % *PAGE_SIZE != 0 {
-            start += *PAGE_SIZE - (start % *PAGE_SIZE);
-        }
-
-        let mut end = start + region.size;
-        if end % *PAGE_SIZE != 0 {
-            end -= end % *PAGE_SIZE;
-        }
-
-        // Require this region be at least a page.
-        if start >= end {
-            return None;
-        }
-
-        region.base = start;
-        region.size = end - start;
-
-        Some(region)
+        Ok(())
     }
 }
 
@@ -431,7 +528,7 @@ impl Memory {
 mod tests {
     use {
         super::*,
-        crate::hypervisor::testing::{MockBehavior, MockHypervisor},
+        crate::hypervisor::testing::{MockBehavior, MockHypervisor, MockMemoryMapping},
     };
 
     #[fuchsia::test]
@@ -442,7 +539,7 @@ mod tests {
         let mut config = GuestConfig::EMPTY;
         config.guest_memory = Some(*PAGE_SIZE);
 
-        let memory = Memory::new_from_config(&config, &hypervisor);
+        let memory = Memory::new_from_config(&config, hypervisor.clone());
         assert_eq!(
             MemoryError::FailedToAllocateMemory { status: zx::Status::NO_RESOURCES },
             memory.err().unwrap()
@@ -450,24 +547,89 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn read_write_vmar_mapping() {
+        let hypervisor = MockHypervisor::new();
+        let memory = Memory::new(1 << 32, hypervisor.clone()).unwrap();
+
+        // Both the VMO and VMAR should equal all of guest physical memory.
+        let info = memory.host_vmar.borrow().inner.info().unwrap();
+        let last_region = memory.ram_regions.last().unwrap();
+        assert_eq!(info.len as u64, last_region.base + last_region.size);
+        assert_eq!(memory.vmo.get_size().unwrap(), last_region.base + last_region.size);
+
+        memory.map_into_host().unwrap();
+
+        // Write a known string into the first 6 bytes of each mapped memory region.
+        let expected = "GOOGLE".as_bytes().to_vec();
+        for region in memory.ram_regions.iter() {
+            let slice = unsafe {
+                let base = memory.host_vmar_offset as *mut u8;
+                let offset = base.add(region.base as usize);
+                std::slice::from_raw_parts_mut(offset, 6)
+            };
+            slice.copy_from_slice(&expected);
+        }
+
+        // Read the string for each region from the VMO.
+        for region in memory.ram_regions.iter() {
+            let mut actual = [0u8; 6];
+            memory.vmo.read(&mut actual, region.base).unwrap();
+            assert_eq!(actual, expected.as_slice());
+        }
+
+        // Write a known string into the first 6 bytes of each region via the VMO.
+        let expected = "ELGOOG".as_bytes().to_vec();
+        for region in memory.ram_regions.iter() {
+            memory.vmo.write(&expected, region.base).unwrap();
+        }
+
+        // Read the string from the mapped memory regions.
+        for region in memory.ram_regions.iter() {
+            let actual = unsafe {
+                let base = memory.host_vmar_offset as *mut u8;
+                let offset = base.add(region.base as usize);
+                std::slice::from_raw_parts(offset, 6)
+            };
+            assert_eq!(actual, expected.as_slice());
+        }
+
+        // Check the mapped values stored via the mock.
+        let additional = architecture_dependent_non_ram_vmar_regions();
+        let expected: Vec<_> = memory
+            .ram_regions
+            .iter()
+            .chain(additional.iter())
+            .map(|elem| MockMemoryMapping {
+                vmar_offset: elem.base.try_into().expect("u64 should fit into usize"),
+                vmo_offset: elem.base,
+                length: elem.size.try_into().expect("u64 should fit into usize"),
+                flags: zx::VmarFlags::PERM_READ
+                    | zx::VmarFlags::PERM_WRITE
+                    | zx::VmarFlags::SPECIFIC
+                    | zx::VmarFlags::REQUIRE_NON_RESIZABLE,
+            })
+            .collect();
+        assert_eq!(memory.host_vmar.borrow().mappings, expected);
+    }
+
+    #[fuchsia::test]
     async fn page_align_total_guest_memory() {
         // Round up to the nearest page.
-        assert_eq!(Memory::page_align_memory(1, "test"), *PAGE_SIZE);
-        assert_eq!(Memory::page_align_memory(*PAGE_SIZE - 1, "test"), *PAGE_SIZE);
-        assert_eq!(Memory::page_align_memory(*PAGE_SIZE, "test"), *PAGE_SIZE);
-        assert_eq!(Memory::page_align_memory(*PAGE_SIZE + 1, "test"), *PAGE_SIZE * 2);
+        assert_eq!(page_align_memory(1, "test"), *PAGE_SIZE);
+        assert_eq!(page_align_memory(*PAGE_SIZE - 1, "test"), *PAGE_SIZE);
+        assert_eq!(page_align_memory(*PAGE_SIZE, "test"), *PAGE_SIZE);
+        assert_eq!(page_align_memory(*PAGE_SIZE + 1, "test"), *PAGE_SIZE * 2);
     }
 
     #[fuchsia::test]
     async fn page_align_guest_memory_region() {
         // Page aligned.
-        let actual =
-            Memory::page_align_memory_region(MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE)).unwrap();
+        let actual = page_align_memory_region(MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE)).unwrap();
         let expected = MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE);
         assert_eq!(actual, expected);
 
         // End is not page aligned, so round it down.
-        let actual = Memory::page_align_memory_region(MemoryRegion::new(
+        let actual = page_align_memory_region(MemoryRegion::new(
             *PAGE_SIZE,
             *PAGE_SIZE * 3 + *PAGE_SIZE / 2,
         ))
@@ -477,7 +639,7 @@ mod tests {
 
         // Start is not page aligned, so round it up (note that the second field is size, not the
         // ending address which is why it will also change).
-        let actual = Memory::page_align_memory_region(MemoryRegion::new(
+        let actual = page_align_memory_region(MemoryRegion::new(
             *PAGE_SIZE / 2,
             *PAGE_SIZE * 3 + *PAGE_SIZE / 2,
         ))
@@ -486,18 +648,14 @@ mod tests {
         assert_eq!(actual, expected);
 
         // After page aligning this is a zero length region, and is thus dropped.
-        assert!(Memory::page_align_memory_region(MemoryRegion::new(
-            *PAGE_SIZE / 2,
-            *PAGE_SIZE / 2
-        ))
-        .is_none());
+        assert!(
+            page_align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 2)).is_none()
+        );
 
         // After page aligning this would be a negative length region, and is thus dropped.
-        assert!(Memory::page_align_memory_region(MemoryRegion::new(
-            *PAGE_SIZE / 2,
-            *PAGE_SIZE / 4
-        ))
-        .is_none());
+        assert!(
+            page_align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 4)).is_none()
+        );
     }
 
     #[fuchsia::test]
@@ -507,7 +665,7 @@ mod tests {
         let target_memory = *PAGE_SIZE * 5;
         let restrictions = [MemoryRegion::new(*PAGE_SIZE * 2 + *PAGE_SIZE / 2, *PAGE_SIZE * 2)];
 
-        let actual = Memory::generate_guest_ram_regions(target_memory, &restrictions).unwrap();
+        let actual = generate_guest_ram_regions(target_memory, &restrictions).unwrap();
         let expected = [
             MemoryRegion::new(0, *PAGE_SIZE * 2),
             MemoryRegion::new(*PAGE_SIZE * 5, *PAGE_SIZE * 3),
@@ -528,7 +686,7 @@ mod tests {
         let restrictions =
             [MemoryRegion::new(0, *PAGE_SIZE / 2), MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE)];
 
-        let actual = Memory::generate_guest_ram_regions(target_memory, &restrictions).unwrap();
+        let actual = generate_guest_ram_regions(target_memory, &restrictions).unwrap();
         let expected = [MemoryRegion::new(*PAGE_SIZE * 2, *PAGE_SIZE * 5)];
 
         assert!(actual
@@ -540,8 +698,8 @@ mod tests {
     #[fuchsia::test]
     async fn get_guest_memory_regions() {
         // Four GiB of guest memory will extend beyond the PCI device region for x86, but not for arm64.
-        let target_memory = Memory::page_align_memory(1 << 32, "test");
-        let actual = Memory::generate_guest_ram_regions(target_memory, &RESTRICTED_RANGES).unwrap();
+        let target_memory = page_align_memory(1 << 32, "test");
+        let actual = generate_guest_ram_regions(target_memory, &RESTRICTED_RANGES).unwrap();
 
         #[cfg(target_arch = "x86_64")]
         let expected = [
@@ -565,9 +723,8 @@ mod tests {
     async fn too_much_guest_memory_requested_to_place_with_restrictions() {
         // The first dynamic device address restriction extends to +INF, so requesting enough
         // memory to overlap with the dynamic device range will always fail.
-        let target_memory = Memory::page_align_memory(FIRST_DYNAMIC_DEVICE_ADDR + 0x1000, "test");
-        let err =
-            Memory::generate_guest_ram_regions(target_memory, &RESTRICTED_RANGES).unwrap_err();
+        let target_memory = page_align_memory(FIRST_DYNAMIC_DEVICE_ADDR + 0x1000, "test");
+        let err = generate_guest_ram_regions(target_memory, &RESTRICTED_RANGES).unwrap_err();
 
         assert_eq!(
             std::mem::discriminant(&err),
@@ -578,7 +735,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_align_allocated_device_memory_range() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, &hypervisor).unwrap();
+        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
 
         let device1 =
             memory.allocate_dynamic_device_address(*PAGE_SIZE / 2, "a".to_string()).unwrap();
@@ -586,14 +743,14 @@ mod tests {
 
         // Device 1 didn't request a full page, but device 2 will still be paged aligned.
         assert_eq!(device1 + *PAGE_SIZE, device2);
-        assert_eq!(device1, Memory::page_align_memory(device1, "test"));
-        assert_eq!(device2, Memory::page_align_memory(device2, "test"));
+        assert_eq!(device1, page_align_memory(device1, "test"));
+        assert_eq!(device2, page_align_memory(device2, "test"));
     }
 
     #[fuchsia::test]
     async fn device_memory_not_overlapping() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, &hypervisor).unwrap();
+        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
 
         let devices = 0xc000000;
         memory.add_device_range(devices, 0x1000, "a".to_string()).unwrap();
@@ -605,7 +762,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_overlap() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, &hypervisor).unwrap();
+        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
 
         let device_addr = memory.allocate_dynamic_device_address(0x1000, "a".to_string()).unwrap();
 
@@ -623,7 +780,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_invalid_size() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, &hypervisor).unwrap();
+        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
 
         assert_eq!(
             memory.add_device_range(0x10000, 0x0, "a".to_string()).err().unwrap(),
@@ -639,7 +796,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_has_guest_memory_overlap() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(1 << 30, &hypervisor).unwrap();
+        let mut memory = Memory::new(1 << 30, hypervisor.clone()).unwrap();
 
         assert_eq!(
             memory
