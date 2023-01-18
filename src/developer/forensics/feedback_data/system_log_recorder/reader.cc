@@ -27,6 +27,8 @@ namespace feedback_data {
 namespace system_log_recorder {
 namespace {
 
+static re2::RE2* kLineStart = new re2::RE2("^\\[\\d{5,9}\\.\\d{3}\\]\\[\\d{5,9}\\]\\[\\d{5,9}\\]");
+
 // Check if the start of |line| is formatted like a log message by checking that the timestamp, pid,
 // and tid tags are present. The formatting is defined in
 // //src/developer/forensics/utils/log_format.h.
@@ -34,10 +36,7 @@ namespace {
 // Note: this definition of this function needs to in the same file as SortLog otherwise. We
 // experienced significant performance issue when this was not done and the log being sorted was
 // large.
-bool MatchesLogMessage(std::string_view line) {
-  re2::RE2 line_start("^\\[\\d{5,9}\\.\\d{3}\\]\\[\\d{5,9}\\]\\[\\d{5,9}\\]");
-  return re2::RE2::PartialMatch(line, line_start);
-}
+bool MatchesLogMessage(std::string_view line) { return re2::RE2::PartialMatch(line, *kLineStart); }
 
 std::string MakeRepeatedWarning(const size_t repeat_count) {
   if (repeat_count == 1) {
