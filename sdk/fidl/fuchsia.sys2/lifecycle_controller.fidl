@@ -1,18 +1,92 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=7)
 library fuchsia.sys2;
 
 using fuchsia.component;
 using fuchsia.component.decl;
 
-/// Describes the result of the Start command.
-type StartResult = strict enum {
-    /// The instance was started.
-    STARTED = 0;
+// Errors that can occur from resolving a component instance
+@available(added=11)
+type ResolveError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The given moniker is invalid.
+    BAD_MONIKER = 3;
+    // The package containing the component manifest could not be found.
+    PACKAGE_NOT_FOUND = 4;
+    // The component manifest could not be found in the package.
+    MANIFEST_NOT_FOUND = 5;
+};
 
-    /// The instance was already running.
-    ALREADY_STARTED = 1;
+// Errors that can occur from starting a component instance
+@available(added=11)
+type StartError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The given moniker is invalid.
+    BAD_MONIKER = 3;
+    // The package containing the component manifest could not be found.
+    PACKAGE_NOT_FOUND = 4;
+    // The component manifest could not be found in the package.
+    MANIFEST_NOT_FOUND = 5;
+};
+
+// Errors that can occur from stopping a component instance
+@available(added=11)
+type StopError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The given moniker is invalid.
+    BAD_MONIKER = 3;
+};
+
+// Errors that can occur from destroying a component instance
+@available(added=11)
+type DestroyError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The given moniker is invalid.
+    BAD_MONIKER = 3;
+    // The given child reference is invalid.
+    BAD_CHILD_REF = 4;
+};
+
+// Errors that can occur from unresolving a component instance
+@available(added=11)
+type UnresolveError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The given moniker is invalid.
+    BAD_MONIKER = 3;
+};
+
+// Errors that can occur from creating a component instance
+@available(added=11)
+type CreateError = flexible enum {
+    // An unexpected error occurred.
+    INTERNAL = 1;
+    // The instance identified by the given moniker could not be found.
+    INSTANCE_NOT_FOUND = 2;
+    // The instance identified by the given moniker already exists.
+    INSTANCE_ALREADY_EXISTS = 3;
+    // The given moniker is invalid.
+    BAD_MONIKER = 4;
+    // The given child declaration is invalid.
+    BAD_CHILD_DECL = 5;
+    // The parent instance does not have a collection with the given name.
+    COLLECTION_NOT_FOUND = 6;
 };
 
 /// Mutates the component instance state in a realm.
@@ -20,7 +94,71 @@ type StartResult = strict enum {
 protocol LifecycleController {
     /// Starts the instance identified by the given moniker.
     ///
+    /// The client can pass in the server end of a channel
+    /// for the fuchsia.component.Binder protocol. This protocol
+    /// will notify the client when the instance has stopped.
+    ///
     /// The function returns once the instance has been started.
+    @available(added=11)
+    StartInstance(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        binder server_end:fuchsia.component.Binder;
+    }) -> () error StartError;
+
+    /// Stops the instance identified by the given moniker.
+    ///
+    /// The function returns once the instance has been stopped.
+    @available(added=11)
+    StopInstance(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> () error StopError;
+
+    /// Resolves the instance identified by the given moniker.
+    ///
+    /// The function returns once the instance has been resolved.
+    @available(added=11)
+    ResolveInstance(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> () error ResolveError;
+
+    /// Unresolves the component designated by the provided relative moniker
+    /// relative to the component to which the protocol is scoped.
+    ///
+    /// The function returns once the instance has been unresolved.
+    @available(added=11)
+    UnresolveInstance(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> () error UnresolveError;
+
+    /// Creates a new child instance identified by the given moniker.
+    ///
+    /// The function returns once the child instance has been added to the topology.
+    @available(added=11)
+    CreateInstance(resource struct {
+        parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        collection fuchsia.component.decl.CollectionRef;
+        decl fuchsia.component.decl.Child;
+        args fuchsia.component.CreateChildArgs;
+    }) -> () error CreateError;
+
+    /// Destroys the instance identified by the given moniker.
+    ///
+    /// The function returns once the child instance no longer exists in the topology.
+    @available(added=11)
+    DestroyInstance(struct {
+        parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        child fuchsia.component.decl.ChildRef;
+    }) -> () error DestroyError;
+
+    // ---------------------------------------------------------------
+    // The methods below are considered deprecated and will be removed
+    // in an upcoming API release.
+    // ---------------------------------------------------------------
+
+    /// Starts the instance identified by the given moniker.
+    ///
+    /// The function returns once the instance has been started.
+    @available(added=7, deprecated=11, removed=12, note="Use StartInstance instead", legacy=true)
     Start(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
@@ -30,6 +168,7 @@ protocol LifecycleController {
     /// Stops the instance identified by the given moniker.
     ///
     /// The function returns once the instance has been stopped.
+    @available(added=7, deprecated=11, removed=12, note="Use StopInstance instead", legacy=true)
     Stop(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         is_recursive bool;
@@ -38,6 +177,7 @@ protocol LifecycleController {
     /// Resolves the instance identified by the given moniker.
     ///
     /// The function returns once the instance has been resolved
+    @available(added=7, deprecated=11, removed=12, note="Use ResolveInstance instead", legacy=true)
     Resolve(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
@@ -47,6 +187,12 @@ protocol LifecycleController {
     ///
     /// The function returns once the component successfully unresolves, or the
     /// operation fails.
+    @available(
+            added=7,
+            deprecated=11,
+            removed=12,
+            note="Use UnresolveInstance instead",
+            legacy=true)
     Unresolve(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
@@ -57,6 +203,7 @@ protocol LifecycleController {
     /// `parent_moniker` is the moniker of the instance that owns the collection.
     ///
     /// The function returns once the child instance has been added to the topology.
+    @available(added=7, deprecated=11, removed=12, note="Use CreateInstance instead", legacy=true)
     CreateChild(resource struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         collection fuchsia.component.decl.CollectionRef;
@@ -70,6 +217,7 @@ protocol LifecycleController {
     /// `parent_moniker` is the moniker of the instance that owns the collection.
     ///
     /// The function returns once the child instance no longer exists in the topology.
+    @available(added=7, deprecated=11, removed=12, note="Use DestroyInstance instead", legacy=true)
     DestroyChild(struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         child fuchsia.component.decl.ChildRef;
@@ -79,9 +227,20 @@ protocol LifecycleController {
     /// instance identified by its moniker. This protocol is served by component manager.
     ///
     /// TODO(http://fxbug.dev/97774): Move this function to [`fuchsia.sys2/RealmQuery`]
+    @available(added=11, deprecated=11, removed=12, legacy=true)
     GetStorageAdmin(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         capability string:fuchsia.component.MAX_CAPABILITY_ID_LENGTH;
         admin_server server_end:StorageAdmin;
     }) -> () error fuchsia.component.Error;
+};
+
+/// Describes the result of the Start command.
+@available(added=7, deprecated=11, removed=12, note="Use StartInstance instead", legacy=true)
+type StartResult = strict enum {
+    /// The instance was started.
+    STARTED = 0;
+
+    /// The instance was already running.
+    ALREADY_STARTED = 1;
 };

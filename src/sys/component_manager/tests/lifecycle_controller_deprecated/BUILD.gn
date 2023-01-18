@@ -9,29 +9,27 @@ import("//build/rust/rustc_test.gni")
 group("tests") {
   testonly = true
 
-  deps = [ ":lifecycle_controller_test" ]
+  deps = [ ":lifecycle_controller_deprecated_test" ]
 }
 
-rustc_test("lifecycle_controller_test_bin") {
-  name = "lifecycle_controller_test"
+rustc_test("lifecycle_controller_deprecated_test_bin") {
+  name = "lifecycle_controller_deprecated_test"
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_unittest_package("lifecycle_controller_test") {
-  manifest = "meta/lifecycle_controller_test.cml"
+fuchsia_unittest_package("lifecycle_controller_deprecated_test") {
+  manifest = "meta/lifecycle_controller_deprecated_test.cml"
   deps = [
-    ":lifecycle_controller_test_bin",
+    ":lifecycle_controller_deprecated_test_bin",
     "//src/sys/component_manager/testing/echo_server",
   ]
 }
