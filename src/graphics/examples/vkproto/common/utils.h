@@ -46,6 +46,11 @@
     return err;                                                                                    \
   }
 
+// Prefix macro w/ VKP to avoid spurious clang-tidy warnings.
+#define VKP_DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName &) = delete;         \
+  TypeName &operator=(const TypeName &) = delete
+
 namespace vkp {
 
 enum SearchProp { INSTANCE_EXT_PROP, INSTANCE_LAYER_PROP, PHYS_DEVICE_EXT_PROP };
@@ -76,8 +81,8 @@ bool FindRequiredProperties(const std::vector<const char *> &required_props, Sea
                             std::vector<std::string> *missing_props_out = nullptr);
 
 // Find queue family index from physical device.  If |surface| is not nullptr,
-// succeed only if queue family has present support.  If |queue_family_index| is not
-// nullptr, store the queue family index into it if found.
+// succeed only if queue family has present support.  If |queue_family_index| is
+// not nullptr, store the queue family index into it if found.
 bool FindQueueFamilyIndex(vk::PhysicalDevice phys_device, VkSurfaceKHR surface = nullptr,
                           vk::QueueFlags queue_flags = vk::QueueFlagBits::eGraphics,
                           uint32_t *queue_family_index = nullptr);

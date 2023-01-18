@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "src/lib/fxl/macros.h"
+#include "src/graphics/examples/vkproto/common/utils.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -21,7 +21,7 @@ class Shader {
   static bool ReadFile(const std::string& file_name, std::vector<char>* buffer);
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(Shader);
+  VKP_DISALLOW_COPY_AND_ASSIGN(Shader);
 };
 
 }  // namespace vkp

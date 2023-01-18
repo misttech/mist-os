@@ -31,6 +31,7 @@ common_files = [
   "render_pass.h",
   "shader.cc",
   "shader.h",
+  "surface.h",
   "swapchain.cc",
   "swapchain.h",
   "utils.cc",

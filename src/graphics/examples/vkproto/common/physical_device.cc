@@ -48,7 +48,7 @@ bool ChooseDevice(const vk::PhysicalDevice &physical_device_in, const VkSurfaceK
 
 namespace vkp {
 
-PhysicalDevice::PhysicalDevice(std::shared_ptr<vk::Instance> instance, VkSurfaceKHR surface,
+PhysicalDevice::PhysicalDevice(std::shared_ptr<vk::Instance> instance, const VkSurfaceKHR &surface,
                                const vk::QueueFlags &queue_flags)
     : initialized_(false), instance_(instance), surface_(surface), queue_flags_(queue_flags) {}
 
@@ -70,6 +70,7 @@ bool PhysicalDevice::Init() {
   }
 
   RTN_IF_MSG(false, !initialized_, "Couldn't find graphics family device.\n");
+
   return initialized_;
 }
 

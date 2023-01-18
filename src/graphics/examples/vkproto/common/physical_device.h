@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "src/graphics/examples/vkproto/common/instance.h"
-#include "src/lib/fxl/macros.h"
+#include "src/graphics/examples/vkproto/common/surface.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -17,7 +17,8 @@ namespace vkp {
 
 class PhysicalDevice {
  public:
-  explicit PhysicalDevice(std::shared_ptr<vk::Instance> instance, VkSurfaceKHR surface = nullptr,
+  explicit PhysicalDevice(std::shared_ptr<vk::Instance> instance,
+                          const VkSurfaceKHR &surface = nullptr,
                           const vk::QueueFlags &queue_flags = vk::QueueFlagBits::eGraphics);
 
   bool Init();
@@ -27,11 +28,11 @@ class PhysicalDevice {
 
  private:
   PhysicalDevice() = delete;
-  FXL_DISALLOW_COPY_AND_ASSIGN(PhysicalDevice);
+  VKP_DISALLOW_COPY_AND_ASSIGN(PhysicalDevice);
 
   bool initialized_;
   std::shared_ptr<vk::Instance> instance_;
-  VkSurfaceKHR surface_ = nullptr;
+  VkSurfaceKHR surface_;
   vk::QueueFlags queue_flags_;
 
   vk::PhysicalDevice physical_device_;

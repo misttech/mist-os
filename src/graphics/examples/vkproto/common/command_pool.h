@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_COMMAND_POOL_H_
 
 #include "src/graphics/examples/vkproto/common/device.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -22,7 +21,7 @@ class CommandPool {
   const vk::CommandPool &get() const { return command_pool_.get(); }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(CommandPool);
+  VKP_DISALLOW_COPY_AND_ASSIGN(CommandPool);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

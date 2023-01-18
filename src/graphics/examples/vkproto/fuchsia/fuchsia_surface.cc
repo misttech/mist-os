@@ -2,27 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "surface.h"
+#include "fuchsia_surface.h"
 
-#include "utils.h"
+#include "src/graphics/examples/vkproto/common/utils.h"
 
 namespace vkp {
 
-Surface::Surface(std::shared_ptr<vk::Instance> instance)
-    : initialized_(false), instance_(instance) {}
+FuchsiaSurface::FuchsiaSurface(std::shared_ptr<vk::Instance> instance) : Surface(instance) {}
 
-Surface::~Surface() {
+FuchsiaSurface::~FuchsiaSurface() {
   if (initialized_) {
     vkDestroySurfaceKHR(*instance_, surface_, nullptr);
   }
 }
 
-bool Surface::Init() {
+bool FuchsiaSurface::Init() {
   if (initialized_) {
-    RTN_MSG(false, "vkp::Surface::Init() failed - already initialized.\n");
+    RTN_MSG(false, "vkp::FuchsiaSurface::Init() failed - already initialized.\n");
   }
   if (!instance_.get()) {
-    RTN_MSG(false, "vkp::Surface::Init() failed - must provide instance.\n");
+    RTN_MSG(false, "vkp::FuchsiaSurface::Init() failed - must provide instance.\n");
   }
 
   // TODO(fxbug.dev/13252): Move to scenic (public) surface.
@@ -34,7 +33,7 @@ bool Surface::Init() {
   auto rv = vkCreateImagePipeSurfaceFUCHSIA(*instance_, &info, nullptr, &surface_);
 
   if (rv != VK_SUCCESS) {
-    RTN_MSG(false, "Surface creation failed.\n");
+    RTN_MSG(false, "FuchsiaSurface creation failed.\n");
   }
 
   initialized_ = true;

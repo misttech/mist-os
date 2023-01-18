@@ -13,7 +13,6 @@
 #include "src/graphics/examples/vkproto/common/physical_device.h"
 #include "src/graphics/examples/vkproto/common/readback.h"
 #include "src/graphics/examples/vkproto/common/render_pass.h"
-#include "src/graphics/examples/vkproto/common/swapchain.h"
 #include "src/graphics/examples/vkproto/common/utils.h"
 
 std::shared_ptr<vk::Device> MakeSharedDevice(const vk::PhysicalDevice& physical_device,

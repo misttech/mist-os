@@ -23,8 +23,8 @@ executable("bin") {
   sources = common_sources
 
   sources += [
-    "../fuchsia/surface.cc",
-    "../fuchsia/surface.h",
+    "../fuchsia/fuchsia_surface.cc",
+    "../fuchsia/fuchsia_surface.h",
     "main.cc",
   ]
 
@@ -35,7 +35,6 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//src/lib/fsl",
-    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/vulkan",
     "//third_party/github.com/ARM-software/HWCPipe:mali_profiler",

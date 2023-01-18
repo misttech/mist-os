@@ -38,7 +38,6 @@ executable("bin") {
   defines = [ "VULKAN_HPP_NO_EXCEPTIONS" ]
 
   deps = [
-    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]
@@ -52,15 +51,15 @@ executable("bin") {
     ]
 
     sources += [
-      "../fuchsia/surface.cc",
-      "../fuchsia/surface.h",
+      "../fuchsia/fuchsia_surface.cc",
+      "../fuchsia/fuchsia_surface.h",
     ]
   } else {
     include_dirs += [ "//src/graphics/examples/vkproto/glfw" ]
 
     sources += [
-      "../glfw/surface.cc",
-      "../glfw/surface.h",
+      "../glfw/glfw_surface.cc",
+      "../glfw/glfw_surface.h",
     ]
 
     deps += [

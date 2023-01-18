@@ -10,7 +10,7 @@
 
 namespace vkp {
 
-Device::Device(const vk::PhysicalDevice &physical_device, VkSurfaceKHR surface,
+Device::Device(const vk::PhysicalDevice &physical_device, const VkSurfaceKHR &surface,
                vk::QueueFlags queue_flags)
     : initialized_(false),
       physical_device_(physical_device),

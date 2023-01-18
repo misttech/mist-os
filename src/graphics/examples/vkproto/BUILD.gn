@@ -52,19 +52,17 @@ vulkan_executable("bin") {
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 
-  deps = [ "//src/lib/fxl" ]
-
   if (is_fuchsia) {
     include_dirs += [ "//src/graphics/examples/vkproto/fuchsia" ]
 
-    deps += [
+    deps = [
       "//src/lib/vulkan",
       "//src/lib/vulkan/swapchain",
     ]
 
     sources += [
-      "fuchsia/surface.cc",
-      "fuchsia/surface.h",
+      "fuchsia/fuchsia_surface.cc",
+      "fuchsia/fuchsia_surface.h",
     ]
   } else {
     defines = [ "USE_GLFW=1" ]
@@ -72,11 +70,11 @@ vulkan_executable("bin") {
     include_dirs += [ "//src/graphics/examples/vkproto/glfw" ]
 
     sources += [
-      "glfw/surface.cc",
-      "glfw/surface.h",
+      "glfw/glfw_surface.cc",
+      "glfw/glfw_surface.h",
     ]
 
-    deps += [
+    deps = [
       ":spirv_copy",
       "//third_party/glfw",
     ]

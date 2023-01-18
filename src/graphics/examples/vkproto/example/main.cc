@@ -20,9 +20,9 @@
 #include "src/graphics/examples/vkproto/common/readback.h"
 #include "src/graphics/examples/vkproto/common/render_pass.h"
 #ifdef __Fuchsia__
-#include "src/graphics/examples/vkproto/fuchsia/surface.h"
+#include "src/graphics/examples/vkproto/fuchsia/fuchsia_surface.h"
 #else
-#include "src/graphics/examples/vkproto/glfw/surface.h"
+#include "src/graphics/examples/vkproto/glfw/glfw_surface.h"
 #endif
 #include "src/graphics/examples/vkproto/common/swapchain.h"
 #include "src/graphics/examples/vkproto/common/utils.h"
@@ -75,9 +75,9 @@ int main(int argc, char* argv[]) {
   std::shared_ptr<vkp::Surface> vkp_surface;
   if (!offscreen) {
 #if USE_GLFW
-    vkp_surface = std::make_shared<vkp::Surface>(instance, window);
+    vkp_surface = std::make_shared<vkp::GlfwSurface>(instance, window);
 #else
-    vkp_surface = std::make_shared<vkp::Surface>(instance);
+    vkp_surface = std::make_shared<vkp::FuchsiaSurface>(instance);
 #endif
     RTN_IF_MSG(1, !vkp_surface->Init(), "Surface initialization failed\n");
   }

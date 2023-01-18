@@ -93,7 +93,7 @@ namespace vkp {
 
 Swapchain::Swapchain(const vk::PhysicalDevice phys_device, std::shared_ptr<vk::Device> device,
                      const VkSurfaceKHR& surface)
-    : initialized_(false), device_(device), surface_(std::move(surface)) {
+    : initialized_(false), device_(device), surface_(surface) {
   phys_device_ = std::make_unique<vk::PhysicalDevice>(phys_device);
 }
 

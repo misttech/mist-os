@@ -11,7 +11,6 @@
 #include "src/graphics/examples/vkproto/common/command_pool.h"
 #include "src/graphics/examples/vkproto/common/device.h"
 #include "src/graphics/examples/vkproto/common/framebuffers.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -42,7 +41,7 @@ class CommandBuffers {
   const vk::Extent2D &extent() const { return extent_; }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(CommandBuffers);
+  VKP_DISALLOW_COPY_AND_ASSIGN(CommandBuffers);
 
   bool initialized_ = false;
   bool allocated_ = false;

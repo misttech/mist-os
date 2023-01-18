@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "src/graphics/examples/vkproto/common/instance.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -31,7 +30,7 @@ class DebugUtilsMessenger {
   static vk::DebugUtilsMessengerCreateInfoEXT DefaultDebugUtilsMessengerInfo();
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(DebugUtilsMessenger);
+  VKP_DISALLOW_COPY_AND_ASSIGN(DebugUtilsMessenger);
 
   bool initialized_ = false;
   std::shared_ptr<vk::Instance> instance_;

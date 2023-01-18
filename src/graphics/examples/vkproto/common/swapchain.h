@@ -8,12 +8,7 @@
 #include <vector>
 
 #include "src/graphics/examples/vkproto/common/device.h"
-#include "src/lib/fxl/macros.h"
-#ifdef __Fuchsia__
-#include "src/graphics/examples/vkproto/fuchsia/surface.h"
-#else
-#include "src/graphics/examples/vkproto/glfw/surface.h"
-#endif
+#include "src/graphics/examples/vkproto/common/surface.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -44,7 +39,7 @@ class Swapchain {
   const vk::SwapchainKHR &get() const { return swap_chain_.get(); }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(Swapchain);
+  VKP_DISALLOW_COPY_AND_ASSIGN(Swapchain);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

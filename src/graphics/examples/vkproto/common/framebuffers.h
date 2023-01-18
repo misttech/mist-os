@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "src/graphics/examples/vkproto/common/device.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -22,7 +21,7 @@ class Framebuffers {
   const std::vector<vk::UniqueFramebuffer> &framebuffers() const;
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(Framebuffers);
+  VKP_DISALLOW_COPY_AND_ASSIGN(Framebuffers);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

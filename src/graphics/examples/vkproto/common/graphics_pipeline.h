@@ -7,7 +7,6 @@
 
 #include "src/graphics/examples/vkproto/common/device.h"
 #include "src/graphics/examples/vkproto/common/render_pass.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -23,7 +22,7 @@ class GraphicsPipeline {
   const vk::Pipeline &get() const;
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(GraphicsPipeline);
+  VKP_DISALLOW_COPY_AND_ASSIGN(GraphicsPipeline);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

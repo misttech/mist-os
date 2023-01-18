@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "surface.h"
+#include "glfw_surface.h"
 
-#include "utils.h"
+#include "src/graphics/examples/vkproto/common/utils.h"
 
 namespace vkp {
 
-Surface::Surface(std::shared_ptr<vk::Instance> instance, GLFWwindow *window)
-    : initialized_(false), instance_(instance), window_(window) {}
+GlfwSurface::GlfwSurface(std::shared_ptr<vk::Instance> instance, GLFWwindow *window)
+    : Surface(instance), window_(window) {}
 
-Surface::~Surface() {
+GlfwSurface::~GlfwSurface() {
   if (initialized_) {
     vkDestroySurfaceKHR(*instance_, surface_, nullptr);
   }
 }
 
-bool Surface::Init() {
+bool GlfwSurface::Init() {
   if (initialized_) {
-    RTN_MSG(false, "vkp::Surface::Init() failed - already initialized.\n");
+    RTN_MSG(false, "vkp::GlfwSurface::Init() failed - already initialized.\n");
   }
   if (!instance_.get()) {
-    RTN_MSG(false, "vkp::Surface::Init() failed - must provide instance and window.\n");
+    RTN_MSG(false, "vkp::GlfwSurface::Init() failed - must provide instance and window.\n");
   }
   auto rv = glfwCreateWindowSurface(*instance_, window_, nullptr, &surface_);
 

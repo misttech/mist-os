@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_RENDER_PASS_H_
 
 #include "src/graphics/examples/vkproto/common/device.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -22,7 +21,7 @@ class RenderPass {
   const vk::RenderPass &get() const { return render_pass_.get(); }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(RenderPass);
+  VKP_DISALLOW_COPY_AND_ASSIGN(RenderPass);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

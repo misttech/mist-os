@@ -42,8 +42,8 @@ executable("bin") {
   ]
 
   sources += [
-    "../fuchsia/surface.cc",
-    "../fuchsia/surface.h",
+    "../fuchsia/fuchsia_surface.cc",
+    "../fuchsia/fuchsia_surface.h",
   ]
 
   data = [

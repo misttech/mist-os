@@ -6,7 +6,7 @@
 #define SRC_GRAPHICS_EXAMPLES_VKPROTO_COMMON_DEVICE_H_
 #include <vector>
 
-#include "src/lib/fxl/macros.h"
+#include "src/graphics/examples/vkproto/common/utils.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -14,7 +14,7 @@ namespace vkp {
 
 class Device {
  public:
-  explicit Device(const vk::PhysicalDevice &physical_device, VkSurfaceKHR surface = nullptr,
+  explicit Device(const vk::PhysicalDevice &physical_device, const VkSurfaceKHR &surface = nullptr,
                   vk::QueueFlags queue_flags = vk::QueueFlagBits::eGraphics);
   ~Device();
 
@@ -26,7 +26,7 @@ class Device {
   bool initialized() const { return initialized_; }
 
  private:
-  FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(Device);
+  VKP_DISALLOW_COPY_AND_ASSIGN(Device);
 
   bool initialized_;
   vk::PhysicalDevice physical_device_;

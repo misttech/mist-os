@@ -7,7 +7,7 @@
 
 #include <vector>
 
-#include "src/lib/fxl/macros.h"
+#include "src/graphics/examples/vkproto/common/utils.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -34,7 +34,7 @@ class Instance {
   bool initialized() const { return initialized_; }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(Instance);
+  VKP_DISALLOW_COPY_AND_ASSIGN(Instance);
 
   bool initialized_ = false;
   vk::InstanceCreateInfo instance_info_{};

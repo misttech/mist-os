@@ -7,7 +7,6 @@
 
 #include "src/graphics/examples/vkproto/common/device.h"
 #include "src/graphics/examples/vkproto/common/physical_device.h"
-#include "src/lib/fxl/macros.h"
 
 #include <vulkan/vulkan.hpp>
 
@@ -33,7 +32,7 @@ class ImageView {
   const vk::ImageView &get() const { return image_view_.get(); }
 
  private:
-  FXL_DISALLOW_COPY_AND_ASSIGN(ImageView);
+  VKP_DISALLOW_COPY_AND_ASSIGN(ImageView);
 
   bool initialized_;
   std::shared_ptr<vk::Device> device_;

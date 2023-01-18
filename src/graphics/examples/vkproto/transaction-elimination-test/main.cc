@@ -24,7 +24,6 @@
 #include "src/graphics/examples/vkproto/common/instance.h"
 #include "src/graphics/examples/vkproto/common/physical_device.h"
 #include "src/graphics/examples/vkproto/common/render_pass.h"
-#include "src/graphics/examples/vkproto/common/swapchain.h"
 #include "src/graphics/examples/vkproto/common/utils.h"
 #include "src/lib/fsl/handles/object_info.h"
 
