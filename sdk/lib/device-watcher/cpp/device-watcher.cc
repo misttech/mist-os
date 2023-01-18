@@ -86,44 +86,6 @@ zx_status_t DirWatcher::WaitForRemoval(std::string_view filename, zx::duration t
   return ZX_ERR_NOT_FOUND;
 }
 
-__EXPORT
-zx_status_t IterateDirectory(const int dir_fd, FileCallback callback) {
-  DIR* const dir = fdopendir(dir_fd);
-  if (dir == nullptr) {
-    close(dir_fd);
-    return ZX_ERR_IO;
-  }
-  const auto close_dir = fit::defer([dir]() { closedir(dir); });
-
-  fdio_t* const io = fdio_unsafe_fd_to_io(dirfd(dir));
-  const auto release = fit::defer([io]() { fdio_unsafe_release(io); });
-  const zx_handle_t channel = fdio_unsafe_borrow_channel(io);
-
-  for (;;) {
-    const dirent* const entry = readdir(dir);
-    if (entry == nullptr) {
-      return ZX_OK;
-    }
-
-    const std::string_view filename(entry->d_name);
-    if (filename == "." || filename == "..") {
-      continue;
-    }
-
-    zx::channel client, server;
-    if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
-      return status;
-    }
-    if (zx_status_t status = fdio_service_connect_at(channel, entry->d_name, server.release());
-        status != ZX_OK) {
-      return status;
-    }
-    if (zx_status_t status = callback(filename, std::move(client)); status != ZX_OK) {
-      return status;
-    }
-  }
-}
-
 namespace {
 
 zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string_view path,

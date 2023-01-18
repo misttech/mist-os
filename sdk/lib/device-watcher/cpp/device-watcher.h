@@ -31,15 +31,6 @@ zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
 zx::result<zx::channel> RecursiveWaitForFile(const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
-// Invokes |callback| on each entry in the directory, returning immediately after all entries have
-// been processed. |callback| is passed the file name and a channel for the file's fuchsia.io.Node
-// protocol. If |callback| returns a status other than ZX_OK, iteration terminates immediately, and
-// the error status is returned. This function does not continue to watch the directory for newly
-// created files.
-// This method takes ownership of |fd|.
-using FileCallback = fit::function<zx_status_t(std::string_view, zx::channel)>;
-zx_status_t IterateDirectory(int fd, FileCallback callback);
-
 // DirWatcher can be used to detect when a file has been removed from the filesystem.
 //
 // Example usage:
