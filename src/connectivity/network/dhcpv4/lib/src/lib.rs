@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 pub mod configuration;
-pub mod protocol;
+pub use dhcp_protocol as protocol;
 pub mod server;
 pub mod stash;
 
