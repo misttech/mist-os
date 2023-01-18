@@ -342,8 +342,7 @@ impl Task {
             | CLONE_SETTLS
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
-            | CLONE_CHILD_SETTID
-            | CLONE_VFORK) as u64;
+            | CLONE_CHILD_SETTID) as u64;
 
         // CLONE_SETTLS is implemented by sys_clone.
 
