@@ -15,6 +15,11 @@ declare_args() {
   # using '--args=ermine_app_entries="config/app_launch_entries.json"'
   ermine_app_entries = "config/app_launch_entries.json"
 
+  # Build arg that allows overriding the default manifest for Ermine.
+  # TODO(fxbug.dev/120106): Remove this argument when we have a better way of
+  # overriding the manifest.
+  ermine_manifest = "meta/ermine.cml"
+
   # Whether or not to launch screensaver.
   ermine_start_screensaver = false
 
@@ -151,7 +156,7 @@ flutter_component("component") {
     main_dart = "main.dart"
   }
   component_name = "ermine"
-  manifest = "meta/ermine.cml"
+  manifest = ermine_manifest
   deps = [
     ":app_launch_entries_resource",
     ":lib",
