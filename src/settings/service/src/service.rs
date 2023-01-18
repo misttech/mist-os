@@ -67,6 +67,9 @@ pub enum Address {
     PolicyHandler(PolicyType),
     EventSource(event::Address),
     Storage,
+    /// This value is reserved for testing purposes.
+    #[cfg(test)]
+    Test(u64),
 }
 
 /// The types of data that can be sent through the service `MessageHub`. This

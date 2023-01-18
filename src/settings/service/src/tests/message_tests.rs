@@ -15,7 +15,6 @@ use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::sync::Arc;
 use std::task::Poll;
 
@@ -26,11 +25,6 @@ pub(crate) enum TestMessage {
     Baz,
     Qux,
     Thud,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Copy, Hash)]
-pub(crate) enum TestAddress {
-    Foo(u64),
 }
 
 /// Ensures the delivery result matches expected value.
@@ -60,7 +54,8 @@ const ROLE_2: crate::Role = crate::Role::Policy(policy::Role::PolicyHandler);
 
 mod test {
     use super::*;
-    pub(crate) type MessageHub = crate::message::message_hub::MessageHub<TestMessage, TestAddress>;
+    pub(crate) type MessageHub =
+        crate::message::message_hub::MessageHub<TestMessage, crate::Address>;
 }
 
 mod num_test {
@@ -168,12 +163,12 @@ async fn test_end_to_end_messaging() {
     let delegate = test::MessageHub::create();
 
     let (messenger_client_1, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     let (_, mut receptor_2) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(2))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
     let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(TestAddress::Foo(2))).send();
+        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(2))).send();
 
     verify_payload(
         ORIGINAL,
@@ -196,13 +191,13 @@ async fn test_implicit_forward() {
     let delegate = test::MessageHub::create();
 
     let (messenger_client_1, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     let (_, mut receiver_2) = delegate.create(MessengerType::Broker(None)).await.unwrap();
     let (_, mut receiver_3) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(3))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
     let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(TestAddress::Foo(3))).send();
+        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(3))).send();
 
     // Ensure observer gets payload and then do nothing with message.
     verify_payload(ORIGINAL, &mut receiver_2, None).await;
@@ -232,13 +227,13 @@ async fn test_observe_addressable() {
     let delegate = test::MessageHub::create();
 
     let (messenger_client_1, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     let (_, mut receptor_2) = delegate.create(MessengerType::Broker(None)).await.unwrap();
     let (_, mut receptor_3) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(3))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
     let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(TestAddress::Foo(3))).send();
+        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(3))).send();
 
     let observe_receptor = Arc::new(Mutex::new(None));
     verify_payload(ORIGINAL, &mut receptor_2, {
@@ -280,12 +275,12 @@ fn test_timeout() {
     let fut = async move {
         let delegate = test::MessageHub::create();
         let (messenger_client_1, _) =
-            delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+            delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
         let (_, mut receptor_2) =
-            delegate.create(MessengerType::Addressable(TestAddress::Foo(2))).await.unwrap();
+            delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
         let mut reply_receptor = messenger_client_1
-            .message(ORIGINAL, Audience::Address(TestAddress::Foo(2)))
+            .message(ORIGINAL, Audience::Address(crate::Address::Test(2)))
             .set_timeout(Some(timeout_ms.millis()))
             .send();
 
@@ -327,11 +322,11 @@ async fn test_broadcast() {
     let delegate = test::MessageHub::create();
 
     let (messenger_client_1, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     let (_, mut receptor_2) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(2))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
     let (_, mut receptor_3) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(3))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
     let _ = messenger_client_1.message(ORIGINAL, Audience::Broadcast).send();
 
@@ -343,10 +338,10 @@ async fn test_broadcast() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_delivery_status() {
     let delegate = test::MessageHub::create();
-    let known_receiver_address = TestAddress::Foo(2);
-    let unknown_address = TestAddress::Foo(3);
+    let known_receiver_address = crate::Address::Test(2);
+    let unknown_address = crate::Address::Test(3);
     let (messenger_client_1, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     let (_, mut receptor_2) =
         delegate.create(MessengerType::Addressable(known_receiver_address)).await.unwrap();
 
@@ -374,7 +369,7 @@ async fn test_delivery_status() {
 async fn test_send_delete() {
     let delegate = test::MessageHub::create();
     let (_, mut receptor_2) = delegate
-        .create(MessengerType::Addressable(TestAddress::Foo(2)))
+        .create(MessengerType::Addressable(crate::Address::Test(2)))
         .await
         .expect("client should be created");
     {
@@ -393,14 +388,16 @@ async fn test_beacon_error() {
     let delegate = test::MessageHub::create();
 
     let (messenger_client, _) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
     {
         let (_, mut receptor) =
-            delegate.create(MessengerType::Addressable(TestAddress::Foo(2))).await.unwrap();
+            delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
         verify_result(
             Status::Received,
-            &mut messenger_client.message(ORIGINAL, Audience::Address(TestAddress::Foo(2))).send(),
+            &mut messenger_client
+                .message(ORIGINAL, Audience::Address(crate::Address::Test(2)))
+                .send(),
         )
         .await;
         verify_payload(ORIGINAL, &mut receptor, None).await;
@@ -408,7 +405,7 @@ async fn test_beacon_error() {
 
     verify_result(
         Status::Undeliverable,
-        &mut messenger_client.message(ORIGINAL, Audience::Address(TestAddress::Foo(2))).send(),
+        &mut messenger_client.message(ORIGINAL, Audience::Address(crate::Address::Test(2))).send(),
     )
     .await;
 }
@@ -419,12 +416,12 @@ async fn test_acknowledge() {
     let delegate = test::MessageHub::create();
 
     let (_, mut receptor) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
 
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
 
     let mut message_receptor =
-        messenger.message(ORIGINAL, Audience::Address(TestAddress::Foo(1))).send();
+        messenger.message(ORIGINAL, Audience::Address(crate::Address::Test(1))).send();
 
     verify_payload(ORIGINAL, &mut receptor, None).await;
 
@@ -438,23 +435,23 @@ async fn test_messenger_behavior() {
     for _ in 0..2 {
         verify_messenger_behavior(MessengerType::Broker(None)).await;
         verify_messenger_behavior(MessengerType::Unbound).await;
-        verify_messenger_behavior(MessengerType::Addressable(TestAddress::Foo(2))).await;
+        verify_messenger_behavior(MessengerType::Addressable(crate::Address::Test(2))).await;
     }
 }
 
-async fn verify_messenger_behavior(messenger_type: MessengerType<TestMessage, TestAddress>) {
+async fn verify_messenger_behavior(messenger_type: MessengerType<TestMessage, crate::Address>) {
     let delegate = test::MessageHub::create();
 
     // Messenger to receive message.
     let (target_client, mut target_receptor) =
-        delegate.create(MessengerType::Addressable(TestAddress::Foo(1))).await.unwrap();
+        delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
 
     // Author Messenger.
     let (test_client, mut test_receptor) = delegate.create(messenger_type).await.unwrap();
 
     // Send top level message from the Messenger.
     let mut reply_receptor =
-        test_client.message(ORIGINAL, Audience::Address(TestAddress::Foo(1))).send();
+        test_client.message(ORIGINAL, Audience::Address(crate::Address::Test(1))).send();
 
     let captured_signature = Arc::new(Mutex::new(None));
 
@@ -534,7 +531,7 @@ async fn test_next_payload() {
 
     {
         let mut receptor =
-            unbound_messenger_1.message(REPLY, Audience::Address(TestAddress::Foo(1))).send();
+            unbound_messenger_1.message(REPLY, Audience::Address(crate::Address::Test(1))).send();
         // Should return an error
         let receptor_result = receptor.next_payload().await;
         assert!(receptor_result.is_err());
@@ -834,7 +831,7 @@ async fn test_broker_filter_audience_address() {
         .await
         .expect("broadcast messenger should be created");
     // Receptor to receive both broadcast and targeted messages.
-    let target_address = TestAddress::Foo(2);
+    let target_address = crate::Address::Test(2);
     let (_, mut receptor) = delegate
         .create(MessengerType::Addressable(target_address))
         .await
@@ -868,14 +865,14 @@ async fn test_broker_filter_author() {
     let delegate = test::MessageHub::create();
 
     // Messenger to send targeted message.
-    let author_address = TestAddress::Foo(1);
+    let author_address = crate::Address::Test(1);
     let (messenger, _) = delegate
         .create(MessengerType::Addressable(author_address))
         .await
         .expect("messenger should be created");
 
     // Receptor to receive targeted message.
-    let target_address = TestAddress::Foo(2);
+    let target_address = crate::Address::Test(2);
     let (_, mut receptor) = delegate
         .create(MessengerType::Addressable(target_address))
         .await
@@ -974,7 +971,7 @@ async fn test_broker_filter_combined_any() {
         .await
         .expect("broadcast messenger should be created");
     // Receptor for messages.
-    let target_address = TestAddress::Foo(2);
+    let target_address = crate::Address::Test(2);
     let (_, mut receptor) = delegate
         .create(MessengerType::Addressable(target_address))
         .await
@@ -1020,7 +1017,7 @@ async fn test_broker_filter_combined_all() {
     let (messenger, _) =
         delegate.create(MessengerType::Unbound).await.expect("sending messenger should be created");
     // Receptor for messages.
-    let target_address = TestAddress::Foo(2);
+    let target_address = crate::Address::Test(2);
     let (_, mut receptor) = delegate
         .create(MessengerType::Addressable(target_address))
         .await
@@ -1063,10 +1060,10 @@ async fn test_group_message() {
     // Messenger to send message.
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     // Receptors for messages.
-    let target_address_1 = TestAddress::Foo(1);
+    let target_address_1 = crate::Address::Test(1);
     let (_, mut receptor_1) =
         delegate.create(MessengerType::Addressable(target_address_1)).await.unwrap();
-    let target_address_2 = TestAddress::Foo(2);
+    let target_address_2 = crate::Address::Test(2);
     let (_, mut receptor_2) =
         delegate.create(MessengerType::Addressable(target_address_2)).await.unwrap();
     let (_, mut receptor_3) = delegate.create(MessengerType::Unbound).await.unwrap();
@@ -1096,7 +1093,7 @@ async fn test_group_message_redundant_targets() {
     // Messenger to send broadcast message and targeted message.
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     // Receptors for messages.
-    let target_address = TestAddress::Foo(1);
+    let target_address = crate::Address::Test(1);
     let (_, mut receptor) = delegate
         .create(MessengerType::Addressable(target_address))
         .await
@@ -1123,7 +1120,7 @@ async fn test_group_message_redundant_targets() {
 
 #[fuchsia::test(allow_stalls = false)]
 async fn test_audience_matching() {
-    let target_audience: Audience<TestAddress> = Audience::Address(TestAddress::Foo(1));
+    let target_audience = Audience::Address(crate::Address::Test(1));
     // An audience should contain itself.
     assert!(target_audience.contains(&target_audience));
     // An audience with only broadcast should not match.
@@ -1149,8 +1146,8 @@ async fn test_audience_matching() {
     // An a subset should be contained within a superset and a superset should
     // not be contained in a subset.
     {
-        let target_audience_2 = Audience::Address(TestAddress::Foo(2));
-        let target_audience_3 = Audience::Address(TestAddress::Foo(3));
+        let target_audience_2 = Audience::Address(crate::Address::Test(2));
+        let target_audience_3 = Audience::Address(crate::Address::Test(3));
 
         let audience_subset = Audience::Group(
             group::Builder::new()
