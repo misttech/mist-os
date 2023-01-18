@@ -1341,6 +1341,10 @@ fn extract_v6_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
             )
         }
         packet_formats::icmp::mld::MldPacket::MulticastListenerQuery(_) => None,
+        packet_formats::icmp::mld::MldPacket::MulticastListenerReportV2(_) => {
+            // TODO(https://fxbug.dev/119938): Support MLDv2.
+            None
+        }
     }
 }
 

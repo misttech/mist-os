@@ -15,12 +15,16 @@ use core::time::Duration;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
-use packet::serialize::InnerPacketBuilder;
+use packet::{
+    records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout},
+    serialize::InnerPacketBuilder,
+    BufferView,
+};
 use zerocopy::{
     byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, LayoutVerified, Unaligned,
 };
 
-use crate::error::{ParseError, ParseResult};
+use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpUnusedCode, MessageBody};
 
 /// An ICMPv6 packet with an MLD message.
@@ -30,7 +34,178 @@ pub enum MldPacket<B: ByteSlice> {
     MulticastListenerQuery(IcmpPacket<Ipv6, B, MulticastListenerQuery>),
     MulticastListenerReport(IcmpPacket<Ipv6, B, MulticastListenerReport>),
     MulticastListenerDone(IcmpPacket<Ipv6, B, MulticastListenerDone>),
+    MulticastListenerReportV2(IcmpPacket<Ipv6, B, MulticastListenerReportV2>),
 }
+
+create_protocol_enum!(
+    /// Multicast Record Types as defined in [RFC 3810 section 5.2.12]
+    ///
+    /// [RFC 3810 section 5.2.12]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2.12
+    #[allow(missing_docs)]
+    #[derive(PartialEq, Copy, Clone)]
+    pub enum Mldv2MulticastRecordType: u8 {
+        ModeIsInclude, 0x01, "Mode Is Include";
+        ModeIsExclude, 0x02, "Mode Is Exclude";
+        ChangeToIncludeMode, 0x03, "Change To Include Mode";
+        ChangeToExcludeMode, 0x04, "Change To Exclude Mode";
+        AllowNewSources, 0x05, "Allow New Sources";
+        BlockOldSources, 0x06, "Block Old Sources";
+    }
+);
+
+/// Fixed information for an MLDv2 Report's Multicast Record, per
+/// [RFC 3810 section 5.2].
+///
+/// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
+#[derive(Copy, Clone, Debug, AsBytes, FromBytes, Unaligned)]
+#[repr(C)]
+pub struct MulticastRecordHeader {
+    record_type: u8,
+    aux_data_len: u8,
+    number_of_sources: U16,
+    multicast_address: Ipv6Addr,
+}
+
+impl MulticastRecordHeader {
+    /// Returns the number of sources.
+    pub fn number_of_sources(&self) -> u16 {
+        self.number_of_sources.get()
+    }
+
+    /// Returns the type of the record.
+    pub fn record_type(&self) -> Result<Mldv2MulticastRecordType, UnrecognizedProtocolCode<u8>> {
+        Mldv2MulticastRecordType::try_from(self.record_type)
+    }
+
+    /// Returns the multicast address.
+    pub fn multicast_addr(&self) -> &Ipv6Addr {
+        &self.multicast_address
+    }
+}
+
+/// Wire representation of an MLDv2 Report's Multicast Record, per
+/// [RFC 3810 section 5.2].
+///
+/// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
+pub struct MulticastRecord<B> {
+    header: LayoutVerified<B, MulticastRecordHeader>,
+    sources: LayoutVerified<B, [Ipv6Addr]>,
+}
+
+impl<B: ByteSlice> MulticastRecord<B> {
+    /// Returns the multicast record header.
+    pub fn header(&self) -> &MulticastRecordHeader {
+        self.header.deref()
+    }
+
+    /// Returns the multicast record's sources.
+    pub fn sources(&self) -> &[Ipv6Addr] {
+        self.sources.deref()
+    }
+}
+
+/// An implementation of MLDv2 report's records parsing.
+#[derive(Copy, Clone, Debug)]
+pub enum Mldv2ReportRecords {}
+
+impl RecordsImplLayout for Mldv2ReportRecords {
+    type Context = usize;
+    type Error = ParseError;
+}
+
+impl<'a> RecordsImpl<'a> for Mldv2ReportRecords {
+    type Record = MulticastRecord<&'a [u8]>;
+
+    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        data: &mut BV,
+        _ctx: &mut usize,
+    ) -> RecordParseResult<MulticastRecord<&'a [u8]>, ParseError> {
+        let header = data
+            .take_obj_front::<MulticastRecordHeader>()
+            .ok_or_else(debug_err_fn!(ParseError::Format, "Can't take multicast record header"))?;
+        let sources = data
+            .take_slice_front::<Ipv6Addr>(header.number_of_sources().into())
+            .ok_or_else(debug_err_fn!(ParseError::Format, "Can't take multicast record sources"))?;
+        // every record may have aux_data_len 32-bit words at the end.
+        // we need to update our buffer view to reflect that.
+        let _ = data
+            .take_front(usize::from(header.aux_data_len) * 4)
+            .ok_or_else(debug_err_fn!(ParseError::Format, "Can't skip auxiliary data"))?;
+
+        Ok(ParsedRecord::Parsed(Self::Record { header, sources }))
+    }
+}
+
+/// The layout for an MLDv2 message body header, per [RFC 3810 section 5.2].
+///
+/// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
+#[repr(C)]
+#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+pub struct Mldv2ReportMessageHeader {
+    /// Initialized to zero by the sender; ignored by receivers.
+    _reserved: [u8; 2],
+    /// The number of multicast address records found in this message.
+    num_mcast_addr_records: U16,
+}
+
+impl Mldv2ReportMessageHeader {
+    /// Returns the number of multicast address records found in this message.
+    pub fn num_mcast_addr_records(&self) -> u16 {
+        self.num_mcast_addr_records.get()
+    }
+}
+
+/// The on-wire structure for the body of an MLDv2 report message, per
+/// [RFC 3910 section 5.2].
+///
+/// [RFC 3810 section 5.2]: https://www.rfc-editor.org/rfc/rfc3810#section-5.2
+#[derive(Debug)]
+pub struct Mldv2ReportBody<B: ByteSlice> {
+    header: LayoutVerified<B, Mldv2ReportMessageHeader>,
+    records: Records<B, Mldv2ReportRecords>,
+}
+
+impl<B: ByteSlice> Mldv2ReportBody<B> {
+    /// Returns the header.
+    pub fn header(&self) -> &Mldv2ReportMessageHeader {
+        self.header.deref()
+    }
+
+    /// Returns an iterator over the multicast address records.
+    pub fn iter_multicast_records(&self) -> impl Iterator<Item = MulticastRecord<&'_ [u8]>> {
+        self.records.iter()
+    }
+}
+
+impl<B: ByteSlice> MessageBody<B> for Mldv2ReportBody<B> {
+    fn parse(bytes: B) -> ParseResult<Self> {
+        let (header, bytes) = LayoutVerified::<_, Mldv2ReportMessageHeader>::new_from_prefix(bytes)
+            .ok_or(ParseError::Format)?;
+        let records = Records::parse_with_context(bytes, header.num_mcast_addr_records().into())?;
+        Ok(Mldv2ReportBody { header, records })
+    }
+
+    fn len(&self) -> usize {
+        self.bytes().len()
+    }
+
+    fn bytes(&self) -> &[u8] {
+        self.header.bytes()
+    }
+}
+
+/// Multicast Listener Report V2 Message.
+#[repr(C)]
+#[derive(AsBytes, FromBytes, Unaligned, Copy, Clone, Debug)]
+pub struct MulticastListenerReportV2;
+
+impl_icmp_message!(
+    Ipv6,
+    MulticastListenerReportV2,
+    MulticastListenerReportV2,
+    IcmpUnusedCode,
+    Mldv2ReportBody<B>
+);
 
 /// Multicast Listener Query V1 Message.
 #[repr(C)]
@@ -487,5 +662,32 @@ mod tests {
             ))
             .unwrap();
         check_icmp(&icmp, 0, HOST_GROUP_ADDRESS);
+    }
+
+    #[test]
+    fn test_mld_parse_report_v2() {
+        use crate::icmp::mld::MulticastListenerReportV2;
+        use crate::testdata::mld_router_report_v2::*;
+        let req = REPORT.to_vec();
+        let mut req = &req[..];
+        let ip = req.parse_with::<_, Ipv6Packet<_>>(()).unwrap();
+        check_ip(&ip, SRC_IP, DST_IP);
+        let icmp = req
+            .parse_with::<_, IcmpPacket<_, _, MulticastListenerReportV2>>(IcmpParseArgs::new(
+                SRC_IP, DST_IP,
+            ))
+            .unwrap();
+        assert_eq!(
+            &icmp
+                .body()
+                .iter_multicast_records()
+                .map(|record| {
+                    let hdr = record.header();
+                    assert_eq!(record.sources(), SOURCES);
+                    (hdr.record_type().expect("valid record type"), *hdr.multicast_addr())
+                })
+                .collect::<Vec<_>>()[..],
+            RECORDS,
+        );
     }
 }

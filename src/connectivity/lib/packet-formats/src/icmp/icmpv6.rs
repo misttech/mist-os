@@ -70,6 +70,9 @@ impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
             Mld(MulticastListenerDone(ref p)) => {
                 f.debug_tuple("MulticastListenerDone").field(p).finish()
             }
+            Mld(MulticastListenerReportV2(ref p)) => {
+                f.debug_tuple("MulticastListenerReportV2").field(p).finish()
+            }
         }
     }
 }
@@ -96,6 +99,7 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
             Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
             Mld(MulticastListenerReport(p)) => p.parse_metadata(),
             Mld(MulticastListenerDone(p)) => p.parse_metadata(),
+            Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
         }
     }
 
@@ -119,20 +123,21 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
             buffer,
             args,
             packet,
-            DestUnreachable         => DestUnreachable(packet)              => IcmpDestUnreachable,
-            PacketTooBig            => PacketTooBig(packet)                 => Icmpv6PacketTooBig,
-            TimeExceeded            => TimeExceeded(packet)                 => IcmpTimeExceeded,
-            ParameterProblem        => ParameterProblem(packet)             => Icmpv6ParameterProblem,
-            EchoRequest             => EchoRequest(packet)                  => IcmpEchoRequest,
-            EchoReply               => EchoReply(packet)                    => IcmpEchoReply,
-            RouterSolicitation      => Ndp(RouterSolicitation(packet))      => ndp::RouterSolicitation,
-            RouterAdvertisement     => Ndp(RouterAdvertisement(packet))     => ndp::RouterAdvertisement,
-            NeighborSolicitation    => Ndp(NeighborSolicitation(packet))    => ndp::NeighborSolicitation,
-            NeighborAdvertisement   => Ndp(NeighborAdvertisement(packet))   => ndp::NeighborAdvertisement,
-            Redirect                => Ndp(Redirect(packet))                => ndp::Redirect,
-            MulticastListenerQuery  => Mld(MulticastListenerQuery(packet))  => mld::MulticastListenerQuery,
-            MulticastListenerReport => Mld(MulticastListenerReport(packet)) => mld::MulticastListenerReport,
-            MulticastListenerDone   => Mld(MulticastListenerDone(packet))   => mld::MulticastListenerDone,
+            DestUnreachable           => DestUnreachable(packet)              => IcmpDestUnreachable,
+            PacketTooBig              => PacketTooBig(packet)                 => Icmpv6PacketTooBig,
+            TimeExceeded              => TimeExceeded(packet)                 => IcmpTimeExceeded,
+            ParameterProblem          => ParameterProblem(packet)             => Icmpv6ParameterProblem,
+            EchoRequest               => EchoRequest(packet)                  => IcmpEchoRequest,
+            EchoReply                 => EchoReply(packet)                    => IcmpEchoReply,
+            RouterSolicitation        => Ndp(RouterSolicitation(packet))      => ndp::RouterSolicitation,
+            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))     => ndp::RouterAdvertisement,
+            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))    => ndp::NeighborSolicitation,
+            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))   => ndp::NeighborAdvertisement,
+            Redirect                  => Ndp(Redirect(packet))                => ndp::Redirect,
+            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))  => mld::MulticastListenerQuery,
+            MulticastListenerReport   => Mld(MulticastListenerReport(packet)) => mld::MulticastListenerReport,
+            MulticastListenerReportV2 => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
+            MulticastListenerDone     => Mld(MulticastListenerDone(packet))   => mld::MulticastListenerDone,
         ))
     }
 }
@@ -159,6 +164,9 @@ create_protocol_enum!(
         MulticastListenerQuery, 130, "Multicast Listener Query";
         MulticastListenerReport, 131, "Multicast Listener Report";
         MulticastListenerDone, 132, "Multicast Listener Done";
+
+        // MLDv2 messages
+        MulticastListenerReportV2, 143, "Multicast Listener Report V2";
     }
 );
 

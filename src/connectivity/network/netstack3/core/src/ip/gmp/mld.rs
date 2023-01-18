@@ -150,6 +150,10 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> MldPacketHandler<C, 
                 debug!("Hosts are not interested in Done messages");
                 return;
             }
+            MldPacket::MulticastListenerReportV2(_) => {
+                debug!("TODO(https://fxbug.dev/119938): Support MLDv2");
+                return;
+            }
         } {
             error!("Error occurred when handling MLD message: {}", e);
         }
