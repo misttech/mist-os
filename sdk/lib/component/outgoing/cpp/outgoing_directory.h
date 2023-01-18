@@ -136,7 +136,8 @@ class OutgoingDirectory final {
   //
   // See sample use cases in test case(s) located at
   // //sdk/lib/component/tests/outgoing_directory_test.cc
-  template <typename Protocol, typename ServerImpl>
+  template <typename Protocol, typename ServerImpl,
+            typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddProtocol(std::unique_ptr<ServerImpl> impl,
                            cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return AddProtocolAt<Protocol>(kServiceDirectory, std::move(impl), name);
@@ -151,7 +152,7 @@ class OutgoingDirectory final {
   // Active connections are never torn down when/if |RemoveProtocol| is invoked
   // with the same |name|. Users of this method should manage teardown of
   // all active connections.
-  template <typename Protocol>
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddUnmanagedProtocol(
       TypedHandler<Protocol> handler,
       cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
@@ -166,7 +167,8 @@ class OutgoingDirectory final {
 
   // Same as |AddProtocol| but allows setting the parent directory in
   // which the protocol will be installed.
-  template <typename Protocol, typename ServerImpl>
+  template <typename Protocol, typename ServerImpl,
+            typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddProtocolAt(cpp17::string_view path, std::unique_ptr<ServerImpl> impl,
                              cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
@@ -192,7 +194,7 @@ class OutgoingDirectory final {
 
   // Same as |AddProtocol| but uses a typed handler and allows the usage of
   // setting the parent directory in which the protocol will be installed.
-  template <typename Protocol>
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddUnmanagedProtocolAt(
       cpp17::string_view path, TypedHandler<Protocol> handler,
       cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
@@ -229,7 +231,7 @@ class OutgoingDirectory final {
   //
   // See sample use cases in test case(s) located at
   // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
-  template <typename Service>
+  template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
   zx::result<> AddService(ServiceInstanceHandler handler,
                           cpp17::string_view instance = kDefaultServiceInstance) {
     static_assert(fidl::IsService<Service>(), "Type of |Service| must be FIDL service");
@@ -240,6 +242,19 @@ class OutgoingDirectory final {
   // Same as above but is untyped.
   zx::result<> AddService(ServiceInstanceHandler handler, cpp17::string_view service,
                           cpp17::string_view instance = kDefaultServiceInstance);
+
+  template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
+  zx::result<> AddServiceAt(ServiceInstanceHandler handler, cpp17::string_view path,
+                            cpp17::string_view instance = kDefaultServiceInstance) {
+    static_assert(fidl::IsService<Service>(), "Type of |Service| must be FIDL service");
+
+    return AddServiceAt(std::move(handler), path, Service::Name, instance);
+  }
+
+  // Same as above but is untyped.
+  zx::result<> AddServiceAt(ServiceInstanceHandler handler, cpp17::string_view path,
+                            cpp17::string_view service,
+                            cpp17::string_view instance = kDefaultServiceInstance);
 
   // Serve a subdirectory at the root of this outgoing directory.
   //
@@ -276,7 +291,7 @@ class OutgoingDirectory final {
   // ```
   // outgoing.RemoveProtocol<lib_example::MyProtocol>();
   // ```
-  template <typename Protocol>
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> RemoveProtocol(cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return RemoveProtocol(name);
   }
@@ -298,7 +313,7 @@ class OutgoingDirectory final {
   // ```
   // outgoing.RemoveProtocolAt<lib_example::MyProtocol>("diagnostics");
   // ```
-  template <typename Protocol>
+  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> RemoveProtocolAt(
       cpp17::string_view path, cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return RemoveProtocolAt(path, name);
@@ -321,7 +336,7 @@ class OutgoingDirectory final {
   // ```
   // outgoing.RemoveService<lib_example::MyService>("my-instance");
   // ```
-  template <typename Service>
+  template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
   zx::result<> RemoveService(cpp17::string_view instance = kDefaultServiceInstance) {
     return RemoveService(Service::Name, instance);
   }
@@ -329,6 +344,15 @@ class OutgoingDirectory final {
   // Same as above but untyped.
   zx::result<> RemoveService(cpp17::string_view service,
                              cpp17::string_view instance = kDefaultServiceInstance);
+
+  template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
+  zx::result<> RemoveServiceAt(cpp17::string_view path,
+                               cpp17::string_view instance = kDefaultServiceInstance) {
+    return RemoveServiceAt(path, Service::Name, instance);
+  }
+
+  zx::result<> RemoveServiceAt(cpp17::string_view path, cpp17::string_view service,
+                               cpp17::string_view instance);
 
   // Removes the subdirectory on the provided |directory_name|.
   //
@@ -367,7 +391,7 @@ class OutgoingDirectory final {
 
   void UnbindAllConnections(cpp17::string_view name);
 
-  static std::string MakePath(cpp17::string_view service, cpp17::string_view instance);
+  static std::string MakePath(std::vector<std::string_view> strings);
 
   struct Inner {
     Inner(async_dispatcher_t* dispatcher, svc_dir_t* root);

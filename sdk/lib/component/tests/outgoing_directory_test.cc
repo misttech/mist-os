@@ -32,12 +32,11 @@
 #include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/lib/testing/predicates/status.h"
+#include <src/lib/storage/vfs/cpp/managed_vfs.h>
+#include <src/lib/storage/vfs/cpp/pseudo_dir.h>
+#include <src/lib/storage/vfs/cpp/pseudo_file.h>
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+#include <src/lib/testing/predicates/status.h>
 
 namespace {
 
@@ -405,6 +404,86 @@ TEST_F(OutgoingDirectoryTest, AddProtocolAtServesProtocol) {
   EXPECT_EQ(reply_received, kTestString);
 }
 
+TEST_F(OutgoingDirectoryTest, AddServiceAtServesServiceInNonSvcDirectory) {
+  constexpr static char kDirectory[] = "test";
+
+  EchoImpl regular_impl(/*reversed=*/false);
+  {
+    zx::result result = GetOutgoingDirectory()->AddServiceAt<fuchsia_examples::EchoService>(
+        std::move(fuchsia_examples::EchoService::InstanceHandler({
+            .regular_echo = regular_impl.bind_handler(dispatcher()),
+            .reversed_echo = nullptr,
+        })),
+        /*path=*/kDirectory);
+    ASSERT_TRUE(result.is_ok()) << result.status_string();
+  }
+
+  // Setup test client.
+  zx::result open_result = component::OpenServiceAt<fuchsia_examples::EchoService>(
+      GetSvcClientEnd(GetRootClientEnd(), /*path=*/kDirectory));
+  ASSERT_TRUE(open_result.is_ok()) << open_result.status_string();
+
+  fuchsia_examples::EchoService::ServiceClient service = std::move(open_result.value());
+
+  // Assert that service is connected and that proper impl returns expected reply.
+  bool message_echoed = false;
+  fidl::WireClient client = ConnectToServiceMember(service, /*reversed=*/false);
+  std::string_view expected_reply = kTestString;
+  client->EchoString(kTestString)
+      .ThenExactlyOnce(
+          [quit_loop = QuitLoopClosure(), &message_echoed, expected_reply = expected_reply](
+              fidl::WireUnownedResult<fuchsia_examples::Echo::EchoString>& reply) {
+            EXPECT_TRUE(reply.ok()) << "Reply failed with: " << reply.error().status_string();
+            EXPECT_EQ(reply.value().response.get(), expected_reply);
+            message_echoed = true;
+            quit_loop();
+          });
+
+  RunLoop();
+
+  EXPECT_TRUE(message_echoed);
+}
+
+TEST_F(OutgoingDirectoryTest, AddServiceAtServesServiceInNestedPath) {
+  constexpr static char kDirectory[] = "foo/bar";
+
+  EchoImpl regular_impl(/*reversed=*/false);
+  {
+    zx::result result = GetOutgoingDirectory()->AddServiceAt<fuchsia_examples::EchoService>(
+        std::move(fuchsia_examples::EchoService::InstanceHandler({
+            .regular_echo = regular_impl.bind_handler(dispatcher()),
+            .reversed_echo = nullptr,
+        })),
+        /*path=*/kDirectory);
+    ASSERT_TRUE(result.is_ok()) << result.status_string();
+  }
+
+  // Setup test client.
+  zx::result open_result = component::OpenServiceAt<fuchsia_examples::EchoService>(
+      GetSvcClientEnd(GetRootClientEnd(), /*path=*/kDirectory));
+  ASSERT_TRUE(open_result.is_ok()) << open_result.status_string();
+
+  fuchsia_examples::EchoService::ServiceClient service = std::move(open_result.value());
+
+  // Assert that service is connected and that proper impl returns expected reply.
+  bool message_echoed = false;
+  fidl::WireClient client = ConnectToServiceMember(service, /*reversed=*/false);
+  std::string_view expected_reply = kTestString;
+  client->EchoString(kTestString)
+      .ThenExactlyOnce(
+          [quit_loop = QuitLoopClosure(), &message_echoed, expected_reply = expected_reply](
+              fidl::WireUnownedResult<fuchsia_examples::Echo::EchoString>& reply) {
+            EXPECT_TRUE(reply.ok()) << "Reply failed with: " << reply.error().status_string();
+            EXPECT_EQ(reply.value().response.get(), expected_reply);
+            message_echoed = true;
+            quit_loop();
+          });
+
+  RunLoop();
+
+  EXPECT_TRUE(message_echoed);
+}
+
 TEST_F(OutgoingDirectoryTest, AddDirectoryAtCanServeADirectory) {
   static constexpr char kTestPath[] = "root";
   static constexpr char kTestDirectory[] = "diagnostics";
@@ -695,6 +774,39 @@ TEST_F(OutgoingDirectoryTest, AddProtocolAtFailsIfDirectoryIsEmpty) {
   EXPECT_EQ(GetOutgoingDirectory()
                 ->AddUnmanagedProtocolAt(/*handler=*/std::move(handler), /*path=*/"",
                                          /*name=*/"fuchsia.examples.Echo")
+                .status_value(),
+            ZX_ERR_INVALID_ARGS);
+}
+
+TEST_F(OutgoingDirectoryTest, AddServiceAtFailsIfDirectoryIsEmpty) {
+  component::AnyHandler handler = [](zx::channel request) {};
+  EXPECT_EQ(
+      GetOutgoingDirectory()
+          ->AddServiceAt<fuchsia_examples::EchoService>(CreateNonEmptyServiceHandler(), /*path=*/"")
+          .status_value(),
+      ZX_ERR_INVALID_ARGS);
+}
+
+TEST_F(OutgoingDirectoryTest, AddServiceAtFailsIfPathMalformed) {
+  component::AnyHandler handler = [](zx::channel request) {};
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddServiceAt<fuchsia_examples::EchoService>(CreateNonEmptyServiceHandler(),
+                                                              /*path=*/"/")
+                .status_value(),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddServiceAt<fuchsia_examples::EchoService>(CreateNonEmptyServiceHandler(),
+                                                              /*path=*/"//")
+                .status_value(),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddServiceAt<fuchsia_examples::EchoService>(CreateNonEmptyServiceHandler(),
+                                                              /*path=*/"foo//bar")
+                .status_value(),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(GetOutgoingDirectory()
+                ->AddServiceAt<fuchsia_examples::EchoService>(CreateNonEmptyServiceHandler(),
+                                                              /*path=*/"foo/bar/")
                 .status_value(),
             ZX_ERR_INVALID_ARGS);
 }

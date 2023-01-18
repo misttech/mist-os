@@ -177,6 +177,12 @@ zx::result<> OutgoingDirectory::AddDirectoryAt(fidl::ClientEnd<fuchsia_io::Direc
 zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler,
                                            cpp17::string_view service,
                                            cpp17::string_view instance) {
+  return AddServiceAt(std::move(handler), kServiceDirectory, service, instance);
+}
+
+zx::result<> OutgoingDirectory::AddServiceAt(ServiceInstanceHandler handler,
+                                             cpp17::string_view path, cpp17::string_view service,
+                                             cpp17::string_view instance) {
   if (service.empty() || instance.empty()) {
     return zx::error_result(ZX_ERR_INVALID_ARGS);
   }
@@ -186,13 +192,13 @@ zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler,
     return zx::make_result(ZX_ERR_INVALID_ARGS);
   }
 
-  std::string basepath = MakePath(service, instance);
+  std::string fullpath = MakePath({path, service, instance});
   for (auto& [member_name, member_handler] : handlers) {
-    zx::result<> status = AddUnmanagedProtocolAt(std::move(member_handler), basepath, member_name);
+    zx::result<> status = AddUnmanagedProtocolAt(std::move(member_handler), fullpath, member_name);
     if (status.is_error()) {
       // If we encounter an error with any of the instance members, scrub entire
       // directory entry.
-      inner().registered_handlers_.erase(basepath);
+      inner().registered_handlers_.erase(fullpath);
       return status;
     }
   }
@@ -245,17 +251,21 @@ zx::result<> OutgoingDirectory::RemoveProtocolAt(cpp17::string_view directory,
 
 zx::result<> OutgoingDirectory::RemoveService(cpp17::string_view service,
                                               cpp17::string_view instance) {
+  return RemoveServiceAt(kServiceDirectory, service, instance);
+}
+
+zx::result<> OutgoingDirectory::RemoveServiceAt(cpp17::string_view path, cpp17::string_view service,
+                                                cpp17::string_view instance) {
   std::lock_guard guard(inner().checker_);
 
-  std::string path = MakePath(service, instance);
-  if (inner().registered_handlers_.count(path) == 0) {
+  std::string fullpath = MakePath({path, service, instance});
+  if (inner().registered_handlers_.count(fullpath) == 0) {
     return zx::make_result(ZX_ERR_NOT_FOUND);
   }
 
   // Remove svc_dir_t entry first so that channels close _before_ we remove
   // pointer values out from underneath handlers.
-  std::string service_path =
-      std::string(kServiceDirectory) + std::string(kSvcPathDelimiter) + std::string(service);
+  std::string service_path = MakePath({path, service});
 #if __Fuchsia_API_level__ >= 10
   zx_status_t status = svc_directory_remove_entry(
       inner().root_, service_path.c_str(), service_path.size(), instance.data(), instance.size());
@@ -265,7 +275,7 @@ zx::result<> OutgoingDirectory::RemoveService(cpp17::string_view service,
 #endif
 
   // Now it's safe to remove entry from map.
-  inner().registered_handlers_.erase(path);
+  inner().registered_handlers_.erase(fullpath);
 
   return zx::make_result(status);
 }
@@ -315,10 +325,31 @@ void OutgoingDirectory::UnbindAllConnections(cpp17::string_view name) {
   }
 }
 
-std::string OutgoingDirectory::MakePath(cpp17::string_view service, cpp17::string_view instance) {
-  std::stringstream path;
-  path << kServiceDirectory << kSvcPathDelimiter << service << kSvcPathDelimiter << instance;
-  return path.str();
+std::string OutgoingDirectory::MakePath(std::vector<std::string_view> strings) {
+  size_t output_length = 0;
+  // Add up the sizes of the strings.
+  for (const auto& i : strings) {
+    output_length += i.size();
+  }
+  // Add the sizes of the separators.
+  if (!strings.empty()) {
+    output_length += (strings.size() - 1) * std::string(kSvcPathDelimiter).size();
+  }
+
+  std::string joined;
+  joined.reserve(output_length);
+
+  bool first = true;
+  for (const auto& i : strings) {
+    if (!first) {
+      joined.append(kSvcPathDelimiter);
+    } else {
+      first = false;
+    }
+    joined.append(i.begin(), i.end());
+  }
+
+  return joined;
 }
 
 }  // namespace component
