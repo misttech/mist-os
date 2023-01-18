@@ -350,6 +350,16 @@ void ProcessImpl::DidLoadModuleSymbols(LoadedModuleSymbols* module) {
     observer.DidLoadModuleSymbols(this, module);
 }
 
+void ProcessImpl::DidLoadAllModuleSymbols() {
+  for (auto& observer : session()->process_observers())
+    observer.DidLoadAllModuleSymbols(this);
+}
+
+void ProcessImpl::WillLoadModuleSymbols(int num_modules) {
+  for (auto& observer : session()->process_observers())
+    observer.WillLoadModuleSymbols(this, num_modules);
+}
+
 void ProcessImpl::WillUnloadModuleSymbols(LoadedModuleSymbols* module) {
   for (auto& observer : session()->process_observers())
     observer.WillUnloadModuleSymbols(this, module);

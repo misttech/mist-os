@@ -10,7 +10,9 @@ namespace zxdb {
 
 void ConsoleNoninteractive::Quit() { debug::MessageLoop::Current()->QuitNow(); }
 
-void ConsoleNoninteractive::Output(const OutputBuffer& output) { output.WriteToStdout(); }
+void ConsoleNoninteractive::Output(const OutputBuffer& output, bool add_newline) {
+  output.WriteToStdout(add_newline);
+}
 
 void ConsoleNoninteractive::ModalGetOption(const line_input::ModalPromptOptions& options,
                                            OutputBuffer message, const std::string& prompt,

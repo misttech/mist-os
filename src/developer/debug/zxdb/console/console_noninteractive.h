@@ -28,13 +28,17 @@ class ConsoleNoninteractive : public Console {
   // Console implementation
   void Init() override {}
   void Quit() override;
-  void Output(const OutputBuffer& output) override;
+  void Output(const OutputBuffer& output, bool add_newline) override;
   void Clear() override {}
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,
                       line_input::ModalLineInput::ModalCompletionCallback cb) override;
   void ProcessInputLine(const std::string& line, fxl::RefPtr<CommandContext> cmd_context = nullptr,
                         bool add_to_history = true) override;
+
+  bool InputEnabled() const override { return false; }
+  void EnableInput() override {}
+  void DisableInput() override {}
 };
 
 }  // namespace zxdb

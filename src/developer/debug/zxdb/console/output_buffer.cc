@@ -289,7 +289,7 @@ void OutputBuffer::FormatHelp(const std::string& str) {
   }
 }
 
-void OutputBuffer::WriteToStdout() const {
+void OutputBuffer::WriteToStdout(bool add_newline) const {
   bool ended_in_newline = false;
   for (const Span& span : spans_) {
     // We apply syntax first. If normal, we see if any color are to be set.
@@ -314,7 +314,7 @@ void OutputBuffer::WriteToStdout() const {
       ended_in_newline = span.text.back() == '\n';
   }
 
-  if (!ended_in_newline)
+  if (!ended_in_newline && add_newline)
     FwriteStringView("\n");
 
   std::fflush(stdout);

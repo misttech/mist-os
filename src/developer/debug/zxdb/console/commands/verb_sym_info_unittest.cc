@@ -67,6 +67,10 @@ TEST_F(VerbSymInfo, PLTFunctionInfo) {
   mock_module->AddSymbolLocations(plt_identifier, {plt_location});
 
   console().ProcessInputLine("sym-info $plt(zx_channel_write)");
+  // Eat the "Loading symbols ... Done." output messages for sufficiently large symbol modules.
+  console().GetOutputEvent();
+  console().GetOutputEvent();
+
   auto event = console().GetOutputEvent();
   ASSERT_EQ(MockConsole::OutputEvent::Type::kOutput, event.type);
   ASSERT_EQ(

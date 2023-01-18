@@ -30,11 +30,19 @@ class ProcessObserver {
   virtual void WillDestroyProcess(Process* process, DestroyReason reason, int exit_code,
                                   uint64_t timestamp) {}
 
+  // Called immediately before loading module symbols for an attached process. Loading symbols is
+  // synchronous, since most actions the user would want to take require symbols to be loaded.
+  virtual void WillLoadModuleSymbols(Process* process, int num_modules) {}
+
   // Notification that a module with symbols is ready to use.
   //
   // Note: There is currently no notification for module loads absent symbol information. If that's
   // necessary, this will need refactoring.
   virtual void DidLoadModuleSymbols(Process* process, LoadedModuleSymbols* module) {}
+
+  // Notification that we're completely done loading and indexing all modules and all
+  // |DidLoadModuleSymbols| notifications have been dispatched.
+  virtual void DidLoadAllModuleSymbols(Process* process) {}
 
   // Notification that the given module with symbols is about to be removed.
   virtual void WillUnloadModuleSymbols(Process* process, LoadedModuleSymbols* module) {}

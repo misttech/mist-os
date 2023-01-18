@@ -128,7 +128,7 @@ class OutputBuffer {
   void FormatHelp(const std::string& str);
 
   // Writes the current contents of this OutputBuffer to stdout.
-  void WriteToStdout() const;
+  void WriteToStdout(bool add_newline = true) const;
 
   // Concatenates to a single string with no formatting.
   std::string AsString() const;

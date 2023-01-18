@@ -12,7 +12,7 @@
 
 namespace zxdb {
 
-void MockConsole::Output(const OutputBuffer& output) {
+void MockConsole::Output(const OutputBuffer& output, bool add_newline) {
   output_queue_.push_back({MockConsole::OutputEvent::Type::kOutput, output});
   output_buffer_.Append(output);
 
@@ -75,7 +75,7 @@ void MockConsole::ModalGetOption(const line_input::ModalPromptOptions& options,
   last_modal_cb_ = std::move(cb);
 
   // Add the message to the output queue so tests can see what as printed for this prompt.
-  Output(message);
+  GetWeakPtr()->Output(message);
 }
 
 void MockConsole::ProcessInputLine(const std::string& line, fxl::RefPtr<CommandContext> cmd_context,

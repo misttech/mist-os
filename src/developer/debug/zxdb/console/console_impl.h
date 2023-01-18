@@ -33,13 +33,23 @@ class ConsoleImpl : public Console {
   // Console implementation
   void Init() override;
   void Quit() override;
-  void Output(const OutputBuffer& output) override;
+  void Output(const OutputBuffer& output, bool add_newline) override;
   void Clear() override;
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,
                       line_input::ModalLineInput::ModalCompletionCallback cb) override;
   void ProcessInputLine(const std::string& line, fxl::RefPtr<CommandContext> cmd_context = nullptr,
                         bool add_to_history = true) override;
+
+  // Returns true if input handling is enabled. False means input is blocked.
+  bool InputEnabled() const override { return stdio_watch_.watching(); }
+
+  // Start watching stdio for input. Do nothing if the input is already enabled.
+  void EnableInput() override;
+
+  // Stop watching stdio for input. The UI will be blocked until EnableInput() is called.
+  // Do nothing if the input is already disabled.
+  void DisableInput() override;
 
  private:
   FRIEND_TEST(ConsoleImplTest, ControlC);
@@ -49,16 +59,6 @@ class ConsoleImpl : public Console {
   // Searches for history at $HOME/.zxdb_history and loads it if found.
   bool SaveHistoryFile();
   void LoadHistoryFile();
-
-  // Returns true if input handling is enabled. False means input is blocked.
-  bool InputEnabled() const { return stdio_watch_.watching(); }
-
-  // Start watching stdio for input. Do nothing if the input is already enabled.
-  void EnableInput();
-
-  // Stop watching stdio for input. The UI will be blocked until EnableInput() is called.
-  // Do nothing if the input is already disabled.
-  void DisableInput();
 
   debug::MessageLoop::WatchHandle stdio_watch_;
 

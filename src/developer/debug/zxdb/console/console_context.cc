@@ -7,6 +7,10 @@
 #include <inttypes.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 #include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/filter.h"
 #include "src/developer/debug/zxdb/client/frame.h"
@@ -26,12 +30,17 @@
 #include "src/developer/debug/zxdb/console/format_node_console.h"
 #include "src/developer/debug/zxdb/console/format_target.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
+#include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
 
 namespace {
+
+// How long to wait before printing another "." in the console while loading large amounts of
+// symbols, in seconds.
+constexpr auto kSymbolLoadingPrintInterval = std::chrono::seconds(2);
 
 // We want to display full information for some exceptions like page faults, but debugger exceptions
 // like single step and debug breakpoint exceptions don't need thhe full treatment to reduce noice
@@ -622,6 +631,24 @@ void ConsoleContext::DidCreateProcess(Process* process, uint64_t timestamp) {
   Console::get()->Output(out);
 }
 
+void ConsoleContext::DidLoadAllModuleSymbols(Process* process) {
+  // Release the lock to signal the printing thread it's time to stop.
+  lock_timer_.unlock();
+
+  // Clean up the thread if we spawned one and give the console back to the user.
+  if (symbol_loading_printer_thread_ && symbol_loading_printer_thread_->joinable()) {
+    symbol_loading_printer_thread_->join();
+
+    // The symbols have been processed, indicate and give the console back to the user.
+    Console::get()->Output("Done.");
+    // This must be called from the same thread as the MessageLoop, so the spawned thread cannot be
+    // responsible for re-enabling the console input.
+    Console::get()->EnableInput();
+  }
+
+  symbol_loading_printer_thread_.reset();
+}
+
 void ConsoleContext::WillDestroyProcess(Process* process, DestroyReason reason, int exit_code,
                                         uint64_t timestamp) {
   TargetRecord* record = GetTargetRecord(process->GetTarget());
@@ -647,6 +674,32 @@ void ConsoleContext::WillDestroyProcess(Process* process, DestroyReason reason, 
   }
 
   console->Output(msg);
+}
+
+void ConsoleContext::WillLoadModuleSymbols(Process* process, int num_modules) {
+  if (!process)
+    return;
+
+  Console* console = Console::get();
+
+  // Disable the console while the symbols are loaded. Once processing has finished, re-enable.
+  console->DisableInput();
+
+  OutputBuffer out("Loading ");
+  out.Append(std::to_string(num_modules));
+  out.Append(" modules for " + process->GetName() + " ");
+  console->Output(out, false);
+
+  lock_timer_.lock();
+  symbol_loading_printer_thread_ = std::make_unique<std::thread>([this, console]() {
+    const OutputBuffer out(".");
+    while (!lock_timer_.try_lock_for(kSymbolLoadingPrintInterval)) {
+      console->Output(out, false);
+    }
+    // If the lock attempt succeeds, then we're done loading and indexing symbols from this module.
+    lock_timer_.unlock();
+    return;
+  });
 }
 
 void ConsoleContext::DidCreateThread(Thread* thread) {

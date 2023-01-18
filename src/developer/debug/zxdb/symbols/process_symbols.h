@@ -45,9 +45,11 @@ class ProcessSymbols {
   // See the corresponding functions in ProcessObserver for docs.
   class Notifications {
    public:
+    virtual void WillLoadModuleSymbols(int num_modules) {}
     virtual void DidLoadModuleSymbols(LoadedModuleSymbols* module) {}
-    virtual void WillUnloadModuleSymbols(LoadedModuleSymbols* module) {}
+    virtual void DidLoadAllModuleSymbols() {}
     virtual void OnSymbolLoadFailure(const Err& err) {}
+    virtual void WillUnloadModuleSymbols(LoadedModuleSymbols* module) {}
   };
 
   // The passed-in pointers must outlive this class.

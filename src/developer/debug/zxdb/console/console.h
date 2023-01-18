@@ -38,7 +38,7 @@ class Console : debug::LogBackend {
   virtual void Quit() = 0;
 
   // Prints the buffer/string to the console.
-  virtual void Output(const OutputBuffer& output) = 0;
+  virtual void Output(const OutputBuffer& output, bool add_newline = true) = 0;
   void Output(const std::string& s);
   void Output(const Err& err);
 
@@ -67,6 +67,10 @@ class Console : debug::LogBackend {
   virtual void ProcessInputLine(const std::string& line,
                                 fxl::RefPtr<CommandContext> cmd_context = nullptr,
                                 bool add_to_history = true) = 0;
+
+  virtual bool InputEnabled() const = 0;
+  virtual void EnableInput() = 0;
+  virtual void DisableInput() = 0;
 
   // Implements |LogBackend|.
   void WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,

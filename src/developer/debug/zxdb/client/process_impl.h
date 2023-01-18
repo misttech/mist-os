@@ -94,7 +94,9 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
   void UpdateThreads(const std::vector<debug_ipc::ThreadRecord>& new_threads);
 
   // ProcessSymbols::Notifications implementation:
+  void WillLoadModuleSymbols(int num_modules) override;
   void DidLoadModuleSymbols(LoadedModuleSymbols* module) override;
+  void DidLoadAllModuleSymbols() override;
   void WillUnloadModuleSymbols(LoadedModuleSymbols* module) override;
 
   uint64_t GetElfSymbolAddress(const std::string& symbol, uint64_t* size);

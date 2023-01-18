@@ -121,7 +121,7 @@ bool ConsoleImpl::SaveHistoryFile() {
   return files::WriteFile(filepath, history_data.data(), history_data.size());
 }
 
-void ConsoleImpl::Output(const OutputBuffer& output) {
+void ConsoleImpl::Output(const OutputBuffer& output, bool add_newline) {
   // Since most operations are asynchronous, we have to hide the input line before printing anything
   // or it will get appended to whatever the user is typing on the screen.
   //
@@ -139,7 +139,7 @@ void ConsoleImpl::Output(const OutputBuffer& output) {
   if (InputEnabled())
     line_input_.Hide();
 
-  output.WriteToStdout();
+  output.WriteToStdout(add_newline);
 
   if (InputEnabled())
     line_input_.Show();
@@ -160,7 +160,7 @@ void ConsoleImpl::ModalGetOption(const line_input::ModalPromptOptions& options,
   //
   // Okay to capture |this| because we own the line_input_.
   line_input_.ModalGetOption(options, prompt, std::move(cb),
-                             [this, message = std::move(message)]() { Output(message); });
+                             [this, message]() { GetWeakPtr()->Output(message); });
 }
 
 void ConsoleImpl::Quit() {

@@ -5,6 +5,10 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_CONSOLE_CONTEXT_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_CONSOLE_CONTEXT_H_
 
+#include <condition_variable>
+#include <thread>
+#include <unordered_set>
+
 #include "src/developer/debug/zxdb/client/breakpoint_observer.h"
 #include "src/developer/debug/zxdb/client/component_observer.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
@@ -15,6 +19,7 @@
 #include "src/developer/debug/zxdb/client/target_observer.h"
 #include "src/developer/debug/zxdb/client/thread_observer.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
 
 namespace zxdb {
 
@@ -139,6 +144,8 @@ class ConsoleContext : public ProcessObserver,
   void DidCreateProcess(Process* process, uint64_t timestamp) override;
   void WillDestroyProcess(Process* process, DestroyReason reason, int exit_code,
                           uint64_t timestamp) override;
+  void WillLoadModuleSymbols(Process* process, int num_modules) override;
+  void DidLoadAllModuleSymbols(Process* process) override;
   void OnSymbolLoadFailure(Process* process, const Err& err) override;
 
   // ThreadObserver implementation:
@@ -240,6 +247,13 @@ class ConsoleContext : public ProcessObserver,
   int active_breakpoint_id_ = 0;
   int active_filter_id_ = 0;
   int active_symbol_server_id_ = 0;
+
+  // A separate thread that handles the console UI while symbols are being loaded and indexed. A new
+  // thread is spawned that will take more than a few seconds to process. Once
+  // |OnAllModuleSymbolsLoaded| is called from the Process object, the thread is cleaned up and
+  // console is given back to the user.
+  std::unique_ptr<std::thread> symbol_loading_printer_thread_;
+  std::timed_mutex lock_timer_;
 
   fxl::RefPtr<PrettyStackManager> pretty_stack_manager_;
 };

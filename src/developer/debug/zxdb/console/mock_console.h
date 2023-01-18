@@ -72,7 +72,7 @@ class MockConsole : public Console {
   void Init() override {}
   void Quit() override { has_quit_ = true; }
   void Clear() override;
-  void Output(const OutputBuffer& output) override;
+  void Output(const OutputBuffer& output, bool add_newline) override;
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,
                       line_input::ModalLineInput::ModalCompletionCallback cb) override;
@@ -81,6 +81,10 @@ class MockConsole : public Console {
 
   // Overrider that uses an OfflineCommandContext by default.
   void ProcessInputLine(const std::string& line, OfflineCommandContext::CompletionCallback cb);
+
+  bool InputEnabled() const override { return false; }
+  void EnableInput() override {}
+  void DisableInput() override {}
 
  private:
   Session* session_;

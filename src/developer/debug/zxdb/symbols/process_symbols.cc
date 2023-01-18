@@ -53,6 +53,11 @@ void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules,
       new_module_indices.push_back(i);
   }
 
+  // Notify that we're about to load all the symbols before actually loading anything. Wait until
+  // the number of new modules has been calculated so the UI is only blocked when there are many
+  // new modules. See |WillLoadModuleSymbols| in console_context.cc for details.
+  notifications_->WillLoadModuleSymbols(new_module_indices.size());
+
   // Find deleted modules plus any that need their symbols refreshed.
   std::vector<ModuleMap::iterator> deleted_modules;
   for (auto iter = modules_.begin(); iter != modules_.end(); ++iter) {
@@ -95,6 +100,8 @@ void ProcessSymbols::SetModules(const std::vector<debug_ipc::Module>& modules,
     notifications_->DidLoadModuleSymbols(added_module);
   for (auto& err : load_errors)
     notifications_->OnSymbolLoadFailure(err);
+
+  notifications_->DidLoadAllModuleSymbols();
 }
 
 void ProcessSymbols::InjectModuleForTesting(const std::string& name, const std::string& build_id,
