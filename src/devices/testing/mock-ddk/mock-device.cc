@@ -171,7 +171,7 @@ zx_status_t MockDevice::GetMetadataSize(uint32_t type, size_t* out_size) {
     *out_size = metadata.size();
     return ZX_OK;
   }
-  return ZX_ERR_BAD_STATE;
+  return ZX_ERR_NOT_FOUND;
 }
 
 zx_status_t MockDevice::GetVariable(const char* name, char* out, size_t size, size_t* actual) {
