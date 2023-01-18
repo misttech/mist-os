@@ -488,9 +488,12 @@ bool VkRenderer::ImageIsAlreadyRegisteredForUsage(const allocation::GlobalImageI
 }
 bool VkRenderer::ImportRenderTargetImage(const allocation::ImageMetadata& metadata,
                                          const vk::BufferCollectionFUCHSIA vk_collection) {
-  std::scoped_lock lock(lock_);
-  const bool needs_readback =
-      readback_collections_.find(metadata.collection_id) != readback_collections_.end();
+  bool needs_readback = false;
+  {
+    std::scoped_lock lock(lock_);
+    needs_readback =
+        readback_collections_.find(metadata.collection_id) != readback_collections_.end();
+  }
 
   const vk::ImageUsageFlags kRenderTargetAsReadbackSourceUsageFlags =
       escher::RectangleCompositor::kRenderTargetUsageFlags | vk::ImageUsageFlagBits::eTransferSrc;
@@ -504,47 +507,39 @@ bool VkRenderer::ImportRenderTargetImage(const allocation::ImageMetadata& metada
   }
 
   image->set_swapchain_layout(vk::ImageLayout::eColorAttachmentOptimal);
+  auto depth_texture = CreateDepthTexture(escher_.get(), image);
+
+  std::scoped_lock lock(lock_);
   render_target_map_[metadata.identifier] = image;
-  depth_target_map_[metadata.identifier] = CreateDepthTexture(escher_.get(), image);
+  depth_target_map_[metadata.identifier] = std::move(depth_texture);
   pending_render_targets_.insert(metadata.identifier);
   return true;
 }
 
 bool VkRenderer::ImportReadbackImage(const allocation::ImageMetadata& metadata,
                                      const vk::BufferCollectionFUCHSIA vk_collection) {
-  std::scoped_lock lock(lock_);
-  const auto readback_collection_itr = readback_collections_.find(metadata.collection_id);
-  // Check to see if the buffers are allocated and return false if not.
-  {
-    zx_status_t allocation_status = ZX_OK;
-    const zx_status_t status =
-        readback_collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
-    if (status != ZX_OK || allocation_status != ZX_OK) {
-      FX_LOGS(ERROR) << "Readback collection was not allocated: " << zx_status_get_string(status)
-                     << " ;alloc: " << zx_status_get_string(allocation_status);
-      return false;
-    }
-  }
-
-  const escher::ImagePtr readback_image = ExtractImage(
-      metadata, BufferCollectionUsage::kReadback, readback_collection_itr->second.vk_collection,
-      vk::ImageUsageFlagBits::eTransferDst);
+  const escher::ImagePtr readback_image =
+      ExtractImage(metadata, BufferCollectionUsage::kReadback, vk_collection,
+                   vk::ImageUsageFlagBits::eTransferDst);
   if (!readback_image) {
     FX_LOGS(ERROR) << "Could not extract readback image.";
     return false;
   }
+
+  std::scoped_lock lock(lock_);
   readback_image_map_[metadata.identifier] = readback_image;
   return true;
 }
 
 bool VkRenderer::ImportClientImage(const allocation::ImageMetadata& metadata,
                                    const vk::BufferCollectionFUCHSIA vk_collection) {
-  std::scoped_lock lock(lock_);
   const auto texture = ExtractTexture(metadata, vk_collection);
   if (!texture) {
     FX_LOGS(ERROR) << "Could not extract client texture image.";
     return false;
   }
+
+  std::scoped_lock lock(lock_);
   texture_map_[metadata.identifier] = texture;
   pending_textures_.insert(metadata.identifier);
   return true;

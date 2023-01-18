@@ -119,11 +119,13 @@ class VkRenderer final : public Renderer {
   // The function ExtractImage() creates an escher Image from a sysmem collection vmo.
   escher::ImagePtr ExtractImage(const ImageMetadata& metadata, BufferCollectionUsage bc_usage,
                                 vk::BufferCollectionFUCHSIA collection,
-                                vk::ImageUsageFlags image_usage, bool readback = false);
+                                vk::ImageUsageFlags image_usage, bool readback = false)
+      FXL_LOCKS_EXCLUDED(lock_);
 
   // ExtractTexture() is a wrapper function to ExtractImage().
   escher::TexturePtr ExtractTexture(const ImageMetadata& metadata,
-                                    vk::BufferCollectionFUCHSIA collection);
+                                    vk::BufferCollectionFUCHSIA collection)
+      FXL_LOCKS_EXCLUDED(lock_);
 
   // Copies |source_image| into |dest_image|.
   void BlitRenderTarget(escher::CommandBuffer* command_buffer, escher::ImagePtr source_image,
