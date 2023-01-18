@@ -35,6 +35,9 @@ executable("crasher") {
   output_name = "exception_broker_crasher"
 
   sources = [ "crasher.cc" ]
+
+  # TODO(fxbug.dev/118712): Remove this once the underlying issue is addressed.
+  exclude_toolchain_tags = [ "hwasan" ]
 }
 
 executable("exception_broker_config_test_exe") {
@@ -68,6 +71,9 @@ executable("exception_broker_integration_test_exe") {
     "//src/lib/fxl",
     "//third_party/googletest:gtest",
   ]
+
+  # TODO(fxbug.dev/118712): Remove this once the underlying issue is addressed.
+  exclude_toolchain_tags = [ "hwasan" ]
 }
 
 executable("exception_broker_unittest_exe") {
