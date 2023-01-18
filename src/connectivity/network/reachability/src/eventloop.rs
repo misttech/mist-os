@@ -13,11 +13,12 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _},
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_stack as fnet_stack,
-    fuchsia_async::{self as fasync, TimeoutExt as _},
+    fuchsia_async::{self as fasync},
     fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     futures::{pin_mut, prelude::*, select},
-    reachability_core::{watchdog, InterfaceView, Monitor, NeighborCache},
+    named_timer::NamedTimeoutExt,
+    reachability_core::{watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID},
     reachability_handler::{ReachabilityHandler, ReachabilityState},
     std::collections::HashMap,
     tracing::{debug, error},
@@ -43,7 +44,7 @@ impl watchdog::SystemDispatcher for SystemDispatcher {
         diagnostics
             .log_debug_info_to_syslog()
             .map_err(watchdog::Error::Fidl)
-            .on_timeout(fasync::Time::after(FIDL_TIMEOUT), || Err(watchdog::Error::Timeout))
+            .on_timeout_named(&FIDL_TIMEOUT_ID, FIDL_TIMEOUT, || Err(watchdog::Error::Timeout))
             .await
     }
 
@@ -92,7 +93,7 @@ impl watchdog::DeviceDiagnosticsProvider for DeviceDiagnosticsProvider {
                     }
                 },
             )
-            .on_timeout(fasync::Time::after(FIDL_TIMEOUT), || Err(watchdog::Error::Timeout))
+            .on_timeout_named(&FIDL_TIMEOUT_ID, FIDL_TIMEOUT, || Err(watchdog::Error::Timeout))
             .await
     }
 
@@ -100,7 +101,7 @@ impl watchdog::DeviceDiagnosticsProvider for DeviceDiagnosticsProvider {
         self.diagnostics
             .log_debug_info_to_syslog()
             .map_err(watchdog::Error::Fidl)
-            .on_timeout(fasync::Time::after(FIDL_TIMEOUT), || Err(watchdog::Error::Timeout))
+            .on_timeout_named(&FIDL_TIMEOUT_ID, FIDL_TIMEOUT, || Err(watchdog::Error::Timeout))
             .await
     }
 }

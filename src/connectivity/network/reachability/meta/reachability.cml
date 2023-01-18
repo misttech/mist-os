@@ -1,25 +1,9 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "//src/connectivity/network/reachability/meta/reachability_base.shard.cml" ],
     program: {
-        runner: "elf",
         binary: "bin/reachability",
     },
-    use: [
-        {
-            protocol: [
-                "fuchsia.net.debug.Diagnostics",
-                "fuchsia.net.debug.Interfaces",
-                "fuchsia.net.interfaces.State",
-                "fuchsia.net.neighbor.View",
-                "fuchsia.net.stack.Stack",
-                "fuchsia.posix.socket.Provider",
-            ],
-        },
-    ],
 }

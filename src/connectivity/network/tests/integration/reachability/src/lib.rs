@@ -4,16 +4,21 @@
 
 #![cfg(test)]
 
-use std::collections::HashMap;
-
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
+use fidl_fuchsia_net_reachability as fnet_reachability;
 use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_testing as ftesting;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 
-use futures::{FutureExt as _, Stream, StreamExt as _, TryFutureExt as _};
+use assert_matches::assert_matches;
+use either::Either;
+use fidl::endpoints::Proxy;
+use futures::{
+    stream::FusedStream, Future, FutureExt as _, Stream, StreamExt as _, TryFutureExt as _,
+};
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6, net_mac};
 use netstack_testing_common::{
     constants::{ipv4 as ipv4_consts, ipv6 as ipv6_consts},
@@ -31,8 +36,10 @@ use packet_formats::{
     ipv6::Ipv6PacketBuilder,
     testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
 };
-use reachability_core::State;
+use reachability_core::{State, FIDL_TIMEOUT_ID};
+use std::{cell::RefCell, collections::HashMap};
 use test_case::test_case;
+use tracing::info;
 
 const INTERNET_V4: net_types::ip::Ipv4Addr = net_ip_v4!("8.8.8.8");
 const INTERNET_V6: net_types::ip::Ipv6Addr = net_ip_v6!("2001:4860:4860::8888");
@@ -263,6 +270,7 @@ struct NetemulInterface<'a> {
     _network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
     fake_ep: netemul::TestFakeEndpoint<'a>,
+    is_sending_replies: RefCell<bool>,
 }
 
 impl<'a> NetemulInterface<'a> {
@@ -355,14 +363,19 @@ fn handle_frame_stream<'a>(
     want: State,
     gateway_v4: &'a net_types::ip::Ipv4Addr,
     gateway_v6: &'a net_types::ip::Ipv6Addr,
+    is_sending_replies: &'a RefCell<bool>,
 ) -> impl Stream<Item = ()> + 'a {
     fake_ep.frame_stream().map(|r| r.expect("fake endpoint frame stream error")).filter_map(
         move |(frame, dropped)| {
             assert_eq!(dropped, 0);
             async move {
-                let reply = match reply_if_echo_request(frame, want, &gateway_v4, &gateway_v6) {
-                    Some(reply) => reply,
-                    None => return None,
+                let reply = if *is_sending_replies.borrow() {
+                    match reply_if_echo_request(frame, want, &gateway_v4, &gateway_v6) {
+                        Some(reply) => reply,
+                        None => return None,
+                    }
+                } else {
+                    return None;
                 };
                 fake_ep
                     .write(reply.as_ref())
@@ -372,6 +385,175 @@ fn handle_frame_stream<'a>(
             }
         },
     )
+}
+
+struct ReachabilityEnv<'a> {
+    sandbox: &'a netemul::TestSandbox,
+    realm: netemul::TestRealm<'a>,
+    controller: fnet_neighbor::ControllerProxy,
+    stack: fnet_stack::StackProxy,
+    fake_clock: ftesting::FakeClockControlProxy,
+}
+
+fn setup_reachability_env<'a>(
+    name: &'a str,
+    sandbox: &'a netemul::TestSandbox,
+) -> ReachabilityEnv<'a> {
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack2, _, _>(
+            name,
+            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+        )
+        .expect("failed to create realm");
+    let controller = realm
+        .connect_to_protocol::<fnet_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
+    let stack =
+        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("failed to connect to Stack");
+    let fake_clock = realm
+        .connect_to_protocol::<ftesting::FakeClockControlMarker>()
+        .expect("failed to connect to FakeClockControl");
+
+    ReachabilityEnv { sandbox, realm, controller, stack, fake_clock }
+}
+
+async fn create_netemul_interfaces<'a>(
+    name: &'a str,
+    sandbox: &'a netemul::TestSandbox,
+    env: &'a ReachabilityEnv<'_>,
+    configs: &[(InterfaceConfig, State)],
+) -> Vec<NetemulInterface<'a>> {
+    futures::stream::iter(configs.iter())
+        .then(|(config, _): &(InterfaceConfig, State)| {
+            let config = config.clone();
+            async {
+                let name = format!("{}_{}", name, config.name_suffix);
+                let network =
+                    sandbox.create_network(name.clone()).await.expect("failed to create network");
+                let fake_ep =
+                    network.create_fake_endpoint().expect("failed to create fake endpoint");
+                let interface = env
+                    .realm
+                    .join_network(&network, name)
+                    .await
+                    .expect("failed to join network with netdevice endpoint");
+                let is_sending_replies = RefCell::new(true);
+
+                configure_interface(&interface, &env.controller, &env.stack, config).await;
+                NetemulInterface { _network: network, interface, fake_ep, is_sending_replies }
+            }
+        })
+        .collect::<_>()
+        .await
+}
+
+fn create_echo_reply_streams<'a>(
+    interfaces: &'a Vec<NetemulInterface<'_>>,
+    configs: &'a [(InterfaceConfig, State)],
+) -> impl FusedStream<Item = ()> + 'a {
+    // TODO(fxbug.dev/119965): Combine configs with the NetemulInterface struct
+    interfaces
+        .iter()
+        .zip(configs.iter())
+        .map(
+            |(
+                NetemulInterface { _network, interface: _, fake_ep, is_sending_replies },
+                (config, want_state),
+            )| {
+                Box::pin(handle_frame_stream(
+                    &fake_ep,
+                    *want_state,
+                    &config.gateway_v4,
+                    &config.gateway_v6,
+                    &is_sending_replies,
+                ))
+            },
+        )
+        .collect::<futures::stream::SelectAll<_>>()
+        .fuse()
+}
+
+async fn initialize_fake_clock_with_deadline<T>(fake_clock: &T) -> zx::EventPair
+where
+    T: ftesting::FakeClockControlProxyInterface,
+{
+    // Set up the fake clock and start the timer.
+    fake_clock.pause().await.expect("failed to pause the clock");
+    let (deadline_set_event, deadline_set_server) = zx::EventPair::create();
+
+    fake_clock
+        .add_stop_point(
+            &mut FIDL_TIMEOUT_ID.into(),
+            ftesting::DeadlineEventType::Set,
+            deadline_set_server,
+        )
+        .await
+        .expect("add_stop_point failed")
+        .expect("add_stop_point returned error");
+
+    fake_clock
+        .resume_with_increments(
+            zx::Duration::from_millis(1).into_nanos(),
+            &mut ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
+        )
+        .await
+        .expect("resume with increment failed")
+        .expect("resume with increment returned error");
+
+    deadline_set_event
+}
+
+fn accelerate_time_until_timeout<'a, T>(
+    fake_clock: &'a T,
+    deadline_set_event: &'a zx::EventPair,
+) -> impl Future + 'a
+where
+    T: ftesting::FakeClockControlProxyInterface + 'a,
+{
+    async move {
+        // Wait for the timer to be set.
+        let _ = fasync::OnSignals::new(deadline_set_event, zx::Signals::EVENTPAIR_SIGNALED)
+            .await
+            .expect("waiting for timer set failed");
+
+        let (deadline_expire_event, deadline_expire_server) = zx::EventPair::create();
+
+        fake_clock
+            .add_stop_point(
+                &mut FIDL_TIMEOUT_ID.into(),
+                ftesting::DeadlineEventType::Expired,
+                deadline_expire_server,
+            )
+            .await
+            .expect("add_stop_point failed")
+            .expect("add_stop_point returned error");
+
+        // Fast increment speed after timer is set.
+        fake_clock
+            .resume_with_increments(
+                zx::Duration::from_millis(1).into_nanos(),
+                &mut ftesting::Increment::Determined(zx::Duration::from_seconds(10).into_nanos()),
+            )
+            .await
+            .expect("resume with increment failed")
+            .expect("resume with increment returned error");
+        info!("time accelerated until timeout reached");
+
+        // When the deadline expires, return speed to normal.
+        let _ = fasync::OnSignals::new(&deadline_expire_event, zx::Signals::EVENTPAIR_SIGNALED)
+            .await
+            .expect("waiting for timer expired failed");
+
+        fake_clock
+            .resume_with_increments(
+                zx::Duration::from_millis(1).into_nanos(),
+                &mut ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
+            )
+            .await
+            .expect("resume with increments failed")
+            .expect("resme with increment returned error");
+        info!("time slowed after timeout reached");
+    }
 }
 
 #[netstack_test]
@@ -419,38 +601,10 @@ fn handle_frame_stream<'a>(
 async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig, State)]) {
     let name = format!("{}_{}", name, sub_test_name);
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox
-        .create_netstack_realm_with::<Netstack2, _, _>(
-            &name,
-            std::iter::once(&KnownServiceProvider::Reachability),
-        )
-        .expect("failed to create realm");
-    let controller = realm
-        .connect_to_protocol::<fnet_neighbor::ControllerMarker>()
-        .expect("failed to connect to Controller");
-    let stack =
-        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("failed to connect to Stack");
+    let env = setup_reachability_env(&name, &sandbox);
+    let deadline_set_event = initialize_fake_clock_with_deadline(&env.fake_clock).await;
 
-    let interfaces = futures::stream::iter(configs.iter())
-        .then(|(config, _): &(InterfaceConfig, State)| {
-            let config = config.clone();
-            async {
-                let name = format!("{}_{}", name, config.name_suffix);
-                let network =
-                    sandbox.create_network(name.clone()).await.expect("failed to create network");
-                let fake_ep =
-                    network.create_fake_endpoint().expect("failed to create fake endpoint");
-                let interface = realm
-                    .join_network(&network, name)
-                    .await
-                    .expect("failed to join network with netdevice endpoint");
-
-                configure_interface(&interface, &controller, &stack, config).await;
-                NetemulInterface { _network: network, interface, fake_ep }
-            }
-        })
-        .collect::<Vec<_>>()
-        .await;
+    let interfaces = create_netemul_interfaces(&name, &env.sandbox, &env, &configs).await;
     let want_interfaces = interfaces
         .iter()
         .zip(configs.iter())
@@ -458,25 +612,15 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
             (interface.id(), IpStates::new(*want_state))
         })
         .collect::<HashMap<_, _>>();
-    let mut echo_reply_streams = interfaces
-        .iter()
-        .zip(configs.iter())
-        .map(|(NetemulInterface { _network, interface: _, fake_ep }, (config, want_state))| {
-            Box::pin(handle_frame_stream(
-                &fake_ep,
-                *want_state,
-                &config.gateway_v4,
-                &config.gateway_v6,
-            ))
-        })
-        .collect::<futures::stream::SelectAll<_>>();
+
+    let mut echo_reply_streams = create_echo_reply_streams(&interfaces, &configs);
 
     // TODO(https://fxbug.dev/65585): Get reachability monitor's reachability state over FIDL rather
     // than the inspect data. Watching for updates to inspect data is currently not supported, so
     // poll instead.
     const INSPECT_COMPONENT: &str = "reachability";
     const INSPECT_TREE_SELECTOR: &str = "root";
-    let realm_ref = &realm;
+    let realm_ref = &env.realm;
     let inspect_data_stream = futures::stream::unfold(None, |duration| async move {
         let () = match duration {
             None => {}
@@ -515,11 +659,17 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
         );
 
     let reachability_monitor_wait_fut =
-        wait_for_component_stopped(&realm, constants::reachability::COMPONENT_NAME, None).fuse();
+        wait_for_component_stopped(&env.realm, constants::reachability::COMPONENT_NAME, None)
+            .fuse();
     futures::pin_mut!(reachability_monitor_wait_fut);
+
+    let time_control_fut =
+        accelerate_time_until_timeout(&env.fake_clock, &deadline_set_event).fuse();
+    futures::pin_mut!(time_control_fut);
 
     loop {
         futures::select! {
+            _ = time_control_fut => (),
             o = echo_reply_streams.next() => {
                 let () = o.expect("interface echo reply stream ended unexpectedly");
             }
@@ -576,4 +726,243 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
             }
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum InterfacesWithInternetInitiallyTrue {
+    All,
+    AllThenZero,
+    AtLeastOne,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum InterfacesWithInternetInitiallyFalse {
+    ZeroThenAll,
+    ZeroThenOne,
+    Zero,
+}
+
+#[netstack_test]
+#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::All))]
+#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::AllThenZero))]
+#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::AtLeastOne))]
+#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::ZeroThenAll))]
+#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::ZeroThenOne))]
+#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::Zero))]
+async fn test_internet_available(
+    name: &str,
+    interfaces_with_internet: &Either<
+        InterfacesWithInternetInitiallyTrue,
+        InterfacesWithInternetInitiallyFalse,
+    >,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let env = setup_reachability_env(name, &sandbox);
+
+    let deadline_set_event = initialize_fake_clock_with_deadline(&env.fake_clock).await;
+    let monitor = env
+        .realm
+        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+        .expect("failed to connect to fuchsia.net.reachability.Monitor");
+
+    let configs = vec![
+        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
+    ];
+    let interfaces = create_netemul_interfaces(name, &env.sandbox, &env, &configs).await;
+
+    let mut echo_reply_streams = create_echo_reply_streams(&interfaces, &configs);
+    let () = echo_reply_streams.next().await.expect("echo reply stream ended unexpectedly");
+
+    let reachability_monitor_wait_fut =
+        wait_for_component_stopped(&env.realm, constants::reachability::COMPONENT_NAME, None)
+            .fuse();
+    futures::pin_mut!(reachability_monitor_wait_fut);
+
+    // Creates a stream from Watch so it can be called again when the response has been received.
+    let monitor_ref = &monitor;
+    let monitor_watch_stream =
+        futures::stream::unfold((), |_| async move { Some((monitor_ref.watch().await, ())) })
+            .fuse();
+    futures::pin_mut!(monitor_watch_stream);
+
+    let time_control_fut =
+        accelerate_time_until_timeout(&env.fake_clock, &deadline_set_event).fuse();
+    futures::pin_mut!(time_control_fut);
+
+    let expected_final_state = match interfaces_with_internet {
+        Either::Left(interface_case) => {
+            // The first call to the Monitor should return the Some(false) default response.
+            let snapshot: fnet_reachability::Snapshot = monitor
+                .watch()
+                .await
+                .expect("failed to fetch snapshot fuchsia.net.reachability.Monitor");
+            assert_eq!(snapshot.internet_available, Some(false));
+
+            match interface_case {
+                InterfacesWithInternetInitiallyTrue::All => true,
+                InterfacesWithInternetInitiallyTrue::AllThenZero => false,
+                InterfacesWithInternetInitiallyTrue::AtLeastOne => {
+                    // Disable replies for all but one interface.
+                    *interfaces[0].is_sending_replies.borrow_mut() = false;
+                    true
+                }
+            }
+        }
+        Either::Right(interface_case) => {
+            // Disable replies for all interfaces.
+            *interfaces[0].is_sending_replies.borrow_mut() = false;
+            *interfaces[1].is_sending_replies.borrow_mut() = false;
+
+            match interface_case {
+                InterfacesWithInternetInitiallyFalse::ZeroThenAll => true,
+                InterfacesWithInternetInitiallyFalse::ZeroThenOne => true,
+                InterfacesWithInternetInitiallyFalse::Zero => false,
+            }
+        }
+    };
+
+    loop {
+        futures::select! {
+            _ = time_control_fut => (),
+            o = echo_reply_streams.next() => {
+                let () = o.expect("interface echo reply stream ended unexpectedly");
+            }
+            r = monitor_watch_stream.next() => {
+                match r {
+                   Some(Ok(x)) => {
+                       let internet_available = x.internet_available.unwrap();
+
+                       match interfaces_with_internet {
+                            Either::Left(interface_case) => {
+                                if internet_available {
+                                    match interface_case {
+                                        InterfacesWithInternetInitiallyTrue::AllThenZero => {
+                                            // Disable replies for all interfaces.
+                                            *interfaces[0].is_sending_replies.borrow_mut() = false;
+                                            *interfaces[1].is_sending_replies.borrow_mut() = false;
+                                            continue;
+                                        },
+                                        _ => (),
+                                    }
+                                }
+                            },
+                            Either::Right(interface_case) => {
+                                if !internet_available {
+                                    match interface_case {
+                                        InterfacesWithInternetInitiallyFalse::ZeroThenAll => {
+                                            // Enable replies for all interfaces.
+                                            *interfaces[0].is_sending_replies.borrow_mut() = true;
+                                            *interfaces[1].is_sending_replies.borrow_mut() = true;
+                                            continue;
+                                        },
+                                        InterfacesWithInternetInitiallyFalse::ZeroThenOne => {
+                                            // Enable replies for one interface.
+                                            *interfaces[0].is_sending_replies.borrow_mut() = true;
+                                            continue;
+                                        },
+                                        InterfacesWithInternetInitiallyFalse::Zero => (),
+                                    }
+                                }
+                            },
+                       };
+                       assert_eq!(internet_available, expected_final_state);
+                       break;
+                   },
+                   Some(Err(e)) => panic!("failed to fetch updated snapshot {}", e),
+                   None => unreachable!("monitor_watch_stream unexpectedly ended"),
+                }
+            }
+            event = reachability_monitor_wait_fut => {
+                panic!("reachability monitor terminated unexpectedly with event: {:?}", event);
+            }
+        }
+    }
+}
+
+#[netstack_test]
+async fn test_hanging_get_multiple_clients(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack2, _, _>(
+            name,
+            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+        )
+        .expect("failed to create realm");
+
+    let monitor_client1 = realm
+        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+        .expect("client 1: failed to connect to fuchsia.net.reachability.Monitor");
+
+    let monitor_client2 = realm
+        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+        .expect("client 2: failed to connect to fuchsia.net.reachability.Monitor");
+
+    assert_eq!(
+        monitor_client1
+            .watch()
+            .await
+            .expect("client 1: failed to fetch updated snapshot")
+            .internet_available,
+        Some(false)
+    );
+    assert_eq!(
+        monitor_client2
+            .watch()
+            .await
+            .expect("client 2: failed to fetch updated snapshot")
+            .internet_available,
+        Some(false)
+    );
+}
+
+#[netstack_test]
+async fn test_cannot_call_set_options_after_watch(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack2, _, _>(
+            name,
+            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+        )
+        .expect("failed to create realm");
+
+    let monitor = realm
+        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+        .expect("failed to connect to fuchsia.net.reachability.Monitor");
+
+    assert_matches!(
+        monitor.watch().await.expect("failed to fetch updated snapshot").internet_available,
+        Some(_)
+    );
+    assert_matches!(monitor.set_options(fnet_reachability::MonitorOptions::EMPTY), Ok(()));
+
+    // The request stream should be closed if the client calls SetOptions after calling Watch
+    // previously.
+    assert_matches!(monitor.on_closed().await, Ok(_));
+}
+
+#[netstack_test]
+async fn test_cannot_call_set_options_twice(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<Netstack2, _, _>(
+            name,
+            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+        )
+        .expect("failed to create realm");
+
+    let monitor = realm
+        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+        .expect("failed to connect to fuchsia.net.reachability.Monitor");
+
+    let () = monitor
+        .set_options(fnet_reachability::MonitorOptions::EMPTY)
+        .expect("failed to set reachability API options");
+    let () = monitor
+        .set_options(fnet_reachability::MonitorOptions::EMPTY)
+        .expect("failed to set reachability API options");
+
+    // The request stream should be closed if the client calls SetOptions after calling it once
+    // already.
+    assert_matches!(monitor.on_closed().await, Ok(_));
 }

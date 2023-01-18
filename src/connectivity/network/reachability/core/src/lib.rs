@@ -16,6 +16,7 @@ use {
     fuchsia_inspect::Inspector,
     futures::{FutureExt as _, StreamExt as _},
     inspect::InspectInfo,
+    named_timer::DeadlineId,
     net_declare::{fidl_subnet, std_ip},
     net_types::ScopeableAddress as _,
     std::collections::hash_map::{Entry, HashMap},
@@ -28,6 +29,11 @@ const IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS: std::net::IpAddr = std_ip!("8.8.
 const IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS: std::net::IpAddr = std_ip!("2001:4860:4860::8888");
 const UNSPECIFIED_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("0.0.0.0/0");
 const UNSPECIFIED_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("::0/0");
+
+// Timeout ID for the fake clock component that restrains the integration tests from reaching the
+// FIDL timeout and subsequently failing. Shared by the eventloop and integration library.
+pub const FIDL_TIMEOUT_ID: DeadlineId<'static> =
+    DeadlineId::new("reachability", "fidl-request-timeout");
 
 /// `Stats` keeps the monitoring service statistic counters.
 #[derive(Debug, Default, Clone)]

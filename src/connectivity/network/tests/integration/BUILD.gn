@@ -66,7 +66,7 @@ package_deps = [
   "//src/connectivity/network/netstack3:component-debug",
 
   # reachability monitor is under test.
-  "//src/connectivity/network/reachability:component",
+  "//src/connectivity/network/reachability:component_with_fake_time",
 
   # sampler config is tested as part of inspect integration tests.
   ":sampler-config",

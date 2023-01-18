@@ -6,9 +6,7 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("bin") {
-  name = "reachability"
-  version = "0.1.0"
+bin_base = {
   edition = "2021"
 
   deps = [
@@ -21,6 +19,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fake-clock/named-timer",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -38,7 +37,27 @@ rustc_binary("bin") {
     "src/main.rs",
   ]
 
+  non_rust_deps = []
+}
+
+rustc_binary("bin") {
+  name = "reachability"
+  version = "0.1.0"
+  edition = "2021"
+  forward_variables_from(bin_base, "*")
+
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+rustc_binary("bin_with_fake_time") {
+  name = "reachability_with_fake_time"
+  edition = "2021"
+  forward_variables_from(bin_base, "*")
+
+  testonly = true
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  non_rust_deps += [ "//src/lib/fake-clock/lib" ]
 }
 
 rustc_library("lib") {
@@ -76,6 +95,13 @@ fuchsia_component("component") {
   component_name = "reachability"
   manifest = "meta/reachability.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_component("component_with_fake_time") {
+  component_name = "reachability_with_fake_time"
+  manifest = "meta/reachability_with_fake_time.cml"
+  deps = [ ":bin_with_fake_time" ]
+  testonly = true
 }
 
 group("tests") {

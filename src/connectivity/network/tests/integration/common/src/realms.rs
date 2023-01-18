@@ -18,6 +18,7 @@ use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
+use fidl_fuchsia_net_reachability as fnet_reachability;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
@@ -223,7 +224,7 @@ pub mod constants {
     }
     pub mod reachability {
         pub const COMPONENT_NAME: &str = "reachability";
-        pub const COMPONENT_URL: &str = "#meta/reachability.cm";
+        pub const COMPONENT_URL: &str = "#meta/reachability_with_fake_time.cm";
     }
     pub mod network_test_realm {
         pub const COMPONENT_NAME: &str = "controller";
@@ -485,6 +486,7 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 source: Some(fnetemul::ChildSource::Component(
                     constants::reachability::COMPONENT_URL.to_string(),
                 )),
+                exposes: Some(vec![fnet_reachability::MonitorMarker::PROTOCOL_NAME.to_string()]),
                 uses: Some(fnetemul::ChildUses::Capabilities(vec![
                     fnetemul::Capability::LogSink(fnetemul::Empty {}),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_interfaces::StateMarker>(
@@ -504,6 +506,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::DiagnosticsMarker>(
                         constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<
+                        fidl_fuchsia_testing::FakeClockMarker,
+                    >(
+                        constants::fake_clock::COMPONENT_NAME
                     )),
                 ])),
                 eager: Some(true),
