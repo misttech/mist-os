@@ -28,6 +28,9 @@ constexpr size_t kFirmwareWaitSeconds = 300;
 // How many seconds to wait for a response to a driver-initiated vendor command.
 constexpr size_t kVendorCmdResponseWaitSeconds = 10;
 
+// Value to fill in unused bytes in SDIO transactions
+constexpr uint8_t kUnusedSdioByteFiller = 0x55;
+
 class BtHciMarvell;
 using BtHciMarvellType =
     ddk::Device<BtHciMarvell, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable>;

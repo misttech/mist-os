@@ -53,7 +53,12 @@ class TestFrame {
         MakeMarvellFrameView(reinterpret_cast<uint8_t*>(mapper_.start()), frame_size_with_header);
     frame_view.header().total_frame_size().Write(frame_size_with_header);
     frame_view.header().channel_id().Write(static_cast<uint8_t>(channel_id_));
-    memcpy(frame_view.payload().BackingStorage().data(), data_.data(), data_.size());
+
+    uint8_t* payload = frame_view.payload().BackingStorage().data();
+    ASSERT_GE(buffer_size, data_.size());
+    memcpy(payload, data_.data(), data_.size());
+    memset(&payload[data_.size()], kUnusedSdioByteFiller, buffer_size - data_.size());
+
     buffer_region_.buffer.vmo = vmo_.get();
     buffer_region_.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
     buffer_region_.offset = 0;

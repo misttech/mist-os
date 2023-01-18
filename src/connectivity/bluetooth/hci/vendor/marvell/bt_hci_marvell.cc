@@ -296,23 +296,19 @@ bool BtHciMarvell::ProcessVendorEvent(const uint8_t* frame, size_t frame_size) {
   is_handled = true;
 
   // Isolate the return parameters and cross-check sizes
-  const size_t return_params_length =
-      cmd_complete_event_view.header().parameter_total_size().Read() -
-      pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes();
+  const size_t return_params_length = cmd_complete_event_view.return_parameters_size().Read();
   if (return_params_length < 1) {
     zxlogf(ERROR,
            "Insufficient parameters received in response to vendor SetMacAddr HCI operation");
     return is_handled;
   }
   if (payload_size <
-      (pw::bluetooth::emboss::EventHeaderView::SizeInBytes() +
-       pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes() + return_params_length)) {
+      (pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes() + return_params_length)) {
     zxlogf(ERROR, "Improperly formatted command complete frame - ignoring");
     return is_handled;
   }
   const uint8_t* return_params =
-      &payload_data[pw::bluetooth::emboss::EventHeaderView::SizeInBytes() +
-                    pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes()];
+      &payload_data[pw::bluetooth::emboss::CommandCompleteEventView::SizeInBytes()];
 
   // Finally, check that the status code returned is correct
   if (return_params[0] != kHciMarvellCmdCompleteSuccess) {
@@ -602,6 +598,8 @@ zx_status_t BtHciMarvell::WriteToCard(const HostChannel* host_channel) {
   auto frame_view = MakeMarvellFrameView(frame_buf, kMarvellFrameHeaderSize);
   frame_view.header().total_frame_size().Write(size_with_header);
   frame_view.header().channel_id().Write(static_cast<uint8_t>(host_channel->read_id()));
+
+  memset(&frame_buf[size_with_header], kUnusedSdioByteFiller, total_buffer_size - size_with_header);
 
   // And write out to the controller
   return WriteToIoport(total_buffer_size, vmo);
